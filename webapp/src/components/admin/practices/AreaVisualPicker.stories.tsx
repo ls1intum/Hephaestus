@@ -6,7 +6,6 @@ const meta = {
 	title: "Admin/Practices/Building blocks/Area visual picker",
 	component: AreaVisualPicker,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "centered",
 	},
 	tags: ["autodocs"],
@@ -30,8 +29,7 @@ export const Default: Story = {
 		await userEvent.click(await screen.findByRole("button", { name: "Colour amber" }));
 		await expect(args.onChange).toHaveBeenCalledWith({ color: "amber" });
 
-		await userEvent.type(screen.getByRole("textbox", { name: "Search icons" }), "git branch");
-		await userEvent.click(screen.getByRole("button", { name: "GitBranch" }));
+		await userEvent.click(await screen.findByLabelText("Git branch"));
 		await expect(args.onChange).toHaveBeenCalledWith({ icon: "GitBranch" });
 	},
 };

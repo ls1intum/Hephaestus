@@ -8,12 +8,6 @@ const meta = {
 		viewport: { defaultViewport: "desktop" },
 	},
 	tags: ["autodocs"],
-	argTypes: {
-		buildInfo: {
-			control: "object",
-			description: "Build metadata for preview deployments",
-		},
-	},
 } satisfies Meta<typeof Footer>;
 
 export default meta;

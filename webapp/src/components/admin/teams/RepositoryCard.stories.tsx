@@ -2,9 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { RepositoryCard } from "./RepositoryCard";
 
-/**
- * RepositoryCard displays a repo with active labels and an action to manage them.
- */
 const meta = {
 	component: RepositoryCard,
 	parameters: { layout: "centered" },
@@ -48,14 +45,6 @@ const catalog: LabelInfo[] = [
 ];
 
 export const Default: Story = {
-	args: {
-		repository: repo,
-		team,
-		catalogLabels: catalog,
-	},
-};
-
-export const Filtered: Story = {
 	args: {
 		repository: repo,
 		team,

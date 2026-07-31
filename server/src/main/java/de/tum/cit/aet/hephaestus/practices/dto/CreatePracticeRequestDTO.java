@@ -27,10 +27,10 @@ public record CreatePracticeRequestDTO(
     String name,
 
     @NotNull(message = "Trigger events are required")
-    @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
+    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
     @ValidTriggerEvents
     @Schema(
-        description = "Domain events that trigger detection",
+        description = "Domain events that trigger detection; empty for scheduled conversation reviews",
         example = "[\"PullRequestCreated\", \"ReviewSubmitted\"]"
     )
     List<String> triggerEvents,

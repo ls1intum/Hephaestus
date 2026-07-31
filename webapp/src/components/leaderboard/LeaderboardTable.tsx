@@ -1,5 +1,6 @@
 import { NoEntryIcon } from "@primer/octicons-react";
 import { AwardIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage";
@@ -27,8 +28,8 @@ export interface LeaderboardTableProps {
 	isLoading: boolean;
 	variant: LeaderboardVariant;
 	currentUser?: UserInfo;
-	onUserClick?: (username: string) => void;
-	onTeamClick?: (teamId: number) => void;
+	renderUserLink?: (username: string, children: ReactNode) => ReactNode;
+	renderTeamLink?: (teamId: number, children: ReactNode) => ReactNode;
 	teamLabelsById?: Record<number, string>;
 	providerType?: ProviderType;
 	leaguesEnabled?: boolean;
@@ -38,8 +39,8 @@ export function LeaderboardTable({
 	isLoading,
 	variant,
 	currentUser,
-	onUserClick,
-	onTeamClick,
+	renderUserLink,
+	renderTeamLink,
 	teamLabelsById,
 	providerType = "GITHUB",
 	leaguesEnabled = true,
@@ -52,7 +53,7 @@ export function LeaderboardTable({
 		return (
 			<div className="flex flex-col items-center justify-center px-4 py-8 text-center">
 				<NoEntryIcon className="h-12 w-12 text-provider-danger-foreground mb-2" />
-				<h3 className="text-lg font-medium">No entries found</h3>
+				<h2 className="text-lg font-medium">No entries found</h2>
 				<p className="text-muted-foreground">There are no leaderboard entries available.</p>
 			</div>
 		);
@@ -83,25 +84,23 @@ export function LeaderboardTable({
 						const team = (entry as TeamLeaderboardEntry).team;
 						if (!team) return null;
 						const displayName = teamLabelsById?.[team.id] ?? team.name;
+						const teamIdentity = (
+							<div className="flex items-center gap-2 font-medium">
+								<Avatar className="size-9">
+									<AvatarImage
+										src={getTeamAvatarUrl(providerType, team.id) ?? undefined}
+										alt={`${displayName}'s avatar`}
+									/>
+									<AvatarFallback>{getInitials(displayName)}</AvatarFallback>
+								</Avatar>
+								<span className="text-wrap text-muted-foreground">{displayName}</span>
+							</div>
+						);
 						return (
-							<TableRow
-								key={team.id}
-								id={`team-${team.id}`}
-								className="cursor-pointer"
-								onClick={() => onTeamClick?.(team.id)}
-							>
+							<TableRow key={team.id} id={`team-${team.id}`}>
 								<TableCell className="text-center">{entry.rank}</TableCell>
 								<TableCell>
-									<div className="flex items-center gap-2 font-medium">
-										<Avatar className="size-9">
-											<AvatarImage
-												src={getTeamAvatarUrl(providerType, team.id) ?? undefined}
-												alt={`${displayName}'s avatar`}
-											/>
-											<AvatarFallback>{getInitials(displayName)}</AvatarFallback>
-										</Avatar>
-										<span className="text-muted-foreground text-wrap">{displayName}</span>
-									</div>
+									{renderTeamLink ? renderTeamLink(team.id, teamIdentity) : teamIdentity}
 								</TableCell>
 								<TableCell className="text-center font-medium">{entry.score}</TableCell>
 								<TableCell>
@@ -131,18 +130,21 @@ export function LeaderboardTable({
 
 					const currentUserLogin = currentUser?.login ? currentUser.login.toLowerCase() : undefined;
 					const isCurrentUser = currentUserLogin === user.login.toLowerCase();
+					const userIdentity = (
+						<div className="flex items-center gap-2 font-medium">
+							<Avatar className="size-9">
+								<AvatarImage src={user.avatarUrl || undefined} alt={`${user.name}'s avatar`} />
+								<AvatarFallback>{getInitials(user.name, user.login)}</AvatarFallback>
+							</Avatar>
+							<span className="text-wrap text-muted-foreground">{user.name}</span>
+						</div>
+					);
 
 					return (
 						<TableRow
 							key={user.login}
 							id={`rank-${entry.rank}`}
-							className={cn(
-								"cursor-pointer",
-								isCurrentUser && "bg-accent dark:bg-accent/30 dark:hover:bg-accent/50",
-							)}
-							onClick={() => {
-								onUserClick?.(user.login);
-							}}
+							className={cn(isCurrentUser && "bg-accent dark:bg-accent/30 dark:hover:bg-accent/50")}
 						>
 							<TableCell className="text-center">{entry.rank}</TableCell>
 							{leaguesEnabled && (
@@ -153,13 +155,7 @@ export function LeaderboardTable({
 								</TableCell>
 							)}
 							<TableCell>
-								<div className="flex items-center gap-2 font-medium">
-									<Avatar className="size-9">
-										<AvatarImage src={user.avatarUrl || undefined} alt={`${user.name}'s avatar`} />
-										<AvatarFallback>{getInitials(user.name, user.login)}</AvatarFallback>
-									</Avatar>
-									<span className="text-muted-foreground text-wrap">{user.name}</span>
-								</div>
+								{renderUserLink ? renderUserLink(user.login, userIdentity) : userIdentity}
 							</TableCell>
 							<TableCell className="text-center font-medium">{entry.score}</TableCell>
 							<TableCell>

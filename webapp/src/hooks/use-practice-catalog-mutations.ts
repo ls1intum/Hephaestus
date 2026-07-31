@@ -323,6 +323,16 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 	);
 	const blockedPracticeOrderBuckets = new Set<string>();
 	const blockedMoveDestinationSlugs = new Set<string>();
+	if (place.isPending) {
+		blockedPracticeOrderBuckets.add(UNASSIGNED);
+		blockedMoveDestinationSlugs.add(UNASSIGNED);
+		for (const practice of queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? []) {
+			if (practice.areaSlug) {
+				blockedPracticeOrderBuckets.add(practice.areaSlug);
+				blockedMoveDestinationSlugs.add(practice.areaSlug);
+			}
+		}
+	}
 	if (deleteArea.isPending && deleteArea.variables) {
 		const deletingAreaSlug = deleteArea.variables.path.areaSlug;
 		blockedPracticeOrderBuckets.add(deletingAreaSlug);
@@ -339,7 +349,8 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		blockedMoveDestinationSlugs.add(bucket);
 	}
 	return {
-		areaStructurePending: createArea.isPending || deleteArea.isPending || reorderAreas.isPending,
+		areaStructurePending:
+			createArea.isPending || deleteArea.isPending || reorderAreas.isPending || place.isPending,
 		createArea,
 		deleteArea,
 		deletePractice,

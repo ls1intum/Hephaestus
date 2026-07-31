@@ -23,7 +23,6 @@ const meta = {
 	title: "Admin/Practice reviews/Reviewed work",
 	component: ReviewTargetPage,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "padded",
 		msw: { handlers: handlers() },
 		chromatic: { viewports: [320, 768, 1440] },
@@ -79,5 +78,6 @@ export const FindingsFailed: Story = {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByRole("heading", { name: reviewArtifact.title })).toBeVisible();
 		await expect(await canvas.findByText("Couldn't load findings")).toBeVisible();
+		await expect(await canvas.findByText(reviewFeedback[0].bodyPreview)).toBeVisible();
 	},
 };

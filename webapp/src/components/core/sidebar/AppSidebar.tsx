@@ -1,7 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { SquarePen } from "lucide-react";
-import type { ReactNode } from "react";
-import type { ChatThreadSummary, WorkspaceListItem } from "@/api/types.gen";
+import type { MouseEvent, ReactNode } from "react";
+import type {
+	ChatThreadSummary,
+	IntegrationCatalogEntry,
+	WorkspaceListItem,
+} from "@/api/types.gen";
 import {
 	Sidebar,
 	SidebarContent,
@@ -13,6 +17,8 @@ import {
 	SidebarMenuItem,
 	SidebarMenuSkeleton,
 	SidebarRail,
+	SidebarTrigger,
+	useSidebar,
 } from "@/components/ui/sidebar";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { NavAdmin } from "./NavAdmin";
@@ -31,6 +37,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	isAdmin: boolean;
 	isAppAdmin: boolean;
 	hasMentorAccess: boolean;
+	integrationKinds: ReadonlyArray<IntegrationCatalogEntry["kind"]>;
 	context: SidebarContext;
 	workspaces: WorkspaceListItem[];
 	activeWorkspace?: WorkspaceListItem;
@@ -47,6 +54,7 @@ export function AppSidebar({
 	isAdmin,
 	isAppAdmin,
 	hasMentorAccess,
+	integrationKinds,
 	context,
 	workspaces,
 	activeWorkspace,
@@ -56,8 +64,16 @@ export function AppSidebar({
 	mentorThreads,
 	mentorThreadsLoading,
 	mentorThreadsError,
+	onClick,
 	...props
 }: AppSidebarProps) {
+	const { isMobile, setOpenMobile } = useSidebar();
+	const handleSectionClick = (event: MouseEvent<HTMLDivElement>) => {
+		onClick?.(event);
+		if (isMobile && event.target instanceof Element && event.target.closest("a")) {
+			setOpenMobile(false);
+		}
+	};
 	let contextHeader: ReactNode = null;
 	let sidebarContent: ReactNode = null;
 
@@ -121,6 +137,7 @@ export function AppSidebar({
 					<NavAdmin
 						workspaceSlug={activeWorkspace.workspaceSlug}
 						achievementsEnabled={activeWorkspace.achievementsEnabled}
+						integrationKinds={integrationKinds}
 						scmProviderType={activeWorkspace.providerType === "GITLAB" ? "GITLAB" : "GITHUB"}
 					/>
 				)}
@@ -130,7 +147,8 @@ export function AppSidebar({
 
 	return (
 		<Sidebar collapsible={context === "main" ? "icon" : "offcanvas"} {...props}>
-			<SidebarHeader>
+			<SidebarHeader onClick={handleSectionClick}>
+				{isMobile && <SidebarTrigger className="ml-auto" aria-label="Close navigation" />}
 				{context !== "admin" && (
 					<WorkspaceSwitcher
 						isLoading={workspacesLoading}
@@ -143,8 +161,8 @@ export function AppSidebar({
 				)}
 				{contextHeader}
 			</SidebarHeader>
-			<SidebarContent>{sidebarContent}</SidebarContent>
-			<SidebarFooter>
+			<SidebarContent onClick={handleSectionClick}>{sidebarContent}</SidebarContent>
+			<SidebarFooter onClick={handleSectionClick}>
 				<NavFooter isAppAdmin={isAppAdmin} />
 			</SidebarFooter>
 			<SidebarRail />

@@ -58,28 +58,23 @@ const RouterDecorator: Decorator = (Story) => {
 };
 
 const injectDocsThemeCSS = () => {
-	if (typeof document !== "undefined") {
-		const styleId = "storybook-docs-theme";
-		let style = document.getElementById(styleId);
+	if (typeof document === "undefined") return;
 
-		if (!style) {
-			style = document.createElement("style");
-			style.id = styleId;
-			document.head.appendChild(style);
-		}
+	const styleId = "storybook-docs-theme";
+	let style = document.getElementById(styleId);
 
-		style.textContent = `
-  .docs-story {
-        background-color: var(--background) !important;
-        color: var(--foreground) !important;
-      }
-      
-  html.dark .docs-story {
-        background-color: var(--background) !important;
-        color: var(--foreground) !important;
-      }
-    `;
+	if (!style) {
+		style = document.createElement("style");
+		style.id = styleId;
+		document.head.appendChild(style);
 	}
+
+	style.textContent = `
+		.docs-story {
+			background-color: var(--background) !important;
+			color: var(--foreground) !important;
+		}
+	`;
 };
 
 const ThemeDecorator: Decorator = (Story) => {
@@ -110,6 +105,12 @@ const StorybookThemeProvider = ({
 
 const preview: Preview = {
 	parameters: {
+		// Base UI focus guards redirect focus immediately but axe flags their hidden sentinels.
+		// https://github.com/mui/base-ui/issues/4668
+		a11y: {
+			test: "error",
+			context: { exclude: "[data-base-ui-focus-guard]" },
+		},
 		controls: {
 			matchers: {
 				color: /(background|color)$/i,

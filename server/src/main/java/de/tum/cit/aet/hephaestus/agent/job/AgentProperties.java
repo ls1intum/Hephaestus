@@ -22,8 +22,8 @@ import org.springframework.validation.annotation.Validated;
  * @param heartbeatInterval interval between {@code worker_registry} liveness heartbeats
  * @param payloadRetention  age from {@code completed_at} at which a TERMINAL job's {@code container_logs}
  *                          and {@code output} are stripped to NULL
- * @param rowRetention      age from {@code completed_at} at which a TERMINAL job row is deleted; must be
- *                          {@code >= payloadRetention}
+ * @param rowRetention      age from {@code completed_at} at which an unreferenced TERMINAL job row is
+ *                          deleted; must be {@code >= payloadRetention}
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.agent")

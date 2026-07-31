@@ -1,15 +1,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
 	computeUserLeagueStatsQueryKey,
 	getLeaderboardQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
-
-// Mounting the real route pulls in the whole admin layout and its lazy modules.
-vi.setConfig({ testTimeout: 15_000 });
 
 const WORKSPACE = {
 	id: 1,
@@ -54,6 +51,7 @@ async function renderSettingsRoute() {
 		),
 		http.get("*/workspaces", () => HttpResponse.json([WORKSPACE])),
 		http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(WORKSPACE)),
+		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([])),
 		http.put("*/workspaces/:workspaceSlug/league/reset", () => {
 			resetCalls += 1;
 			return new HttpResponse(null, { status: 204 });
@@ -61,7 +59,6 @@ async function renderSettingsRoute() {
 	);
 
 	const queryClient = testQueryClient();
-	// `staleTime: Infinity` leaves invalidation as the only thing that can mark these stale.
 	for (const queryKey of [LEADERBOARD_KEY, LEAGUE_STATS_KEY]) {
 		queryClient.setQueryData(queryKey, []);
 		queryClient.setQueryDefaults(queryKey, { staleTime: Number.POSITIVE_INFINITY });
@@ -73,8 +70,6 @@ async function renderSettingsRoute() {
 }
 
 describe("workspace settings route", () => {
-	// Asserted against the cache, not by counting refetches: neither league surface is mounted here,
-	// so a correct invalidation fires no request at all.
 	it("marks the leaderboard and league stats stale after a reset", async () => {
 		const { queryClient, resetCalls } = await renderSettingsRoute();
 

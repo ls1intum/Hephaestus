@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.info.License;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.servers.Server;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Schema;
@@ -67,6 +68,12 @@ import org.springframework.data.web.PagedModel;
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
+    tags = {
+        @Tag(
+            name = "Practice reviews",
+            description = "Workspace-admin access to review runs, findings, and message delivery history"
+        ),
+    },
     servers = { @Server(url = "/", description = "Default Server URL") },
     security = { @SecurityRequirement(name = "bearerAuth") }
 )

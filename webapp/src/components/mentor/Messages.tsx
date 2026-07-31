@@ -10,33 +10,19 @@ import { PreviewMessage, ThinkingMessage } from "./Message";
 import type { PartRendererMap } from "./renderers/types";
 
 export interface MessagesProps {
-	/** Array of chat messages to display */
 	messages: ChatMessage[];
-	/** Array of votes for messages */
 	votes?: Array<ChatMessageVote>;
-	/** Current chat status */
 	status: UseChatHelpers<ChatMessage>["status"];
-	/** Whether the interface is in readonly mode */
 	readonly?: boolean;
-	/** Whether to show thinking message for submissions */
 	showThinking?: boolean;
-	/** Whether to show greeting when no messages */
 	showGreeting?: boolean;
-	/** Layout variant for different contexts */
 	variant?: "default" | "artifact";
-	/** Container ref for scroll management */
 	containerRef?: RefObject<HTMLDivElement | null>;
-	/** End ref for scroll management */
 	endRef?: RefObject<HTMLDivElement | null>;
-	/** Handler for message editing */
 	onMessageEdit?: (messageId: string, newContent: string) => void;
-	/** Handler for copying message content */
 	onCopy?: (content: string) => void;
-	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Optional CSS class name */
 	className?: string;
-	/** Injected renderers for tool parts */
 	partRenderers?: PartRendererMap;
 }
 
@@ -58,7 +44,6 @@ export function Messages({
 }: MessagesProps) {
 	const isArtifact = variant === "artifact";
 
-	// Determine if a message currently renders any visible content
 	const hasVisibleContent = (message: ChatMessage): boolean => {
 		const parts = message?.parts ?? [];
 		if (parts.length === 0) return false;
@@ -67,7 +52,6 @@ export function Messages({
 			if (p.type === "file") return true;
 			if (typeof p.type === "string" && p.type.startsWith("tool-")) {
 				const state = (p as { state?: string }).state;
-				// All states that render visible content in tool renderers
 				const visibleStates = [
 					"input-streaming",
 					"input-available",
@@ -86,8 +70,6 @@ export function Messages({
 	return (
 		<ScrollArea className="flex flex-col w-full flex-1 min-h-0" viewportRef={containerRef}>
 			<div
-				// Announce streamed assistant replies to screen readers: a polite live region so the answer
-				// is read as it arrives, with aria-busy while the model is still producing it.
 				role="log"
 				aria-live="polite"
 				aria-relevant="additions text"
@@ -95,9 +77,7 @@ export function Messages({
 				className={cn(
 					"flex flex-col w-full pb-16",
 					{
-						// Default layout - centered like the input
 						"min-w-0 gap-2 flex-1 pt-4 relative mx-auto md:max-w-3xl": !isArtifact,
-						// Artifact layout
 						"gap-2 flex-1 px-0 pt-4": isArtifact,
 						"gap-4": readonly,
 					},

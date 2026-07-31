@@ -7,6 +7,9 @@ import {
 	reloadAchievementsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { ExtendedUserTeams } from "@/components/admin/types";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -16,12 +19,16 @@ interface AdminAchievementsPageProps {
 	users: ExtendedUserTeams[];
 	isLoading: boolean;
 	workspaceSlug: string;
+	error?: unknown;
+	onRetry?: () => void;
 }
 
 export function AdminAchievementsPage({
 	users,
 	isLoading,
 	workspaceSlug,
+	error,
+	onRetry,
 }: AdminAchievementsPageProps) {
 	const queryClient = useQueryClient();
 	const { username } = useAuth();
@@ -39,7 +46,6 @@ export function AdminAchievementsPage({
 			{
 				loading: "Reloading achievement definitions...",
 				success: () => {
-					// Invalidate both definitions and user progress queries
 					queryClient.invalidateQueries({
 						predicate: (query) => {
 							const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
@@ -112,60 +118,63 @@ export function AdminAchievementsPage({
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6">
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-				<div className="min-w-0">
-					<h1 className="text-3xl font-bold tracking-tight">Achievements</h1>
-					<p className="text-muted-foreground">
-						Recalculate achievements for users in this workspace.
-					</p>
-				</div>
-				<div className="flex flex-col gap-2 sm:flex-row">
-					<Button
-						variant="outline"
-						onClick={handleReload}
-						disabled={isLoading || reloadMutation.isPending}
-						className="w-full sm:w-auto"
-					>
-						{reloadMutation.isPending ? (
-							<>
-								<Spinner className="mr-2 h-4 w-4" />
-								Reloading...
-							</>
-						) : (
-							<>
-								<RefreshCw className="mr-2 h-4 w-4" />
-								Reload Definitions
-							</>
-						)}
-					</Button>
-					<Button
-						onClick={handleRecalculateAll}
-						disabled={isLoading || isRecalculatingAll || users.length === 0}
-						className="w-full sm:w-auto"
-					>
-						{isRecalculatingAll ? (
-							<>
-								<Spinner className="mr-2 h-4 w-4" />
-								Recalculating All...
-							</>
-						) : (
-							<>
-								<Trophy className="mr-2 h-4 w-4" />
-								Recalculate All
-							</>
-						)}
-					</Button>
-				</div>
-			</div>
-
-			<AdminAchievementsTable
-				users={users}
-				isLoading={isLoading}
-				workspaceSlug={workspaceSlug}
-				onRecalculate={handleRecalculateSingle}
-				recalculatingUsers={recalculatingUsers}
+		<PageLayout>
+			<PageHeader
+				icon={<Trophy />}
+				title="Achievements"
+				description="Recalculate achievements for workspace members."
+				actions={
+					<>
+						<Button
+							variant="outline"
+							onClick={handleReload}
+							disabled={isLoading || reloadMutation.isPending}
+							className="w-full sm:w-auto"
+						>
+							{reloadMutation.isPending ? (
+								<>
+									<Spinner className="mr-2 h-4 w-4" />
+									Reloading...
+								</>
+							) : (
+								<>
+									<RefreshCw className="mr-2 h-4 w-4" />
+									Reload Definitions
+								</>
+							)}
+						</Button>
+						<Button
+							onClick={handleRecalculateAll}
+							disabled={isLoading || isRecalculatingAll || users.length === 0}
+							className="w-full sm:w-auto"
+						>
+							{isRecalculatingAll ? (
+								<>
+									<Spinner className="mr-2 h-4 w-4" />
+									Recalculating All...
+								</>
+							) : (
+								<>
+									<Trophy className="mr-2 h-4 w-4" />
+									Recalculate All
+								</>
+							)}
+						</Button>
+					</>
+				}
 			/>
-		</div>
+
+			{error ? (
+				<QueryErrorAlert error={error} title="Couldn't load achievements" onRetry={onRetry} />
+			) : (
+				<AdminAchievementsTable
+					users={users}
+					isLoading={isLoading}
+					workspaceSlug={workspaceSlug}
+					onRecalculate={handleRecalculateSingle}
+					recalculatingUsers={recalculatingUsers}
+				/>
+			)}
+		</PageLayout>
 	);
 }

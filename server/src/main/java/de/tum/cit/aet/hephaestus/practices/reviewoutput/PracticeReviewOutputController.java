@@ -32,10 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @WorkspaceScopedController
 @RequestMapping("/practices/reviews")
-@Tag(
-    name = "Practice Review Output",
-    description = "Workspace-admin access to practice review runs, findings, and feedback delivery records"
-)
+@Tag(name = "Practice reviews")
 @RequiredArgsConstructor
 @Validated
 @RequireAtLeastWorkspaceAdmin
@@ -107,7 +104,7 @@ public class PracticeReviewOutputController {
         description = "Results are ordered newest first and include every delivery state.",
         operationId = "listPracticeReviewFeedback"
     )
-    @ApiResponse(responseCode = "200", description = "Paginated feedback units returned")
+    @ApiResponse(responseCode = "200", description = "Paginated messages returned")
     @ApiResponse(
         responseCode = "400",
         description = "Invalid filter or pagination",
@@ -136,7 +133,7 @@ public class PracticeReviewOutputController {
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Feedback unit detail returned",
+        description = "Message details returned",
         content = @Content(schema = @Schema(implementation = ReviewFeedbackDetailDTO.class))
     )
     @ApiResponse(

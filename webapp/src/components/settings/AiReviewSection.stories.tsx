@@ -8,19 +8,6 @@ const meta = {
 		layout: "centered",
 	},
 	tags: ["autodocs"],
-	argTypes: {
-		aiReviewEnabled: {
-			control: "boolean",
-			description: "Whether practice-feedback comments are enabled",
-		},
-		onToggleAiReview: {
-			description: "Callback when AI review setting is changed",
-		},
-		isLoading: {
-			control: "boolean",
-			description: "Whether the component is in loading state",
-		},
-	},
 	args: {
 		onToggleAiReview: fn(),
 	},

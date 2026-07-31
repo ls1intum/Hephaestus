@@ -34,9 +34,6 @@ tags:
   name: Account
 - description: Instance-admin login provider management
   name: Admin
-- description: "Workspace-admin access to practice review runs, findings, and feedback\
-    \ delivery records"
-  name: Practice Review Output
 - description: Per-workspace Slack channel consent + activation
   name: Slack channel activation
 - description: Per-workspace LLM spend rollup and budget status
@@ -69,6 +66,9 @@ tags:
   name: Outline collections
 - description: Team management within workspace
   name: Teams
+- description: "Workspace-admin access to review runs, findings, and message delivery\
+    \ history"
+  name: Practice reviews
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
@@ -3589,7 +3589,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/Practice"
           description: Practices returned
-      security: []
       summary: List practice definitions
       tags:
       - Practice Catalog
@@ -3617,8 +3616,16 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Practice created
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice area not found
         "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice slug already exists in this workspace
       summary: Create a new practice definition
       tags:
@@ -3945,6 +3952,10 @@ paths:
                   $ref: "#/components/schemas/Practice"
           description: Practices reordered; the full ordered practice list is returned
         "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: "orderedSlugs is empty, has duplicates, or is not the area's\
             \ complete set"
       summary: Reorder the practices within an area
@@ -4053,7 +4064,7 @@ paths:
           description: Invalid filter or pagination
       summary: List practice reviews with finding and feedback outcomes
       tags:
-      - Practice Review Output
+      - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/feedback:
     get:
       description: Results are ordered newest first and include every delivery state.
@@ -4176,7 +4187,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PagedModelReviewFeedback"
-          description: Paginated feedback units returned
+          description: Paginated messages returned
         "400":
           content:
             application/problem+json:
@@ -4185,7 +4196,7 @@ paths:
           description: Invalid filter or pagination
       summary: List practice review feedback across the workspace
       tags:
-      - Practice Review Output
+      - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}:
     get:
       operationId: getPracticeReviewFeedback
@@ -4209,7 +4220,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewFeedbackDetail"
-          description: Feedback unit detail returned
+          description: Message details returned
         "404":
           content:
             application/problem+json:
@@ -4218,7 +4229,7 @@ paths:
           description: Feedback not found in this workspace
       summary: "Get feedback with its stored body, findings and placements"
       tags:
-      - Practice Review Output
+      - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/findings:
     get:
       description: Results include linked feedback outcomes and are ordered newest
@@ -4367,7 +4378,7 @@ paths:
           description: Invalid filter or pagination
       summary: List practice review findings across the workspace
       tags:
-      - Practice Review Output
+      - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}:
     get:
       operationId: getPracticeReviewFinding
@@ -4400,7 +4411,7 @@ paths:
           description: Finding not found in this workspace
       summary: Get a finding with its evidence and linked feedback
       tags:
-      - Practice Review Output
+      - Practice reviews
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -4421,6 +4432,10 @@ paths:
         "204":
           description: Practice deleted
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
       summary: Delete a practice definition
       tags:
@@ -4448,8 +4463,11 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Practice returned
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
-      security: []
       summary: Get a practice definition
       tags:
       - Practice Catalog
@@ -4482,6 +4500,10 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Practice updated
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice or practice area not found
       summary: Update a practice
       tags:
@@ -4516,6 +4538,10 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Active state updated
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
       summary: Set practice active state
       tags:
@@ -4552,6 +4578,10 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Practice moved
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice or area not found
       summary: Move a practice
       tags:
@@ -4590,8 +4620,16 @@ paths:
                   $ref: "#/components/schemas/Practice"
           description: Practice placed; the full updated practice list is returned
         "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: "position is missing, negative, or beyond the destination"
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice or area not found
       summary: Place a practice in the catalog
       tags:
@@ -6890,14 +6928,15 @@ components:
           pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         triggerEvents:
           type: array
-          description: Domain events that trigger detection
+          description: Domain events that trigger detection; empty for scheduled conversation
+            reviews
           example:
           - PullRequestCreated
           - ReviewSubmitted
           items:
             type: string
           maxItems: 10
-          minItems: 1
+          minItems: 0
         whatGoodLooksLike:
           type: string
           description: "Developer-facing exemplar; a concrete instance, not the assessment\
@@ -9416,7 +9455,7 @@ components:
         number:
           type: integer
           format: int32
-          description: Provider-visible issue or pull-request number
+          description: Provider-visible work-item number
         provider:
           type: string
           description: "Source provider, when recorded"
@@ -9427,7 +9466,7 @@ components:
           - OUTLINE
         repositoryName:
           type: string
-          description: Repository owner/name for SCM artifacts
+          description: Provider-qualified repository path for SCM artifacts
         title:
           type: string
         type:
@@ -9445,7 +9484,7 @@ components:
       - type
     ReviewBoundFeedback:
       type: object
-      description: A feedback unit composed from a finding
+      description: A message composed from a finding
       properties:
         agentJobId:
           type: string
@@ -9462,8 +9501,7 @@ components:
         deliveredAt:
           type: string
           format: date-time
-          description: When the feedback was placed; null if it never reached a delivery
-            surface
+          description: When the message was placed; null if it was not delivered
         deliveryState:
           type: string
           enum:
@@ -9477,13 +9515,13 @@ components:
           format: uuid
         role:
           type: string
-          description: Whether the finding led the unit or reinforced it
+          description: Whether the finding led the message or reinforced it
           enum:
           - PRIMARY
           - SUPPORTING
         suppressionReason:
           type: string
-          description: Why the unit was withheld; null unless the state is SUPPRESSED
+          description: Why the message was withheld; null unless the state is SUPPRESSED
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -9505,7 +9543,7 @@ components:
       - role
     ReviewBoundFinding:
       type: object
-      description: A finding that contributed to a feedback unit
+      description: A finding that contributed to a message
       properties:
         area:
           $ref: "#/components/schemas/ReviewPracticeArea"
@@ -9519,7 +9557,9 @@ components:
         confidence:
           type: number
           format: float
-          description: Detector confidence (0.0-1.0)
+          description: Detector confidence
+          maximum: 1
+          minimum: 0
         findingId:
           type: string
           format: uuid
@@ -9529,7 +9569,7 @@ components:
         ordinal:
           type: integer
           format: int32
-          description: Render order within the unit (lower renders earlier)
+          description: Render order within the message (lower renders earlier)
         practiceName:
           type: string
         practiceSlug:
@@ -9542,7 +9582,7 @@ components:
           - NOT_APPLICABLE
         role:
           type: string
-          description: Whether the finding leads the unit or reinforces it
+          description: Whether the finding leads the message or reinforces it
           enum:
           - PRIMARY
           - SUPPORTING
@@ -9568,21 +9608,19 @@ components:
       - title
     ReviewFeedback:
       type: object
-      description: A composed feedback unit with its delivery disposition
       properties:
         agentJobId:
           type: string
           format: uuid
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
-          description: Work item the unit targets; null for an unanchored unit
+          description: Work item the message targets; null for an unanchored message
         bodyPreview:
           type: string
-          description: Leading characters of the composed body; null when the unit
+          description: Leading characters of the composed body; null when the message
             carries no body
         bodyTruncated:
           type: boolean
-          description: Whether the stored body is longer than the preview
         channel:
           type: string
           enum:
@@ -9595,8 +9633,7 @@ components:
         deliveredAt:
           type: string
           format: date-time
-          description: When the feedback was placed; null if it never reached a delivery
-            surface
+          description: When the message was placed; null if it was not delivered
         deliveryState:
           type: string
           enum:
@@ -9608,25 +9645,24 @@ components:
         findingCount:
           type: integer
           format: int64
-          description: Number of findings used to compose the unit
+          description: Number of findings used to compose the message
         id:
           type: string
           format: uuid
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Who the unit is addressed to; null when the identity is no
-            longer resolvable
+          description: Who the message is addressed to; null when the identity is
+            no longer resolvable
         replacesId:
           type: string
           format: uuid
-          description: The unit this one replaced on its continuity line; null on
-            a first delivery
+          description: The message this one replaced; null on a first delivery
         subject:
           $ref: "#/components/schemas/ReviewSubject"
           description: Whose work the message addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the unit was withheld; null unless the state is SUPPRESSED
+          description: Why the message was withheld; null unless the state is SUPPRESSED
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -9681,7 +9717,7 @@ components:
           format: uuid
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
-          description: Work item the unit targets; null for an unanchored unit
+          description: Work item the message targets; null for an unanchored message
         body:
           type: string
           description: Stored composed body; null when none was produced
@@ -9697,8 +9733,7 @@ components:
         deliveredAt:
           type: string
           format: date-time
-          description: When the feedback was placed; null if it never reached a delivery
-            surface
+          description: When the message was placed; null if it was not delivered
         deliveryState:
           type: string
           enum:
@@ -9722,19 +9757,18 @@ components:
             $ref: "#/components/schemas/ReviewPlacement"
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Who the unit is addressed to; null when the identity is no
-            longer resolvable
+          description: Who the message is addressed to; null when the identity is
+            no longer resolvable
         replacesId:
           type: string
           format: uuid
-          description: The unit this one replaced on its continuity line; null on
-            a first delivery
+          description: The message this one replaced; null on a first delivery
         subject:
           $ref: "#/components/schemas/ReviewSubject"
           description: Whose work the message addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the unit was withheld; null unless the state is SUPPRESSED
+          description: Why the message was withheld; null unless the state is SUPPRESSED
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -9765,23 +9799,23 @@ components:
         delivered:
           type: integer
           format: int64
-          description: Linked feedback units delivered to a surface
+          description: Linked messages delivered
         failed:
           type: integer
           format: int64
-          description: Linked feedback units whose delivery failed
+          description: Linked messages whose delivery failed
         prepared:
           type: integer
           format: int64
-          description: Linked feedback units awaiting delivery
+          description: Linked messages awaiting delivery
         superseded:
           type: integer
           format: int64
-          description: Linked feedback units delivered and later replaced
+          description: Linked messages delivered and later replaced
         suppressed:
           type: integer
           format: int64
-          description: Linked feedback units withheld by policy
+          description: Linked messages withheld by policy
       required:
       - delivered
       - failed
@@ -9809,10 +9843,12 @@ components:
         confidence:
           type: number
           format: float
-          description: Detector confidence (0.0-1.0)
+          description: Detector confidence
+          maximum: 1
+          minimum: 0
         feedbackDisposition:
           $ref: "#/components/schemas/ReviewFeedbackDisposition"
-          description: Counts of linked feedback units by delivery state
+          description: Counts of linked messages by delivery state
         id:
           type: string
           format: uuid
@@ -9831,7 +9867,7 @@ components:
           - NOT_APPLICABLE
         recurrenceKey:
           type: string
-          description: Cross-run locus key; null for findings predating fingerprinting
+          description: Cross-run locus key; null when continuity is unavailable
         severity:
           type: string
           description: Severity band (null unless assessment is BAD)
@@ -9895,9 +9931,10 @@ components:
         confidence:
           type: number
           format: float
-          description: Detector confidence (0.0-1.0)
-        evidence:
-          description: Detector evidence
+          description: Detector confidence
+          maximum: 1
+          minimum: 0
+        evidence: {}
         feedback:
           type: array
           description: "Linked feedback, newest first"
@@ -9925,10 +9962,9 @@ components:
           - NOT_APPLICABLE
         reasoning:
           type: string
-          description: Detector reasoning behind the finding
         recurrenceKey:
           type: string
-          description: Cross-run locus key; null for findings predating fingerprinting
+          description: Cross-run locus key; null when continuity is unavailable
         severity:
           type: string
           description: Severity band (null unless assessment is BAD)
@@ -9956,7 +9992,7 @@ components:
       - title
     ReviewPlacement:
       type: object
-      description: A recorded placement of feedback on a delivery surface
+      description: A recorded message placement
       properties:
         anchorEndLine:
           type: integer
@@ -10007,10 +10043,10 @@ components:
       properties:
         color:
           type: string
-          description: Optional palette colour key
+          description: Palette color key
         icon:
           type: string
-          description: Optional lucide icon name
+          description: Lucide icon name
         name:
           type: string
         slug:
@@ -10063,7 +10099,7 @@ components:
         number:
           type: integer
           format: int32
-          description: Provider-visible issue or pull-request number
+          description: Provider-visible work-item number
         provider:
           type: string
           enum:
@@ -10898,11 +10934,12 @@ components:
           minLength: 0
         triggerEvents:
           type: array
-          description: Domain events that trigger detection
+          description: Domain events that trigger detection; empty for scheduled conversation
+            reviews
           items:
             type: string
           maxItems: 10
-          minItems: 1
+          minItems: 0
         whatGoodLooksLike:
           type: string
           description: "Developer-facing exemplar (learner layer); a concrete instance,\

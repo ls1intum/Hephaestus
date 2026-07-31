@@ -10,33 +10,19 @@ import { cn } from "@/lib/utils";
 import { PreviewAttachment } from "./PreviewAttachment";
 
 export interface MultimodalInputProps {
-	/** Current upload/submission status */
 	status: "ready" | "submitted" | "error";
-	/** Handler for stopping current submission */
 	onStop: () => void;
-	/** Current attachments */
 	attachments: Array<Attachment>;
-	/** Handler for attachment changes */
 	onAttachmentsChange: (attachments: Array<Attachment>) => void;
-	/** Handler for file upload */
 	onFileUpload: (files: File[]) => Promise<Array<Attachment | undefined>>;
-	/** Handler for form submission with text and attachments */
 	onSubmit: (data: { text: string; attachments: Array<Attachment> }) => void;
-	/** Optional CSS class name */
 	className?: string;
-	/** Placeholder text for textarea */
 	placeholder?: string;
-	/** Initial input value */
 	initialInput?: string;
-	/** Whether the input should be readonly */
 	readonly?: boolean;
-	/** Whether to disable attachment functionality */
 	disableAttachments?: boolean;
-	/** Whether the scroll container is at the bottom (for scroll button visibility) */
 	isAtBottom?: boolean;
-	/** Function to scroll to bottom of the chat */
 	scrollToBottom?: () => void;
-	/** Whether viewing an old version (affects button styling) */
 	isCurrentVersion?: boolean;
 }
 
@@ -61,43 +47,25 @@ export function MultimodalInput({
 	const { width } = useWindowSize();
 	const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
 
-	// Simple internal state management
 	const [input, setInput] = useState(initialInput);
-
-	// Update internal state when initialInput changes
-	useEffect(() => {
-		setInput(initialInput);
-	}, [initialInput]);
-
-	const adjustHeight = () => {
-		if (textareaRef.current) {
-			textareaRef.current.style.height = "auto";
-			textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
-		}
-	};
 
 	const resetHeight = () => {
 		if (textareaRef.current) {
-			// Let the browser recalc to the intrinsic content height
 			textareaRef.current.style.height = "auto";
 		}
 	};
 
-	// Handle initial setup and height adjustment
-	// biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
 	useEffect(() => {
-		if (textareaRef.current) {
-			adjustHeight();
-		}
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+		textarea.style.height = "auto";
+		textarea.style.height = `${textarea.scrollHeight + 2}px`;
 	}, []);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: We need to adjust height when input changes
-	useEffect(() => {
-		adjustHeight();
-	}, [input]);
 
 	const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(event.target.value);
+		event.currentTarget.style.height = "auto";
+		event.currentTarget.style.height = `${event.currentTarget.scrollHeight + 2}px`;
 	};
 
 	const submitForm = () => {
@@ -106,7 +74,6 @@ export function MultimodalInput({
 			attachments,
 		});
 
-		// Reset UI state after submission
 		setInput("");
 		resetHeight();
 
@@ -177,6 +144,7 @@ export function MultimodalInput({
 					className="fixed -top-4 -left-4 size-0.5 opacity-0 pointer-events-none"
 					ref={fileInputRef}
 					multiple
+					aria-label="Attach files"
 					onChange={handleFileChange}
 					tabIndex={-1}
 				/>
@@ -205,36 +173,19 @@ export function MultimodalInput({
 				</div>
 			)}
 
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: Container focuses inner textarea for better UX */}
 			<div
 				className={cn(
-					// Base textarea styling - exact copy from ui/textarea with focus-within
 					"border-input placeholder:text-muted-foreground focus-within:border-ring focus-within:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-xl border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-within:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-					// Custom layout styling
 					"flex-col gap-1",
-					// Make container clickable to focus input
-					"cursor-text",
 					readonly && "cursor-not-allowed opacity-60",
 					className,
 				)}
-				// interactive container used to focus inner textarea
-				onClick={() => {
-					if (!readonly && textareaRef.current) {
-						textareaRef.current.focus();
-					}
-				}}
-				onKeyDown={(event) => {
-					if (event.key === "Enter" || event.key === " ") {
-						if (!readonly && textareaRef.current) {
-							textareaRef.current.focus();
-						}
-					}
-				}}
 			>
 				<div className="flex-1">
 					<Textarea
 						data-testid="multimodal-input"
 						ref={textareaRef}
+						aria-label="Message"
 						placeholder={placeholder}
 						value={input}
 						onChange={handleInput}
@@ -247,7 +198,6 @@ export function MultimodalInput({
 								event.preventDefault();
 
 								if (status !== "ready") {
-									// Let parent handle status messages
 									return;
 								}
 

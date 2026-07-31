@@ -1,25 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Building2 } from "lucide-react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
+import { z } from "zod";
 import { adminListWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import type { AdminWorkspaceView } from "@/api/types.gen";
 import { AdminWorkspacesTable } from "@/components/admin/workspaces/AdminWorkspacesTable";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { instanceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/admin/workspaces")({
 	head: instanceAdminHead("Workspaces"),
+	validateSearch: z.object({ q: z.string().max(200).optional().catch(undefined) }),
 	component: AdminWorkspacesPage,
 });
 
 function AdminWorkspacesPage() {
-	const [search, setSearch] = useState("");
+	const navigate = useNavigate({ from: Route.fullPath });
+	const search = Route.useSearch().q ?? "";
 	const deferredSearch = useDeferredValue(search);
 
-	// The endpoint returns the full (metadata-only) list — there are at most dozens of workspaces, so
-	// we load all and filter client-side (matches the admin overview's scale).
 	const listQuery = useQuery(adminListWorkspacesOptions());
 	const all: AdminWorkspaceView[] = listQuery.data ?? [];
 
@@ -40,17 +43,12 @@ function AdminWorkspacesPage() {
 		: all;
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6">
-			<header className="space-y-1">
-				<div className="flex items-center gap-2">
-					<Building2 className="size-6 text-muted-foreground" aria-hidden />
-					<h1 className="text-2xl font-semibold">Workspaces</h1>
-				</div>
-				<p className="text-sm text-muted-foreground">
-					Every workspace on this instance (metadata only). To act inside a workspace, impersonate a
-					member — that path is audited.
-				</p>
-			</header>
+		<PageLayout>
+			<PageHeader
+				icon={<Building2 />}
+				title="Workspaces"
+				description="View every workspace on this instance and its ownership and status."
+			/>
 
 			<div className="relative w-full sm:max-w-sm">
 				<Label htmlFor="admin-workspaces-search" className="sr-only">
@@ -62,7 +60,12 @@ function AdminWorkspacesPage() {
 					type="search"
 					placeholder="Search by name, slug, owner, provider, or status…"
 					value={search}
-					onChange={(event) => setSearch(event.target.value)}
+					onChange={(event) =>
+						navigate({
+							search: { q: event.target.value || undefined },
+							replace: true,
+						})
+					}
 					className="pl-9"
 				/>
 			</div>
@@ -73,6 +76,6 @@ function AdminWorkspacesPage() {
 				isError={listQuery.isError}
 				hasSearch={term.length > 0}
 			/>
-		</div>
+		</PageLayout>
 	);
 }

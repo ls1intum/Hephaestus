@@ -10,8 +10,8 @@ import {
 import type { ConfigAuditEntryView, PageConfigAuditEntryView } from "@/api/types.gen";
 import {
 	type ConfigAuditSearch,
-	dayEndIso,
-	dayStartIso,
+	dayAfterInstant,
+	dayStartInstant,
 	fromDateRange,
 	toDateRange,
 } from "@/components/admin/audit-shared/audit-search";
@@ -47,8 +47,8 @@ function toQuery(search: ConfigAuditSearch) {
 		entityType: narrowToEnum(search.entityType, ENTITY_TYPES),
 		action: narrowToEnum(search.action, ACTIONS),
 		actorId: search.actorId,
-		from: dateRange?.from ? dayStartIso(dateRange.from) : undefined,
-		to: dateRange?.to ? dayEndIso(dateRange.to) : undefined,
+		from: dateRange?.from ? dayStartInstant(dateRange.from) : undefined,
+		to: dateRange?.to ? dayAfterInstant(dateRange.to) : undefined,
 	};
 }
 
@@ -112,10 +112,8 @@ function ConfigAuditView({
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
-	// From the narrowed query, not raw search: unrecognised enum values filter nothing, so they must
-	// not count as an active filter.
 	const query = toQuery(search);
-	const hasFilter = Boolean(
+	const hasAppliedFilter = Boolean(
 		query.entityType || query.action || query.actorId !== undefined || query.from,
 	);
 
@@ -130,7 +128,7 @@ function ConfigAuditView({
 
 	return (
 		<div className="space-y-4">
-			<FilterToolbar hasFilter={hasFilter} onReset={reset}>
+			<FilterToolbar hasFilter={hasAppliedFilter} onReset={reset}>
 				<FacetMultiSelect
 					title="Setting"
 					options={ENTITY_TYPE_OPTIONS}
@@ -157,13 +155,13 @@ function ConfigAuditView({
 				)}
 			</FilterToolbar>
 
-			<ResultCount total={total} noun={["change", "changes"]} hasFilter={hasFilter} />
+			<ResultCount total={total} noun={["change", "changes"]} hasFilter={hasAppliedFilter} />
 
 			<ConfigAuditTable
 				entries={entries}
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
-				hasFilter={hasFilter}
+				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
 				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}

@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { CheckCircleIcon, InfoIcon, XCircleIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -10,10 +10,6 @@ type Search = {
 	reason?: string;
 };
 
-// OAuth callback landing route. When sessionStorage has a return-slug from the
-// initiating workspace, we redirect back BEFORE rendering (no Card flash) and
-// surface the toast on the destination. When there's no slug (different tab,
-// browser restart), we render the terminal Card with a return-to-dashboard button.
 export const Route = createFileRoute("/_authenticated/integrations")({
 	component: IntegrationsCallback,
 	validateSearch: (search): Search => ({
@@ -21,18 +17,14 @@ export const Route = createFileRoute("/_authenticated/integrations")({
 		reason: typeof search.reason === "string" ? search.reason : undefined,
 	}),
 	beforeLoad: ({ search }) => {
-		if (typeof window === "undefined") return; // SSR no-op
+		if (typeof window === "undefined") return;
 		const slug = window.sessionStorage.getItem("slack-connect-return-slug");
-		if (!slug) return; // fall through to terminal render
+		if (!slug) return;
 		window.sessionStorage.removeItem("slack-connect-return-slug");
-		// Stash the status so the destination route can toast it after navigation.
 		if (search.status) {
 			window.sessionStorage.setItem("slack-connect-result", search.status);
 			if (search.reason) window.sessionStorage.setItem("slack-connect-reason", search.reason);
 		}
-		// Must land on the page that renders AdminSlackNotificationSettings — it is the sole
-		// consumer of the stashed keys above. Any other destination leaves them unread, so the
-		// admin gets no feedback here and a stale toast the next time they open this page.
 		throw redirect({
 			to: "/w/$workspaceSlug/admin/integrations/slack",
 			params: { workspaceSlug: slug },
@@ -42,7 +34,6 @@ export const Route = createFileRoute("/_authenticated/integrations")({
 
 function IntegrationsCallback() {
 	const { status, reason } = Route.useSearch();
-	const navigate = useNavigate();
 	const toasted = useRef(false);
 
 	useEffect(() => {
@@ -53,10 +44,6 @@ function IntegrationsCallback() {
 			toast.error("Integration connection failed", { description: reason });
 	}, [status, reason]);
 
-	// A bare /integrations visit (no ?status — e.g. the user reloaded after the
-	// beforeLoad redirect already consumed the return-slug) is NOT a failure. Only an
-	// explicit ?status=error renders the destructive card; missing status is a neutral
-	// terminal state, and ?status=success is the connected confirmation.
 	const failed = status === "error";
 	const succeeded = status === "success";
 	const Icon = failed ? XCircleIcon : succeeded ? CheckCircleIcon : InfoIcon;
@@ -81,7 +68,7 @@ function IntegrationsCallback() {
 							<p className="mt-2 wrap-anywhere text-sm text-muted-foreground">{reason}</p>
 						)}
 					</div>
-					<Button onClick={() => navigate({ to: "/" })}>Return to dashboard</Button>
+					<Button render={<Link to="/" />}>Return to dashboard</Button>
 				</CardContent>
 			</Card>
 		</div>

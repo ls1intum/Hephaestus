@@ -32,7 +32,7 @@ describe("AdminSettingsPage — non-integration content", () => {
 
 	it("shows the league reset card when leagues are enabled", () => {
 		setup({ features: { ...features, leaguesEnabled: true } });
-		expect(screen.getByText(/reset and recalculate leagues/i)).toBeTruthy();
+		screen.getByText(/reset and recalculate leagues/i);
 	});
 
 	it("leaves the danger zone out until the active workspace has resolved", () => {

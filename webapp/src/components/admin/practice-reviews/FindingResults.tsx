@@ -17,7 +17,6 @@ import {
 	ItemGroup,
 	ItemTitle,
 } from "@/components/ui/item";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
@@ -31,6 +30,7 @@ import { ReviewArtifact, ReviewArtifactLink } from "./ReviewArtifact";
 import { FindingAssessmentBadge, FindingFeedbackSummary } from "./ReviewBadges";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
+import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 
 export type FindingResultsState =
 	| { status: "loading" }
@@ -43,7 +43,7 @@ export interface FindingResultsProps {
 }
 
 export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
-	if (state.status === "loading") return <FindingsListSkeleton />;
+	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading findings" />;
 	if (state.status === "empty") {
 		return (
 			<Empty className="border">
@@ -88,7 +88,7 @@ export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
 										to="/w/$workspaceSlug/admin/practices/reviews/findings/$findingId"
 										params={{ workspaceSlug, findingId: finding.id }}
 										search={(previous) => previous}
-										className="line-clamp-2 font-medium hover:underline"
+										className="font-medium hover:underline"
 									>
 										{finding.title}
 									</Link>
@@ -129,7 +129,7 @@ export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
 							}
 						>
 							<ItemContent className="min-w-0">
-								<ItemTitle className="w-full min-w-0 line-clamp-2 break-words">
+								<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
 									{finding.title}
 								</ItemTitle>
 								<ItemDescription>
@@ -152,20 +152,5 @@ export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
 				))}
 			</ItemGroup>
 		</>
-	);
-}
-
-function FindingsListSkeleton() {
-	return (
-		<div className="space-y-2 rounded-lg border p-4" role="status">
-			<span className="sr-only">Loading findings</span>
-			{Array.from({ length: 5 }, (_, index) => (
-				<div key={index} className="flex items-center gap-4 py-3">
-					<Skeleton className="h-4 flex-1" />
-					<Skeleton className="h-5 w-24" />
-					<Skeleton className="hidden h-4 w-48 md:block" />
-				</div>
-			))}
-		</div>
 	);
 }

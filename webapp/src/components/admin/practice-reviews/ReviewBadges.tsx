@@ -81,7 +81,7 @@ export function FindingCountsSummary({ counts }: { counts: ReviewFindingCounts }
 			? `${counts.strengths} ${counts.strengths === 1 ? "strength" : "strengths"}`
 			: undefined,
 		counts.problems > 0
-			? `${counts.problems} ${counts.problems === 1 ? "area" : "areas"} to improve`
+			? `${counts.problems} ${counts.problems === 1 ? "improvement" : "improvements"}`
 			: undefined,
 		counts.notApplicable > 0 ? `${counts.notApplicable} not applicable` : undefined,
 	].filter(Boolean);

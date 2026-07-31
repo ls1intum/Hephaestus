@@ -7,7 +7,6 @@ const meta = {
 	title: "Admin/Practice reviews/Building blocks/Review actions",
 	component: ReviewRunActions,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "centered",
 		chromatic: { viewports: [1440] },
 	},

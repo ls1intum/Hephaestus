@@ -73,13 +73,11 @@ public class Practice {
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
-    /** Reviewed work kind used to select compatible triggers and detection context. */
     @Enumerated(EnumType.STRING)
     @Column(name = "applies_to", nullable = false, length = 32)
     @ColumnDefault("'PULL_REQUEST'")
     private WorkArtifact artifactType = WorkArtifact.PULL_REQUEST;
 
-    /** Optional area; {@code null} means Unassigned. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_area"))
     @OnDelete(action = OnDeleteAction.SET_NULL)

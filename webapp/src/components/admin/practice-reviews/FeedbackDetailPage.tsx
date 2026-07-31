@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, MapPinIcon, ScanSearchIcon } from "lucide-react";
+import { MapPinIcon, ScanSearchIcon } from "lucide-react";
 import { getPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewPlacement } from "@/api/types.gen";
 import { DetailRow } from "@/components/common/DetailRow";
@@ -13,7 +13,6 @@ import {
 	AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
 	Item,
@@ -25,10 +24,10 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
 import { FeedbackMessage } from "./FeedbackMessage";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
 import { FindingAssessmentBadge } from "./ReviewBadges";
+import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
 import { ReviewTechnicalDetails } from "./ReviewTechnicalDetails";
@@ -45,35 +44,50 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 	const query = useQuery({
 		...getPracticeReviewFeedbackOptions({ path: { workspaceSlug, feedbackId } }),
 	});
+	const breadcrumbs = (
+		<ReviewBreadcrumbs
+			workspaceSlug={workspaceSlug}
+			section={{
+				label: "Delivery",
+				link: (
+					<Link
+						to="/w/$workspaceSlug/admin/practices/reviews/delivery"
+						params={{ workspaceSlug }}
+						search={(previous) => previous}
+					/>
+				),
+			}}
+			current="Message"
+		/>
+	);
 
 	if (query.isLoading)
 		return (
-			<div className="flex min-h-64 items-center justify-center">
-				<Spinner className="size-7" />
-			</div>
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<div className="flex min-h-64 items-center justify-center">
+					<Spinner className="size-7" />
+				</div>
+			</article>
 		);
 	if (query.isError || !query.data) {
 		return (
-			<QueryErrorAlert
-				error={query.error}
-				title="Couldn't load this message"
-				onRetry={() => query.refetch()}
-			/>
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<QueryErrorAlert
+					error={query.error}
+					title="Couldn't load this message"
+					onRetry={() => query.refetch()}
+				/>
+			</article>
 		);
 	}
 	const feedback = query.data;
 	const subjectDiffers = feedback.subject && feedback.subject.id !== feedback.recipient?.id;
 
 	return (
-		<article className="mx-auto min-w-0 max-w-4xl space-y-8">
-			<Link
-				to="/w/$workspaceSlug/admin/practices/reviews/delivery"
-				params={{ workspaceSlug }}
-				search={(previous) => previous}
-				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3")}
-			>
-				<ArrowLeftIcon aria-hidden /> Back to delivery
-			</Link>
+		<article className="min-w-0 max-w-4xl space-y-8">
+			{breadcrumbs}
 			<header className="space-y-4">
 				<div className="space-y-1">
 					<h2 className="break-words text-2xl font-semibold tracking-tight">
@@ -186,7 +200,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 						Delivery
 					</h3>
 					<p className="text-sm text-muted-foreground">
-						Destination: {CHANNEL_LABELS[feedback.channel]}
+						Channel: {CHANNEL_LABELS[feedback.channel]}
 					</p>
 				</div>
 				{feedback.placements.length > 0 ? (
@@ -215,7 +229,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 						</Link>
 					</DetailRow>
 					<DetailRow label="Subject">{subjectLabel(feedback.subject)}</DetailRow>
-					<DetailRow label="Destination">{CHANNEL_LABELS[feedback.channel]}</DetailRow>
+					<DetailRow label="Channel">{CHANNEL_LABELS[feedback.channel]}</DetailRow>
 					{feedback.deliveredAt && (
 						<DetailRow label="Delivered">
 							<RelativeTime value={feedback.deliveredAt} />

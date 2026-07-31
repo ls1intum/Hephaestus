@@ -8,8 +8,14 @@ import { mockAvailableModels } from "./story-mock-data";
 
 type Canvas = ReturnType<typeof within>;
 
-async function openAdvancedOnFirstCard(canvas: Canvas) {
-	await userEvent.click((await canvas.findAllByRole("button", { name: /Advanced/ }))[0]);
+function purposeCard(canvas: Canvas, name: string) {
+	return within(canvas.getByRole("region", { name }));
+}
+
+async function openPracticeReviewAdvanced(canvas: Canvas) {
+	await userEvent.click(
+		purposeCard(canvas, "Practice reviews").getByRole("button", { name: /Advanced/ }),
+	);
 }
 
 const detectionBinding: AgentBinding = {
@@ -46,7 +52,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const DetectionBoundMentorUnbound: Story = {};
+export const PracticeReviewsBoundHephUnbound: Story = {};
 
 export const Loading: Story = {
 	args: { isLoading: true },
@@ -76,40 +82,48 @@ export const LoadForbidden: Story = {
 	},
 };
 
-export const PurposeDisabledForWorkspace: Story = {
-	args: { mentorEnabled: false },
+export const ProjectReviewsDisabled: Story = {
+	args: { practicesEnabled: false },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByText("Workspace off")).toBeInTheDocument();
-		await expect(
-			within(canvas.getByRole("region", { name: "Mentor" })).getByRole("button", {
-				name: "Save",
-			}),
-		).toBeEnabled();
+		const card = within(canvas.getByRole("region", { name: "Practice reviews" }));
+		await expect(card.getByText("Ready")).toBeInTheDocument();
+		await expect(card.getByText("Practice reviews off")).toBeInTheDocument();
+		await expect(card.getByRole("link", { name: "Open Review settings" })).toHaveAttribute(
+			"href",
+			"/w/acme/admin/practices/settings",
+		);
+		await expect(card.getByRole("button", { name: "Save assignment" })).toBeEnabled();
 	},
 };
 
 export const OnlyThePendingCardIsFrozen: Story = {
 	args: { pendingPurposes: new Set(["PRACTICE_DETECTION" as const]) },
 	play: async ({ canvas }) => {
-		const [detectionSave, mentorSave] = await canvas.findAllByRole("button", { name: "Save" });
-		await expect(detectionSave).toBeDisabled();
-		await expect(mentorSave).toBeEnabled();
+		await expect(
+			purposeCard(canvas, "Practice reviews").getByRole("button", { name: "Save assignment" }),
+		).toBeDisabled();
+		await expect(
+			purposeCard(canvas, "Heph").getByRole("button", { name: "Save assignment" }),
+		).toBeEnabled();
 	},
 };
 
 export const AdvancedDisclosure: Story = {
 	play: async ({ canvas }) => {
-		await openAdvancedOnFirstCard(canvas);
-		await expect(await canvas.findByLabelText("Timeout (seconds)")).toBeInTheDocument();
+		await openPracticeReviewAdvanced(canvas);
+		await expect(
+			purposeCard(canvas, "Practice reviews").getByLabelText("Timeout (seconds)"),
+		).toBeInTheDocument();
 	},
 };
 
 export const InvalidRunLimit: Story = {
 	play: async ({ canvas }) => {
-		await openAdvancedOnFirstCard(canvas);
+		const card = purposeCard(canvas, "Practice reviews");
+		await openPracticeReviewAdvanced(canvas);
 
-		await userEvent.clear(await canvas.findByLabelText("Timeout (seconds)"));
-		await userEvent.click(canvas.getAllByRole("button", { name: "Save" })[0]);
+		await userEvent.clear(card.getByLabelText("Timeout (seconds)"));
+		await userEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		await expect(await canvas.findByText("Enter a number of seconds.")).toBeInTheDocument();
 		await expect(screen.queryByRole("status")).toBeNull();
@@ -123,8 +137,10 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("Practice feedback");
+		await canvas.findByText("Practice reviews");
 		await expectNoPageOverflow();
-		await expectControlOnScreen(canvas.getAllByRole("button", { name: "Save" })[0]);
+		await expectControlOnScreen(
+			purposeCard(canvas, "Practice reviews").getByRole("button", { name: "Save assignment" }),
+		);
 	},
 };

@@ -21,7 +21,7 @@ export function ReviewMoreFilters({ activeCount, children }: ReviewMoreFiltersPr
 					</Button>
 				}
 			/>
-			<PopoverContent align="start" className="w-72 space-y-4">
+			<PopoverContent align="start" className="w-72 space-y-4" aria-label="More filters">
 				{children}
 			</PopoverContent>
 		</Popover>

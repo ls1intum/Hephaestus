@@ -12,7 +12,7 @@ public record ReviewRunTargetDTO(
     @NonNull WorkArtifact type,
     @Schema(description = "Internal artifact entity ID, when recorded") Long id,
     IntegrationKind provider,
-    @Schema(description = "Provider-visible issue or pull-request number") Integer number,
+    @Schema(description = "Provider-visible work-item number") Integer number,
     @NonNull String title,
     String repositoryName,
     String channelName,

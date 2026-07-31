@@ -1,13 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, InfoIcon, MessageSquareTextIcon } from "lucide-react";
+import { InfoIcon, MessageSquareTextIcon } from "lucide-react";
 import { getPracticeReviewFindingOptions } from "@/api/@tanstack/react-query.gen";
 import { DetailRow } from "@/components/common/DetailRow";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
 	Item,
@@ -18,10 +17,10 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
 import { FindingEvidence } from "./FindingEvidence";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
 import { FeedbackStateBadge, FindingAssessmentBadge } from "./ReviewBadges";
+import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
 import { ReviewTechnicalDetails } from "./ReviewTechnicalDetails";
@@ -38,34 +37,49 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 	const query = useQuery({
 		...getPracticeReviewFindingOptions({ path: { workspaceSlug, findingId } }),
 	});
+	const breadcrumbs = (
+		<ReviewBreadcrumbs
+			workspaceSlug={workspaceSlug}
+			section={{
+				label: "Findings",
+				link: (
+					<Link
+						to="/w/$workspaceSlug/admin/practices/reviews/findings"
+						params={{ workspaceSlug }}
+						search={(previous) => previous}
+					/>
+				),
+			}}
+			current="Finding"
+		/>
+	);
 
 	if (query.isLoading)
 		return (
-			<div className="flex min-h-64 items-center justify-center">
-				<Spinner className="size-7" />
-			</div>
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<div className="flex min-h-64 items-center justify-center">
+					<Spinner className="size-7" />
+				</div>
+			</article>
 		);
 	if (query.isError || !query.data) {
 		return (
-			<QueryErrorAlert
-				error={query.error}
-				title="Couldn't load this finding"
-				onRetry={() => query.refetch()}
-			/>
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<QueryErrorAlert
+					error={query.error}
+					title="Couldn't load this finding"
+					onRetry={() => query.refetch()}
+				/>
+			</article>
 		);
 	}
 	const finding = query.data;
 
 	return (
-		<article className="mx-auto min-w-0 max-w-4xl space-y-8">
-			<Link
-				to="/w/$workspaceSlug/admin/practices/reviews/findings"
-				params={{ workspaceSlug }}
-				search={(previous) => previous}
-				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3")}
-			>
-				<ArrowLeftIcon aria-hidden /> Back to findings
-			</Link>
+		<article className="min-w-0 max-w-4xl space-y-8">
+			{breadcrumbs}
 			<header className="space-y-4">
 				<div className="space-y-2">
 					<div className="flex flex-wrap items-center gap-2">

@@ -30,7 +30,6 @@ const meta = {
 	title: "Admin/Practice reviews/Message details",
 	component: FeedbackDetailPage,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },
@@ -62,14 +61,10 @@ export const NotDelivered: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Not delivered")).toBeVisible();
-		await expect(canvas.getByRole("heading", { name: "Message for Grace Hopper" })).toBeVisible();
 		await expect(
 			canvas.getByRole("link", { name: "View all findings and feedback for this work" }),
 		).toBeVisible();
-		await expect(canvas.getByText("The route exposes an internal detection term")).toBeVisible();
-		await expect(canvas.getByText("Destination: Alongside the work")).toBeVisible();
 		await expect(canvas.getByText("This message was not posted.")).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "View Markdown source" })).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };

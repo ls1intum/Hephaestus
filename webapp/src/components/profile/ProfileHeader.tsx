@@ -3,7 +3,11 @@ import { format } from "date-fns";
 import { Sparkles } from "lucide-react";
 import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
-import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils.ts";
+import {
+	getLeagueColor,
+	getLeagueForegroundColor,
+	getLeagueTier,
+} from "@/components/leaderboard/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,8 +73,9 @@ export function ProfileHeader({
 									render={
 										<div
 											className={cn(
-												"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
+												"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background font-bold text-xs",
 												getLeagueColor(leagueTier),
+												getLeagueForegroundColor(leagueTier),
 											)}
 										/>
 									}

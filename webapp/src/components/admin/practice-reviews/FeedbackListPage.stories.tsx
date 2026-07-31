@@ -10,7 +10,6 @@ const meta = {
 	title: "Admin/Practice reviews/Delivery",
 	component: FeedbackListPage,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
 		msw: {

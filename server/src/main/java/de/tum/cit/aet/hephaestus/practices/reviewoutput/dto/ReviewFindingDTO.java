@@ -25,11 +25,11 @@ public record ReviewFindingDTO(
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Detector confidence (0.0-1.0)") Float confidence,
-    @Schema(description = "Cross-run locus key; null for findings predating fingerprinting") String recurrenceKey,
+    @NonNull @Schema(description = "Detector confidence", minimum = "0", maximum = "1") Float confidence,
+    @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
     @NonNull Instant observedAt,
     @NonNull
-    @Schema(description = "Counts of linked feedback units by delivery state")
+    @Schema(description = "Counts of linked messages by delivery state")
     ReviewFeedbackDispositionDTO feedbackDisposition
 ) {
     public static ReviewFindingDTO from(

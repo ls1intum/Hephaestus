@@ -5,6 +5,8 @@ import { adminListWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { AuthAuditPanel } from "@/components/admin/audit/AuthAuditPanel";
 import { type AuditSearch, auditSearchSchema } from "@/components/admin/audit-shared/audit-search";
 import { AdminConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { instanceAdminHead } from "@/lib/page-title";
 
@@ -18,9 +20,6 @@ function AdminAuditPage() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// `replace`, so filter churn does not bury the previous page under dozens of history entries. The
-	// tab switch below deliberately does not: it discards the other tab's selection, and Back is the
-	// only way to undo that.
 	const patchSearch = (patch: Partial<AuditSearch>) =>
 		navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
@@ -31,24 +30,17 @@ function AdminAuditPage() {
 	const resolveWorkspaceName = (id: number) => workspaceNames.get(id);
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6">
-			<header className="space-y-1">
-				<div className="flex items-center gap-2">
-					<ScrollTextIcon className="size-6 text-muted-foreground" aria-hidden />
-					<h1 className="text-2xl font-semibold">Audit log</h1>
-				</div>
-				<p className="text-sm text-muted-foreground">
-					A permanent record of sign-ins, permission changes, and settings changes across this
-					instance.
-				</p>
-			</header>
+		<PageLayout>
+			<PageHeader
+				icon={<ScrollTextIcon />}
+				title="Audit log"
+				description="Review sign-ins, permission changes, and settings changes across this instance."
+			/>
 
 			<Tabs
 				className="gap-4"
 				value={search.tab}
 				onValueChange={(value) =>
-					// The tabs filter different dimensions, so only actor and date carry across; the rest
-					// would silently return an unrelated, empty result.
 					navigate({
 						search: (prev) => ({
 							tab: value as AuditSearch["tab"],
@@ -80,6 +72,6 @@ function AdminAuditPage() {
 					/>
 				</TabsContent>
 			</Tabs>
-		</div>
+		</PageLayout>
 	);
 }

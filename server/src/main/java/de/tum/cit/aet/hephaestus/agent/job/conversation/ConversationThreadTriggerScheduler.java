@@ -120,6 +120,7 @@ public class ConversationThreadTriggerScheduler {
                     var request = new ConversationReviewSubmissionRequest(
                         c.threadId(),
                         c.channelId(),
+                        c.channelName(),
                         c.threadTs(),
                         participant,
                         c.lastTs()

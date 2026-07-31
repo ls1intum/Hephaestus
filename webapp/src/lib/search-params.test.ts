@@ -6,6 +6,10 @@ describe("multiValue", () => {
 		expect(multiValue.parse("CREATED")).toEqual(["CREATED"]);
 	});
 
+	it("deduplicates repeated values", () => {
+		expect(multiValue.parse(["CREATED", "CREATED", "UPDATED"])).toEqual(["CREATED", "UPDATED"]);
+	});
+
 	it("drops invalid input", () => {
 		expect(multiValue.parse(42)).toBeUndefined();
 	});

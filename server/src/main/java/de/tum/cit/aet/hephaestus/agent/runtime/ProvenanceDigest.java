@@ -8,12 +8,10 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
-/** Content digests for run provenance: equal digests mean byte-identical content. */
 public final class ProvenanceDigest {
 
     private ProvenanceDigest() {}
 
-    /** SHA-256 of {@code bytes} as lowercase hex. */
     public static String sha256Hex(byte[] bytes) {
         return HexFormat.of().formatHex(newSha256().digest(bytes));
     }
@@ -28,16 +26,8 @@ public final class ProvenanceDigest {
     }
 
     /**
-     * Root digest over a sandbox's input files, blind to {@code jobId} wherever it appears in their bytes.
-     *
-     * <p>The run's own id is not something the detector reasons about, yet it is written into the workspace
-     * ({@code task.json}'s envelope, {@code manifest.json}'s header). Left in, every run would digest
-     * differently and the column could only ever restate the primary key. Ignoring it is what makes the digest
-     * answer the question an evaluation asks: <em>did these two runs see the same inputs?</em>
-     *
-     * <p>{@code jobId} is matched as the lowercase hyphenated form {@link UUID#toString} produces, which is how
-     * every writer emits it; a file inventing another encoding would keep its id and make this run's digest
-     * unique to it.
+     * Hashes sandbox inputs after removing the run UUID so otherwise-identical runs share a digest. Only the
+     * lowercase hyphenated form produced by {@link UUID#toString()} is elided.
      */
     public static String inputsDigestHex(Map<String, byte[]> files, UUID jobId) {
         byte[] jobIdBytes = jobId.toString().getBytes(StandardCharsets.UTF_8);

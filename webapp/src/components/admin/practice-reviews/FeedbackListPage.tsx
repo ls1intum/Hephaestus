@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { listPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
 import { DateRangeFacet } from "@/components/common/DateRangeFacet";
 import {
@@ -17,9 +19,9 @@ import { FeedbackResults } from "./FeedbackResults";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { ReviewMoreFilters } from "./ReviewMoreFilters";
 import {
-	AVAILABLE_FEEDBACK_CHANNELS,
 	CHANNEL_LABELS,
 	DELIVERY_STATE_LABELS,
+	FEEDBACK_CHANNELS,
 	type FeedbackChannel,
 	type FeedbackDeliveryState,
 	type FeedbackSuppressionReason,
@@ -32,12 +34,10 @@ const DELIVERY_OPTIONS: FacetOption<FeedbackDeliveryState>[] =
 	toFacetOptions(DELIVERY_STATE_LABELS);
 const REASON_OPTIONS: FacetOption<FeedbackSuppressionReason>[] =
 	toFacetOptions(SUPPRESSION_REASON_LABELS);
-const CHANNEL_OPTIONS: FacetOption<FeedbackChannel>[] = AVAILABLE_FEEDBACK_CHANNELS.map(
-	(value) => ({
-		value,
-		label: CHANNEL_LABELS[value],
-	}),
-);
+const CHANNEL_OPTIONS: FacetOption<FeedbackChannel>[] = FEEDBACK_CHANNELS.map((value) => ({
+	value,
+	label: CHANNEL_LABELS[value],
+}));
 
 export interface FeedbackListPageProps {
 	workspaceSlug: string;
@@ -53,6 +53,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 		}),
 	});
 	const feedback = query.data?.content ?? [];
+	const totalPages = query.data?.page?.totalPages;
 	const recipient = feedback[0]?.recipient;
 	const hasFilter = Boolean(
 		search.deliveryState?.length ||
@@ -79,6 +80,12 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 			to: undefined,
 		});
 	const patchFilter = (patch: Partial<FeedbackSearch>) => onSearchChange({ ...patch, page: 0 });
+
+	useEffect(() => {
+		if (totalPages !== undefined && search.page && search.page >= totalPages) {
+			onSearchChange({ page: Math.max(0, totalPages - 1) });
+		}
+	}, [onSearchChange, search.page, totalPages]);
 
 	return (
 		<section aria-label="Feedback delivery" className="space-y-4">
@@ -113,7 +120,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 							onChange={(values) => patchFilter({ suppressionReason: nonEmpty(values) })}
 						/>
 						<FacetMultiSelect
-							title="Destination"
+							title="Channel"
 							variant="field"
 							options={CHANNEL_OPTIONS}
 							selected={search.channel ?? []}
@@ -169,7 +176,14 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 			<TablePagination
 				page={query.data?.page?.number ?? search.page ?? 0}
 				totalPages={query.data?.page?.totalPages ?? 0}
-				onPageChange={(page) => onSearchChange({ page })}
+				renderPageLink={(page, props) => (
+					<Link
+						{...props}
+						to="/w/$workspaceSlug/admin/practices/reviews/delivery"
+						params={{ workspaceSlug }}
+						search={(previous) => ({ ...previous, page: page === 0 ? undefined : page })}
+					/>
+				)}
 			/>
 		</section>
 	);

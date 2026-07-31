@@ -142,4 +142,22 @@
             ]]></sql>
         </rollback>
     </changeSet>
+
+    <changeSet id="1785274902740-7" author="hephaestus" runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_agent_job_workspace_purpose_created already present and valid">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                WHERE c.relname = 'idx_agent_job_workspace_purpose_created' AND i.indisvalid
+            </sqlCheck>
+        </preConditions>
+        <comment>Serve the practice-review timeline without scanning other agent purposes.</comment>
+        <sql>
+            DROP INDEX CONCURRENTLY IF EXISTS idx_agent_job_workspace_purpose_created;
+            CREATE INDEX CONCURRENTLY idx_agent_job_workspace_purpose_created
+                ON agent_job (workspace_id, purpose, created_at DESC, id DESC);
+        </sql>
+        <rollback>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS idx_agent_job_workspace_purpose_created;</sql>
+        </rollback>
+    </changeSet>
 </databaseChangeLog>

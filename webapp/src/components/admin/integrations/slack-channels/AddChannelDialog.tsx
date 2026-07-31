@@ -21,7 +21,6 @@ export interface AddChannelDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	candidates?: SlackChannelCandidate[];
-	/** Register the channel. Resolves on success (dialog closes), rejects to keep it open. */
 	onSubmit: (input: { slackChannelId: string; channelName?: string }) => Promise<void> | void;
 }
 
@@ -34,7 +33,6 @@ export function AddChannelDialog({
 	const [selectedCandidate, setSelectedCandidate] = useState<SlackChannelCandidate | null>(null);
 	const [channelReference, setChannelReference] = useState("");
 	const [channelName, setChannelName] = useState("");
-	// With no channels to pick from, the paste path is the only path — don't hide it behind a toggle.
 	const [pasteOpen, setPasteOpen] = useState(candidates.length === 0);
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
@@ -56,8 +54,6 @@ export function AddChannelDialog({
 				}
 			: null;
 
-	// Reset the fields on close rather than remounting via a changing `key`, which would break the
-	// Dialog's exit animation. The single instance persists, so the next open starts clean.
 	function handleOpenChange(next: boolean) {
 		if (!next) {
 			setSelectedCandidate(null);
@@ -72,8 +68,6 @@ export function AddChannelDialog({
 
 	async function submit() {
 		if (submitting) return;
-		// The submit button stays enabled: an admin who clicks it gets told what is missing rather
-		// than staring at a dead control with no stated reason.
 		if (!resolved) {
 			setSubmitError(
 				hasCandidates
@@ -89,7 +83,7 @@ export function AddChannelDialog({
 			await onSubmit(resolved);
 			handleOpenChange(false);
 		} catch {
-			// Rejection = keep the dialog open. The mutation's onError already surfaced the toast.
+			return;
 		} finally {
 			setSubmitting(false);
 		}

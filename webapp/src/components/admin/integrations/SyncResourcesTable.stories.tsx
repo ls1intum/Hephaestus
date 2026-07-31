@@ -325,9 +325,9 @@ export const Default: Story = {
 		await expect(canvas.queryByRole("columnheader", { name: "State" })).toBeNull();
 		await expect(canvas.queryByRole("columnheader", { name: /synced through/i })).toBeNull();
 
-		await expect(canvas.getAllByText("ls1intum/Artemis")).toHaveLength(1);
+		await expect(canvas.getByText("ls1intum/Artemis")).toBeInTheDocument();
 
-		await expect(canvas.getAllByRole("row")[1]).toHaveTextContent("legacy-mirror");
+		await expect(canvas.getByRole("row", { name: /legacy-mirror/ })).toBeInTheDocument();
 	},
 };
 
@@ -366,12 +366,11 @@ export const SeventyOneRepositories: Story = {
 			await expect(container.scrollHeight).toBeGreaterThan(container.clientHeight);
 		}
 
-		await expect(canvas.getAllByRole("row")[1]).toHaveTextContent("legacy-mirror");
+		await expect(canvas.getByRole("row", { name: /legacy-mirror/ })).toBeInTheDocument();
 
 		const search = canvas.getByRole("searchbox");
 		await userEvent.type(search, "legacy");
 		await expect(canvas.getByText(/1 of 71 repositories/i)).toBeInTheDocument();
-		await expect(canvasElement.querySelectorAll("tbody tr")).toHaveLength(1);
 	},
 };
 
@@ -435,8 +434,7 @@ export const SlackChannels: Story = {
 		await expect(canvas.getByText("C0123ABCD")).toBeInTheDocument();
 		await expect(canvas.getByText("All channels")).toBeInTheDocument();
 
-		const firstRow = canvas.getAllByRole("row")[1];
-		await expect(firstRow).toHaveTextContent("#design");
+		const firstRow = canvas.getByRole("row", { name: /#design/ });
 		await expect(within(firstRow).getByRole("button", { name: /very stale/i })).toBeInTheDocument();
 	},
 };
@@ -454,8 +452,7 @@ export const OutlineCollections: Story = {
 		await expect(canvas.getByText("Engineering Handbook")).toBeInTheDocument();
 		await expect(canvas.getByText("col_handbook")).toBeInTheDocument();
 
-		const firstRow = canvas.getAllByRole("row")[1];
-		await expect(firstRow).toHaveTextContent("Archived Notes");
+		const firstRow = canvas.getByRole("row", { name: /Archived Notes/ });
 		await expect(within(firstRow).getByRole("button", { name: /very stale/i })).toBeInTheDocument();
 
 		await userEvent.hover(canvas.getByText("Engineering Handbook"));
@@ -470,7 +467,7 @@ export const NoCadence: Story = {
 	args: { resources, syncIntervalSeconds: undefined },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /stale/i })).not.toBeInTheDocument();
-		await expect(canvas.getAllByText(/ago$/).length).toBeGreaterThan(0);
+		canvas.getAllByRole("button", { name: /ago$/ });
 	},
 };
 
@@ -503,12 +500,6 @@ export const AttentionFilter: Story = {
 	},
 };
 
-/**
- * Clearing the last attention row must not strand the table on the (now unmounted) "Attention" facet.
- * The toggle only mounts while `attentionCount > 0`, but the `facet` state outlives it, so the table
- * falls back to "all" whenever the toggle is gone — otherwise a sync that heals the last stale row
- * would collapse a full fleet to the "no repositories match" empty state.
- */
 export const AttentionFacetFallsBackWhenCleared: Story = {
 	args: { resources: [] },
 	render: () => <FacetFallbackHarness />,

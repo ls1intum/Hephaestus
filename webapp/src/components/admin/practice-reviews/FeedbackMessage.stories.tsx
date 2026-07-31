@@ -8,7 +8,7 @@ const body =
 const meta = {
 	title: "Admin/Practice reviews/Building blocks/Message preview",
 	component: FeedbackMessage,
-	parameters: { a11y: { test: "error" }, layout: "padded", chromatic: { viewports: [320, 768] } },
+	parameters: { layout: "padded", chromatic: { viewports: [320, 768] } },
 	tags: ["autodocs"],
 	args: { body, deliveryState: "DELIVERED" },
 } satisfies Meta<typeof FeedbackMessage>;

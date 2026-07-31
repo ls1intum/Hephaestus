@@ -34,11 +34,6 @@ function decode(value: string): ModelSelection {
 	return { scope: scope as ModelSelection["scope"], id: Number(id) };
 }
 
-/**
- * An option's accessible name. It has to repeat the price that the visual row shows on its right:
- * an explicit `aria-label` replaces the item's contents wholesale, so leaving the price out would
- * cost screen-reader users the one number the choice turns on.
- */
 function optionLabel(model: AvailableLlmModel): string {
 	return `${model.displayName} · ${model.connectionDisplayName} · ${priceLabel(model, "workspace")}`;
 }
@@ -63,10 +58,6 @@ function ModelOptions({ models }: { models: AvailableLlmModel[] }) {
 	));
 }
 
-/**
- * Grouped by funding source. Never shows the upstream model id or the connection's endpoint — only
- * the display name and price framing.
- */
 export function ModelPicker({
 	id,
 	availableModels,

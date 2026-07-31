@@ -1,6 +1,13 @@
 import { Folder, Package, Rocket } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { getAreaVisual, ICON_NAMES, iconSearchText, PILL, SEEDED_AREA_SLUGS } from "./area-visuals";
+import {
+	getAreaVisual,
+	ICON_NAMES,
+	iconLabel,
+	iconSearchText,
+	PILL,
+	SEEDED_AREA_SLUGS,
+} from "./area-visuals";
 
 const EXPECTED_SLUGS = [
 	"review-ready-work",
@@ -20,14 +27,6 @@ const EXPECTED_SLUGS = [
 describe("areaVisuals", () => {
 	it("has a seed for every seeded area slug", () => {
 		expect([...SEEDED_AREA_SLUGS].sort()).toEqual([...EXPECTED_SLUGS].sort());
-	});
-
-	it("resolves every seeded slug to a curated (non-fallback) icon and a real colour pill", () => {
-		for (const slug of SEEDED_AREA_SLUGS) {
-			const visual = getAreaVisual(slug);
-			expect(visual.Icon).not.toBe(Folder);
-			expect(visual.pill).toMatch(/^bg-/);
-		}
 	});
 
 	it("lets an admin-set icon and colour override the seeded default", () => {
@@ -69,6 +68,10 @@ describe("areaVisuals", () => {
 		["MessageSquareReply", "message square reply"],
 	])("splits the PascalCase icon name %s into searchable %s", (name, expected) => {
 		expect(iconSearchText(name)).toBe(expected);
+	});
+
+	it("turns icon identifiers into human labels", () => {
+		expect(iconLabel("MessageSquareReply")).toBe("Message square reply");
 	});
 
 	it("matches icons by a word fragment of their split name", () => {

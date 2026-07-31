@@ -113,11 +113,6 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		teams: { control: false },
-		isLoading: { control: "boolean" },
-		onHideTeam: { action: "hideTeam" },
-		onToggleRepositoryVisibility: { action: "toggleRepositoryVisibility" },
-		onAddLabelToTeam: { action: "addLabelToTeam" },
-		onRemoveLabelFromTeam: { action: "removeLabelFromTeam" },
 	},
 	args: {
 		teams,
@@ -125,6 +120,8 @@ const meta = {
 		onToggleRepositoryVisibility: fn(),
 		onAddLabelToTeam: fn(),
 		onRemoveLabelFromTeam: fn(),
+		search: "",
+		onSearchChange: fn(),
 	},
 } satisfies Meta<typeof AdminTeamsTable>;
 

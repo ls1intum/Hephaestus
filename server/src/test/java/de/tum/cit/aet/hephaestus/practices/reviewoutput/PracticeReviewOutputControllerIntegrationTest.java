@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -296,6 +297,11 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
     class AccessControl {
 
         @Test
+        void anonymousCallerCannotReadReviewOutput() {
+            webTestClient.get().uri(FINDINGS, workspace.getWorkspaceSlug()).exchange().expectStatus().isUnauthorized();
+        }
+
+        @Test
         @WithUser
         void workspaceMemberCannotReadReviewOutput() {
             get(FINDINGS, workspace.getWorkspaceSlug()).expectStatus().isForbidden();
@@ -514,7 +520,14 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         )
         @WithAdminUser
         void rejectsInvalidFindingQuery(String query) {
-            get(FINDINGS + query, workspace.getWorkspaceSlug()).expectStatus().isBadRequest();
+            get(FINDINGS + query, workspace.getWorkspaceSlug())
+                .expectStatus()
+                .isBadRequest()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(400);
         }
 
         @Test
@@ -1015,7 +1028,14 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         )
         @WithAdminUser
         void rejectsInvalidFeedbackFiltersAndPagination(String query) {
-            get(FEEDBACK + query, workspace.getWorkspaceSlug()).expectStatus().isBadRequest();
+            get(FEEDBACK + query, workspace.getWorkspaceSlug())
+                .expectStatus()
+                .isBadRequest()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(400);
         }
 
         @Test

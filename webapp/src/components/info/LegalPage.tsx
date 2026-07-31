@@ -1,5 +1,6 @@
 import { type AnchorHTMLAttributes, type ImgHTMLAttributes, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
+import { MarkdownCode } from "@/components/common/MarkdownCode";
 import environment from "@/environment";
 import {
 	isSafeLegalHref,
@@ -14,7 +15,7 @@ const DISCLAIMER_BANNER =
 
 const ERROR_COPY = "Unable to load legal content.";
 
-// Legal Markdown is operator-controlled. Disable raw HTML and allow-list URLs and attributes.
+// Treat host-supplied legal overrides as untrusted at the browser rendering boundary.
 function SafeAnchor({ href, children, className }: AnchorHTMLAttributes<HTMLAnchorElement>) {
 	if (!isSafeLegalHref(href)) {
 		return <span className={className}>{children}</span>;
@@ -37,7 +38,7 @@ function SafeImage({ src, alt, className }: ImgHTMLAttributes<HTMLImageElement>)
 	return <img src={src} alt={alt ?? ""} className={className} />;
 }
 
-const SAFE_COMPONENTS = { a: SafeAnchor, img: SafeImage };
+const SAFE_COMPONENTS = { a: SafeAnchor, code: MarkdownCode, img: SafeImage };
 
 const warnedDisclaimer = new Set<LegalPageId>();
 

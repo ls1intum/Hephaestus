@@ -23,10 +23,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-/** Mirrors `CreateLoginProviderRequest["type"]` — every provider type the server accepts. */
 type ProviderType = "GITHUB" | "GITLAB" | "SLACK" | "OUTLINE";
 
-/** Scope hint per provider type — Outline's OAuth app only needs `read` for identity linking. */
 function scopesPlaceholder(type: ProviderType): string {
 	if (type === "SLACK") return "openid profile email";
 	if (type === "OUTLINE") return "read";
@@ -36,17 +34,12 @@ function scopesPlaceholder(type: ProviderType): string {
 interface LoginProviderFormDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** When set, the dialog edits this provider; otherwise it creates a new one. */
 	editing: LoginProviderView | null;
 	isSubmitting: boolean;
 	onCreate: (body: CreateLoginProviderRequest) => void;
 	onUpdate: (registrationId: string, body: UpdateLoginProviderRequest) => void;
 }
 
-/**
- * Create/edit form for an instance login provider. On edit, the registration id + type are immutable
- * (they're the provider's identity) and the client secret is write-only — left blank, it is unchanged.
- */
 export function LoginProviderFormDialog({
 	open,
 	onOpenChange,
@@ -65,7 +58,6 @@ export function LoginProviderFormDialog({
 	const [scopes, setScopes] = useState("");
 	const [errors, setErrors] = useState<{ registrationId?: string; baseUrl?: string }>({});
 
-	// Re-seed the form whenever the dialog opens for a different target.
 	useEffect(() => {
 		if (!open) return;
 		setRegistrationId(editing?.registrationId ?? "");
@@ -78,20 +70,14 @@ export function LoginProviderFormDialog({
 		setErrors({});
 	}, [open, editing]);
 
-	// GitHub is always github.com and Slack is always slack.com; GitLab and Outline are self-hosted
-	// per instance, so only those two carry a base URL.
 	const needsBaseUrl = type === "GITLAB" || type === "OUTLINE";
 	const isSlack = type === "SLACK";
 	const isOutline = type === "OUTLINE";
 
-	// The redirect URI the operator must register on the upstream OAuth app. On edit the server
-	// already computed it; on create we derive the same shape from this instance's origin.
 	const redirectUri =
 		editing?.redirectUri ??
 		`${window.location.origin}/api/login/oauth2/code/${registrationId.trim() || "<registration-id>"}`;
 
-	// Mirror the server-side constraints so the operator sees the problem inline before a round-trip:
-	// the registration id is the immutable callback-path segment, and an instance base URL must be HTTPS.
 	const REGISTRATION_ID_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 	const validate = (): boolean => {
 		const next: { registrationId?: string; baseUrl?: string } = {};
@@ -171,7 +157,9 @@ export function LoginProviderFormDialog({
 					</Field>
 
 					<Field>
-						<FieldLabel htmlFor="lp-type">Provider type</FieldLabel>
+						<FieldLabel id="lp-type-label" htmlFor="lp-type">
+							Provider type
+						</FieldLabel>
 						<Select
 							value={type}
 							onValueChange={(v) => setType(v as ProviderType)}
@@ -180,7 +168,7 @@ export function LoginProviderFormDialog({
 							<SelectTrigger id="lp-type">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent aria-labelledby="lp-type-label">
 								<SelectItem value="GITHUB">GitHub</SelectItem>
 								<SelectItem value="GITLAB">GitLab / self-hosted GitLab</SelectItem>
 								<SelectItem value="SLACK">Slack / Sign in with Slack</SelectItem>

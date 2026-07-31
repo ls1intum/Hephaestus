@@ -6,11 +6,11 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Counts of feedback by delivery state")
 public record ReviewFeedbackDispositionDTO(
-    @NonNull @Schema(description = "Linked feedback units awaiting delivery") Long prepared,
-    @NonNull @Schema(description = "Linked feedback units delivered to a surface") Long delivered,
-    @NonNull @Schema(description = "Linked feedback units delivered and later replaced") Long superseded,
-    @NonNull @Schema(description = "Linked feedback units withheld by policy") Long suppressed,
-    @NonNull @Schema(description = "Linked feedback units whose delivery failed") Long failed
+    @NonNull @Schema(description = "Linked messages awaiting delivery") Long prepared,
+    @NonNull @Schema(description = "Linked messages delivered") Long delivered,
+    @NonNull @Schema(description = "Linked messages delivered and later replaced") Long superseded,
+    @NonNull @Schema(description = "Linked messages withheld by policy") Long suppressed,
+    @NonNull @Schema(description = "Linked messages whose delivery failed") Long failed
 ) {
     public static ReviewFeedbackDispositionDTO empty() {
         return new ReviewFeedbackDispositionDTO(0L, 0L, 0L, 0L, 0L);

@@ -10,10 +10,9 @@ export const reviewArtifact: ReviewArtifact = {
 	id: 42,
 	type: "PULL_REQUEST",
 	provider: "GITHUB",
-	number: 1420,
-	repositoryName: "hephaestustest/obsphera/obsphera-replay",
-	title:
-		"Add an admin surface for practice feedback with a deliberately long title that still reflows on narrow screens",
+	number: 1423,
+	repositoryName: "ls1intum/Hephaestus",
+	title: "Admin read surface for detection output and withheld feedback",
 	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
 };
 

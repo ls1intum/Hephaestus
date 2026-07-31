@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { AnchorHTMLAttributes, HTMLAttributes } from "react";
 import { Streamdown } from "streamdown";
+import { MarkdownCode } from "@/components/common/MarkdownCode";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
@@ -35,12 +36,13 @@ function SafeAnchor({ href, children, className }: AnchorHTMLAttributes<HTMLAnch
 	);
 }
 
-function PreviewHeading(props: HTMLAttributes<HTMLHeadingElement>) {
-	return <h4 {...props} />;
+function PreviewHeading({ children, className }: HTMLAttributes<HTMLHeadingElement>) {
+	return <h4 className={className}>{children}</h4>;
 }
 
 const UNTRUSTED_MARKDOWN_COMPONENTS = {
 	a: SafeAnchor,
+	code: MarkdownCode,
 	img: () => null,
 	h1: PreviewHeading,
 	h2: PreviewHeading,
@@ -104,7 +106,7 @@ function feedbackOutcome(
 		case "DELIVERED":
 			return {
 				title: "Delivered",
-				description: "This message reached its destination.",
+				description: "This message was delivered.",
 				icon: CheckCircle2Icon,
 				headerClass: "bg-success/5 text-success",
 			};

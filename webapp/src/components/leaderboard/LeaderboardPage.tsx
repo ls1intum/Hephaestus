@@ -1,4 +1,8 @@
+import { Trophy } from "lucide-react";
+import type { ReactNode } from "react";
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import type { ProviderType } from "@/lib/provider";
 import { LeaderboardFilter } from "./LeaderboardFilter";
 import { LeaderboardLegend } from "./LeaderboardLegend";
@@ -21,7 +25,7 @@ interface LeaderboardPageProps {
 	onTeamChange?: (team: string) => void;
 	onSortChange?: (sort: LeaderboardSortType) => void;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string, timeframe?: string) => void;
-	onUserClick?: (username: string) => void;
+	renderUserLink?: (username: string, children: ReactNode) => ReactNode;
 	selectedTeam?: string;
 	selectedSort?: LeaderboardSortType;
 	initialAfterDate?: string;
@@ -34,7 +38,7 @@ interface LeaderboardPageProps {
 	};
 	selectedMode: LeaderboardVariant;
 	onModeChange?: (mode: LeaderboardVariant) => void;
-	onTeamClick?: (teamId: number) => void;
+	renderTeamLink?: (teamId: number, children: ReactNode) => ReactNode;
 	leaguesEnabled?: boolean;
 }
 
@@ -51,7 +55,7 @@ export function LeaderboardPage({
 	onTeamChange,
 	onSortChange,
 	onTimeframeChange,
-	onUserClick,
+	renderUserLink,
 	selectedTeam,
 	selectedSort,
 	initialAfterDate,
@@ -60,7 +64,7 @@ export function LeaderboardPage({
 	leaderboardSchedule,
 	selectedMode,
 	onModeChange,
-	onTeamClick,
+	renderTeamLink,
 	leaguesEnabled = true,
 }: LeaderboardPageProps) {
 	const formattedSchedule = leaderboardSchedule
@@ -71,9 +75,13 @@ export function LeaderboardPage({
 		: undefined;
 
 	return (
-		<div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col items-center">
-			<div className="min-w-0 w-full">
-				<h1 className="text-3xl font-bold mb-4">Code Review Leaderboard</h1>
+		<PageLayout>
+			<PageHeader
+				icon={<Trophy />}
+				title="Leaderboard"
+				description="Compare code review activity across contributors and teams."
+			/>
+			<div className="min-w-0">
 				<div className="grid min-w-0 grid-cols-1 gap-y-4 xl:grid-cols-4 xl:gap-4">
 					<div className="col-span-1 min-w-0 space-y-4">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
@@ -111,8 +119,8 @@ export function LeaderboardPage({
 								isLoading={isLoading}
 								variant={selectedMode}
 								currentUser={currentUser}
-								onUserClick={onUserClick}
-								onTeamClick={onTeamClick}
+								renderUserLink={renderUserLink}
+								renderTeamLink={renderTeamLink}
 								teamLabelsById={teamLabelsById}
 								providerType={providerType}
 								leaguesEnabled={leaguesEnabled}
@@ -125,6 +133,6 @@ export function LeaderboardPage({
 					</div>
 				</div>
 			</div>
-		</div>
+		</PageLayout>
 	);
 }

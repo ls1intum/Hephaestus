@@ -18,7 +18,6 @@ export const TRIGGER_EVENTS_BY_FOCUS: Record<
 		{ value: "IssueLabeled", label: "Issue is labeled" },
 		{ value: "IssueClosed", label: "Issue is closed" },
 	],
-	// Conversation reviews are scheduled rather than triggered by an artifact event.
 	CONVERSATION_THREAD: [],
 };
 
@@ -33,6 +32,11 @@ export const FOCUS_ARTIFACT_OPTIONS = [
 		hint: "Evaluates the diff, commits, and review thread",
 	},
 	{ value: "ISSUE", label: "Issue", hint: "Evaluates the issue title, body, labels, and comments" },
+	{
+		value: "CONVERSATION_THREAD",
+		label: "Conversation",
+		hint: "Evaluates recent messages when the scheduled conversation review runs",
+	},
 ] as const;
 
 export function generateSlug(name: string): string {

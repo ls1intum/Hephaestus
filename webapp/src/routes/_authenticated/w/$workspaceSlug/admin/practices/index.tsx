@@ -1,11 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import { listAreasOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
 import { generateSlug } from "@/components/admin/practices/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
+import {
+	PRACTICE_SEARCH_PARAMS,
+	practiceSearchSchema,
+} from "@/components/admin/practices/practice-search";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -22,13 +29,16 @@ import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practice catalog"),
+	validateSearch: practiceSearchSchema,
+	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
 	component: PracticeCatalogRoute,
 });
 
 function PracticeCatalogRoute() {
 	const { workspaceSlug } = Route.useParams();
+	const { focus } = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
 
-	const [focusFilter, setFocusFilter] = useState<FocusFilter>("ALL");
 	const [deletingArea, setDeletingArea] = useState<PracticeArea | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
@@ -40,16 +50,18 @@ function PracticeCatalogRoute() {
 		...listPracticesOptions({ path: { workspaceSlug } }),
 	});
 
-	if (areasQuery.isPending || practicesQuery.isPending) {
-		return (
-			<div className="flex h-64 items-center justify-center">
-				<Spinner className="size-8" />
-			</div>
-		);
-	}
-	if (areasQuery.isError || practicesQuery.isError) {
-		return (
-			<div className="mx-auto w-full max-w-5xl">
+	return (
+		<PageLayout>
+			<PageHeader
+				icon={<ListChecks />}
+				title="Practice catalog"
+				description="Organize the practices Hephaestus uses to review work."
+			/>
+			{areasQuery.isPending || practicesQuery.isPending ? (
+				<div className="flex h-64 items-center justify-center">
+					<Spinner className="size-8" />
+				</div>
+			) : areasQuery.isError || practicesQuery.isError ? (
 				<QueryErrorAlert
 					error={areasQuery.error ?? practicesQuery.error}
 					title="Couldn't load the practice catalog"
@@ -58,81 +70,74 @@ function PracticeCatalogRoute() {
 						practicesQuery.refetch();
 					}}
 				/>
-			</div>
-		);
-	}
-
-	return (
-		<div className="mx-auto w-full max-w-5xl space-y-6">
-			<header className="space-y-1">
-				<h1 className="text-3xl font-bold tracking-tight">Practice catalog</h1>
-				<p className="max-w-2xl text-muted-foreground">
-					Organize the standards Hephaestus uses to review contributions.
-				</p>
-			</header>
-
-			<PracticeCatalog
-				workspaceSlug={workspaceSlug}
-				areas={areasQuery.data}
-				practices={practicesQuery.data}
-				pending={{
-					areaSlugs: catalog.pendingAreaSlugs,
-					practiceSlugs: catalog.pendingPracticeSlugs,
-					areaStructure: catalog.areaStructurePending,
-					blockedMoveDestinationSlugs: catalog.blockedMoveDestinationSlugs,
-					blockedPracticeOrderBuckets: catalog.blockedPracticeOrderBuckets,
-					creatingArea: catalog.createArea.isPending,
-				}}
-				focusFilter={focusFilter}
-				onFocusFilterChange={setFocusFilter}
-				onCreateArea={async (name) => {
-					try {
-						await catalog.createArea.mutateAsync({
-							path: { workspaceSlug },
-							body: { slug: generateSlug(name), name },
-						});
-						return true;
-					} catch {
-						return false;
+			) : (
+				<PracticeCatalog
+					workspaceSlug={workspaceSlug}
+					areas={areasQuery.data}
+					practices={practicesQuery.data}
+					pending={{
+						areaSlugs: catalog.pendingAreaSlugs,
+						practiceSlugs: catalog.pendingPracticeSlugs,
+						areaStructure: catalog.areaStructurePending,
+						blockedMoveDestinationSlugs: catalog.blockedMoveDestinationSlugs,
+						blockedPracticeOrderBuckets: catalog.blockedPracticeOrderBuckets,
+						creatingArea: catalog.createArea.isPending,
+					}}
+					focusFilter={focus ?? "ALL"}
+					onFocusFilterChange={(next: FocusFilter) =>
+						navigate({
+							search: { focus: next === "ALL" ? undefined : next },
+						})
 					}
-				}}
-				onRenameArea={async (areaSlug, name) => {
-					try {
-						await catalog.updateArea.mutateAsync({
-							path: { workspaceSlug, areaSlug },
-							body: { name },
-						});
-						return true;
-					} catch {
-						return false;
+					onCreateArea={async (name) => {
+						try {
+							await catalog.createArea.mutateAsync({
+								path: { workspaceSlug },
+								body: { slug: generateSlug(name), name },
+							});
+							return true;
+						} catch {
+							return false;
+						}
+					}}
+					onRenameArea={async (areaSlug, name) => {
+						try {
+							await catalog.updateArea.mutateAsync({
+								path: { workspaceSlug, areaSlug },
+								body: { name },
+							});
+							return true;
+						} catch {
+							return false;
+						}
+					}}
+					onToggleAreaActive={(areaSlug, active) =>
+						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: { active } })
 					}
-				}}
-				onToggleAreaActive={(areaSlug, active) =>
-					catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: { active } })
-				}
-				onDeleteArea={(areaSlug) =>
-					setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
-				}
-				onReorderAreas={(orderedSlugs) =>
-					catalog.reorderAreas.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })
-				}
-				onSetAreaVisual={(areaSlug, patch) =>
-					catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: patch })
-				}
-				onSetPracticeActive={(practiceSlug, active) =>
-					catalog.setActive.mutate({
-						path: { workspaceSlug, practiceSlug },
-						body: { active },
-					})
-				}
-				onDeletePractice={setDeletingPractice}
-				onPlacePractice={(practiceSlug, areaSlug, position) =>
-					catalog.placePractice.mutate({
-						path: { workspaceSlug, practiceSlug },
-						body: { areaSlug: areaSlug ?? undefined, position },
-					})
-				}
-			/>
+					onDeleteArea={(areaSlug) =>
+						setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
+					}
+					onReorderAreas={(orderedSlugs) =>
+						catalog.reorderAreas.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })
+					}
+					onSetAreaVisual={(areaSlug, patch) =>
+						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: patch })
+					}
+					onSetPracticeActive={(practiceSlug, active) =>
+						catalog.setActive.mutate({
+							path: { workspaceSlug, practiceSlug },
+							body: { active },
+						})
+					}
+					onDeletePractice={setDeletingPractice}
+					onPlacePractice={(practiceSlug, areaSlug, position) =>
+						catalog.placePractice.mutate({
+							path: { workspaceSlug, practiceSlug },
+							body: { areaSlug: areaSlug ?? undefined, position },
+						})
+					}
+				/>
+			)}
 
 			<AlertDialog
 				open={deletingArea !== null}
@@ -178,8 +183,7 @@ function PracticeCatalogRoute() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{deletingPractice?.name}&rdquo;?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently deletes the practice definition and its observations. This cannot be
-							undone.
+							This permanently deletes the practice and its findings. This can't be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -203,6 +207,6 @@ function PracticeCatalogRoute() {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</div>
+		</PageLayout>
 	);
 }

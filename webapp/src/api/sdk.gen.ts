@@ -1293,7 +1293,11 @@ export const updateArea = <ThrowOnError extends boolean = false>(options: Option
  *
  * Returns all practice definitions for the workspace, optionally filtered by active state
  */
-export const listPractices = <ThrowOnError extends boolean = false>(options: Options<ListPracticesData, ThrowOnError>) => (options.client ?? client).get<ListPracticesResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices', ...options });
+export const listPractices = <ThrowOnError extends boolean = false>(options: Options<ListPracticesData, ThrowOnError>) => (options.client ?? client).get<ListPracticesResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices',
+    ...options
+});
 
 /**
  * Create a new practice definition
@@ -1485,7 +1489,11 @@ export const deletePractice = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Get a practice definition
  */
-export const getPractice = <ThrowOnError extends boolean = false>(options: Options<GetPracticeData, ThrowOnError>) => (options.client ?? client).get<GetPracticeResponses, GetPracticeErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}', ...options });
+export const getPractice = <ThrowOnError extends boolean = false>(options: Options<GetPracticeData, ThrowOnError>) => (options.client ?? client).get<GetPracticeResponses, GetPracticeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}',
+    ...options
+});
 
 /**
  * Update a practice

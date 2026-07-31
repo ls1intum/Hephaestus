@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, WorkflowIcon } from "lucide-react";
+import { WorkflowIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
 	cancelAgentJobMutation,
@@ -24,7 +24,6 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import {
 	Empty,
 	EmptyDescription,
@@ -34,8 +33,8 @@ import {
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf } from "@/lib/problem-detail";
-import { cn } from "@/lib/utils";
 import { ReviewArtifactLink } from "./ReviewArtifact";
+import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewOutputSections } from "./ReviewOutputSections";
 import { ReviewRunActions } from "./ReviewRunActions";
 import { ReviewRunTechnicalDetails } from "./ReviewRunTechnicalDetails";
@@ -101,20 +100,42 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				description: problemDetailOf(error, "Try again in a moment."),
 			}),
 	});
+	const breadcrumbs = (
+		<ReviewBreadcrumbs
+			workspaceSlug={workspaceSlug}
+			section={{
+				label: "Reviews",
+				link: (
+					<Link
+						to="/w/$workspaceSlug/admin/practices/reviews"
+						params={{ workspaceSlug }}
+						search={{ page: search.page, status: search.status }}
+					/>
+				),
+			}}
+			current="Review"
+		/>
+	);
 
 	if (jobQuery.isLoading)
 		return (
-			<div className="flex min-h-64 items-center justify-center">
-				<Spinner className="size-7" />
-			</div>
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<div className="flex min-h-64 items-center justify-center">
+					<Spinner className="size-7" />
+				</div>
+			</article>
 		);
 	if (jobQuery.isError || !jobQuery.data) {
 		return (
-			<QueryErrorAlert
-				error={jobQuery.error}
-				title="Couldn't load this review"
-				onRetry={() => jobQuery.refetch()}
-			/>
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<QueryErrorAlert
+					error={jobQuery.error}
+					title="Couldn't load this review"
+					onRetry={() => jobQuery.refetch()}
+				/>
+			</article>
 		);
 	}
 	const job = jobQuery.data;
@@ -134,15 +155,8 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 		feedback.length === 0;
 
 	return (
-		<article className="mx-auto min-w-0 max-w-4xl space-y-8">
-			<Link
-				to="/w/$workspaceSlug/admin/practices/reviews"
-				params={{ workspaceSlug }}
-				search={{ page: search.page, status: search.status }}
-				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3")}
-			>
-				<ArrowLeftIcon aria-hidden /> Back to reviews
-			</Link>
+		<article className="min-w-0 max-w-4xl space-y-8">
+			{breadcrumbs}
 			<header className="space-y-4">
 				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 					<div className="min-w-0 space-y-2">

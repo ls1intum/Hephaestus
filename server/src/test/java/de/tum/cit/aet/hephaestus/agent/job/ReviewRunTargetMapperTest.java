@@ -54,6 +54,7 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
 
         ObjectNode conversation = MAPPER.createObjectNode();
         conversation.put("slack_thread_id", 91L);
+        conversation.put("slack_channel_name", "engineering");
 
         ObjectNode malformed = MAPPER.createObjectNode();
         malformed.put("pull_request_id", "not-an-id");
@@ -105,7 +106,7 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
                     null,
                     "Conversation",
                     null,
-                    null,
+                    "engineering",
                     null
                 )
             ),

@@ -121,7 +121,6 @@ function ThreadContainer() {
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<Chat
-				id={mentorChat.currentThreadId || threadId}
 				messages={mentorChat.messages as unknown as ChatMessage[]}
 				votes={mentorChat.votes}
 				status={mentorChat.status}

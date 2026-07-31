@@ -15,7 +15,13 @@ function FeedbackListRoute() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const updateSearch = (patch: Partial<FeedbackSearch>) =>
-		navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
+		navigate({
+			search: (previous) => {
+				const next = { ...previous, ...patch };
+				return { ...next, page: next.page || undefined };
+			},
+			replace: true,
+		});
 
 	return (
 		<FeedbackListPage workspaceSlug={workspaceSlug} search={search} onSearchChange={updateSearch} />

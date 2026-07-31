@@ -17,6 +17,8 @@ import type {
 } from "@/api/types.gen";
 import { LoginProviderFormDialog } from "@/components/admin/login-providers/LoginProviderFormDialog";
 import { LoginProvidersTable } from "@/components/admin/login-providers/LoginProvidersTable";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
@@ -27,7 +29,6 @@ export const Route = createFileRoute("/_authenticated/admin/login-providers")({
 	component: AdminLoginProvidersPage,
 });
 
-/** One prefix for toggle and delete, so one lookup covers both. Creation has no row to disable. */
 const PROVIDER_WRITE_MUTATION_KEY = ["adminWriteLoginProvider"];
 
 function AdminLoginProvidersPage() {
@@ -96,24 +97,18 @@ function AdminLoginProvidersPage() {
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-5xl space-y-6">
-			<header className="flex flex-wrap items-start justify-between gap-3">
-				<div className="space-y-1">
-					<div className="flex items-center gap-2">
-						<KeyRound className="size-6 text-muted-foreground" aria-hidden />
-						<h1 className="text-2xl font-semibold">Login providers</h1>
-					</div>
-					<p className="max-w-2xl text-sm text-muted-foreground">
-						Configure OAuth providers for sign-in and account linking. Slack and Outline are
-						link-only — users connect them from Settings, they are never offered on the sign-in
-						page. Slack's redirect URI here is separate from the Slack app-install callback.
-					</p>
-				</div>
-				<Button onClick={openCreate}>
-					<Plus className="size-4" aria-hidden />
-					Add provider
-				</Button>
-			</header>
+		<PageLayout>
+			<PageHeader
+				icon={<KeyRound />}
+				title="Login providers"
+				description="Configure OAuth providers for sign-in and account linking."
+				actions={
+					<Button onClick={openCreate}>
+						<Plus className="size-4" aria-hidden />
+						Add provider
+					</Button>
+				}
+			/>
 
 			<LoginProvidersTable
 				providers={providers}
@@ -136,6 +131,6 @@ function AdminLoginProvidersPage() {
 				onCreate={handleCreate}
 				onUpdate={handleUpdate}
 			/>
-		</div>
+		</PageLayout>
 	);
 }

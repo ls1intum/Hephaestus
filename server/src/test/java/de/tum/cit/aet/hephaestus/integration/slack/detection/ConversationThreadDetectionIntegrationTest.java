@@ -122,6 +122,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
             .containsExactlyInAnyOrder(100L, 101L);
         assertThat(captor.getAllValues()).allSatisfy(r -> {
             assertThat(r.slackChannelId()).isEqualTo("C1");
+            assertThat(r.slackChannelName()).isEqualTo("engineering");
             assertThat(r.slackThreadTs()).isEqualTo(rootTs);
             assertThat(r.lastTs()).isEqualTo(lastTs);
         });

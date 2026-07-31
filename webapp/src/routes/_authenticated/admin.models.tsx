@@ -37,6 +37,8 @@ import { AdminLlmModelFormDialog } from "@/components/admin/llm/AdminLlmModelFor
 import { AdminLlmModelsSection } from "@/components/admin/llm/AdminLlmModelsSection";
 import { InstanceLlmSettingsCard } from "@/components/admin/llm/InstanceLlmSettingsCard";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
@@ -53,7 +55,6 @@ export const Route = createFileRoute("/_authenticated/admin/models")({
 	component: AdminLlmPage,
 });
 
-/** One prefix per row kind, so a delete cannot un-disable a row whose own write is still in flight. */
 const CONNECTION_WRITE_MUTATION_KEY = ["adminWriteLlmConnection"];
 const MODEL_WRITE_MUTATION_KEY = ["adminWriteLlmModel"];
 
@@ -218,29 +219,25 @@ function AdminLlmPage() {
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6">
-			<header className="flex flex-wrap items-start justify-between gap-3">
-				<div className="space-y-1">
-					<div className="flex items-center gap-2">
-						<BrainCircuit className="size-6 text-muted-foreground" aria-hidden />
-						<h1 className="text-2xl font-semibold">AI models</h1>
-					</div>
-					<p className="max-w-2xl text-sm text-muted-foreground">
-						Connect OpenAI-compatible endpoints and share models with workspaces.
-					</p>
-				</div>
-				<Button
-					disabled={!connectionsQuery.isSuccess}
-					onClick={() => {
-						setEditingConnection(null);
-						setProbedModels({ connectionId: null, models: [] });
-						setConnectionDialogOpen(true);
-					}}
-				>
-					<Plus className="size-4" aria-hidden />
-					Add connection
-				</Button>
-			</header>
+		<PageLayout>
+			<PageHeader
+				icon={<BrainCircuit />}
+				title="AI models"
+				description="Connect OpenAI-compatible endpoints and share models with workspaces."
+				actions={
+					<Button
+						disabled={!connectionsQuery.isSuccess}
+						onClick={() => {
+							setEditingConnection(null);
+							setProbedModels({ connectionId: null, models: [] });
+							setConnectionDialogOpen(true);
+						}}
+					>
+						<Plus className="size-4" aria-hidden />
+						Add connection
+					</Button>
+				}
+			/>
 
 			<AdminLlmConnectionsTable
 				connections={connections}
@@ -379,9 +376,6 @@ function AdminLlmPage() {
 
 			<AdminLlmModelAccessDialog
 				open={accessModel != null}
-				// Dismissal is allowed while the PUT is in flight: we set no request timeout, so refusing
-				// it would trap focus in the popup against a connection that never answers. The request
-				// runs on and its row stays disabled, so this cannot reopen onto a second save.
 				onOpenChange={(open) => {
 					if (!open) setAccessModel(null);
 				}}
@@ -409,6 +403,6 @@ function AdminLlmPage() {
 					);
 				}}
 			/>
-		</div>
+		</PageLayout>
 	);
 }

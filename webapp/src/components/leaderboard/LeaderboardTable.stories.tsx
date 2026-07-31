@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { LeaderboardTable } from "./LeaderboardTable";
 
@@ -43,10 +42,6 @@ const reviewedPullRequests = [
 		},
 	},
 ];
-
-/**
- * A table component that displays leaderboard data with user rankings, scores, and activity metrics.
- */
 
 const mockLeaderboardEntries: LeaderboardEntry[] = [
 	{
@@ -182,24 +177,8 @@ const meta = {
 	parameters: {
 		layout: "padded",
 	},
-	argTypes: {
-		leaderboard: {
-			description: "Array of leaderboard entries to display",
-		},
-		isLoading: {
-			description: "Whether the leaderboard data is currently loading",
-			control: "boolean",
-		},
-		currentUser: {
-			description: "Currently logged in user info to highlight their row",
-		},
-		onUserClick: {
-			description: "Callback function when a user row is clicked",
-			action: "clicked",
-		},
-	},
 	args: {
-		onUserClick: fn(),
+		renderUserLink: (username, children) => <a href={`/users/${username}`}>{children}</a>,
 		variant: "INDIVIDUAL",
 	},
 } satisfies Meta<typeof LeaderboardTable>;
@@ -207,9 +186,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof LeaderboardTable>;
 
-/**
- * Default display of the leaderboard with entries and navigation callback.
- */
 export const Default: Story = {
 	args: {
 		leaderboard: mockLeaderboardEntries,
@@ -217,9 +193,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Loading state showing skeleton placeholders.
- */
 export const Loading: Story = {
 	args: {
 		leaderboard: [],
@@ -227,9 +200,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * Empty state shown when no leaderboard entries are available.
- */
 export const Empty: Story = {
 	args: {
 		leaderboard: [],
@@ -237,9 +207,6 @@ export const Empty: Story = {
 	},
 };
 
-/**
- * Shows the leaderboard with the current user highlighted.
- */
 export const WithCurrentUser: Story = {
 	args: {
 		leaderboard: mockLeaderboardEntries,
@@ -311,14 +278,11 @@ const mockTeamLeaderboardEntries: LeaderboardEntry[] = [
 	},
 ];
 
-/**
- * Team variant with aggregated team-level activity metrics.
- */
 export const TeamVariant: Story = {
 	args: {
 		leaderboard: mockTeamLeaderboardEntries,
 		isLoading: false,
 		variant: "TEAM",
-		onTeamClick: fn(),
+		renderTeamLink: (teamId, children) => <a href={`?team=${teamId}`}>{children}</a>,
 	},
 };

@@ -4,6 +4,8 @@ import { useId } from "react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { BudgetExhaustedAlert } from "@/components/admin/ai/BudgetExhaustedAlert";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,28 +28,18 @@ import { MonthNavigator } from "./MonthNavigator";
 import { budgetUsedPercent, formatMonthLabel, projectBudget } from "./usage-utils";
 
 export interface AdminLlmUsagePageProps {
-	/** ISO `yyyy-MM`. */
 	month: string;
 	isCurrentMonth: boolean;
-	/** Not `!isCurrentMonth`: both are false on a month later than this one. */
 	canGoNext: boolean;
 	workspaceSlug: string;
 	report?: WorkspaceLlmUsageReport;
 	isLoading: boolean;
 	error: unknown;
 	onRetry?: () => void;
-	onPrevMonth: () => void;
-	onNextMonth: () => void;
 	onEditOwnProviderCap: () => void;
 	now?: Date;
 }
 
-/**
- * Workspace-admin cost control for one month, under two independent caps that are different
- * people's money and are never summed (`docs/contributor/llm-cost-vocabulary.md`): the
- * *shared-model budget* the host sets and funds, and the *provider cap* the workspace sets on its
- * own provider. Every banner names whose cap tripped, because only one of them is theirs to lift.
- */
 export function AdminLlmUsagePage({
 	month,
 	isCurrentMonth,
@@ -57,12 +49,9 @@ export function AdminLlmUsagePage({
 	isLoading,
 	error,
 	onRetry,
-	onPrevMonth,
-	onNextMonth,
 	onEditOwnProviderCap,
 	now = new Date(),
 }: AdminLlmUsagePageProps) {
-	// Priced spend only, so each is a floor when `unpricedEventCount` is non-zero.
 	const sharedSpend = report?.instanceTotalCostUsd ?? 0;
 	const providerSpend = report?.ownProviderTotalCostUsd ?? 0;
 	const sharedBudget = report?.instanceMonthlyBudgetUsd;
@@ -93,7 +82,6 @@ export function AdminLlmUsagePage({
 		providerCap != null
 			? spendOfCapConversion(providerSpend, providerCap, fx)
 			: spendConversion(providerSpend, fx);
-	// Only figures that actually render, so the estimate footnote never trails a page with no estimate on it.
 	const hasConversion =
 		sharedTitleFx != null ||
 		providerTitleFx != null ||
@@ -101,21 +89,26 @@ export function AdminLlmUsagePage({
 		spendConversion(providerSpend, fx) != null;
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6">
-			<div className="flex flex-wrap items-center justify-between gap-4">
-				<header className="space-y-1">
-					<div className="flex items-center gap-2">
-						<CircleDollarSign className="size-6 text-muted-foreground" aria-hidden />
-						<h1 className="text-2xl font-semibold">AI usage</h1>
-					</div>
-				</header>
-				<MonthNavigator
-					month={month}
-					canGoNext={canGoNext}
-					onPrevMonth={onPrevMonth}
-					onNextMonth={onNextMonth}
-				/>
-			</div>
+		<PageLayout>
+			<PageHeader
+				icon={<CircleDollarSign />}
+				title="AI usage"
+				description="Track model spend and usage for this workspace."
+				actions={
+					<MonthNavigator
+						month={month}
+						canGoNext={canGoNext}
+						renderMonthLink={(nextMonth, props) => (
+							<Link
+								{...props}
+								to="/w/$workspaceSlug/admin/usage"
+								params={{ workspaceSlug }}
+								search={(previous) => ({ ...previous, month: nextMonth })}
+							/>
+						)}
+					/>
+				}
+			/>
 
 			{error != null ? (
 				<QueryErrorAlert error={error} title="Couldn't load AI usage" onRetry={onRetry} />
@@ -145,7 +138,6 @@ export function AdminLlmUsagePage({
 				</>
 			) : (
 				<>
-					{/* The provider cap comes first when both are paused: it is the one they can act on. */}
 					{providerPaused && (
 						<BudgetExhaustedAlert
 							scope="own"
@@ -289,7 +281,7 @@ export function AdminLlmUsagePage({
 					{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
 				</>
 			)}
-		</div>
+		</PageLayout>
 	);
 }
 
@@ -311,7 +303,6 @@ interface CapHeadlineProps {
 	titleFx: FxConversion | null;
 }
 
-/** Spend, the cap it runs against, and the display-currency estimate — one voice on both cards. */
 function CapHeadline({ spendUsd, capUsd, titleFx }: CapHeadlineProps) {
 	return (
 		<CardTitle className="text-2xl tabular-nums">
@@ -335,7 +326,6 @@ interface SharedBudgetCardProps {
 	titleFx: FxConversion | null;
 }
 
-/** Read-only by design: only the host can move this number. */
 function SharedBudgetCard({
 	isCurrentMonth,
 	spendUsd,
@@ -346,7 +336,6 @@ function SharedBudgetCard({
 }: SharedBudgetCardProps) {
 	const labelId = useId();
 	return (
-		// A landmark, so "which purse is this figure in" is answerable from the accessible tree alone.
 		<Card role="region" aria-labelledby={labelId}>
 			<CardHeader>
 				<CardDescription id={labelId}>
@@ -385,7 +374,6 @@ interface ProviderCapCardProps {
 	titleFx: FxConversion | null;
 }
 
-/** The workspace's own money: set, change, and remove all live here. */
 function ProviderCapCard({
 	isCurrentMonth,
 	spendUsd,

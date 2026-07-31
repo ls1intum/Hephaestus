@@ -10,11 +10,11 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A finding that contributed to a feedback unit")
+@Schema(description = "A finding that contributed to a message")
 public record ReviewBoundFindingDTO(
     @NonNull UUID findingId,
-    @NonNull @Schema(description = "Whether the finding leads the unit or reinforces it") EvidenceRole role,
-    @NonNull @Schema(description = "Render order within the unit (lower renders earlier)") Integer ordinal,
+    @NonNull @Schema(description = "Whether the finding leads the message or reinforces it") EvidenceRole role,
+    @NonNull @Schema(description = "Render order within the message (lower renders earlier)") Integer ordinal,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
     @Schema(description = "Practice area; null when the practice is Unassigned") ReviewPracticeAreaDTO area,
@@ -22,7 +22,7 @@ public record ReviewBoundFindingDTO(
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Detector confidence (0.0-1.0)") Float confidence,
+    @NonNull @Schema(description = "Detector confidence", minimum = "0", maximum = "1") Float confidence,
     @NonNull Instant observedAt
 ) {
     public static ReviewBoundFindingDTO from(BoundObservation row) {

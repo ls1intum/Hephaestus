@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, within } from "storybook/test";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { MonthNavigator } from "./MonthNavigator";
 
-/** Prev/next month stepper. Pure — the container owns the selected month. */
 const meta = {
 	component: MonthNavigator,
 	parameters: { layout: "centered" },
@@ -11,8 +10,7 @@ const meta = {
 	args: {
 		month: "2026-07",
 		canGoNext: true,
-		onPrevMonth: fn(),
-		onNextMonth: fn(),
+		renderMonthLink: (month, props) => <a {...props} href={`?month=${month}`} />,
 	},
 } satisfies Meta<typeof MonthNavigator>;
 
@@ -21,16 +19,15 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/**
- * WCAG 2.2 SC 4.1.2: `disabled`, not `aria-disabled` — a merely dimmed control stays in the tab
- * order and still announces as available, inviting a keyboard user into a month that cannot exist.
- */
 export const CurrentMonth: Story = {
 	args: { canGoNext: false },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Next month" }));
-		await expect(canvas.getByRole("button", { name: "Previous month" })).toBeEnabled();
+		await expect(canvas.getByRole("link", { name: "Previous month" })).toHaveAttribute(
+			"href",
+			"?month=2026-06",
+		);
 	},
 };
 

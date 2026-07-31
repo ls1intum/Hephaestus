@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { getUserProfileOptions, reloadAchievementsMutation } from "@/api/@tanstack/react-query.gen";
 import { AchievementDesignerHeader } from "@/components/achievements/AchievementDesignerHeader";
 import { SkillTreeDesigner } from "@/components/achievements/SkillTreeDesigner";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";
 import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-definitions";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
@@ -23,7 +24,8 @@ function AchievementDesignerPage() {
 	const queryClient = useQueryClient();
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
 	const { workspaceSlug } = Route.useParams();
-	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
+	const featureState = useWorkspaceFeatures(workspaceSlug);
+	const achievementsEnabled = featureState.features?.achievementsEnabled;
 
 	const reloadMutation = useMutation({
 		...reloadAchievementsMutation(),
@@ -62,11 +64,21 @@ function AchievementDesignerPage() {
 
 	const allDefinitionsQuery = useAllAchievementDefinitions(workspaceSlug, username || "");
 
-	if (!featuresLoading && !achievementsEnabled) {
+	if (!featureState.isLoading && !featureState.isError && achievementsEnabled === false) {
 		return <Navigate to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} replace />;
 	}
 
-	if (featuresLoading || !achievementsEnabled) {
+	if (featureState.isError) {
+		return (
+			<QueryErrorAlert
+				error={featureState.error}
+				title="Couldn't load workspace features"
+				onRetry={featureState.refetch}
+			/>
+		);
+	}
+
+	if (featureState.isLoading || achievementsEnabled !== true) {
 		return (
 			<div className="flex min-h-0 flex-1 items-center justify-center">
 				<Spinner className="h-8 w-8" />

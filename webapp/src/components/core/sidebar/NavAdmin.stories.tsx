@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect } from "storybook/test";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavAdmin } from "./NavAdmin";
 
@@ -11,16 +12,7 @@ const meta = {
 	args: {
 		workspaceSlug: "aet",
 		achievementsEnabled: true,
-	},
-	argTypes: {
-		workspaceSlug: {
-			control: "text",
-			description: "Active workspace slug",
-		},
-		achievementsEnabled: {
-			control: "boolean",
-			description: "Whether achievement management is available",
-		},
+		integrationKinds: ["GITHUB", "SLACK", "OUTLINE"],
 	},
 	decorators: [
 		(Story) => (
@@ -45,5 +37,32 @@ export const AchievementsDisabled: Story = {
 export const GitLabWorkspace: Story = {
 	args: {
 		scmProviderType: "GITLAB",
+		integrationKinds: ["GITLAB", "SLACK", "OUTLINE"],
+	},
+};
+
+export const ExpandedNavigation: Story = {
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Practices" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Integrations" }));
+
+		await expect(canvas.getByRole("link", { name: "Catalog" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Practice reviews" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Overview" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+	},
+};
+
+export const OptionalIntegrationsUnavailable: Story = {
+	args: {
+		integrationKinds: ["GITHUB"],
+	},
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Integrations" }));
+
+		await expect(canvas.getByRole("link", { name: "Overview" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+		await expect(canvas.queryByRole("link", { name: "Slack" })).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("link", { name: "Outline" })).not.toBeInTheDocument();
 	},
 };

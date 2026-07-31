@@ -94,7 +94,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 					</nav>
 
 					{showBuildInfo && (
-						<div className="hidden items-center gap-2 border-l border-sidebar-border pl-4 font-mono text-xs text-muted-foreground/60 xl:flex">
+						<div className="hidden items-center gap-2 border-l border-sidebar-border pl-4 font-mono text-xs text-muted-foreground xl:flex">
 							{buildInfo?.branch && (
 								<Tooltip>
 									<TooltipTrigger

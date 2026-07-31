@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ArrowRightIcon, HistoryIcon } from "lucide-react";
-import { Fragment } from "react";
 import { listSlackChannelConsentEventsOptions } from "@/api/@tanstack/react-query.gen";
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -12,14 +11,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import {
-	Item,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemSeparator,
-	ItemTitle,
-} from "@/components/ui/item";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Sheet,
@@ -34,15 +26,10 @@ import { ConsentStateBadge } from "./consent-terms";
 
 export interface ChannelHistorySheetProps {
 	workspaceSlug: string;
-	/** Non-null opens the sheet and selects the channel whose audit trail to load. */
 	channel: SlackMonitoredChannel | null;
 	onOpenChange: (open: boolean) => void;
 }
 
-/**
- * Lazy per-channel consent audit trail. The query is enabled only while the sheet is open,
- * so listing the channels never fans out N history requests.
- */
 export function ChannelHistorySheet({
 	workspaceSlug,
 	channel,
@@ -103,12 +90,9 @@ export function ChannelHistorySheet({
 					)}
 
 					{!isLoading && !error && events.length > 0 && (
-						<ItemGroup>
-							{events.map((event, index) => (
-								<Fragment key={event.id}>
-									{index > 0 && <ItemSeparator />}
-									<HistoryEntry event={event} />
-								</Fragment>
+						<ItemGroup className="has-[[data-size=sm]]:gap-0">
+							{events.map((event) => (
+								<HistoryEntry key={event.id} event={event} />
 							))}
 						</ItemGroup>
 					)}
@@ -120,7 +104,11 @@ export function ChannelHistorySheet({
 
 function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
 	return (
-		<Item render={<li />} size="sm" className="items-start">
+		<Item
+			render={<li />}
+			size="sm"
+			className="items-start rounded-none border-x-0 border-t-0 border-b border-border last:border-b-0"
+		>
 			<ItemContent>
 				<ItemTitle className="gap-1.5">
 					{event.fromState && (

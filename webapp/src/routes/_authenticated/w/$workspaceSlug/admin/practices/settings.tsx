@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { SlidersHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
 	getPracticeReviewSettingsOptions,
@@ -7,14 +9,17 @@ import {
 	getWorkspaceOptions,
 	listAgentsOptions,
 	updatePracticeReviewSettingsMutation,
-	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
 import {
-	PracticeDetectionPolicyCard,
 	type PracticeReviewField,
+	PracticeReviewSettings as PracticeReviewSettingsForm,
 	type PracticeReviewWorkspaceUpdate,
-} from "@/components/admin/ai/PracticeDetectionPolicyCard";
+} from "@/components/admin/practices/PracticeReviewSettings";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
+import { Spinner } from "@/components/ui/spinner";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
 
@@ -33,10 +38,6 @@ function ReviewSettingsContainer() {
 
 	const bindingsQuery = useQuery({
 		...listAgentsOptions({ path: { workspaceSlug } }),
-	});
-
-	const availableModelsQuery = useQuery({
-		...workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug } }),
 	});
 
 	const workspaceQuery = useQuery({
@@ -105,56 +106,63 @@ function ReviewSettingsContainer() {
 		updateFeatures.mutate({ path: { workspaceSlug }, body: settings });
 	};
 
-	return (
-		<div className="mx-auto w-full max-w-3xl space-y-6">
-			<header className="space-y-1">
-				<h1 className="text-3xl font-bold tracking-tight">Practice review settings</h1>
-				<p className="max-w-2xl text-muted-foreground">
-					Configure how Hephaestus reviews connected project work.
-				</p>
-			</header>
+	const isLoading = reviewSettingsQuery.isLoading || workspaceQuery.isLoading;
+	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
-			<PracticeDetectionPolicyCard
-				settings={reviewSettingsQuery.data}
-				detectionBinding={bindingsQuery.data?.find(
-					(binding) => binding.purpose === "PRACTICE_DETECTION",
-				)}
-				workspaceSlug={workspaceSlug}
-				availableModels={availableModelsQuery.data ?? []}
-				enabled={workspaceQuery.data?.practicesEnabled ?? false}
-				autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
-				manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
-				isLoading={
-					reviewSettingsQuery.isLoading ||
-					bindingsQuery.isLoading ||
-					availableModelsQuery.isLoading ||
-					workspaceQuery.isLoading
-				}
-				isError={
-					reviewSettingsQuery.isError ||
-					bindingsQuery.isError ||
-					availableModelsQuery.isError ||
-					workspaceQuery.isError
-				}
-				error={
-					reviewSettingsQuery.error ??
-					bindingsQuery.error ??
-					availableModelsQuery.error ??
-					workspaceQuery.error
-				}
-				savingReviewSettings={updatePracticeReviewSettings.isPending}
-				savingWorkspaceSettings={updateFeatures.isPending}
-				onUpdateReviewSettings={handleUpdateReviewSettings}
-				onUpdateWorkspaceSettings={handleUpdateWorkspaceSettings}
-				onResetReviewField={handleResetReviewField}
+	let content: ReactNode;
+	if (isLoading) {
+		content = (
+			<div className="flex h-40 items-center justify-center">
+				<Spinner className="size-6" />
+			</div>
+		);
+	} else if (error || !reviewSettingsQuery.data || !workspaceQuery.data) {
+		content = (
+			<QueryErrorAlert
+				error={error}
+				title="Couldn't load the review settings"
 				onRetry={() => {
 					reviewSettingsQuery.refetch();
-					bindingsQuery.refetch();
-					availableModelsQuery.refetch();
 					workspaceQuery.refetch();
 				}}
 			/>
-		</div>
+		);
+	} else {
+		content = (
+			<PracticeReviewSettingsForm
+				workspaceSlug={workspaceSlug}
+				model={{
+					binding: bindingsQuery.data?.find((binding) => binding.purpose === "PRACTICE_DETECTION"),
+					isLoading: bindingsQuery.isLoading,
+					isError: bindingsQuery.isError,
+					onRetry: () => bindingsQuery.refetch(),
+				}}
+				workspace={{
+					enabled: workspaceQuery.data.practicesEnabled,
+					autoTriggerEnabled: workspaceQuery.data.practiceReviewAutoTriggerEnabled,
+					manualTriggerEnabled: workspaceQuery.data.practiceReviewManualTriggerEnabled,
+					isSaving: updateFeatures.isPending,
+					onUpdate: handleUpdateWorkspaceSettings,
+				}}
+				policy={{
+					settings: reviewSettingsQuery.data,
+					isSaving: updatePracticeReviewSettings.isPending,
+					onUpdate: handleUpdateReviewSettings,
+					onReset: handleResetReviewField,
+				}}
+			/>
+		);
+	}
+
+	return (
+		<PageLayout>
+			<PageHeader
+				icon={<SlidersHorizontal />}
+				title="Review settings"
+				description="Configure how Hephaestus reviews connected project work."
+			/>
+			<div className="max-w-3xl">{content}</div>
+		</PageLayout>
 	);
 }
 

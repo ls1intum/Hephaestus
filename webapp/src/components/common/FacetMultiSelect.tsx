@@ -124,14 +124,16 @@ export function FacetMultiSelect<TValue extends string | number>({
 					</>
 				) : (
 					<>
-						<span
-							className={cn("truncate", selectedOptions.length === 0 && "text-muted-foreground")}
-						>
-							{selectedOptions.length === 0
-								? `Select ${title.toLowerCase()}…`
-								: selectedOptions.length === 1
-									? selectedOptions[0].label
-									: `${selectedOptions.length} selected`}
+						<span className="min-w-0 truncate text-left">
+							<span>{title}</span>
+							{selectedOptions.length > 0 && (
+								<span className="text-muted-foreground">
+									:{" "}
+									{selectedOptions.length === 1
+										? selectedOptions[0].label
+										: `${selectedOptions.length} selected`}
+								</span>
+							)}
 						</span>
 						<ComboboxIcon>
 							<ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" aria-hidden />
@@ -140,7 +142,7 @@ export function FacetMultiSelect<TValue extends string | number>({
 				)}
 			</ComboboxTrigger>
 
-			<ComboboxContent align="start" className="min-w-56">
+			<ComboboxContent align="start" className="min-w-56" aria-label={`${title} filters`}>
 				<ComboboxSearchInput
 					placeholder="Search…"
 					aria-label={`Search ${title.toLowerCase()} options`}

@@ -6,6 +6,7 @@ import {
 	getUserProfileOptions,
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -63,12 +64,13 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$use
 function UserProfile() {
 	const { username, workspaceSlug } = Route.useParams();
 	const { isCurrentUser } = useAuth();
-	const { achievementsEnabled, progressionEnabled, leaguesEnabled } =
-		useWorkspaceFeatures(workspaceSlug);
+	const featureState = useWorkspaceFeatures(workspaceSlug);
+	const achievementsEnabled = featureState.features?.achievementsEnabled;
+	const progressionEnabled = featureState.features?.progressionEnabled;
+	const leaguesEnabled = featureState.features?.leaguesEnabled;
 	const { after, before, monitorRepositories, monitorLimit } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Query for workspace to get leaderboard schedule
 	const workspaceQuery = useQuery({
 		...getWorkspaceOptions({
 			path: { workspaceSlug },
@@ -76,8 +78,6 @@ function UserProfile() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	// Extract leaderboard schedule from workspace config
-	// React Compiler handles memoization automatically
 	const getSchedule = (): LeaderboardSchedule => {
 		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
 
@@ -95,12 +95,10 @@ function UserProfile() {
 	};
 	const schedule = getSchedule();
 
-	// Compute effective date range - default to "this week" based on schedule
 	const getEffectiveDates = () => {
 		if (after) {
 			return { after, before };
 		}
-		// Default to "this week" using the leaderboard schedule
 		const range = getDateRangeForPreset("this-week", schedule);
 		return formatDateRangeForApi(range);
 	};
@@ -115,10 +113,8 @@ function UserProfile() {
 	const parsedBefore = parseDateParam(effectiveDates.before);
 	const selectedRepositoryIds = parseRepositoryIds(monitorRepositories);
 
-	// Check if current user is the dashboard user
 	const currUserIsDashboardUser = isCurrentUser(username);
 
-	// Query for user profile data
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
 			path: { workspaceSlug, login: username },
@@ -165,6 +161,16 @@ function UserProfile() {
 		});
 	};
 
+	if (featureState.isError) {
+		return (
+			<QueryErrorAlert
+				error={featureState.error}
+				title="Couldn't load workspace features"
+				onRetry={featureState.refetch}
+			/>
+		);
+	}
+
 	return (
 		<ProfilePage
 			providerType={toScmProviderType(workspaceQuery.data?.providerType)}
@@ -188,9 +194,9 @@ function UserProfile() {
 			before={effectiveDates.before}
 			onTimeframeChange={handleTimeframeChange}
 			schedule={schedule}
-			achievementsEnabled={achievementsEnabled}
-			progressionEnabled={progressionEnabled}
-			leaguesEnabled={leaguesEnabled}
+			achievementsEnabled={achievementsEnabled === true}
+			progressionEnabled={progressionEnabled === true}
+			leaguesEnabled={leaguesEnabled === true}
 		/>
 	);
 }

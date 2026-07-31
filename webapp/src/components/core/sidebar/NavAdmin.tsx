@@ -1,20 +1,23 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
 	BookUser,
-	Bot,
+	BrainCircuit,
 	ChevronRight,
 	CircleDollarSign,
 	ClipboardCheck,
+	LayoutGridIcon,
+	ListChecks,
 	Map as MapIcon,
-	MessageSquareText,
 	PlugZapIcon,
 	ScrollText,
 	Settings2,
 	SlidersHorizontal,
 	Trophy,
 	Users,
+	Workflow,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactElement, type ReactNode, useEffect, useState } from "react";
+import type { IntegrationCatalogEntry } from "@/api/types.gen";
 import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -22,26 +25,29 @@ import {
 	SidebarGroup,
 	SidebarGroupLabel,
 	SidebarMenu,
-	SidebarMenuAction,
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarMenuSub,
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
+	useSidebar,
 } from "@/components/ui/sidebar";
 
 export interface NavAdminProps {
 	workspaceSlug: string;
 	achievementsEnabled: boolean;
+	integrationKinds: ReadonlyArray<IntegrationCatalogEntry["kind"]>;
 	scmProviderType?: "GITHUB" | "GITLAB";
 }
 
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled,
+	integrationKinds,
 	scmProviderType = "GITHUB",
 }: NavAdminProps) {
 	const matchRoute = useMatchRoute();
+	const { isMobile, state: sidebarState } = useSidebar();
 
 	const onWorkspaceSettings = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/settings", fuzzy: false }),
@@ -61,6 +67,7 @@ export function NavAdmin({
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/reviews", fuzzy: true }),
 	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
+	const onCatalog = onSection && !onReviewSettings && !onReviews;
 
 	const onIntegrationsScm = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/scm", fuzzy: true }),
@@ -74,6 +81,8 @@ export function NavAdmin({
 	const onIntegrationsSection = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/integrations", fuzzy: true }),
 	);
+	const onIntegrationsOverview =
+		onIntegrationsSection && !onIntegrationsScm && !onIntegrationsSlack && !onIntegrationsOutline;
 	const onModels = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/models", fuzzy: true }));
 	const onUsage = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/usage", fuzzy: true }));
 	const onAudit = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/audit", fuzzy: true }));
@@ -81,6 +90,15 @@ export function NavAdmin({
 	const [integrationsOpen, setIntegrationsOpen] = useState(onIntegrationsSection);
 	const ScmIcon = scmProviderType === "GITLAB" ? GitlabIcon : GithubIcon;
 	const scmLabel = scmProviderType === "GITLAB" ? "GitLab" : "GitHub";
+	const scmKind = scmProviderType === "GITLAB" ? "GITLAB" : "GITHUB";
+
+	useEffect(() => {
+		if (onSection) setPracticesOpen(true);
+	}, [onSection]);
+
+	useEffect(() => {
+		if (onIntegrationsSection) setIntegrationsOpen(true);
+	}, [onIntegrationsSection]);
 
 	return (
 		<SidebarGroup>
@@ -145,129 +163,145 @@ export function NavAdmin({
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
-				<Collapsible
-					open={onSection || practicesOpen}
+				<AdminNavSection
+					label="Practices"
+					icon={<ClipboardCheck />}
+					active={onSection}
+					open={practicesOpen}
 					onOpenChange={setPracticesOpen}
-					render={<SidebarMenuItem />}
+					collapsed={!isMobile && sidebarState === "collapsed"}
+					landingLink={
+						<Link
+							to="/w/$workspaceSlug/admin/practices"
+							params={{ workspaceSlug }}
+							activeOptions={{ exact: true }}
+							aria-current={onCatalog ? "page" : undefined}
+						/>
+					}
 				>
-					<SidebarMenuButton
-						tooltip="Practices"
-						isActive={onSection}
-						render={<Link to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} />}
-					>
-						<ClipboardCheck />
-						<span>Practices</span>
-					</SidebarMenuButton>
-					<CollapsibleTrigger
-						render={<SidebarMenuAction aria-label="Toggle practices" className="group" />}
-					>
-						<ChevronRight className="transition-transform group-aria-expanded:rotate-90" />
-					</CollapsibleTrigger>
-					<CollapsibleContent>
-						<SidebarMenuSub>
-							<SidebarMenuSubItem>
-								<SidebarMenuSubButton
-									isActive={onReviews}
-									render={
-										<Link
-											to="/w/$workspaceSlug/admin/practices/reviews"
-											params={{ workspaceSlug }}
-										/>
-									}
-								>
-									<MessageSquareText />
-									<span>Practice feedback</span>
-								</SidebarMenuSubButton>
-							</SidebarMenuSubItem>
-							<SidebarMenuSubItem>
-								<SidebarMenuSubButton
-									isActive={onReviewSettings}
-									render={
-										<Link
-											to="/w/$workspaceSlug/admin/practices/settings"
-											params={{ workspaceSlug }}
-										/>
-									}
-								>
-									<SlidersHorizontal />
-									<span>Review settings</span>
-								</SidebarMenuSubButton>
-							</SidebarMenuSubItem>
-						</SidebarMenuSub>
-					</CollapsibleContent>
-				</Collapsible>
-				<Collapsible
-					open={onIntegrationsSection || integrationsOpen}
+					<SidebarMenuSubItem>
+						<SidebarMenuSubButton
+							isActive={onCatalog}
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/practices"
+									params={{ workspaceSlug }}
+									activeOptions={{ exact: true }}
+									aria-current={onCatalog ? "page" : undefined}
+								/>
+							}
+						>
+							<ListChecks />
+							<span>Catalog</span>
+						</SidebarMenuSubButton>
+					</SidebarMenuSubItem>
+					<SidebarMenuSubItem>
+						<SidebarMenuSubButton
+							isActive={onReviews}
+							render={
+								<Link to="/w/$workspaceSlug/admin/practices/reviews" params={{ workspaceSlug }} />
+							}
+						>
+							<Workflow />
+							<span>Practice reviews</span>
+						</SidebarMenuSubButton>
+					</SidebarMenuSubItem>
+					<SidebarMenuSubItem>
+						<SidebarMenuSubButton
+							isActive={onReviewSettings}
+							render={
+								<Link to="/w/$workspaceSlug/admin/practices/settings" params={{ workspaceSlug }} />
+							}
+						>
+							<SlidersHorizontal />
+							<span>Review settings</span>
+						</SidebarMenuSubButton>
+					</SidebarMenuSubItem>
+				</AdminNavSection>
+				<AdminNavSection
+					label="Integrations"
+					icon={<PlugZapIcon />}
+					active={onIntegrationsSection}
+					open={integrationsOpen}
 					onOpenChange={setIntegrationsOpen}
-					render={<SidebarMenuItem />}
+					collapsed={!isMobile && sidebarState === "collapsed"}
+					landingLink={
+						<Link
+							to="/w/$workspaceSlug/admin/integrations"
+							params={{ workspaceSlug }}
+							activeOptions={{ exact: true }}
+							aria-current={onIntegrationsOverview ? "page" : undefined}
+						/>
+					}
 				>
-					<SidebarMenuButton
-						tooltip="Integrations"
-						isActive={onIntegrationsSection}
-						render={<Link to="/w/$workspaceSlug/admin/integrations" params={{ workspaceSlug }} />}
-					>
-						<PlugZapIcon />
-						<span>Integrations</span>
-					</SidebarMenuButton>
-					<CollapsibleTrigger
-						render={<SidebarMenuAction aria-label="Toggle integrations" className="group" />}
-					>
-						<ChevronRight className="transition-transform group-aria-expanded:rotate-90" />
-					</CollapsibleTrigger>
-					<CollapsibleContent>
-						<SidebarMenuSub>
-							<SidebarMenuSubItem>
-								<SidebarMenuSubButton
-									isActive={onIntegrationsScm}
-									render={
-										<Link
-											to="/w/$workspaceSlug/admin/integrations/scm"
-											params={{ workspaceSlug }}
-										/>
-									}
-								>
-									<ScmIcon />
-									<span>{scmLabel}</span>
-								</SidebarMenuSubButton>
-							</SidebarMenuSubItem>
-							<SidebarMenuSubItem>
-								<SidebarMenuSubButton
-									isActive={onIntegrationsSlack}
-									render={
-										<Link
-											to="/w/$workspaceSlug/admin/integrations/slack"
-											params={{ workspaceSlug }}
-										/>
-									}
-								>
-									<SlackIcon />
-									<span>Slack</span>
-								</SidebarMenuSubButton>
-							</SidebarMenuSubItem>
-							<SidebarMenuSubItem>
-								<SidebarMenuSubButton
-									isActive={onIntegrationsOutline}
-									render={
-										<Link
-											to="/w/$workspaceSlug/admin/integrations/outline"
-											params={{ workspaceSlug }}
-										/>
-									}
-								>
-									<OutlineIcon />
-									<span>Outline</span>
-								</SidebarMenuSubButton>
-							</SidebarMenuSubItem>
-						</SidebarMenuSub>
-					</CollapsibleContent>
-				</Collapsible>
+					<SidebarMenuSubItem>
+						<SidebarMenuSubButton
+							isActive={onIntegrationsOverview}
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/integrations"
+									params={{ workspaceSlug }}
+									activeOptions={{ exact: true }}
+								/>
+							}
+						>
+							<LayoutGridIcon />
+							<span>Overview</span>
+						</SidebarMenuSubButton>
+					</SidebarMenuSubItem>
+					{integrationKinds.includes(scmKind) && (
+						<SidebarMenuSubItem>
+							<SidebarMenuSubButton
+								isActive={onIntegrationsScm}
+								render={
+									<Link to="/w/$workspaceSlug/admin/integrations/scm" params={{ workspaceSlug }} />
+								}
+							>
+								<ScmIcon aria-hidden />
+								<span>{scmLabel}</span>
+							</SidebarMenuSubButton>
+						</SidebarMenuSubItem>
+					)}
+					{integrationKinds.includes("SLACK") && (
+						<SidebarMenuSubItem>
+							<SidebarMenuSubButton
+								isActive={onIntegrationsSlack}
+								render={
+									<Link
+										to="/w/$workspaceSlug/admin/integrations/slack"
+										params={{ workspaceSlug }}
+									/>
+								}
+							>
+								<SlackIcon aria-hidden />
+								<span>Slack</span>
+							</SidebarMenuSubButton>
+						</SidebarMenuSubItem>
+					)}
+					{integrationKinds.includes("OUTLINE") && (
+						<SidebarMenuSubItem>
+							<SidebarMenuSubButton
+								isActive={onIntegrationsOutline}
+								render={
+									<Link
+										to="/w/$workspaceSlug/admin/integrations/outline"
+										params={{ workspaceSlug }}
+									/>
+								}
+							>
+								<OutlineIcon aria-hidden />
+								<span>Outline</span>
+							</SidebarMenuSubButton>
+						</SidebarMenuSubItem>
+					)}
+				</AdminNavSection>
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip={ADMIN_NAV_LABELS.models}
 						isActive={onModels}
 						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 					>
-						<Bot />
+						<BrainCircuit />
 						<span>{ADMIN_NAV_LABELS.models}</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
@@ -295,5 +329,52 @@ export function NavAdmin({
 				</SidebarMenuItem>
 			</SidebarMenu>
 		</SidebarGroup>
+	);
+}
+
+interface AdminNavSectionProps {
+	label: string;
+	icon: ReactNode;
+	active: boolean;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	collapsed: boolean;
+	landingLink: ReactElement;
+	children: ReactNode;
+}
+
+function AdminNavSection({
+	label,
+	icon,
+	active,
+	open,
+	onOpenChange,
+	collapsed,
+	landingLink,
+	children,
+}: AdminNavSectionProps) {
+	return (
+		<Collapsible open={open} onOpenChange={onOpenChange} render={<SidebarMenuItem />}>
+			{collapsed ? (
+				<SidebarMenuButton tooltip={label} isActive={active} render={landingLink}>
+					{icon}
+					<span>{label}</span>
+				</SidebarMenuButton>
+			) : (
+				<CollapsibleTrigger
+					render={<SidebarMenuButton tooltip={label} isActive={!open && active} />}
+				>
+					{icon}
+					<span>{label}</span>
+					<ChevronRight
+						className="ml-auto transition-transform group-aria-expanded/menu-button:rotate-90"
+						aria-hidden
+					/>
+				</CollapsibleTrigger>
+			)}
+			<CollapsibleContent>
+				<SidebarMenuSub>{children}</SidebarMenuSub>
+			</CollapsibleContent>
+		</Collapsible>
 	);
 }

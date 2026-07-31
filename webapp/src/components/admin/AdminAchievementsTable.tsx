@@ -23,6 +23,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -98,6 +99,7 @@ export function AdminAchievementsTable({
 			},
 			{
 				id: "actions",
+				header: () => <span className="sr-only">Actions</span>,
 				cell: ({ row }) => {
 					const user = row.original;
 					const isRecalculating = recalculatingUsers.has(user.user.login);
@@ -290,7 +292,9 @@ export function AdminAchievementsTable({
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<p className="text-sm font-medium whitespace-nowrap">Rows per page</p>
+						<Label htmlFor="achievement-rows-per-page" className="whitespace-nowrap">
+							Rows per page
+						</Label>
 						<Select
 							value={`${table.getState().pagination.pageSize}`}
 							onValueChange={(value) => {
@@ -298,7 +302,7 @@ export function AdminAchievementsTable({
 							}}
 							items={pageSizeItems}
 						>
-							<SelectTrigger className="h-8 w-17.5">
+							<SelectTrigger id="achievement-rows-per-page" className="h-8 w-17.5">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent side="top">

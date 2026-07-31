@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A recorded placement of feedback on a delivery surface")
+@Schema(description = "A recorded message placement")
 public record ReviewPlacementDTO(
     @NonNull UUID id,
     @NonNull PlacementType placementType,

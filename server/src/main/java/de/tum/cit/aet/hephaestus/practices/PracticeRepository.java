@@ -33,6 +33,8 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     @EntityGraph(attributePaths = "area")
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
+    boolean existsByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+
     @EntityGraph(attributePaths = "area")
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 

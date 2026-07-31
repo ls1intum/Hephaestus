@@ -11,6 +11,7 @@ import {
 	getAreaVisual,
 	ICON_COMPONENTS,
 	ICON_NAMES,
+	iconLabel,
 	iconSearchText,
 	PILL,
 } from "./area-visuals";
@@ -123,7 +124,7 @@ export function AreaVisualPicker({
 									<ToggleGroupItem
 										key={iconName}
 										value={iconName}
-										aria-label={iconName}
+										aria-label={iconLabel(iconName)}
 										className="size-8 min-w-0 p-0 text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground"
 									>
 										<Icon className="size-4" aria-hidden="true" />

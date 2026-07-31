@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-
+import { fn } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "@/components/admin/types";
 import { withStandardPage } from "@/stories/decorators";
@@ -13,6 +13,11 @@ const meta = {
 	},
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
+	args: {
+		view: { q: "", team: "all", sort: "name", desc: false, page: 0, size: 10 },
+		onViewChange: fn(),
+		renderPageLink: (page, props) => <a {...props} href={`?page=${page}`} />,
+	},
 } satisfies Meta<typeof AdminMembersPage>;
 
 export default meta;

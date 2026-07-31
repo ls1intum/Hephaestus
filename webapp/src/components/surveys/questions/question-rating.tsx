@@ -129,6 +129,8 @@ export function QuestionRating({
 							onValueChange={handleNumericChange}
 							variant="outline"
 							size="sm"
+							role="toolbar"
+							aria-label="Rating"
 							className="flex flex-nowrap"
 						>
 							{ratings.map((rating) => (

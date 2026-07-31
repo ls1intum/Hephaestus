@@ -1,3 +1,6 @@
+import { UserRoundCog } from "lucide-react";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { optionalIntegrationsAvailable } from "@/integrations/consent";
@@ -49,68 +52,69 @@ export function SettingsPage({
 	const researchPending = isLoading || researchLoading;
 
 	return (
-		<div className="w-full max-w-3xl mx-auto space-y-8">
-			<div className="space-y-1">
-				<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-				<p className="text-muted-foreground text-balance">
-					Manage your account preferences and settings
-				</p>
-			</div>
+		<PageLayout>
+			<PageHeader
+				icon={<UserRoundCog />}
+				title="User settings"
+				description="Manage your preferences, connected accounts, and sessions."
+			/>
 
-			{settingsError ? (
-				<>
-					<Separator />
-					<section className="space-y-2" aria-labelledby="settings-error-heading">
-						<h2 id="settings-error-heading" className="text-xl font-semibold">
-							Preferences
-						</h2>
-						<p className="text-sm text-destructive" role="alert">
-							We couldn't load your preferences, so your feedback and research settings aren't
-							shown.
-						</p>
-						{onRetrySettings && (
-							<Button variant="outline" size="sm" onClick={onRetrySettings}>
-								Retry
-							</Button>
+			<div className="max-w-3xl space-y-8">
+				{settingsError ? (
+					<>
+						<Separator />
+						<section className="space-y-2" aria-labelledby="settings-error-heading">
+							<h2 id="settings-error-heading" className="text-xl font-semibold">
+								Preferences
+							</h2>
+							<p className="text-sm text-destructive" role="alert">
+								We couldn't load your preferences, so your feedback and research settings aren't
+								shown.
+							</p>
+							{onRetrySettings && (
+								<Button variant="outline" size="sm" onClick={onRetrySettings}>
+									Retry
+								</Button>
+							)}
+						</section>
+					</>
+				) : (
+					<>
+						<Separator />
+						<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
+
+						{showResearchSection && (
+							<>
+								<Separator />
+								<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
+							</>
 						)}
-					</section>
-				</>
-			) : (
-				<>
-					<Separator />
-					<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
+					</>
+				)}
 
-					{showResearchSection && (
-						<>
-							<Separator />
-							<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
-						</>
-					)}
-				</>
-			)}
+				<Separator />
+				<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
 
-			<Separator />
-			<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
+				{showSlackPreferencesSection && (
+					<>
+						<Separator />
+						<SlackPreferencesSection {...slackRest} isLoading={isLoading || slackLoading} />
+					</>
+				)}
 
-			{showSlackPreferencesSection && (
-				<>
-					<Separator />
-					<SlackPreferencesSection {...slackRest} isLoading={isLoading || slackLoading} />
-				</>
-			)}
+				<Separator />
+				<SessionsSection />
 
-			<Separator />
-			<SessionsSection />
+				{optionalIntegrationsAvailable && (
+					<>
+						<Separator />
+						<CookiePreferencesSection />
+					</>
+				)}
 
-			{optionalIntegrationsAvailable && (
-				<>
-					<Separator />
-					<CookiePreferencesSection />
-				</>
-			)}
-
-			<Separator />
-			<DangerZoneSection onAccountDeleted={onAccountDeleted} />
-		</div>
+				<Separator />
+				<DangerZoneSection onAccountDeleted={onAccountDeleted} />
+			</div>
+		</PageLayout>
 	);
 }

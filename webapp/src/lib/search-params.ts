@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const multiValue = z
 	.union([z.string().transform((value) => [value]), z.array(z.string())])
+	.transform((values) => [...new Set(values)])
 	.optional()
 	.catch(undefined);
 

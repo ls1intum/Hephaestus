@@ -1,128 +1,86 @@
-# Evaluation Provenance Contract
+# Evaluation provenance contract
 
-> Status: living reference, part of the detection replay & reliability-metrics epic
-> ([#1353](https://github.com/ls1intum/Hephaestus/issues/1353)). Companion to the schema reference in
-> `practice-feedback-schema.md` (ADR 0021 / ADR 0022).
+This document defines how an evaluation reconstructs a practice review. Exact columns and domain values
+belong to the Java model and
+[Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/resources/db/changelog),
+not here. The [generated database schema](./database-schema.mdx) provides the structural view.
 
-What each detection run persists, how an evaluation joins it, and the invariants to preserve.
+## Per-review provenance
 
----
+Each review is an `agent_job`. Provenance is captured at the stage where it becomes stable:
 
-## 1. What is persisted per detection run
-
-Every detection run is one `agent_job` row. The provenance columns are written **before the sandbox
-starts** (so failed and cancelled runs keep their provenance too) or frozen at submit time:
-
-| Dimension | Where it lives | Written when |
+| Dimension | Stored in | Captured at |
 | --- | --- | --- |
-| Pinned model id + version | `agent_job.config_snapshot` (JSONB, frozen `ConfigSnapshot`) and denormalised `agent_job.llm_model` / `llm_model_version` | snapshot at submit; denormalised columns at completion |
-| Route + behaviour shape: wire API (`apiProtocol`), base URL, upstream model id, context window, max output tokens, reasoning support, connection scope + id, timeout, internet access | `agent_job.config_snapshot` (`ConfigSnapshot` v5) | submit |
-| Price snapshot (the per-token rates the run is billed at) | `agent_job.config_snapshot.priceSnapshot` | **claim**, not submit — `ConfigSnapshot.from` writes it null and `AgentJobExecutor` attaches it via `withPriceSnapshot` when the job is admitted (see below) |
-| Criteria / practice revision | `observation.practice_revision_id` → `practice_revision` (SCD-2 snapshot of `Practice.criteria`) | persist time, pinned **as of `agent_job.started_at`** (see §3) |
-| Prompt template version | `agent_job.prompt_digest` — SHA-256 root digest of the prompt scaffolding (`pi-orchestrator.md` + runner script + sidecar scripts), computed by `PiRuntimeFactory` | prepare, before sandbox start |
-| Input snapshot reference | `agent_job.inputs_digest` — SHA-256 root digest over **every** file materialised into the sandbox workspace (context files, practice criteria, precompute scripts, task envelope, prompt scaffolding, Pi settings), computed by `AgentJobExecutor` over the final merged file set | prepare, before sandbox start |
-| Per-file content hashes | `inputs/manifest.json` (`ContextManifestBuilder`) — per-file `sha256` for `inputs/context/*`, blobs stored in the content-addressed store, manifest persisted under the fabric's `jobs/{jobId}/` | prepare (best-effort; the DB root digest above is the authoritative record) |
-| Repository state | `agent_job.metadata.commit_sha` (head ref) — the read-only repo mount is **not** hashed; the commit SHA pins it | submit |
-| Usage outcomes | `agent_job.llm_total_*`, `llm_cache_*` for the run's own token counts; `llm_usage_event.cost_usd` for what it cost | completion |
+| Route and behaviour configuration | `agent_job.config_snapshot` | submission |
+| Price rates used for accounting | `agent_job.config_snapshot.priceSnapshot` | claim |
+| Prompt scaffolding digest | `agent_job.prompt_digest` | preparation |
+| Injected input-file digest | `agent_job.inputs_digest` | preparation |
+| Repository revision | `agent_job.metadata.commit_sha` | submission |
+| Practice criteria revision | `observation.practice_revision_id` | observation persistence |
+| Model identity and usage outcomes | denormalised `agent_job` usage fields and `llm_usage_event` | completion |
 
-Digest semantics (`ProvenanceDigest`): root digest = SHA-256 over the path-sorted sequence of
-`path NUL sha256(content) LF`. Two runs with equal `inputs_digest` consumed byte-identical inputs.
-`prompt_digest` is stable across models and workspaces — an evaluation **groups runs by
-`prompt_digest`** and must not aggregate precision across different values.
+The frozen `ConfigSnapshot` contains the wire protocol, endpoint, upstream model identifier, context
+window, output-token limit, reasoning support, connection identity, timeout, and internet policy. Its
+optional `modelVersion` field is not a model identity. Treat the complete snapshot, rather than a
+hand-picked tuple of fields, as the run's behaviour configuration.
 
-### Sampling parameters
+`prompt_digest` is a SHA-256 root digest of the shipped prompt scaffolding. Evaluations must not aggregate
+precision across different prompt digests.
 
-Hephaestus does not set temperature or top_p for detection runs. The configured maximum output-token
-limit is frozen in the job's `ConfigSnapshot` and applied by the runtime. What identifies the route is
-the frozen
-`(base URL, upstream model id, model_version)` — the provider is no longer a named enum, since every
-connection speaks an OpenAI-compatible wire API and the base URL is what actually distinguishes one
-endpoint from another. That triple, plus `prompt_digest`, IS the sampling provenance today.
-**Invariant:** if sampling knobs are ever introduced, they must be added to `WorkspaceAgentBinding`
-and carried through `ConfigSnapshot` (the per-job frozen config) — never set ad hoc in the runtime —
-so each run keeps its own record.
+`inputs_digest` covers the final map of files injected by the executor. It excludes the repository mount
+and runtime-created material. The digest is path-order independent and deliberately elides every byte
+occurrence of the current job UUID. Equal values therefore mean equal injected inputs **modulo that UUID
+elision**, not byte-identical sandbox workspaces. A replay must also check out
+`agent_job.metadata.commit_sha`.
 
----
+Sampling controls may only be introduced through workspace bindings and must be frozen in
+`ConfigSnapshot`. Runtime-only sampling knobs are forbidden because completed runs must remain
+reproducible.
 
-## 2. The feedback ledger: delivered vs withheld
+## Delivery evidence
 
-User reactions are only usable as labels when the feedback reached a developer-facing surface. Every
-**prepared unit** — a composed review that reached the delivery layer — lands exactly one `feedback`
-row, in the state that says what became of it (`FeedbackDeliveryState`, defined in
-[practice-feedback-schema.md](./practice-feedback-schema.md)). `DELIVERED` and `SUPERSEDED` prove
-placement; neither proves that a person read it. `SUPPRESSED` means policy withheld it and always
-carries a reason.
+Every composed message that reaches the delivery layer has a `feedback` row. The Java
+[`FeedbackDeliveryState`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackDeliveryState.java)
+and
+[`FeedbackSuppressionReason`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackSuppressionReason.java)
+types own the domain values; Liquibase owns the persisted constraints.
 
-> **This table is the one home of the suppression-reason list.** It tracks the Java enum
-> `practices/feedback/FeedbackSuppressionReason` and the `chk_feedback_suppression_reason` CHECK
-> constraint, which must agree with it value-for-value. `practice-feedback-schema.md` § 3.9 and
-> ADR 0021 point here rather than repeating it — a second copy of an enum is a second thing to be
-> wrong. Adding a value means: enum constant, CHECK-constraint changeset, and a row below naming its
-> writer.
+`DELIVERED` and `SUPERSEDED` prove that a placement was recorded. They do not prove that a person read
+the message. `SUPPRESSED` records a policy decision to withhold a message and always carries a reason.
+Any new decision point that can withhold a composed message must write the suppressed row instead of
+silently dropping it.
 
-| Reason | Written by | Granularity |
-| --- | --- | --- |
-| `REACTED_DISPUTED` / `REACTED_NOT_APPLICABLE` | `ReactionSuppressionFilter` — the developer already reacted to this locus | per observation |
-| `VOLUME_CAPPED` | `DeliveryComposer` volume cap on the non-blocking improvement tail, reported via `DeliveryContent.withheld` and recorded by `FeedbackLedgerRecorder` | per observation |
-| `COMPOSER_DEDUPED` | `DeliveryComposer` near-duplicate collapse (epic-structure pair, co-occurrence pairs) | per observation |
-| `CONVERSATION_EXPIRED` | TTL sweeper — a `PREPARED` conversational unit aged out unraised | per unit |
-| `VOLUME_CAPPED` (conversation) | `ConversationalFeedbackPreparer` — over the per-recipient cap for a mentor turn | per observation |
-| `ARTIFACT_GONE` / `ARTIFACT_CLOSED` / `ARTIFACT_MERGED` / `ARTIFACT_DRAFT` | whole-review delivery gates in `FeedbackDeliveryService` / `IssueReviewHandler` | one unit per job (ordinal 5000) |
-| `RECIPIENT_OPTED_OUT` | author disabled AI review | one unit per job |
-| `EMPTY_AFTER_SANITIZE` | composed body sanitised to blank and no inline note was placed | one unit per job |
+## Evaluation joins
 
-Unit ordinal bases on `(agent_job_id, position)`: `0` live in-context unit, `1000+` reaction
-suppression, `2000+` composer-withheld, `3000+` conversational, `4000` failed, `5000` gate-suppressed.
+- **Observation to producer:** join `observation.agent_job_id` to `agent_job` for configuration,
+  digests, repository revision, and usage; join `observation.practice_revision_id` to the criteria used
+  for that observation.
+- **Observation to delivery outcome:** join through `feedback_observation` to feedback state and
+  suppression reason. A link to a delivered or superseded message proves placement. Links only to
+  prepared, suppressed, or failed messages do not. No link means no feedback was composed from that
+  observation.
+- **Reaction to delivered evidence:** join `reaction.feedback_id` to feedback, then through
+  `feedback_observation` to its observations. Reactions are accepted only for delivered messages; a later
+  review may supersede that message.
+- **Feedback to posted location:** join `feedback_placement` and inspect `posted_comment_ref` or
+  `chat_message_id`.
 
-**Invariant:** any new decision point that can withhold a prepared unit — a gate, cap, dedup, filter —
-MUST write a `SUPPRESSED` row with a reason (add the enum value + its `chk_feedback_suppression_reason`
-entry). A silent drop reopens the gap: an evaluator can no longer tell "model missed" from "policy
-withheld" from "placed without a recorded reaction". The converse holds too — every reason above names
-a live writer.
+Criteria revisions are selected as of `agent_job.started_at`, which is stamped when the job is claimed.
+A revision created after that instant is not attributed to the run.
 
----
+## Known limits
 
-## 3. Join chains an evaluation uses
-
-- **Observation → what produced it:** `observation.agent_job_id` → `agent_job`
-  (`config_snapshot`, `prompt_digest`, `inputs_digest`, `metadata.commit_sha`) and
-  `observation.practice_revision_id` → `practice_revision.criteria`.
-- **Observation → did it reach a delivery surface:** `feedback_observation` →
-  `feedback.delivery_state` (+ `suppression_reason`). An observation bound to a `DELIVERED` or
-  `SUPERSEDED` unit was rendered (BAD as `PRIMARY`; GOOD strengths bind `SUPPORTING` but may render
-  abridged — see §4). An observation bound only to `PREPARED`/`SUPPRESSED`/`FAILED` units was not
-  placed. No linked unit means no feedback was composed and is distinct from a `SUPPRESSED` unit.
-- **Reaction → label:** `ReactionService` accepts a reaction only while its feedback unit is
-  `DELIVERED`, so a reaction labels a unit known to have been placed. A later delivery may mark that
-  unit `SUPERSEDED`. `reaction.feedback_id` → `feedback` → `feedback_observation` → observations. The
-  posted surface is recoverable via
-  `feedback_placement.posted_comment_ref` / `chat_message_id`.
-
-Criteria-revision pinning is **as-of `agent_job.started_at`**: `started_at` is stamped at claim,
-before the catalog injector reads `Practice.criteria` into the sandbox. A revision appended after
-that timestamp is not pinned, including one written between the claim and criteria materialisation.
-
----
-
-## 4. Known limits (documented, deliberate)
-
-- **Pre-observation filters:** parser discards, the diff-scope filter, unknown-slug discards, and
-  duplicate-key discards happen **before** an `Observation` exists; they are counted in logs only.
-  The observation set is "validated, in-scope findings", not raw model output.
-- **`NOT_APPLICABLE` abstentions** persist as observations but are never delivered and get no
-  ledger row — they are abstentions, not withheld findings.
-- **GOOD strengths** bound `SUPPORTING` to a `DELIVERED` unit may have been rendered only as a
-  brief acknowledgement line, not verbatim. Placement evidence for strengths is coarser than for problems;
-  precision evaluation should score BAD observations.
-- **The repo mount is not part of `inputs_digest`** — `metadata.commit_sha` pins it. A replay must
-  check out that SHA.
-- **`prompt_digest` covers the shipped scaffolding**, not the per-job task prompt (PR number, repo
-  name); those are in `agent_job.metadata` and the task envelope (which IS in `inputs_digest`).
-- **`inputs_digest` is blind to the job's own id, and to nothing else by design.** Any other
-  per-run-varying byte makes it unique per run and silently useless for grouping. The known drift source
-  is unordered SQL feeding a context file — the catalogue (`PracticeCatalogInjector` sorts by slug),
-  review threads and the repository inventory are pinned; **this is not an exhaustive sweep**, so a
-  context provider that materialises an unordered or unstably-truncated result set reopens it. Verify
-  against a real run before trusting a grouping query.
-- **Legacy rows** (before these columns landed) have NULL digests and possibly NULL
-  `practice_revision_id` — exclude them from evaluation rather than guessing.
+- Parser discards, diff-scope filtering, unknown practice slugs, and duplicate occurrence keys happen
+  before an observation exists. Logs count them, but the database contains only validated, in-scope
+  observations.
+- A `NOT_APPLICABLE` result is an abstention. It is not delivered and does not create a suppression row.
+- A good observation linked as supporting evidence may be rendered as an abridged acknowledgement.
+  Placement evidence is therefore coarser for strengths; precision evaluation should score bad
+  observations.
+- The repository mount is not part of `inputs_digest`; the commit SHA pins it.
+- `prompt_digest` covers shipped scaffolding, not the per-job task prompt. Task-specific data is represented
+  in job metadata and injected inputs.
+- `inputs_digest` compares materialised bytes, not semantic source equivalence. Different materialisations
+  produce different digests.
+- Older rows may have null digests or no practice revision. Exclude them from evaluations rather than
+  inferring missing provenance.

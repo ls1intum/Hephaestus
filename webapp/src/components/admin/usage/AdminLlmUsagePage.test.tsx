@@ -45,7 +45,6 @@ const baseReport: WorkspaceLlmUsageReport = {
 	],
 };
 
-/** The page links to the workspace's models page, so it needs a router in scope. */
 async function renderPage(
 	report: WorkspaceLlmUsageReport = baseReport,
 	props: Partial<React.ComponentProps<typeof AdminLlmUsagePage>> = {},
@@ -60,8 +59,6 @@ async function renderPage(
 				report={report}
 				isLoading={false}
 				error={null}
-				onPrevMonth={() => {}}
-				onNextMonth={() => {}}
 				onEditOwnProviderCap={() => {}}
 				now={new Date("2026-07-10T12:00:00.000Z")}
 				{...props}
@@ -81,51 +78,49 @@ describe("AdminLlmUsagePage", () => {
 	it("separates shared-model and provider spend in every rollup", async () => {
 		await renderPage();
 
-		expect(screen.getByText("Shared-model spend so far")).toBeTruthy();
-		expect(screen.getByText("Shared-model budget · set by your host")).toBeTruthy();
-		expect(screen.getByText("Your provider spend so far")).toBeTruthy();
-		expect(screen.getByText("Provider cap · set by you, billed by your provider")).toBeTruthy();
+		screen.getByText("Shared-model spend so far");
+		screen.getByText("Shared-model budget · set by your host");
+		screen.getByText("Your provider spend so far");
+		screen.getByText("Provider cap · set by you, billed by your provider");
 
 		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
-		expect(within(byJobType).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
-		expect(within(byJobType).getByRole("columnheader", { name: "Your provider" })).toBeTruthy();
-		expect(within(byJobType).getByRole("columnheader", { name: "No price set" })).toBeTruthy();
-		expect(within(byJobType).getByText("$4.25")).toBeTruthy();
-		expect(within(byJobType).getByText("$1.75")).toBeTruthy();
+		within(byJobType).getByRole("columnheader", { name: "Shared models" });
+		within(byJobType).getByRole("columnheader", { name: "Your provider" });
+		within(byJobType).getByRole("columnheader", { name: "No price set" });
+		within(byJobType).getByText("$4.25");
+		within(byJobType).getByText("$1.75");
 
 		const byDay = screen.getByRole("table", { name: "AI spend by day" });
-		expect(within(byDay).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
-		expect(within(byDay).getByRole("columnheader", { name: "Your provider" })).toBeTruthy();
-		expect(within(byDay).getByRole("columnheader", { name: "No price set" })).toBeTruthy();
-		expect(within(byDay).getByText("$4.25")).toBeTruthy();
-		expect(within(byDay).getByText("$1.75")).toBeTruthy();
+		within(byDay).getByRole("columnheader", { name: "Shared models" });
+		within(byDay).getByRole("columnheader", { name: "Your provider" });
+		within(byDay).getByRole("columnheader", { name: "No price set" });
+		within(byDay).getByText("$4.25");
+		within(byDay).getByText("$1.75");
 	});
 
 	it("gives each cap its own meter, named for whose money it is", async () => {
 		await renderPage();
 
-		expect(screen.getByRole("progressbar", { name: "Shared-model budget used" })).toBeTruthy();
-		expect(screen.getByRole("progressbar", { name: "Your provider cap used" })).toBeTruthy();
+		screen.getByRole("progressbar", { name: "Shared-model budget used" });
+		screen.getByRole("progressbar", { name: "Your provider cap used" });
 	});
 
 	it("gives the right pricing owner an actionable no-price-set warning", async () => {
 		await renderPage();
 
-		expect(screen.getByText("2 runs aren't counted in these totals")).toBeTruthy();
-		expect(
-			screen.getByText(/Add prices for your own models in .*; for shared models, ask your host\./),
-		).toBeTruthy();
+		screen.getByText("2 runs aren't counted in these totals");
+		screen.getByText(/Add prices for your own models in .*; for shared models, ask your host\./);
 	});
 
 	it("averages each purse over the run count on its own, never the two summed", async () => {
 		await renderPage();
 
 		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
-		expect(within(byJobType).getByRole("columnheader", { name: "Avg per run" })).toBeTruthy();
-		expect(within(byJobType).getByText("$0.85")).toBeTruthy();
-		expect(within(byJobType).getByText("shared models")).toBeTruthy();
-		expect(within(byJobType).getByText("$0.35")).toBeTruthy();
-		expect(within(byJobType).getByText("your provider")).toBeTruthy();
+		within(byJobType).getByRole("columnheader", { name: "Avg per run" });
+		within(byJobType).getByText("$0.85");
+		within(byJobType).getByText("shared models");
+		within(byJobType).getByText("$0.35");
+		within(byJobType).getByText("your provider");
 	});
 
 	describe("pause banners", () => {
@@ -165,9 +160,11 @@ describe("AdminLlmUsagePage", () => {
 		])("explains %s, and links to the fix only where the reader can apply it", async (_name, patch, title, body, href) => {
 			await renderPage({ ...baseReport, ...patch });
 
-			const banner = screen.getByText(title).closest("[role='alert']") as HTMLElement;
-			expect(banner).toBeTruthy();
-			expect(within(banner).getByText(body)).toBeTruthy();
+			const banner = screen.getByText(title).closest("[role='alert']");
+			if (!(banner instanceof HTMLElement)) {
+				throw new Error(`Pause banner "${title}" not found`);
+			}
+			within(banner).getByText(body);
 			expect(
 				within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
 					null,
@@ -187,8 +184,10 @@ describe("AdminLlmUsagePage", () => {
 			);
 
 			const banner = screen.getByText("Your provider cap is reached").closest("[role='alert']");
-			expect(banner).toBeTruthy();
-			const adjust = within(banner as HTMLElement).getByRole("button", { name: "Adjust cap" });
+			if (!(banner instanceof HTMLElement)) {
+				throw new Error("Provider pause banner not found");
+			}
+			const adjust = within(banner).getByRole("button", { name: "Adjust cap" });
 
 			fireEvent.click(adjust);
 
@@ -253,7 +252,7 @@ describe("AdminLlmUsagePage", () => {
 				{ onEditOwnProviderCap },
 			);
 
-			expect(screen.getByText(copy)).toBeTruthy();
+			screen.getByText(copy);
 			fireEvent.click(screen.getByRole("button", { name: "Set cap" }));
 			expect(onEditOwnProviderCap).toHaveBeenCalled();
 		});
@@ -268,11 +267,9 @@ describe("AdminLlmUsagePage", () => {
 			);
 
 			expect(screen.queryByRole("button", { name: label })).toBeNull();
-			expect(
-				screen.getByText(
-					"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
-				),
-			).toBeTruthy();
+			screen.getByText(
+				"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
+			);
 		});
 	});
 
@@ -323,7 +320,7 @@ describe("AdminLlmUsagePage", () => {
 			}
 			const table = screen.getByRole("table", { name: "AI spend by day" });
 			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain(footerText);
-			expect(screen.getByText(/reference rate published on/)).toBeTruthy();
+			screen.getByText(/reference rate published on/);
 		});
 
 		it("stays silent under a cap that is set but converted nowhere on the page", async () => {

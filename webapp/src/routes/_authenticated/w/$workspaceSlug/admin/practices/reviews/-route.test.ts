@@ -36,9 +36,8 @@ beforeEach(() => {
 
 describe("practice review routes", () => {
 	it.each([
-		["Review activity", "/w/acme/admin/practices/reviews"],
-		["Review activity", "/w/acme/admin/practices/reviews/11111111-1111-1111-1111-111111111111"],
-		["Review activity", "/w/acme/admin/practices/reviews/targets/pull-request/42"],
+		["Reviews", "/w/acme/admin/practices/reviews"],
+		["Reviews", "/w/acme/admin/practices/reviews/11111111-1111-1111-1111-111111111111"],
 		["Findings", "/w/acme/admin/practices/reviews/findings"],
 		["Findings", "/w/acme/admin/practices/reviews/findings/55555555-5555-5555-5555-555555555555"],
 		["Delivery", "/w/acme/admin/practices/reviews/delivery"],
@@ -58,13 +57,13 @@ describe("practice review routes", () => {
 		within(navigation).getByRole("link", { name: expectedCurrent, current: "page" });
 	});
 
-	it("redirects the former Runs page to Review activity", async () => {
+	it("redirects the former Runs page to Reviews", async () => {
 		const location = await land("/w/acme/admin/practices/runs");
 
 		expect(location.pathname).toBe("/w/acme/admin/practices/reviews");
 	});
 
-	it("keeps reviewed-work output under Review activity and carries its scope into Delivery", async () => {
+	it("treats reviewed work as a neutral view and carries its scope into Delivery", async () => {
 		const emptyPage = {
 			content: [],
 			page: { number: 0, size: 5, totalElements: 0, totalPages: 0 },
@@ -80,7 +79,7 @@ describe("practice review routes", () => {
 		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/targets/pull-request/42");
 		await screen.findByText("No review output found");
 		const navigation = screen.getByRole("navigation", { name: "Practice review sections" });
-		within(navigation).getByRole("link", { name: "Review activity", current: "page" });
+		expect(within(navigation).queryByRole("link", { current: "page" })).toBeNull();
 
 		const deliveryLink = within(navigation).getByRole("link", {
 			name: "Delivery",

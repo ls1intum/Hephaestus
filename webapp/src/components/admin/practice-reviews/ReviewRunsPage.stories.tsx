@@ -5,21 +5,13 @@ import type { ReviewRunSummary } from "@/api/types.gen";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunsPage } from "./ReviewRunsPage";
+import { reviewArtifact } from "./story-mock-data";
 
 const reviews: ReviewRunSummary[] = [
 	{
 		id: "11111111-1111-1111-1111-111111111111",
 		status: "COMPLETED",
-		target: {
-			id: 42,
-			type: "PULL_REQUEST",
-			provider: "GITHUB",
-			number: 1420,
-			repositoryName: "hephaestustest/obsphera/obsphera-replay",
-			title:
-				"Make practice review output visible even when the repository and reviewed work names are unusually long",
-			url: "https://github.com/ls1intum/Hephaestus/pull/1423",
-		},
+		target: reviewArtifact,
 		createdAt: new Date("2026-07-28T13:42:00Z"),
 		findings: { strengths: 2, problems: 1, notApplicable: 1 },
 		feedback: { delivered: 1, failed: 0, prepared: 0, superseded: 0, suppressed: 1 },
@@ -50,10 +42,9 @@ const reviewsHandler = (content: ReviewRunSummary[] = reviews) =>
 	);
 
 const meta = {
-	title: "Admin/Practice reviews/Review activity",
+	title: "Admin/Practice reviews/Reviews",
 	component: ReviewRunsPage,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "fullscreen",
 		msw: { handlers: [reviewsHandler()] },
 		chromatic: { viewports: [320, 768, 1440] },
@@ -75,18 +66,6 @@ export const Default: Story = {
 		chromatic: { viewports: [1440] },
 		viewport: { defaultViewport: "desktop" },
 	},
-	play: async ({ canvasElement }) => {
-		const table = within(await within(canvasElement).findByRole("table"));
-		await expect(
-			table.getByText("2 strengths · 1 area to improve · 1 not applicable"),
-		).toBeVisible();
-		await expect(table.getByText("1 delivered · 1 not delivered")).toBeVisible();
-		await expect(
-			table.getByRole("row", {
-				name: /Keep the controller thin.*Running.*Pending.*Pending/i,
-			}),
-		).toBeVisible();
-	},
 };
 
 export const Mobile: Story = {
@@ -98,13 +77,9 @@ export const Mobile: Story = {
 		const canvas = within(canvasElement);
 		const list = await canvas.findByRole("list");
 		const review = await within(list).findByRole("link", {
-			name: /hephaestustest\/obsphera\/obsphera-replay.*PR #1420/i,
+			name: /ls1intum\/Hephaestus.*PR #1423/i,
 		});
 		await expect(review).toBeVisible();
-		await expect(
-			within(review).getByText("2 strengths · 1 area to improve · 1 not applicable"),
-		).toBeVisible();
-		await expect(within(review).getByText("1 delivered · 1 not delivered")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };

@@ -12,10 +12,8 @@ export interface LeagueProgressCardProps {
 }
 
 export function LeagueProgressCard({ leaguePoints, onInfoClick }: LeagueProgressCardProps) {
-	// Get current league from points
 	const currentLeague = getLeagueFromPoints(leaguePoints);
 
-	// Calculate progress value based on league min and max points
 	const progressValue = currentLeague
 		? ((leaguePoints - currentLeague.minPoints) * 100) /
 			(currentLeague.maxPoints - currentLeague.minPoints)
@@ -32,7 +30,6 @@ export function LeagueProgressCard({ leaguePoints, onInfoClick }: LeagueProgress
 						<span className="text-sm font-semibold text-muted-foreground">
 							{currentLeague.name}
 						</span>
-						{/* Points display */}
 						<div className="w-full flex items-center justify-center gap-1 text-sm text-muted-foreground">
 							<span className="whitespace-nowrap">
 								{currentLeague.maxPoints === Number.POSITIVE_INFINITY
@@ -43,12 +40,11 @@ export function LeagueProgressCard({ leaguePoints, onInfoClick }: LeagueProgress
 						</div>
 					</div>
 					{onInfoClick && (
-						<Button variant="ghost" size="icon" onClick={onInfoClick}>
+						<Button variant="ghost" size="icon" onClick={onInfoClick} aria-label="About leagues">
 							<Info className="text-muted-foreground" />
 						</Button>
 					)}
 				</div>
-				{/* Progress bar container */}
 				{currentLeague.maxPoints !== Number.POSITIVE_INFINITY && (
 					<div className="flex items-center gap-2 mt-1">
 						<ProgressRoot.Root

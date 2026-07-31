@@ -17,7 +17,6 @@ import {
 	ItemGroup,
 	ItemTitle,
 } from "@/components/ui/item";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
@@ -29,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { ReviewArtifact, ReviewArtifactLink } from "./ReviewArtifact";
 import { FeedbackStateBadge } from "./ReviewBadges";
+import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { CHANNEL_LABELS, SUPPRESSION_REASON_LABELS, subjectLabel } from "./review-format";
 
 export type FeedbackResultsState =
@@ -42,7 +42,7 @@ export interface FeedbackResultsProps {
 }
 
 export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) {
-	if (state.status === "loading") return <FeedbackListSkeleton />;
+	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading messages" />;
 	if (state.status === "empty") {
 		return (
 			<Empty className="border">
@@ -72,7 +72,7 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 					<TableHeader>
 						<TableRow>
 							<TableHead scope="col">Message</TableHead>
-							<TableHead scope="col">Delivery</TableHead>
+							<TableHead scope="col">Outcome</TableHead>
 							<TableHead scope="col">Reviewed work</TableHead>
 							<TableHead scope="col" className="w-32">
 								Composed
@@ -164,20 +164,5 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 				))}
 			</ItemGroup>
 		</>
-	);
-}
-
-function FeedbackListSkeleton() {
-	return (
-		<div className="space-y-2 rounded-lg border p-4" role="status">
-			<span className="sr-only">Loading messages</span>
-			{Array.from({ length: 5 }, (_, index) => (
-				<div key={index} className="flex items-center gap-4 py-3">
-					<Skeleton className="h-4 flex-1" />
-					<Skeleton className="h-5 w-24" />
-					<Skeleton className="hidden h-4 w-48 md:block" />
-				</div>
-			))}
-		</div>
 	);
 }

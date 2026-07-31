@@ -1,5 +1,8 @@
+import { Users } from "lucide-react";
 import { useLayoutEffect, useMemo } from "react";
 import type { TeamInfo } from "@/api/types.gen";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { type Contributor, ContributorGrid } from "@/components/shared/ContributorGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -209,11 +212,12 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	}, []);
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6">
-			<div className="space-y-1">
-				<h1 className="text-3xl font-bold tracking-tight">Team contributors</h1>
-				<p className="text-muted-foreground">See contributors grouped by team.</p>
-			</div>
+		<PageLayout>
+			<PageHeader
+				icon={<Users />}
+				title="Teams"
+				description="See contributors grouped by team and explore their activity."
+			/>
 
 			{isLoading ? (
 				<div className="space-y-4">
@@ -239,6 +243,6 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			) : (
 				<p className="py-8 text-center text-muted-foreground">No teams found</p>
 			)}
-		</div>
+		</PageLayout>
 	);
 }

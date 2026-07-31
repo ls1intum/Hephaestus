@@ -37,7 +37,4 @@ export const workspaceAuditSearchSchema = auditSearchSchema.omit({
 
 export type ConfigAuditSearch = z.infer<typeof workspaceAuditSearchSchema>;
 
-export { fromDateRange, fromDayParam, toDateRange, toDayParam };
-
-export const dayStartIso = dayStartInstant;
-export const dayEndIso = dayAfterInstant;
+export { dayAfterInstant, dayStartInstant, fromDateRange, fromDayParam, toDateRange, toDayParam };

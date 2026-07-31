@@ -69,13 +69,18 @@ export default function Header({
 						<Link
 							to="/w/$workspaceSlug"
 							params={{ workspaceSlug: workspaceSlug ?? "" }}
+							aria-label="Hephaestus home"
 							className="flex gap-2 items-center hover:text-muted-foreground"
 						>
 							<Hammer className="text-2xl sm:text-3xl" />
 							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
 						</Link>
 					) : (
-						<Link to="/" className="flex gap-2 items-center hover:text-muted-foreground">
+						<Link
+							to="/"
+							aria-label="Hephaestus home"
+							className="flex gap-2 items-center hover:text-muted-foreground"
+						>
 							<Hammer className="text-2xl sm:text-3xl" />
 							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
 						</Link>

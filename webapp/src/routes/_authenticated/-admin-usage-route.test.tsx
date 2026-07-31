@@ -91,7 +91,7 @@ describe("instance AI usage route", () => {
 		mockUsageRoutes({ budgetUsd: 50 });
 		await renderUsageRoute("/admin/usage?month=2999-01");
 
-		expect(screen.getByText(formatMonthLabel(MONTH))).toBeTruthy();
+		screen.getByText(formatMonthLabel(MONTH));
 		expect(requestedMonths).toEqual([MONTH]);
 	});
 
@@ -138,7 +138,7 @@ describe("instance AI usage route", () => {
 		releaseBudgetPut?.();
 
 		await screen.findByText("Couldn't save the budget");
-		expect(screen.getByText("The budget service is down.")).toBeTruthy();
+		screen.getByText("The budget service is down.");
 		expect(
 			screen
 				.getByRole("progressbar", { name: "Shared-model budget used by Acme" })

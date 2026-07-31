@@ -950,7 +950,7 @@ export type UpdatePracticeRequest = {
      */
     precomputeScript?: string;
     /**
-     * Domain events that trigger detection
+     * Domain events that trigger detection; empty for scheduled conversation reviews
      */
     triggerEvents?: Array<string>;
     /**
@@ -1632,7 +1632,7 @@ export type ReviewRunTarget = {
      */
     id?: number;
     /**
-     * Provider-visible issue or pull-request number
+     * Provider-visible work-item number
      */
     number?: number;
     provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
@@ -1676,11 +1676,11 @@ export type ReviewFeedbackCounts = {
 
 export type ReviewPracticeArea = {
     /**
-     * Optional palette colour key
+     * Palette color key
      */
     color?: string;
     /**
-     * Optional lucide icon name
+     * Lucide icon name
      */
     icon?: string;
     name: string;
@@ -1688,7 +1688,7 @@ export type ReviewPracticeArea = {
 };
 
 /**
- * A recorded placement of feedback on a delivery surface
+ * A recorded message placement
  */
 export type ReviewPlacement = {
     /**
@@ -1738,12 +1738,9 @@ export type ReviewFindingDetail = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Detector confidence (0.0-1.0)
+     * Detector confidence
      */
     confidence: number;
-    /**
-     * Detector evidence
-     */
     evidence?: unknown;
     /**
      * Linked feedback, newest first
@@ -1758,12 +1755,9 @@ export type ReviewFindingDetail = {
     practiceRevisionId?: number;
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
-    /**
-     * Detector reasoning behind the finding
-     */
     reasoning?: string;
     /**
-     * Cross-run locus key; null for findings predating fingerprinting
+     * Cross-run locus key; null when continuity is unavailable
      */
     recurrenceKey?: string;
     /**
@@ -1778,24 +1772,24 @@ export type ReviewFindingDetail = {
 };
 
 /**
- * A feedback unit composed from a finding
+ * A message composed from a finding
  */
 export type ReviewBoundFeedback = {
     agentJobId: string;
     channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
     createdAt: Date;
     /**
-     * When the feedback was placed; null if it never reached a delivery surface
+     * When the message was placed; null if it was not delivered
      */
     deliveredAt?: Date;
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
     feedbackId: string;
     /**
-     * Whether the finding led the unit or reinforced it
+     * Whether the finding led the message or reinforced it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
-     * Why the unit was withheld; null unless the state is SUPPRESSED
+     * Why the message was withheld; null unless the state is SUPPRESSED
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
 };
@@ -1810,7 +1804,7 @@ export type ReviewArtifact = {
      */
     id: number;
     /**
-     * Provider-visible issue or pull-request number
+     * Provider-visible work-item number
      */
     number?: number;
     /**
@@ -1818,7 +1812,7 @@ export type ReviewArtifact = {
      */
     provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     /**
-     * Repository owner/name for SCM artifacts
+     * Provider-qualified repository path for SCM artifacts
      */
     repositoryName?: string;
     title: string;
@@ -1844,11 +1838,11 @@ export type ReviewFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Detector confidence (0.0-1.0)
+     * Detector confidence
      */
     confidence: number;
     /**
-     * Counts of linked feedback units by delivery state
+     * Counts of linked messages by delivery state
      */
     feedbackDisposition: ReviewFeedbackDisposition;
     id: string;
@@ -1857,7 +1851,7 @@ export type ReviewFinding = {
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
     /**
-     * Cross-run locus key; null for findings predating fingerprinting
+     * Cross-run locus key; null when continuity is unavailable
      */
     recurrenceKey?: string;
     /**
@@ -1876,23 +1870,23 @@ export type ReviewFinding = {
  */
 export type ReviewFeedbackDisposition = {
     /**
-     * Linked feedback units delivered to a surface
+     * Linked messages delivered
      */
     delivered: number;
     /**
-     * Linked feedback units whose delivery failed
+     * Linked messages whose delivery failed
      */
     failed: number;
     /**
-     * Linked feedback units awaiting delivery
+     * Linked messages awaiting delivery
      */
     prepared: number;
     /**
-     * Linked feedback units delivered and later replaced
+     * Linked messages delivered and later replaced
      */
     superseded: number;
     /**
-     * Linked feedback units withheld by policy
+     * Linked messages withheld by policy
      */
     suppressed: number;
 };
@@ -1903,7 +1897,7 @@ export type ReviewFeedbackDisposition = {
 export type ReviewFeedbackDetail = {
     agentJobId: string;
     /**
-     * Work item the unit targets; null for an unanchored unit
+     * Work item the message targets; null for an unanchored message
      */
     artifact?: ReviewArtifact;
     /**
@@ -1913,7 +1907,7 @@ export type ReviewFeedbackDetail = {
     channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
     createdAt: Date;
     /**
-     * When the feedback was placed; null if it never reached a delivery surface
+     * When the message was placed; null if it was not delivered
      */
     deliveredAt?: Date;
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
@@ -1927,11 +1921,11 @@ export type ReviewFeedbackDetail = {
      */
     placements: Array<ReviewPlacement>;
     /**
-     * Who the unit is addressed to; null when the identity is no longer resolvable
+     * Who the message is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
     /**
-     * The unit this one replaced on its continuity line; null on a first delivery
+     * The message this one replaced; null on a first delivery
      */
     replacesId?: string;
     /**
@@ -1939,7 +1933,7 @@ export type ReviewFeedbackDetail = {
      */
     subject?: ReviewSubject;
     /**
-     * Why the unit was withheld; null unless the state is SUPPRESSED
+     * Why the message was withheld; null unless the state is SUPPRESSED
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
     /**
@@ -1949,7 +1943,7 @@ export type ReviewFeedbackDetail = {
 };
 
 /**
- * A finding that contributed to a feedback unit
+ * A finding that contributed to a message
  */
 export type ReviewBoundFinding = {
     /**
@@ -1961,20 +1955,20 @@ export type ReviewBoundFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Detector confidence (0.0-1.0)
+     * Detector confidence
      */
     confidence: number;
     findingId: string;
     observedAt: Date;
     /**
-     * Render order within the unit (lower renders earlier)
+     * Render order within the message (lower renders earlier)
      */
     ordinal: number;
     practiceName: string;
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
     /**
-     * Whether the finding leads the unit or reinforces it
+     * Whether the finding leads the message or reinforces it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
@@ -1984,41 +1978,35 @@ export type ReviewBoundFinding = {
     title: string;
 };
 
-/**
- * A composed feedback unit with its delivery disposition
- */
 export type ReviewFeedback = {
     agentJobId: string;
     /**
-     * Work item the unit targets; null for an unanchored unit
+     * Work item the message targets; null for an unanchored message
      */
     artifact?: ReviewArtifact;
     /**
-     * Leading characters of the composed body; null when the unit carries no body
+     * Leading characters of the composed body; null when the message carries no body
      */
     bodyPreview?: string;
-    /**
-     * Whether the stored body is longer than the preview
-     */
     bodyTruncated: boolean;
     channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
     createdAt: Date;
     /**
-     * When the feedback was placed; null if it never reached a delivery surface
+     * When the message was placed; null if it was not delivered
      */
     deliveredAt?: Date;
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
     /**
-     * Number of findings used to compose the unit
+     * Number of findings used to compose the message
      */
     findingCount: number;
     id: string;
     /**
-     * Who the unit is addressed to; null when the identity is no longer resolvable
+     * Who the message is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
     /**
-     * The unit this one replaced on its continuity line; null on a first delivery
+     * The message this one replaced; null on a first delivery
      */
     replacesId?: string;
     /**
@@ -2026,7 +2014,7 @@ export type ReviewFeedback = {
      */
     subject?: ReviewSubject;
     /**
-     * Why the unit was withheld; null unless the state is SUPPRESSED
+     * Why the message was withheld; null unless the state is SUPPRESSED
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
 };
@@ -4052,7 +4040,7 @@ export type CreatePracticeRequest = {
      */
     slug: string;
     /**
-     * Domain events that trigger detection
+     * Domain events that trigger detection; empty for scheduled conversation reviews
      */
     triggerEvents: Array<string>;
     /**
@@ -7615,12 +7603,14 @@ export type CreatePracticeErrors = {
     /**
      * Practice area not found
      */
-    404: unknown;
+    404: ProblemDetail;
     /**
      * Practice slug already exists in this workspace
      */
-    409: unknown;
+    409: ProblemDetail;
 };
+
+export type CreatePracticeError = CreatePracticeErrors[keyof CreatePracticeErrors];
 
 export type CreatePracticeResponses = {
     /**
@@ -7884,8 +7874,10 @@ export type ReorderPracticesErrors = {
     /**
      * orderedSlugs is empty, has duplicates, or is not the area's complete set
      */
-    400: unknown;
+    400: ProblemDetail;
 };
+
+export type ReorderPracticesError = ReorderPracticesErrors[keyof ReorderPracticesErrors];
 
 export type ReorderPracticesResponses = {
     /**
@@ -8016,7 +8008,7 @@ export type ListPracticeReviewFeedbackError = ListPracticeReviewFeedbackErrors[k
 
 export type ListPracticeReviewFeedbackResponses = {
     /**
-     * Paginated feedback units returned
+     * Paginated messages returned
      */
     200: PagedModelReviewFeedback;
 };
@@ -8047,7 +8039,7 @@ export type GetPracticeReviewFeedbackError = GetPracticeReviewFeedbackErrors[key
 
 export type GetPracticeReviewFeedbackResponses = {
     /**
-     * Feedback unit detail returned
+     * Message details returned
      */
     200: ReviewFeedbackDetail;
 };
@@ -8159,8 +8151,10 @@ export type DeletePracticeErrors = {
     /**
      * Practice not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type DeletePracticeError = DeletePracticeErrors[keyof DeletePracticeErrors];
 
 export type DeletePracticeResponses = {
     /**
@@ -8188,8 +8182,10 @@ export type GetPracticeErrors = {
     /**
      * Practice not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type GetPracticeError = GetPracticeErrors[keyof GetPracticeErrors];
 
 export type GetPracticeResponses = {
     /**
@@ -8217,8 +8213,10 @@ export type UpdatePracticeErrors = {
     /**
      * Practice or practice area not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type UpdatePracticeError = UpdatePracticeErrors[keyof UpdatePracticeErrors];
 
 export type UpdatePracticeResponses = {
     /**
@@ -8246,8 +8244,10 @@ export type SetActiveErrors = {
     /**
      * Practice not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type SetActiveError = SetActiveErrors[keyof SetActiveErrors];
 
 export type SetActiveResponses = {
     /**
@@ -8275,8 +8275,10 @@ export type BindAreaErrors = {
     /**
      * Practice or area not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type BindAreaError = BindAreaErrors[keyof BindAreaErrors];
 
 export type BindAreaResponses = {
     /**
@@ -8304,12 +8306,14 @@ export type PlacePracticeErrors = {
     /**
      * position is missing, negative, or beyond the destination
      */
-    400: unknown;
+    400: ProblemDetail;
     /**
      * Practice or area not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type PlacePracticeError = PlacePracticeErrors[keyof PlacePracticeErrors];
 
 export type PlacePracticeResponses = {
     /**

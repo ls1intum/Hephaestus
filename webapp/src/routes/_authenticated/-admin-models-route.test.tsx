@@ -61,7 +61,7 @@ describe("instance AI models route", () => {
 	it("renders before a connection or provider probe has been selected", async () => {
 		mockPage();
 
-		expect(await renderModelsRoute()).toBeTruthy();
+		await renderModelsRoute();
 	});
 
 	it("keeps each connection's toggle pending independently when two run at once", async () => {

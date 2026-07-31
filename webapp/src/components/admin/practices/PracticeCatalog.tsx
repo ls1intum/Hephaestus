@@ -45,13 +45,12 @@ import {
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuItem,
+	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
-	DropdownMenuSub,
-	DropdownMenuSubContent,
-	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -78,7 +77,7 @@ import { cn } from "@/lib/utils";
 import { AreaVisualPicker } from "./AreaVisualPicker";
 import { getPracticeDropTarget, type PracticeDropTarget } from "./practice-catalog-dnd";
 
-export type FocusFilter = "ALL" | "PULL_REQUEST" | "ISSUE";
+export type FocusFilter = "ALL" | Practice["artifactType"];
 
 export interface PracticeCatalogPendingState {
 	areaSlugs: ReadonlySet<string>;
@@ -127,10 +126,17 @@ interface ActivePracticeDrop extends PracticeDropTarget {
 }
 
 const FOCUS_FILTERS = [
-	{ value: "ALL", label: "All reviewed work" },
+	{ value: "ALL", label: "All work types" },
 	{ value: "PULL_REQUEST", label: "Pull or merge requests" },
 	{ value: "ISSUE", label: "Issues" },
+	{ value: "CONVERSATION_THREAD", label: "Conversations" },
 ] satisfies Array<{ value: FocusFilter; label: string }>;
+
+const ARTIFACT_LABELS: Record<Practice["artifactType"], string> = {
+	PULL_REQUEST: "Pull or merge request",
+	ISSUE: "Issue",
+	CONVERSATION_THREAD: "Conversation",
+};
 
 export function PracticeCatalog({
 	workspaceSlug,
@@ -305,7 +311,7 @@ export function PracticeCatalog({
 					value={focusFilter}
 					onValueChange={(value) => value && onFocusFilterChange(value as FocusFilter)}
 				>
-					<SelectTrigger className="w-full sm:hidden" aria-label="Filter by reviewed work">
+					<SelectTrigger className="w-full sm:hidden" aria-label="Filter by work type">
 						<SelectValue />
 					</SelectTrigger>
 					<SelectContent>
@@ -322,7 +328,7 @@ export function PracticeCatalog({
 					onValueChange={(v) => v[0] && onFocusFilterChange(v[0] as FocusFilter)}
 					variant="outline"
 					size="sm"
-					aria-label="Filter by reviewed work"
+					aria-label="Filter by work type"
 					className="hidden sm:flex"
 				>
 					<ToggleGroupItem value="ALL" className="min-w-0">
@@ -336,6 +342,9 @@ export function PracticeCatalog({
 					</ToggleGroupItem>
 					<ToggleGroupItem value="ISSUE" className="min-w-0">
 						Issues
+					</ToggleGroupItem>
+					<ToggleGroupItem value="CONVERSATION_THREAD" className="min-w-0">
+						Conversations
 					</ToggleGroupItem>
 				</ToggleGroup>
 				<div className="grid grid-cols-2 gap-2 sm:flex">
@@ -355,7 +364,7 @@ export function PracticeCatalog({
 				</div>
 			</div>
 			{focusFilter !== "ALL" && (
-				<p className="text-sm text-muted-foreground">Clear the filter to move practices.</p>
+				<p className="text-sm text-muted-foreground">Clear the filter to drag practices.</p>
 			)}
 
 			<DndContext
@@ -631,7 +640,7 @@ function SortableArea({
 						</Badge>
 						{!area.active && (
 							<Badge variant="outline" className="shrink-0">
-								Dashboard hidden
+								Hidden from practice dashboards
 							</Badge>
 						)}
 					</span>
@@ -642,7 +651,7 @@ function SortableArea({
 						checked={area.active}
 						onCheckedChange={(c) => onToggleActive(area.slug, c)}
 						disabled={pending}
-						aria-label={`${area.name} area shown on dashboards`}
+						aria-label={`${area.name} area shown on practice dashboards`}
 					/>
 					<DropdownMenu>
 						<DropdownMenuTrigger
@@ -665,7 +674,7 @@ function SortableArea({
 								disabled={pending}
 								onClick={() => onToggleActive(area.slug, !area.active)}
 							>
-								{area.active ? "Hide from dashboards" : "Show on dashboards"}
+								{area.active ? "Hide from practice dashboards" : "Show on practice dashboards"}
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem
@@ -860,7 +869,7 @@ function SortablePracticeRow({
 			label: practice.name,
 			practiceSlug: practice.slug,
 		} satisfies CatalogDndData,
-		disabled: !showReorderHandle || reorderDisabled,
+		disabled: !showReorderHandle || reorderDisabled || pending,
 	});
 	const style = { transform: CSS.Transform.toString(transform), transition };
 	return (
@@ -879,7 +888,7 @@ function SortablePracticeRow({
 					size="icon-sm"
 					className="touch-none shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing disabled:cursor-default"
 					aria-label={`Move practice ${practice.name}`}
-					disabled={reorderDisabled}
+					disabled={reorderDisabled || pending}
 					{...attributes}
 					{...listeners}
 				>
@@ -904,7 +913,7 @@ function SortablePracticeRow({
 					checked={practice.active}
 					onCheckedChange={(c) => onSetActive(practice.slug, c)}
 					disabled={pending}
-					aria-label={`${practice.name} included in reviews`}
+					aria-label={`${practice.name} included in new reviews`}
 				/>
 				<DropdownMenu>
 					<DropdownMenuTrigger
@@ -933,40 +942,40 @@ function SortablePracticeRow({
 							disabled={pending}
 							onClick={() => onSetActive(practice.slug, !practice.active)}
 						>
-							{practice.active ? "Exclude from reviews" : "Include in reviews"}
+							{practice.active ? "Exclude from new reviews" : "Include in new reviews"}
 						</DropdownMenuItem>
-						<DropdownMenuSub>
-							<DropdownMenuSubTrigger disabled={pending}>Move to</DropdownMenuSubTrigger>
-							<DropdownMenuSubContent>
-								<DropdownMenuRadioGroup
-									value={practice.areaSlug ?? UNASSIGNED}
-									onValueChange={(value) => {
-										const areaSlug = value === UNASSIGNED ? null : value;
-										if ((practice.areaSlug ?? null) === areaSlug) return;
-										const position = getPracticeDropTarget(
-											allPractices,
-											practice.slug,
-											areaSlug,
-										)?.position;
-										if (position !== undefined) onPlace(practice.slug, areaSlug, position);
-									}}
+						<DropdownMenuSeparator />
+						<DropdownMenuGroup>
+							<DropdownMenuLabel>Move to</DropdownMenuLabel>
+							<DropdownMenuRadioGroup
+								value={practice.areaSlug ?? UNASSIGNED}
+								onValueChange={(value) => {
+									const areaSlug = value === UNASSIGNED ? null : value;
+									if ((practice.areaSlug ?? null) === areaSlug) return;
+									const position = getPracticeDropTarget(
+										allPractices,
+										practice.slug,
+										areaSlug,
+									)?.position;
+									if (position !== undefined) onPlace(practice.slug, areaSlug, position);
+								}}
+							>
+								<DropdownMenuRadioItem
+									value={UNASSIGNED}
+									disabled={blockedMoveDestinationSlugs.has(UNASSIGNED)}
+									closeOnClick
 								>
-									<DropdownMenuRadioItem
-										value={UNASSIGNED}
-										disabled={blockedMoveDestinationSlugs.has(UNASSIGNED)}
-									>
-										Unassigned
-									</DropdownMenuRadioItem>
-									{areas
-										.filter((area) => !blockedMoveDestinationSlugs.has(area.slug))
-										.map((area) => (
-											<DropdownMenuRadioItem key={area.slug} value={area.slug}>
-												{area.name}
-											</DropdownMenuRadioItem>
-										))}
-								</DropdownMenuRadioGroup>
-							</DropdownMenuSubContent>
-						</DropdownMenuSub>
+									Unassigned
+								</DropdownMenuRadioItem>
+								{areas
+									.filter((area) => !blockedMoveDestinationSlugs.has(area.slug))
+									.map((area) => (
+										<DropdownMenuRadioItem key={area.slug} value={area.slug} closeOnClick>
+											{area.name}
+										</DropdownMenuRadioItem>
+									))}
+							</DropdownMenuRadioGroup>
+						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							variant="destructive"
@@ -987,8 +996,8 @@ function PracticeRowDetails({ practice, title }: { practice: Practice; title: Re
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<span>{practice.artifactType === "ISSUE" ? "Issue" : "Pull or merge request"}</span>
-				{!practice.active && <Badge variant="outline">Paused</Badge>}
+				<span>{ARTIFACT_LABELS[practice.artifactType]}</span>
+				{!practice.active && <Badge variant="outline">Excluded</Badge>}
 				{practice.precomputeScript && <Badge variant="outline">Precompute</Badge>}
 			</ItemDescription>
 		</ItemContent>

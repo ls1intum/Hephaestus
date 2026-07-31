@@ -37,10 +37,7 @@ export const CHANNEL_LABELS: Record<FeedbackChannel, string> = {
 	PROFILE: "On the developer profile",
 };
 
-export const AVAILABLE_FEEDBACK_CHANNELS = [
-	"IN_CONTEXT",
-	"CONVERSATION",
-] as const satisfies readonly FeedbackChannel[];
+export const FEEDBACK_CHANNELS = Object.keys(CHANNEL_LABELS) as FeedbackChannel[];
 
 export const DELIVERY_STATE_LABELS: Record<FeedbackDeliveryState, string> = {
 	PREPARED: "Awaiting conversation",
@@ -64,7 +61,13 @@ export const SUPPRESSION_REASON_LABELS: Record<FeedbackSuppressionReason, string
 	EMPTY_AFTER_SANITIZE: "No deliverable content remained after sanitisation",
 };
 
-export type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "warning";
+export type BadgeVariant =
+	| "default"
+	| "secondary"
+	| "destructive"
+	| "outline"
+	| "success"
+	| "warning";
 
 export function severityBadgeVariant(severity: Severity): BadgeVariant {
 	switch (severity) {
@@ -81,7 +84,7 @@ export function severityBadgeVariant(severity: Severity): BadgeVariant {
 export function deliveryStateBadgeVariant(state: FeedbackDeliveryState): BadgeVariant {
 	switch (state) {
 		case "DELIVERED":
-			return "default";
+			return "success";
 		case "PREPARED":
 			return "secondary";
 		case "SUPERSEDED":

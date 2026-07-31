@@ -17,9 +17,9 @@ public record UpdatePracticeRequestDTO(
     @Nullable
     String name,
 
-    @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
+    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
     @ValidTriggerEvents
-    @Schema(description = "Domain events that trigger detection")
+    @Schema(description = "Domain events that trigger detection; empty for scheduled conversation reviews")
     @Nullable
     List<String> triggerEvents,
 

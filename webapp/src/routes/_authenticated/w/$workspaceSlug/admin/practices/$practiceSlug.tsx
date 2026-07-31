@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	getPracticeOptions,
@@ -9,7 +9,11 @@ import {
 	updatePracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, UpdatePracticeRequest } from "@/api/types.gen";
-import { PracticeForm } from "@/components/admin/practices/PracticeForm";
+import { PracticeForm, PracticeFormShell } from "@/components/admin/practices/PracticeForm";
+import {
+	PRACTICE_SEARCH_PARAMS,
+	practiceSearchSchema,
+} from "@/components/admin/practices/practice-search";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -23,6 +27,8 @@ export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug",
 )({
 	head: workspaceAdminHead("Edit practice"),
+	validateSearch: practiceSearchSchema,
+	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
 	component: EditPracticeContainer,
 });
 
@@ -86,29 +92,29 @@ function EditPracticeContainer() {
 		}
 	};
 
-	const handleCancel = () => {
-		navigate({ to: ".." });
-	};
-
 	if (practiceQuery.isPending || areasQuery.isPending) {
 		return (
-			<div className="flex h-64 items-center justify-center">
-				<Spinner className="size-8" />
-			</div>
+			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
+				<div className="flex h-64 max-w-3xl items-center justify-center">
+					<Spinner className="size-8" />
+				</div>
+			</PracticeFormShell>
 		);
 	}
 	if (practiceQuery.isError || areasQuery.isError) {
 		return (
-			<div className="mx-auto w-full max-w-3xl">
-				<QueryErrorAlert
-					error={practiceQuery.error ?? areasQuery.error}
-					title="Couldn't load the practice"
-					onRetry={() => {
-						practiceQuery.refetch();
-						areasQuery.refetch();
-					}}
-				/>
-			</div>
+			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
+				<div className="max-w-3xl">
+					<QueryErrorAlert
+						error={practiceQuery.error ?? areasQuery.error}
+						title="Couldn't load the practice"
+						onRetry={() => {
+							practiceQuery.refetch();
+							areasQuery.refetch();
+						}}
+					/>
+				</div>
+			</PracticeFormShell>
 		);
 	}
 
@@ -119,7 +125,6 @@ function EditPracticeContainer() {
 			initialData={practiceQuery.data}
 			areas={areasQuery.data}
 			onSubmit={handleSubmit}
-			onCancel={handleCancel}
 			isPending={updatePractice.isPending}
 		/>
 	);

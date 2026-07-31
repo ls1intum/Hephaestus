@@ -10,7 +10,11 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import type React from "react";
-import { getUserSettingsOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getIntegrationCatalogOptions,
+	getUserSettingsOptions,
+	listThreadsOptions,
+} from "@/api/@tanstack/react-query.gen";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
@@ -157,7 +161,7 @@ function GlobalCopilot() {
 	const { isAuthenticated, isLoading } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const { workspaceSlug } = useActiveWorkspaceSlug();
-	const { mentorEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
+	const { features, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
@@ -187,7 +191,7 @@ function GlobalCopilot() {
 		!isAuthenticated ||
 		!workspaceSlug ||
 		!hasMentorAccess ||
-		!mentorEnabled
+		!features?.mentorEnabled
 	) {
 		return null;
 	}
@@ -209,7 +213,6 @@ function GlobalCopilot() {
 			}}
 		>
 			<Chat
-				id={mentorChat.currentThreadId || mentorChat.id}
 				messages={mentorChat.messages as ChatMessage[]}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
@@ -247,10 +250,6 @@ function HeaderContainer() {
 		userName: workspaceUserName,
 	} = useWorkspaceAccess();
 
-	// Inside a workspace, "you" are the account's identity for that workspace's provider (ADR 0017):
-	// e.g. a GitLab-logged-in account is its GitHub user in a GitHub workspace. Prefer that identity for
-	// the displayed name and the "My Profile" link so it points at the right per-provider profile;
-	// fall back to the global account identity outside a workspace (or before membership resolves).
 	const effectiveUsername = workspaceUserLogin ?? username;
 	const effectiveName =
 		workspaceUserName ?? (userProfile && `${userProfile.firstName} ${userProfile.lastName}`);
@@ -273,11 +272,6 @@ function HeaderContainer() {
 	);
 }
 
-/**
- * Sets `data-provider` attribute on a wrapper div so provider-aware CSS custom
- * properties (--color-provider-*) resolve to the correct palette (GitHub Primer
- * or GitLab Pajamas) based on the active workspace's provider type.
- */
 function ProviderColorScope({ children }: { children: React.ReactNode }) {
 	const { providerType } = useActiveWorkspaceSlug();
 	return <div data-provider={getProviderSlug(providerType)}>{children}</div>;
@@ -293,6 +287,24 @@ function AppSidebarContainer() {
 	const hasWorkspace = Boolean(workspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
+	const integrationCatalogQuery = useQuery({
+		...getIntegrationCatalogOptions({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+		enabled: workspaceAccess.isAdmin && Boolean(workspaceSlug),
+		placeholderData: (previousData) => previousData,
+	});
+	const integrationCatalog = Array.isArray(integrationCatalogQuery.data)
+		? integrationCatalogQuery.data
+		: [];
+	const integrationKinds = [
+		...new Set([
+			...integrationCatalog.map((entry) => entry.kind),
+			...(activeWorkspace?.providerType === "GITLAB"
+				? (["GITLAB"] as const)
+				: activeWorkspace?.providerType === "GITHUB"
+					? (["GITHUB"] as const)
+					: []),
+		]),
+	];
 
 	const sidebarContext: SidebarContext = pathname.startsWith("/admin")
 		? "admin"
@@ -300,7 +312,6 @@ function AppSidebarContainer() {
 			? "mentor"
 			: "main";
 
-	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
 		data: mentorThreads,
 		isLoading: mentorThreadsLoading,
@@ -321,8 +332,6 @@ function AppSidebarContainer() {
 		selectWorkspace(ws.workspaceSlug);
 		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
 		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		// Runtime-built internal path (slug + preserved subpath): use the typed `href` field
-		// rather than `to as never` — relative href stays an SPA navigation.
 		navigate({ href: target, replace: true });
 	};
 
@@ -336,6 +345,7 @@ function AppSidebarContainer() {
 			isAdmin={workspaceAccess.isAdmin}
 			isAppAdmin={isAppAdmin}
 			hasMentorAccess={hasMentorAccess}
+			integrationKinds={integrationKinds}
 			context={sidebarContext}
 			workspaces={workspaceList}
 			activeWorkspace={activeWorkspace}

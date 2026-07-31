@@ -9,9 +9,9 @@ public record ReviewArtifactDTO(
     @NonNull WorkArtifact type,
     @NonNull @Schema(description = "Internal artifact entity ID") Long id,
     @Schema(description = "Source provider, when recorded") IntegrationKind provider,
-    @Schema(description = "Provider-visible issue or pull-request number") Integer number,
+    @Schema(description = "Provider-visible work-item number") Integer number,
     @NonNull String title,
-    @Schema(description = "Repository owner/name for SCM artifacts") String repositoryName,
+    @Schema(description = "Provider-qualified repository path for SCM artifacts") String repositoryName,
     @Schema(description = "Slack channel name for conversation artifacts") String channelName,
     @Schema(description = "Provider URL, when one is available") String url
 ) {}

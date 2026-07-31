@@ -27,6 +27,8 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -60,7 +62,7 @@ public class PracticeCatalogController {
         description = "Practices returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class)))
     )
-    @SecurityRequirements
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<List<PracticeDTO>> listPractices(
         WorkspaceContext workspaceContext,
         @RequestParam(name = "active", required = false) @Parameter(
@@ -106,9 +108,12 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "404",
         description = "Practice not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
-    @SecurityRequirements
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<PracticeDTO> getPractice(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug
@@ -127,12 +132,18 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "409",
         description = "Practice slug already exists in this workspace",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @ApiResponse(
         responseCode = "404",
         description = "Practice area not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
@@ -161,7 +172,10 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "400",
         description = "orderedSlugs is empty, has duplicates, or is not the area's complete set",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
@@ -188,7 +202,10 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "404",
         description = "Practice or practice area not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
@@ -211,7 +228,10 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "404",
         description = "Practice not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_ACTIVE")
@@ -237,7 +257,10 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "404",
         description = "Practice or area not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
@@ -263,12 +286,18 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "400",
         description = "position is missing, negative, or beyond the destination",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @ApiResponse(
         responseCode = "404",
         description = "Practice or area not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
@@ -291,7 +320,10 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "404",
         description = "Practice not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")

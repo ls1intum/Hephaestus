@@ -21,16 +21,17 @@ export function AiReviewSection({
 					Practice feedback
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Choose whether Hephaestus posts new feedback on your pull or merge requests.
+					Choose whether Hephaestus can send new practice feedback to you.
 				</p>
 			</div>
 
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="ai-review-comments">Feedback comments</FieldLabel>
+					<FieldLabel htmlFor="ai-review-comments">Comments and Slack reminders</FieldLabel>
 					<FieldDescription>
-						Turn off new comments on your pull requests and merge requests. Reviews still run, and
-						their findings remain available to workspace admins.
+						When off, Hephaestus won't post practice feedback on pull or merge requests you author
+						or send Slack reminders. Reviews still run, and workspace admins can still see the
+						findings.
 					</FieldDescription>
 				</FieldContent>
 				<Switch

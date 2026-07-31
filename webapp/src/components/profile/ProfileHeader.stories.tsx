@@ -1,47 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ProfileHeader } from "./ProfileHeader";
 
-/**
- * Header component for the user profile page displaying key user information.
- * Shows the user's profile details, league points, contribution history,
- * and repositories they've contributed to.
- */
 const meta = {
 	component: ProfileHeader,
 	parameters: {
 		layout: "centered",
-		docs: {
-			description: {
-				component:
-					"Header section of the profile page showing user information, stats, and repository contributions.",
-			},
-		},
-	},
-	argTypes: {
-		isLoading: {
-			description: "Whether the component is in a loading state",
-			control: "boolean",
-		},
-		user: {
-			description: "User profile data",
-			control: "object",
-		},
-		userXpRecord: {
-			description: "XP progression data for the user",
-			control: "object",
-		},
-		leaguePoints: {
-			description: "Total league points earned by the user",
-			control: "number",
-		},
-		firstContribution: {
-			description: "Date of the user's first contribution (Date object)",
-			control: "date",
-		},
-		contributedRepositories: {
-			description: "List of repositories the user has contributed to",
-			control: "object",
-		},
 	},
 	tags: ["autodocs"],
 	args: {
@@ -52,10 +15,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Standard profile header showing an active contributor with multiple repositories
- * and a significant number of league points.
- */
 export const Default: Story = {
 	args: {
 		isLoading: false,
@@ -95,9 +54,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Loading state displayed while user data is being fetched.
- */
 export const Loading: Story = {
 	args: {
 		isLoading: true,

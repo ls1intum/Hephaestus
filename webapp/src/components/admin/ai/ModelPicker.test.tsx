@@ -36,23 +36,20 @@ describe("ModelPicker", () => {
 		);
 		expect(screen.getByRole("combobox").textContent).toContain("GPT-5 · Organization endpoint");
 		fireEvent.click(screen.getByRole("combobox"));
-		expect(screen.getByRole("option", { name: /GPT-5 · Organization endpoint/ })).toBeTruthy();
-		expect(screen.getByRole("option", { name: /GPT-5 · Workspace endpoint/ })).toBeTruthy();
-		expect(screen.getByText("Shared models")).toBeTruthy();
-		expect(screen.getByText("Your models")).toBeTruthy();
+		screen.getByRole("option", { name: /GPT-5 · Organization endpoint/ });
+		screen.getByRole("option", { name: /GPT-5 · Workspace endpoint/ });
+		screen.getByText("Shared models");
+		screen.getByText("Your models");
 	});
 
 	it("keeps the price in each option's accessible name", () => {
 		render(<ModelPicker availableModels={models} value={null} onChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole("combobox"));
 
-		// The picker is answerable for the price reaching the accessible *name*, not just the text.
 		for (const model of models) {
-			expect(
-				screen.getByRole("option", {
-					name: `${model.displayName} · ${model.connectionDisplayName} · ${priceLabel(model, "workspace")}`,
-				}),
-			).toBeTruthy();
+			screen.getByRole("option", {
+				name: `${model.displayName} · ${model.connectionDisplayName} · ${priceLabel(model, "workspace")}`,
+			});
 		}
 	});
 

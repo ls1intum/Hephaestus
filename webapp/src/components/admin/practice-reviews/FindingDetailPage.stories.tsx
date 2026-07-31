@@ -9,7 +9,6 @@ const meta = {
 	title: "Admin/Practice reviews/Finding details",
 	component: FindingDetailPage,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },

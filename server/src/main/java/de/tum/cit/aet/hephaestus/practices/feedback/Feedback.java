@@ -19,7 +19,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
 
-/** One recipient-specific message composed from one or more observations. */
 @Entity
 @Immutable
 @Table(
@@ -74,7 +73,6 @@ public class Feedback {
     @Column(name = "channel", nullable = false, length = 32)
     private FeedbackChannel channel;
 
-    /** Stable, zero-based position within a job; part of {@code uk_feedback_unit}. */
     @NotNull
     @Column(name = "position", nullable = false)
     private Integer position;

@@ -11,8 +11,8 @@ import type {
 } from "./review-format";
 import {
 	ASSESSMENT_LABELS,
-	AVAILABLE_FEEDBACK_CHANNELS,
 	DELIVERY_STATE_LABELS,
+	FEEDBACK_CHANNELS,
 	PRESENCE_LABELS,
 	SEVERITY_LABELS,
 	SUPPRESSION_REASON_LABELS,
@@ -41,25 +41,36 @@ const scope = {
 	to: day,
 };
 
-export const feedbackSearchSchema = z.object({
-	...scope,
-	page,
-	deliveryState: enumValues(DELIVERY_STATES),
-	suppressionReason: enumValues(SUPPRESSION_REASONS),
-	channel: enumValues<FeedbackChannel>(AVAILABLE_FEEDBACK_CHANNELS),
-	recipientUserId: positiveId,
-});
+function canonicalDateRange<T extends { from?: string; to?: string }>(search: T): T {
+	if (!search.from || (search.to && search.to < search.from)) {
+		return { ...search, to: undefined };
+	}
+	return search;
+}
 
-export const findingsSearchSchema = z.object({
-	...scope,
-	page,
-	areaSlug: multiValue,
-	practiceSlug: multiValue,
-	presence: enumValues(PRESENCES),
-	assessment: enumValues(ASSESSMENTS),
-	severity: enumValues(SEVERITIES),
-	subjectUserId: positiveId,
-});
+export const feedbackSearchSchema = z
+	.object({
+		...scope,
+		page,
+		deliveryState: enumValues(DELIVERY_STATES),
+		suppressionReason: enumValues(SUPPRESSION_REASONS),
+		channel: enumValues<FeedbackChannel>(FEEDBACK_CHANNELS),
+		recipientUserId: positiveId,
+	})
+	.transform(canonicalDateRange);
+
+export const findingsSearchSchema = z
+	.object({
+		...scope,
+		page,
+		areaSlug: multiValue,
+		practiceSlug: multiValue,
+		presence: enumValues(PRESENCES),
+		assessment: enumValues(ASSESSMENTS),
+		severity: enumValues(SEVERITIES),
+		subjectUserId: positiveId,
+	})
+	.transform(canonicalDateRange);
 
 export const runsSearchSchema = z.object({
 	page,

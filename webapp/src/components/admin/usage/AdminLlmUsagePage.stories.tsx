@@ -125,8 +125,6 @@ const meta = {
 		error: null,
 		now: NOW,
 		onRetry: fn(),
-		onPrevMonth: fn(),
-		onNextMonth: fn(),
 		onEditOwnProviderCap: fn(),
 	},
 } satisfies Meta<typeof AdminLlmUsagePage>;

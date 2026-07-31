@@ -1,5 +1,8 @@
 import { Link, useMatchRoute, useParams, useSearch } from "@tanstack/react-router";
+import { MessageSquareText, ScanSearch, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { reviewArtifactTypeFromSlug } from "./ReviewArtifact";
@@ -14,9 +17,10 @@ const VIEWS = [
 	{
 		id: "reviews",
 		to: "/w/$workspaceSlug/admin/practices/reviews",
-		label: "Review activity",
+		label: "Reviews",
 		title: "Practice reviews",
 		description: "See when reviews ran and what they produced.",
+		icon: Workflow,
 	},
 	{
 		id: "findings",
@@ -24,6 +28,7 @@ const VIEWS = [
 		label: "Findings",
 		title: "Findings",
 		description: "Explore strengths and improvements, with evidence from reviewed work.",
+		icon: ScanSearch,
 	},
 	{
 		id: "delivery",
@@ -31,6 +36,7 @@ const VIEWS = [
 		label: "Delivery",
 		title: "Feedback delivery",
 		description: "See each message Hephaestus prepared and whether it reached its recipient.",
+		icon: MessageSquareText,
 	},
 ] as const;
 
@@ -38,7 +44,7 @@ export type PracticeReviewSection = (typeof VIEWS)[number]["id"];
 
 export interface PracticeReviewsHeaderProps {
 	workspaceSlug: string;
-	activeSection: PracticeReviewSection;
+	activeSection?: PracticeReviewSection;
 	scope?: ReviewScopeSearch;
 }
 
@@ -77,13 +83,25 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 			fuzzy: true,
 		}),
 	);
-	const activeId = deliveryActive ? "delivery" : findingsActive ? "findings" : "reviews";
+	const targetActive = Boolean(
+		matchRoute({
+			to: "/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId",
+			fuzzy: true,
+		}),
+	);
+	const activeId = targetActive
+		? undefined
+		: deliveryActive
+			? "delivery"
+			: findingsActive
+				? "findings"
+				: "reviews";
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6">
+		<PageLayout>
 			<PracticeReviewsHeader workspaceSlug={workspaceSlug} activeSection={activeId} scope={scope} />
 			{children}
-		</div>
+		</PageLayout>
 	);
 }
 
@@ -92,16 +110,17 @@ export function PracticeReviewsHeader({
 	activeSection,
 	scope = {},
 }: PracticeReviewsHeaderProps) {
-	const activeView = VIEWS.find((view) => view.id === activeSection) ?? VIEWS[0];
+	const activeView = VIEWS.find((view) => view.id === activeSection);
+	const title = activeView?.title ?? "Reviewed work";
+	const description =
+		activeView?.description ?? "See the review output associated with one piece of work.";
+	const Icon = activeView?.icon ?? ScanSearch;
 	return (
-		<header className="space-y-4">
-			<div className="space-y-1">
-				<h1 className="text-3xl font-bold tracking-tight">{activeView.title}</h1>
-				<p className="max-w-2xl text-muted-foreground">{activeView.description}</p>
-			</div>
+		<div className="space-y-4">
+			<PageHeader icon={<Icon />} title={title} description={description} />
 			<nav
 				aria-label="Practice review sections"
-				className="grid grid-cols-[1.4fr_1fr_1fr] gap-1 rounded-lg bg-muted p-1 sm:grid-cols-3"
+				className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1 sm:inline-grid"
 			>
 				{VIEWS.map(({ id, to, label }) => (
 					<Link
@@ -113,13 +132,13 @@ export function PracticeReviewsHeader({
 						activeOptions={{ exact: true }}
 						className={cn(
 							buttonVariants({ variant: "ghost", size: "sm" }),
-							"min-w-0 px-2 text-foreground aria-[current=page]:bg-background aria-[current=page]:font-semibold aria-[current=page]:shadow-sm aria-[current=page]:hover:bg-background",
+							"min-w-0 px-2 text-muted-foreground aria-[current=page]:bg-background aria-[current=page]:text-foreground aria-[current=page]:shadow-sm aria-[current=page]:hover:bg-background",
 						)}
 					>
 						{label}
 					</Link>
 				))}
 			</nav>
-		</header>
+		</div>
 	);
 }

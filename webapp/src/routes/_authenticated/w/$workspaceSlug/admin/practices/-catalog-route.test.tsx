@@ -36,4 +36,18 @@ describe("practice catalog route", () => {
 		await screen.findByRole("heading", { name: "Practice catalog" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByRole("button", { name: "Enable practices" })).toBeNull();
 	});
+
+	it("restores the work type filter from the URL", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members/me", () =>
+				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			),
+			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
+			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
+		);
+
+		renderRouteAt("/w/acme/admin/practices?focus=ISSUE");
+
+		await screen.findByText("Clear the filter to drag practices.", {}, ROUTE_RENDER_WAIT);
+	});
 });

@@ -9,8 +9,8 @@ import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
 import {
 	type AuditSearch,
-	dayEndIso,
-	dayStartIso,
+	dayAfterInstant,
+	dayStartInstant,
 	fromDateRange,
 	toDateRange,
 } from "@/components/admin/audit-shared/audit-search";
@@ -52,14 +52,13 @@ export function AuthAuditPanel({
 	const [exporting, setExporting] = useState(false);
 
 	const dateRange = toDateRange(search);
-	// One filter shape for the list and the export, so what you see is what you download.
 	const filters = {
 		eventType: narrowToEnum(search.eventType, EVENT_TYPES),
 		result: narrowToEnum(search.outcome, OUTCOMES),
 		accountId: search.accountId,
 		actingAccountId: search.actorId,
-		from: dateRange?.from ? dayStartIso(dateRange.from) : undefined,
-		to: dateRange?.to ? dayEndIso(dateRange.to) : undefined,
+		from: dateRange?.from ? dayStartInstant(dateRange.from) : undefined,
+		to: dateRange?.to ? dayAfterInstant(dateRange.to) : undefined,
 	} as const;
 
 	const listQuery = useInfiniteQuery({
@@ -71,9 +70,7 @@ export function AuthAuditPanel({
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
-	// From the narrowed filter, not raw search: unrecognised enum values filter nothing, so they must
-	// not count as an active filter.
-	const hasFilter = Boolean(
+	const hasAppliedFilter = Boolean(
 		filters.eventType ||
 			filters.result ||
 			filters.accountId !== undefined ||
@@ -117,7 +114,7 @@ export function AuthAuditPanel({
 	return (
 		<div className="space-y-4">
 			<FilterToolbar
-				hasFilter={hasFilter}
+				hasFilter={hasAppliedFilter}
 				onReset={reset}
 				actions={
 					<Button
@@ -166,13 +163,13 @@ export function AuthAuditPanel({
 				)}
 			</FilterToolbar>
 
-			<ResultCount total={total} noun={["event", "events"]} hasFilter={hasFilter} />
+			<ResultCount total={total} noun={["event", "events"]} hasFilter={hasAppliedFilter} />
 
 			<AdminAuditTable
 				events={events}
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
-				hasFilter={hasFilter}
+				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
 				hasNextPage={Boolean(listQuery.hasNextPage)}
 				isFetchingNextPage={listQuery.isFetchingNextPage}

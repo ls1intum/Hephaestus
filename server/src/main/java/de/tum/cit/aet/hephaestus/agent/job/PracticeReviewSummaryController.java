@@ -24,10 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @WorkspaceScopedController
 @RequestMapping("/practices/reviews")
-@Tag(
-    name = "Practice Review Output",
-    description = "Workspace-admin access to practice review runs, findings, and feedback delivery records"
-)
+@Tag(name = "Practice reviews")
 @RequiredArgsConstructor
 @Validated
 @RequireAtLeastWorkspaceAdmin

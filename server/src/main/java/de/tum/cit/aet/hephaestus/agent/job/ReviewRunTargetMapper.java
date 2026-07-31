@@ -53,7 +53,7 @@ final class ReviewRunTargetMapper {
                 null,
                 "Conversation",
                 null,
-                null,
+                textValue(metadata, "slack_channel_name", null),
                 null
             );
         };

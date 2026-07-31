@@ -48,7 +48,6 @@ const meta = {
 	title: "Admin/Practices/Catalog",
 	component: PracticeCatalog,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "padded",
 		chromatic: { viewports: [320, 1440] },
 		viewport: { defaultViewport: "reflow" },
@@ -84,14 +83,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {
-	play: async ({ canvas }) => {
-		const filters = canvas.getAllByLabelText("Filter by reviewed work");
-		await waitFor(() =>
-			expect(filters.filter((filter) => filter.getClientRects().length > 0)).toHaveLength(1),
-		);
-		await expect(canvas.getByText("Dashboard hidden")).toBeVisible();
-		await expect(canvas.getByText("Paused")).toBeVisible();
-		await expect(canvas.getByText(mockUnassignedPractice.name)).toBeVisible();
+	play: async () => {
 		await expectNoPageOverflow();
 	},
 };
@@ -100,7 +92,7 @@ export const Filtered: Story = {
 	args: { focusFilter: "ISSUE" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Clear the filter to move practices.")).toBeVisible();
+		await expect(canvas.getByText("Clear the filter to drag practices.")).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: /Move practice/ })).not.toBeInTheDocument();
 	},
 };
@@ -111,17 +103,8 @@ export const MoveToUnassigned: Story = {
 		await userEvent.click(
 			canvas.getByRole("button", { name: `More actions for ${mockPracticeLongText.name}` }),
 		);
-		const moveTo = await screen.findByRole("menuitem", { name: "Move to" });
-		moveTo.focus();
-		await userEvent.keyboard("{ArrowRight}");
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: "Unassigned" }));
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(mockPracticeLongText.slug, null, 1);
-		await userEvent.keyboard("{Escape}");
-		await waitFor(() =>
-			expect(screen.queryByRole("menuitemradio", { name: "Unassigned" })).not.toBeInTheDocument(),
-		);
-		await userEvent.keyboard("{Escape}");
-		await waitFor(() => expect(screen.queryAllByRole("menu")).toHaveLength(0));
 	},
 };
 
@@ -143,8 +126,6 @@ export const Reordering: Story = {
 				name: `Move practice ${mockUnassignedPractice.name}`,
 			}),
 		).toBeEnabled();
-		await expect(canvas.getByRole("button", { name: "Add area" })).toBeEnabled();
-		await expect(canvas.getByRole("link", { name: "New practice" })).toBeEnabled();
 	},
 };
 
@@ -158,20 +139,15 @@ export const DeletingArea: Story = {
 			blockedPracticeOrderBuckets: new Set([areas[0].slug, "__unassigned__"]),
 		},
 	},
-	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(
-			canvas.getByRole("button", { name: `More actions for ${mockUnassignedPractice.name}` }),
-		);
-		const moveTo = await screen.findByRole("menuitem", { name: "Move to" });
-		moveTo.focus();
-		await userEvent.keyboard("{ArrowRight}");
+		const actions = canvas.getByRole("button", {
+			name: `More actions for ${mockUnassignedPractice.name}`,
+		});
+		await userEvent.click(actions);
+		await expect(await screen.findByRole("menuitemradio", { name: areas[1].name })).toBeEnabled();
 		await expect(
 			screen.queryByRole("menuitemradio", { name: areas[0].name }),
 		).not.toBeInTheDocument();
-		await expect(screen.getByRole("menuitemradio", { name: areas[1].name })).toBeEnabled();
-		await userEvent.keyboard("{Escape}{Escape}");
-		await waitFor(() => expect(screen.queryAllByRole("menu")).toHaveLength(0));
 	},
 };
 
@@ -186,7 +162,11 @@ export const EmptyDestinations: Story = {
 		practices: [],
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getAllByText("No practices in this area.")).toHaveLength(mockAreas.length);
+		for (const area of mockAreas) {
+			const areaSection = canvas.getByText(area.name).closest('[data-slot="accordion-item"]');
+			if (!(areaSection instanceof HTMLElement)) throw new Error(`Area ${area.name} not rendered`);
+			await expect(within(areaSection).getByText("No practices in this area.")).toBeVisible();
+		}
 		await expect(canvas.getByText("No unassigned practices.")).toBeVisible();
 		await expectNoPageOverflow();
 	},

@@ -1,5 +1,5 @@
 import { useReactFlow } from "@xyflow/react";
-import { Maximize2, RefreshCw, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { Map as MapIcon, Maximize2, RefreshCw, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -35,10 +35,10 @@ export function AchievementDesignerHeader({
 		<header className="flex shrink-0 flex-col gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
 			<div className="flex min-w-0 items-center gap-3">
 				<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground shadow-[0_0_15px_rgba(var(--shadow-rgb),0.2)]">
-					<Sparkles className="size-5 text-background" />
+					<MapIcon className="size-5 text-background" />
 				</div>
 				<div className="min-w-0">
-					<h1 className="truncate text-lg font-bold text-foreground">Contributor journey</h1>
+					<h1 className="truncate text-lg font-bold text-foreground">Achievement designer</h1>
 					<p className="hidden text-xs text-muted-foreground sm:block">
 						Designer mode — configure achievement layouts
 					</p>

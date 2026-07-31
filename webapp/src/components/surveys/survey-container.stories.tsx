@@ -6,10 +6,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { PostHogSurvey } from "@/types/survey";
 import { SurveyContainer } from "./survey-container";
 
-/**
- * Survey with diverse question types and response-based branching.
- * Tests: open text, single choice with branching, rating scale, multiple choice.
- */
 const branchingSurvey: PostHogSurvey = {
 	id: "019a1bba-e554-0000-ba61-39946d83e49c",
 	name: "Open feedback",
@@ -77,7 +73,6 @@ const branchingSurvey: PostHogSurvey = {
 	current_iteration_start_date: new Date().toISOString(),
 };
 
-/** Production Hephaestus feedback survey - all open-text questions */
 const hephaestusFeedbackSurvey: PostHogSurvey = {
 	id: "019b03ae-f2e3-0000-dadd-f988e31a45fa",
 	name: "Help us improve Hephaestus!",
@@ -133,9 +128,6 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 	current_iteration_start_date: new Date().toISOString(),
 };
 
-/**
- * SurveyContainer renders multi-step PostHog API surveys with branching logic and progress handling.
- */
 const meta = {
 	title: "Surveys/SurveyContainer",
 	component: SurveyContainer,
@@ -159,25 +151,16 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default survey with diverse question types and branching logic.
- */
 export const Default: Story = {
 	args: {},
 };
 
-/**
- * Production Hephaestus feedback survey with all open-text questions.
- */
 export const HephaestusFeedback: Story = {
 	args: {
 		survey: hephaestusFeedbackSurvey,
 	},
 };
 
-/**
- * Presents the survey inside a floating popover for contextual collection.
- */
 export const InPagePopover: Story = {
 	parameters: {
 		layout: "fullscreen",
@@ -196,6 +179,7 @@ export const InPagePopover: Story = {
 						}
 					/>
 					<PopoverContent
+						aria-label={args.survey.name}
 						side="top"
 						align="end"
 						sideOffset={16}
@@ -219,15 +203,9 @@ export const InPagePopover: Story = {
 	},
 };
 
-/**
- * Highlights response-based branching by logging the active question after each response.
- * Uses the branching survey to demonstrate different paths based on user answers.
- */
 export const ResponseBasedBranching: Story = {
 	args: {
 		survey: branchingSurvey,
-		onProgress: fn((responses, meta) => {
-			console.info("Progress updated", { responses, meta });
-		}),
+		onProgress: fn(),
 	},
 };

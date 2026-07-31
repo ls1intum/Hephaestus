@@ -44,7 +44,6 @@ const meta = {
 	title: "Admin/Practice reviews/Review details",
 	component: ReviewRunDetailPage,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },

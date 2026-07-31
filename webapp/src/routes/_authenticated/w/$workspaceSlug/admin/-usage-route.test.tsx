@@ -87,7 +87,7 @@ describe("workspace AI usage route", () => {
 		releaseCapPut?.();
 
 		await screen.findByText("Couldn't save the cap");
-		expect(screen.getByText(REJECTION)).toBeTruthy();
+		screen.getByText(REJECTION);
 	});
 
 	it("reports a rejection inline, and only inline, while the dialog is open", async () => {

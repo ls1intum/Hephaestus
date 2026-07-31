@@ -31,23 +31,10 @@ const meta = {
 		isAdmin: false,
 		isAppAdmin: false,
 		hasMentorAccess: false,
+		integrationKinds: ["GITHUB", "SLACK", "OUTLINE"],
 		context: "main",
 		workspaces: [mockWorkspace],
 		activeWorkspace: mockWorkspace,
-	},
-	argTypes: {
-		username: {
-			control: "text",
-			description: "Username of the current user",
-		},
-		isAdmin: {
-			control: "boolean",
-			description: "Whether the user has administrative privileges",
-		},
-		workspacesLoading: {
-			control: "boolean",
-			description: "Shows loading skeletons while workspaces are being fetched",
-		},
 	},
 	decorators: [
 		(Story) => (
@@ -205,20 +192,5 @@ export const MentorRoleButFeatureDisabled: Story = {
 		hasMentorAccess: true,
 		activeWorkspace: { ...mockWorkspace, mentorEnabled: false },
 		workspaces: [{ ...mockWorkspace, mentorEnabled: false }],
-	},
-};
-
-export const WorkspaceAdminReviewsPaused: Story = {
-	args: {
-		isAdmin: true,
-		activeWorkspace: { ...mockWorkspace, practicesEnabled: false },
-		workspaces: [{ ...mockWorkspace, practicesEnabled: false }],
-	},
-	play: async ({ canvasElement, userEvent }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("link", { name: "Practices" })).toBeInTheDocument();
-		await userEvent.click(canvas.getByRole("button", { name: "Toggle practices" }));
-		await expect(canvas.getByRole("link", { name: "Practice feedback" })).toBeInTheDocument();
-		await expect(canvas.getByRole("link", { name: "Review settings" })).toBeInTheDocument();
 	},
 };

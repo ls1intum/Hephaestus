@@ -219,7 +219,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        void shouldAllowMemberToList() {
+        void shouldRejectMemberToProtectReviewCriteria() {
             User member = persistUser("mentor");
             ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
             persistPractice("member-visible", "Visible", true);
@@ -230,10 +230,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(1);
+                .isForbidden();
         }
 
         @Test
@@ -276,7 +273,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        void shouldAllowMemberToGet() {
+        void shouldRejectMemberToProtectReviewCriteria() {
             User member = persistUser("mentor");
             ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
             persistPractice("member-get", "Member Get", true);
@@ -287,10 +284,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.slug")
-                .isEqualTo("member-get");
+                .isForbidden();
         }
 
         @Test
@@ -660,7 +654,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                .containsKeys("slug", "name", "criteria", "triggerEvents");
+                .containsKeys("slug", "name", "criteria");
         }
 
         @Test
@@ -1951,6 +1945,40 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(
                 practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "issue-with-pr-trigger")
             ).isEmpty();
+        }
+
+        @Test
+        @WithAdminUser
+        void createsScheduledConversationPracticeWithoutTriggerEvents() {
+            ensureAdminMembership(workspace);
+            var request = new CreatePracticeRequestDTO(
+                "conversation-practice",
+                "Conversation Practice",
+                List.of(),
+                "Detect constructive conversations",
+                null,
+                WorkArtifact.CONVERSATION_THREAD,
+                null,
+                null,
+                null
+            );
+
+            PracticeDTO result = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.artifactType()).isEqualTo(WorkArtifact.CONVERSATION_THREAD);
+            assertThat(result.triggerEvents()).isEmpty();
         }
     }
 

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon, WorkflowIcon } from "lucide-react";
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import { listPracticeReviewsOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewRunSummary } from "@/api/types.gen";
 import { STATUS_LABELS, statusBadgeVariant } from "@/components/admin/ai/job-utils";
@@ -34,7 +34,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
@@ -46,6 +45,7 @@ import {
 } from "@/components/ui/table";
 import { ReviewArtifact } from "./ReviewArtifact";
 import { FeedbackCountsSummary, FindingCountsSummary } from "./ReviewBadges";
+import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import type { RunsSearch } from "./review-search";
 
 const PAGE_SIZE = 20;
@@ -82,6 +82,13 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 	});
 	const reviews = query.data?.content ?? [];
 	const hasFilter = Boolean(search.status);
+	const totalPages = query.data?.page?.totalPages;
+
+	useEffect(() => {
+		if (totalPages !== undefined && search.page && search.page >= totalPages) {
+			onSearchChange({ page: Math.max(0, totalPages - 1) });
+		}
+	}, [onSearchChange, search.page, totalPages]);
 
 	return (
 		<section aria-label="Practice reviews" className="space-y-4">
@@ -130,7 +137,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 					onRetry={() => query.refetch()}
 				/>
 			) : query.isLoading ? (
-				<RunListSkeleton />
+				<ReviewResultsSkeleton label="Loading reviews" />
 			) : reviews.length === 0 ? (
 				<Empty className="border">
 					<EmptyHeader>
@@ -151,7 +158,14 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 			<TablePagination
 				page={query.data?.page?.number ?? search.page ?? 0}
 				totalPages={query.data?.page?.totalPages ?? 0}
-				onPageChange={(page) => onSearchChange({ page })}
+				renderPageLink={(page, props) => (
+					<Link
+						{...props}
+						to="/w/$workspaceSlug/admin/practices/reviews"
+						params={{ workspaceSlug }}
+						search={{ page: page === 0 ? undefined : page, status: search.status }}
+					/>
+				)}
 			/>
 		</section>
 	);
@@ -306,20 +320,5 @@ function ReviewList({
 				))}
 			</ItemGroup>
 		</>
-	);
-}
-
-function RunListSkeleton() {
-	return (
-		<div className="space-y-2 rounded-lg border p-4" role="status">
-			<span className="sr-only">Loading reviews</span>
-			{Array.from({ length: 5 }, (_, index) => (
-				<div key={index} className="flex gap-4 py-3">
-					<Skeleton className="h-4 flex-1" />
-					<Skeleton className="h-5 w-24" />
-					<Skeleton className="hidden h-4 w-32 md:block" />
-				</div>
-			))}
-		</div>
 	);
 }

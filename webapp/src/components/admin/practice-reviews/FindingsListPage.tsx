@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import {
 	listAreasOptions,
 	listPracticeReviewFindingsOptions,
@@ -60,6 +62,7 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 		description: (areasQuery.data ?? []).find((area) => area.slug === practice.areaSlug)?.name,
 	}));
 	const findings = findingsQueryResult.data?.content ?? [];
+	const totalPages = findingsQueryResult.data?.page?.totalPages;
 	const subject = findings[0]?.subject;
 	const hasFilter = Boolean(
 		search.areaSlug?.length ||
@@ -90,6 +93,12 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 			to: undefined,
 		});
 	const patchFilter = (patch: Partial<FindingsSearch>) => onSearchChange({ ...patch, page: 0 });
+
+	useEffect(() => {
+		if (totalPages !== undefined && search.page && search.page >= totalPages) {
+			onSearchChange({ page: Math.max(0, totalPages - 1) });
+		}
+	}, [onSearchChange, search.page, totalPages]);
 
 	return (
 		<section aria-label="Practice review findings" className="space-y-4">
@@ -142,7 +151,7 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 							onChange={(values) => patchFilter({ severity: nonEmpty(values) })}
 						/>
 						<FacetMultiSelect
-							title="Evidence status"
+							title="Practice status"
 							variant="field"
 							options={PRESENCE_OPTIONS}
 							selected={search.presence ?? []}
@@ -198,7 +207,14 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 			<TablePagination
 				page={findingsQueryResult.data?.page?.number ?? search.page ?? 0}
 				totalPages={findingsQueryResult.data?.page?.totalPages ?? 0}
-				onPageChange={(page) => onSearchChange({ page })}
+				renderPageLink={(page, props) => (
+					<Link
+						{...props}
+						to="/w/$workspaceSlug/admin/practices/reviews/findings"
+						params={{ workspaceSlug }}
+						search={(previous) => ({ ...previous, page: page === 0 ? undefined : page })}
+					/>
+				)}
 			/>
 		</section>
 	);

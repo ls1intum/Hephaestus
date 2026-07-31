@@ -47,9 +47,6 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 	>([]);
 	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>([]);
 
-	// Generate nodes/edges when user or achievements props change.
-	// Depend on individual primitive fields instead of the `user` object reference
-	// to avoid infinite re-renders when the parent creates a new object each render.
 	useEffect(() => {
 		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(
 			{ name, avatarUrl, level, leaguePoints },
@@ -79,11 +76,9 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				proOptions={PRO_OPTIONS}
 				className="bg-background"
 				aria-label="Achievement skill tree"
-				// Nodes should be not accessible besides selection for tooltip
 				elementsSelectable={true}
 				nodesDraggable={false}
 				nodesConnectable={false}
-				// Disable all keyboard props
 				deleteKeyCode={null}
 				selectionKeyCode={null}
 				multiSelectionKeyCode={null}
@@ -91,16 +86,13 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				panActivationKeyCode={null}
 			>
 				<SkillTreeGraphBackground />
-				{/* Subtle dot grid background */}
 				<Background gap={40} size={1} color="var(--border)" className="opacity-20" />
 
-				{/* Controls */}
 				<Controls
 					className="bg-card! border-border! rounded-lg! overflow-hidden [&>button]:bg-card! [&>button]:border-border! [&>button]:text-foreground! [&>button:hover]:bg-secondary!"
 					showInteractive={false}
 				/>
 
-				{/* Mini map */}
 				<MiniMap
 					nodeColor={(node) => getMiniMapNodeColor(node, isDark)}
 					maskColor={isDark ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)"}

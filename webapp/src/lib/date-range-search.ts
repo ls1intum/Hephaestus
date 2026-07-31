@@ -1,4 +1,4 @@
-import { addDays, format, formatISO, parse, startOfDay } from "date-fns";
+import { addDays, format, parse, startOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
 const DAY = "yyyy-MM-dd";
@@ -25,12 +25,10 @@ export function fromDateRange(range: DateRange | undefined): { from?: string; to
 	};
 }
 
-const asWireInstant = (iso: string) => iso as unknown as Date;
-
 export function dayStartInstant(date: Date): Date {
-	return asWireInstant(formatISO(startOfDay(date)));
+	return startOfDay(date);
 }
 
 export function dayAfterInstant(date: Date): Date {
-	return asWireInstant(formatISO(startOfDay(addDays(date, 1))));
+	return startOfDay(addDays(date, 1));
 }

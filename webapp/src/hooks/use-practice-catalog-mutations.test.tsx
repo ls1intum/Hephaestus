@@ -156,22 +156,19 @@ describe("usePracticeCatalogMutations", () => {
 		});
 	});
 
-	it("serializes structural placements", async () => {
+	it("blocks structural changes while a placement settles", async () => {
 		const client = queryClient();
 		client.setQueryData(queryKey, [
 			practice("first", "quality", 0),
 			practice("second", "quality", 1),
 		]);
 		let resolveFirst: (value: Practice[]) => void = () => {};
-		const mutation = vi
-			.fn()
-			.mockImplementationOnce(
-				() =>
-					new Promise<Practice[]>((resolve) => {
-						resolveFirst = resolve;
-					}),
-			)
-			.mockResolvedValueOnce([practice("second", "quality", 0), practice("first", "quality", 1)]);
+		const mutation = vi.fn(
+			() =>
+				new Promise<Practice[]>((resolve) => {
+					resolveFirst = resolve;
+				}),
+		);
 		vi.mocked(placePracticeMutation).mockReturnValue({ mutationFn: mutation });
 		const { result } = renderHook(() => usePracticeCatalogMutations(WORKSPACE), {
 			wrapper: wrapper(client),
@@ -182,16 +179,18 @@ describe("usePracticeCatalogMutations", () => {
 				path: { workspaceSlug: WORKSPACE, practiceSlug: "first" },
 				body: { areaSlug: "quality", position: 1 },
 			});
-			result.current.placePractice.mutate({
-				path: { workspaceSlug: WORKSPACE, practiceSlug: "second" },
-				body: { areaSlug: "quality", position: 0 },
-			});
 		});
 
-		await waitFor(() => expect(mutation).toHaveBeenCalledOnce());
-		expect(result.current.blockedPracticeOrderBuckets).toEqual(new Set());
+		await waitFor(() => expect(result.current.placePractice.isPending).toBe(true));
+		expect(result.current.areaStructurePending).toBe(true);
+		expect(result.current.blockedPracticeOrderBuckets).toEqual(
+			new Set(["__unassigned__", "quality"]),
+		);
+		expect(result.current.blockedMoveDestinationSlugs).toEqual(
+			new Set(["__unassigned__", "quality"]),
+		);
 		resolveFirst([practice("second", "quality", 0), practice("first", "quality", 1)]);
-		await waitFor(() => expect(mutation).toHaveBeenCalledTimes(2));
+		await waitFor(() => expect(result.current.placePractice.isSuccess).toBe(true));
 	});
 
 	it("blocks reordering only in the bucket being deleted from", async () => {

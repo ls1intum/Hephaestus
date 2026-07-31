@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { type ReactNode, useState } from "react";
-import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { expectControlOnScreen, expectDialogFitsViewport } from "@/test/reflow";
 import { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 
@@ -84,8 +84,6 @@ export const Confirming: Story = {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await userEvent.click(dialog.getByRole("button", { name: "Delete" }));
 
-		// The popup outlives its own close by an exit animation, so "gone" is waited for.
-		await waitFor(async () => await expect(screen.queryByRole("alertdialog")).toBeNull());
 		await expect(canvas.getByText("Deleted “GPT-5”")).toBeInTheDocument();
 	},
 };

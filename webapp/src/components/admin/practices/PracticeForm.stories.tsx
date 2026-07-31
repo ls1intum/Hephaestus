@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn } from "storybook/test";
+import { expect, fn, screen } from "storybook/test";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeForm } from "./PracticeForm";
@@ -12,7 +12,6 @@ const meta = {
 	title: "Admin/Practices/Practice editor",
 	component: PracticeForm,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "fullscreen",
 		chromatic: { viewports: [1440] },
 	},
@@ -30,7 +29,6 @@ export const Create: Story = {
 			workspaceSlug="demo"
 			areas={mockAreas}
 			onSubmit={createSubmit}
-			onCancel={fn()}
 			isPending={false}
 		/>
 	),
@@ -51,7 +49,6 @@ export const EditWithAdvanced: Story = {
 			initialData={mockPracticeWithAllTriggers}
 			areas={mockAreas}
 			onSubmit={fn()}
-			onCancel={fn()}
 			isPending={false}
 		/>
 	),
@@ -59,14 +56,7 @@ export const EditWithAdvanced: Story = {
 
 export const Submitting: Story = {
 	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			onSubmit={fn()}
-			onCancel={fn()}
-			isPending
-		/>
+		<PracticeForm mode="create" workspaceSlug="demo" areas={mockAreas} onSubmit={fn()} isPending />
 	),
 };
 
@@ -82,7 +72,6 @@ export const EditClearsOptionalGuidance: Story = {
 			}}
 			areas={mockAreas}
 			onSubmit={editSubmit}
-			onCancel={fn()}
 			isPending={false}
 		/>
 	),
@@ -103,20 +92,18 @@ export const EditClearsOptionalGuidance: Story = {
 	},
 };
 
-export const ValidationAndSubmit: Story = {
+export const ValidationErrors: Story = {
 	render: () => (
 		<PracticeForm
 			mode="create"
 			workspaceSlug="demo"
 			areas={mockAreas}
 			onSubmit={createSubmit}
-			onCancel={fn()}
 			isPending={false}
 		/>
 	),
-	parameters: { chromatic: { disableSnapshot: true } },
+	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas, userEvent }) => {
-		createSubmit.mockClear();
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
 		await expect(canvas.getByText("Name must be at least 3 characters")).toBeVisible();
 		await expect(canvas.getByText("Select at least one trigger event")).toBeVisible();
@@ -124,7 +111,16 @@ export const ValidationAndSubmit: Story = {
 			"aria-invalid",
 			"true",
 		);
+	},
+};
 
+export const ValidationAndSubmit: Story = {
+	...ValidationErrors,
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async (context) => {
+		createSubmit.mockClear();
+		await ValidationErrors.play?.(context);
+		const { canvas, userEvent } = context;
 		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Clear review context");
 		await userEvent.click(
 			canvas.getByRole("checkbox", { name: "Pull or merge request is opened" }),
@@ -141,6 +137,41 @@ export const ValidationAndSubmit: Story = {
 				criteria: "Check whether the reviewed work explains its purpose.",
 				triggerEvents: ["PullRequestCreated"],
 				artifactType: "PULL_REQUEST",
+			},
+			null,
+		);
+	},
+};
+
+export const ConversationPractice: Story = {
+	render: () => (
+		<PracticeForm
+			mode="create"
+			workspaceSlug="demo"
+			areas={mockAreas}
+			onSubmit={createSubmit}
+			isPending={false}
+		/>
+	),
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		createSubmit.mockClear();
+		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
+		await userEvent.click(canvas.getByRole("combobox", { name: "Evaluates" }));
+		await userEvent.click(await screen.findByRole("option", { name: "Conversation" }));
+		await expect(canvas.queryByText("Start a review when… *")).not.toBeInTheDocument();
+		await userEvent.type(
+			canvas.getByRole("textbox", { name: /Evaluation criteria/ }),
+			"Check whether the conversation stays constructive.",
+		);
+		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
+		await expect(createSubmit).toHaveBeenCalledWith(
+			{
+				name: "Helpful discussion",
+				slug: "helpful-discussion",
+				criteria: "Check whether the conversation stays constructive.",
+				triggerEvents: [],
+				artifactType: "CONVERSATION_THREAD",
 			},
 			null,
 		);

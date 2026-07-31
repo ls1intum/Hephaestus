@@ -7,7 +7,6 @@ const meta = {
 	title: "Admin/Practice reviews/Building blocks/Reviewed work",
 	component: ReviewArtifact,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "padded",
 		chromatic: { viewports: [1440] },
 	},

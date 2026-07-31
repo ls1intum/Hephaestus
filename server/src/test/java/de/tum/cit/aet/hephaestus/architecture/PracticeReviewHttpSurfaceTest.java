@@ -2,27 +2,26 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Set;
+import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-class PracticeReviewReadSurfaceTest extends HephaestusArchitectureTest {
-
-    private static final Set<String> CONTROLLERS = Set.of(
-        "PracticeReviewOutputController",
-        "PracticeReviewSummaryController"
-    );
+class PracticeReviewHttpSurfaceTest extends HephaestusArchitectureTest {
 
     @Test
-    void practiceReviewSurfaceIsReadOnly() {
+    void practiceReviewHttpSurfaceIsAdminGatedAndGetOnly() {
         var controllers = classes
             .stream()
-            .filter(type -> CONTROLLERS.contains(type.getSimpleName()))
+            .filter(type -> type.isAnnotatedWith(RequestMapping.class))
+            .filter(type ->
+                java.util.Arrays.asList(type.getAnnotationOfType(RequestMapping.class).value()).contains(
+                    "/practices/reviews"
+                )
+            )
             .toList();
-        assertThat(controllers)
-            .extracting(type -> type.getSimpleName())
-            .containsExactlyInAnyOrderElementsOf(CONTROLLERS);
+        assertThat(controllers).isNotEmpty();
+        assertThat(controllers).allMatch(type -> type.isAnnotatedWith(RequireAtLeastWorkspaceAdmin.class));
 
         var nonGetHandlers = controllers
             .stream()

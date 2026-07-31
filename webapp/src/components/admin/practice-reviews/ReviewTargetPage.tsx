@@ -1,12 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, FileQuestionIcon } from "lucide-react";
+import { FileQuestionIcon } from "lucide-react";
 import {
 	listPracticeReviewFeedbackOptions,
 	listPracticeReviewFindingsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { ReviewArtifact as ReviewArtifactData } from "@/api/types.gen";
-import { buttonVariants } from "@/components/ui/button";
 import {
 	Empty,
 	EmptyDescription,
@@ -15,8 +13,8 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import { ReviewArtifactLink } from "./ReviewArtifact";
+import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewOutputSections } from "./ReviewOutputSections";
 
 export interface ReviewTargetPageProps {
@@ -55,15 +53,8 @@ export function ReviewTargetPage({
 		findings.length === 0;
 
 	return (
-		<article className="mx-auto min-w-0 max-w-4xl space-y-8">
-			<Link
-				to="/w/$workspaceSlug/admin/practices/reviews"
-				params={{ workspaceSlug }}
-				search={{}}
-				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3")}
-			>
-				<ArrowLeftIcon aria-hidden /> Back to reviews
-			</Link>
+		<article className="min-w-0 max-w-4xl space-y-8">
+			<ReviewBreadcrumbs workspaceSlug={workspaceSlug} current="Reviewed work" />
 			{noOutput ? (
 				<Empty className="border">
 					<EmptyHeader>

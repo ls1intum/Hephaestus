@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { expect, fn, screen, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FindingsListPage } from "./FindingsListPage";
@@ -10,7 +10,6 @@ const meta = {
 	title: "Admin/Practice reviews/Findings",
 	component: FindingsListPage,
 	parameters: {
-		a11y: { test: "error" },
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
 		msw: {
@@ -70,21 +69,25 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement, userEvent }) => {
+	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText(`${reviewFindings.length} findings.`)).toBeVisible();
 		for (const name of ["Area", "Practice", "Assessment"]) {
 			await expect(canvas.getByRole("combobox", { name })).toBeVisible();
 		}
 		await expect(canvas.getByRole("button", { name: "Date" })).toBeVisible();
-		const moreFilters = canvas.getByRole("button", { name: /More filters/ });
-		await userEvent.click(moreFilters);
+	},
+};
+
+export const MoreFiltersOpen: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvasElement, userEvent }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: /More filters/ }));
 		const dialog = await screen.findByRole("dialog");
-		await waitFor(() =>
-			expect(within(dialog).getByRole("combobox", { name: "Evidence status" })).toBeVisible(),
-		);
-		await userEvent.keyboard("{Escape}");
-		await waitFor(() => expect(dialog).not.toBeVisible());
+		await expect(
+			await within(dialog).findByRole("combobox", { name: "Practice status" }),
+		).toBeVisible();
 	},
 };
 

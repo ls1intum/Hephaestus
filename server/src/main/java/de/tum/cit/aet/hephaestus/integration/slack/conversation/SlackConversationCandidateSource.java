@@ -40,21 +40,16 @@ public class SlackConversationCandidateSource implements ConversationCandidateSo
             .toList();
     }
 
-    /**
-     * Unboxes one {@code Object[]} row from {@link SlackThreadRepository#findSettledCandidateRows} into the
-     * agent SPI record. Manual mapping (not a JPQL constructor expression) because the record's
-     * {@code workspaceId}/{@code threadId} components are primitive {@code long} — see the repository method's
-     * javadoc for why that resolution is not guaranteed by Hibernate's "SELECT new".
-     */
-    private static ConversationThreadCandidate toCandidate(Object[] row) {
+    private static ConversationThreadCandidate toCandidate(SlackThreadRepository.SettledCandidateRow row) {
         return new ConversationThreadCandidate(
-            ((Number) row[0]).longValue(),
-            ((Number) row[1]).longValue(),
-            (String) row[2],
-            (String) row[3],
-            (String) row[4],
-            (String) row[5],
-            (long[]) row[6]
+            row.getWorkspaceId(),
+            row.getThreadId(),
+            row.getSlackChannelId(),
+            row.getSlackChannelName(),
+            row.getSlackThreadTs(),
+            row.getLastTs(),
+            row.getLastReviewedTs(),
+            row.getParticipantMemberIds()
         );
     }
 

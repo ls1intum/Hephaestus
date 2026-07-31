@@ -4,7 +4,7 @@ import type { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 
 export interface DateRangeFacetProps {
@@ -43,6 +43,7 @@ export function DateRangeFacet({ value, onChange }: DateRangeFacetProps) {
 				}
 			/>
 			<PopoverContent className="w-auto p-0" align="start">
+				<PopoverTitle className="sr-only">Choose a date range</PopoverTitle>
 				<Calendar
 					autoFocus
 					mode="range"

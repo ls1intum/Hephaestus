@@ -11,6 +11,7 @@ public record ConversationThreadCandidate(
     long workspaceId,
     long threadId,
     String channelId,
+    @Nullable String channelName,
     String threadTs,
     String lastTs,
     @Nullable String lastReviewedTs,

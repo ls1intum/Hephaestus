@@ -232,8 +232,13 @@ export const ICON_COMPONENTS: Record<string, LucideIcon> = {
 
 export const ICON_NAMES = Object.keys(ICON_COMPONENTS);
 
+export function iconLabel(name: string): string {
+	const words = name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function iconSearchText(name: string): string {
-	return name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+	return iconLabel(name).toLowerCase();
 }
 
 function resolveIcon(name?: string | null): LucideIcon | undefined {

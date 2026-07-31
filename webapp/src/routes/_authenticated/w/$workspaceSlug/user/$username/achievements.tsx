@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -16,19 +17,37 @@ function UserAchievementsPage() {
 	const { workspaceSlug, username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const navigate = useNavigate();
-	const { achievementsEnabled, isLoading } = useWorkspaceFeatures(workspaceSlug);
+	const featureState = useWorkspaceFeatures(workspaceSlug);
+	const achievementsEnabled = featureState.features?.achievementsEnabled;
 
 	useEffect(() => {
-		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
+		if (!featureState.isLoading && !featureState.isError && achievementsEnabled === false) {
 			navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
 				replace: true,
 			});
 		}
-	}, [isLoading, achievementsEnabled, workspaceSlug, username, navigate]);
+	}, [
+		featureState.isLoading,
+		featureState.isError,
+		achievementsEnabled,
+		workspaceSlug,
+		username,
+		navigate,
+	]);
 
-	if (isLoading || !achievementsEnabled) {
+	if (featureState.isError) {
+		return (
+			<QueryErrorAlert
+				error={featureState.error}
+				title="Couldn't load workspace features"
+				onRetry={featureState.refetch}
+			/>
+		);
+	}
+
+	if (featureState.isLoading || achievementsEnabled !== true) {
 		return (
 			<div className="flex min-h-0 flex-1 items-center justify-center">
 				<Spinner className="size-8" />

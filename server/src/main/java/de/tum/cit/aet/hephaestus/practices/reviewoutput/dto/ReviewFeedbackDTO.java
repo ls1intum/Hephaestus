@@ -10,31 +10,24 @@ import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A composed feedback unit with its delivery disposition")
 public record ReviewFeedbackDTO(
     @NonNull UUID id,
     @NonNull UUID agentJobId,
-    @Schema(description = "Work item the unit targets; null for an unanchored unit") ReviewArtifactDTO artifact,
-    @Schema(description = "Who the unit is addressed to; null when the identity is no longer resolvable")
+    @Schema(description = "Work item the message targets; null for an unanchored message") ReviewArtifactDTO artifact,
+    @Schema(description = "Who the message is addressed to; null when the identity is no longer resolvable")
     ReviewSubjectDTO recipient,
     @Schema(description = "Whose work the message addresses; may equal the recipient") ReviewSubjectDTO subject,
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,
-    @Schema(description = "Why the unit was withheld; null unless the state is SUPPRESSED")
+    @Schema(description = "Why the message was withheld; null unless the state is SUPPRESSED")
     FeedbackSuppressionReason suppressionReason,
-    @Schema(description = "The unit this one replaced on its continuity line; null on a first delivery")
-    UUID replacesId,
+    @Schema(description = "The message this one replaced; null on a first delivery") UUID replacesId,
     @NonNull Instant createdAt,
-    @Schema(description = "When the feedback was placed; null if it never reached a delivery surface")
-    Instant deliveredAt,
-    @Schema(description = "Leading characters of the composed body; null when the unit carries no body")
+    @Schema(description = "When the message was placed; null if it was not delivered") Instant deliveredAt,
+    @Schema(description = "Leading characters of the composed body; null when the message carries no body")
     String bodyPreview,
-    @Schema(
-        description = "Whether the stored body is longer than the preview",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
-    boolean bodyTruncated,
-    @NonNull @Schema(description = "Number of findings used to compose the unit") Long findingCount
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean bodyTruncated,
+    @NonNull @Schema(description = "Number of findings used to compose the message") Long findingCount
 ) {
     public static ReviewFeedbackDTO from(
         OperatorFeedbackRow row,

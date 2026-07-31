@@ -10,18 +10,17 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A feedback unit composed from a finding")
+@Schema(description = "A message composed from a finding")
 public record ReviewBoundFeedbackDTO(
     @NonNull UUID feedbackId,
-    @NonNull @Schema(description = "Whether the finding led the unit or reinforced it") EvidenceRole role,
+    @NonNull @Schema(description = "Whether the finding led the message or reinforced it") EvidenceRole role,
     @NonNull UUID agentJobId,
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,
-    @Schema(description = "Why the unit was withheld; null unless the state is SUPPRESSED")
+    @Schema(description = "Why the message was withheld; null unless the state is SUPPRESSED")
     FeedbackSuppressionReason suppressionReason,
     @NonNull Instant createdAt,
-    @Schema(description = "When the feedback was placed; null if it never reached a delivery surface")
-    Instant deliveredAt
+    @Schema(description = "When the message was placed; null if it was not delivered") Instant deliveredAt
 ) {
     public static ReviewBoundFeedbackDTO from(BoundFeedbackUnit row) {
         return new ReviewBoundFeedbackDTO(

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronRight, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type {
 	CreatePracticeRequest,
@@ -7,6 +7,8 @@ import type {
 	PracticeArea,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { CodeEditor } from "@/components/shared/CodeEditor";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,7 +42,6 @@ interface PracticeFormCreateProps {
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
-	onCancel: () => void;
 	isPending: boolean;
 	initialData?: never;
 }
@@ -51,11 +52,17 @@ interface PracticeFormEditProps {
 	initialData: Practice;
 	areas: PracticeArea[];
 	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
-	onCancel: () => void;
 	isPending: boolean;
 }
 
 export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
+
+interface PracticeFormShellProps {
+	mode: "create" | "edit";
+	workspaceSlug: string;
+	practiceName?: string;
+	children: React.ReactNode;
+}
 
 interface FormState {
 	name: string;
@@ -101,7 +108,6 @@ export function PracticeForm({
 	workspaceSlug,
 	areas,
 	onSubmit,
-	onCancel,
 	isPending,
 	initialData,
 }: PracticeFormProps) {
@@ -138,7 +144,9 @@ export function PracticeForm({
 			? "Slug must be 3-64 lowercase alphanumeric characters separated by hyphens"
 			: undefined;
 	const triggerError =
-		submitted && form.triggerEvents.length === 0 ? "Select at least one trigger event" : undefined;
+		submitted && form.focusArtifact !== "CONVERSATION_THREAD" && form.triggerEvents.length === 0
+			? "Select at least one trigger event"
+			: undefined;
 	const criteriaError =
 		submitted && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
@@ -147,7 +155,7 @@ export function PracticeForm({
 	const isValid =
 		form.name.trim().length >= 3 &&
 		form.criteria.trim().length >= 3 &&
-		form.triggerEvents.length > 0 &&
+		(form.focusArtifact === "CONVERSATION_THREAD" || form.triggerEvents.length > 0) &&
 		(mode === "edit" || isValidSlug(form.slug));
 
 	const handleSubmit = (e: React.FormEvent) => {
@@ -192,33 +200,12 @@ export function PracticeForm({
 	};
 
 	return (
-		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
-			<div>
-				<div className="mx-auto w-full max-w-3xl">
-					<div className="mb-8">
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={onCancel}
-							className="-ml-3 mb-4"
-						>
-							<ArrowLeft className="size-4" />
-							Back to catalog
-						</Button>
-						<h1 className="break-words text-3xl font-bold tracking-tight">
-							{mode === "create" ? "Create practice" : `Edit: ${initialData?.name}`}
-						</h1>
-						{mode === "create" && (
-							<p className="mt-1 text-muted-foreground">
-								Define what Hephaestus should look for in reviewed work.
-							</p>
-						)}
-						<p className="mt-3 text-sm text-muted-foreground">
-							Fields marked <span aria-hidden>*</span> are required.
-						</p>
-					</div>
-
+		<PracticeFormShell mode={mode} workspaceSlug={workspaceSlug} practiceName={initialData?.name}>
+			<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
+				<div className="max-w-3xl">
+					<p className="mb-8 text-sm text-muted-foreground">
+						Fields marked <span aria-hidden>*</span> are required.
+					</p>
 					<div className="space-y-8">
 						<section className="space-y-4">
 							<h2 className="text-lg font-semibold">General</h2>
@@ -355,41 +342,45 @@ export function PracticeForm({
 
 						<Separator />
 
-						<section className="space-y-4">
-							<fieldset
-								className="space-y-4"
-								aria-invalid={!!triggerError}
-								aria-describedby={triggerError ? "trigger-error" : undefined}
-							>
-								<legend className="text-lg font-semibold">Start a review when… *</legend>
-								<p className="text-sm text-muted-foreground">Choose one or more events.</p>
-								<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-									{TRIGGER_EVENTS_BY_FOCUS[form.focusArtifact].map((option) => (
-										<Label
-											key={option.value}
-											htmlFor={`trigger-${option.value}`}
-											className="flex items-center gap-2 text-sm font-normal cursor-pointer"
-										>
-											<Checkbox
-												id={`trigger-${option.value}`}
-												checked={form.triggerEvents.includes(option.value)}
-												onCheckedChange={(checked) =>
-													handleToggleEvent(option.value, checked === true)
-												}
-											/>
-											{option.label}
-										</Label>
-									))}
-								</div>
-								{triggerError && (
-									<p id="trigger-error" className="text-sm text-destructive">
-										{triggerError}
-									</p>
-								)}
-							</fieldset>
-						</section>
+						{form.focusArtifact !== "CONVERSATION_THREAD" && (
+							<>
+								<section className="space-y-4">
+									<fieldset
+										className="space-y-4"
+										aria-invalid={!!triggerError}
+										aria-describedby={triggerError ? "trigger-error" : undefined}
+									>
+										<legend className="text-lg font-semibold">Start a review when… *</legend>
+										<p className="text-sm text-muted-foreground">Choose one or more events.</p>
+										<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+											{TRIGGER_EVENTS_BY_FOCUS[form.focusArtifact].map((option) => (
+												<Label
+													key={option.value}
+													htmlFor={`trigger-${option.value}`}
+													className="flex items-center gap-2 text-sm font-normal cursor-pointer"
+												>
+													<Checkbox
+														id={`trigger-${option.value}`}
+														checked={form.triggerEvents.includes(option.value)}
+														onCheckedChange={(checked) =>
+															handleToggleEvent(option.value, checked === true)
+														}
+													/>
+													{option.label}
+												</Label>
+											))}
+										</div>
+										{triggerError && (
+											<p id="trigger-error" className="text-sm text-destructive">
+												{triggerError}
+											</p>
+										)}
+									</fieldset>
+								</section>
 
-						<Separator />
+								<Separator />
+							</>
+						)}
 
 						<section className="space-y-4">
 							<div className="space-y-1">
@@ -507,27 +498,63 @@ export function PracticeForm({
 						)}
 					</div>
 				</div>
-			</div>
 
-			<div className="border-t pt-4">
-				<div className="mx-auto flex w-full max-w-3xl justify-between">
-					<Button type="button" variant="outline" onClick={onCancel}>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={isPending}>
-						{isPending ? (
-							<>
-								<Spinner className="mr-2 size-4" />
-								{mode === "create" ? "Creating…" : "Saving…"}
-							</>
-						) : mode === "create" ? (
-							"Create practice"
-						) : (
-							"Save changes"
-						)}
-					</Button>
+				<div className="max-w-3xl border-t pt-4">
+					<div className="flex justify-between">
+						<Link
+							to="/w/$workspaceSlug/admin/practices"
+							params={{ workspaceSlug }}
+							search={(previous) => previous}
+							className={buttonVariants({ variant: "outline" })}
+						>
+							Cancel
+						</Link>
+						<Button type="submit" disabled={isPending}>
+							{isPending ? (
+								<>
+									<Spinner className="mr-2 size-4" />
+									{mode === "create" ? "Creating…" : "Saving…"}
+								</>
+							) : mode === "create" ? (
+								"Create practice"
+							) : (
+								"Save changes"
+							)}
+						</Button>
+					</div>
 				</div>
-			</div>
-		</form>
+			</form>
+		</PracticeFormShell>
+	);
+}
+
+export function PracticeFormShell({
+	mode,
+	workspaceSlug,
+	practiceName,
+	children,
+}: PracticeFormShellProps) {
+	return (
+		<PageLayout>
+			<Link
+				to="/w/$workspaceSlug/admin/practices"
+				params={{ workspaceSlug }}
+				search={(previous) => previous}
+				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
+			>
+				<ArrowLeft className="size-4" />
+				Practice catalog
+			</Link>
+			<PageHeader
+				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
+				title={mode === "create" ? "Create practice" : `Edit: ${practiceName ?? "practice"}`}
+				description={
+					mode === "create"
+						? "Define what Hephaestus should look for in reviewed work."
+						: "Update how this practice evaluates reviewed work."
+				}
+			/>
+			{children}
+		</PageLayout>
 	);
 }

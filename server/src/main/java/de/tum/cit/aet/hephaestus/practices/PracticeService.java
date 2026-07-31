@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -240,7 +241,13 @@ public class PracticeService {
 
     private void validateTriggerEventsForFocus(Practice practice) {
         var allowed = TriggerEventCatalog.eligibleFor(practice.getArtifactType());
-        List<String> incompatible = TriggerEventsConverter.toList(practice.getTriggerEvents())
+        List<String> triggerEvents = TriggerEventsConverter.toList(practice.getTriggerEvents());
+        if (practice.getArtifactType() != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
+            throw new IllegalArgumentException(
+                "At least one trigger event is required for " + practice.getArtifactType()
+            );
+        }
+        List<String> incompatible = triggerEvents
             .stream()
             .filter(event -> !allowed.contains(event))
             .toList();

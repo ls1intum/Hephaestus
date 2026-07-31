@@ -12,10 +12,15 @@ export interface WorkspaceFeatures {
 	leaguesEnabled: boolean;
 }
 
-export function useWorkspaceFeatures(workspaceSlug: string | undefined): WorkspaceFeatures & {
+export interface WorkspaceFeaturesResult {
+	features?: WorkspaceFeatures;
 	isLoading: boolean;
 	isError: boolean;
-} {
+	error: unknown;
+	refetch: () => void;
+}
+
+export function useWorkspaceFeatures(workspaceSlug: string | undefined): WorkspaceFeaturesResult {
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const query = useQuery({
@@ -26,21 +31,25 @@ export function useWorkspaceFeatures(workspaceSlug: string | undefined): Workspa
 
 	const workspaces = Array.isArray(query.data) ? query.data : [];
 	const activeWorkspace = workspaces.find((ws) => ws.workspaceSlug === workspaceSlug);
+	const workspaceMissing =
+		Boolean(workspaceSlug) && query.isSuccess && !activeWorkspace && !authLoading;
 
 	return {
-		...getWorkspaceFeatures(activeWorkspace),
-		isLoading: query.isLoading,
-		isError: query.isError,
+		features: activeWorkspace ? workspaceFeaturesOf(activeWorkspace) : undefined,
+		isLoading: authLoading || query.isLoading,
+		isError: query.isError || workspaceMissing,
+		error: query.error ?? (workspaceMissing ? new Error("Workspace not found") : undefined),
+		refetch: () => void query.refetch(),
 	};
 }
 
-export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFeatures {
+function workspaceFeaturesOf(workspace: WorkspaceListItem): WorkspaceFeatures {
 	return {
-		practicesEnabled: workspace?.practicesEnabled ?? true,
-		mentorEnabled: workspace?.mentorEnabled ?? false,
-		achievementsEnabled: workspace?.achievementsEnabled ?? true,
-		leaderboardEnabled: workspace?.leaderboardEnabled ?? true,
-		progressionEnabled: workspace?.progressionEnabled ?? true,
-		leaguesEnabled: workspace?.leaguesEnabled ?? false,
+		practicesEnabled: workspace.practicesEnabled,
+		mentorEnabled: workspace.mentorEnabled,
+		achievementsEnabled: workspace.achievementsEnabled,
+		leaderboardEnabled: workspace.leaderboardEnabled,
+		progressionEnabled: workspace.progressionEnabled,
+		leaguesEnabled: workspace.leaguesEnabled,
 	};
 }

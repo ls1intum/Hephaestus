@@ -42,11 +42,9 @@ export function ThemeProvider({
 			appliedTheme = theme as "light" | "dark";
 		}
 
-		// Add class for styling
 		root.classList.add(appliedTheme);
 		root.setAttribute("data-color-mode", appliedTheme);
 
-		// Update theme color meta tag if it exists
 		const metaThemeColor = document.querySelector('meta[name="theme-color"]');
 		if (metaThemeColor) {
 			const color = appliedTheme === "dark" ? "hsl(0 0% 10%)" : "hsl(0 0% 100%)";
