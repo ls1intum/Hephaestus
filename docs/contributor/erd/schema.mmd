@@ -650,7 +650,7 @@ erDiagram
     Observation {
         UUID id PK
         VARCHAR(255) occurrence_key UK "NOT NULL"
-        UUID agent_job_id "NOT NULL"
+        UUID agent_job_id FK "NOT NULL"
         BIGINT practice_id FK "NOT NULL"
         VARCHAR(32) artifact_type "NOT NULL"
         BIGINT artifact_id "NOT NULL"
@@ -776,6 +776,11 @@ erDiagram
         TIMESTAMPTZ updated_at
         VARCHAR(64) icon
         VARCHAR(32) color
+    }
+
+    PracticeCatalogInstallation {
+        BIGINT workspace_id PK,FK
+        TIMESTAMPTZ installed_at "NOT NULL"
     }
 
     PracticeRevision {
@@ -1312,6 +1317,7 @@ erDiagram
     Connection ||--|| OutlineDocument : has
     Workspace ||--|| Practice : has
     Workspace ||--|| PracticeArea : has
+    Workspace ||--|| PracticeCatalogInstallation : has
     Practice ||--|| PracticeRevision : has
     IdentityProvider ||--|| Project : references
     Project ||--|| ProjectField : has
@@ -1393,6 +1399,7 @@ erDiagram
     Workspace ||--o{ LlmUsageEvent : has
     ChatThread ||--o{ MentorSlackThread : has
     User ||--o{ Milestone : created_by
+    AgentJob ||--o{ Observation : has
     Practice ||--o{ Observation : has
     User ||--o{ Observation : has
     PracticeRevision ||--o{ Observation : has

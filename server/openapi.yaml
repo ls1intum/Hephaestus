@@ -66,6 +66,9 @@ tags:
   name: Outline collections
 - description: Team management within workspace
   name: Teams
+- description: "Workspace-admin access to review runs, findings, and message delivery\
+    \ history"
+  name: Practice reviews
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
@@ -347,6 +350,7 @@ paths:
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
+            - PRACTICE_DEFINITION
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -1714,6 +1718,7 @@ paths:
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
+            - PRACTICE_DEFINITION
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -3472,8 +3477,7 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
     delete:
-      description: "Bound practices are unbound (their area link is cleared), not\
-        \ deleted"
+      description: "Moves its practices to Unassigned, then deletes the area"
       operationId: deleteArea
       parameters:
       - description: Workspace slug
@@ -3585,7 +3589,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/Practice"
           description: Practices returned
-      security: []
       summary: List practice definitions
       tags:
       - Practice Catalog
@@ -3612,7 +3615,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Practice"
           description: Practice created
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Practice area not found
         "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice slug already exists in this workspace
       summary: Create a new practice definition
       tags:
@@ -3939,6 +3952,10 @@ paths:
                   $ref: "#/components/schemas/Practice"
           description: Practices reordered; the full ordered practice list is returned
         "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: "orderedSlugs is empty, has duplicates, or is not the area's\
             \ complete set"
       summary: Reorder the practices within an area
@@ -3991,6 +4008,410 @@ paths:
       summary: Update the workspace's practice-review policy
       tags:
       - Practice Review Settings
+  /workspaces/{workspaceSlug}/practices/reviews:
+    get:
+      description: Results are ordered newest first.
+      operationId: listPracticeReviews
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelReviewRunSummary"
+          description: Paginated review summaries returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Invalid filter or pagination
+      summary: List practice reviews with finding and feedback outcomes
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/feedback:
+    get:
+      description: Results are ordered newest first and include every delivery state.
+      operationId: listPracticeReviewFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      - in: query
+        name: deliveryState
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - PREPARED
+            - DELIVERED
+            - SUPERSEDED
+            - SUPPRESSED
+            - FAILED
+      - in: query
+        name: suppressionReason
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - VOLUME_CAPPED
+            - COMPOSER_DEDUPED
+            - REACTED_DISPUTED
+            - REACTED_NOT_APPLICABLE
+            - CONVERSATION_EXPIRED
+            - ARTIFACT_GONE
+            - ARTIFACT_CLOSED
+            - ARTIFACT_MERGED
+            - ARTIFACT_DRAFT
+            - RECIPIENT_OPTED_OUT
+            - EMPTY_AFTER_SANITIZE
+      - in: query
+        name: channel
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - IN_CONTEXT
+            - CONVERSATION
+            - PROFILE
+      - in: query
+        name: agentJobId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: artifactType
+        required: false
+        schema:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+      - description: Artifact ID; requires artifactType
+        in: query
+        name: artifactId
+        required: false
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - in: query
+        name: recipientUserId
+        required: false
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - description: Inclusive lower bound
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: Exclusive upper bound
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelReviewFeedback"
+          description: Paginated messages returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Invalid filter or pagination
+      summary: List practice review feedback across the workspace
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}:
+    get:
+      operationId: getPracticeReviewFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewFeedbackDetail"
+          description: Message details returned
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Feedback not found in this workspace
+      summary: "Get feedback with its stored body, findings and placements"
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/findings:
+    get:
+      description: Results include linked feedback outcomes and are ordered newest
+        first by default.
+      operationId: listPracticeReviewFindings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      - description: "Sorting strategy. ACTIONABILITY orders problems from CRITICAL\
+          \ to INFO, then strengths, then not-applicable findings; ties are newest\
+          \ first."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+          default: NEWEST
+          enum:
+          - NEWEST
+          - ACTIONABILITY
+      - in: query
+        name: practiceSlug
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - in: query
+        name: areaSlug
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - in: query
+        name: presence
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - PRESENT
+            - ABSENT
+            - NOT_APPLICABLE
+      - in: query
+        name: assessment
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - GOOD
+            - BAD
+      - in: query
+        name: severity
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - in: query
+        name: agentJobId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: artifactType
+        required: false
+        schema:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+      - description: Artifact ID; requires artifactType
+        in: query
+        name: artifactId
+        required: false
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - in: query
+        name: subjectUserId
+        required: false
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - description: Inclusive lower bound
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: Exclusive upper bound
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelReviewFinding"
+          description: Paginated findings returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Invalid filter or pagination
+      summary: List practice review findings across the workspace
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}:
+    get:
+      operationId: getPracticeReviewFinding
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: findingId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewFindingDetail"
+          description: Finding detail returned
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Finding not found in this workspace
+      summary: Get a finding with its evidence and linked feedback
+      tags:
+      - Practice reviews
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -4011,6 +4432,10 @@ paths:
         "204":
           description: Practice deleted
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
       summary: Delete a practice definition
       tags:
@@ -4038,8 +4463,11 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Practice returned
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
-      security: []
       summary: Get a practice definition
       tags:
       - Practice Catalog
@@ -4072,8 +4500,12 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Practice updated
         "404":
-          description: Practice not found
-      summary: Update a practice definition
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Practice or practice area not found
+      summary: Update a practice
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/active:
@@ -4106,14 +4538,18 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Active state updated
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
       summary: Set practice active state
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/area:
     put:
-      description: "Binds the practice to the area named by areaSlug, or unbinds it\
-        \ when areaSlug is null"
+      description: "Moves the practice to the requested area, or to Unassigned when\
+        \ areaSlug is null"
       operationId: bindArea
       parameters:
       - description: Workspace slug
@@ -4140,10 +4576,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Practice"
-          description: Binding updated
+          description: Practice moved
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
           description: Practice or area not found
-      summary: Bind a practice to an area
+      summary: Move a practice
+      tags:
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/placement:
+    put:
+      description: Moves the practice and sets its exact position in one atomic write;
+        omit areaSlug for Unassigned
+      operationId: placePractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlacePracticeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practice"
+          description: Practice placed; the full updated practice list is returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "position is missing, negative, or beyond the destination"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Practice or area not found
+      summary: Place a practice in the catalog
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
@@ -5637,6 +6125,9 @@ components:
           - FAILED
           - TIMED_OUT
           - CANCELLED
+        target:
+          $ref: "#/components/schemas/ReviewRunTarget"
+          description: Work item reviewed by this job
       required:
       - availableAt
       - configSnapshot
@@ -5645,6 +6136,7 @@ components:
       - jobType
       - retryCount
       - status
+      - target
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -5781,12 +6273,13 @@ components:
       - unlocked
     BindPracticeAreaRequest:
       type: object
-      description: "Request to bind a practice to an area, or unbind it when areaSlug\
-        \ is null"
+      description: Request to move a practice to an area or Unassigned
       properties:
         areaSlug:
-          type: string
-          description: "Slug of the area to bind to, or null to unbind"
+          type:
+          - string
+          - "null"
+          description: Destination area slug; omit or set to null for Unassigned
           example: review-ready-work
     ChatMessage:
       type: object
@@ -5933,6 +6426,7 @@ components:
           - WORKSPACE_TOKEN
           - WORKSPACE_VISIBILITY
           - PRACTICE_ACTIVE
+          - PRACTICE_DEFINITION
           - WORKSPACE_INSTANCE_LLM_BUDGET
           - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
@@ -6364,7 +6858,7 @@ components:
         displayOrder:
           type: integer
           format: int32
-          description: Sort order within the workspace. Defaults to 0 when omitted.
+          description: Sort order within the workspace. Appended when omitted.
           example: 1
         icon:
           type: string
@@ -6393,6 +6887,12 @@ components:
       type: object
       description: Request to create a new practice definition
       properties:
+        areaSlug:
+          type:
+          - string
+          - "null"
+          description: Practice area to add the practice to. Omit or set to null for
+            Unassigned.
         artifactType:
           type: string
           description: Artifact this practice evaluates. Defaults to PULL_REQUEST
@@ -6428,18 +6928,19 @@ components:
           pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         triggerEvents:
           type: array
-          description: Domain events that trigger detection
+          description: Domain events that trigger detection; empty for scheduled conversation
+            reviews
           example:
           - PullRequestCreated
           - ReviewSubmitted
           items:
             type: string
           maxItems: 10
-          minItems: 1
+          minItems: 0
         whatGoodLooksLike:
           type: string
-          description: "Developer-facing exemplar (learner layer); a concrete instance,\
-            \ not the rubric"
+          description: "Developer-facing exemplar; a concrete instance, not the assessment\
+            \ criteria"
           maxLength: 2000
           minLength: 0
         whyItMatters:
@@ -7922,6 +8423,20 @@ components:
         totalPages:
           type: integer
           format: int32
+    PageMetadata:
+      properties:
+        number:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int64
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
     PageObservationList:
       type: object
       properties:
@@ -8004,6 +8519,49 @@ components:
           $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
+    PagedModelReviewFeedback:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewFeedback"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PagedModelReviewFinding:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewFinding"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PagedModelReviewRunSummary:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewRunSummary"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PlacePracticeRequest:
+      type: object
+      description: A practice's position in the catalog
+      properties:
+        areaSlug:
+          type: string
+          description: Destination area slug; omit to place the practice in Unassigned
+          example: review-ready-work
+        position:
+          type: integer
+          format: int32
+          description: Zero-based position in the destination
+          example: 1
+          minimum: 0
+      required:
+      - position
     Practice:
       type: object
       description: Practice definition for evaluating developer contributions
@@ -8884,6 +9442,703 @@ components:
       - pending
       - stale
       - total
+    ReviewArtifact:
+      type: object
+      properties:
+        channelName:
+          type: string
+          description: Slack channel name for conversation artifacts
+        id:
+          type: integer
+          format: int64
+          description: Internal artifact entity ID
+        number:
+          type: integer
+          format: int32
+          description: Provider-visible work-item number
+        provider:
+          type: string
+          description: "Source provider, when recorded"
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+        repositoryName:
+          type: string
+          description: Provider-qualified repository path for SCM artifacts
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        url:
+          type: string
+          description: "Provider URL, when one is available"
+      required:
+      - id
+      - title
+      - type
+    ReviewBoundFeedback:
+      type: object
+      description: A message composed from a finding
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          enum:
+          - IN_CONTEXT
+          - CONVERSATION
+          - PROFILE
+        createdAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+          description: When the message was placed; null if it was not delivered
+        deliveryState:
+          type: string
+          enum:
+          - PREPARED
+          - DELIVERED
+          - SUPERSEDED
+          - SUPPRESSED
+          - FAILED
+        feedbackId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          description: Whether the finding led the message or reinforced it
+          enum:
+          - PRIMARY
+          - SUPPORTING
+        suppressionReason:
+          type: string
+          description: Why the message was withheld; null unless the state is SUPPRESSED
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_DEDUPED
+          - REACTED_DISPUTED
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - ARTIFACT_GONE
+          - ARTIFACT_CLOSED
+          - ARTIFACT_MERGED
+          - ARTIFACT_DRAFT
+          - RECIPIENT_OPTED_OUT
+          - EMPTY_AFTER_SANITIZE
+      required:
+      - agentJobId
+      - channel
+      - createdAt
+      - deliveryState
+      - feedbackId
+      - role
+    ReviewBoundFinding:
+      type: object
+      description: A finding that contributed to a message
+      properties:
+        area:
+          $ref: "#/components/schemas/ReviewPracticeArea"
+          description: Practice area; null when the practice is Unassigned
+        assessment:
+          type: string
+          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          enum:
+          - GOOD
+          - BAD
+        confidence:
+          type: number
+          format: float
+          description: Detector confidence
+          maximum: 1
+          minimum: 0
+        findingId:
+          type: string
+          format: uuid
+        observedAt:
+          type: string
+          format: date-time
+        ordinal:
+          type: integer
+          format: int32
+          description: Render order within the message (lower renders earlier)
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        presence:
+          type: string
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+        role:
+          type: string
+          description: Whether the finding leads the message or reinforces it
+          enum:
+          - PRIMARY
+          - SUPPORTING
+        severity:
+          type: string
+          description: Severity band (null unless assessment is BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+      required:
+      - confidence
+      - findingId
+      - observedAt
+      - ordinal
+      - practiceName
+      - practiceSlug
+      - presence
+      - role
+      - title
+    ReviewFeedback:
+      type: object
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+        artifact:
+          $ref: "#/components/schemas/ReviewArtifact"
+          description: Work item the message targets; null for an unanchored message
+        bodyPreview:
+          type: string
+          description: Leading characters of the composed body; null when the message
+            carries no body
+        bodyTruncated:
+          type: boolean
+        channel:
+          type: string
+          enum:
+          - IN_CONTEXT
+          - CONVERSATION
+          - PROFILE
+        createdAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+          description: When the message was placed; null if it was not delivered
+        deliveryState:
+          type: string
+          enum:
+          - PREPARED
+          - DELIVERED
+          - SUPERSEDED
+          - SUPPRESSED
+          - FAILED
+        findingCount:
+          type: integer
+          format: int64
+          description: Number of findings used to compose the message
+        id:
+          type: string
+          format: uuid
+        recipient:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Who the message is addressed to; null when the identity is
+            no longer resolvable
+        replacesId:
+          type: string
+          format: uuid
+          description: The message this one replaced; null on a first delivery
+        subject:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Whose work the message addresses; may equal the recipient
+        suppressionReason:
+          type: string
+          description: Why the message was withheld; null unless the state is SUPPRESSED
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_DEDUPED
+          - REACTED_DISPUTED
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - ARTIFACT_GONE
+          - ARTIFACT_CLOSED
+          - ARTIFACT_MERGED
+          - ARTIFACT_DRAFT
+          - RECIPIENT_OPTED_OUT
+          - EMPTY_AFTER_SANITIZE
+      required:
+      - agentJobId
+      - bodyTruncated
+      - channel
+      - createdAt
+      - deliveryState
+      - findingCount
+      - id
+    ReviewFeedbackCounts:
+      type: object
+      description: Counts of feedback by delivery state
+      properties:
+        delivered:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        prepared:
+          type: integer
+          format: int64
+        superseded:
+          type: integer
+          format: int64
+        suppressed:
+          type: integer
+          format: int64
+      required:
+      - delivered
+      - failed
+      - prepared
+      - superseded
+      - suppressed
+    ReviewFeedbackDetail:
+      type: object
+      description: Full feedback detail including the stored composed body
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+        artifact:
+          $ref: "#/components/schemas/ReviewArtifact"
+          description: Work item the message targets; null for an unanchored message
+        body:
+          type: string
+          description: Stored composed body; null when none was produced
+        channel:
+          type: string
+          enum:
+          - IN_CONTEXT
+          - CONVERSATION
+          - PROFILE
+        createdAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+          description: When the message was placed; null if it was not delivered
+        deliveryState:
+          type: string
+          enum:
+          - PREPARED
+          - DELIVERED
+          - SUPERSEDED
+          - SUPPRESSED
+          - FAILED
+        findings:
+          type: array
+          description: Source findings in render order
+          items:
+            $ref: "#/components/schemas/ReviewBoundFinding"
+        id:
+          type: string
+          format: uuid
+        placements:
+          type: array
+          description: Recorded placements; empty when none
+          items:
+            $ref: "#/components/schemas/ReviewPlacement"
+        recipient:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Who the message is addressed to; null when the identity is
+            no longer resolvable
+        replacesId:
+          type: string
+          format: uuid
+          description: The message this one replaced; null on a first delivery
+        subject:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Whose work the message addresses; may equal the recipient
+        suppressionReason:
+          type: string
+          description: Why the message was withheld; null unless the state is SUPPRESSED
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_DEDUPED
+          - REACTED_DISPUTED
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - ARTIFACT_GONE
+          - ARTIFACT_CLOSED
+          - ARTIFACT_MERGED
+          - ARTIFACT_DRAFT
+          - RECIPIENT_OPTED_OUT
+          - EMPTY_AFTER_SANITIZE
+        threadKey:
+          type: string
+          description: Cross-run continuity key tying successive deliveries together
+      required:
+      - agentJobId
+      - channel
+      - createdAt
+      - deliveryState
+      - findings
+      - id
+      - placements
+    ReviewFeedbackDisposition:
+      type: object
+      description: Counts of feedback by delivery state
+      properties:
+        delivered:
+          type: integer
+          format: int64
+          description: Linked messages delivered
+        failed:
+          type: integer
+          format: int64
+          description: Linked messages whose delivery failed
+        prepared:
+          type: integer
+          format: int64
+          description: Linked messages awaiting delivery
+        superseded:
+          type: integer
+          format: int64
+          description: Linked messages delivered and later replaced
+        suppressed:
+          type: integer
+          format: int64
+          description: Linked messages withheld by policy
+      required:
+      - delivered
+      - failed
+      - prepared
+      - superseded
+      - suppressed
+    ReviewFinding:
+      type: object
+      description: A practice review finding with its linked feedback outcomes
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+        area:
+          $ref: "#/components/schemas/ReviewPracticeArea"
+          description: Practice area; null when the practice is Unassigned
+        artifact:
+          $ref: "#/components/schemas/ReviewArtifact"
+        assessment:
+          type: string
+          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          enum:
+          - GOOD
+          - BAD
+        confidence:
+          type: number
+          format: float
+          description: Detector confidence
+          maximum: 1
+          minimum: 0
+        feedbackDisposition:
+          $ref: "#/components/schemas/ReviewFeedbackDisposition"
+          description: Counts of linked messages by delivery state
+        id:
+          type: string
+          format: uuid
+        observedAt:
+          type: string
+          format: date-time
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        presence:
+          type: string
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+        recurrenceKey:
+          type: string
+          description: Cross-run locus key; null when continuity is unavailable
+        severity:
+          type: string
+          description: Severity band (null unless assessment is BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        subject:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Whose work the finding is about; null when the identity is
+            no longer resolvable
+        title:
+          type: string
+      required:
+      - agentJobId
+      - artifact
+      - confidence
+      - feedbackDisposition
+      - id
+      - observedAt
+      - practiceName
+      - practiceSlug
+      - presence
+      - title
+    ReviewFindingCounts:
+      type: object
+      description: Counts of findings by assessment
+      properties:
+        notApplicable:
+          type: integer
+          format: int64
+        problems:
+          type: integer
+          format: int64
+        strengths:
+          type: integer
+          format: int64
+      required:
+      - notApplicable
+      - problems
+      - strengths
+    ReviewFindingDetail:
+      type: object
+      description: A finding with evidence and linked feedback
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+        area:
+          $ref: "#/components/schemas/ReviewPracticeArea"
+          description: Practice area; null when the practice is Unassigned
+        artifact:
+          $ref: "#/components/schemas/ReviewArtifact"
+        assessment:
+          type: string
+          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          enum:
+          - GOOD
+          - BAD
+        confidence:
+          type: number
+          format: float
+          description: Detector confidence
+          maximum: 1
+          minimum: 0
+        evidence: {}
+        feedback:
+          type: array
+          description: "Linked feedback, newest first"
+          items:
+            $ref: "#/components/schemas/ReviewBoundFeedback"
+        id:
+          type: string
+          format: uuid
+        observedAt:
+          type: string
+          format: date-time
+        practiceName:
+          type: string
+        practiceRevisionId:
+          type: integer
+          format: int64
+          description: "Criteria revision selected as of job start, when available"
+        practiceSlug:
+          type: string
+        presence:
+          type: string
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+        reasoning:
+          type: string
+        recurrenceKey:
+          type: string
+          description: Cross-run locus key; null when continuity is unavailable
+        severity:
+          type: string
+          description: Severity band (null unless assessment is BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        subject:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Whose work the finding is about; null when the identity is
+            no longer resolvable
+        title:
+          type: string
+      required:
+      - agentJobId
+      - artifact
+      - confidence
+      - feedback
+      - id
+      - observedAt
+      - practiceName
+      - practiceSlug
+      - presence
+      - title
+    ReviewPlacement:
+      type: object
+      description: A recorded message placement
+      properties:
+        anchorEndLine:
+          type: integer
+          format: int32
+          description: Last anchored line (1-based)
+        anchorKind:
+          type: string
+          description: Anchor granularity; null for non-inline placements
+          enum:
+          - LINE
+          - RANGE
+          - FILE
+          - IMAGE
+        anchorPath:
+          type: string
+          description: Head-side path of the anchored file
+        anchorSide:
+          type: string
+          description: Diff side of the anchor
+          enum:
+          - OLD
+          - NEW
+        anchorStartLine:
+          type: integer
+          format: int32
+          description: First anchored line (1-based)
+        chatMessageId:
+          type: string
+          format: uuid
+          description: Mentor chat-message identifier
+        id:
+          type: string
+          format: uuid
+        placementType:
+          type: string
+          enum:
+          - SUMMARY
+          - INLINE
+          - CONVERSATION_TURN
+        postedCommentRef:
+          type: string
+          description: Provider-native comment identifier
+      required:
+      - id
+      - placementType
+    ReviewPracticeArea:
+      type: object
+      properties:
+        color:
+          type: string
+          description: Palette color key
+        icon:
+          type: string
+          description: Lucide icon name
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+      - name
+      - slug
+    ReviewRunSummary:
+      type: object
+      description: A review run with finding and feedback outcome counts
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        feedback:
+          $ref: "#/components/schemas/ReviewFeedbackCounts"
+        findings:
+          $ref: "#/components/schemas/ReviewFindingCounts"
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+        target:
+          $ref: "#/components/schemas/ReviewRunTarget"
+      required:
+      - createdAt
+      - feedback
+      - findings
+      - id
+      - status
+      - target
+    ReviewRunTarget:
+      type: object
+      description: Work reviewed by an agent job
+      properties:
+        channelName:
+          type: string
+        id:
+          type: integer
+          format: int64
+          description: "Internal artifact entity ID, when recorded"
+        number:
+          type: integer
+          format: int32
+          description: Provider-visible work-item number
+        provider:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+        repositoryName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        url:
+          type: string
+      required:
+      - title
+      - type
+    ReviewSubject:
+      type: object
+      properties:
+        avatarUrl:
+          type: string
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+          description: Login on the source provider
+        name:
+          type: string
+          description: "Display name, when known"
+      required:
+      - id
+      - login
     RevokeSessionsResult:
       type: object
       properties:
@@ -9634,9 +10889,12 @@ components:
           pattern: .*\S.*
     UpdatePracticeRequest:
       type: object
-      description: Request to update an existing practice definition (PATCH — only
-        non-null fields applied)
+      description: Request to update a practice; omitted fields remain unchanged
       properties:
+        area:
+          $ref: "#/components/schemas/BindPracticeAreaRequest"
+          description: Catalog placement to apply with the definition update; omit
+            to leave unchanged
         artifactType:
           type: string
           description: Artifact this practice evaluates
@@ -9645,6 +10903,16 @@ components:
           - ISSUE
           - CONVERSATION_THREAD
           example: ISSUE
+        clear:
+          type: array
+          description: Optional fields to clear before applying supplied values
+          items:
+            type: string
+            enum:
+            - PRECOMPUTE_SCRIPT
+            - WHY_IT_MATTERS
+            - WHAT_GOOD_LOOKS_LIKE
+          uniqueItems: true
         criteria:
           type: string
           description: Practice evaluation criteria
@@ -9666,11 +10934,12 @@ components:
           minLength: 0
         triggerEvents:
           type: array
-          description: Domain events that trigger detection
+          description: Domain events that trigger detection; empty for scheduled conversation
+            reviews
           items:
             type: string
           maxItems: 10
-          minItems: 1
+          minItems: 0
         whatGoodLooksLike:
           type: string
           description: "Developer-facing exemplar (learner layer); a concrete instance,\

@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { expectNoPageOverflow } from "@/test/reflow";
 import Header from "./Header";
 
-/** Fully presentational. The version badge links to GitHub releases in production only. */
 const meta = {
 	component: Header,
 	parameters: {
@@ -31,32 +31,6 @@ const meta = {
 			</SidebarProvider>
 		),
 	],
-	argTypes: {
-		isAuthenticated: {
-			control: "boolean",
-			description: "User authentication state",
-		},
-		isLoading: {
-			control: "boolean",
-			description: "Whether the authentication is currently loading",
-		},
-		name: {
-			control: "text",
-			description: "Full name of the authenticated user",
-		},
-		username: {
-			control: "text",
-			description: "Username of the authenticated user",
-		},
-		version: {
-			control: "text",
-			description: "Application version - links to release notes for semver",
-		},
-		workspaceSlug: {
-			control: "text",
-			description: "Active workspace slug for routing",
-		},
-	},
 } satisfies Meta<typeof Header>;
 
 export default meta;
@@ -111,7 +85,6 @@ export const Loading: Story = {
 	},
 };
 
-/** With no active workspace the logo links to the landing page. */
 export const NoWorkspace: Story = {
 	args: {
 		isAuthenticated: true,
@@ -125,10 +98,9 @@ export const Mobile: Story = {
 		isAuthenticated: true,
 		isLoading: false,
 	},
-	globals: {
-		viewport: {
-			value: "mobile1",
-			isRotated: false,
-		},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
 	},
+	play: expectNoPageOverflow,
 };

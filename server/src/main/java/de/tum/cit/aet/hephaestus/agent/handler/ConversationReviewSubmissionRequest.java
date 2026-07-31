@@ -2,15 +2,16 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#CONVERSATION_REVIEW} jobs:
  * one settled Slack thread, identified by {@code (channelId, threadTs)}, and the single participant the
- * findings are filed against. Idempotency/cooldown semantics of {@code lastTs} are documented at the key
- * construction in {@link ConversationReviewHandler#createSubmission}.
+ * findings are filed against.
  *
  * @param slackThreadId the {@code slack_thread} aggregate id (the delivery artifactId)
  * @param slackChannelId the Slack channel id
+ * @param slackChannelName the channel name captured when the review was submitted
  * @param slackThreadTs the thread root {@code ts}
  * @param aboutUserId the resolved workspace member id whose turns the findings are about (the DM recipient)
  * @param lastTs the thread's newest message {@code ts} — the disposable freshness segment
@@ -18,6 +19,7 @@ import java.util.Objects;
 public record ConversationReviewSubmissionRequest(
     long slackThreadId,
     String slackChannelId,
+    @Nullable String slackChannelName,
     String slackThreadTs,
     long aboutUserId,
     String lastTs
@@ -26,6 +28,7 @@ public record ConversationReviewSubmissionRequest(
         Objects.requireNonNull(slackChannelId, "slackChannelId must not be null");
         Objects.requireNonNull(slackThreadTs, "slackThreadTs must not be null");
         Objects.requireNonNull(lastTs, "lastTs must not be null");
+        slackChannelName = slackChannelName == null || slackChannelName.isBlank() ? null : slackChannelName;
         if (slackChannelId.isBlank()) {
             throw new IllegalArgumentException("slackChannelId must not be blank");
         }

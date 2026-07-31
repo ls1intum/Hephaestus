@@ -1,27 +1,34 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import type { ComponentProps, ReactElement, ReactNode } from "react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	Pagination,
 	PaginationContent,
 	PaginationEllipsis,
 	PaginationItem,
 } from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
-export interface TablePaginationProps {
-	/** Zero-based, matching the Spring page the table is showing. */
+interface TablePaginationCommonProps {
 	page: number;
 	totalPages: number;
-	onPageChange: (page: number) => void;
 	className?: string;
 }
 
+export type TablePaginationProps = TablePaginationCommonProps &
+	(
+		| {
+				onPageChange: (page: number) => void;
+				renderPageLink?: never;
+		  }
+		| {
+				renderPageLink: (page: number, props: ComponentProps<"a">) => ReactElement;
+				onPageChange?: never;
+		  }
+	);
+
 const WINDOW_THRESHOLD = 7;
 
-/**
- * Windowed page tokens: first, last, current ±1, with "ellipsis" gaps between. A gap of exactly one
- * page renders that page instead — an ellipsis standing for a single number is wider than the
- * number it replaces, and unclickable where the number is not.
- */
 function paginationItems(current: number, total: number): (number | "ellipsis")[] {
 	if (total <= WINDOW_THRESHOLD) {
 		return Array.from({ length: total }, (_, i) => i);
@@ -32,9 +39,10 @@ function paginationItems(current: number, total: number): (number | "ellipsis")[
 	let previous: number | undefined;
 	for (const page of sorted) {
 		if (previous !== undefined) {
-			if (page - previous === 2) {
-				items.push(page - 1);
-			} else if (page - previous > 2) {
+			const missingPages = page - previous - 1;
+			if (missingPages === 1) {
+				items.push(previous + 1);
+			} else if (missingPages > 1) {
 				items.push("ellipsis");
 			}
 		}
@@ -44,38 +52,80 @@ function paginationItems(current: number, total: number): (number | "ellipsis")[
 	return items;
 }
 
-/**
- * The pager for a table that changes pages by calling back rather than by navigating.
- *
- * Every control is a `<button disabled>` rather than the kit's `PaginationLink`, which is an anchor:
- * an `href`-less anchor dimmed with `pointer-events-none` stays in the tab order and is still
- * announced as an available control (WCAG 2.2 SC 4.1.2).
- */
+interface PageControlProps {
+	page: number;
+	label: string;
+	current?: boolean;
+	size?: "default" | "icon";
+	className?: string;
+	children: ReactNode;
+	onPageChange?: (page: number) => void;
+	renderPageLink?: (page: number, props: ComponentProps<"a">) => ReactElement;
+}
+
+function PageControl({
+	page,
+	label,
+	current,
+	size = "icon",
+	className,
+	children,
+	onPageChange,
+	renderPageLink,
+}: PageControlProps) {
+	if (renderPageLink) {
+		return renderPageLink(page, {
+			"aria-current": current ? "page" : undefined,
+			"aria-label": label,
+			className: cn(buttonVariants({ variant: current ? "outline" : "ghost", size }), className),
+			children,
+		});
+	}
+	return (
+		<Button
+			variant={current ? "outline" : "ghost"}
+			size={size}
+			aria-label={label}
+			aria-current={current ? "page" : undefined}
+			className={className}
+			onClick={() => onPageChange?.(page)}
+		>
+			{children}
+		</Button>
+	);
+}
+
 export function TablePagination({
 	page,
 	totalPages,
 	onPageChange,
+	renderPageLink,
 	className,
 }: TablePaginationProps) {
-	if (totalPages <= 1) {
-		return null;
-	}
+	if (totalPages <= 1) return null;
 
 	return (
 		<Pagination className={className}>
-			{/* Wrapping absorbs text-only zoom (WCAG 2.2 SC 1.4.4) instead of scrolling horizontally. */}
 			<PaginationContent className="flex-wrap justify-center gap-y-1">
 				<PaginationItem>
-					<Button
-						variant="ghost"
-						className="pl-1.5!"
-						aria-label="Go to previous page"
-						disabled={page <= 0}
-						onClick={() => onPageChange(Math.max(0, page - 1))}
-					>
-						<ChevronLeftIcon data-icon="inline-start" />
-						<span className="hidden sm:block">Previous</span>
-					</Button>
+					{page <= 0 ? (
+						<Button variant="ghost" className="pl-1.5!" aria-label="Go to previous page" disabled>
+							<ChevronLeftIcon data-icon="inline-start" />
+							<span className="hidden sm:block">Previous</span>
+						</Button>
+					) : (
+						<PageControl
+							page={page - 1}
+							label="Go to previous page"
+							size="default"
+							className="pl-1.5!"
+							onPageChange={onPageChange}
+							renderPageLink={renderPageLink}
+						>
+							<ChevronLeftIcon data-icon="inline-start" />
+							<span className="hidden sm:block">Previous</span>
+						</PageControl>
+					)}
 				</PaginationItem>
 				{paginationItems(page, totalPages).map((item, index) =>
 					item === "ellipsis" ? (
@@ -84,29 +134,37 @@ export function TablePagination({
 						</PaginationItem>
 					) : (
 						<PaginationItem key={item}>
-							<Button
-								variant={item === page ? "outline" : "ghost"}
-								size="icon"
-								aria-label={`Go to page ${item + 1}`}
-								aria-current={item === page ? "page" : undefined}
-								onClick={() => onPageChange(item)}
+							<PageControl
+								page={item}
+								label={`Go to page ${item + 1}`}
+								current={item === page}
+								onPageChange={onPageChange}
+								renderPageLink={renderPageLink}
 							>
 								{item + 1}
-							</Button>
+							</PageControl>
 						</PaginationItem>
 					),
 				)}
 				<PaginationItem>
-					<Button
-						variant="ghost"
-						className="pr-1.5!"
-						aria-label="Go to next page"
-						disabled={page >= totalPages - 1}
-						onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
-					>
-						<span className="hidden sm:block">Next</span>
-						<ChevronRightIcon data-icon="inline-end" />
-					</Button>
+					{page >= totalPages - 1 ? (
+						<Button variant="ghost" className="pr-1.5!" aria-label="Go to next page" disabled>
+							<span className="hidden sm:block">Next</span>
+							<ChevronRightIcon data-icon="inline-end" />
+						</Button>
+					) : (
+						<PageControl
+							page={page + 1}
+							label="Go to next page"
+							size="default"
+							className="pr-1.5!"
+							onPageChange={onPageChange}
+							renderPageLink={renderPageLink}
+						>
+							<span className="hidden sm:block">Next</span>
+							<ChevronRightIcon data-icon="inline-end" />
+						</PageControl>
+					)}
 				</PaginationItem>
 			</PaginationContent>
 		</Pagination>

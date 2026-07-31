@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -32,11 +33,22 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     @EntityGraph(attributePaths = "area")
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
+    boolean existsByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+
     @EntityGraph(attributePaths = "area")
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    /** Practices bound to an area (the per-area dashboard aggregation key). */
-    List<Practice> findByWorkspaceIdAndAreaId(Long workspaceId, Long areaId);
+    List<Practice> findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long areaId);
+
+    @Query(
+        """
+        SELECT COALESCE(MAX(p.displayOrder), -1)
+        FROM Practice p
+        WHERE p.workspace.id = :workspaceId
+        AND ((:areaId IS NULL AND p.area IS NULL) OR p.area.id = :areaId)
+        """
+    )
+    int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId, @Param("areaId") @Nullable Long areaId);
 
     /**
      * Acquire a row-level write lock on a practice ({@code SELECT ... FOR UPDATE}). Used to serialise

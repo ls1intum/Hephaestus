@@ -51,7 +51,11 @@ public class AgentJobController {
     ) {
         int safePage = Math.max(page, 0);
         int pageSize = Math.max(1, Math.min(size, 100));
-        Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequest.of(
+            safePage,
+            pageSize,
+            Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+        );
         Page<AgentJobDTO> jobs = agentJobService
             .getJobs(workspaceContext.id(), status, pageable)
             .map(AgentJobDTO::from);

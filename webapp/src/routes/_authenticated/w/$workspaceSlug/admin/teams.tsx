@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
 import {
 	addLabelToTeamMutation,
 	getAllTeamsOptions,
@@ -21,16 +22,20 @@ import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/teams")({
 	head: workspaceAdminHead("Teams"),
+	validateSearch: z.object({
+		q: z.string().max(200).optional().catch(undefined),
+	}),
 	component: AdminTeamsContainer,
 });
 
 function AdminTeamsContainer() {
 	const queryClient = useQueryClient();
+	const search = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
 	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 
-	// Query for teams data
 	const teamsQueryKey = getAllTeamsQueryKey({
 		path: { workspaceSlug: slug },
 	});
@@ -39,7 +44,6 @@ function AdminTeamsContainer() {
 		enabled: hasWorkspace,
 	});
 
-	// Mutations
 	const updateTeamVisibility = useMutation({
 		...updateTeamVisibilityMutation(),
 		onMutate: async (vars: Options<UpdateTeamVisibilityData>) => {
@@ -115,7 +119,6 @@ function AdminTeamsContainer() {
 		},
 	});
 
-	// Handler functions
 	const handleHideTeam = async (teamId: number, hidden: boolean) => {
 		if (!hasWorkspace) {
 			return;
@@ -168,6 +171,14 @@ function AdminTeamsContainer() {
 		<AdminTeamsTable
 			teams={teamsQuery.data || []}
 			isLoading={isWorkspaceLoading || teamsQuery.isLoading || !workspaceSlug}
+			error={teamsQuery.error}
+			search={search.q ?? ""}
+			onSearchChange={(q) => {
+				navigate({ search: { q: q || undefined }, replace: true });
+			}}
+			onRetry={() => {
+				teamsQuery.refetch();
+			}}
 			onHideTeam={handleHideTeam}
 			onToggleRepositoryVisibility={handleToggleRepositoryVisibility}
 			onAddLabelToTeam={handleAddLabelToTeam}

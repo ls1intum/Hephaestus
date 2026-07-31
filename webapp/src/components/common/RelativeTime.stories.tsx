@@ -4,7 +4,6 @@ import { RelativeTime } from "./RelativeTime";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
 
-/** A timestamp as "4 minutes ago", with the absolute instant one hover away. */
 const meta = {
 	component: RelativeTime,
 	parameters: { layout: "centered" },
@@ -27,14 +26,13 @@ export const HoverRevealsAbsoluteTime: Story = {
 	},
 };
 
-/** Uncoloured on purpose: only an adverse judgement is worth tinting. */
 export const Fresh: Story = { args: { value: minutesAgo(4), tone: "fresh" } };
 
 export const Stale: Story = {
 	args: { value: minutesAgo(180), tone: "stale" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/ago$/)).toHaveClass("text-warning");
+		await expect(canvas.getByRole("button", { name: /stale/i })).toBeInTheDocument();
 	},
 };
 
@@ -42,7 +40,7 @@ export const VeryStale: Story = {
 	args: { value: minutesAgo(60 * 24 * 9), tone: "veryStale" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/ago$/)).toHaveClass("text-destructive");
+		await expect(canvas.getByRole("button", { name: /very stale/i })).toBeInTheDocument();
 	},
 };
 
@@ -72,7 +70,6 @@ export const WireString: Story = {
 	},
 };
 
-/** An unparseable value is an absent one, not a fresh one. */
 export const InvalidValue: Story = { args: { value: "not-a-date" } };
 
 export const WithoutTooltip: Story = {

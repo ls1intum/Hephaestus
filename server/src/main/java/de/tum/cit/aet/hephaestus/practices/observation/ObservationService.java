@@ -327,27 +327,14 @@ public class ObservationService {
         return Optional.ofNullable(deliveredGuidanceByObservation(Set.of(observationId)).get(observationId));
     }
 
-    /**
-     * Batch-resolve observation-id → delivered feedback body for the given ids in ONE query. An observation can
-     * be bound to several DELIVERED units (re-deliveries); the most recent one (by feedback {@code createdAt})
-     * wins so the surface shows the latest advice the developer actually saw. Observations with no DELIVERED
-     * feedback are absent from the map (the caller treats absence as "nothing delivered").
-     */
     private Map<UUID, String> deliveredGuidanceByObservation(Set<UUID> observationIds) {
         if (observationIds.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, ObservationAdviceBody> latest = new HashMap<>();
-        for (ObservationAdviceBody row : feedbackObservationRepository.findAdviceBodiesByObservationIds(
-            observationIds
-        )) {
-            latest.merge(row.getObservationId(), row, (existing, candidate) ->
-                candidate.getFeedbackCreatedAt().isAfter(existing.getFeedbackCreatedAt()) ? candidate : existing
-            );
-        }
-        Map<UUID, String> result = new HashMap<>();
-        latest.forEach((id, row) -> result.put(id, row.getBody()));
-        return result;
+        return feedbackObservationRepository
+            .findLatestAdviceBodiesByObservationIds(observationIds)
+            .stream()
+            .collect(Collectors.toMap(ObservationAdviceBody::getObservationId, ObservationAdviceBody::getBody));
     }
 
     /**

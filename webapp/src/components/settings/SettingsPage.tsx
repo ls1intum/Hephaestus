@@ -1,3 +1,6 @@
+import { UserRoundCog } from "lucide-react";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { optionalIntegrationsAvailable } from "@/integrations/consent";
@@ -16,57 +19,20 @@ import {
 } from "./SlackPreferencesSection";
 
 export interface SettingsPageProps {
-	/**
-	 * Props for the AiReviewSection component (only rendered when showAiReviewSection is true)
-	 */
 	aiReviewProps: AiReviewSectionProps;
-	/**
-	 * Whether to show the AI review section (feature-flagged via account_feature flag)
-	 */
-	showAiReviewSection: boolean;
-	/**
-	 * Props for the ResearchParticipationSection component
-	 */
 	researchProps: ResearchParticipationSectionProps;
-	/**
-	 * Whether to show the research participation section (requires PostHog)
-	 */
 	showResearchSection: boolean;
-	/**
-	 * Props for the LinkedAccountsSection component
-	 */
 	linkedAccountsProps: LinkedAccountsSectionProps;
-	/**
-	 * Props for Slack account and message-use preferences.
-	 */
 	slackPreferencesProps: SlackPreferencesSectionProps;
-	/** Whether to show Slack account and message-use preferences. */
 	showSlackPreferencesSection?: boolean;
-	/**
-	 * Called after the account is deleted (logout + redirect).
-	 */
 	onAccountDeleted: () => void | Promise<void>;
-	/**
-	 * Whether the settings are still loading
-	 */
 	isLoading?: boolean;
-	/**
-	 * Whether the user-settings query failed. When true the settings-backed sections (AI review,
-	 * research participation) show an error + retry instead of a fabricated default, so a privacy
-	 * toggle is never shown as "on" just because the load failed.
-	 */
 	settingsError?: boolean;
-	/** Retry loading the user settings. */
 	onRetrySettings?: () => void;
 }
 
-/**
- * SettingsPage component combining all settings sections
- * Provides a consistent layout for the settings page
- */
 export function SettingsPage({
 	aiReviewProps,
-	showAiReviewSection,
 	researchProps,
 	showResearchSection,
 	linkedAccountsProps,
@@ -86,16 +52,15 @@ export function SettingsPage({
 	const researchPending = isLoading || researchLoading;
 
 	return (
-		<div className="w-full max-w-3xl mx-auto space-y-8">
-			<div className="space-y-1">
-				<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-				<p className="text-muted-foreground text-balance">
-					Manage your account preferences and settings
-				</p>
-			</div>
+		<PageLayout>
+			<PageHeader
+				icon={<UserRoundCog />}
+				title="User settings"
+				description="Manage your preferences, connected accounts, and sessions."
+			/>
 
-			{settingsError ? (
-				(showAiReviewSection || showResearchSection) && (
+			<div className="max-w-3xl space-y-8">
+				{settingsError ? (
 					<>
 						<Separator />
 						<section className="space-y-2" aria-labelledby="settings-error-heading">
@@ -103,8 +68,8 @@ export function SettingsPage({
 								Preferences
 							</h2>
 							<p className="text-sm text-destructive" role="alert">
-								We couldn't load your preferences, so your AI-review and research-participation
-								settings aren't shown — we won't display a guessed value for a privacy choice.
+								We couldn't load your preferences, so your feedback and research settings aren't
+								shown.
 							</p>
 							{onRetrySettings && (
 								<Button variant="outline" size="sm" onClick={onRetrySettings}>
@@ -113,47 +78,43 @@ export function SettingsPage({
 							)}
 						</section>
 					</>
-				)
-			) : (
-				<>
-					{showAiReviewSection && (
-						<>
-							<Separator />
-							<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
-						</>
-					)}
+				) : (
+					<>
+						<Separator />
+						<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
 
-					{showResearchSection && (
-						<>
-							<Separator />
-							<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
-						</>
-					)}
-				</>
-			)}
+						{showResearchSection && (
+							<>
+								<Separator />
+								<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
+							</>
+						)}
+					</>
+				)}
 
-			<Separator />
-			<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
+				<Separator />
+				<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
 
-			{showSlackPreferencesSection && (
-				<>
-					<Separator />
-					<SlackPreferencesSection {...slackRest} isLoading={isLoading || slackLoading} />
-				</>
-			)}
+				{showSlackPreferencesSection && (
+					<>
+						<Separator />
+						<SlackPreferencesSection {...slackRest} isLoading={isLoading || slackLoading} />
+					</>
+				)}
 
-			<Separator />
-			<SessionsSection />
+				<Separator />
+				<SessionsSection />
 
-			{optionalIntegrationsAvailable && (
-				<>
-					<Separator />
-					<CookiePreferencesSection />
-				</>
-			)}
+				{optionalIntegrationsAvailable && (
+					<>
+						<Separator />
+						<CookiePreferencesSection />
+					</>
+				)}
 
-			<Separator />
-			<DangerZoneSection onAccountDeleted={onAccountDeleted} />
-		</div>
+				<Separator />
+				<DangerZoneSection onAccountDeleted={onAccountDeleted} />
+			</div>
+		</PageLayout>
 	);
 }

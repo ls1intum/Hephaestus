@@ -95,14 +95,7 @@ public class Observation {
     @Column(name = "occurrence_key", nullable = false, length = 255)
     private String occurrenceKey;
 
-    /**
-     * The agent job that produced this observation. A raw UUID with no {@code @ManyToOne} and no DB FK:
-     * {@code agent_job} lives in the {@code agent} module, so a referencing FK from {@code practices}
-     * would create a Spring-Modulith module cycle. The column is therefore an unconstrained scalar — the
-     * referential link is by convention, not enforced. The native {@code insertIfAbsent} write path supplies
-     * this UUID (like {@code id}) directly because it bypasses the JPA persist lifecycle entirely, independent
-     * of the FK question — {@code @PrePersist} never populated {@code agent_job_id} on the JPA path either.
-     */
+    /** The producing job, stored as a scalar to keep the persistence model independent of the agent module. */
     @NotNull
     @Column(name = "agent_job_id", nullable = false, columnDefinition = "UUID")
     private UUID agentJobId;

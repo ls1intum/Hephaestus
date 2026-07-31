@@ -31,6 +31,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -77,6 +79,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     private TransactionTemplate transactionTemplate;
 
     @Mock
+    private PracticeRepository practiceRepository;
+
+    @Mock
     private de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
 
     @Mock
@@ -100,6 +105,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             objectMapper,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false),
+            practiceRepository,
             llmBudgetService,
             llmModelResolver
         );
@@ -108,7 +114,11 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.getFeatures().setPracticesEnabled(true);
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
+        lenient()
+            .when(practiceRepository.existsByWorkspaceIdAndActiveTrueAndArtifactType(anyLong(), any()))
+            .thenReturn(true);
 
         enabledBinding = new WorkspaceAgentBinding();
         enabledBinding.setId(10L);
@@ -168,7 +178,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyWhenBindingIsDisabled() {
-            enabledBinding.setEnabled(false); // bound-but-disabled = detection paused
+            enabledBinding.setEnabled(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             Optional<AgentJob> result = service.submit(
@@ -209,6 +219,44 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldNotSubmitAfterPracticeReviewsAreTurnedOff() {
+            workspace.getFeatures().setPracticesEnabled(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldNotSubmitWithoutAnActivePracticeForTheReviewedWork() {
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(
+                practiceRepository.existsByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.CONVERSATION_THREAD)
+            ).thenReturn(false);
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.CONVERSATION_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.CONVERSATION_REVIEW,
                 mock(JobSubmissionRequest.class)
             );
 
@@ -400,13 +448,10 @@ class AgentJobServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.empty());
 
-            // saveAndFlush throws constraint violation (concurrent duplicate won the race)
             when(agentJobRepository.saveAndFlush(any())).thenThrow(
                 new DataIntegrityViolationException("uk_agent_job_idempotency")
             );
 
-            // submitForConfig catches DataIntegrityViolationException and returns null,
-            // which results in Optional.empty() from submit()
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
@@ -418,8 +463,6 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipSubmissionWhenCooldownActive() {
-            // Default workspace inherits the property cooldownMinutes=15, so the cooldown branch runs. A
-            // recent job for the same (PR, phase)/config → submission is skipped (no new job persisted).
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -445,7 +488,6 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldCreateJobWhenCooldownElapsed() {
-            // Cooldown lookup returns empty (no recent job within the window) → the job is created.
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -566,8 +608,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         @Test
         @SuppressWarnings("unchecked")
         void submitPreparedNamesTheUnboundAndBudgetCausesWhenNothingWasSubmitted() {
-            // submitPrepared is invoked by the controller AFTER the prep transaction commits, so submit() runs
-            // outside any outer transaction. With no enabled config it renders the no-job message.
             lenient()
                 .when(transactionTemplate.execute(any()))
                 .thenAnswer(inv -> {
@@ -576,7 +616,7 @@ class AgentJobServiceTest extends BaseUnitTest {
                 });
             when(
                 agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)
-            ).thenReturn(Optional.empty()); // unbound → no job
+            ).thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             String result = service.submitPrepared(

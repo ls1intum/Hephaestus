@@ -2,17 +2,14 @@ package de.tum.cit.aet.hephaestus.practices.dto;
 
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Request DTO for updating an existing practice definition.
- *
- * <p>Uses PATCH semantics: only non-null fields are applied.
- */
-@Schema(description = "Request to update an existing practice definition (PATCH — only non-null fields applied)")
+@Schema(description = "Request to update a practice; omitted fields remain unchanged")
 public record UpdatePracticeRequestDTO(
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
     @Pattern(regexp = ".*\\S.*", message = "Name must not be blank")
@@ -20,9 +17,9 @@ public record UpdatePracticeRequestDTO(
     @Nullable
     String name,
 
-    @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
+    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
     @ValidTriggerEvents
-    @Schema(description = "Domain events that trigger detection")
+    @Schema(description = "Domain events that trigger detection; empty for scheduled conversation reviews")
     @Nullable
     List<String> triggerEvents,
 
@@ -49,5 +46,14 @@ public record UpdatePracticeRequestDTO(
     @Pattern(regexp = ".*\\S.*", message = "What-good-looks-like must not be blank")
     @Schema(description = "Developer-facing exemplar (learner layer); a concrete instance, not the rubric")
     @Nullable
-    String whatGoodLooksLike
+    String whatGoodLooksLike,
+
+    @Valid
+    @Schema(description = "Catalog placement to apply with the definition update; omit to leave unchanged")
+    @Nullable
+    BindPracticeAreaRequestDTO area,
+
+    @Schema(description = "Optional fields to clear before applying supplied values")
+    @Nullable
+    Set<ClearablePracticeField> clear
 ) {}

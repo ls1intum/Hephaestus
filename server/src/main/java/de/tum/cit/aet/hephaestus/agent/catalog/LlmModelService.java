@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.LlmModelAudit;
+import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -14,7 +15,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -327,14 +327,6 @@ public class LlmModelService {
     }
 
     private static boolean isUpstreamIdConflict(DataIntegrityViolationException e) {
-        Throwable cur = e;
-        while (cur != null) {
-            if (cur instanceof ConstraintViolationException cve) {
-                String name = cve.getConstraintName();
-                return name != null && name.equalsIgnoreCase("ux_llm_model_connection_upstream");
-            }
-            cur = cur.getCause();
-        }
-        return false;
+        return DataIntegrityViolationConstraints.hasName(e, "ux_llm_model_connection_upstream");
     }
 }

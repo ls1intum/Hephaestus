@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -15,15 +17,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Repository for the immutable {@link FeedbackObservation} M:N join binding a {@link Feedback} unit to the
- * {@link de.tum.cit.aet.hephaestus.practices.model.Observation}s it was composed from.
- *
- * <p>Written via a native {@code ON CONFLICT DO NOTHING} upsert — race-safe on a recorder retry.
- *
- * <p>Workspace-agnostic: the join row carries no tenant column — it is scoped through its parent
- * {@link Feedback} (which holds {@code workspace_id}), so callers tenant-scope at the {@code Feedback} level.
- */
 @Repository
 @WorkspaceAgnostic("FeedbackObservation is a join row scoped through its parent Feedback's workspace_id, not its own")
 public interface FeedbackObservationRepository extends JpaRepository<FeedbackObservation, FeedbackObservation.Id> {
@@ -59,39 +52,28 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     )
     List<UUID> findObservationIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
 
-    /**
-     * The composed advice body bound to each of the given observations — the advice source for the private
-     * read surfaces. Per ADR 0021 the immutable {@code Observation} carries NO advice; advice lives on the
-     * {@code Feedback} {@code body} column read here.
-     *
-     * <p>Returns {@code DELIVERED} AND {@code FAILED} bodies: a failed SCM post must not blank the
-     * developer-facing reflection surfaces. PREPARED/SUPPRESSED units carry no body and drop out on the
-     * null-body filter. An observation can bind several such units (re-deliveries); callers keep the most
-     * recent by {@code feedbackCreatedAt}.
-     */
+    /** Private reflection uses the newest available body, including {@code FAILED}; other states are ineligible. */
     @Query(
-        """
-        SELECT ff.observation.id AS observationId,
-               ff.feedback.body AS body,
-               ff.feedback.createdAt AS feedbackCreatedAt
-        FROM FeedbackObservation ff
-        WHERE ff.observation.id IN :observationIds
-          AND ff.feedback.deliveryState IN (
-                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED,
-                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.FAILED
-              )
-          AND ff.feedback.body IS NOT NULL
-        """
+        value = """
+        SELECT DISTINCT ON (fo.observation_id)
+               fo.observation_id AS observationId,
+               f.body AS body
+        FROM feedback_observation fo
+        JOIN feedback f ON f.id = fo.feedback_id
+        WHERE fo.observation_id IN (:observationIds)
+          AND f.delivery_state IN ('DELIVERED', 'FAILED')
+          AND f.body IS NOT NULL
+        ORDER BY fo.observation_id, f.created_at DESC, f.id DESC
+        """,
+        nativeQuery = true
     )
-    List<ObservationAdviceBody> findAdviceBodiesByObservationIds(
+    List<ObservationAdviceBody> findLatestAdviceBodiesByObservationIds(
         @Param("observationIds") Collection<UUID> observationIds
     );
 
-    /** Projection: an observation id paired with its composed advice body and that feedback's creation time. */
     interface ObservationAdviceBody {
         UUID getObservationId();
         String getBody();
-        Instant getFeedbackCreatedAt();
     }
 
     // --- conversational feedback delivery loop ---
@@ -153,6 +135,73 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         @Param("recipientUserId") Long recipientUserId,
         Pageable pageable
     );
+
+    @Query(
+        """
+        SELECT fo.observation.id AS observationId, fo.role AS role, fo.ordinal AS ordinal,
+               p.slug AS practiceSlug, p.name AS practiceName, o.title AS title,
+               pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
+               o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
+               o.confidence AS confidence, o.observedAt AS observedAt
+        FROM FeedbackObservation fo
+        JOIN fo.observation o
+        JOIN o.practice p
+        LEFT JOIN p.area pa
+        WHERE fo.feedback.id = :feedbackId
+          AND fo.feedback.workspaceId = :workspaceId
+          AND p.workspace.id = :workspaceId
+        ORDER BY fo.ordinal ASC
+        """
+    )
+    List<BoundObservation> findBoundObservations(
+        @Param("workspaceId") Long workspaceId,
+        @Param("feedbackId") UUID feedbackId
+    );
+
+    @Query(
+        """
+        SELECT fo.feedback.id AS feedbackId, fo.role AS role,
+               fo.feedback.agentJobId AS agentJobId, fo.feedback.channel AS channel,
+               fo.feedback.deliveryState AS deliveryState, fo.feedback.suppressionReason AS suppressionReason,
+               fo.feedback.createdAt AS createdAt, fo.feedback.deliveredAt AS deliveredAt
+        FROM FeedbackObservation fo
+        WHERE fo.observation.id = :observationId AND fo.feedback.workspaceId = :workspaceId
+        ORDER BY fo.feedback.createdAt DESC, fo.feedback.id DESC
+        """
+    )
+    List<BoundFeedbackUnit> findBoundFeedbackUnits(
+        @Param("workspaceId") Long workspaceId,
+        @Param("observationId") UUID observationId
+    );
+
+    interface BoundObservation {
+        UUID getObservationId();
+        EvidenceRole getRole();
+        Integer getOrdinal();
+        String getPracticeSlug();
+        String getPracticeName();
+        String getAreaSlug();
+        String getAreaName();
+        String getAreaIcon();
+        String getAreaColor();
+        String getTitle();
+        Presence getPresence();
+        Assessment getAssessment();
+        Severity getSeverity();
+        Float getConfidence();
+        Instant getObservedAt();
+    }
+
+    interface BoundFeedbackUnit {
+        UUID getFeedbackId();
+        EvidenceRole getRole();
+        UUID getAgentJobId();
+        FeedbackChannel getChannel();
+        FeedbackDeliveryState getDeliveryState();
+        FeedbackSuppressionReason getSuppressionReason();
+        Instant getCreatedAt();
+        Instant getDeliveredAt();
+    }
 
     /** Projection: facts + practice for one PREPARED conversational unit (no body - composed at delivery). */
     interface PreparedConversationFact {

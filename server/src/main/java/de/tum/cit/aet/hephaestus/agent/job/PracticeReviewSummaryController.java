@@ -1,0 +1,59 @@
+package de.tum.cit.aet.hephaestus.agent.job;
+
+import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PagedModel;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@WorkspaceScopedController
+@RequestMapping("/practices/reviews")
+@Tag(name = "Practice reviews")
+@RequiredArgsConstructor
+@Validated
+@RequireAtLeastWorkspaceAdmin
+public class PracticeReviewSummaryController {
+
+    private final ReviewRunSummaryQueryService queryService;
+
+    @GetMapping
+    @Operation(
+        summary = "List practice reviews with finding and feedback outcomes",
+        description = "Results are ordered newest first.",
+        operationId = "listPracticeReviews"
+    )
+    @ApiResponse(responseCode = "200", description = "Paginated review summaries returned")
+    @ApiResponse(
+        responseCode = "400",
+        description = "Invalid filter or pagination",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
+    )
+    public ResponseEntity<PagedModel<ReviewRunSummaryDTO>> listReviews(
+        WorkspaceContext workspaceContext,
+        @RequestParam(required = false) AgentJobStatus status,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
+    ) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+        return ResponseEntity.ok(new PagedModel<>(queryService.list(workspaceContext.id(), status, pageable)));
+    }
+}

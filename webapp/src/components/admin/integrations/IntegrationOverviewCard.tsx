@@ -4,7 +4,7 @@ import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActiveJobProgress } from "./ActiveJobProgress";
@@ -108,14 +108,14 @@ export function IntegrationOverviewCard({
 								Source control is selected when the workspace is created.
 							</p>
 						) : (
-							<Button
-								size="sm"
-								nativeButton={false}
-								render={<Link to={detailTo} params={{ workspaceSlug }} />}
+							<Link
+								to={detailTo}
+								params={{ workspaceSlug }}
+								className={buttonVariants({ size: "sm" })}
 							>
 								Connect
 								<ArrowRightIcon className="size-3.5" />
-							</Button>
+							</Link>
 						)}
 					</div>
 				) : !isConnectionActive ? (
@@ -182,15 +182,14 @@ export function IntegrationOverviewCard({
 						triggeringType={isTriggering ? "RECONCILIATION" : null}
 						activeJob={status?.activeJob}
 					/>
-					<Button
-						size="sm"
-						variant="ghost"
-						nativeButton={false}
-						render={<Link to={detailTo} params={{ workspaceSlug }} />}
+					<Link
+						to={detailTo}
+						params={{ workspaceSlug }}
+						className={buttonVariants({ size: "sm", variant: "ghost" })}
 					>
 						View details
 						<ArrowRightIcon className="size-3.5" />
-					</Button>
+					</Link>
 				</CardFooter>
 			)}
 		</Card>

@@ -7,31 +7,28 @@ import { adminExportAuthEvents } from "@/api/sdk.gen";
 import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
-import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
-import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
-import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
 	type AuditSearch,
-	dayEndIso,
-	dayStartIso,
+	dayAfterInstant,
+	dayStartInstant,
 	fromDateRange,
-	narrowToEnum,
-	nonEmpty,
 	toDateRange,
 } from "@/components/admin/audit-shared/audit-search";
-import { dedupeById } from "@/components/admin/audit-shared/dedupe-by-id";
 import { nameForRef } from "@/components/admin/audit-shared/name-for-ref";
-import { springPageParams } from "@/components/admin/audit-shared/spring-page";
-import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
+import { DateRangeFacet } from "@/components/common/DateRangeFacet";
+import { FacetMultiSelect, toFacetOptions } from "@/components/common/FacetMultiSelect";
+import { FilterToolbar } from "@/components/common/FilterToolbar";
+import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
+import { ResultCount } from "@/components/common/ResultCount";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { springPageParams } from "@/integrations/tanstack-query/spring-page";
+import { dedupeById } from "@/lib/dedupe-by-id";
+import { narrowToEnum, nonEmpty } from "@/lib/search-params";
 
 const PAGE_SIZE = 50;
 
-const EVENT_TYPE_OPTIONS = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
-	value,
-	label,
-}));
+const EVENT_TYPE_OPTIONS = toFacetOptions(EVENT_TYPE_LABELS);
 
 const OUTCOME_OPTIONS = [
 	{ value: "SUCCESS", label: "Success" },
@@ -55,14 +52,13 @@ export function AuthAuditPanel({
 	const [exporting, setExporting] = useState(false);
 
 	const dateRange = toDateRange(search);
-	// One filter shape for the list and the export, so what you see is what you download.
 	const filters = {
 		eventType: narrowToEnum(search.eventType, EVENT_TYPES),
 		result: narrowToEnum(search.outcome, OUTCOMES),
 		accountId: search.accountId,
 		actingAccountId: search.actorId,
-		from: dateRange?.from ? dayStartIso(dateRange.from) : undefined,
-		to: dateRange?.to ? dayEndIso(dateRange.to) : undefined,
+		from: dateRange?.from ? dayStartInstant(dateRange.from) : undefined,
+		to: dateRange?.to ? dayAfterInstant(dateRange.to) : undefined,
 	} as const;
 
 	const listQuery = useInfiniteQuery({
@@ -74,9 +70,7 @@ export function AuthAuditPanel({
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
-	// From the narrowed filter, not raw search: unrecognised enum values filter nothing, so they must
-	// not count as an active filter.
-	const hasFilter = Boolean(
+	const hasAppliedFilter = Boolean(
 		filters.eventType ||
 			filters.result ||
 			filters.accountId !== undefined ||
@@ -119,8 +113,8 @@ export function AuthAuditPanel({
 
 	return (
 		<div className="space-y-4">
-			<AuditToolbar
-				hasFilter={hasFilter}
+			<FilterToolbar
+				hasFilter={hasAppliedFilter}
 				onReset={reset}
 				actions={
 					<Button
@@ -147,12 +141,12 @@ export function AuthAuditPanel({
 					selected={search.outcome ?? []}
 					onChange={(values) => onSearchChange({ outcome: nonEmpty(values) })}
 				/>
-				<AuditDateFacet
+				<DateRangeFacet
 					value={dateRange}
 					onChange={(range) => onSearchChange(fromDateRange(range))}
 				/>
 				{search.accountId !== undefined && (
-					<AuditRefFilterPill
+					<ReferenceFilterPill
 						label="Account"
 						id={search.accountId}
 						name={nameForRef(events, search.accountId)}
@@ -160,34 +154,22 @@ export function AuthAuditPanel({
 					/>
 				)}
 				{search.actorId !== undefined && (
-					<AuditRefFilterPill
+					<ReferenceFilterPill
 						label="Impersonated by"
 						id={search.actorId}
 						name={nameForRef(events, search.actorId)}
 						onClear={() => onSearchChange({ actorId: undefined })}
 					/>
 				)}
-			</AuditToolbar>
+			</FilterToolbar>
 
-			{/* A persistent live region announces the count; the visible line is conditional, because an
-			    empty <p> still collects the stack's margins and leaves a gap under the toolbar. */}
-			<span role="status" aria-live="polite" className="sr-only">
-				{total === undefined
-					? ""
-					: `${total.toLocaleString()} ${total === 1 ? "event" : "events"}${hasFilter ? " match your filters" : ""}.`}
-			</span>
-			{total !== undefined && (
-				<p className="text-sm text-muted-foreground" aria-hidden>
-					{total.toLocaleString()} {total === 1 ? "event" : "events"}
-					{hasFilter ? " match your filters" : ""}.
-				</p>
-			)}
+			<ResultCount total={total} noun={["event", "events"]} hasFilter={hasAppliedFilter} />
 
 			<AdminAuditTable
 				events={events}
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
-				hasFilter={hasFilter}
+				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
 				hasNextPage={Boolean(listQuery.hasNextPage)}
 				isFetchingNextPage={listQuery.isFetchingNextPage}

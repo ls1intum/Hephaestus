@@ -10,10 +10,6 @@ const Combobox = ComboboxPrimitive.Root;
 const ComboboxCollection = ComboboxPrimitive.Collection;
 const ComboboxPortal = ComboboxPrimitive.Portal;
 
-/**
- * `Intl.Collator`-backed matcher for the root's `filter` prop, so accented and cased text match the
- * way the reader expects rather than the way `toLowerCase()` does.
- */
 const useComboboxFilter = ComboboxPrimitive.useFilter;
 
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
@@ -30,10 +26,6 @@ function ComboboxIcon({ className, ...props }: ComboboxPrimitive.Icon.Props) {
 	);
 }
 
-/**
- * The button that opens the popup. Mirrors `SelectTrigger` so a combobox and a select sitting in the
- * same form are indistinguishable until opened.
- */
 function ComboboxTrigger({
 	className,
 	size = "default",
@@ -57,7 +49,6 @@ function ComboboxTrigger({
 	);
 }
 
-/** Portalled, anchored popup. Mirrors `SelectContent`. */
 function ComboboxContent({
 	className,
 	children,
@@ -92,7 +83,6 @@ function ComboboxContent({
 	);
 }
 
-/** The bare text input. Use `ComboboxSearchInput` for the magnifier-prefixed filter field. */
 function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
 	return (
 		<ComboboxPrimitive.Input
@@ -106,10 +96,6 @@ function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
 	);
 }
 
-/**
- * The filter field: the same input wrapped in an `InputGroup` with a magnifier, for use inside a
- * popup or dialog where the input's only job is to narrow the list.
- */
 function ComboboxSearchInput({
 	className,
 	containerClassName,
@@ -140,7 +126,6 @@ function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
 	);
 }
 
-/** Rendered only when the filtered list is empty. Requires `items` on the root. */
 function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
 	return (
 		<ComboboxPrimitive.Empty
@@ -151,7 +136,6 @@ function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
 	);
 }
 
-/** A polite live region for out-of-band status (e.g. "Loading…"). Keep it mounted. */
 function ComboboxStatus({ className, ...props }: ComboboxPrimitive.Status.Props) {
 	return (
 		<ComboboxPrimitive.Status
@@ -182,10 +166,6 @@ function ComboboxLabel({ className, ...props }: ComboboxPrimitive.GroupLabel.Pro
 	);
 }
 
-/**
- * An option. Base UI drives the roving highlight through `data-highlighted`, which it omits entirely
- * when the item is not highlighted — so the presence-form variant below marks exactly one item.
- */
 function ComboboxItem({ className, children, ...props }: ComboboxPrimitive.Item.Props) {
 	return (
 		<ComboboxPrimitive.Item
@@ -201,7 +181,6 @@ function ComboboxItem({ className, children, ...props }: ComboboxPrimitive.Item.
 	);
 }
 
-/** The tick shown on the selected item. Renders nothing unless the item is selected. */
 function ComboboxItemIndicator({ className, ...props }: ComboboxPrimitive.ItemIndicator.Props) {
 	return (
 		<ComboboxPrimitive.ItemIndicator

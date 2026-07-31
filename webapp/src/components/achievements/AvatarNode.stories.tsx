@@ -54,6 +54,13 @@ export const HighLevel: Story = {
 	},
 };
 
+export const DiamondLeague: Story = {
+	args: {
+		...defaultArgs,
+		data: { ...defaultArgs.data, leaguePoints: 1800 },
+	},
+};
+
 export const FallbackAvatar: Story = {
 	args: {
 		...defaultArgs,

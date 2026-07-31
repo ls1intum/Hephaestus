@@ -18,7 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Bounds {@code agent_job} growth in two passes: TERMINAL rows older than
  * {@link AgentProperties#payloadRetention} keep everything but their bulky {@code container_logs} /
- * {@code output}, and rows older than {@link AgentProperties#rowRetention} go entirely.
+ * {@code output}, and unreferenced rows older than {@link AgentProperties#rowRetention} go entirely.
  *
  * <p>Both are batched rather than issued as one unbounded statement, so no single transaction holds
  * locks or generates WAL/dead-tuple pressure long enough to hurt the queue sharing this table.
@@ -33,7 +33,6 @@ public class AgentJobRetentionService {
 
     private static final int BATCH_SIZE = 500;
 
-    /** Wall-clock budget per pass; whatever a first-enabled backlog leaves behind is worked off next run. */
     private static final Duration MAX_PASS_DURATION = Duration.ofMinutes(5);
 
     private final AgentJobRepository jobRepository;
@@ -109,7 +108,7 @@ public class AgentJobRetentionService {
         int batchDeleted;
         do {
             Integer result = transactionTemplate.execute(status ->
-                jobRepository.deleteTerminalRowsOlderThan(cutoff, BATCH_SIZE)
+                jobRepository.deleteUnreferencedTerminalRowsOlderThan(cutoff, BATCH_SIZE)
             );
             batchDeleted = result != null ? result : 0;
             total += batchDeleted;

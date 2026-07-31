@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { server } from "@/mocks/server";
-import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 15_000 });
@@ -42,8 +42,8 @@ function mockUsageRoute(onPutBudget: () => Promise<Response> | Response = reject
 async function renderUsageRoute(onPutBudget?: () => Promise<Response> | Response) {
 	mockUsageRoute(onPutBudget);
 	renderRouteAt("/w/acme/admin/usage");
-	await screen.findByRole("heading", { name: "AI usage" }, TRANSFORM_WAIT);
-	return screen.findByRole("button", { name: "Change cap" }, TRANSFORM_WAIT);
+	await screen.findByRole("heading", { name: "AI usage" }, ROUTE_RENDER_WAIT);
+	return screen.findByRole("button", { name: "Change cap" }, ROUTE_RENDER_WAIT);
 }
 
 const capField = () => screen.getByLabelText(/Monthly cap/i);
@@ -87,7 +87,7 @@ describe("workspace AI usage route", () => {
 		releaseCapPut?.();
 
 		await screen.findByText("Couldn't save the cap");
-		expect(screen.getByText(REJECTION)).toBeTruthy();
+		screen.getByText(REJECTION);
 	});
 
 	it("reports a rejection inline, and only inline, while the dialog is open", async () => {

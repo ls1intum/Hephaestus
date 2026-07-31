@@ -49,6 +49,8 @@
         <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
         <openapi.server.port>38090</openapi.server.port>
 
+        <openapi.jmx.port>9001</openapi.jmx.port>
+
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
@@ -1073,6 +1075,7 @@
                         <configuration>
                             <!-- Use 'specs' profile for OpenAPI generation - disables WorkspaceStartupListener -->
                             <profiles>specs</profiles>
+                            <jmxPort>${openapi.jmx.port}</jmxPort>
                             <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
                                 --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false
                                 -Dserver.port=${openapi.server.port}
@@ -1085,6 +1088,9 @@
                         <goals>
                             <goal>stop</goal>
                         </goals>
+                        <configuration>
+                            <jmxPort>${openapi.jmx.port}</jmxPort>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -1104,6 +1110,7 @@
                     <apiDocsUrl>http://localhost:${openapi.server.port}/v3/api-docs.yaml</apiDocsUrl>
                     <outputFileName>openapi.yaml</outputFileName>
                     <outputDir>.</outputDir>
+                    <failOnError>true</failOnError>
                 </configuration>
             </plugin>
             <!-- PMD for static code analysis - detects unused fields, variables, and other code quality issues -->

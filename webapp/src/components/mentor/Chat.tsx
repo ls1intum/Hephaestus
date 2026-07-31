@@ -11,45 +11,24 @@ import { MultimodalInput } from "./MultimodalInput";
 import type { PartRendererMap } from "./renderers/types";
 
 export interface ChatProps {
-	/** Unique identifier for the chat session */
-	id: string;
-	/** Array of chat messages to display */
 	messages: ChatMessage[];
-	/** Array of votes for messages */
 	votes?: ChatMessageVote[];
-	/** Current chat status */
 	status: UseChatHelpers<ChatMessage>["status"];
-	/** Whether the interface is in readonly mode */
 	readonly?: boolean;
-	/** Whether the scroll container is at the bottom */
 	isAtBottom?: boolean;
-	/** Function to scroll to bottom of the chat */
 	scrollToBottom?: () => void;
-	/** Current input attachments */
 	attachments: Attachment[];
-	/** Handler for message submission */
 	onMessageSubmit: (data: { text: string; attachments: Attachment[] }) => void;
-	/** Handler for stopping current operation */
 	onStop: () => void;
-	/** Handler for file uploads */
 	onFileUpload: (files: File[]) => Promise<Attachment[]>;
-	/** Handler for attachment changes */
 	onAttachmentsChange: (attachments: Attachment[]) => void;
-	/** Handler for message editing */
 	onMessageEdit?: (messageId: string, content: string) => void;
-	/** Handler for copying message content */
 	onCopy?: (content: string) => void;
-	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Handler for retrying after an error */
 	onReload?: () => void;
-	/** Placeholder text for input */
 	inputPlaceholder?: string;
-	/** Whether to disable attachment functionality */
 	disableAttachments?: boolean;
-	/** Optional CSS class name */
 	className?: string;
-	/** Injected renderers for tool parts (keep presentational) */
 	partRenderers?: PartRendererMap;
 }
 
@@ -74,87 +53,78 @@ export function Chat({
 	className,
 	partRenderers,
 }: ChatProps) {
-	// Internal scroll management for the chat container
 	const { containerRef, endRef, isAtBottom, scrollToBottom } = useScrollToBottom();
 
-	// Use internal scroll management if parent doesn't provide it
 	const actualIsAtBottom = parentScrollToBottom ? parentIsAtBottom : isAtBottom;
 	const actualScrollToBottom = parentScrollToBottom || scrollToBottom;
 
 	return (
-		<>
-			<div className={cn("relative h-full", className)}>
-				<div className="flex flex-col h-full">
-					<Messages
-						messages={messages}
-						votes={votes}
-						status={status}
-						readonly={readonly}
-						showThinking={status === "submitted" || status === "streaming"}
-						showGreeting={messages.length === 0}
-						variant="default"
-						containerRef={containerRef}
-						endRef={endRef}
-						onMessageEdit={onMessageEdit}
-						onCopy={onCopy}
-						onVote={onVote}
-						partRenderers={partRenderers}
-					/>
+		<div className={cn("relative h-full", className)}>
+			<div className="flex flex-col h-full">
+				<Messages
+					messages={messages}
+					votes={votes}
+					status={status}
+					readonly={readonly}
+					showThinking={status === "submitted" || status === "streaming"}
+					showGreeting={messages.length === 0}
+					variant="default"
+					containerRef={containerRef}
+					endRef={endRef}
+					onMessageEdit={onMessageEdit}
+					onCopy={onCopy}
+					onVote={onVote}
+					partRenderers={partRenderers}
+				/>
 
-					{/* Absolutely anchored input at the bottom of SidebarInset content area */}
-					<div className="flex flex-col gap-2 items-center w-full px-4 pb-2 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
-						{/* Error state display */}
-						{status === "error" && (
-							<div className="w-full max-w-3xl mb-2">
-								<Alert variant="destructive">
-									<AlertCircle className="size-4" />
-									<AlertTitle>Something went wrong</AlertTitle>
-									<AlertDescription className="flex items-center justify-between gap-4">
-										<span>An error occurred while generating the response. Please try again.</span>
-										{onReload && (
-											<Button variant="outline" size="sm" onClick={onReload} className="shrink-0">
-												<RotateCcw className="size-4" />
-												Try again
-											</Button>
-										)}
-									</AlertDescription>
-								</Alert>
-							</div>
-						)}
-						{!readonly && (
-							<div className="w-full max-w-3xl">
-								<MultimodalInput
-									status={
-										status === "submitted" || status === "streaming"
-											? "submitted"
-											: status === "error"
-												? "error"
-												: "ready"
-									}
-									onStop={onStop}
-									attachments={attachments}
-									onAttachmentsChange={onAttachmentsChange}
-									onFileUpload={onFileUpload}
-									onSubmit={onMessageSubmit}
-									placeholder={inputPlaceholder}
-									readonly={readonly}
-									disableAttachments={disableAttachments}
-									isAtBottom={actualIsAtBottom}
-									scrollToBottom={actualScrollToBottom}
-									isCurrentVersion={true}
-									className="bg-background dark:bg-muted"
-								/>
-							</div>
-						)}
-						{/* AI Disclaimer */}
-						<p className="text-center text-balance text-xs text-muted-foreground px-4">
-							Heph can make mistakes. Consider verifying important information.
-						</p>
-					</div>
+				<div className="flex flex-col gap-2 items-center w-full px-4 pb-2 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
+					{status === "error" && (
+						<div className="w-full max-w-3xl mb-2">
+							<Alert variant="destructive">
+								<AlertCircle className="size-4" />
+								<AlertTitle>Something went wrong</AlertTitle>
+								<AlertDescription className="flex items-center justify-between gap-4">
+									<span>An error occurred while generating the response. Please try again.</span>
+									{onReload && (
+										<Button variant="outline" size="sm" onClick={onReload} className="shrink-0">
+											<RotateCcw className="size-4" />
+											Try again
+										</Button>
+									)}
+								</AlertDescription>
+							</Alert>
+						</div>
+					)}
+					{!readonly && (
+						<div className="w-full max-w-3xl">
+							<MultimodalInput
+								status={
+									status === "submitted" || status === "streaming"
+										? "submitted"
+										: status === "error"
+											? "error"
+											: "ready"
+								}
+								onStop={onStop}
+								attachments={attachments}
+								onAttachmentsChange={onAttachmentsChange}
+								onFileUpload={onFileUpload}
+								onSubmit={onMessageSubmit}
+								placeholder={inputPlaceholder}
+								readonly={readonly}
+								disableAttachments={disableAttachments}
+								isAtBottom={actualIsAtBottom}
+								scrollToBottom={actualScrollToBottom}
+								isCurrentVersion={true}
+								className="bg-background dark:bg-muted"
+							/>
+						</div>
+					)}
+					<p className="text-center text-balance text-xs text-muted-foreground px-4">
+						Heph can make mistakes. Consider verifying important information.
+					</p>
 				</div>
 			</div>
-
-			{/* Overlay is injected by route containers, not here */}
-		</>
+		</div>
 	);
 }

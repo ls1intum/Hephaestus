@@ -95,6 +95,9 @@ public class IssueReviewHandler implements JobTypeHandler {
         metadata.put("title", r.title());
         metadata.put("body", r.body());
         metadata.put("state", r.state());
+        if (r.url() != null) {
+            metadata.put("issue_url", r.url());
+        }
         // Lifecycle event that triggered this job; the injector materialises only the matching practices
         // (e.g. IssueClosed runs the retrospective set). Null = full focus set (gate-bypass dev path).
         if (r.triggerEvent() != null) {

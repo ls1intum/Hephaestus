@@ -30,7 +30,7 @@ function StageNumber({ number }: StageNumberProps) {
 
 	return (
 		<motion.span
-			className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-white"
+			className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-mentor-foreground"
 			animate={shouldReduceMotion ? undefined : { scale: [1, 1.08, 1] }}
 			transition={{
 				duration: 4.8,
@@ -498,7 +498,7 @@ export function LandingFeaturesSection() {
 				<div className="absolute -right-32 bottom-8 size-80 rounded-full bg-mentor/5 blur-3xl" />
 			</div>
 
-			<div className="container relative mx-auto max-w-7xl px-4 md:px-6">
+			<div className="relative mx-auto w-full max-w-7xl px-4 md:px-6">
 				<motion.div
 					initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
 					whileInView={{ opacity: 1, y: 0 }}

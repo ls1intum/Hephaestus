@@ -24,22 +24,18 @@ export function AdminSettingsPage({
 	workspaceSlug,
 }: AdminSettingsPageProps) {
 	return (
-		<div className="container mx-auto py-6 max-w-4xl">
-			<h1 className="text-3xl font-bold mb-8">Workspace settings</h1>
+		<div className="max-w-4xl space-y-10">
+			<AdminFeaturesSettings
+				values={features}
+				isSaving={isSavingFeatures}
+				onToggle={onToggleFeature}
+			/>
 
-			<div className="space-y-10">
-				<AdminFeaturesSettings
-					values={features}
-					isSaving={isSavingFeatures}
-					onToggle={onToggleFeature}
-				/>
+			{features.leaguesEnabled && (
+				<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
+			)}
 
-				{features.leaguesEnabled && (
-					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
-				)}
-
-				{workspaceSlug != null && <AdminDangerZoneSettings workspaceSlug={workspaceSlug} />}
-			</div>
+			{workspaceSlug != null && <AdminDangerZoneSettings workspaceSlug={workspaceSlug} />}
 		</div>
 	);
 }

@@ -100,12 +100,9 @@ import {
 	Zap,
 } from "lucide-react";
 
-/**
- * Visual identity for a practice area. Colour is a redundant cue only, never the meaning. Pill
- * classes are full literal strings so Tailwind keeps them; free-form hex is not contrast-checked.
- */
 export type AreaVisual = { Icon: LucideIcon; pill: string };
 
+// Tailwind requires complete class names in source to include them in the generated CSS.
 export const PILL: Record<string, string> = {
 	red: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200",
 	orange: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
@@ -235,9 +232,13 @@ export const ICON_COMPONENTS: Record<string, LucideIcon> = {
 
 export const ICON_NAMES = Object.keys(ICON_COMPONENTS);
 
-/** Word-split so a search for "git" matches "GitBranch". */
+export function iconLabel(name: string): string {
+	const words = name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function iconSearchText(name: string): string {
-	return name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+	return iconLabel(name).toLowerCase();
 }
 
 function resolveIcon(name?: string | null): LucideIcon | undefined {
@@ -268,7 +269,6 @@ export const SEEDED_AREA_SLUGS = Object.keys(AREA_SEEDS);
 
 const FALLBACK: Seed = { icon: "Folder", color: "slate" };
 
-/** The icon/colour names for an area before any admin override. */
 export function areaSeed(slug: string, name = ""): { icon: string; color: string } {
 	return seedFor(slug, name);
 }
@@ -287,8 +287,6 @@ function seedFor(slug: string, name: string): Seed {
 	return FALLBACK;
 }
 
-/** An admin-set `icon`/`color` wins, else the seed for the slug, else a keyword fallback. Unknown
- * names degrade to the seed so the chip always renders. */
 export function getAreaVisual(
 	slug: string,
 	name = "",

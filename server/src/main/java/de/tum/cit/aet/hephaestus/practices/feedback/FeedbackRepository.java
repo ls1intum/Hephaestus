@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -14,13 +16,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Repository for immutable {@link Feedback} units with append-only semantics.
- *
- * <p>Workspace-agnostic: {@code Feedback} carries a raw {@code workspace_id} scalar rather than a
- * {@code @ManyToOne} workspace association (cross-module FK), so the standard tenancy filter does not
- * apply here — callers scope by {@code workspaceId} explicitly.
- */
 @Repository
 @WorkspaceAgnostic("Feedback is scoped by a raw workspace_id scalar (cross-module FK), not a Workspace association")
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
@@ -29,6 +24,35 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     /** Workspace-scoped lookup of a single feedback unit (reaction authorization + tenancy isolation). */
     Optional<Feedback> findByIdAndWorkspaceId(UUID id, Long workspaceId);
+
+    @Query(
+        value = """
+        SELECT f.agent_job_id AS "jobId",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED') AS "prepared",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'DELIVERED') AS "delivered",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED') AS "suppressed",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed"
+        FROM feedback f
+        WHERE f.workspace_id = :workspaceId
+          AND f.agent_job_id IN :jobIds
+        GROUP BY f.agent_job_id
+        """,
+        nativeQuery = true
+    )
+    List<ReviewFeedbackCounts> summarizeReviewFeedback(
+        @Param("workspaceId") Long workspaceId,
+        @Param("jobIds") Collection<UUID> jobIds
+    );
+
+    interface ReviewFeedbackCounts {
+        UUID getJobId();
+        Long getPrepared();
+        Long getDelivered();
+        Long getSuperseded();
+        Long getSuppressed();
+        Long getFailed();
+    }
 
     /**
      * The headline locus of a feedback unit: the {@code recurrence_key} of its earliest {@code PRIMARY}-role
@@ -319,4 +343,76 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         nativeQuery = true
     )
     int expirePreparedConversationBefore(@Param("workspaceId") Long workspaceId, @Param("cutoff") Instant cutoff);
+
+    int BODY_PREVIEW_LENGTH = 320;
+
+    String OPERATOR_PREDICATES = """
+          AND (CAST(:#{#f.deliveryStateNames()} AS text[]) IS NULL OR f.delivery_state = ANY(CAST(:#{#f.deliveryStateNames()} AS text[])))
+          AND (CAST(:#{#f.suppressionReasonNames()} AS text[]) IS NULL OR f.suppression_reason = ANY(CAST(:#{#f.suppressionReasonNames()} AS text[])))
+          AND (CAST(:#{#f.channelNames()} AS text[]) IS NULL OR f.channel = ANY(CAST(:#{#f.channelNames()} AS text[])))
+          AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR f.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
+          AND (CAST(:#{#f.artifactTypeName()} AS text) IS NULL OR f.artifact_type = CAST(:#{#f.artifactTypeName()} AS text))
+          AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR f.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
+          AND (CAST(:#{#f.recipientUserId()} AS bigint) IS NULL OR f.recipient_user_id = CAST(:#{#f.recipientUserId()} AS bigint))
+          AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR f.created_at >= CAST(:#{#f.from()} AS timestamptz))
+          AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR f.created_at < CAST(:#{#f.to()} AS timestamptz))
+        """;
+
+    @Query(
+        value = "SELECT f.id AS \"id\"," +
+            " f.agent_job_id AS \"agentJobId\"," +
+            " f.artifact_type AS \"artifactType\"," +
+            " f.artifact_id AS \"artifactId\"," +
+            " f.recipient_user_id AS \"recipientUserId\"," +
+            " f.about_user_id AS \"aboutUserId\"," +
+            " f.channel AS \"channel\"," +
+            " f.delivery_state AS \"deliveryState\"," +
+            " f.suppression_reason AS \"suppressionReason\"," +
+            " f.replaces_id AS \"replacesId\"," +
+            " f.created_at AS \"createdAt\"," +
+            " f.delivered_at AS \"deliveredAt\"," +
+            " left(f.body, " +
+            BODY_PREVIEW_LENGTH +
+            ") AS \"bodyPreview\"," +
+            " (f.body IS NOT NULL AND length(f.body) > " +
+            BODY_PREVIEW_LENGTH +
+            ") AS \"bodyTruncated\"," +
+            " (SELECT count(*) FROM feedback_observation fo" +
+            " JOIN observation o ON o.id = fo.observation_id" +
+            " JOIN practice p ON p.id = o.practice_id" +
+            " WHERE fo.feedback_id = f.id AND p.workspace_id = f.workspace_id) AS \"observationCount\"" +
+            " FROM feedback f WHERE f.workspace_id = :workspaceId" +
+            OPERATOR_PREDICATES +
+            " ORDER BY f.created_at DESC, f.id DESC",
+        countQuery = "SELECT count(*) FROM feedback f WHERE f.workspace_id = :workspaceId" + OPERATOR_PREDICATES,
+        nativeQuery = true
+    )
+    Page<OperatorFeedbackRow> findForWorkspace(
+        @Param("workspaceId") Long workspaceId,
+        @Param("f") FeedbackQueryFilter filter,
+        Pageable pageable
+    );
+
+    interface OperatorFeedbackRow {
+        UUID getId();
+        UUID getAgentJobId();
+        WorkArtifact getArtifactType();
+        Long getArtifactId();
+        Long getRecipientUserId();
+        Long getAboutUserId();
+        FeedbackChannel getChannel();
+        FeedbackDeliveryState getDeliveryState();
+        FeedbackSuppressionReason getSuppressionReason();
+
+        UUID getReplacesId();
+
+        Instant getCreatedAt();
+        Instant getDeliveredAt();
+
+        String getBodyPreview();
+
+        Boolean getBodyTruncated();
+
+        Long getObservationCount();
+    }
 }

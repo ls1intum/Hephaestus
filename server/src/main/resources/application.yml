@@ -458,8 +458,7 @@ hephaestus:
         # instead of requeued again. Authoritative budget lives on agent_job.retry_count.
         max-retries: ${AGENT_MAX_RETRIES:5}
         heartbeat-interval: 25s
-        # Retention: AgentJobRetentionService. payload-retention strips container_logs/
-        # output to NULL past this age; row-retention deletes the whole terminal row past this age.
+        # Strip heavy job payloads after payload-retention; delete unreferenced terminal jobs after row-retention.
         payload-retention: ${AGENT_PAYLOAD_RETENTION:P14D}
         row-retention: ${AGENT_ROW_RETENTION:P90D}
 

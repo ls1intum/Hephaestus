@@ -21,7 +21,6 @@ import {
 import { AdminRepositoriesSettings } from "@/components/admin/integrations/AdminRepositoriesSettings";
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
-import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import {
 	SCM_CLASS_KEYS,
@@ -29,8 +28,10 @@ import {
 } from "@/components/admin/integrations/SyncResourcesTable";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
@@ -113,8 +114,6 @@ function ScmIntegrationPage() {
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
 		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
-		// Every page is a new query key, so without this a page turn re-enters `pending` and collapses
-		// the table into skeletons. Keep the previous page on screen while the next one loads.
 		placeholderData: (previousData) => previousData,
 	});
 
@@ -150,9 +149,6 @@ function ScmIntegrationPage() {
 		});
 	};
 
-	// Monitoring a repository does not just change the list — it changes what this connection syncs,
-	// and normally enqueues a lifecycle job. Refresh the sync state here rather than hoping the SSE
-	// hint beats the toast.
 	const onRepositorySetChanged = () => {
 		queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
 		invalidateSyncState();
@@ -161,8 +157,6 @@ function ScmIntegrationPage() {
 	const addRepository = useMutation({
 		...addRepositoryToMonitorMutation(),
 		onSuccess: onRepositorySetChanged,
-		// The inline FieldError says "invalid"; the toast says why (403 not an owner, 409 already
-		// monitored).
 		onError: (e) => {
 			toast.error("Failed to add repository", { description: problemDetailOf(e) });
 		},
@@ -199,8 +193,6 @@ function ScmIntegrationPage() {
 
 	const activeJob = status?.activeJob;
 
-	// Sync and Backfill share one mutation, so `isPending` alone cannot say which button was pressed;
-	// the in-flight variables carry that, so no extra state is needed to tell them apart.
 	const pendingTriggerType = triggerSync.isPending ? triggerSync.variables?.body?.type : undefined;
 	const triggeringType =
 		pendingTriggerType === "RECONCILIATION" || pendingTriggerType === "BACKFILL"
@@ -208,8 +200,8 @@ function ScmIntegrationPage() {
 			: null;
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-8 py-6">
-			<IntegrationPageHeader
+		<PageLayout>
+			<PageHeader
 				icon={
 					kind === "GITLAB" ? (
 						<GitlabIcon className="size-6" />
@@ -223,8 +215,6 @@ function ScmIntegrationPage() {
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
 			/>
 
-			{/* A suspended/uninstalled connection still paints a normal-looking header; this shared
-			    notice is what says sync stopped and why. */}
 			{hasConnection && !isConnectionActive && (
 				<ConnectionStateNotice connectionState={entry?.connectionState} displayName={label} />
 			)}
@@ -238,21 +228,15 @@ function ScmIntegrationPage() {
 				triggeringType={triggeringType}
 				actions={
 					isAppInstallationWorkspace && (
-						<Button
-							variant="outline"
-							size="sm"
-							nativeButton={false}
-							render={
-								<a
-									href="https://github.com/settings/installations"
-									target="_blank"
-									rel="noreferrer"
-								/>
-							}
+						<a
+							href="https://github.com/settings/installations"
+							target="_blank"
+							rel="noreferrer"
+							className={buttonVariants({ variant: "outline", size: "sm" })}
 						>
 							Manage installation on GitHub
 							<ExternalLinkIcon className="size-3.5" />
-						</Button>
+						</a>
 					)
 				}
 				isCancelling={cancelJob.isPending}
@@ -284,8 +268,6 @@ function ScmIntegrationPage() {
 				}}
 			/>
 
-			{/* The canonical repository list: every monitored repo with its per-class counts and freshness.
-			    The add/remove management card sits below it, so this stays the one full-height scroller. */}
 			{hasConnection && (
 				<Card>
 					<CardHeader>
@@ -300,8 +282,6 @@ function ScmIntegrationPage() {
 							onRetry={() => refetchResources()}
 							resourceNoun="repository"
 							resourceNounPlural="repositories"
-							// The freshness cadence comes from the server so the client doesn't hard-code
-							// one; without it the ledger can't judge staleness.
 							syncIntervalSeconds={status?.syncIntervalSeconds}
 							expectedClassKeys={SCM_CLASS_KEYS}
 						/>
@@ -340,6 +320,6 @@ function ScmIntegrationPage() {
 					onPageChange={setJobsPage}
 				/>
 			)}
-		</div>
+		</PageLayout>
 	);
 }

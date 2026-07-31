@@ -14,6 +14,7 @@ public record AgentJobDTO(
     @NonNull @Schema(description = "Job ID") UUID id,
     @NonNull @Schema(description = "Job type") AgentJobType jobType,
     @NonNull @Schema(description = "Current job status") AgentJobStatus status,
+    @NonNull @Schema(description = "Work item reviewed by this job") ReviewRunTargetDTO target,
     @Schema(description = "Job metadata (routing/display info)") Object metadata,
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull
@@ -69,6 +70,7 @@ public record AgentJobDTO(
             job.getId(),
             job.getJobType(),
             job.getStatus(),
+            ReviewRunTargetDTO.from(job),
             job.getMetadata(),
             job.getOutput(),
             redactInstanceBaseUrl(snapshot),

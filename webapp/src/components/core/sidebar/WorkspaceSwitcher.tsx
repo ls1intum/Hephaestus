@@ -42,12 +42,9 @@ export function WorkspaceSwitcher({
 
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			// Check if Command (Mac) or Control (Windows/Linux) is pressed
 			if (event.metaKey || event.ctrlKey) {
-				// Check if the key is a number between 1-9
 				const keyNum = Number.parseInt(event.key, 10);
 				if (!Number.isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
-					// Get the workspace at index (keyNum - 1)
 					const workspaceIndex = keyNum - 1;
 					if (workspaceIndex < workspaces.length) {
 						event.preventDefault();
@@ -68,7 +65,7 @@ export function WorkspaceSwitcher({
 		return (
 			<SidebarMenu>
 				<SidebarMenuItem>
-					<SidebarMenuButton size="lg" className="pointer-events-none">
+					<SidebarMenuButton size="lg" disabled aria-label="Loading workspaces">
 						<Skeleton className="aspect-square size-8 rounded-lg" />
 						<div className="grid flex-1 text-left text-sm leading-tight gap-1 group-data-[collapsible=icon]:hidden">
 							<Skeleton className="h-3 w-20" />

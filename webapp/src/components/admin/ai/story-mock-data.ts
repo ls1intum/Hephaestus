@@ -47,10 +47,28 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
  * fixed 2026-05-20 scene, where `availableAt` is a claim time already past.
  */
 const MINUTE_MS = 60_000;
+const pullRequestTarget: AgentJob["target"] = {
+	id: 42,
+	type: "PULL_REQUEST",
+	provider: "GITHUB",
+	number: 1420,
+	repositoryName: "ls1intum/Hephaestus",
+	title: "Make practice review output visible",
+	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
+};
+const issueTarget: AgentJob["target"] = {
+	id: 43,
+	type: "ISSUE",
+	provider: "GITHUB",
+	number: 1420,
+	repositoryName: "ls1intum/Hephaestus",
+	title: "Admin read surface for observations and prepared feedback",
+};
 
 export const mockJobCompleted: AgentJob = {
 	id: "job-completed-1",
 	jobType: "PULL_REQUEST_REVIEW",
+	target: pullRequestTarget,
 	status: "COMPLETED",
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer", llmProvider: "OPENAI" },
@@ -71,6 +89,7 @@ export const mockJobCompleted: AgentJob = {
 export const mockJobRunning: AgentJob = {
 	id: "job-running-1",
 	jobType: "PULL_REQUEST_REVIEW",
+	target: pullRequestTarget,
 	status: "RUNNING",
 	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
@@ -83,6 +102,7 @@ export const mockJobRunning: AgentJob = {
 export const mockJobFailedDelivery: AgentJob = {
 	id: "job-failed-delivery-1",
 	jobType: "PULL_REQUEST_REVIEW",
+	target: pullRequestTarget,
 	status: "COMPLETED",
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
@@ -102,6 +122,7 @@ export const mockJobFailedDelivery: AgentJob = {
 export const mockJobQueued: AgentJob = {
 	id: "job-queued-1",
 	jobType: "PULL_REQUEST_REVIEW",
+	target: pullRequestTarget,
 	status: "QUEUED",
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
@@ -115,6 +136,7 @@ export const mockJobQueued: AgentJob = {
 export const mockJobHeldOnBudget: AgentJob = {
 	id: "job-held-budget-1",
 	jobType: "PULL_REQUEST_REVIEW",
+	target: pullRequestTarget,
 	status: "QUEUED",
 	model: "gpt-5.4-nano",
 	configSnapshot: { name: "Default reviewer" },
@@ -128,6 +150,7 @@ export const mockJobHeldOnBudget: AgentJob = {
 export const mockJobHeldForUnknownReason: AgentJob = {
 	id: "job-held-unknown-1",
 	jobType: "ISSUE_REVIEW",
+	target: issueTarget,
 	status: "QUEUED",
 	model: "gpt-5.4-nano",
 	configSnapshot: { name: "Default reviewer" },
@@ -141,6 +164,7 @@ export const mockJobHeldForUnknownReason: AgentJob = {
 export const mockJobBackingOff: AgentJob = {
 	id: "job-backoff-1",
 	jobType: "PULL_REQUEST_REVIEW",
+	target: pullRequestTarget,
 	status: "QUEUED",
 	model: "openai/gpt-oss-20b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
@@ -153,6 +177,7 @@ export const mockJobBackingOff: AgentJob = {
 export const mockJobTimedOut: AgentJob = {
 	id: "job-timed-out-1",
 	jobType: "PULL_REQUEST_REVIEW",
+	target: pullRequestTarget,
 	status: "TIMED_OUT",
 	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },

@@ -22,6 +22,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -59,6 +61,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private PracticeRepository practiceRepository;
+
+    @Autowired
     private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
@@ -79,7 +84,17 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("submit-test"));
+        workspace = WorkspaceTestFixtures.activeWorkspace("submit-test");
+        workspace.getFeatures().setPracticesEnabled(true);
+        workspace = workspaceRepository.save(workspace);
+
+        Practice practice = new Practice();
+        practice.setWorkspace(workspace);
+        practice.setSlug("submit-test");
+        practice.setName("Submit test");
+        practice.setCriteria("Review the pull request");
+        practice.setTriggerEvents(OBJECT_MAPPER.createArrayNode().add("PullRequestCreated"));
+        practiceRepository.save(practice);
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("submit-test"));
         LlmModel model = llmModelRepository.save(

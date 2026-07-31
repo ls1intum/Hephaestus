@@ -1,25 +1,12 @@
-import { Label } from "@/components/ui/label";
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 
 export interface AiReviewSectionProps {
-	/**
-	 * Whether the user receives practice-feedback comments
-	 */
 	aiReviewEnabled: boolean;
-	/**
-	 * Callback when the AI review setting changes
-	 */
 	onToggleAiReview: (checked: boolean) => void;
-	/**
-	 * Whether the component is in loading state
-	 */
 	isLoading?: boolean;
 }
 
-/**
- * AiReviewSection component for managing AI-generated review comment preferences.
- * Gated by the run_practice_review feature flag (visibility controlled by parent).
- */
 export function AiReviewSection({
 	aiReviewEnabled,
 	onToggleAiReview,
@@ -34,30 +21,27 @@ export function AiReviewSection({
 					Practice feedback
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Choose whether Hephaestus posts AI-generated feedback on your change requests
+					Choose whether Hephaestus can send new practice feedback to you.
 				</p>
 			</div>
 
-			<div className="flex items-start justify-between gap-6 py-4">
-				<div className="space-y-1 flex-1">
-					<Label htmlFor="ai-review-comments" className="text-base font-medium cursor-pointer">
-						Pull request comments
-					</Label>
-					<p className="text-sm text-muted-foreground leading-relaxed">
-						Turn off new comments on your pull requests and merge requests. Reviews still run, and
-						their findings remain available to workspace admins.
-					</p>
-				</div>
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="ai-review-comments">Comments and Slack reminders</FieldLabel>
+					<FieldDescription>
+						When off, Hephaestus won't post practice feedback on pull or merge requests you author
+						or send Slack reminders. Reviews still run, and workspace admins can still see the
+						findings.
+					</FieldDescription>
+				</FieldContent>
 				<Switch
 					id="ai-review-comments"
-					className="mt-1"
 					checked={aiReviewEnabled}
 					onCheckedChange={onToggleAiReview}
 					disabled={pending}
 					aria-busy={pending}
-					aria-label="Toggle practice feedback comments"
 				/>
-			</div>
+			</Field>
 		</section>
 	);
 }

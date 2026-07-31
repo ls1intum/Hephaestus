@@ -9,7 +9,6 @@ const eventTypes = [
 	{ value: "FEATURE_FLAG_CHANGED", label: "Feature flag changed" },
 ];
 
-/** One facet of a filter or a form: the toolbar's dashed chip, or a full-width form field. */
 const meta = {
 	component: FacetMultiSelect,
 	parameters: { layout: "centered" },
@@ -38,7 +37,6 @@ export const TwoSelected: Story = {
 	args: { selected: ["LOGIN_SUCCESS", "ROLE_CHANGED"] },
 };
 
-/** Past two, chips would wrap the toolbar, so the trigger collapses to a count. */
 export const ManySelected: Story = {
 	args: { selected: ["LOGIN_SUCCESS", "LOGIN_FAILURE", "ROLE_CHANGED"] },
 };
@@ -55,12 +53,10 @@ export const FieldVariant: Story = {
 	},
 };
 
-/** The caller names the void; the generic "No matches" would be wrong here. */
 export const NoOptions: Story = {
 	args: { variant: "field", title: "Workspaces", options: [], emptyLabel: "No workspaces yet" },
 };
 
-/** "arztliche" finds "Ärztliche", which a `toLowerCase().includes()` filter never would. */
 export const AccentInsensitiveSearch: Story = {
 	args: {
 		variant: "field",
@@ -73,9 +69,26 @@ export const AccentInsensitiveSearch: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: "Workspaces" }));
-		// By placeholder: Base UI's combobox input is itself `role="combobox"`, not a textbox.
 		await userEvent.type(await screen.findByPlaceholderText("Search…"), "arztliche");
 		await expect(await screen.findByRole("option", { name: /Ärztliche/ })).toBeInTheDocument();
 		await expect(screen.queryByRole("option", { name: /Teaching/ })).toBeNull();
+	},
+};
+
+export const SelectsAnOption: Story = {
+	play: async ({ args, canvasElement }) => {
+		await userEvent.click(within(canvasElement).getByRole("combobox", { name: "Event" }));
+		await userEvent.click(await screen.findByRole("option", { name: "Sign-in succeeded" }));
+		await expect(args.onChange).toHaveBeenCalledWith(["LOGIN_SUCCESS"]);
+	},
+};
+
+export const ClearsTheSelection: Story = {
+	args: { selected: ["LOGIN_SUCCESS"] },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("combobox", { name: /Event:/ }));
+		await userEvent.click(await screen.findByRole("button", { name: "Clear selection" }));
+		await expect(args.onChange).toHaveBeenCalledWith([]);
 	},
 };

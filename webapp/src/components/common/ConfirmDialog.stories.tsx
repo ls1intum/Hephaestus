@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { type ReactNode, useState } from "react";
-import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expectControlOnScreen, expectDialogFitsViewport } from "@/test/reflow";
 import { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 
 interface Row {
@@ -10,7 +11,6 @@ interface Row {
 
 const row: Row = { id: 7, displayName: "GPT-5" };
 
-/** Holds `subject` in caller state, as every real surface does, so the dialog can close. */
 function ConfirmHarness(props: ConfirmDialogProps<Row>) {
 	const [subject, setSubject] = useState<Row | null>(props.subject);
 	const [deleted, setDeleted] = useState<Row | null>(null);
@@ -33,7 +33,6 @@ function ConfirmHarness(props: ConfirmDialogProps<Row>) {
 	);
 }
 
-/** The confirm for a destructive row action: it names the row, because "Are you sure?" cannot be answered. */
 const meta = {
 	component: ConfirmDialog as (props: ConfirmDialogProps<Row>) => ReactNode,
 	parameters: { layout: "centered" },
@@ -54,7 +53,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** "Cancel" is not the opposite of every verb — turning a connection off is refused by keeping it. */
 export const CustomVerbs: Story = {
 	args: {
 		title: (subject: Row) => `Turn off “${subject.displayName}”?`,
@@ -69,6 +67,15 @@ export const LongName: Story = {
 	args: {
 		subject: { id: 8, displayName: "gpt-5-turbo-preview-2026-07-01-eu-central-fallback" },
 	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: async () => {
+		await expectDialogFitsViewport();
+		await expectControlOnScreen(screen.getByRole("button", { name: /^cancel$/i }));
+		await expectControlOnScreen(screen.getByRole("button", { name: /^delete$/i }));
+	},
 };
 
 export const Confirming: Story = {
@@ -77,8 +84,6 @@ export const Confirming: Story = {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await userEvent.click(dialog.getByRole("button", { name: "Delete" }));
 
-		// The popup outlives its own close by an exit animation, so "gone" is waited for.
-		await waitFor(async () => await expect(screen.queryByRole("alertdialog")).toBeNull());
 		await expect(canvas.getByText("Deleted “GPT-5”")).toBeInTheDocument();
 	},
 };

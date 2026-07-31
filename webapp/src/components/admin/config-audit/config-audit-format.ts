@@ -23,6 +23,7 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	WORKSPACE_TOKEN: "Access token",
 	WORKSPACE_VISIBILITY: "Visibility",
 	PRACTICE_ACTIVE: "Practice active",
+	PRACTICE_DEFINITION: "Practice",
 	WORKSPACE_INSTANCE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_OWN_PROVIDER_LLM_BUDGET: "Own-provider AI cap",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",

@@ -68,7 +68,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @BeforeAll
     static void migrateAcrossSeededLegacyData() throws Exception {
         assertThat(updateUpToTheReleaseChangelog())
-            .as("the release changelog must still be the tail of master.xml for this test to mean anything")
+            .as("the release changelog must still contribute changesets for this test to mean anything")
             .isPositive();
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(PRE_RELEASE_TAG);
@@ -361,12 +361,17 @@ class LegacyAgentConfigMigrationIntegrationTest {
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
-            long release = pending
-                .stream()
-                .filter(cs -> cs.getFilePath().endsWith(RELEASE_CHANGELOG))
-                .count();
-            liquibase.update((int) (pending.size() - release), contexts(), new LabelExpression());
-            return (int) release;
+            List<Integer> releaseIndexes = new ArrayList<>();
+            for (int index = 0; index < pending.size(); index++) {
+                if (pending.get(index).getFilePath().endsWith(RELEASE_CHANGELOG)) {
+                    releaseIndexes.add(index);
+                }
+            }
+            if (releaseIndexes.isEmpty()) {
+                return 0;
+            }
+            liquibase.update(releaseIndexes.getFirst(), contexts(), new LabelExpression());
+            return releaseIndexes.size();
         }
     }
 

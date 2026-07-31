@@ -6,6 +6,7 @@ export interface TeamTreeProps {
 	team: TeamInfo;
 	childrenMap: Map<number, TeamInfo[]>;
 	displaySet: Set<number>;
+	headingLevel?: 2 | 3 | 4 | 5 | 6;
 	onToggleVisibility: (teamId: number, hidden: boolean) => void | Promise<void>;
 	onToggleRepositoryVisibility: (
 		teamId: number,
@@ -21,6 +22,7 @@ export function TeamTree({
 	team,
 	childrenMap,
 	displaySet,
+	headingLevel = 2,
 	onToggleVisibility,
 	onToggleRepositoryVisibility,
 	onAddLabel,
@@ -32,6 +34,7 @@ export function TeamTree({
 		<TeamCard
 			team={team}
 			memberCount={(team.members ?? []).length}
+			headingLevel={headingLevel}
 			onToggleVisibility={(hidden) => onToggleVisibility(team.id, hidden)}
 			getCatalogLabels={getCatalogLabels}
 		>
@@ -67,6 +70,7 @@ export function TeamTree({
 							team={child}
 							childrenMap={childrenMap}
 							displaySet={displaySet}
+							headingLevel={Math.min(headingLevel + 1, 6) as 2 | 3 | 4 | 5 | 6}
 							onToggleVisibility={onToggleVisibility}
 							onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 							onAddLabel={onAddLabel}

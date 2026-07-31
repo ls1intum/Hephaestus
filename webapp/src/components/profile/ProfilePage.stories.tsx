@@ -1,76 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { fn } from "storybook/test";
+import { withStandardPage } from "@/stories/decorators";
+import { expectNoPageOverflow } from "@/test/reflow";
 import { ProfilePage } from "./ProfilePage";
 
 const now = new Date();
 const defaultAfter = formatISO(startOfISOWeek(now));
 const defaultBefore = formatISO(endOfISOWeek(now));
 
-/**
- * Complete user profile page that combines header and content sections.
- * Displays a user's profile information, contributions, review activity,
- * and open pull requests in a unified interface.
- */
 const meta = {
 	component: ProfilePage,
 	parameters: {
-		layout: "padded",
-		docs: {
-			description: {
-				component:
-					"The main profile page that integrates all profile components into a cohesive user profile view.",
-			},
-		},
+		layout: "fullscreen",
 	},
-	argTypes: {
-		isLoading: {
-			description: "Whether the page is in a loading state",
-			control: "boolean",
-			table: {
-				type: { summary: "boolean" },
-				defaultValue: { summary: "false" },
-			},
-		},
-		error: {
-			description: "Whether there was an error loading the profile data",
-			control: "boolean",
-			table: {
-				type: { summary: "boolean" },
-				defaultValue: { summary: "false" },
-			},
-		},
-		username: {
-			description: "Username of the profile owner",
-			control: "text",
-			table: {
-				type: { summary: "string" },
-			},
-		},
-		profileData: {
-			description: "Complete profile data object containing user info and activity",
-			control: "object",
-			table: {
-				type: { summary: "object" },
-			},
-		},
-		workspaceSlug: {
-			description: "Active workspace slug for routing",
-			control: "text",
-		},
-		after: {
-			description: "Start of the activity window (ISO string)",
-			control: "text",
-		},
-		before: {
-			description: "End of the activity window (ISO string)",
-			control: "text",
-		},
-		onTimeframeChange: {
-			description: "Callback when the timeframe is adjusted",
-			table: { type: { summary: "function" } },
-		},
-	},
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 } satisfies Meta<typeof ProfilePage>;
 
@@ -82,9 +26,6 @@ const baseMonitorArgs = {
 	onActivityMonitorFiltersChange: fn(),
 };
 
-/**
- * Standard profile view showing a user with activity across multiple repositories.
- */
 export const Default: Story = {
 	args: {
 		...baseMonitorArgs,
@@ -134,9 +75,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Loading state shown while profile data is being fetched.
- */
 export const Loading: Story = {
 	args: {
 		...baseMonitorArgs,
@@ -152,9 +90,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * Error state displayed when profile data could not be loaded.
- */
 export const ErrorState: Story = {
 	args: {
 		...baseMonitorArgs,
@@ -170,9 +105,6 @@ export const ErrorState: Story = {
 	},
 };
 
-/**
- * Shows how the profile page appears for a new user with no activity.
- */
 export const Empty: Story = {
 	args: {
 		...baseMonitorArgs,
@@ -203,4 +135,37 @@ export const Empty: Story = {
 			contributedRepositories: [],
 		},
 	},
+};
+
+export const MobileReflow: Story = {
+	...Default,
+	args: {
+		...Default.args,
+		username: "avery-long-provider-username-that-must-remain-readable",
+		profileData: {
+			...Default.args?.profileData,
+			userInfo: {
+				...Default.args?.profileData?.userInfo,
+				id: 99,
+				login: "avery-long-provider-username-that-must-remain-readable",
+				name: "A deliberately long contributor name that wraps cleanly",
+				avatarUrl: "https://github.com/github.png",
+				htmlUrl: "https://github.com/avery-long-provider-username-that-must-remain-readable",
+				leaguePoints: 150,
+			},
+			xpRecord: Default.args?.profileData?.xpRecord ?? {
+				currentLevel: 5,
+				currentLevelXP: 450,
+				xpNeeded: 1000,
+				totalXP: 5450,
+			},
+			firstContribution: Default.args?.profileData?.firstContribution,
+			contributedRepositories: Default.args?.profileData?.contributedRepositories ?? [],
+		},
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: expectNoPageOverflow,
 };

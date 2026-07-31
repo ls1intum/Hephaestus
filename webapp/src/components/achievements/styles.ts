@@ -16,8 +16,6 @@ import type {
 	AchievementStatus,
 } from "@/components/achievements/types";
 
-// ===== Achievement Category Styling ===== //
-
 export const categoryLabels = {
 	pull_requests: "Pull Requests",
 	commits: "Commits",
@@ -34,15 +32,13 @@ export const defaultCategoryIcons = {
 	milestones: MilestoneIcon,
 } as const satisfies Record<AchievementCategory, React.ElementType>;
 
-// ===== Achievement Rarity Styling ===== //
-
 export const raritySizes = {
-	common: "size-10", // 40px
-	uncommon: "size-12", // 48px
-	rare: "size-14", // 56px
-	epic: "size-16", // 64px
-	legendary: "size-20", // 80px
-	mythic: "size-24", // 96px
+	common: "size-10",
+	uncommon: "size-12",
+	rare: "size-14",
+	epic: "size-16",
+	legendary: "size-20",
+	mythic: "size-24",
 } as const satisfies Record<AchievementRarity, string>;
 
 export const rarityPixelSizes = {
@@ -63,10 +59,6 @@ export const rarityLabels = {
 	mythic: "Mythic",
 } as const satisfies Record<AchievementRarity, string>;
 
-/**
- * Rarity border colors using the `--rarity-*` CSS custom properties.
- * Used for tooltip borders and other rarity-colored accents.
- */
 export const rarityBorderColors = {
 	common: "border-rarity-common",
 	uncommon: "border-rarity-uncommon",
@@ -76,29 +68,6 @@ export const rarityBorderColors = {
 	mythic: "border-rarity-mythic-from",
 } as const satisfies Record<AchievementRarity, string>;
 
-/**
- * Rarity title text colors for tooltips and headings.
- *
- * Low tiers use the standard foreground to stay clean.
- * Epic+ tiers use their chromatic `--rarity-*` tokens,
- * giving the achievement name itself a colored "aura".
- */
-export const rarityTitleColors = {
-	common: "text-foreground",
-	uncommon: "text-rarity-uncommon",
-	rare: "text-rarity-rare",
-	epic: "text-rarity-epic",
-	legendary: "text-rarity-legendary",
-	mythic: "text-rarity-mythic",
-} as const satisfies Record<AchievementRarity, string>;
-
-/**
- * Small accent-colored backgrounds keyed by rarity.
- *
- * Used in the stats panel "Recent Unlocks" list and similar
- * contexts where a tiny colored dot or circle represents the
- * tier. Colors are the `--rarity-*` tokens at a toned-down opacity.
- */
 export const rarityAccentBackgrounds = {
 	common: "bg-rarity-common",
 	uncommon: "bg-rarity-uncommon/80",
@@ -117,19 +86,6 @@ export const rarityIconSizes = {
 	mythic: 52,
 } as const satisfies Record<AchievementRarity, number>;
 
-/**
- * Rarity styling classes for the achievement node *frame* (border, shadow, animation).
- *
- * These intentionally do NOT include background colors — backgrounds are
- * controlled by {@link statusBackgrounds} so that locked/available/unlocked
- * status is always clearly communicated regardless of rarity tier.
- *
- * Design philosophy (game dev + web dev hybrid):
- * - **Same core shape** (circle + centered icon) — only the "frame" changes.
- * - **Progressive enhancement**: each tier adds ONE new visual element.
- * - **Border differentiation**: width, color, shadow — the primary recognition signal.
- * - **Color strategy**: common→rare = monochromatic (shadcn feel), epic+ = chromatic accents.
- */
 export const rarityStylingClasses = {
 	common: "border-2 border-rarity-common",
 	uncommon: "border-3 border-rarity-uncommon",
@@ -140,14 +96,6 @@ export const rarityStylingClasses = {
 	mythic: "achievement-mythic-hexagon",
 } as const satisfies Record<AchievementRarity, string>;
 
-/**
- * Fully-opaque background classes based on achievement status.
- *
- * - **locked**: muted gray — visible but clearly "not yet achieved".
- * - **available**: mid-tone — progress is possible, draws subtle attention.
- * - **unlocked**: high contrast fill — the achievement "lights up".
- * - **hidden**: same as locked (shown only in designer/admin views).
- */
 export const statusBackgrounds = {
 	locked: "bg-node-locked",
 	available: "bg-node-available",
@@ -155,18 +103,12 @@ export const statusBackgrounds = {
 	hidden: "bg-node-locked",
 } as const satisfies Record<AchievementStatus, string>;
 
-/**
- * CSS Custom properties for the Mythic Hexagon's inner solid fill.
- * Maps status perfectly to the CSS variable used by Tailwind.
- */
 export const mythicBackgroundVars = {
 	locked: "var(--node-locked)",
 	available: "var(--node-available)",
 	unlocked: "var(--node-unlocked)",
 	hidden: "var(--node-locked)",
 } as const satisfies Record<AchievementStatus, string>;
-
-// ===== Achievement Status Styling ===== //
 
 export const statusIcons = {
 	locked: LockIcon,
@@ -175,20 +117,13 @@ export const statusIcons = {
 	hidden: EyeClosedIcon,
 } as const satisfies Record<AchievementStatus, React.ElementType>;
 
-// ===== Achievement Label Styling ===== //
-
-/** Skill tree radial angles with clock direction annotations */
 const skillTreeAngles = {
-	NORTH: 270, // Top (Commits)
-	EAST: 0, // Right (Pull Requests)
-	SOUTH: 90, // Bottom (Communication)
-	WEST: 180, // Left (Issues)
+	NORTH: 270,
+	EAST: 0,
+	SOUTH: 90,
+	WEST: 180,
 } as const satisfies Record<string, number>;
 
-/**
- * Category metadata for positioning achievements on the skill tree.
- * Keys match backend enum values (lowercase).
- */
 export const categoryMeta = {
 	commits: {
 		name: "Commits",
@@ -212,7 +147,7 @@ export const categoryMeta = {
 	},
 	milestones: {
 		name: "Milestones",
-		angle: 0, // Milestones don't have a specific direction, they are placed in between components or have a special border later.
+		angle: 0,
 		description: "Combined achievements",
 	},
 } as const satisfies Record<

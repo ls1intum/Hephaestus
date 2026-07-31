@@ -41,17 +41,18 @@ export const TypeToConfirm: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		const gate = dialog.getByLabelText(/to confirm/i);
+		const submit = dialog.getByRole("button", { name: /delete workspace/i });
 
 		await userEvent.type(gate, " acme-corp");
-		await userEvent.keyboard("{Enter}");
+		await userEvent.click(submit);
 		await expect(args.onConfirm).not.toHaveBeenCalled();
-		await expect(gate).toHaveAttribute("aria-invalid", "true");
+		await waitFor(() => expect(gate).toHaveAttribute("aria-invalid", "true"));
 		await expect(gate).toHaveAccessibleDescription(/does not match/i);
 		await expect(dialog.getByText(/that does not match/i)).toBeInTheDocument();
 
 		await userEvent.clear(gate);
 		await userEvent.type(gate, "acme-corp");
-		await userEvent.keyboard("{Enter}");
+		await userEvent.click(submit);
 		await expect(args.onConfirm).toHaveBeenCalledTimes(1);
 	},
 };

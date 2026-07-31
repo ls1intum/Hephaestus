@@ -12,6 +12,7 @@ interface LoginSearch {
 }
 
 export const Route = createFileRoute("/login")({
+	staticData: { surface: "auth" },
 	validateSearch: (search): LoginSearch => ({
 		returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
 		error: typeof search.error === "string" ? search.error : undefined,

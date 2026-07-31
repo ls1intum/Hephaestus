@@ -5,33 +5,15 @@ import type { ChatMessage } from "@/lib/types";
 import { Chat } from "./Chat";
 import { Copilot } from "./Copilot";
 
-/**
- * Copilot widget for displaying a Chat component in a floating bottom-right popover.
- * Provides easy access to AI assistance without disrupting the main application workflow.
- */
 const meta: Meta<typeof Copilot> = {
 	component: Copilot,
-	parameters: {
-		layout: "fullscreen",
-		docs: {
-			description: {
-				component: `A floating chat widget positioned in the bottom-right corner. Contains a Chat component for AI assistance.
-
-## Portal Implementation
-
-When documents are clicked within the chat, the Artifact components are rendered using React's \`createPortal\` to the document body. This ensures the artifacts appear as true fullscreen overlays above all other content, including the Popover container itself.
-
-The portal implementation breaks the artifacts out of the Popover's stacking context, preventing z-index conflicts and ensuring proper fullscreen behavior.`,
-			},
-		},
-	},
+	parameters: { layout: "fullscreen" },
 	tags: ["autodocs"],
 } satisfies Meta<typeof Copilot>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock conversation data from Chat stories
 const CONVERSATION_MESSAGES: ChatMessage[] = [
 	{
 		id: "msg-1",
@@ -113,44 +95,30 @@ P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨
 	},
 ];
 
-/**
- * Empty Copilot widget ready for new conversations.
- * Click the chat icon in the bottom-right corner to open a fresh chat interface.
- */
-export const Default: Story = {
-	render: () => (
-		<div className="h-screen w-full bg-background relative">
-			<div className="p-8">
-				<h1 className="text-2xl font-bold mb-4">Copilot Widget - New Chat</h1>
-				<p className="text-muted-foreground mb-8 max-w-2xl">
-					This demonstrates the Copilot widget in its initial state. Look for the chat icon in the
-					bottom-right corner to start a new conversation with the AI assistant.
-				</p>
+const CONVERSATION_VOTES = [
+	{ messageId: "msg-2", isUpvoted: true, updatedAt: new Date() },
+	{ messageId: "msg-4", isUpvoted: true, updatedAt: new Date() },
+] satisfies ChatMessageVote[];
 
-				<div className="space-y-4">
-					<div className="p-6 bg-background rounded-lg border">
-						<h2 className="font-semibold mb-2">Main Application Content</h2>
-						<p className="text-muted-foreground">
-							This is your main application content. The Copilot widget floats above this content
-							and can be accessed at any time without disrupting the user's workflow.
-						</p>
-					</div>
-
-					<div className="p-6 bg-background rounded-lg border">
-						<h2 className="font-semibold mb-2">Always Available</h2>
-						<p className="text-muted-foreground">
-							Users can continue working while having instant access to AI assistance through the
-							floating widget. Perfect for contextual help and quick questions.
-						</p>
-					</div>
-				</div>
-			</div>
-
+function CopilotPreview({
+	messages,
+	votes,
+	inputPlaceholder,
+}: {
+	messages: ChatMessage[];
+	votes: ChatMessageVote[];
+	inputPlaceholder: string;
+}) {
+	return (
+		<div className="relative h-screen w-full bg-background">
+			<main className="p-8">
+				<h1 className="text-2xl font-bold">Workspace overview</h1>
+				<p className="mt-2 text-muted-foreground">Review recent activity and team progress.</p>
+			</main>
 			<Copilot onNewChat={fn()} onOpenFullChat={fn()}>
 				<Chat
-					id="copilot-empty"
-					messages={[]}
-					votes={[]}
+					messages={messages}
+					votes={votes}
 					status="ready"
 					attachments={[]}
 					onMessageSubmit={fn()}
@@ -161,79 +129,24 @@ export const Default: Story = {
 					onCopy={fn()}
 					onVote={fn()}
 					scrollToBottom={fn()}
-					inputPlaceholder="Ask me anything..."
+					inputPlaceholder={inputPlaceholder}
 					className="h-full max-h-none"
 				/>
 			</Copilot>
 		</div>
-	),
+	);
+}
+
+export const Default: Story = {
+	render: () => <CopilotPreview messages={[]} votes={[]} inputPlaceholder="Ask me anything…" />,
 };
 
-/**
- * Copilot widget with an ongoing conversation.
- * Demonstrates the widget with a realistic conversation flow including document artifacts.
- */
 export const WithConversation: Story = {
 	render: () => (
-		<div className="h-screen w-full bg-background relative">
-			<div className="p-8">
-				<h1 className="text-2xl font-bold mb-4">Copilot Widget - Active Conversation</h1>
-				<p className="text-muted-foreground mb-8 max-w-2xl">
-					This shows the Copilot widget with an ongoing conversation about birthday planning. Click
-					the chat icon to see the conversation history and document artifacts.
-				</p>
-
-				<div className="space-y-4">
-					<div className="p-6 bg-background rounded-lg border">
-						<h2 className="font-semibold mb-2">Rich Conversations</h2>
-						<p className="text-muted-foreground">
-							The widget supports complex conversations with document creation, editing, and
-							artifact management. All within a compact, non-intrusive interface.
-						</p>
-					</div>
-
-					<div className="p-6 bg-background rounded-lg border">
-						<h2 className="font-semibold mb-2">Document Artifacts</h2>
-						<p className="text-muted-foreground">
-							AI-generated documents can be viewed, edited, and downloaded directly from the chat
-							interface. Perfect for creative writing, planning, and collaborative content creation.
-						</p>
-					</div>
-				</div>
-			</div>
-
-			<Copilot onNewChat={fn()} onOpenFullChat={fn()}>
-				<Chat
-					id="copilot-conversation"
-					messages={CONVERSATION_MESSAGES}
-					votes={
-						[
-							{
-								messageId: "msg-2",
-								isUpvoted: true,
-								updatedAt: new Date(),
-							},
-							{
-								messageId: "msg-4",
-								isUpvoted: true,
-								updatedAt: new Date(),
-							},
-						] satisfies ChatMessageVote[]
-					}
-					status="ready"
-					attachments={[]}
-					onMessageSubmit={fn()}
-					onStop={fn()}
-					onFileUpload={fn()}
-					onAttachmentsChange={fn()}
-					onMessageEdit={fn()}
-					onCopy={fn()}
-					onVote={fn()}
-					scrollToBottom={fn()}
-					inputPlaceholder="Continue the conversation..."
-					className="h-full max-h-none"
-				/>
-			</Copilot>
-		</div>
+		<CopilotPreview
+			messages={CONVERSATION_MESSAGES}
+			votes={CONVERSATION_VOTES}
+			inputPlaceholder="Continue the conversation…"
+		/>
 	),
 };

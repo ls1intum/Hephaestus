@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -17,6 +19,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import tools.jackson.databind.JsonNode;
 
 @Repository
 public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
@@ -27,6 +30,38 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     Page<AgentJob> findByWorkspaceId(Long workspaceId, Pageable pageable);
 
     Page<AgentJob> findByWorkspaceIdAndStatus(Long workspaceId, AgentJobStatus status, Pageable pageable);
+
+    @Query(
+        "SELECT j.id AS id, j.jobType AS jobType, j.integrationKind AS integrationKind, j.metadata AS metadata " +
+            "FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids"
+    )
+    List<ReviewRunTargetRow> findReviewRunTargets(
+        @Param("workspaceId") Long workspaceId,
+        @Param("ids") Collection<UUID> ids
+    );
+
+    @Query(
+        "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
+            "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +
+            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose"
+    )
+    Page<ReviewRunSummaryRow> findReviewRunSummaries(
+        @Param("workspaceId") Long workspaceId,
+        @Param("purpose") AgentPurpose purpose,
+        Pageable pageable
+    );
+
+    @Query(
+        "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
+            "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +
+            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose AND j.status = :status"
+    )
+    Page<ReviewRunSummaryRow> findReviewRunSummaries(
+        @Param("workspaceId") Long workspaceId,
+        @Param("purpose") AgentPurpose purpose,
+        @Param("status") AgentJobStatus status,
+        Pageable pageable
+    );
 
     Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
@@ -467,15 +502,6 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     )
     int stripTerminalPayloads(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
 
-    /**
-     * Deletes terminal rows outright, batched like {@link #stripTerminalPayloads}.
-     *
-     * <p>Excludes {@code delivery_status = 'PENDING'} (deleting would drop the pending delivery
-     * forever) and rows referenced by {@code feedback} ({@code feedback.agent_job_id} is
-     * {@code ON DELETE RESTRICT}, and the append-only research data hanging off it must outlive the
-     * operational row). Referenced rows already shed their payload columns at the earlier strip pass,
-     * so keeping them is bounded growth.
-     */
     @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
@@ -485,11 +511,12 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             "  AND j.completed_at < :cutoff " +
             "  AND j.delivery_status <> 'PENDING' " +
             "  AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.agent_job_id = j.id) " +
+            "  AND NOT EXISTS (SELECT 1 FROM observation o WHERE o.agent_job_id = j.id) " +
             "  LIMIT :batchSize" +
             ")",
         nativeQuery = true
     )
-    int deleteTerminalRowsOlderThan(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
+    int deleteUnreferencedTerminalRowsOlderThan(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
 
     /**
      * Depth, oldest-eligible-age, held count and running count in a single pass, so the scan cost does
@@ -525,5 +552,23 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         long getHeld();
 
         long getRunning();
+    }
+
+    interface ReviewRunTargetRow {
+        UUID getId();
+
+        AgentJobType getJobType();
+
+        @Nullable
+        IntegrationKind getIntegrationKind();
+
+        @Nullable
+        JsonNode getMetadata();
+    }
+
+    interface ReviewRunSummaryRow extends ReviewRunTargetRow {
+        AgentJobStatus getStatus();
+
+        Instant getCreatedAt();
     }
 }

@@ -1,6 +1,10 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { CENTERED_HANDLE_STYLE } from "@/components/achievements/skill-tree-shared";
-import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils";
+import {
+	getLeagueColor,
+	getLeagueForegroundColor,
+	getLeagueTier,
+} from "@/components/leaderboard/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -24,10 +28,8 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 
 	return (
 		<div className={cn(className, "relative group")}>
-			{/* Pulse effect */}
 			<div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-75 duration-3000 pointer-events-none" />
 
-			{/* Avatar with Level Badge - Matching ProfileHeader.tsx styling */}
 			<div className="relative shrink-0 transition-transform duration-300 hover:scale-105">
 				<Avatar className="size-24 border-4 border-background shadow-[0_0_30px_rgba(var(--shadow-rgb),0.3)]">
 					<AvatarImage src={data.avatarUrl} alt={`${data.name}'s avatar`} />
@@ -36,14 +38,14 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 					</AvatarFallback>
 				</Avatar>
 
-				{/* Level Badge */}
 				<Tooltip>
 					<TooltipTrigger
 						render={
 							<div
 								className={cn(
-									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm cursor-help z-[100]",
+									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background font-bold text-sm cursor-help z-[100]",
 									getLeagueColor(leagueTier),
+									getLeagueForegroundColor(leagueTier),
 								)}
 							/>
 						}
@@ -56,7 +58,6 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 				</Tooltip>
 			</div>
 
-			{/* Source Handle - connect to first nodes */}
 			<Handle
 				type="source"
 				position={Position.Bottom}

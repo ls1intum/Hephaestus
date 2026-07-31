@@ -102,7 +102,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
+    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
     public ResponseEntity<PracticeAreaDTO> createArea(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeAreaRequestDTO request
@@ -138,7 +138,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
+    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
     public ResponseEntity<PracticeAreaDTO> updateArea(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
@@ -182,7 +182,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalogue display order; changes no behaviour")
+    @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
     public ResponseEntity<List<PracticeAreaDTO>> reorderAreas(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody ReorderPracticeAreasRequestDTO request
@@ -199,7 +199,7 @@ public class PracticeAreaController {
     @DeleteMapping("/{areaSlug}")
     @Operation(
         summary = "Delete a practice area",
-        description = "Bound practices are unbound (their area link is cleared), not deleted"
+        description = "Moves its practices to Unassigned, then deletes the area"
     )
     @ApiResponse(responseCode = "204", description = "Area deleted")
     @ApiResponse(
@@ -208,7 +208,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
+    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
     public ResponseEntity<Void> deleteArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
         areaService.deleteArea(workspaceContext, areaSlug);
         return ResponseEntity.noContent().build();

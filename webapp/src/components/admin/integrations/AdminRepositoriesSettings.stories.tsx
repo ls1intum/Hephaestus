@@ -2,36 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 
-/**
- * Admin surface for the monitored-repositories plane. Presentational: the add/remove mutations and
- * their loading/error flags come from the container, so these stories mock the callbacks with `fn()`.
- */
 const meta = {
 	component: AdminRepositoriesSettings,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	argTypes: {
-		isLoading: {
-			control: "boolean",
-			description: "Whether the repositories are loading",
-		},
-		error: {
-			control: "object",
-			description: "Error that occurred while loading repositories",
-		},
-		addRepositoryError: {
-			control: "object",
-			description: "Error that occurred while adding a repository",
-		},
-		isAddingRepository: {
-			control: "boolean",
-			description: "Whether a repository is currently being added",
-		},
-		isRemovingRepository: {
-			control: "boolean",
-			description: "Whether a repository is currently being removed",
-		},
-	},
 	args: {
 		repositories: [
 			{ nameWithOwner: "octocat/Hello-World" },
@@ -52,10 +26,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default state with a list of monitored repositories. The add gate: a value without a `/` keeps Add
- * disabled; an `owner/name` value enables it and submits.
- */
 export const Default: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -74,12 +44,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * A large fleet. The list caps and scrolls rather than growing to full height and overflowing onto the
- * add form. Asserts the real layout in browser mode: the Base UI ScrollArea viewport is height-bounded
- * (≤ the max-h-80 cap) and its content overflows it (scrollable). If the viewport were left unbounded,
- * every row would render at full height and push the page taller.
- */
 export const ManyRepositories: Story = {
 	args: {
 		repositories: Array.from({ length: 40 }, (_, index) => ({
@@ -93,19 +57,13 @@ export const ManyRepositories: Story = {
 		await expect(viewport).not.toBeNull();
 		if (!viewport) return;
 
-		// Bounded to the max-h-80 (20rem = 320px) cap, not grown to fit all 40 rows.
 		await expect(viewport.clientHeight).toBeLessThanOrEqual(320);
-		// Content overflows the bounded viewport rather than pushing the page taller.
 		await expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
 
 		await expect(canvas.getByLabelText("Add a repository")).toBeVisible();
 	},
 };
 
-/**
- * Removing a repository is guarded by a destructive confirm dialog. The copy names WHAT is erased and
- * states the upstream is untouched and re-syncable.
- */
 export const RemoveConfirm: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -126,13 +84,6 @@ export const RemoveConfirm: Story = {
 	},
 };
 
-/**
- * A remove is in flight.
- *
- * The dialog is controlled and held open across the mutation: an uncontrolled `AlertDialogAction`
- * closes on click, unmounting the node that carries `disabled={isRemovingRepository}` before the flag
- * can flip. Holding it open gives the confirm somewhere to show "Stopping…".
- */
 export const RemoveInProgress: Story = {
 	args: {
 		isRemovingRepository: true,
@@ -144,15 +95,10 @@ export const RemoveInProgress: Story = {
 		const dialog = await screen.findByRole("alertdialog");
 		const confirm = within(dialog).getByRole("button", { name: /stopping/i });
 		await expect(confirm).toBeDisabled();
-		// Cancel is held too: dismissing mid-flight would strand a mutation the admin can't see.
 		await expect(within(dialog).getByRole("button", { name: /cancel/i })).toBeDisabled();
 	},
 };
 
-/**
- * The confirm survives the click and stays open while the mutation runs, so the pending state has
- * somewhere to live. Pressing it once fires exactly one remove.
- */
 export const RemoveHoldsDialogOpen: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -166,10 +112,6 @@ export const RemoveHoldsDialogOpen: Story = {
 	},
 };
 
-/**
- * Loading state. The placeholders carry the same `Item` chrome as the rows they become — border,
- * height, trailing action slot — rather than bare grey bars that resize the card on resolve.
- */
 export const Loading: Story = {
 	args: {
 		repositories: [],
@@ -177,9 +119,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * Empty state — no repositories monitored yet; the empty affordance points at the add field.
- */
 export const Empty: Story = {
 	args: {
 		repositories: [],
@@ -190,9 +129,6 @@ export const Empty: Story = {
 	},
 };
 
-/**
- * The repository-list query failed — the shared error alert, not the empty or populated state.
- */
 export const LoadError: Story = {
 	args: {
 		repositories: [],
@@ -207,16 +143,11 @@ export const LoadError: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/couldn't load the monitored repositories/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/repositories service is unavailable/i)).toBeInTheDocument();
-		// Every sibling section offers a retry.
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalledTimes(1);
 	},
 };
 
-/**
- * The add mutation failed — the field surfaces the server's own reason under the input rather than a
- * fixed string, so the admin sees the one piece of information they can act on.
- */
 export const AddValidationError: Story = {
 	args: {
 		addRepositoryError: Object.assign(new Error("request failed"), {
@@ -235,9 +166,6 @@ export const AddValidationError: Story = {
 	},
 };
 
-/**
- * A repository is being added — the Add button and input are disabled while the mutation runs.
- */
 export const AddingRepository: Story = {
 	args: {
 		isAddingRepository: true,

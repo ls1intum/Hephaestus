@@ -34,11 +34,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function RouteComponent() {
 	const queryClient = useQueryClient();
-	const { logout, linkAccount, hasRole } = useAuth();
+	const { logout, linkAccount } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
-
-	// Feature flag: AI review section visible only for users with the practice review role
-	const showAiReviewSection = hasRole("run_practice_review");
 
 	const {
 		data: settings,
@@ -233,7 +230,6 @@ function RouteComponent() {
 				onToggleAiReview: handleAiReviewToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
-			showAiReviewSection={showAiReviewSection}
 			showResearchSection={analyticsConfigured}
 			researchProps={{
 				participateInResearch: settings?.participateInResearch ?? true,

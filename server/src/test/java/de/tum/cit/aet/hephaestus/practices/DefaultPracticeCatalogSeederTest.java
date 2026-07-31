@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.transaction.support.TransactionOperations;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -45,6 +47,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
+    private PracticeCatalogInstallationRepository installationRepository;
+
+    @Mock
     private WorkspaceRepository workspaceRepository;
 
     private final AsyncTaskExecutor directExecutor = Runnable::run;
@@ -54,6 +59,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     private DefaultPracticeCatalogSeeder seeder(boolean enabled, AsyncTaskExecutor executor) {
+        lenient()
+            .when(workspaceRepository.findByIdForUpdate(any()))
+            .thenAnswer(invocation -> Optional.of(workspace(invocation.getArgument(0))));
         return new DefaultPracticeCatalogSeeder(
             enabled,
             JsonMapper.builder().build(),
@@ -61,15 +69,17 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             practiceService,
             areaRepository,
             practiceRepository,
+            installationRepository,
             workspaceRepository,
-            executor
+            executor,
+            TransactionOperations.withoutTransaction()
         );
     }
 
     @Test
     void disabled_doesNothing() {
         seeder(false).seed();
-        verifyNoInteractions(workspaceRepository, areaRepository, areaService, practiceService);
+        verifyNoInteractions(workspaceRepository, installationRepository, areaRepository, areaService, practiceService);
     }
 
     @Test
@@ -81,12 +91,11 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Test
     void happyPath_seedsTheGroundedCatalog() {
-        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
 
         seeder(true).seed();
 
-        // Every practice in the shipped catalog is bound to its area; the counts below are the catalog's.
         verify(areaService).createArea(any(), eq("review-ready-work"), any());
         verify(areaService).createArea(any(), eq("acting-on-review-feedback"), any());
         verify(areaService).createArea(any(), eq("actionable-issue-authoring"), any());
@@ -97,9 +106,10 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
         verify(practiceService, times(37)).createPractice(any(), practiceCaptor.capture());
-        verify(areaService, times(37)).bindPractice(any(), any(), any());
+        verify(installationRepository).save(any());
+        verify(areaService, never()).bindPractice(any(), any(), any());
+        assertThat(practiceCaptor.getAllValues()).allSatisfy(request -> assertThat(request.areaSlug()).isNotBlank());
 
-        // Focus breakdown: 7 issue-focused, 3 conversation-focused (the communication area), the rest PR-focused.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::artifactType).toList();
         assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST, WorkArtifact.CONVERSATION_THREAD);
         assertThat(
@@ -115,9 +125,6 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
                 .count()
         ).isEqualTo(3);
 
-        // Every seeded practice's criteria is the per-focus evidence-contract preamble composed onto the
-        // practice-specific criteria with a "\n\n---\n\n" fence: a non-empty preamble before the fence,
-        // naming the practice's focus. Structural (not exact-prose) so rewording a preamble can't break it.
         for (var request : practiceCaptor.getAllValues()) {
             int fence = request.criteria().indexOf("\n\n---\n\n");
             assertThat(fence).as("preamble fenced ahead of the practice criteria").isGreaterThan(40);
@@ -132,7 +139,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void startup_reconcilesEveryWorkspace() {
+    void startup_installsCatalogForUnmarkedWorkspaces() {
         Workspace first = new Workspace();
         first.setId(1L);
         Workspace second = new Workspace();
@@ -144,14 +151,14 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         verify(areaService, times(24)).createArea(any(), any(), any());
         verify(practiceService, times(74)).createPractice(any(), any());
+        verify(installationRepository, times(2)).save(any());
     }
 
     @Test
-    void idempotent_skipsAreasAndPracticesThatAlreadyExistAndAreBound() {
-        // An already-present practice that is already bound to an area must be left untouched (respect admin edits).
+    void existingCatalog_isRecordedWithoutChangingRows() {
         Practice bound = new Practice();
         bound.setArea(new PracticeArea());
-        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.of(bound));
 
@@ -160,66 +167,66 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(areaService, never()).createArea(any(), any(), any());
         verify(practiceService, never()).createPractice(any(), any());
         verify(areaService, never()).bindPractice(any(), any(), any());
+        verify(installationRepository).save(any());
     }
 
     @Test
-    void perRowIdempotent_resumesMissingPracticesWhenAreaAlreadyExists() {
-        // Regression: a mid-area failure can leave the area created but only some practices seeded. A per-AREA
-        // skip would permanently strand the rest; per-ROW idempotency must still seed the practices that are
-        // absent even though their area already exists.
-        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+    void initialInstall_addsMissingPracticesToExistingAreas() {
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
 
         seeder(true).seed();
 
-        // No area is re-created (all present), but every absent practice is still seeded and bound.
         verify(areaService, never()).createArea(any(), any(), any());
         verify(practiceService, times(37)).createPractice(any(), any());
-        verify(areaService, times(37)).bindPractice(any(), any(), any());
+        verify(areaService, never()).bindPractice(any(), any(), any());
+        verify(installationRepository).save(any());
     }
 
     @Test
-    void resumable_bindsAStrandedPracticeThatExistsButIsUnbound() {
-        // C4 root cause: createPractice and bindPractice run in SEPARATE transactions, so a mid-seed failure
-        // can leave a practice committed with area=NULL. A plain exists-then-skip guard would strand it forever.
-        // On the next boot the seeder must re-bind the unbound practice WITHOUT re-creating it.
-        Practice unbound = new Practice(); // area defaults to null
-        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+    void existingUnassignedPractice_isLeftUntouched() {
+        Practice unbound = new Practice();
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.of(unbound));
 
         seeder(true).seed();
 
-        // Never re-create an existing practice, but bind each unbound one to its catalog area.
         verify(practiceService, never()).createPractice(any(), any());
-        verify(areaService, times(37)).bindPractice(any(), any(), any());
+        verify(areaService, never()).bindPractice(any(), any(), any());
+        verify(installationRepository).save(any());
     }
 
     @Test
-    void perRowFailure_skipsTheBadRowButSeedsTheRest() {
-        // Per-ROW resilience: one practice that fails (e.g. a malformed artifactType making createPractice
-        // throw) must skip ONLY that row, not abort the remaining catalog. With 37 practices, a single
-        // throwing createPractice still leaves 36 created and bound.
-        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+    void failedInstall_doesNotRecordCompletion() {
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
-        // First createPractice throws; all subsequent calls succeed.
-        when(practiceService.createPractice(any(), any()))
-            .thenThrow(new RuntimeException("malformed artifactType"))
-            .thenReturn(new Practice());
+        when(practiceService.createPractice(any(), any())).thenThrow(new RuntimeException("malformed artifactType"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
 
-        // All 37 are attempted; the 36 that did not throw are bound (the failed row never reaches bindPractice).
-        verify(practiceService, times(37)).createPractice(any(), any());
-        verify(areaService, times(36)).bindPractice(any(), any(), any());
+        verify(practiceService).createPractice(any(), any());
+        verify(installationRepository, never()).save(any());
+    }
+
+    @Test
+    void completedInstall_doesNotChangeCatalogAgain() {
+        Workspace workspace = workspace(1L);
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace));
+        when(installationRepository.existsById(1L)).thenReturn(true);
+
+        seeder(true).seed();
+
+        verifyNoInteractions(areaRepository, practiceRepository, areaService, practiceService);
+        verify(installationRepository, never()).save(any());
     }
 
     @Test
     void onWorkspaceCreated_dispatchesCatalogSeeding() {
         AsyncTaskExecutor executor = org.mockito.Mockito.mock(AsyncTaskExecutor.class);
-        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(new Workspace()));
+        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace(7L)));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
 
@@ -233,7 +240,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         verify(areaService, times(12)).createArea(any(), any(), any());
         verify(practiceService, times(37)).createPractice(any(), any());
-        verify(areaService, times(37)).bindPractice(any(), any(), any());
+        verify(areaService, never()).bindPractice(any(), any(), any());
+        verify(installationRepository).save(any());
     }
 
     @Test
@@ -265,7 +273,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Test
     void seedingFailure_isIsolatedAndDoesNotThrow() {
-        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(areaService.createArea(any(), any(), any())).thenThrow(new RuntimeException("boom"));
 
@@ -290,11 +298,6 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Test
     void shippedCatalogLearnerCopy_carriesNoDetectorVocab() {
-        // Silent-swallow guard: whyItMatters / whatGoodLooksLike are learner-facing, so PracticeService's
-        // authoring guard rejects the detector's ALL-CAPS presence/assessment tokens in them. That guard
-        // runs at SEED time inside createPractice; a violation there is swallowed per-row (green boot, the
-        // practice never seeds). This static check catches such a leak at the source, mirroring the service
-        // pattern \b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\b matched case-sensitively as standalone tokens.
         var detectorVocab = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
         JsonNode catalog = JsonMapper.builder()
             .build()
@@ -313,9 +316,6 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Test
     void shippedCatalogCriteria_useRealNewlinesNotLiteralEscapes() {
-        // The injector writes criteria verbatim into the judge's context, so a literal two-char "\n" (instead
-        // of a real newline) would collapse every "## Section" of the judge prompt onto one line. Catch it at
-        // the source.
         JsonNode catalog = JsonMapper.builder()
             .build()
             .readTree(getClass().getClassLoader().getResourceAsStream("practices/default-catalog.json"));
@@ -329,5 +329,11 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
                     .doesNotContain("\\n");
             }
         }
+    }
+
+    private static Workspace workspace(long id) {
+        Workspace workspace = new Workspace();
+        workspace.setId(id);
+        return workspace;
     }
 }

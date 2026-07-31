@@ -1,157 +1,197 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { SlidersHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
 	getPracticeReviewSettingsOptions,
 	getPracticeReviewSettingsQueryKey,
 	getWorkspaceOptions,
 	listAgentsOptions,
-	listWorkspacesQueryKey,
-	updateFeaturesMutation,
 	updatePracticeReviewSettingsMutation,
-	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type {
-	UpdatePracticeReviewSettingsRequest,
-	UpdateWorkspaceFeaturesRequest,
-} from "@/api/types.gen";
+import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
 import {
-	PracticeDetectionPolicyCard,
 	type PracticeReviewField,
-} from "@/components/admin/ai/PracticeDetectionPolicyCard";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+	PracticeReviewSettings as PracticeReviewSettingsForm,
+	type PracticeReviewWorkspaceUpdate,
+} from "@/components/admin/practices/PracticeReviewSettings";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
+import { Spinner } from "@/components/ui/spinner";
+import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/settings")({
-	head: workspaceAdminHead("Review settings"),
+	head: workspaceAdminHead("Practice review settings"),
 	component: ReviewSettingsContainer,
 });
 
 function ReviewSettingsContainer() {
 	const queryClient = useQueryClient();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
-	const slug = workspaceSlug ?? "";
+	const { workspaceSlug } = Route.useParams();
 
 	const reviewSettingsQuery = useQuery({
-		...getPracticeReviewSettingsOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
+		...getPracticeReviewSettingsOptions({ path: { workspaceSlug } }),
 	});
 
 	const bindingsQuery = useQuery({
-		...listAgentsOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-
-	const availableModelsQuery = useQuery({
-		...workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
+		...listAgentsOptions({ path: { workspaceSlug } }),
 	});
 
 	const workspaceQuery = useQuery({
-		...getWorkspaceOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
+		...getWorkspaceOptions({ path: { workspaceSlug } }),
 	});
 
-	const invalidateReviewSettings = () => {
-		queryClient.invalidateQueries({
-			queryKey: getPracticeReviewSettingsQueryKey({ path: { workspaceSlug: slug } }),
-		});
-	};
+	const reviewSettingsQueryKey = getPracticeReviewSettingsQueryKey({
+		path: { workspaceSlug },
+	});
+	const reviewSettingsMutationKey = [
+		"workspace",
+		workspaceSlug,
+		"practice-review-settings",
+	] as const;
 
 	const updatePracticeReviewSettings = useMutation({
 		...updatePracticeReviewSettingsMutation(),
-		onSuccess: () => {
-			invalidateReviewSettings();
+		mutationKey: reviewSettingsMutationKey,
+		scope: { id: `workspace:${workspaceSlug}:practice-review-settings` },
+		onMutate: async (variables) => {
+			await queryClient.cancelQueries({ queryKey: reviewSettingsQueryKey });
+			const previous = queryClient.getQueryData<PracticeReviewSettings>(reviewSettingsQueryKey);
+			if (previous && !variables.body.reset?.length) {
+				queryClient.setQueryData(
+					reviewSettingsQueryKey,
+					patchReviewSettings(previous, variables.body),
+				);
+			}
+			return { previous };
+		},
+		onSuccess: (updated) => {
+			queryClient.setQueryData(reviewSettingsQueryKey, updated);
 			toast.success("Review settings updated");
 		},
-		onError: (error) => {
+		onError: (error, _variables, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(reviewSettingsQueryKey, context.previous);
+			}
 			toast.error("Failed to update review settings", {
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},
+		onSettled: () => {
+			if (queryClient.isMutating({ mutationKey: reviewSettingsMutationKey }) === 1) {
+				void queryClient.invalidateQueries({
+					queryKey: reviewSettingsQueryKey,
+				});
+			}
+		},
 	});
 
-	const updateFeatures = useMutation({
-		...updateFeaturesMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({
-				queryKey: getWorkspaceOptions({ path: { workspaceSlug: slug } }).queryKey,
-			});
-			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
-			invalidateReviewSettings();
-			toast.success("Trigger settings updated");
-		},
-		onError: (error) => {
-			toast.error("Failed to update trigger settings", {
-				description: error instanceof Error ? error.message : undefined,
-			});
-		},
+	const updateFeatures = useUpdateWorkspaceFeatures(workspaceSlug, {
+		success: "Practice review settings updated",
+		error: "Failed to update practice review settings",
 	});
 
 	const handleUpdateReviewSettings = (settings: UpdatePracticeReviewSettingsRequest) => {
-		if (!workspaceSlug) return;
 		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: settings });
 	};
 
 	const handleResetReviewField = (field: PracticeReviewField) => {
-		if (!workspaceSlug) return;
 		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: { reset: [field] } });
 	};
 
-	const handleUpdateFeatures = (features: UpdateWorkspaceFeaturesRequest) => {
-		if (!workspaceSlug) return;
-		updateFeatures.mutate({ path: { workspaceSlug }, body: features });
+	const handleUpdateWorkspaceSettings = (settings: PracticeReviewWorkspaceUpdate) => {
+		updateFeatures.mutate({ path: { workspaceSlug }, body: settings });
 	};
 
-	return (
-		<div className="container mx-auto max-w-3xl space-y-6 py-6">
-			<header>
-				<h1 className="text-3xl font-bold tracking-tight">Review settings</h1>
-				<p className="text-muted-foreground">
-					Bind the model, choose triggers, and set the review policy for automated practice
-					detection in this workspace.
-				</p>
-			</header>
+	const isLoading = reviewSettingsQuery.isLoading || workspaceQuery.isLoading;
+	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
-			<PracticeDetectionPolicyCard
-				settings={reviewSettingsQuery.data}
-				detectionBinding={bindingsQuery.data?.find(
-					(binding) => binding.purpose === "PRACTICE_DETECTION",
-				)}
-				workspaceSlug={slug}
-				availableModels={availableModelsQuery.data ?? []}
-				autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
-				manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
-				isLoading={
-					reviewSettingsQuery.isLoading ||
-					bindingsQuery.isLoading ||
-					availableModelsQuery.isLoading ||
-					workspaceQuery.isLoading ||
-					!workspaceSlug
-				}
-				isError={
-					reviewSettingsQuery.isError ||
-					bindingsQuery.isError ||
-					availableModelsQuery.isError ||
-					workspaceQuery.isError
-				}
-				error={
-					reviewSettingsQuery.error ??
-					bindingsQuery.error ??
-					availableModelsQuery.error ??
-					workspaceQuery.error
-				}
-				isSaving={updatePracticeReviewSettings.isPending || updateFeatures.isPending}
-				onUpdateReviewSettings={handleUpdateReviewSettings}
-				onUpdateFeatures={handleUpdateFeatures}
-				onResetReviewField={handleResetReviewField}
+	let content: ReactNode;
+	if (isLoading) {
+		content = (
+			<div className="flex h-40 items-center justify-center">
+				<Spinner className="size-6" />
+			</div>
+		);
+	} else if (error || !reviewSettingsQuery.data || !workspaceQuery.data) {
+		content = (
+			<QueryErrorAlert
+				error={error}
+				title="Couldn't load the review settings"
 				onRetry={() => {
 					reviewSettingsQuery.refetch();
-					bindingsQuery.refetch();
-					availableModelsQuery.refetch();
 					workspaceQuery.refetch();
 				}}
 			/>
-		</div>
+		);
+	} else {
+		content = (
+			<PracticeReviewSettingsForm
+				workspaceSlug={workspaceSlug}
+				model={{
+					binding: bindingsQuery.data?.find((binding) => binding.purpose === "PRACTICE_DETECTION"),
+					isLoading: bindingsQuery.isLoading,
+					isError: bindingsQuery.isError,
+					onRetry: () => bindingsQuery.refetch(),
+				}}
+				workspace={{
+					enabled: workspaceQuery.data.practicesEnabled,
+					autoTriggerEnabled: workspaceQuery.data.practiceReviewAutoTriggerEnabled,
+					manualTriggerEnabled: workspaceQuery.data.practiceReviewManualTriggerEnabled,
+					isSaving: updateFeatures.isPending,
+					onUpdate: handleUpdateWorkspaceSettings,
+				}}
+				policy={{
+					settings: reviewSettingsQuery.data,
+					isSaving: updatePracticeReviewSettings.isPending,
+					onUpdate: handleUpdateReviewSettings,
+					onReset: handleResetReviewField,
+				}}
+			/>
+		);
+	}
+
+	return (
+		<PageLayout>
+			<PageHeader
+				icon={<SlidersHorizontal />}
+				title="Review settings"
+				description="Configure how Hephaestus reviews connected project work."
+			/>
+			<div className="max-w-3xl">{content}</div>
+		</PageLayout>
 	);
+}
+
+function patchReviewSettings(
+	settings: PracticeReviewSettings,
+	patch: UpdatePracticeReviewSettingsRequest,
+): PracticeReviewSettings {
+	return {
+		...settings,
+		...(patch.skipDrafts === undefined
+			? {}
+			: { skipDrafts: patch.skipDrafts, skipDraftsOverride: patch.skipDrafts }),
+		...(patch.deliverToMerged === undefined
+			? {}
+			: {
+					deliverToMerged: patch.deliverToMerged,
+					deliverToMergedOverride: patch.deliverToMerged,
+				}),
+		...(patch.runForAllUsers === undefined
+			? {}
+			: {
+					runForAllUsers: patch.runForAllUsers,
+					runForAllUsersOverride: patch.runForAllUsers,
+				}),
+		...(patch.cooldownMinutes === undefined
+			? {}
+			: {
+					cooldownMinutes: patch.cooldownMinutes,
+					cooldownMinutesOverride: patch.cooldownMinutes,
+				}),
+	};
 }

@@ -1,18 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { HttpResponse, http } from "msw";
 import { expect, fn, within } from "storybook/test";
+import { withStandardPage } from "@/stories/decorators";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
 const allOff: FeatureValues = {
-	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
 	leaderboardEnabled: false,
 	progressionEnabled: false,
 	leaguesEnabled: false,
-	practiceReviewAutoTriggerEnabled: true,
-	practiceReviewManualTriggerEnabled: true,
 };
 
 const membershipRead = [
@@ -24,10 +22,11 @@ const membershipRead = [
 const meta = {
 	component: AdminSettingsPage,
 	parameters: {
-		layout: "padded",
+		layout: "fullscreen",
 		msw: { handlers: membershipRead },
 		chromatic: { viewports: [320, 1440] },
 	},
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
 		isResettingLeagues: false,
@@ -45,7 +44,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("heading", { name: /^features$/i })).toBeInTheDocument();
+		await expect(
+			canvas.getByRole("heading", { name: "Workspace capabilities" }),
+		).toBeInTheDocument();
 		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
 		await canvas.findByRole("button", { name: /^delete workspace$/i });
 	},
@@ -53,17 +54,6 @@ export const Default: Story = {
 
 export const ResettingLeagues: Story = {
 	args: { isResettingLeagues: true, features: { ...allOff, leaguesEnabled: true } },
-};
-
-export const PracticeReviewWithSubToggles: Story = {
-	args: {
-		features: {
-			...allOff,
-			practicesEnabled: true,
-			practiceReviewAutoTriggerEnabled: true,
-			practiceReviewManualTriggerEnabled: false,
-		},
-	},
 };
 
 export const LeaguesEnabled: Story = {

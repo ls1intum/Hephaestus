@@ -60,7 +60,7 @@ export function ProfilePage({
 	}
 
 	return (
-		<div className="pt-4 flex flex-col gap-8">
+		<div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
 			<ProfileHeader
 				user={profileData?.userInfo}
 				firstContribution={profileData?.firstContribution}

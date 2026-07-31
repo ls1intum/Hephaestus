@@ -1,28 +1,56 @@
 import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
+import { useFeatureFlag } from "@/integrations/feature-flags";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor")({
+	staticData: { surface: "fullscreen" },
 	component: MentorLayout,
 });
 
 function MentorLayout() {
 	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { mentorEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const featureState = useWorkspaceFeatures(workspaceSlug);
+	const mentorEnabled = featureState.features?.mentorEnabled;
+	const { enabled: hasMentorAccess, isLoading: accessLoading } = useFeatureFlag("MENTOR_ACCESS");
 
 	if (!workspaceSlug && !isWorkspaceLoading) {
-		return <NoWorkspace />;
+		return (
+			<StandardPageSurface className="h-full overflow-auto">
+				<NoWorkspace />
+			</StandardPageSurface>
+		);
 	}
 
-	if (!featuresLoading && !mentorEnabled && workspaceSlug) {
+	if (
+		!featureState.isLoading &&
+		!featureState.isError &&
+		!accessLoading &&
+		(mentorEnabled === false || !hasMentorAccess) &&
+		workspaceSlug
+	) {
 		return <Navigate to="/w/$workspaceSlug" params={{ workspaceSlug }} replace />;
 	}
 
-	if (featuresLoading || !mentorEnabled) {
+	if (featureState.isError) {
 		return (
-			<div className="flex justify-center items-center h-64">
+			<StandardPageSurface className="h-full overflow-auto">
+				<QueryErrorAlert
+					error={featureState.error}
+					title="Couldn't load workspace features"
+					onRetry={featureState.refetch}
+				/>
+			</StandardPageSurface>
+		);
+	}
+
+	if (featureState.isLoading || accessLoading || mentorEnabled !== true || !hasMentorAccess) {
+		return (
+			<div className="flex min-h-0 flex-1 items-center justify-center">
 				<Spinner className="h-8 w-8" />
 			</div>
 		);

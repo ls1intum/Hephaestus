@@ -39,6 +39,8 @@ public enum ConfigAuditEntityType {
 
     /** A practice being activated or deactivated, which gates whether it is reviewed at all. */
     PRACTICE_ACTIVE,
+    /** A practice's review definition, excluding its active state and catalog placement. */
+    PRACTICE_DEFINITION,
 
     /** A workspace's monthly cap on HOST-funded LLM spend. Set by instance admins. */
     WORKSPACE_INSTANCE_LLM_BUDGET,

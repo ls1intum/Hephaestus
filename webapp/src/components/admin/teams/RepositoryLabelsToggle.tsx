@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { LabelBadge } from "@/components/shared/LabelBadge";
-import { cn } from "@/lib/utils";
+import { Toggle } from "@/components/ui/toggle";
 
 export interface RepositoryLabelsToggleProps {
 	team: TeamInfo;
@@ -44,7 +44,7 @@ export function RepositoryLabelsToggle({
 
 	return (
 		<div className="space-y-1.5">
-			<h4 className="font-medium text-sm">Labels</h4>
+			<p className="font-medium text-sm">Labels</p>
 			<p className="text-xs text-muted-foreground">
 				Selecting labels limits this team's contribution metrics to items tagged with any of the
 				selected labels for this repository.
@@ -54,23 +54,15 @@ export function RepositoryLabelsToggle({
 					{shown.map((label) => {
 						const isActive = activeByName.has((label.name ?? "").toLowerCase());
 						return (
-							<button
-								type="button"
+							<Toggle
 								key={`${label.id}-${label.name}`}
-								onClick={() => handleToggle(label)}
-								title={isActive ? "Click to remove from team" : "Click to add to team"}
+								pressed={isActive}
+								onPressedChange={() => handleToggle(label)}
+								aria-label={`${isActive ? "Remove" : "Add"} ${label.name} label`}
+								className="h-auto min-w-0 rounded-full p-0 data-pressed:ring-2 data-pressed:ring-primary data-pressed:ring-offset-1"
 							>
-								<LabelBadge
-									label={label.name}
-									color={label.color}
-									className={cn(
-										"text-[11px]",
-										isActive
-											? "opacity-100"
-											: "opacity-30 hover:ring-2 hover:ring-primary/50 hover:ring-offset-1",
-									)}
-								/>
-							</button>
+								<LabelBadge label={label.name} color={label.color} className="text-[11px]" />
+							</Toggle>
 						);
 					})}
 				</div>

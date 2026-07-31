@@ -11,7 +11,7 @@ import {
 	listWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ConfigureWorkspaceStep } from "@/components/workspace/create-workspace/ConfigureWorkspaceStep";
 import { ConnectGitLabStep } from "@/components/workspace/create-workspace/ConnectGitLabStep";
@@ -63,7 +63,7 @@ function BackToProviders() {
  */
 function NoGitLabProviderNotice({ isAppAdmin }: { isAppAdmin: boolean }) {
 	return (
-		<div className="mx-auto max-w-2xl py-8">
+		<div className="mx-auto w-full max-w-2xl">
 			<BackToProviders />
 			<div className="space-y-4">
 				<h1 className="text-2xl font-semibold tracking-tight">GitLab sign-in isn't configured</h1>
@@ -74,9 +74,9 @@ function NoGitLabProviderNotice({ isAppAdmin }: { isAppAdmin: boolean }) {
 						: " Ask an instance admin to add one (Instance admin → Login providers)."}
 				</p>
 				{isAppAdmin && (
-					<Button className="w-fit" render={<Link to="/admin/login-providers" />}>
+					<Link to="/admin/login-providers" className={buttonVariants({ className: "w-fit" })}>
 						Manage login providers
-					</Button>
+					</Link>
 				)}
 			</div>
 		</div>
@@ -99,7 +99,7 @@ function GitLabLinkPrompt({
 }) {
 	const multiple = providers.length > 1;
 	return (
-		<div className="mx-auto max-w-2xl py-8">
+		<div className="mx-auto w-full max-w-2xl">
 			<BackToProviders />
 			<div className="space-y-4">
 				<div className="space-y-1.5">
@@ -288,7 +288,7 @@ function GitLabWizardPage() {
 	}
 	if (providersError) {
 		return (
-			<div className="mx-auto max-w-2xl py-8">
+			<div className="mx-auto w-full max-w-2xl">
 				<Alert variant="destructive">
 					<OctagonXIcon aria-hidden="true" />
 					<AlertTitle>Unable to load</AlertTitle>
@@ -318,7 +318,7 @@ function GitLabWizardPage() {
 	}
 
 	return (
-		<div className="mx-auto max-w-2xl py-8">
+		<div className="mx-auto w-full max-w-2xl">
 			{/* Visually hidden live region for screen reader step announcements */}
 			<div aria-live="polite" aria-atomic="true" className="sr-only">
 				{stepAnnouncement}

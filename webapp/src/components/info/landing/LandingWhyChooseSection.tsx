@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 export function LandingWhyChooseSection() {
 	return (
 		<section className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30">
-			<div className="container px-4 md:px-6">
+			<div className="mx-auto w-full max-w-7xl px-4 md:px-6">
 				<div className="mx-auto max-w-3xl">
 					<div className="flex flex-col justify-center space-y-5">
 						<Badge className="w-fit" variant="outline">

@@ -1,5 +1,6 @@
-import { ChevronDown } from "lucide-react";
-import { type FormEvent, type ReactNode, useId, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { BrainCircuit, ChevronDown } from "lucide-react";
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentBinding,
 	AgentBindingRequest,
@@ -7,6 +8,8 @@ import type {
 	WorkspaceLlmUsageReport,
 } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,18 +35,21 @@ interface PurposeMeta {
 	purpose: Purpose;
 	title: string;
 	description: string;
+	disabledLabel: string;
 }
 
 const PURPOSES: PurposeMeta[] = [
 	{
 		purpose: "PRACTICE_DETECTION",
-		title: "Practice detection",
-		description: "Reviews pull requests, issues, and conversations.",
+		title: "Practice reviews",
+		description: "Reviews connected project work and conversations.",
+		disabledLabel: "Practice reviews off",
 	},
 	{
 		purpose: "MENTOR",
-		title: "Mentor",
-		description: "Powers the mentor chat.",
+		title: "Heph",
+		description: "Powers conversations with Heph.",
+		disabledLabel: "Heph web chat off",
 	},
 ];
 
@@ -51,7 +57,6 @@ export const PURPOSE_TITLES: Record<Purpose, string> = Object.fromEntries(
 	PURPOSES.map((meta) => [meta.purpose, meta.title]),
 ) as Record<Purpose, string>;
 
-/** Mirrors `AgentBindingLimits` on the server, which the generated client carries only as prose. */
 const MIN_TIMEOUT_SECONDS = 30;
 const MAX_TIMEOUT_SECONDS = 3600;
 const MIN_CONCURRENT_JOBS = 1;
@@ -68,10 +73,6 @@ function bindingToSelection(binding?: AgentBinding): ModelSelection | null {
 	return null;
 }
 
-/**
- * A numeric field held as the string the user typed, so an emptied input stays empty instead of
- * collapsing to `Number("") === 0` and silently saving a zero.
- */
 interface ParsedNumber {
 	value: number | null;
 	error: string | null;
@@ -103,25 +104,18 @@ export interface AgentBindingsPageProps {
 	availableModels: AvailableLlmModel[];
 	practicesEnabled: boolean;
 	mentorEnabled: boolean;
-	/** The workspace's own AI providers, mounted by the route because this section fetches its own data. */
 	providerPanel?: ReactNode;
 	usage?: WorkspaceLlmUsageReport;
 	isLoading: boolean;
 	isError: boolean;
 	loadError: unknown;
 	pendingPurposes: ReadonlySet<Purpose>;
-	/**
-	 * How many writes *this admin* has completed against each purpose. A card reseeds from the server
-	 * binding exactly when they save or turn it off, and never on a background refetch — which would
-	 * discard the edits they have open.
-	 */
 	saveRevisions?: Partial<Record<Purpose, number>>;
 	onRetry: () => void;
 	onSave: (purpose: Purpose, body: AgentBindingRequest) => void;
 	onTurnOff: (purpose: Purpose) => void;
 }
 
-/** What each AI task runs on, one card per purpose. Presentational: the route owns every query. */
 export function AgentBindingsPage({
 	workspaceSlug,
 	bindings,
@@ -144,71 +138,73 @@ export function AgentBindingsPage({
 		purpose === "MENTOR" ? mentorEnabled : practicesEnabled;
 
 	return (
-		<div className="container mx-auto max-w-4xl py-6">
-			<div className="mb-6">
-				<h1 className="text-3xl font-bold tracking-tight">AI models</h1>
-			</div>
+		<PageLayout>
+			<PageHeader
+				icon={<BrainCircuit />}
+				title="AI models"
+				description="Choose the models that power workspace AI features."
+			/>
 
-			{/* Each paused cap gets its own banner, the one the workspace can act on first. */}
-			{(usage?.ownProviderPaused || usage?.instancePaused) && (
-				<div className="mb-6 space-y-3">
-					{usage.ownProviderPaused && (
-						<BudgetExhaustedAlert
-							scope="own"
-							verdict={usage.ownProviderBudgetVerdict}
-							unpricedEventCount={usage.unpricedEventCount}
-							context="models"
-							workspaceSlug={workspaceSlug}
-						/>
-					)}
-					{usage.instancePaused && (
-						<BudgetExhaustedAlert
-							scope="shared"
-							verdict={usage.instanceBudgetVerdict}
-							unpricedEventCount={usage.unpricedEventCount}
-							context="models"
-							workspaceSlug={workspaceSlug}
-						/>
-					)}
-				</div>
-			)}
-
-			{isError ? (
-				<QueryErrorAlert error={loadError} title="Couldn't load AI models" onRetry={onRetry} />
-			) : isLoading ? (
-				<div className="flex h-40 items-center justify-center">
-					<Spinner className="size-6" />
-				</div>
-			) : (
-				<div className="space-y-6">
-					<section className="space-y-4">
-						<h2 className="text-lg font-semibold">Tasks</h2>
-						{PURPOSES.map((meta) => (
-							<AgentPurposeCard
-								// Keyed on this admin's own writes, not on the bound model id: that would remount
-								// over whatever they have typed the moment *another* admin repointed the purpose.
-								key={`${meta.purpose}:${saveRevisions?.[meta.purpose] ?? 0}`}
-								meta={meta}
-								binding={bindingFor(meta.purpose)}
-								availableModels={availableModels}
-								featureEnabled={featureEnabled(meta.purpose)}
-								pending={pendingPurposes.has(meta.purpose)}
-								onSave={onSave}
-								onTurnOff={onTurnOff}
+			<div className="max-w-4xl space-y-6">
+				{(usage?.ownProviderPaused || usage?.instancePaused) && (
+					<div className="space-y-3">
+						{usage.ownProviderPaused && (
+							<BudgetExhaustedAlert
+								scope="own"
+								verdict={usage.ownProviderBudgetVerdict}
+								unpricedEventCount={usage.unpricedEventCount}
+								context="models"
+								workspaceSlug={workspaceSlug}
 							/>
-						))}
-					</section>
+						)}
+						{usage.instancePaused && (
+							<BudgetExhaustedAlert
+								scope="shared"
+								verdict={usage.instanceBudgetVerdict}
+								unpricedEventCount={usage.unpricedEventCount}
+								context="models"
+								workspaceSlug={workspaceSlug}
+							/>
+						)}
+					</div>
+				)}
 
-					{/* The panel owns this section's heading, because it sits in a row with "Add provider". */}
-					{providerPanel && <section className="space-y-4">{providerPanel}</section>}
-				</div>
-			)}
-		</div>
+				{isError ? (
+					<QueryErrorAlert error={loadError} title="Couldn't load AI models" onRetry={onRetry} />
+				) : isLoading ? (
+					<div className="flex h-40 items-center justify-center">
+						<Spinner className="size-6" />
+					</div>
+				) : (
+					<div className="space-y-6">
+						<section className="space-y-4">
+							<h2 className="text-lg font-semibold">Model assignments</h2>
+							{PURPOSES.map((meta) => (
+								<AgentPurposeCard
+									key={`${meta.purpose}:${saveRevisions?.[meta.purpose] ?? 0}`}
+									meta={meta}
+									workspaceSlug={workspaceSlug}
+									binding={bindingFor(meta.purpose)}
+									availableModels={availableModels}
+									featureEnabled={featureEnabled(meta.purpose)}
+									pending={pendingPurposes.has(meta.purpose)}
+									onSave={onSave}
+									onTurnOff={onTurnOff}
+								/>
+							))}
+						</section>
+
+						{providerPanel && <section className="space-y-4">{providerPanel}</section>}
+					</div>
+				)}
+			</div>
+		</PageLayout>
 	);
 }
 
 interface AgentPurposeCardProps {
 	meta: PurposeMeta;
+	workspaceSlug: string;
 	binding?: AgentBinding;
 	availableModels: AvailableLlmModel[];
 	featureEnabled: boolean;
@@ -219,6 +215,7 @@ interface AgentPurposeCardProps {
 
 function AgentPurposeCard({
 	meta,
+	workspaceSlug,
 	binding,
 	availableModels,
 	featureEnabled,
@@ -227,6 +224,7 @@ function AgentPurposeCard({
 	onTurnOff,
 }: AgentPurposeCardProps) {
 	const cardLabelId = useId();
+	const formRef = useRef<HTMLFormElement>(null);
 	const [selection, setSelection] = useState<ModelSelection | null>(bindingToSelection(binding));
 	const [enabled, setEnabled] = useState(binding?.enabled ?? true);
 	const [timeoutSeconds, setTimeoutSeconds] = useState(String(binding?.timeoutSeconds ?? 600));
@@ -235,10 +233,10 @@ function AgentPurposeCard({
 	);
 	const [allowInternet, setAllowInternet] = useState(binding?.allowInternet ?? false);
 	const [showAdvanced, setShowAdvanced] = useState(false);
-	// Withheld until the first submit, so nothing is marked invalid before anything was attempted.
-	const [showErrors, setShowErrors] = useState(false);
+	const [submitAttempt, setSubmitAttempt] = useState(0);
 
 	const noModels = availableModels.length === 0;
+	const showErrors = submitAttempt > 0;
 
 	const timeout = parseWholeNumber(timeoutSeconds, MIN_TIMEOUT_SECONDS, "seconds", TIMEOUT_CEILING);
 	const concurrency = parseWholeNumber(maxConcurrentJobs, MIN_CONCURRENT_JOBS, "runs");
@@ -254,12 +252,16 @@ function AgentPurposeCard({
 		[noModels ? modelHintId : null, modelError ? modelErrorId : null].filter(Boolean).join(" ") ||
 		undefined;
 
+	useEffect(() => {
+		if (submitAttempt > 0) {
+			formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+		}
+	}, [submitAttempt]);
+
 	const handleSubmit = (event: FormEvent) => {
 		event.preventDefault();
 		if (!selection || timeout.value == null || concurrency.value == null) {
-			// Save stays enabled precisely so this reveals *why*; the disclosure opens because the
-			// offending field may be inside it.
-			setShowErrors(true);
+			setSubmitAttempt((attempt) => attempt + 1);
 			if (timeout.value == null || concurrency.value == null) setShowAdvanced(true);
 			return;
 		}
@@ -273,50 +275,54 @@ function AgentPurposeCard({
 		});
 	};
 
-	if (!featureEnabled) {
-		return (
-			<Card role="region" aria-labelledby={cardLabelId}>
-				<CardHeader>
-					<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
-					<CardDescription>
-						Turned off for this workspace. Only your host can turn it on.
-					</CardDescription>
-				</CardHeader>
-			</Card>
-		);
-	}
-
 	return (
-		// A landmark: every card's Save, Turn off and model picker otherwise read identically.
 		<Card role="region" aria-labelledby={cardLabelId}>
 			<CardHeader>
 				<div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 					<div className="min-w-0 flex-1">
 						<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
-						<CardDescription>{meta.description}</CardDescription>
+						<CardDescription>
+							{meta.description}
+							{!featureEnabled && (
+								<div>
+									<Link
+										to={
+											meta.purpose === "PRACTICE_DETECTION"
+												? "/w/$workspaceSlug/admin/practices/settings"
+												: "/w/$workspaceSlug/admin/settings"
+										}
+										params={{ workspaceSlug }}
+										className="underline underline-offset-4"
+									>
+										{meta.purpose === "PRACTICE_DETECTION"
+											? "Open Review settings"
+											: "Open Workspace settings"}
+									</Link>
+								</div>
+							)}
+						</CardDescription>
 					</div>
-					{binding &&
-						(binding.ready ? (
-							<Badge variant="secondary">Ready</Badge>
-						) : (
-							<Badge variant="destructive">Not ready</Badge>
-						))}
+					<div className="flex flex-wrap justify-end gap-2">
+						{binding &&
+							(binding.ready ? (
+								<Badge variant="secondary">Ready</Badge>
+							) : (
+								<Badge variant="destructive">Not ready</Badge>
+							))}
+						{!featureEnabled && <Badge variant="secondary">{meta.disabledLabel}</Badge>}
+					</div>
 				</div>
 			</CardHeader>
-			{/* noValidate: left to the browser, `min` blocks submit with a bubble `FieldError` can't explain. */}
-			<form onSubmit={handleSubmit} noValidate>
+			<form ref={formRef} onSubmit={handleSubmit} noValidate>
 				<CardContent className="space-y-4">
 					<FieldGroup>
 						<Field data-invalid={Boolean(modelError)}>
-							<FieldLabel htmlFor={`${meta.purpose}-model`}>{meta.title} runs on</FieldLabel>
+							<FieldLabel htmlFor={`${meta.purpose}-model`}>{meta.title} model</FieldLabel>
 							<ModelPicker
 								id={`${meta.purpose}-model`}
 								availableModels={availableModels}
 								value={selection}
-								onChange={(next) => {
-									setSelection(next);
-									setShowErrors(false);
-								}}
+								onChange={setSelection}
 								disabled={pending || noModels}
 								invalid={Boolean(modelError)}
 								aria-describedby={modelDescribedBy}
@@ -331,12 +337,12 @@ function AgentPurposeCard({
 						</Field>
 
 						<Field orientation="horizontal">
-							<FieldLabel htmlFor={`${meta.purpose}-enabled`}>Active</FieldLabel>
+							<FieldLabel htmlFor={`${meta.purpose}-enabled`}>Use this model</FieldLabel>
 							<Switch
 								id={`${meta.purpose}-enabled`}
-								checked={enabled}
+								checked={selection != null && enabled}
 								onCheckedChange={setEnabled}
-								disabled={pending}
+								disabled={pending || selection == null}
 							/>
 						</Field>
 					</FieldGroup>
@@ -368,10 +374,7 @@ function AgentPurposeCard({
 											value={timeoutSeconds}
 											aria-invalid={Boolean(timeoutError)}
 											aria-describedby={timeoutError ? timeoutErrorId : undefined}
-											onChange={(e) => {
-												setTimeoutSeconds(e.target.value);
-												setShowErrors(false);
-											}}
+											onChange={(e) => setTimeoutSeconds(e.target.value)}
 											disabled={pending}
 										/>
 										{timeoutError && <FieldError id={timeoutErrorId}>{timeoutError}</FieldError>}
@@ -388,10 +391,7 @@ function AgentPurposeCard({
 											value={maxConcurrentJobs}
 											aria-invalid={Boolean(concurrencyError)}
 											aria-describedby={concurrencyError ? concurrencyErrorId : undefined}
-											onChange={(e) => {
-												setMaxConcurrentJobs(e.target.value);
-												setShowErrors(false);
-											}}
+											onChange={(e) => setMaxConcurrentJobs(e.target.value)}
 											disabled={pending}
 										/>
 										{concurrencyError && (
@@ -421,11 +421,11 @@ function AgentPurposeCard({
 								onClick={() => onTurnOff(meta.purpose)}
 								disabled={pending}
 							>
-								Turn off
+								Clear assignment
 							</Button>
 						)}
 						<Button type="submit" size="sm" disabled={pending}>
-							Save
+							Save assignment
 						</Button>
 					</div>
 				</CardContent>

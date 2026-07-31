@@ -31,7 +31,6 @@ export interface ProfileTimeframePickerProps {
 	schedule?: LeaderboardSchedule;
 }
 
-/** Icon component for each preset type */
 function PresetIcon({ preset, className }: { preset: TimeframePreset; className?: string }) {
 	const iconClass = cn("h-4 w-4 shrink-0", className);
 
@@ -58,7 +57,6 @@ export function ProfileTimeframePicker({
 }: ProfileTimeframePickerProps) {
 	const [userInteracted, setUserInteracted] = useState(false);
 
-	// Initial preset - captured on first render only via initializer
 	const [selectedPreset, setSelectedPreset] = useState<TimeframePreset>(() =>
 		detectPresetFromDates(afterDate, beforeDate, schedule, enableAllActivity),
 	);
@@ -131,8 +129,6 @@ export function ProfileTimeframePicker({
 
 		if (preset === "custom" && !customRange?.from) {
 			const now = new Date();
-			// If we have an afterDate from props (from a previous preset),
-			// use it as the from date and set to as now
 			if (afterDate) {
 				const fromDate = parseISO(afterDate);
 				setCustomRange({
@@ -140,7 +136,6 @@ export function ProfileTimeframePicker({
 					to: now,
 				});
 			} else {
-				// Fallback to last 7 days
 				setCustomRange({
 					from: subDays(now, 7),
 					to: now,
@@ -156,7 +151,6 @@ export function ProfileTimeframePicker({
 		}
 	};
 
-	// Format custom range label for the button
 	const formatCustomRangeLabel = () => {
 		if (!customRange?.from) return "Pick dates";
 		const from = customRange.from;
@@ -167,7 +161,6 @@ export function ProfileTimeframePicker({
 		}
 
 		if (isSameYear(from, to)) {
-			// Same month: "Dec 1 – 8", different month: "Nov 25 – Dec 1"
 			if (from.getMonth() === to.getMonth()) {
 				return `${format(from, "MMM d")} – ${format(to, "d")}`;
 			}
@@ -183,11 +176,10 @@ export function ProfileTimeframePicker({
 				onValueChange={(value) => value && handlePresetChange(value)}
 				items={items}
 			>
-				<SelectTrigger className="w-65">
+				<SelectTrigger className="w-65" aria-label="Timeframe">
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
 				<SelectContent>
-					{/* Dropdown items use simple labels - easy to scan */}
 					{enableAllActivity && (
 						<SelectItem value="all-activity">
 							<PresetIcon preset="all-activity" />

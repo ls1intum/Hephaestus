@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
@@ -26,6 +27,8 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -39,12 +42,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/**
- * Controller for CRUD management of practice definitions.
- *
- * <p>All endpoints are workspace-scoped. Read operations require workspace membership;
- * write operations require workspace admin or owner role.
- */
 @WorkspaceScopedController
 @RequestMapping("/practices")
 @Tag(name = "Practice Catalog", description = "Manage practice definitions")
@@ -65,7 +62,7 @@ public class PracticeCatalogController {
         description = "Practices returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class)))
     )
-    @SecurityRequirements
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<List<PracticeDTO>> listPractices(
         WorkspaceContext workspaceContext,
         @RequestParam(name = "active", required = false) @Parameter(
@@ -111,9 +108,12 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "404",
         description = "Practice not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
-    @SecurityRequirements
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<PracticeDTO> getPractice(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug
@@ -132,10 +132,21 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "409",
         description = "Practice slug already exists in this workspace",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Practice area not found",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "practice content is versioned in practice_revision (SCD-2 lineage)")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<PracticeDTO> createPractice(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeRequestDTO request
@@ -161,10 +172,13 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "400",
         description = "orderedSlugs is empty, has duplicates, or is not the area's complete set",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalogue display order; changes no behaviour")
+    @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
     public ResponseEntity<List<PracticeDTO>> reorderPractices(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody ReorderPracticesRequestDTO request
@@ -179,7 +193,7 @@ public class PracticeCatalogController {
     }
 
     @PatchMapping("/{practiceSlug}")
-    @Operation(summary = "Update a practice definition")
+    @Operation(summary = "Update a practice")
     @ApiResponse(
         responseCode = "200",
         description = "Practice updated",
@@ -187,13 +201,14 @@ public class PracticeCatalogController {
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Practice not found",
-        content = @Content(schema = @Schema(hidden = true))
+        description = "Practice or practice area not found",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(
-        reason = "criteria edits append a practice_revision; other fields are catalogue content that gates nothing"
-    )
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<PracticeDTO> updatePractice(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -213,7 +228,10 @@ public class PracticeCatalogController {
     @ApiResponse(
         responseCode = "404",
         description = "Practice not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_ACTIVE")
@@ -228,21 +246,24 @@ public class PracticeCatalogController {
 
     @PutMapping("/{practiceSlug}/area")
     @Operation(
-        summary = "Bind a practice to an area",
-        description = "Binds the practice to the area named by areaSlug, or unbinds it when areaSlug is null"
+        summary = "Move a practice",
+        description = "Moves the practice to the requested area, or to Unassigned when areaSlug is null"
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Binding updated",
+        description = "Practice moved",
         content = @Content(schema = @Schema(implementation = PracticeDTO.class))
     )
     @ApiResponse(
         responseCode = "404",
         description = "Practice or area not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
+    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
     public ResponseEntity<PracticeDTO> bindArea(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -252,16 +273,60 @@ public class PracticeCatalogController {
         return ResponseEntity.ok(PracticeDTO.from(practice));
     }
 
+    @PutMapping("/{practiceSlug}/placement")
+    @Operation(
+        summary = "Place a practice in the catalog",
+        description = "Moves the practice and sets its exact position in one atomic write; omit areaSlug for Unassigned"
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Practice placed; the full updated practice list is returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class)))
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "position is missing, negative, or beyond the destination",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Practice or area not found",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
+    )
+    @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    public ResponseEntity<List<PracticeDTO>> placePractice(
+        WorkspaceContext workspaceContext,
+        @PathVariable String practiceSlug,
+        @Valid @RequestBody PlacePracticeRequestDTO request
+    ) {
+        List<PracticeDTO> practices = practiceService
+            .placePractice(workspaceContext, practiceSlug, request.areaSlug(), request.position())
+            .stream()
+            .map(PracticeDTO::from)
+            .toList();
+        return ResponseEntity.ok(practices);
+    }
+
     @DeleteMapping("/{practiceSlug}")
     @Operation(summary = "Delete a practice definition")
     @ApiResponse(responseCode = "204", description = "Practice deleted")
     @ApiResponse(
         responseCode = "404",
         description = "Practice not found",
-        content = @Content(schema = @Schema(hidden = true))
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_ACTIVE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<Void> deletePractice(WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
         practiceService.deletePractice(workspaceContext, practiceSlug);
         return ResponseEntity.noContent().build();
