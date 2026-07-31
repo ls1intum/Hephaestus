@@ -20,7 +20,8 @@ record PracticeDefinitionSnapshot(
     String criteriaSha256,
     @Nullable String precomputeScriptSha256,
     @Nullable String whyItMatters,
-    @Nullable String whatGoodLooksLike
+    @Nullable String whatGoodLooksLike,
+    @Nullable String areaSlug
 ) implements ConfigAuditSnapshot {
     static PracticeDefinitionSnapshot of(Practice practice, @Nullable Integer criteriaRevision) {
         return new PracticeDefinitionSnapshot(
@@ -32,7 +33,8 @@ record PracticeDefinitionSnapshot(
             sha256(practice.getCriteria()),
             practice.getPrecomputeScript() == null ? null : sha256(practice.getPrecomputeScript()),
             practice.getWhyItMatters(),
-            practice.getWhatGoodLooksLike()
+            practice.getWhatGoodLooksLike(),
+            practice.getArea() == null ? null : practice.getArea().getSlug()
         );
     }
 

@@ -1,7 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeDetectionFingerprint;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -20,31 +25,32 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 /**
- * An immutable, append-only snapshot of a {@link Practice}'s {@code criteria} at a point in time — the
- * rubric exactly as it was when a finding was detected against it.
+ * Complete practice definition used to reproduce historical observations.
  *
- * <p>Reproducibility: admins edit {@code Practice.criteria} over time; without snapshots no past finding
- * could be reproduced against the rubric that actually fired it. This is Slowly-Changing-Dimension Type 2
- * over {@code criteria}: each edit appends a revision; {@link Practice#getCriteria()} remains the current
- * projection, so no read path breaks.
- *
- * <p>{@code Observation.practiceRevision} pins each finding to the revision the detector saw
- * (ON DELETE SET NULL); a finding detected before versioning shipped pins {@code null} — an honest
- * "pre-versioning" marker, not a reproducible snapshot. See ADR 0021 / ADR 0022.
+ * <p>{@code Observation.practiceRevision} pins each finding to the definition the detector saw.
  */
 @Entity
 @Immutable
 @Table(
     name = "practice_revision",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_practice_revision_practice_number",
-        columnNames = { "practice_id", "revision_number" }
-    ),
-    indexes = @Index(name = "idx_practice_revision_practice", columnList = "practice_id")
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_practice_revision_practice_number",
+            columnNames = { "practice_id", "revision_number" }
+        ),
+        @UniqueConstraint(name = "uk_practice_revision_owner", columnNames = { "id", "practice_id" }),
+    },
+    indexes = {
+        @Index(name = "idx_practice_revision_practice", columnList = "practice_id"),
+        @Index(name = "idx_practice_revision_equivalent_curated", columnList = "equivalent_curated_revision_id"),
+    }
 )
 @Getter
 @NoArgsConstructor
@@ -68,31 +74,106 @@ public class PracticeRevision {
     @ToString.Exclude
     private Practice practice;
 
-    /**
-     * 1-based, monotonic per practice: revision 1 is created with the practice, {@code +1} on each criteria
-     * change. Unique with {@code practice_id} ({@code uk_practice_revision_practice_number}) — the stable
-     * cross-finding identity of a criteria version.
-     */
     @Column(name = "revision_number", nullable = false)
     private int revisionNumber;
 
-    /** The {@code criteria} text exactly as it was at this revision. */
+    @Column(name = "slug", length = 64)
+    private String slug;
+
+    @Column(name = "name", length = 128)
+    private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "applies_to", length = 32)
+    private WorkArtifact artifactType;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "trigger_events", columnDefinition = "jsonb")
+    @ToString.Exclude
+    private JsonNode triggerEvents;
+
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude
     private String criteria;
 
+    @Column(name = "precompute_script", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String precomputeScript;
+
+    @Column(name = "why_it_matters", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String whyItMatters;
+
+    @Column(name = "what_good_looks_like", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String whatGoodLooksLike;
+
+    @Column(name = "area_slug", length = 64)
+    private String areaSlug;
+
+    @Column(name = "area_name", length = 128)
+    private String areaName;
+
+    @Column(name = "area_description", columnDefinition = "TEXT")
+    private String areaDescription;
+
+    @Column(name = "area_icon", length = 64)
+    private String areaIcon;
+
+    @Column(name = "area_color", length = 32)
+    private String areaColor;
+
+    @Column(name = "detection_fingerprint", length = 64)
+    private String detectionFingerprint;
+
+    /** Curated revision with equivalent detector inputs; independent of catalog-copy provenance. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+        name = "equivalent_curated_revision_id",
+        foreignKey = @ForeignKey(name = "fk_practice_revision_equivalent_curated_revision")
+    )
+    @ToString.Exclude
+    private CuratedPracticeRevision equivalentCuratedRevision;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public PracticeRevision(Practice practice, int revisionNumber, String criteria) {
-        // Fail fast at the call site: criteria/practice are NOT NULL and revision_number is 1-based, so a misuse
-        // should surface a meaningful message here rather than as a deferred flush-time DataIntegrityViolation.
+    public PracticeRevision(Practice practice, int revisionNumber) {
+        this(practice, revisionNumber, null);
+    }
+
+    public PracticeRevision(Practice practice, int revisionNumber, CuratedPracticeRevision equivalentCuratedRevision) {
         this.practice = Objects.requireNonNull(practice, "practice");
         if (revisionNumber < 1) {
             throw new IllegalArgumentException("revisionNumber must be >= 1, got " + revisionNumber);
         }
         this.revisionNumber = revisionNumber;
-        this.criteria = Objects.requireNonNull(criteria, "criteria");
+        this.slug = Objects.requireNonNull(practice.getSlug(), "practice.slug");
+        this.name = Objects.requireNonNull(practice.getName(), "practice.name");
+        this.artifactType = Objects.requireNonNull(practice.getArtifactType(), "practice.artifactType");
+        this.triggerEvents = Objects.requireNonNull(practice.getTriggerEvents(), "practice.triggerEvents").deepCopy();
+        this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
+        this.precomputeScript = practice.getPrecomputeScript();
+        this.whyItMatters = practice.getWhyItMatters();
+        this.whatGoodLooksLike = practice.getWhatGoodLooksLike();
+        PracticeArea area = practice.getArea();
+        if (area != null) {
+            this.areaSlug = area.getSlug();
+            this.areaName = area.getName();
+            this.areaDescription = area.getDescription();
+            this.areaIcon = area.getIcon();
+            this.areaColor = area.getColor();
+        }
+        this.detectionFingerprint = PracticeDetectionFingerprint.of(
+            slug,
+            name,
+            artifactType,
+            TriggerEventsConverter.toList(triggerEvents),
+            criteria,
+            precomputeScript,
+            areaSlug
+        );
+        this.equivalentCuratedRevision = equivalentCuratedRevision;
     }
 
     @PrePersist

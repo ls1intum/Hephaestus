@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedPractice;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -41,6 +43,7 @@ import tools.jackson.databind.JsonNode;
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
         @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
+        @Index(name = "idx_practice_source_curated_practice", columnList = "source_curated_practice_id"),
     }
 )
 @Getter
@@ -84,6 +87,20 @@ public class Practice {
     @ToString.Exclude
     private PracticeArea area;
 
+    /** Catalog provenance retained after a workspace edits its copy; revision equivalence is tracked separately. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+        name = "source_curated_practice_id",
+        foreignKey = @ForeignKey(name = "fk_practice_source_curated_practice")
+    )
+    @ToString.Exclude
+    private CuratedPractice sourceCuratedPractice;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_revision_id", foreignKey = @ForeignKey(name = "fk_practice_current_revision"))
+    @ToString.Exclude
+    private PracticeRevision currentRevision;
+
     @Column(name = "display_order", nullable = false)
     @ColumnDefault("0")
     private int displayOrder = 0;
@@ -100,8 +117,8 @@ public class Practice {
 
     /**
      * The detection rubric the agent evaluates the artifact against — the rule's normative text, never shown
-     * to learners. Mutable; every edit is snapshotted into {@link PracticeRevision} (SCD-2), and the
-     * {@code DEFECT-DETECTOR DISCIPLINE} marker token (see {@link #isDefectDetector()}) lives in this text.
+     * to learners. The {@code DEFECT-DETECTOR DISCIPLINE} marker token (see {@link #isDefectDetector()}) lives
+     * in this text.
      */
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude

@@ -110,6 +110,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "LlmModel", // Instance-curated model behind a connection; global
         "LlmModelPrice", // Instance model price history; global pricing authority
         "InstanceLlmSettings", // Instance LLM settings singleton (egress allowlist + BYO enable + default policy); global
+        "CuratedPractice", // Instance-managed practice identity and retirement lifecycle
+        "CuratedPracticeRevision", // Immutable global curated definition history
+        "CuratedPracticeArea", // Global curated catalog taxonomy
+        "CuratedCatalogSyncState", // Singleton state for the shipped global catalog
         "FxRate", // ECB daily reference rate for display-only conversion; a world fact, not tenant data
         "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
         // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.

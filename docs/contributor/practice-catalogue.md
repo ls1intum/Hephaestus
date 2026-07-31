@@ -1,14 +1,18 @@
 # Practice catalogue curation
 
-The practice catalogue turns observable engineering habits into review criteria. This guide defines
-how bundled defaults are selected and maintained; it does not mirror the deployed catalogue.
+The practice catalogue turns observable engineering habits into review criteria.
 
 ## Sources of truth
 
-- Bundled areas and practices:
+- Shipped catalogue:
   [`default-catalog.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/practices/default-catalog.json)
+  and its referenced precompute scripts
+- Effective instance catalogue: the database projection of the shipped catalogue plus explicit
+  instance overrides, managed at `/admin/catalog` or through `/admin/practice-catalog`
 - Workspace-specific catalogue: the workspace database, managed through the admin UI or REST API
-- Persisted schema and constraints: Liquibase changelogs
+- Workspace default seed: the effective available shipped practices, copied once when the workspace
+  is initialized
+- Persisted schema and initial bootstrap: Liquibase changelogs
 - HTTP projections: generated OpenAPI
 - Product vocabulary: [Practice feedback language](practice-feedback-language.md)
 
@@ -33,11 +37,11 @@ act such as recording a decision, but it must not turn that act into a claim abo
 
 Use the strongest accurate description:
 
-| Label | Meaning |
-| --- | --- |
-| Peer-reviewed evidence | An empirical study directly supports the claimed relationship |
+| Label                          | Meaning                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| Peer-reviewed evidence         | An empirical study directly supports the claimed relationship                  |
 | Standard or canonical guidance | A recognized standard or established engineering guide recommends the practice |
-| Practitioner norm | A community convention; no controlled outcome claim is made |
+| Practitioner norm              | A community convention; no controlled outcome claim is made                    |
 
 Do not present a standard as an experiment or a convention as a proven outcome. Record the exact
 source in the proposal or pull request that changes the catalogue so reviewers can assess the claim.
@@ -61,12 +65,33 @@ Avoid hype, grading language, and claims broader than the artifact being reviewe
 1. State the user problem and supported artifact.
 2. Cite the evidence and classify the claim honestly.
 3. Draft applicability, positive/negative signals, exclusions, and severity.
-4. Edit `default-catalog.json`; an area is optional.
-5. Add or update the catalogue seed, validation, and focused detection tests.
+4. For a default that should reach every deployment, change the bundled catalogue and increment its
+   `catalogRevision`. For an instance-only practice or variation, use `/admin/catalog`.
+5. Add or update focused detection tests when the execution contract changes.
 6. Review learner-facing copy in the admin UI and a representative delivered message.
+
+On startup, a newer bundled revision is applied automatically to practices that still follow the
+shipped definition. An instance edit creates a whole-practice override instead; later bundled
+updates remain available without replacing that override. An administrator can return to the latest
+bundled definition from the editor. A deployed catalogue revision is immutable: changing bundled
+content without incrementing `catalogRevision` prevents startup, while an older application replica
+cannot roll the catalogue back.
+
+Every effective definition change appends an immutable revision. Retirement is an instance policy:
+it hides a practice from the workspace-facing catalogue without changing its source relationship or
+existing workspace copies. A practice removed from a newer bundle is retained in history and hidden
+rather than deleted.
+
+A workspace practice retains its curated source after local edits. Its current revision remains
+equivalent only while its detector inputs match the curated revision; learner-facing edits preserve
+that equivalence.
 
 Workspace-specific practices should be created through the admin UI or API, not direct SQL, so
 validation, ordering, revisions, and audit behavior remain intact.
+
+Workspace defaults are snapshots, not subscriptions. A new workspace receives the current effective
+bundled definitions with their provenance. Subsequent bundled or instance changes never rewrite
+workspace copies; administrators decide whether to adopt a newer curated revision.
 
 ## Reference register
 

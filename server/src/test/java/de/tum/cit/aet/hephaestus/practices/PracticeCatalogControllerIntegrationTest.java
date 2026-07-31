@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -827,6 +828,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(persisted.get().getName()).isEqualTo("New Name");
             assertThat(persisted.get().getCriteria()).isEqualTo("New prompt");
             assertThat(persisted.get().getArea().getSlug()).isEqualTo("target-area");
+            PracticeRevision revision = practiceRevisionRepository
+                .findFirstByPracticeIdOrderByRevisionNumberDesc(persisted.get().getId())
+                .orElseThrow();
+            assertThat(revision.getName()).isEqualTo("New Name");
+            assertThat(revision.getCriteria()).isEqualTo("New prompt");
+            assertThat(revision.getAreaSlug()).isEqualTo("target-area");
+            assertThat(revision.getAreaName()).isEqualTo("Area target-area");
         }
 
         @Test
@@ -1193,6 +1201,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(slugsIn(result, "source")).containsExactly("alpha", "charlie");
             assertThat(slugsIn(result, "destination")).containsExactly("delta", "bravo", "echo");
+            Practice moved = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "bravo").orElseThrow();
+            PracticeRevision revision = practiceRevisionRepository
+                .findFirstByPracticeIdOrderByRevisionNumberDesc(moved.getId())
+                .orElseThrow();
+            assertThat(revision.getAreaSlug()).isEqualTo("destination");
+            assertThat(revision.getAreaName()).isEqualTo("Area destination");
         }
 
         @Test
@@ -1640,8 +1654,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     @Nested
-    @DisplayName("Practice criteria versioning (SCD-2)")
-    class CriteriaVersioning {
+    @DisplayName("Practice definition revision history")
+    class DefinitionVersioning {
 
         private List<PracticeRevision> revisionsFor(String slug) {
             Long practiceId = practiceRepository
@@ -1658,7 +1672,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("create appends revision 1 snapshotting the criteria")
+        @DisplayName("create appends revision 1 snapshotting the complete definition")
         void createAppendsRevisionOne() {
             ensureAdminMembership(workspace);
 
@@ -1675,7 +1689,15 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             List<PracticeRevision> revisions = revisionsFor("versioned-practice");
             assertThat(revisions).hasSize(1);
             assertThat(revisions.get(0).getRevisionNumber()).isEqualTo(1);
+            assertThat(revisions.get(0).getSlug()).isEqualTo("versioned-practice");
+            assertThat(revisions.get(0).getName()).isEqualTo("Practice versioned-practice");
+            assertThat(revisions.get(0).getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+            assertThat(TriggerEventsConverter.toList(revisions.get(0).getTriggerEvents())).containsExactly(
+                "PullRequestCreated",
+                "ReviewSubmitted"
+            );
             assertThat(revisions.get(0).getCriteria()).isEqualTo("Detect if the PR follows best practices");
+            assertThat(revisions.get(0).getDetectionFingerprint()).hasSize(64);
             assertThat(revisions.get(0).getCreatedAt()).isNotNull();
         }
 
@@ -1726,8 +1748,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("update that does NOT change criteria appends no new revision")
-        void unchangedCriteriaAppendsNoRevision() {
+        @DisplayName("renaming a practice appends a complete new revision")
+        void renameAppendsRevision() {
             ensureAdminMembership(workspace);
 
             webTestClient
@@ -1763,8 +1785,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isOk();
 
             List<PracticeRevision> revisions = revisionsFor("stable-practice");
-            assertThat(revisions).hasSize(1);
-            assertThat(revisions.get(0).getRevisionNumber()).isEqualTo(1);
+            assertThat(revisions).hasSize(2);
+            assertThat(revisions).extracting(PracticeRevision::getRevisionNumber).containsExactly(1, 2);
+            assertThat(revisions)
+                .extracting(PracticeRevision::getName)
+                .containsExactly("Practice stable-practice", "Renamed Practice");
         }
 
         @Test

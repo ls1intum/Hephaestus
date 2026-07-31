@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
@@ -138,7 +140,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @AuditExempt(reason = "area visuals and learner grouping do not change review execution")
     public ResponseEntity<PracticeAreaDTO> updateArea(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
@@ -208,7 +210,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<Void> deleteArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
         areaService.deleteArea(workspaceContext, areaSlug);
         return ResponseEntity.noContent().build();

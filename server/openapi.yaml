@@ -105,6 +105,8 @@ tags:
      on both success and failure; only <code>Accept: application/json</code> requests get
      4xx JSON.
   name: o-auth-callback-controller
+- description: Instance-managed curated practice definitions
+  name: Admin Practice Catalog
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
@@ -351,6 +353,7 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - PRACTICE_DEFINITION
+            - CURATED_PRACTICE
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -846,6 +849,211 @@ paths:
       summary: Update a login provider
       tags:
       - Admin
+  /admin/practice-catalog/areas:
+    get:
+      operationId: adminListCuratedPracticeAreas
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CuratedPracticeArea"
+          description: OK
+      summary: List curated practice areas
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/practices:
+    get:
+      operationId: adminListCuratedPractices
+      parameters:
+      - in: query
+        name: includeRetired
+        required: false
+        schema:
+          type: boolean
+          default: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CuratedPracticeSummary"
+          description: OK
+      summary: List curated practices
+      tags:
+      - Admin Practice Catalog
+    post:
+      operationId: adminCreateCuratedPractice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCuratedPracticeRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPracticeDetail"
+          description: Curated practice created
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Slug already exists
+      summary: Create a curated practice
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/practices/{slug}:
+    get:
+      operationId: adminGetCuratedPractice
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPracticeDetail"
+          description: OK
+      summary: Get a curated practice
+      tags:
+      - Admin Practice Catalog
+    put:
+      operationId: adminUpdateCuratedPractice
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCuratedPracticeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPracticeDetail"
+          description: Curated practice updated
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Replace a curated practice definition
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/practices/{slug}/override:
+    delete:
+      operationId: adminDeleteCuratedPracticeOverride
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPracticeDetail"
+          description: Bundled practice definition restored
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No bundled definition is available
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Restore the bundled practice definition
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/practices/{slug}/status:
+    patch:
+      operationId: adminUpdateCuratedPracticeStatus
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCuratedPracticeStatusRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPracticeDetail"
+          description: Curated practice status updated
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Retire or restore a curated practice
+      tags:
+      - Admin Practice Catalog
   /admin/users:
     get:
       operationId: adminListUsers
@@ -1719,6 +1927,7 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - PRACTICE_DEFINITION
+            - CURATED_PRACTICE
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -3561,6 +3770,53 @@ paths:
       summary: Update a practice area
       tags:
       - Practice Areas
+  /workspaces/{workspaceSlug}/practice-catalog:
+    get:
+      operationId: listCuratedPracticeCatalog
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPracticeCatalog"
+          description: OK
+      summary: Browse the curated practice catalog
+      tags:
+      - curated-practice-catalog
+  /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
+    get:
+      operationId: getCuratedPracticeCatalogEntry
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPracticeDetail"
+          description: OK
+      summary: Inspect an available curated practice
+      tags:
+      - curated-practice-catalog
   /workspaces/{workspaceSlug}/practices:
     get:
       description: "Returns all practice definitions for the workspace, optionally\
@@ -6427,6 +6683,7 @@ components:
           - WORKSPACE_VISIBILITY
           - PRACTICE_ACTIVE
           - PRACTICE_DEFINITION
+          - CURATED_PRACTICE
           - WORKSPACE_INSTANCE_LLM_BUDGET
           - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
@@ -6725,6 +6982,57 @@ components:
       - id
       - login
       - name
+    CreateCuratedPracticeRequest:
+      type: object
+      properties:
+        areaSlug:
+          type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        artifactType:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        criteria:
+          type: string
+          maxLength: 50000
+          minLength: 0
+        name:
+          type: string
+          maxLength: 128
+          minLength: 3
+        precomputeScript:
+          type: string
+          maxLength: 100000
+          minLength: 0
+        slug:
+          type: string
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        triggerEvents:
+          type: array
+          items:
+            type: string
+          maxItems: 10
+          minItems: 0
+        whatGoodLooksLike:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        whyItMatters:
+          type: string
+          maxLength: 2000
+          minLength: 0
+      required:
+      - artifactType
+      - criteria
+      - name
+      - slug
+      - triggerEvents
     CreateLlmConnectionRequest:
       type: object
       description: Create an instance LLM provider connection
@@ -7141,6 +7449,180 @@ components:
       - displayName
       - kind
       - workspaceSlug
+    CuratedPracticeArea:
+      type: object
+      properties:
+        color:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+          format: int32
+        icon:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+      - displayOrder
+      - name
+      - slug
+    CuratedPracticeCatalog:
+      type: object
+      properties:
+        areas:
+          type: array
+          items:
+            $ref: "#/components/schemas/CuratedPracticeArea"
+        practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/CuratedPracticeSummary"
+      required:
+      - areas
+      - practices
+    CuratedPracticeDetail:
+      type: object
+      properties:
+        areaSlug:
+          type: string
+        artifactType:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        criteria:
+          type: string
+        id:
+          type: integer
+          format: int64
+        latestBundledCatalogRevision:
+          type: integer
+          format: int64
+        name:
+          type: string
+        precomputeScript:
+          type: string
+        revisionCreatedAt:
+          type: string
+          format: date-time
+        revisionNumber:
+          type: integer
+          format: int32
+        slug:
+          type: string
+        sourceKind:
+          type: string
+          enum:
+          - BUNDLED
+          - INSTANCE
+        status:
+          type: string
+          enum:
+          - AVAILABLE
+          - RETIRED
+        syncStatus:
+          type: string
+          enum:
+          - SYNCED
+          - OVERRIDDEN
+          - UPDATE_AVAILABLE
+          - SOURCE_REMOVED
+          - INSTANCE
+        triggerEvents:
+          type: array
+          items:
+            type: string
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+        whatGoodLooksLike:
+          type: string
+        whyItMatters:
+          type: string
+      required:
+      - artifactType
+      - criteria
+      - id
+      - name
+      - revisionCreatedAt
+      - revisionNumber
+      - slug
+      - sourceKind
+      - status
+      - syncStatus
+      - triggerEvents
+      - updatedAt
+      - version
+    CuratedPracticeSummary:
+      type: object
+      properties:
+        areaSlug:
+          type: string
+        artifactType:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        id:
+          type: integer
+          format: int64
+        latestBundledCatalogRevision:
+          type: integer
+          format: int64
+        name:
+          type: string
+        revisionCreatedAt:
+          type: string
+          format: date-time
+        revisionNumber:
+          type: integer
+          format: int32
+        slug:
+          type: string
+        sourceKind:
+          type: string
+          enum:
+          - BUNDLED
+          - INSTANCE
+        status:
+          type: string
+          enum:
+          - AVAILABLE
+          - RETIRED
+        syncStatus:
+          type: string
+          enum:
+          - SYNCED
+          - OVERRIDDEN
+          - UPDATE_AVAILABLE
+          - SOURCE_REMOVED
+          - INSTANCE
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+      required:
+      - artifactType
+      - id
+      - name
+      - revisionCreatedAt
+      - revisionNumber
+      - slug
+      - sourceKind
+      - status
+      - syncStatus
+      - updatedAt
+      - version
     CurrentUserView:
       type: object
       properties:
@@ -10659,6 +11141,61 @@ components:
           - UNINSTALLED
       required:
       - state
+    UpdateCuratedPracticeRequest:
+      type: object
+      properties:
+        areaSlug:
+          type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        artifactType:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        criteria:
+          type: string
+          maxLength: 50000
+          minLength: 0
+        name:
+          type: string
+          maxLength: 128
+          minLength: 3
+        precomputeScript:
+          type: string
+          maxLength: 100000
+          minLength: 0
+        triggerEvents:
+          type: array
+          items:
+            type: string
+          maxItems: 10
+          minItems: 0
+        whatGoodLooksLike:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        whyItMatters:
+          type: string
+          maxLength: 2000
+          minLength: 0
+      required:
+      - artifactType
+      - criteria
+      - name
+      - triggerEvents
+    UpdateCuratedPracticeStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - AVAILABLE
+          - RETIRED
+      required:
+      - status
     UpdateInstanceLlmSettingsRequest:
       type: object
       description: Update instance-wide LLM governance settings (all fields optional)

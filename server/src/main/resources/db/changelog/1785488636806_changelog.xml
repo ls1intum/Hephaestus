@@ -1,0 +1,542 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1785488636806-1" author="hephaestus">
+        <preConditions
+            onFail="MARK_RAN"
+            onFailMessage="Practice catalog installation state or workspace catalog tables are not present">
+            <tableExists tableName="practice_catalog_installation"/>
+            <tableExists tableName="practice_area"/>
+            <tableExists tableName="practice"/>
+        </preConditions>
+        <comment>
+            Remove the installation marker only when a workspace has neither areas nor practices. Lock both
+            catalog tables so the emptiness decision cannot race a concurrent catalog write.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            LOCK TABLE practice_area, practice IN SHARE MODE;
+
+            DELETE FROM practice_catalog_installation installation
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM practice_area area
+                WHERE area.workspace_id = installation.workspace_id
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM practice
+                WHERE practice.workspace_id = installation.workspace_id
+            );
+        ]]></sql>
+        <rollback>
+            <!-- Re-inserting a marker could suppress a catalog installed after this repair. -->
+            <empty/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1785488636806-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Configuration audit schema is not present">
+            <columnExists tableName="config_audit_event" columnName="workspace_id"/>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event ALTER COLUMN workspace_id DROP NOT NULL;
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                    'PRACTICE_DEFINITION', 'CURATED_PRACTICE',
+                    'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                ));
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_scope
+                CHECK (
+                    (entity_type = 'CURATED_PRACTICE' AND workspace_id IS NULL)
+                    OR (entity_type <> 'CURATED_PRACTICE' AND workspace_id IS NOT NULL)
+                );
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DO $rollback$
+                BEGIN
+                    ALTER TABLE config_audit_event DROP CONSTRAINT IF EXISTS ck_config_audit_event_scope;
+                    IF EXISTS (SELECT 1 FROM config_audit_event WHERE workspace_id IS NULL) THEN
+                        RAISE WARNING 'config_audit_event.workspace_id remains nullable because instance-scoped audit rows exist';
+                    ELSE
+                        ALTER TABLE config_audit_event ALTER COLUMN workspace_id SET NOT NULL;
+                    END IF;
+                    IF NOT EXISTS (SELECT 1 FROM config_audit_event WHERE entity_type = 'CURATED_PRACTICE') THEN
+                        ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                        ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                            CHECK (entity_type IN (
+                                'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                                'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                                'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                                'PRACTICE_DEFINITION',
+                                'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                                'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                                'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                            ));
+                    END IF;
+                END
+                $rollback$;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1785488636806-3" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Curated practice catalog tables already present">
+            <not><tableExists tableName="curated_practice"/></not>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE curated_practice_area (
+                id BIGSERIAL PRIMARY KEY,
+                slug VARCHAR(64) NOT NULL CONSTRAINT uk_curated_practice_area_slug UNIQUE,
+                name VARCHAR(128) NOT NULL,
+                description TEXT,
+                display_order INTEGER NOT NULL,
+                icon VARCHAR(64),
+                color VARCHAR(32),
+                created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+                updated_at TIMESTAMP(6) WITH TIME ZONE NOT NULL
+            );
+
+            CREATE TABLE curated_practice (
+                id BIGSERIAL PRIMARY KEY,
+                slug VARCHAR(64) NOT NULL CONSTRAINT uk_curated_practice_slug UNIQUE,
+                current_revision_id BIGINT,
+                source_kind VARCHAR(16) NOT NULL,
+                sync_status VARCHAR(24) NOT NULL,
+                latest_bundled_revision_id BIGINT,
+                retired_at TIMESTAMP(6) WITH TIME ZONE,
+                created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+                updated_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+                version BIGINT NOT NULL,
+                CONSTRAINT ck_curated_practice_source_kind
+                    CHECK (source_kind IN ('BUNDLED', 'INSTANCE')),
+                CONSTRAINT ck_curated_practice_sync_status
+                    CHECK (sync_status IN (
+                        'SYNCED', 'OVERRIDDEN', 'UPDATE_AVAILABLE', 'SOURCE_REMOVED', 'INSTANCE'
+                    )),
+                CONSTRAINT ck_curated_practice_sync_shape
+                    CHECK (
+                        (
+                            source_kind = 'INSTANCE'
+                            AND sync_status = 'INSTANCE'
+                            AND latest_bundled_revision_id IS NULL
+                        )
+                        OR (
+                            source_kind = 'BUNDLED'
+                            AND sync_status <> 'INSTANCE'
+                        )
+                    )
+            );
+
+            CREATE TABLE curated_practice_revision (
+                id BIGSERIAL PRIMARY KEY,
+                curated_practice_id BIGINT NOT NULL,
+                revision_number INTEGER NOT NULL CHECK (revision_number >= 1),
+                name VARCHAR(128) NOT NULL,
+                applies_to VARCHAR(32) NOT NULL,
+                trigger_events JSONB NOT NULL,
+                criteria TEXT NOT NULL,
+                precompute_script TEXT,
+                why_it_matters TEXT,
+                what_good_looks_like TEXT,
+                area_slug VARCHAR(64),
+                detection_fingerprint VARCHAR(64) NOT NULL,
+                origin VARCHAR(24) NOT NULL,
+                bundle_revision BIGINT,
+                definition_digest VARCHAR(64) NOT NULL,
+                created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+                CONSTRAINT uk_curated_practice_revision_number UNIQUE (curated_practice_id, revision_number),
+                CONSTRAINT uk_curated_practice_revision_bundle UNIQUE (curated_practice_id, bundle_revision),
+                CONSTRAINT uk_curated_practice_revision_owner UNIQUE (id, curated_practice_id),
+                CONSTRAINT fk_curated_practice_revision_practice FOREIGN KEY (curated_practice_id)
+                    REFERENCES curated_practice(id) ON DELETE RESTRICT,
+                CONSTRAINT fk_curated_practice_revision_area FOREIGN KEY (area_slug)
+                    REFERENCES curated_practice_area(slug) ON DELETE RESTRICT,
+                CONSTRAINT ck_curated_practice_revision_applies_to
+                    CHECK (applies_to IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD')),
+                CONSTRAINT ck_curated_practice_revision_trigger_events
+                    CHECK (jsonb_typeof(trigger_events) = 'array'),
+                CONSTRAINT ck_curated_practice_revision_fingerprint
+                    CHECK (detection_fingerprint ~ '^[0-9a-f]{64}$'),
+                CONSTRAINT ck_curated_practice_revision_origin
+                    CHECK (origin IN ('BUNDLED', 'ADMIN', 'ADMIN_RESOLUTION')),
+                CONSTRAINT ck_curated_practice_revision_bundle_shape
+                    CHECK (
+                        (origin = 'BUNDLED' AND bundle_revision IS NOT NULL AND bundle_revision >= 1)
+                        OR (origin IN ('ADMIN', 'ADMIN_RESOLUTION') AND bundle_revision IS NULL)
+                    ),
+                CONSTRAINT ck_curated_practice_revision_definition_digest
+                    CHECK (definition_digest ~ '^[0-9a-f]{64}$')
+            );
+            ALTER TABLE curated_practice
+                ADD CONSTRAINT uk_curated_practice_current_revision UNIQUE (current_revision_id),
+                ADD CONSTRAINT uk_curated_practice_latest_bundled_revision
+                    UNIQUE (latest_bundled_revision_id),
+                ADD CONSTRAINT fk_curated_practice_current_revision
+                    FOREIGN KEY (current_revision_id)
+                    REFERENCES curated_practice_revision(id) ON DELETE RESTRICT,
+                ADD CONSTRAINT fk_curated_practice_latest_bundled_revision
+                    FOREIGN KEY (latest_bundled_revision_id)
+                    REFERENCES curated_practice_revision(id) ON DELETE RESTRICT;
+            CREATE INDEX idx_curated_practice_latest_bundled_revision
+                ON curated_practice(latest_bundled_revision_id);
+
+            CREATE TABLE curated_catalog_sync_state (
+                source VARCHAR(16) PRIMARY KEY,
+                catalog_revision BIGINT NOT NULL,
+                content_digest VARCHAR(64),
+                synchronized_at TIMESTAMP(6) WITH TIME ZONE,
+                provenance_backfill_version INTEGER NOT NULL DEFAULT 0,
+                provenance_backfilled_at TIMESTAMP(6) WITH TIME ZONE,
+                CONSTRAINT ck_curated_catalog_sync_state_source CHECK (source = 'BUNDLED'),
+                CONSTRAINT ck_curated_catalog_sync_state_shape CHECK (
+                    (
+                        catalog_revision = 0
+                        AND content_digest IS NULL
+                        AND synchronized_at IS NULL
+                    )
+                    OR (
+                        catalog_revision >= 1
+                        AND content_digest ~ '^[0-9a-f]{64}$'
+                        AND synchronized_at IS NOT NULL
+                    )
+                ),
+                CONSTRAINT ck_curated_catalog_provenance_backfill_shape CHECK (
+                    (
+                        provenance_backfill_version = 0
+                        AND provenance_backfilled_at IS NULL
+                    )
+                    OR (
+                        provenance_backfill_version = 1
+                        AND provenance_backfilled_at IS NOT NULL
+                    )
+                )
+            );
+            INSERT INTO curated_catalog_sync_state (
+                source, catalog_revision, content_digest, synchronized_at,
+                provenance_backfill_version, provenance_backfilled_at
+            ) VALUES ('BUNDLED', 0, NULL, NULL, 0, NULL);
+
+            CREATE FUNCTION enforce_curated_practice_revision_pointers()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $complete_practice$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM curated_practice practice
+                    WHERE practice.id = NEW.id
+                      AND (
+                          practice.current_revision_id IS NULL
+                          OR NOT EXISTS (
+                              SELECT 1
+                              FROM curated_practice_revision revision
+                              WHERE revision.id = practice.current_revision_id
+                                AND revision.curated_practice_id = NEW.id
+                          )
+                      )
+                ) THEN
+                    RAISE EXCEPTION 'curated practice requires a current revision' USING ERRCODE = '23514';
+                END IF;
+                IF EXISTS (
+                    SELECT 1 FROM curated_practice practice
+                    WHERE practice.id = NEW.id
+                      AND practice.source_kind = 'BUNDLED'
+                      AND (
+                          practice.latest_bundled_revision_id IS NULL
+                          OR NOT EXISTS (
+                              SELECT 1
+                              FROM curated_practice_revision revision
+                              WHERE revision.id = practice.latest_bundled_revision_id
+                                AND revision.curated_practice_id = NEW.id
+                                AND revision.origin = 'BUNDLED'
+                          )
+                      )
+                ) THEN
+                    RAISE EXCEPTION 'bundled curated practice revision pointers are incomplete'
+                        USING ERRCODE = '23514';
+                END IF;
+                RETURN NULL;
+            END;
+            $complete_practice$;
+
+            CREATE CONSTRAINT TRIGGER curated_practice_requires_revision_pointers
+                AFTER INSERT OR UPDATE OF current_revision_id, latest_bundled_revision_id,
+                    source_kind, sync_status ON curated_practice
+                DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION enforce_curated_practice_revision_pointers();
+
+            CREATE FUNCTION reject_curated_practice_revision_mutation()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $immutable_revision$
+            BEGIN
+                RAISE EXCEPTION 'curated practice revisions are append-only' USING ERRCODE = '55000';
+            END;
+            $immutable_revision$;
+
+            CREATE TRIGGER curated_practice_revision_append_only
+                BEFORE UPDATE OR DELETE ON curated_practice_revision
+                FOR EACH ROW EXECUTE FUNCTION reject_curated_practice_revision_mutation();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE curated_practice
+                    DROP CONSTRAINT IF EXISTS fk_curated_practice_current_revision,
+                    DROP CONSTRAINT IF EXISTS fk_curated_practice_latest_bundled_revision;
+                DROP TABLE curated_catalog_sync_state;
+                DROP TABLE curated_practice_revision;
+                DROP TABLE curated_practice;
+                DROP TABLE curated_practice_area;
+                DROP FUNCTION reject_curated_practice_revision_mutation();
+                DROP FUNCTION enforce_curated_practice_revision_pointers();
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1785488636806-4" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Workspace practice revisions already contain complete definitions">
+            <not><columnExists tableName="practice_revision" columnName="slug"/></not>
+        </preConditions>
+        <comment>Make a complete immutable revision the authoritative current definition for every workspace practice.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE practice_revision
+                ADD COLUMN slug VARCHAR(64),
+                ADD COLUMN name VARCHAR(128),
+                ADD COLUMN applies_to VARCHAR(32),
+                ADD COLUMN trigger_events JSONB,
+                ADD COLUMN precompute_script TEXT,
+                ADD COLUMN why_it_matters TEXT,
+                ADD COLUMN what_good_looks_like TEXT,
+                ADD COLUMN area_slug VARCHAR(64),
+                ADD COLUMN area_name VARCHAR(128),
+                ADD COLUMN area_description TEXT,
+                ADD COLUMN area_icon VARCHAR(64),
+                ADD COLUMN area_color VARCHAR(32),
+                ADD COLUMN detection_fingerprint VARCHAR(64),
+                ADD COLUMN equivalent_curated_revision_id BIGINT;
+
+            ALTER TABLE practice
+                ADD COLUMN current_revision_id BIGINT,
+                ADD COLUMN source_curated_practice_id BIGINT;
+
+            INSERT INTO practice_revision (
+                practice_id, revision_number, criteria, created_at,
+                slug, name, applies_to, trigger_events, precompute_script,
+                why_it_matters, what_good_looks_like,
+                area_slug, area_name, area_description, area_icon, area_color
+            )
+            SELECT practice.id,
+                   COALESCE(max_revision.revision_number, 0) + 1,
+                   practice.criteria,
+                   CURRENT_TIMESTAMP,
+                   practice.slug,
+                   practice.name,
+                   practice.applies_to,
+                   practice.trigger_events,
+                   practice.precompute_script,
+                   practice.why_it_matters,
+                   practice.what_good_looks_like,
+                   area.slug,
+                   area.name,
+                   area.description,
+                   area.icon,
+                   area.color
+            FROM practice
+            LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+            LEFT JOIN (
+                SELECT practice_id, max(revision_number) AS revision_number
+                FROM practice_revision
+                GROUP BY practice_id
+            ) max_revision ON max_revision.practice_id = practice.id;
+
+            UPDATE practice
+            SET current_revision_id = current_revision.id
+            FROM practice_revision current_revision
+            WHERE current_revision.practice_id = practice.id
+              AND current_revision.revision_number = (
+                  SELECT max(candidate.revision_number)
+                  FROM practice_revision candidate
+                  WHERE candidate.practice_id = practice.id
+              );
+
+            ALTER TABLE practice_revision
+                ADD CONSTRAINT uk_practice_revision_owner UNIQUE (id, practice_id),
+                ADD CONSTRAINT fk_practice_revision_equivalent_curated_revision
+                    FOREIGN KEY (equivalent_curated_revision_id)
+                    REFERENCES curated_practice_revision(id) ON DELETE RESTRICT,
+                ADD CONSTRAINT ck_practice_revision_number
+                    CHECK (revision_number >= 1),
+                ADD CONSTRAINT ck_practice_revision_definition_shape
+                    CHECK (
+                        (
+                            slug IS NULL
+                            AND name IS NULL
+                            AND applies_to IS NULL
+                            AND trigger_events IS NULL
+                            AND detection_fingerprint IS NULL
+                            AND equivalent_curated_revision_id IS NULL
+                        )
+                        OR (
+                            slug IS NOT NULL
+                            AND name IS NOT NULL
+                            AND applies_to IS NOT NULL
+                            AND trigger_events IS NOT NULL
+                        )
+                    ),
+                ADD CONSTRAINT ck_practice_revision_applies_to
+                    CHECK (applies_to IS NULL OR applies_to IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD')),
+                ADD CONSTRAINT ck_practice_revision_trigger_events
+                    CHECK (trigger_events IS NULL OR jsonb_typeof(trigger_events) = 'array'),
+                ADD CONSTRAINT ck_practice_revision_fingerprint
+                    CHECK (detection_fingerprint IS NULL OR detection_fingerprint ~ '^[0-9a-f]{64}$');
+
+            ALTER TABLE practice
+                ADD CONSTRAINT uk_practice_current_revision UNIQUE (current_revision_id),
+                ADD CONSTRAINT fk_practice_current_revision
+                    FOREIGN KEY (current_revision_id)
+                    REFERENCES practice_revision(id),
+                ADD CONSTRAINT fk_practice_source_curated_practice
+                    FOREIGN KEY (source_curated_practice_id)
+                    REFERENCES curated_practice(id) ON DELETE RESTRICT;
+
+            CREATE INDEX idx_practice_revision_equivalent_curated
+                ON practice_revision(equivalent_curated_revision_id);
+            CREATE INDEX idx_practice_source_curated_practice
+                ON practice(source_curated_practice_id);
+
+            CREATE FUNCTION enforce_practice_revision_immutability()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $immutable_revision$
+            BEGIN
+                IF OLD.equivalent_curated_revision_id IS NULL
+                   AND NEW.equivalent_curated_revision_id IS NOT NULL
+                   AND OLD.detection_fingerprint IS NULL
+                   AND NEW.detection_fingerprint IS NOT NULL
+                   AND NEW.practice_id = OLD.practice_id
+                   AND NEW.revision_number = OLD.revision_number
+                   AND NEW.slug IS NOT DISTINCT FROM OLD.slug
+                   AND NEW.name IS NOT DISTINCT FROM OLD.name
+                   AND NEW.applies_to IS NOT DISTINCT FROM OLD.applies_to
+                   AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
+                   AND NEW.criteria = OLD.criteria
+                   AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
+                   AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
+                   AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
+                   AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
+                   AND NEW.area_name IS NOT DISTINCT FROM OLD.area_name
+                   AND NEW.area_description IS NOT DISTINCT FROM OLD.area_description
+                   AND NEW.area_icon IS NOT DISTINCT FROM OLD.area_icon
+                   AND NEW.area_color IS NOT DISTINCT FROM OLD.area_color
+                   AND NEW.created_at = OLD.created_at
+                THEN
+                    RETURN NEW;
+                END IF;
+                RAISE EXCEPTION 'practice revisions are immutable' USING ERRCODE = '55000';
+            END;
+            $immutable_revision$;
+
+            CREATE TRIGGER practice_revision_immutable_update
+                BEFORE UPDATE ON practice_revision
+                FOR EACH ROW EXECUTE FUNCTION enforce_practice_revision_immutability();
+
+            CREATE FUNCTION enforce_practice_current_revision_projection()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $current_projection$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM practice practice
+                    JOIN practice_revision revision
+                      ON revision.id = practice.current_revision_id
+                     AND revision.practice_id = practice.id
+                    LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+                    WHERE practice.id = NEW.id
+                      AND revision.slug = practice.slug
+                      AND revision.name = practice.name
+                      AND revision.applies_to = practice.applies_to
+                      AND revision.trigger_events = practice.trigger_events
+                      AND revision.criteria = practice.criteria
+                      AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
+                      AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
+                      AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                      AND revision.area_slug IS NOT DISTINCT FROM area.slug
+                ) THEN
+                    RAISE EXCEPTION 'practice current revision does not match its current projection'
+                        USING ERRCODE = '23514';
+                END IF;
+                RETURN NULL;
+            END;
+            $current_projection$;
+
+            CREATE CONSTRAINT TRIGGER practice_requires_current_revision_projection
+                AFTER INSERT OR UPDATE OF current_revision_id, slug, name, applies_to, trigger_events,
+                    criteria, precompute_script, why_it_matters, what_good_looks_like, practice_area_id
+                ON practice
+                DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION enforce_practice_current_revision_projection();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TRIGGER IF EXISTS practice_requires_current_revision_projection ON practice;
+                DROP FUNCTION IF EXISTS enforce_practice_current_revision_projection();
+                DROP TRIGGER IF EXISTS practice_revision_immutable_update ON practice_revision;
+                DROP FUNCTION IF EXISTS enforce_practice_revision_immutability();
+
+                ALTER TABLE practice
+                    DROP CONSTRAINT IF EXISTS fk_practice_current_revision,
+                    DROP CONSTRAINT IF EXISTS uk_practice_current_revision,
+                    DROP CONSTRAINT IF EXISTS fk_practice_source_curated_practice;
+                UPDATE practice SET current_revision_id = NULL;
+
+                DELETE FROM practice_revision
+                WHERE slug IS NOT NULL
+                  AND detection_fingerprint IS NULL
+                  AND equivalent_curated_revision_id IS NULL;
+
+                DROP INDEX IF EXISTS idx_practice_revision_equivalent_curated;
+                DROP INDEX IF EXISTS idx_practice_source_curated_practice;
+
+                ALTER TABLE practice_revision
+                    DROP CONSTRAINT IF EXISTS uk_practice_revision_owner,
+                    DROP CONSTRAINT IF EXISTS fk_practice_revision_equivalent_curated_revision,
+                    DROP CONSTRAINT IF EXISTS ck_practice_revision_number,
+                    DROP CONSTRAINT IF EXISTS ck_practice_revision_definition_shape,
+                    DROP CONSTRAINT IF EXISTS ck_practice_revision_applies_to,
+                    DROP CONSTRAINT IF EXISTS ck_practice_revision_trigger_events,
+                    DROP CONSTRAINT IF EXISTS ck_practice_revision_fingerprint;
+
+                ALTER TABLE practice
+                    DROP COLUMN IF EXISTS current_revision_id,
+                    DROP COLUMN IF EXISTS source_curated_practice_id;
+                ALTER TABLE practice_revision
+                    DROP COLUMN IF EXISTS equivalent_curated_revision_id,
+                    DROP COLUMN IF EXISTS detection_fingerprint,
+                    DROP COLUMN IF EXISTS area_color,
+                    DROP COLUMN IF EXISTS area_icon,
+                    DROP COLUMN IF EXISTS area_description,
+                    DROP COLUMN IF EXISTS area_name,
+                    DROP COLUMN IF EXISTS area_slug,
+                    DROP COLUMN IF EXISTS what_good_looks_like,
+                    DROP COLUMN IF EXISTS why_it_matters,
+                    DROP COLUMN IF EXISTS precompute_script,
+                    DROP COLUMN IF EXISTS trigger_events,
+                    DROP COLUMN IF EXISTS applies_to,
+                    DROP COLUMN IF EXISTS name,
+                    DROP COLUMN IF EXISTS slug;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

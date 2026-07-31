@@ -5,6 +5,7 @@ import {
 	ChevronLeft,
 	CircleDollarSign,
 	KeyRound,
+	LibraryBig,
 	ScrollText,
 	Users,
 } from "lucide-react";
@@ -27,6 +28,12 @@ import {
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 	{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
+	{
+		to: "/admin/catalog",
+		label: "Catalog",
+		icon: LibraryBig,
+		tooltip: "Curated practices",
+	},
 	{
 		to: "/admin/login-providers",
 		label: "Login providers",

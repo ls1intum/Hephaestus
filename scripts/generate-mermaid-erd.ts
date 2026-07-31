@@ -270,10 +270,10 @@ class MermaidErdGenerator {
 		// without the ccu cross-join + DISTINCT.
 		const query = `
 			SELECT
-				conrel.relname  AS child_table,
-				att.attname     AS child_column,
+				conrel.relname AS child_table,
+				array_agg(att.attname ORDER BY k.ord)::text[] AS child_columns,
 				confrel.relname AS parent_table,
-				fatt.attname    AS parent_column,
+				array_agg(fatt.attname ORDER BY k.ord)::text[] AS parent_columns,
 				con.conname     AS constraint_name
 			FROM pg_constraint con
 			JOIN pg_class conrel ON conrel.oid = con.conrelid
@@ -288,34 +288,40 @@ class MermaidErdGenerator {
 			  AND conrel.relispartition = false
 			  AND conns.nspname = $1
 			  ${exclusionsClause}
-			ORDER BY conrel.relname, att.attnum, k.ord
+			GROUP BY conrel.relname, confrel.relname, con.conname
+			ORDER BY conrel.relname, con.conname
 		`;
 		const result = await this.client.query<{
 			child_table: string;
-			child_column: string;
+			child_columns: string[];
 			parent_table: string;
-			parent_column: string;
+			parent_columns: string[];
 			constraint_name: string;
 		}>(query, params);
 
 		const relationships: RelationshipInfo[] = [];
 		for (const row of result.rows) {
+			const childColumn = row.child_columns[0];
+			const parentColumn = row.parent_columns[0];
+			if (!childColumn || !parentColumn) {
+				continue;
+			}
 			const label = this.generateRelationshipLabel(
 				row.child_table,
 				row.parent_table,
-				row.child_column,
+				childColumn,
 			);
 			const cardinality = await this.detectRelationshipCardinality(
 				row.child_table,
-				row.child_column,
+				row.child_columns,
 				row.parent_table,
-				row.parent_column,
+				row.parent_columns,
 			);
 			relationships.push({
 				childTable: row.child_table,
-				childColumn: row.child_column,
+				childColumn,
 				parentTable: row.parent_table,
-				parentColumn: row.parent_column,
+				parentColumn,
 				constraintName: row.constraint_name,
 				label,
 				cardinality,
@@ -370,26 +376,28 @@ class MermaidErdGenerator {
 
 	private async detectRelationshipCardinality(
 		childTable: string,
-		childColumn: string,
+		childColumns: string[],
 		_parentTable: string,
-		_parentColumn: string,
+		_parentColumns: string[],
 	): Promise<RelationshipCardinality> {
+		const sortedChildColumns = [...childColumns].sort();
 		const uniqueQuery = `
 			SELECT COUNT(*) FROM (
-				SELECT ku.column_name
+				SELECT tc.constraint_name
 				FROM information_schema.table_constraints tc
 				JOIN information_schema.key_column_usage ku
 				  ON tc.constraint_name = ku.constraint_name
 				 AND tc.table_schema = ku.table_schema
 				WHERE tc.table_name = $1
 				  AND tc.table_schema = $2
-				  AND ku.column_name = $3
 				  AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE')
+				GROUP BY tc.constraint_name
+				HAVING array_agg(ku.column_name::text ORDER BY ku.column_name) <@ $3::text[]
 			) AS unique_constraints
 		`;
 		const uniqueResult = await this.client.query<{ count: string }>(
 			uniqueQuery,
-			[childTable, this.schema, childColumn],
+			[childTable, this.schema, sortedChildColumns],
 		);
 		const isUnique = Number(uniqueResult.rows[0]?.count ?? 0) > 0;
 
@@ -534,7 +542,10 @@ class MermaidErdGenerator {
 			)} : ${rel.label || "has"}`;
 		const lineCounts = new Map<string, number>();
 		for (const rel of relationships) {
-			lineCounts.set(renderedLine(rel), (lineCounts.get(renderedLine(rel)) ?? 0) + 1);
+			lineCounts.set(
+				renderedLine(rel),
+				(lineCounts.get(renderedLine(rel)) ?? 0) + 1,
+			);
 		}
 
 		for (const [cardinality, rels] of Object.entries(relationshipGroups)) {
@@ -665,7 +676,9 @@ function parseJdbcUrl(jdbcUrl: string): JdbcInfo {
 	}
 
 	// Match: jdbc:postgresql://host[:port]/database
-	const match = /^jdbc:postgresql:\/\/([^:/]+)(?::(\d+))?\/([^?]+)$/.exec(jdbcUrl);
+	const match = /^jdbc:postgresql:\/\/([^:/]+)(?::(\d+))?\/([^?]+)$/.exec(
+		jdbcUrl,
+	);
 	if (!match) {
 		throw new Error(
 			`Invalid JDBC URL format: ${sanitizeJdbcUrl(jdbcUrl)}. Expected jdbc:postgresql://host:port/database`,

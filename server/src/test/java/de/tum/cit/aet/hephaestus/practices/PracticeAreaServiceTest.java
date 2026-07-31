@@ -5,14 +5,19 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -35,6 +40,12 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
+    private PracticeRevisionService practiceRevisionService;
+
+    @Mock
+    private ConfigAuditPort configAudit;
+
+    @Mock
     private WorkspaceRepository workspaceRepository;
 
     @InjectMocks
@@ -54,6 +65,9 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     @BeforeEach
     void mockWorkspaceLock() {
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(new Workspace()));
+        PracticeRevision revision = mock(PracticeRevision.class);
+        lenient().when(revision.getRevisionNumber()).thenReturn(1);
+        lenient().when(practiceRevisionService.append(any())).thenReturn(revision);
     }
 
     @Test
@@ -103,6 +117,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     @Test
     void updateArea_appliesPartialChanges() {
         PracticeArea area = new PracticeArea();
+        area.setId(7L);
         area.setSlug("g");
         area.setName("Old");
         area.setDescription("original blurb");
@@ -121,6 +136,27 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void updateArea_appendsRevisionsWhenSnapshotAttributesChange() {
+        PracticeArea area = area("g");
+        area.setId(7L);
+        area.setName("Old");
+        Practice first = new Practice();
+        first.setId(1L);
+        Practice second = new Practice();
+        second.setId(2L);
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
+        when(practiceAreaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(1L, 7L)).thenReturn(
+            List.of(first, second)
+        );
+
+        service.updateArea(CTX, "g", new AreaAttributes("New", null, null, null, null));
+
+        verify(practiceRevisionService).append(first);
+        verify(practiceRevisionService).append(second);
+    }
+
+    @Test
     void getArea_missing_throwsNotFound() {
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "nope")).thenReturn(Optional.empty());
         assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() -> service.getArea(CTX, "nope"));
@@ -130,7 +166,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     void bindPractice_appendsToTheDestinationArea() {
         PracticeArea destination = area("destination");
         destination.setId(20L);
-        Practice moved = new Practice();
+        Practice moved = practice("moved");
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "moved")).thenReturn(Optional.of(moved));
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "destination")).thenReturn(Optional.of(destination));
         when(practiceRepository.findMaxDisplayOrder(1L, 20L)).thenReturn(4);
@@ -139,11 +175,12 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         Practice bound = service.bindPractice(CTX, "moved", "destination");
 
         assertThat(bound).extracting(Practice::getArea, Practice::getDisplayOrder).containsExactly(destination, 5);
+        verify(practiceRevisionService).append(bound);
     }
 
     @Test
     void bindPractice_nullAreaUnbinds() {
-        Practice practice = new Practice();
+        Practice practice = practice("p");
         PracticeArea currentArea = new PracticeArea();
         currentArea.setId(10L);
         practice.setArea(currentArea);
@@ -154,6 +191,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         Practice unbound = service.bindPractice(CTX, "p", null);
 
         assertThat(unbound).extracting(Practice::getArea, Practice::getDisplayOrder).containsExactly(null, 7);
+        verify(practiceRevisionService).append(unbound);
     }
 
     @Test
@@ -162,7 +200,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         currentArea.setId(10L);
         PracticeArea resolvedArea = area("current");
         resolvedArea.setId(10L);
-        Practice practice = new Practice();
+        Practice practice = practice("p");
         practice.setArea(currentArea);
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(practice));
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "current")).thenReturn(Optional.of(resolvedArea));
@@ -171,11 +209,12 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
         verify(practiceRepository, never()).findMaxDisplayOrder(any(), any());
         verify(practiceRepository, never()).save(any());
+        verify(practiceRevisionService, never()).append(any());
     }
 
     @Test
     void bindPractice_unresolvedArea_throwsNotFound() {
-        when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(new Practice()));
+        when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(practice("p")));
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "foreign")).thenReturn(Optional.empty());
 
         assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
@@ -188,9 +227,11 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     void deleteArea_appendsPracticesToUnassigned() {
         PracticeArea area = area("deleted");
         area.setId(20L);
-        Practice first = new Practice();
+        Practice first = practice("first");
+        first.setId(1L);
         first.setArea(area);
-        Practice second = new Practice();
+        Practice second = practice("second");
+        second.setId(2L);
         second.setArea(area);
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "deleted")).thenReturn(Optional.of(area));
         when(practiceRepository.findMaxDisplayOrder(1L, null)).thenReturn(3);
@@ -203,6 +244,8 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         assertThat(List.of(first, second))
             .extracting(Practice::getArea, Practice::getDisplayOrder)
             .containsExactly(tuple(null, 4), tuple(null, 5));
+        verify(practiceRevisionService).append(first);
+        verify(practiceRevisionService).append(second);
         verify(practiceAreaRepository).delete(area);
     }
 
@@ -210,6 +253,16 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         PracticeArea g = new PracticeArea();
         g.setSlug(slug);
         return g;
+    }
+
+    private static Practice practice(String slug) {
+        Practice practice = new Practice();
+        practice.setSlug(slug);
+        practice.setName(slug);
+        practice.setArtifactType(WorkArtifact.PULL_REQUEST);
+        practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
+        practice.setCriteria("criteria");
+        return practice;
     }
 
     @Test

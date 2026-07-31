@@ -263,7 +263,7 @@ public class PracticeCatalogController {
         )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<PracticeDTO> bindArea(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -300,7 +300,7 @@ public class PracticeCatalogController {
         )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<List<PracticeDTO>> placePractice(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,

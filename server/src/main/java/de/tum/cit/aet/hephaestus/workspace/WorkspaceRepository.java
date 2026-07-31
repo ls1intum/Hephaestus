@@ -17,6 +17,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Workspace is the tenant root - queries manage workspaces themselves")
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
+    Optional<Workspace> findFirstByOrderByIdAsc();
+
     /**
      * Pessimistic lock, for a read whose value is about to be snapshotted and mutated (the audited
      * AI-settings writes). Without it the before-snapshot and the write are not serialized: two
