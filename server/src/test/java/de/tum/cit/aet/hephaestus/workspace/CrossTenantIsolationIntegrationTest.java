@@ -132,13 +132,13 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         User ownerA = persistUser("owner-a");
         workspaceA = createWorkspace("tenant-a", "Tenant A", SHARED_LOGIN, AccountType.ORG, ownerA);
-        ensureWorkspaceMembership(workspaceA, overlapUser, WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspaceA, overlapUser, WorkspaceRole.ADMIN);
         User aliceOnlyA = persistUser("alice-only-a");
         ensureWorkspaceMembership(workspaceA, aliceOnlyA, WorkspaceRole.MEMBER);
 
         User ownerB = persistUser("owner-b");
         workspaceB = createWorkspace("tenant-b", "Tenant B", SHARED_LOGIN, AccountType.ORG, ownerB);
-        ensureWorkspaceMembership(workspaceB, overlapUser, WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspaceB, overlapUser, WorkspaceRole.ADMIN);
         bobOnlyB = persistUser("bob-only-b");
         ensureWorkspaceMembership(workspaceB, bobOnlyB, WorkspaceRole.MEMBER);
 
