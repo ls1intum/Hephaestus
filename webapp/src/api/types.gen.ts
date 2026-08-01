@@ -2049,7 +2049,7 @@ export type ResourceCounts = {
 };
 
 /**
- * Reorder the practices in one area — displayOrder follows the list index
+ * Reorder one area's practices to match the supplied list
  */
 export type ReorderPracticesRequest = {
     /**
@@ -2063,7 +2063,7 @@ export type ReorderPracticesRequest = {
 };
 
 /**
- * Reorder practice areas — displayOrder follows the list index
+ * Reorder practice areas to match the supplied list
  */
 export type ReorderPracticeAreasRequest = {
     /**

@@ -10207,7 +10207,7 @@ components:
       - newSlug
     ReorderPracticeAreasRequest:
       type: object
-      description: Reorder practice areas — displayOrder follows the list index
+      description: Reorder practice areas to match the supplied list
       properties:
         orderedSlugs:
           type: array
@@ -10222,8 +10222,7 @@ components:
       - orderedSlugs
     ReorderPracticesRequest:
       type: object
-      description: Reorder the practices in one area — displayOrder follows the list
-        index
+      description: Reorder one area's practices to match the supplied list
       properties:
         areaSlug:
           type:

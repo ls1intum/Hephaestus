@@ -4,11 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
-/**
- * Request to reorder practice areas. Each area's {@code displayOrder} is set to its index in the list,
- * so the whole ordering is written atomically in one request.
- */
-@Schema(description = "Reorder practice areas — displayOrder follows the list index")
+/** Reorder every area atomically; the list is the complete desired order. */
+@Schema(description = "Reorder practice areas to match the supplied list")
 public record ReorderPracticeAreasRequestDTO(
     @NotEmpty(message = "orderedSlugs must not be empty")
     @Schema(
