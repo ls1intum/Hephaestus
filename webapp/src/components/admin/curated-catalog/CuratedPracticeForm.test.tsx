@@ -129,7 +129,7 @@ describe("CuratedPracticeForm", () => {
 		);
 
 		expect(screen.getByText("Update waiting")).toBeTruthy();
-		expect(screen.getByText(/changed what this practice detects/)).toBeTruthy();
+		expect(screen.getByText(/would change what this practice detects/)).toBeTruthy();
 
 		// The incoming definition must be readable before it can be accepted.
 		fireEvent.click(screen.getByRole("button", { name: "Show the Hephaestus version" }));

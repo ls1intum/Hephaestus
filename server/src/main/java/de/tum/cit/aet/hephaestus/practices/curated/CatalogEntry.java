@@ -51,7 +51,12 @@ public record CatalogEntry<D extends CatalogDefinition>(
             : CatalogEntryState.UPDATE_WAITING;
     }
 
-    /** What separates the definition in force from the one Hephaestus ships now. */
+    /**
+     * What taking the shipped definition would change. This is the difference between what is in
+     * force and what Hephaestus ships, which is not the same as what Hephaestus changed — an
+     * administrator's own edit to the criteria makes the difference a detection one even if the
+     * newer build only reworded. Present it as a consequence, never as an attribution.
+     */
     public CatalogChangeKind changeKind() {
         if (shipped == null || overridden == null) {
             return CatalogChangeKind.NONE;

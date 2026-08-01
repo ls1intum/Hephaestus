@@ -66,7 +66,7 @@ describe("instance catalog routes", () => {
 		renderRouteAt("/admin/catalog");
 
 		await screen.findByText(/2 entries follow Hephaestus by default/, undefined, ROUTE_RENDER_WAIT);
-		expect(screen.getByText(/1 update waiting \(1 change detection\)/)).toBeTruthy();
+		expect(screen.getByText(/1 update waiting \(1 would change detection\)/)).toBeTruthy();
 	});
 
 	it("opens the practice editor from the catalog", async () => {

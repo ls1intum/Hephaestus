@@ -40,6 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
 // the workspace-facing surfaces that report catalog provenance are themselves not role-gated.
 public class CuratedCatalogService {
 
+    // What a "not found" reads as. The names an administrator sees on the Catalog page, not the
+    // types behind it — a slug that isn't in the catalog is the same miss whether or not a row exists.
+    private static final String CATALOG_PRACTICE = "Catalog practice";
+    private static final String CATALOG_AREA = "Catalog area";
+
     private final BundledPracticeCatalogLoader loader;
     private final CuratedPracticeOverrideRepository practiceOverrides;
     private final CuratedAreaOverrideRepository areaOverrides;
@@ -84,14 +89,14 @@ public class CuratedCatalogService {
     public CatalogEntry<PracticeDefinition> practice(String slug) {
         return catalog()
             .practice(slug)
-            .orElseThrow(() -> new EntityNotFoundException("CuratedPractice", slug));
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_PRACTICE, slug));
     }
 
     @Transactional(readOnly = true)
     public CatalogEntry<AreaDefinition> area(String slug) {
         return catalog()
             .area(slug)
-            .orElseThrow(() -> new EntityNotFoundException("CuratedPracticeArea", slug));
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
     }
 
     @Transactional
@@ -102,7 +107,7 @@ public class CuratedCatalogService {
     ) {
         EffectiveCatalog before = catalog();
         validate(before, definition);
-        CatalogEntry<PracticeDefinition> entry = require(before.practice(slug), "CuratedPractice", slug, precondition);
+        CatalogEntry<PracticeDefinition> entry = require(before.practice(slug), CATALOG_PRACTICE, slug, precondition);
         if (entry.effective().equals(definition)) {
             return entry;
         }
@@ -144,7 +149,7 @@ public class CuratedCatalogService {
     ) {
         CatalogEntry<PracticeDefinition> entry = require(
             catalog().practice(slug),
-            "CuratedPractice",
+            CATALOG_PRACTICE,
             slug,
             precondition
         );
@@ -172,7 +177,7 @@ public class CuratedCatalogService {
     ) {
         CatalogEntry<PracticeDefinition> entry = require(
             catalog().practice(slug),
-            "CuratedPractice",
+            CATALOG_PRACTICE,
             slug,
             precondition
         );
@@ -193,7 +198,7 @@ public class CuratedCatalogService {
     ) {
         CatalogEntry<PracticeDefinition> entry = require(
             catalog().practice(slug),
-            "CuratedPractice",
+            CATALOG_PRACTICE,
             slug,
             precondition
         );
@@ -218,7 +223,7 @@ public class CuratedCatalogService {
         @Nullable CuratedVersionPrecondition precondition,
         AreaDefinition definition
     ) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), "CuratedPracticeArea", slug, precondition);
+        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
         if (entry.effective().equals(definition)) {
             return entry;
         }
@@ -251,7 +256,7 @@ public class CuratedCatalogService {
 
     @Transactional
     public CatalogEntry<AreaDefinition> resetArea(String slug, @Nullable CuratedVersionPrecondition precondition) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), "CuratedPracticeArea", slug, precondition);
+        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
         if (entry.shipped() == null) {
             throw new CuratedCatalogConflictException("Hephaestus ships no definition for '" + slug + "'.");
         }
@@ -270,7 +275,7 @@ public class CuratedCatalogService {
 
     @Transactional
     public CatalogEntry<AreaDefinition> keepArea(String slug, @Nullable CuratedVersionPrecondition precondition) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), "CuratedPracticeArea", slug, precondition);
+        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
         areaOverrides
             .findBySlugForUpdate(slug)
             .ifPresent(override -> {
@@ -286,7 +291,7 @@ public class CuratedCatalogService {
         @Nullable CuratedVersionPrecondition precondition,
         CuratedStatus status
     ) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), "CuratedPracticeArea", slug, precondition);
+        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
         if (entry.retired() == (status == CuratedStatus.RETIRED)) {
             return entry;
         }
@@ -330,7 +335,7 @@ public class CuratedCatalogService {
 
     private static void validate(EffectiveCatalog catalog, PracticeDefinition definition) {
         if (definition.areaSlug() != null && catalog.area(definition.areaSlug()).isEmpty()) {
-            throw new EntityNotFoundException("CuratedPracticeArea", definition.areaSlug());
+            throw new EntityNotFoundException(CATALOG_AREA, definition.areaSlug());
         }
         PracticeDefinitionValidator.validate(
             definition.artifactType(),

@@ -31,13 +31,16 @@ export function curatedEntryCopy(
 				detail: `You replaced the Hephaestus ${kind}. Updates to it wait for you rather than overwriting yours.`,
 			};
 		case "UPDATE_WAITING":
+			// Framed by what taking it would do, not by what Hephaestus changed: the difference on
+			// offer includes your own edit, so "Hephaestus changed the detection" can be false while
+			// "taking this changes the detection" is exactly the decision in front of you.
 			return {
 				label: status.changeKind === "WORDING" ? "New wording waiting" : "Update waiting",
 				tone: "attention",
 				detail:
 					status.changeKind === "WORDING"
-						? `Hephaestus has reworded this ${kind}. Taking it cannot change what gets detected.`
-						: `Hephaestus has changed what this ${kind} detects. Your version keeps running until you take it.`,
+						? `The Hephaestus version of this ${kind} differs only in wording — taking it cannot change what gets detected.`
+						: `Taking the Hephaestus version would change what this ${kind} detects. Yours keeps running until you do.`,
 			};
 		case "NO_LONGER_SHIPPED":
 			return {

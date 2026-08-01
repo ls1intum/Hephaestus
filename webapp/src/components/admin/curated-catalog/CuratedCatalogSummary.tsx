@@ -23,7 +23,7 @@ export function CuratedCatalogSummary({ summary }: { summary: Summary }) {
 				<Badge variant="warning">
 					{waiting} {waiting === 1 ? "update" : "updates"} waiting
 					{summary.updatesChangingDetection > 0 &&
-						` (${summary.updatesChangingDetection} change detection)`}
+						` (${summary.updatesChangingDetection} would change detection)`}
 				</Badge>
 			)}
 		</div>
