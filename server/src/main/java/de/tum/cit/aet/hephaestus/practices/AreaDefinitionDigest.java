@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-/** Identity of a whole area definition, display order included. */
+/** Identity of a whole area definition. */
 final class AreaDefinitionDigest {
 
     private AreaDefinitionDigest() {}
@@ -10,7 +10,6 @@ final class AreaDefinitionDigest {
             .add(slug)
             .add(definition.name())
             .addNullable(definition.description())
-            .addInt(definition.displayOrder())
             .addNullable(definition.icon())
             .addNullable(definition.color())
             .hex();

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -14,6 +15,9 @@ import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -69,13 +73,7 @@ public class CuratedCatalogAdminController {
     )
     public ResponseEntity<CuratedCatalogDTO> catalog() {
         EffectiveCatalog catalog = service.catalog();
-        return ResponseEntity.ok(
-            new CuratedCatalogDTO(
-                CuratedCatalogSummaryDTO.from(catalog.summary()),
-                catalog.areas().stream().map(CuratedAreaDTO::from).toList(),
-                catalog.practices().stream().map(CuratedPracticeSummaryDTO::from).toList()
-            )
-        );
+        return catalogResponse(catalog);
     }
 
     @GetMapping("/practices/{slug}")
@@ -239,6 +237,37 @@ public class CuratedCatalogAdminController {
         return ok(service.keepPractice(slug, precondition(ifMatch)), CuratedPracticeDTO::from);
     }
 
+    @PatchMapping("/practices/reorder")
+    @Operation(summary = "Reorder practices within one catalog area", operationId = "adminReorderCuratedPractices")
+    @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
+    public ResponseEntity<CuratedCatalogDTO> reorderPractices(
+        @Parameter(required = true) @RequestHeader(
+            name = HttpHeaders.IF_MATCH,
+            required = false
+        ) @Nullable String ifMatch,
+        @Valid @RequestBody ReorderPracticesRequestDTO request
+    ) {
+        return catalogResponse(
+            service.reorderPractices(precondition(ifMatch), request.areaSlug(), request.orderedSlugs())
+        );
+    }
+
+    @PatchMapping("/practices/{slug}/placement")
+    @Operation(summary = "Move a practice to another catalog area", operationId = "adminPlaceCuratedPractice")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    public ResponseEntity<CuratedCatalogDTO> placePractice(
+        @PathVariable String slug,
+        @Parameter(required = true) @RequestHeader(
+            name = HttpHeaders.IF_MATCH,
+            required = false
+        ) @Nullable String ifMatch,
+        @Valid @RequestBody PlacePracticeRequestDTO request
+    ) {
+        return catalogResponse(
+            service.placePractice(slug, precondition(ifMatch), request.areaSlug(), request.position())
+        );
+    }
+
     @GetMapping("/areas/{slug}")
     @Operation(summary = "Read a catalog area", operationId = "adminGetCuratedArea")
     @ApiResponse(
@@ -399,6 +428,33 @@ public class CuratedCatalogAdminController {
         ) @Nullable String ifMatch
     ) {
         return ok(service.keepArea(slug, precondition(ifMatch)), CuratedAreaDTO::from);
+    }
+
+    @PatchMapping("/areas/reorder")
+    @Operation(summary = "Reorder catalog areas", operationId = "adminReorderCuratedAreas")
+    @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
+    public ResponseEntity<CuratedCatalogDTO> reorderAreas(
+        @Parameter(required = true) @RequestHeader(
+            name = HttpHeaders.IF_MATCH,
+            required = false
+        ) @Nullable String ifMatch,
+        @Valid @RequestBody ReorderPracticeAreasRequestDTO request
+    ) {
+        return catalogResponse(service.reorderAreas(precondition(ifMatch), request.orderedSlugs()));
+    }
+
+    private static ResponseEntity<CuratedCatalogDTO> catalogResponse(EffectiveCatalog catalog) {
+        CuratedCatalogDTO body = new CuratedCatalogDTO(
+            catalog.structureEtag(),
+            CuratedCatalogSummaryDTO.from(catalog.summary()),
+            catalog.areas().stream().map(CuratedAreaDTO::from).toList(),
+            catalog
+                .practices()
+                .stream()
+                .map(entry -> CuratedPracticeSummaryDTO.from(entry, catalog.isEffectivelyOffered(entry)))
+                .toList()
+        );
+        return ResponseEntity.ok().eTag(etag(catalog.structureEtag())).body(body);
     }
 
     private static <D extends CatalogDefinition, T> ResponseEntity<T> ok(

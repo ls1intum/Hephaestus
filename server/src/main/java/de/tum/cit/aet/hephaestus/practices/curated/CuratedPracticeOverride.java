@@ -74,6 +74,9 @@ public class CuratedPracticeOverride {
     @Column(name = "area_slug", length = 64)
     private @Nullable String areaSlug;
 
+    @Column(name = "position")
+    private @Nullable Integer position;
+
     /**
      * Digest of the shipped definition this edit was written against, or null when the build shipped
      * nothing under this slug. Comparing it with what ships now is what distinguishes "you changed
@@ -156,8 +159,13 @@ public class CuratedPracticeOverride {
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
+    public void setPosition(int position, Instant now) {
+        this.position = position;
+        this.updatedAt = Objects.requireNonNull(now, "now");
+    }
+
     /** Whether this row still says anything. A row that says nothing is deleted rather than kept. */
     public boolean isEmpty() {
-        return definition() == null && retiredAt == null;
+        return definition() == null && retiredAt == null && position == null;
     }
 }

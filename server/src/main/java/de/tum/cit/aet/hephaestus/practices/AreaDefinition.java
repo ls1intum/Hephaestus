@@ -11,28 +11,18 @@ import org.jspecify.annotations.Nullable;
 public record AreaDefinition(
     String name,
     @Nullable String description,
-    int displayOrder,
     @Nullable String icon,
     @Nullable String color
 ) implements CatalogDefinition {
     public AreaDefinition {
         Objects.requireNonNull(name, "name");
-        if (displayOrder < 0) {
-            throw new IllegalArgumentException("displayOrder must not be negative");
-        }
         description = blankToNull(description);
         icon = blankToNull(icon);
         color = blankToNull(color);
     }
 
     public static AreaDefinition from(PracticeArea area) {
-        return new AreaDefinition(
-            area.getName(),
-            area.getDescription(),
-            area.getDisplayOrder(),
-            area.getIcon(),
-            area.getColor()
-        );
+        return new AreaDefinition(area.getName(), area.getDescription(), area.getIcon(), area.getColor());
     }
 
     @Override
@@ -40,12 +30,7 @@ public record AreaDefinition(
         return AreaDefinitionDigest.digest(slug, this);
     }
 
-    /**
-     * Identity of how the area presents. Display order is excluded deliberately: a workspace orders
-     * its own areas, and that layout choice must not read as an edit that severs it from the catalog.
-     * Areas reach a detection run only as a slug, so this is also what "detects identically" means
-     * for one.
-     */
+    /** Identity of how the area is presented. Areas do not participate in detection. */
     @Override
     public String detectionFingerprint(String slug) {
         return new CanonicalDigest()

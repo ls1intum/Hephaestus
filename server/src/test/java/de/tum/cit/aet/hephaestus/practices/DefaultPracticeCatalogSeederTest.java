@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -66,11 +67,11 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     void installsWhatTheInstanceOffers() {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(catalogService.catalog()).thenReturn(catalog());
-        when(areaService.createAreaFromCatalog(any(), any(), any())).thenReturn(new PracticeArea());
+        when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
 
         seeder(true, directExecutor).seed();
 
-        verify(areaService).createAreaFromCatalog(any(), eq("packaging"), any());
+        verify(areaService).createAreaFromCatalog(any(), eq("packaging"), any(), eq(0));
         ArgumentCaptor<PracticeDefinition> definition = ArgumentCaptor.forClass(PracticeDefinition.class);
         verify(practiceService).createPracticeFromCatalog(any(), eq("small-prs"), definition.capture());
         assertThat(definition.getValue().criteria()).isEqualTo("Seed criteria");
@@ -92,7 +93,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     void recordsNothingWhenCopyingFails() {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(catalogService.catalog()).thenReturn(catalog());
-        when(areaService.createAreaFromCatalog(any(), any(), any())).thenReturn(new PracticeArea());
+        when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
         when(practiceService.createPracticeFromCatalog(any(), any(), any())).thenThrow(new RuntimeException("nope"));
 
         assertThatCode(() -> seeder(true, directExecutor).seed()).doesNotThrowAnyException();
@@ -115,7 +116,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     private static EffectiveCatalog catalog() {
-        AreaDefinition area = new AreaDefinition("Packaging work", null, 0, null, null);
+        AreaDefinition area = new AreaDefinition("Packaging work", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
             "Small PRs",
             WorkArtifact.PULL_REQUEST,
@@ -127,8 +128,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             "packaging"
         );
         return new EffectiveCatalog(
-            List.of(CatalogEntry.shippedOnly("packaging", area)),
-            List.of(CatalogEntry.shippedOnly("small-prs", practice))
+            List.of(CatalogEntry.shippedOnly("packaging", area, 0)),
+            List.of(CatalogEntry.shippedOnly("small-prs", practice, 0))
         );
     }
 

@@ -67,11 +67,7 @@ public class PracticeAreaController {
             description = "Return only active areas"
         ) Boolean activeOnly
     ) {
-        List<PracticeAreaDTO> areas = areaService
-            .listAreas(workspaceContext, activeOnly)
-            .stream()
-            .map(presenter::present)
-            .toList();
+        List<PracticeAreaDTO> areas = presenter.presentAreas(areaService.listAreas(workspaceContext, activeOnly));
         return ResponseEntity.ok(areas);
     }
 
@@ -191,11 +187,7 @@ public class PracticeAreaController {
         @Valid @RequestBody ReorderPracticeAreasRequestDTO request
     ) {
         areaService.reorder(workspaceContext, request.orderedSlugs());
-        List<PracticeAreaDTO> areas = areaService
-            .listAreas(workspaceContext, null)
-            .stream()
-            .map(presenter::present)
-            .toList();
+        List<PracticeAreaDTO> areas = presenter.presentAreas(areaService.listAreas(workspaceContext, null));
         return ResponseEntity.ok(areas);
     }
 

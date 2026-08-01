@@ -49,6 +49,7 @@ public class BundledPracticeCatalogLoader {
         if (!areasNode.isArray()) {
             throw new IllegalStateException("default practice catalog areas must be an array");
         }
+        int areaPosition = 0;
         for (JsonNode areaNode : areasNode) {
             String areaSlug = requiredText(areaNode, "slug");
             if (!areaSlugs.add(areaSlug)) {
@@ -60,10 +61,10 @@ public class BundledPracticeCatalogLoader {
                     new AreaDefinition(
                         requiredText(areaNode, "name"),
                         text(areaNode, "description"),
-                        nonNegativeInt(areaNode, "displayOrder"),
                         text(areaNode, "icon"),
                         text(areaNode, "color")
-                    )
+                    ),
+                    areaPosition++
                 )
             );
 
@@ -71,12 +72,15 @@ public class BundledPracticeCatalogLoader {
             if (!practicesNode.isArray()) {
                 throw new IllegalStateException("bundled practice area practices must be an array: " + areaSlug);
             }
+            int practicePosition = 0;
             for (JsonNode practiceNode : practicesNode) {
                 String slug = requiredText(practiceNode, "slug");
                 if (!practiceSlugs.add(slug)) {
                     throw new IllegalStateException("duplicate bundled practice slug: " + slug);
                 }
-                practices.add(new BundledEntry<>(slug, definition(root, areaSlug, practiceNode, slug)));
+                practices.add(
+                    new BundledEntry<>(slug, definition(root, areaSlug, practiceNode, slug), practicePosition++)
+                );
             }
         }
         if (areas.isEmpty() || practices.isEmpty()) {
@@ -165,13 +169,5 @@ public class BundledPracticeCatalogLoader {
         }
         String text = value.asString();
         return text.isBlank() ? null : text;
-    }
-
-    private static int nonNegativeInt(JsonNode node, String field) {
-        JsonNode value = node.get(field);
-        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt() || value.asInt() < 0) {
-            throw new IllegalStateException("bundled catalog field must be a non-negative integer: " + field);
-        }
-        return value.asInt();
     }
 }

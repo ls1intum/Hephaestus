@@ -14,6 +14,7 @@ const meta = {
 	parameters: {
 		layout: "fullscreen",
 		chromatic: { viewports: [1440] },
+		a11y: { context: { exclude: ".monaco-editor" } },
 	},
 	tags: ["autodocs"],
 	decorators: [withStandardPage],

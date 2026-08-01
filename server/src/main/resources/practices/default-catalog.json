@@ -10,7 +10,6 @@
       "slug": "review-ready-work",
       "name": "Packaging work for review",
       "description": "Make a change cheap to review before you ask for one. Keep it to a single self-contained concern of a readable size, say what changed and why, write commit subjects a reviewer can follow, and link it to the issue it answers. This is about how the work is packaged, not whether the code has bugs.",
-      "displayOrder": 1,
       "icon": "Package",
       "color": "sky",
       "practices": [
@@ -83,7 +82,6 @@
       "slug": "acting-on-review-feedback",
       "name": "Acting on review feedback",
       "description": "Close the review loop. When a reviewer leaves a substantive comment on a line, answer it with a reply that names what changed or a follow-up commit that addresses it, and resolve the thread before merging. Feedback only improves the work once someone acts on it.",
-      "displayOrder": 2,
       "icon": "MessageSquareReply",
       "color": "cyan",
       "practices": [
@@ -117,7 +115,6 @@
       "slug": "actionable-issue-authoring",
       "name": "Writing issues a maintainer can act on",
       "description": "Write issues someone can pick up without coming back to ask what you meant. State the problem clearly, what you saw versus expected plus steps to reproduce for a bug, or the who and why for a request, keep each issue to one concern, and say how to tell when it is done.",
-      "displayOrder": 3,
       "icon": "FileText",
       "color": "violet",
       "practices": [
@@ -164,7 +161,6 @@
       "slug": "constructive-code-review",
       "name": "Reviewing a teammate's work constructively",
       "description": "Review a teammate's change well. Leave specific, actionable comments, raise concerns as questions rather than commands, and read the change before approving it rather than waving it through.",
-      "displayOrder": 4,
       "icon": "Eye",
       "color": "teal",
       "practices": [
@@ -210,7 +206,6 @@
       "slug": "testing-discipline",
       "name": "Testing your changes",
       "description": "When a change adds or fixes behaviour, it comes with the tests that exercise it. And it never quietly deletes, skips, or weakens a test just to make the build pass.",
-      "displayOrder": 5,
       "icon": "TestTube",
       "color": "amber",
       "practices": [
@@ -248,7 +243,6 @@
       "slug": "code-craftsmanship",
       "name": "Writing maintainable code",
       "description": "Keep the changed code easy for the next person to read and change. Factor out duplication, keep units small and single-purpose, and leave no clutter behind, such as dead code, debug leftovers, or comments that just restate the line.",
-      "displayOrder": 6,
       "icon": "Wrench",
       "color": "emerald",
       "practices": [
@@ -300,7 +294,6 @@
       "slug": "robust-error-handling",
       "name": "Handling failure well",
       "description": "Fail safely when things go wrong. Handle errors instead of swallowing them, check inputs and edge cases where data enters, and do not crash on a problem the code could recover from.",
-      "displayOrder": 7,
       "icon": "ShieldAlert",
       "color": "rose",
       "practices": [
@@ -352,7 +345,6 @@
       "slug": "secure-by-default-changes",
       "name": "Making changes secure by default",
       "description": "Make each change secure by default. Validate and escape untrusted input before it reaches a dangerous sink, avoid insecure defaults and over-broad permissions, and change dependencies deliberately.",
-      "displayOrder": 8,
       "icon": "ShieldCheck",
       "color": "red",
       "practices": [
@@ -404,7 +396,6 @@
       "slug": "decisions-and-documentation",
       "name": "Recording decisions and documenting changes",
       "description": "Capture the why. Record the reasoning behind significant design decisions, and document changes to public APIs and shared behaviour, so the people who maintain or build on the code later can understand it.",
-      "displayOrder": 9,
       "icon": "BookText",
       "color": "slate",
       "practices": [
@@ -468,7 +459,6 @@
       "slug": "delivery-and-version-control-discipline",
       "name": "Disciplined delivery and version control",
       "description": "Keep your delivery clean. Make each commit one self-contained change, leave generated and build files out of the diff, and branch from the shared integration branch so your work stands on its own.",
-      "displayOrder": 10,
       "icon": "GitBranch",
       "color": "fuchsia",
       "practices": [
@@ -518,7 +508,6 @@
       "slug": "issue-traceability-and-lifecycle",
       "name": "Tracking and planning the work",
       "description": "Plan and track the work so a maintainer can route it and watch it progress. Split genuinely large issues into trackable sub-tasks, and triage each one with the labels, assignee, or milestone that tells the team where it belongs.",
-      "displayOrder": 11,
       "icon": "ListChecks",
       "color": "indigo",
       "practices": [
@@ -564,7 +553,6 @@
       "slug": "communication",
       "name": "Communicating in the open",
       "description": "How you talk to teammates in shared channels: ask questions someone can actually answer, give answers people can act on, and keep others informed about where the work stands and what is blocking it. This is about the clarity of the exchange, not the correctness of the code being discussed.",
-      "displayOrder": 12,
       "icon": "MessageCircle",
       "color": "violet",
       "practices": [

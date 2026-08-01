@@ -37,8 +37,8 @@ public class CuratedAreaOverride {
     @Column(name = "description", columnDefinition = "TEXT")
     private @Nullable String description;
 
-    @Column(name = "display_order")
-    private @Nullable Integer displayOrder;
+    @Column(name = "position")
+    private @Nullable Integer position;
 
     @Column(name = "icon", length = 64)
     private @Nullable String icon;
@@ -69,16 +69,15 @@ public class CuratedAreaOverride {
     }
 
     public @Nullable AreaDefinition definition() {
-        if (name == null || displayOrder == null) {
+        if (name == null) {
             return null;
         }
-        return new AreaDefinition(name, description, displayOrder, icon, color);
+        return new AreaDefinition(name, description, icon, color);
     }
 
     public void write(AreaDefinition definition, @Nullable String basedOnDigest, Instant now) {
         this.name = definition.name();
         this.description = definition.description();
-        this.displayOrder = definition.displayOrder();
         this.icon = definition.icon();
         this.color = definition.color();
         this.basedOnDigest = basedOnDigest;
@@ -88,7 +87,6 @@ public class CuratedAreaOverride {
     public void clearDefinition(Instant now) {
         this.name = null;
         this.description = null;
-        this.displayOrder = null;
         this.icon = null;
         this.color = null;
         this.basedOnDigest = null;
@@ -105,7 +103,12 @@ public class CuratedAreaOverride {
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
+    public void setPosition(int position, Instant now) {
+        this.position = position;
+        this.updatedAt = Objects.requireNonNull(now, "now");
+    }
+
     public boolean isEmpty() {
-        return definition() == null && retiredAt == null;
+        return definition() == null && retiredAt == null && position == null;
     }
 }

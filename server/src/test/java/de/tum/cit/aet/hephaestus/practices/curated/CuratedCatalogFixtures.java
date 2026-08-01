@@ -24,6 +24,6 @@ final class CuratedCatalogFixtures {
     }
 
     static AreaDefinition area(String name, String description) {
-        return new AreaDefinition(name, description, 0, "Target", "sky");
+        return new AreaDefinition(name, description, "Target", "sky");
     }
 }

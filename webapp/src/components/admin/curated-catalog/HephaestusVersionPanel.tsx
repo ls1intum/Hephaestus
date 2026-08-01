@@ -41,7 +41,6 @@ const FIELD_LABELS: Record<keyof CuratedPracticeRequest | keyof CuratedAreaReque
 	description: "Description",
 	areaSlug: "Area",
 	artifactType: "Applies to",
-	displayOrder: "Display order",
 	icon: "Icon",
 	color: "Color",
 };

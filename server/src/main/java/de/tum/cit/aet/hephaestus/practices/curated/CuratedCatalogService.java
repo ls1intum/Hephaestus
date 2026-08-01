@@ -6,20 +6,13 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
-import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
-import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
+import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -30,22 +23,21 @@ import org.springframework.transaction.annotation.Transactional;
  * about it.
  *
  * <p>There is no synchronization step and nothing to keep in step. Reading composes the shipped
- * catalog with the override rows; writing stores or removes one row. An entry an administrator has
+ * catalog with the override rows; writing stores or removes an override. An entry an administrator has
  * not touched follows Hephaestus because nothing was written about it, not because anything ran.
  */
 @Service
 @RequiredArgsConstructor
 @WorkspaceAgnostic("The instance catalog is global")
-// Deliberately not @ConditionalOnServerRole: this reads a classpath file and two global tables, and
+// Deliberately not @ConditionalOnServerRole: this reads a classpath file and global catalog tables, and
 // the workspace-facing surfaces that report catalog provenance are themselves not role-gated.
 public class CuratedCatalogService {
 
-    // What a "not found" reads as. The names an administrator sees on the Catalog page, not the
-    // types behind it — a slug that isn't in the catalog is the same miss whether or not a row exists.
     private static final String CATALOG_PRACTICE = "Catalog practice";
     private static final String CATALOG_AREA = "Catalog area";
 
     private final BundledPracticeCatalogLoader loader;
+    private final EntityManager entityManager;
     private final CuratedPracticeOverrideRepository practiceOverrides;
     private final CuratedAreaOverrideRepository areaOverrides;
     private final ConfigAuditPort configAudit;
@@ -53,36 +45,7 @@ public class CuratedCatalogService {
 
     @Transactional(readOnly = true)
     public EffectiveCatalog catalog() {
-        BundledPracticeCatalog bundled = loader.catalog();
-        return new EffectiveCatalog(
-            compose(
-                bundled.areas(),
-                areaOverrides.findAll(),
-                CuratedAreaOverride::getSlug,
-                CuratedAreaOverride::definition,
-                CuratedAreaOverride::getBasedOnDigest,
-                CuratedAreaOverride::getRetiredAt,
-                CuratedAreaOverride::getVersion,
-                CuratedAreaOverride::getUpdatedAt,
-                Comparator.comparingInt((CatalogEntry<AreaDefinition> entry) ->
-                    entry.effective().displayOrder()
-                ).thenComparing(entry -> entry.effective().name())
-            ),
-            compose(
-                bundled.practices(),
-                practiceOverrides.findAll(),
-                CuratedPracticeOverride::getSlug,
-                CuratedPracticeOverride::definition,
-                CuratedPracticeOverride::getBasedOnDigest,
-                CuratedPracticeOverride::getRetiredAt,
-                CuratedPracticeOverride::getVersion,
-                CuratedPracticeOverride::getUpdatedAt,
-                Comparator.comparing(
-                    (CatalogEntry<PracticeDefinition> entry) -> entry.effective().areaSlug(),
-                    Comparator.nullsLast(Comparator.naturalOrder())
-                ).thenComparing(entry -> entry.effective().name())
-            )
-        );
+        return CuratedCatalogModel.compose(loader.catalog(), areaOverrides.findAll(), practiceOverrides.findAll());
     }
 
     @Transactional(readOnly = true)
@@ -105,16 +68,26 @@ public class CuratedCatalogService {
         @Nullable CuratedVersionPrecondition precondition,
         PracticeDefinition definition
     ) {
+        lockCatalog();
         EffectiveCatalog before = catalog();
-        validate(before, definition);
-        CatalogEntry<PracticeDefinition> entry = require(before.practice(slug), CATALOG_PRACTICE, slug, precondition);
+        CuratedCatalogModel.validatePractice(before, definition);
+        CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
+            before.practice(slug),
+            CATALOG_PRACTICE,
+            slug,
+            precondition
+        );
+        if (entry.overridden() != null && definition.equals(entry.shipped())) {
+            clearPracticeDefinition(slug);
+            return recordPractice(slug, entry);
+        }
         if (entry.effective().equals(definition)) {
             return entry;
         }
         CuratedPracticeOverride override = practiceOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .orElseGet(() -> new CuratedPracticeOverride(slug, clock.instant()));
-        override.write(definition, digestOf(entry.shipped(), slug), clock.instant());
+        override.write(definition, CuratedCatalogModel.digestOf(entry.shipped(), slug), clock.instant());
         practiceOverrides.save(override);
         return recordPractice(slug, entry);
     }
@@ -122,13 +95,18 @@ public class CuratedCatalogService {
     /** Adds a practice this instance authors. The slug must be free in the offered catalog. */
     @Transactional
     public CatalogEntry<PracticeDefinition> createPractice(String slug, PracticeDefinition definition) {
+        lockCatalog();
         EffectiveCatalog before = catalog();
-        validate(before, definition);
+        CuratedCatalogModel.validatePractice(before, definition);
         if (before.practice(slug).isPresent()) {
             throw new CuratedCatalogConflictException("A practice with slug '" + slug + "' already exists.");
         }
-        CuratedPracticeOverride override = new CuratedPracticeOverride(slug, clock.instant());
-        override.write(definition, null, clock.instant());
+        Instant now = clock.instant();
+        List<CatalogEntry<PracticeDefinition>> bucket = CuratedCatalogModel.practicesIn(before, definition.areaSlug());
+        resequencePractices(bucket.stream().map(CatalogEntry::slug).toList(), now);
+        CuratedPracticeOverride override = new CuratedPracticeOverride(slug, now);
+        override.write(definition, null, now);
+        override.setPosition(bucket.size(), now);
         practiceOverrides.save(override);
         CatalogEntry<PracticeDefinition> created = practice(slug);
         configAudit.record(
@@ -147,7 +125,8 @@ public class CuratedCatalogService {
         String slug,
         @Nullable CuratedVersionPrecondition precondition
     ) {
-        CatalogEntry<PracticeDefinition> entry = require(
+        lockCatalog();
+        CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
             catalog().practice(slug),
             CATALOG_PRACTICE,
             slug,
@@ -157,7 +136,7 @@ public class CuratedCatalogService {
             throw new CuratedCatalogConflictException("Hephaestus ships no definition for '" + slug + "'.");
         }
         practiceOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .ifPresent(override -> {
                 override.clearDefinition(clock.instant());
                 if (override.isEmpty()) {
@@ -175,16 +154,17 @@ public class CuratedCatalogService {
         String slug,
         @Nullable CuratedVersionPrecondition precondition
     ) {
-        CatalogEntry<PracticeDefinition> entry = require(
+        lockCatalog();
+        CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
             catalog().practice(slug),
             CATALOG_PRACTICE,
             slug,
             precondition
         );
         practiceOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .ifPresent(override -> {
-                override.acknowledge(digestOf(entry.shipped(), slug), clock.instant());
+                override.acknowledge(CuratedCatalogModel.digestOf(entry.shipped(), slug), clock.instant());
                 practiceOverrides.save(override);
             });
         return recordPractice(slug, entry);
@@ -196,7 +176,8 @@ public class CuratedCatalogService {
         @Nullable CuratedVersionPrecondition precondition,
         CuratedStatus status
     ) {
-        CatalogEntry<PracticeDefinition> entry = require(
+        lockCatalog();
+        CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
             catalog().practice(slug),
             CATALOG_PRACTICE,
             slug,
@@ -206,7 +187,7 @@ public class CuratedCatalogService {
             return entry;
         }
         CuratedPracticeOverride override = practiceOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .orElseGet(() -> new CuratedPracticeOverride(slug, clock.instant()));
         override.setStatus(status, clock.instant());
         if (override.isEmpty()) {
@@ -223,25 +204,40 @@ public class CuratedCatalogService {
         @Nullable CuratedVersionPrecondition precondition,
         AreaDefinition definition
     ) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
+        lockCatalog();
+        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
+            catalog().area(slug),
+            CATALOG_AREA,
+            slug,
+            precondition
+        );
+        if (entry.overridden() != null && definition.equals(entry.shipped())) {
+            clearAreaDefinition(slug);
+            return recordArea(slug, entry);
+        }
         if (entry.effective().equals(definition)) {
             return entry;
         }
         CuratedAreaOverride override = areaOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .orElseGet(() -> new CuratedAreaOverride(slug, clock.instant()));
-        override.write(definition, digestOf(entry.shipped(), slug), clock.instant());
+        override.write(definition, CuratedCatalogModel.digestOf(entry.shipped(), slug), clock.instant());
         areaOverrides.save(override);
         return recordArea(slug, entry);
     }
 
     @Transactional
     public CatalogEntry<AreaDefinition> createArea(String slug, AreaDefinition definition) {
-        if (catalog().area(slug).isPresent()) {
+        lockCatalog();
+        EffectiveCatalog before = catalog();
+        if (before.area(slug).isPresent()) {
             throw new CuratedCatalogConflictException("An area with slug '" + slug + "' already exists.");
         }
-        CuratedAreaOverride override = new CuratedAreaOverride(slug, clock.instant());
-        override.write(definition, null, clock.instant());
+        Instant now = clock.instant();
+        resequenceAreas(before.areas().stream().map(CatalogEntry::slug).toList(), now);
+        CuratedAreaOverride override = new CuratedAreaOverride(slug, now);
+        override.write(definition, null, now);
+        override.setPosition(before.areas().size(), now);
         areaOverrides.save(override);
         CatalogEntry<AreaDefinition> created = area(slug);
         configAudit.record(
@@ -256,12 +252,18 @@ public class CuratedCatalogService {
 
     @Transactional
     public CatalogEntry<AreaDefinition> resetArea(String slug, @Nullable CuratedVersionPrecondition precondition) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
+        lockCatalog();
+        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
+            catalog().area(slug),
+            CATALOG_AREA,
+            slug,
+            precondition
+        );
         if (entry.shipped() == null) {
             throw new CuratedCatalogConflictException("Hephaestus ships no definition for '" + slug + "'.");
         }
         areaOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .ifPresent(override -> {
                 override.clearDefinition(clock.instant());
                 if (override.isEmpty()) {
@@ -275,11 +277,17 @@ public class CuratedCatalogService {
 
     @Transactional
     public CatalogEntry<AreaDefinition> keepArea(String slug, @Nullable CuratedVersionPrecondition precondition) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
+        lockCatalog();
+        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
+            catalog().area(slug),
+            CATALOG_AREA,
+            slug,
+            precondition
+        );
         areaOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .ifPresent(override -> {
-                override.acknowledge(digestOf(entry.shipped(), slug), clock.instant());
+                override.acknowledge(CuratedCatalogModel.digestOf(entry.shipped(), slug), clock.instant());
                 areaOverrides.save(override);
             });
         return recordArea(slug, entry);
@@ -291,12 +299,18 @@ public class CuratedCatalogService {
         @Nullable CuratedVersionPrecondition precondition,
         CuratedStatus status
     ) {
-        CatalogEntry<AreaDefinition> entry = require(catalog().area(slug), CATALOG_AREA, slug, precondition);
+        lockCatalog();
+        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
+            catalog().area(slug),
+            CATALOG_AREA,
+            slug,
+            precondition
+        );
         if (entry.retired() == (status == CuratedStatus.RETIRED)) {
             return entry;
         }
         CuratedAreaOverride override = areaOverrides
-            .findBySlugForUpdate(slug)
+            .findBySlug(slug)
             .orElseGet(() -> new CuratedAreaOverride(slug, clock.instant()));
         override.setStatus(status, clock.instant());
         if (override.isEmpty()) {
@@ -305,6 +319,101 @@ public class CuratedCatalogService {
             areaOverrides.save(override);
         }
         return recordArea(slug, entry);
+    }
+
+    @Transactional
+    public EffectiveCatalog reorderAreas(@Nullable CuratedVersionPrecondition precondition, List<String> orderedSlugs) {
+        lockCatalog();
+        EffectiveCatalog before = catalog();
+        CuratedCatalogModel.requireStructure(before, precondition);
+        CuratedCatalogModel.validateCompleteOrder(
+            before.areas().stream().map(CatalogEntry::slug).toList(),
+            orderedSlugs,
+            CATALOG_AREA
+        );
+        Instant now = clock.instant();
+        for (int position = 0; position < orderedSlugs.size(); position++) {
+            CuratedAreaOverride override = areaOverride(orderedSlugs.get(position), now);
+            override.setPosition(position, now);
+            areaOverrides.save(override);
+        }
+        return catalog();
+    }
+
+    @Transactional
+    public EffectiveCatalog reorderPractices(
+        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable String areaSlug,
+        List<String> orderedSlugs
+    ) {
+        lockCatalog();
+        EffectiveCatalog before = catalog();
+        CuratedCatalogModel.requireStructure(before, precondition);
+        if (areaSlug != null && before.area(areaSlug).isEmpty()) {
+            throw new EntityNotFoundException(CATALOG_AREA, areaSlug);
+        }
+        List<String> existing = CuratedCatalogModel.practicesIn(before, areaSlug)
+            .stream()
+            .map(CatalogEntry::slug)
+            .toList();
+        CuratedCatalogModel.validateCompleteOrder(existing, orderedSlugs, CATALOG_PRACTICE);
+        resequencePractices(orderedSlugs, clock.instant());
+        return catalog();
+    }
+
+    @Transactional
+    public EffectiveCatalog placePractice(
+        String slug,
+        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable String areaSlug,
+        int position
+    ) {
+        lockCatalog();
+        EffectiveCatalog before = catalog();
+        CuratedCatalogModel.requireStructure(before, precondition);
+        CatalogEntry<PracticeDefinition> entry = before
+            .practice(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_PRACTICE, slug));
+        if (areaSlug != null && before.area(areaSlug).isEmpty()) {
+            throw new EntityNotFoundException(CATALOG_AREA, areaSlug);
+        }
+        String sourceAreaSlug = entry.effective().areaSlug();
+        if (Objects.equals(sourceAreaSlug, areaSlug)) {
+            throw new IllegalArgumentException("Use the reorder endpoint to move a practice within its area");
+        }
+        List<String> source = CuratedCatalogModel.practicesIn(before, sourceAreaSlug)
+            .stream()
+            .map(CatalogEntry::slug)
+            .filter(candidate -> !candidate.equals(slug))
+            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        List<String> target = CuratedCatalogModel.practicesIn(before, areaSlug)
+            .stream()
+            .map(CatalogEntry::slug)
+            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (position < 0 || position > target.size()) {
+            throw new IllegalArgumentException("position exceeds the destination size");
+        }
+        target.add(position, slug);
+
+        Instant now = clock.instant();
+        PracticeDefinition definition = entry.effective();
+        PracticeDefinition moved = new PracticeDefinition(
+            definition.name(),
+            definition.artifactType(),
+            definition.triggerEvents(),
+            definition.criteria(),
+            definition.precomputeScript(),
+            definition.whyItMatters(),
+            definition.whatGoodLooksLike(),
+            areaSlug
+        );
+        CuratedPracticeOverride override = practiceOverride(slug, now);
+        override.write(moved, CuratedCatalogModel.digestOf(entry.shipped(), slug), now);
+        practiceOverrides.save(override);
+        resequencePractices(source, now);
+        resequencePractices(target, now);
+        recordPractice(slug, entry);
+        return catalog();
     }
 
     private CatalogEntry<PracticeDefinition> recordPractice(String slug, CatalogEntry<PracticeDefinition> before) {
@@ -333,88 +442,61 @@ public class CuratedCatalogService {
         return after;
     }
 
-    private static void validate(EffectiveCatalog catalog, PracticeDefinition definition) {
-        if (definition.areaSlug() != null && catalog.area(definition.areaSlug()).isEmpty()) {
-            throw new EntityNotFoundException(CATALOG_AREA, definition.areaSlug());
-        }
-        PracticeDefinitionValidator.validate(
-            definition.artifactType(),
-            definition.triggerEvents(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike()
-        );
+    private void lockCatalog() {
+        entityManager
+            .createNativeQuery(
+                "SELECT pg_advisory_xact_lock(hashtext('hephaestus'), hashtext('curated-practice-catalog'))"
+            )
+            .getSingleResult();
     }
 
-    private static <D extends CatalogDefinition> CatalogEntry<D> require(
-        java.util.Optional<CatalogEntry<D>> entry,
-        String type,
-        String slug,
-        @Nullable CuratedVersionPrecondition precondition
-    ) {
-        CatalogEntry<D> found = entry.orElseThrow(() -> new EntityNotFoundException(type, slug));
-        if (precondition == null) {
-            throw new CuratedPreconditionRequiredException();
-        }
-        if (!precondition.matches(found.etag())) {
-            throw new StaleCuratedEntryException(type, slug);
-        }
-        return found;
+    private CuratedPracticeOverride practiceOverride(String slug, Instant now) {
+        return practiceOverrides.findBySlug(slug).orElseGet(() -> new CuratedPracticeOverride(slug, now));
     }
 
-    private static @Nullable String digestOf(@Nullable CatalogDefinition definition, String slug) {
-        return definition == null ? null : definition.digest(slug);
+    private CuratedAreaOverride areaOverride(String slug, Instant now) {
+        return areaOverrides.findBySlug(slug).orElseGet(() -> new CuratedAreaOverride(slug, now));
     }
 
-    /**
-     * Lays the override rows over what the build ships. Slugs the build no longer carries still
-     * appear when something was said about them, so an instance never loses sight of its own work.
-     */
-    @SuppressWarnings("checkstyle:ParameterNumber")
-    private static <D extends CatalogDefinition, O> List<CatalogEntry<D>> compose(
-        List<BundledEntry<D>> shipped,
-        List<O> overrides,
-        Function<O, String> slugOf,
-        Function<O, @Nullable D> definitionOf,
-        Function<O, @Nullable String> basedOnDigestOf,
-        Function<O, @Nullable Instant> retiredAtOf,
-        Function<O, Long> versionOf,
-        Function<O, Instant> updatedAtOf,
-        Comparator<CatalogEntry<D>> order
-    ) {
-        Map<String, O> bySlug = overrides.stream().collect(Collectors.toMap(slugOf, Function.identity()));
-        Set<String> slugs = new LinkedHashSet<>(shipped.stream().map(BundledEntry::slug).toList());
-        slugs.addAll(bySlug.keySet());
-        Map<String, D> shippedBySlug = shipped
-            .stream()
-            .collect(Collectors.toMap(BundledEntry::slug, BundledEntry::definition));
-
-        List<CatalogEntry<D>> entries = new ArrayList<>();
-        for (String slug : slugs) {
-            D shippedDefinition = shippedBySlug.get(slug);
-            O override = bySlug.get(slug);
-            if (override == null) {
-                entries.add(CatalogEntry.shippedOnly(slug, shippedDefinition));
-                continue;
-            }
-            D overridden = definitionOf.apply(override);
-            D effective = overridden != null ? overridden : shippedDefinition;
-            if (effective == null) {
-                // Only a retirement remains for a slug the build no longer ships; nothing to offer.
-                continue;
-            }
-            entries.add(
-                new CatalogEntry<>(
-                    slug,
-                    effective,
-                    shippedDefinition,
-                    overridden,
-                    basedOnDigestOf.apply(override),
-                    retiredAtOf.apply(override) != null,
-                    versionOf.apply(override),
-                    updatedAtOf.apply(override)
-                )
-            );
+    private void resequencePractices(List<String> orderedSlugs, Instant now) {
+        for (int position = 0; position < orderedSlugs.size(); position++) {
+            CuratedPracticeOverride override = practiceOverride(orderedSlugs.get(position), now);
+            override.setPosition(position, now);
+            practiceOverrides.save(override);
         }
-        return entries.stream().sorted(order).toList();
+    }
+
+    private void resequenceAreas(List<String> orderedSlugs, Instant now) {
+        for (int position = 0; position < orderedSlugs.size(); position++) {
+            CuratedAreaOverride override = areaOverride(orderedSlugs.get(position), now);
+            override.setPosition(position, now);
+            areaOverrides.save(override);
+        }
+    }
+
+    private void clearPracticeDefinition(String slug) {
+        practiceOverrides
+            .findBySlug(slug)
+            .ifPresent(override -> {
+                override.clearDefinition(clock.instant());
+                if (override.isEmpty()) {
+                    practiceOverrides.delete(override);
+                } else {
+                    practiceOverrides.save(override);
+                }
+            });
+    }
+
+    private void clearAreaDefinition(String slug) {
+        areaOverrides
+            .findBySlug(slug)
+            .ifPresent(override -> {
+                override.clearDefinition(clock.instant());
+                if (override.isEmpty()) {
+                    areaOverrides.delete(override);
+                } else {
+                    areaOverrides.save(override);
+                }
+            });
     }
 }

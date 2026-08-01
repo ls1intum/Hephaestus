@@ -40,9 +40,11 @@ public class CuratedPracticeCatalogController {
     public ResponseEntity<CuratedPracticeDTO> get(WorkspaceContext workspaceContext, @PathVariable String slug) {
         CatalogEntry<PracticeDefinition> entry = service
             .catalog()
-            .practice(slug)
-            .filter(CatalogEntry::offered)
-            .orElseThrow(() -> new EntityNotFoundException("CuratedPractice", slug));
+            .installablePractices()
+            .stream()
+            .filter(candidate -> candidate.slug().equals(slug))
+            .findFirst()
+            .orElseThrow(() -> new EntityNotFoundException("Catalog practice", slug));
         return ResponseEntity.ok(CuratedPracticeDTO.from(entry));
     }
 }

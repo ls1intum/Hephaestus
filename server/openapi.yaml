@@ -898,6 +898,31 @@ paths:
       summary: Add an area to the catalog
       tags:
       - Admin Practice Catalog
+  /admin/practice-catalog/areas/reorder:
+    patch:
+      operationId: adminReorderCuratedAreas
+      parameters:
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderPracticeAreasRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedCatalog"
+          description: OK
+      summary: Reorder catalog areas
+      tags:
+      - Admin Practice Catalog
   /admin/practice-catalog/areas/{slug}:
     get:
       operationId: adminGetCuratedArea
@@ -1126,6 +1151,31 @@ paths:
       summary: Add a practice to the catalog
       tags:
       - Admin Practice Catalog
+  /admin/practice-catalog/practices/reorder:
+    patch:
+      operationId: adminReorderCuratedPractices
+      parameters:
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderPracticesRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedCatalog"
+          description: OK
+      summary: Reorder practices within one catalog area
+      tags:
+      - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}:
     get:
       operationId: adminGetCuratedPractice
@@ -1266,6 +1316,36 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
       summary: Use the Hephaestus definition of a practice
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/practices/{slug}/placement:
+    patch:
+      operationId: adminPlaceCuratedPractice
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlacePracticeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedCatalog"
+          description: OK
+      summary: Move a practice to another catalog area
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}/status:
@@ -6783,11 +6863,12 @@ components:
         changeKind:
           type: string
           description: |-
-            what separates this instance's definition from the one Hephaestus ships now, so
-                 an update that cannot change what gets detected can be taken without weighing it up
+            whether taking the Hephaestus definition changes wording, presentation, or
+                 detection
           enum:
           - NONE
           - WORDING
+          - PRESENTATION
           - DETECTION
         etag:
           type: string
@@ -7725,6 +7806,9 @@ components:
       properties:
         definition:
           $ref: "#/components/schemas/CuratedAreaRequest"
+        position:
+          type: integer
+          format: int32
         shipped:
           $ref: "#/components/schemas/CuratedAreaRequest"
         slug:
@@ -7733,6 +7817,7 @@ components:
           $ref: "#/components/schemas/CatalogEntryStatus"
       required:
       - definition
+      - position
       - slug
       - status
     CuratedAreaRequest:
@@ -7747,10 +7832,6 @@ components:
           type: string
           maxLength: 2000
           minLength: 0
-        displayOrder:
-          type: integer
-          format: int32
-          minimum: 0
         icon:
           type: string
           maxLength: 64
@@ -7760,7 +7841,6 @@ components:
           maxLength: 128
           minLength: 3
       required:
-      - displayOrder
       - name
     CuratedCatalog:
       type: object
@@ -7771,6 +7851,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CuratedArea"
+        etag:
+          type: string
         practices:
           type: array
           items:
@@ -7779,14 +7861,12 @@ components:
           $ref: "#/components/schemas/CuratedCatalogSummary"
       required:
       - areas
+      - etag
       - practices
       - summary
     CuratedCatalogSummary:
       type: object
-      description: |-
-        The catalog at a glance, so the state of the whole thing is one sentence rather than a scan of
-         every entry. Updates are counted separately by whether taking them would change what gets
-         detected — the ones that cannot are safe to take together.
+      description: Counts the catalog states and the consequences of waiting updates.
       properties:
         editedHere:
           type: integer
@@ -7794,13 +7874,16 @@ components:
         noLongerShipped:
           type: integer
           format: int32
-        retired:
+        notOffered:
           type: integer
           format: int32
         total:
           type: integer
           format: int32
         updatesChangingDetection:
+          type: integer
+          format: int32
+        updatesChangingPresentation:
           type: integer
           format: int32
         updatesChangingWordingOnly:
@@ -7812,9 +7895,10 @@ components:
       required:
       - editedHere
       - noLongerShipped
-      - retired
+      - notOffered
       - total
       - updatesChangingDetection
+      - updatesChangingPresentation
       - updatesChangingWordingOnly
       - yours
     CuratedPractice:
@@ -7828,6 +7912,9 @@ components:
       properties:
         definition:
           $ref: "#/components/schemas/CuratedPracticeRequest"
+        position:
+          type: integer
+          format: int32
         shipped:
           $ref: "#/components/schemas/CuratedPracticeRequest"
         slug:
@@ -7836,6 +7923,7 @@ components:
           $ref: "#/components/schemas/CatalogEntryStatus"
       required:
       - definition
+      - position
       - slug
       - status
     CuratedPracticeRequest:
@@ -7899,15 +7987,22 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        effectivelyOffered:
+          type: boolean
         name:
           type: string
+        position:
+          type: integer
+          format: int32
         slug:
           type: string
         status:
           $ref: "#/components/schemas/CatalogEntryStatus"
       required:
       - artifactType
+      - effectivelyOffered
       - name
+      - position
       - slug
       - status
     CurrentUserView:

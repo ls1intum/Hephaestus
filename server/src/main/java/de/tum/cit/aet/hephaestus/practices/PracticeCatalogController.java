@@ -70,11 +70,9 @@ public class PracticeCatalogController {
             description = "Filter by active state"
         ) Boolean active
     ) {
-        List<PracticeDTO> practices = practiceService
-            .listPractices(workspaceContext, active)
-            .stream()
-            .map(presenter::present)
-            .toList();
+        List<PracticeDTO> practices = presenter.presentPractices(
+            practiceService.listPractices(workspaceContext, active)
+        );
         return ResponseEntity.ok(practices);
     }
 
@@ -185,11 +183,7 @@ public class PracticeCatalogController {
         @Valid @RequestBody ReorderPracticesRequestDTO request
     ) {
         practiceService.reorderPractices(workspaceContext, request.areaSlug(), request.orderedSlugs());
-        List<PracticeDTO> practices = practiceService
-            .listPractices(workspaceContext, null)
-            .stream()
-            .map(presenter::present)
-            .toList();
+        List<PracticeDTO> practices = presenter.presentPractices(practiceService.listPractices(workspaceContext, null));
         return ResponseEntity.ok(practices);
     }
 
@@ -307,11 +301,9 @@ public class PracticeCatalogController {
         @PathVariable String practiceSlug,
         @Valid @RequestBody PlacePracticeRequestDTO request
     ) {
-        List<PracticeDTO> practices = practiceService
-            .placePractice(workspaceContext, practiceSlug, request.areaSlug(), request.position())
-            .stream()
-            .map(presenter::present)
-            .toList();
+        List<PracticeDTO> practices = presenter.presentPractices(
+            practiceService.placePractice(workspaceContext, practiceSlug, request.areaSlug(), request.position())
+        );
         return ResponseEntity.ok(practices);
     }
 

@@ -81,6 +81,28 @@ class CatalogOriginTest extends BaseUnitTest {
         assertThat(origin.sourceOffered()).isFalse();
     }
 
+    @Test
+    void aPracticeUnderARetiredAreaIsNoLongerOffered() {
+        Practice copy = practice("Seed criteria", fingerprintOf("Seed criteria"));
+        AreaDefinition area = new AreaDefinition("Quality", null, null, null);
+        PracticeDefinition practice = new PracticeDefinition(
+            "Small PRs",
+            WorkArtifact.PULL_REQUEST,
+            List.of("PullRequestCreated"),
+            "Seed criteria",
+            null,
+            "Reason",
+            null,
+            "quality"
+        );
+        EffectiveCatalog catalog = new EffectiveCatalog(
+            List.of(new CatalogEntry<>("quality", area, area, null, null, true, 0, null)),
+            List.of(CatalogEntry.shippedOnly(SLUG, practice, 0))
+        );
+
+        assertThat(CatalogOrigin.of(copy, catalog).sourceOffered()).isFalse();
+    }
+
     private static PracticeDefinition definition(String criteria) {
         return new PracticeDefinition(
             "Small PRs",
@@ -99,7 +121,7 @@ class CatalogOriginTest extends BaseUnitTest {
     }
 
     private static EffectiveCatalog catalog(String criteria) {
-        return new EffectiveCatalog(List.of(), List.of(CatalogEntry.shippedOnly(SLUG, definition(criteria))));
+        return new EffectiveCatalog(List.of(), List.of(CatalogEntry.shippedOnly(SLUG, definition(criteria), 0)));
     }
 
     private static Practice practice(String criteria, String copiedFromFingerprint) {

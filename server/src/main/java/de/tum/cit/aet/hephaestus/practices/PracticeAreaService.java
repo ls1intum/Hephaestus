@@ -120,14 +120,19 @@ public class PracticeAreaService {
 
     /** The workspace's copy of a catalog area, stamped with where it came from. */
     @Transactional
-    public PracticeArea createAreaFromCatalog(WorkspaceContext ctx, String slug, AreaDefinition definition) {
+    public PracticeArea createAreaFromCatalog(
+        WorkspaceContext ctx,
+        String slug,
+        AreaDefinition definition,
+        int displayOrder
+    ) {
         PracticeArea area = createArea(
             ctx,
             slug,
             new AreaAttributes(
                 definition.name(),
                 definition.description(),
-                definition.displayOrder(),
+                displayOrder,
                 definition.icon(),
                 definition.color()
             )

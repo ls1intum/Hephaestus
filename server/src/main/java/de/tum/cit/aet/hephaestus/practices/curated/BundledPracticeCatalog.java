@@ -16,5 +16,5 @@ record BundledPracticeCatalog(
     List<BundledEntry<PracticeDefinition>> practices
 ) {
     /** One shipped entry: its durable slug and the definition Hephaestus ships under it. */
-    record BundledEntry<D>(String slug, D definition) {}
+    record BundledEntry<D>(String slug, D definition, int position) {}
 }

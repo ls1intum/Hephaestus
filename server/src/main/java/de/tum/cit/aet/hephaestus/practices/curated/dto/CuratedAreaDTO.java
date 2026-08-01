@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 /** An area in the instance catalog, with what Hephaestus ships now when it differs. */
 public record CuratedAreaDTO(
     @NonNull String slug,
+    @NonNull Integer position,
     @NonNull CuratedAreaRequestDTO definition,
     @Nullable CuratedAreaRequestDTO shipped,
     @NonNull CatalogEntryStatusDTO status
@@ -16,6 +17,7 @@ public record CuratedAreaDTO(
     public static CuratedAreaDTO from(CatalogEntry<AreaDefinition> entry) {
         return new CuratedAreaDTO(
             entry.slug(),
+            entry.position(),
             CuratedAreaRequestDTO.of(entry.effective()),
             entry.changeKind() == CatalogChangeKind.NONE ? null : CuratedAreaRequestDTO.of(entry.shipped()),
             CatalogEntryStatusDTO.from(entry)

@@ -3898,7 +3898,9 @@ export type CurrentUserView = {
 export type CuratedPracticeSummary = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    effectivelyOffered: boolean;
     name: string;
+    position: number;
     slug: string;
     status: CatalogEntryStatus;
 };
@@ -3908,10 +3910,10 @@ export type CuratedPracticeSummary = {
  */
 export type CatalogEntryStatus = {
     /**
-     * what separates this instance's definition from the one Hephaestus ships now, so
-     * an update that cannot change what gets detected can be taken without weighing it up
+     * whether taking the Hephaestus definition changes wording, presentation, or
+     * detection
      */
-    changeKind: 'NONE' | 'WORDING' | 'DETECTION';
+    changeKind: 'NONE' | 'WORDING' | 'PRESENTATION' | 'DETECTION';
     etag: string;
     offered: boolean;
     retired: boolean;
@@ -3942,22 +3944,22 @@ export type CuratedPracticeRequest = {
  */
 export type CuratedPractice = {
     definition: CuratedPracticeRequest;
+    position: number;
     shipped?: CuratedPracticeRequest;
     slug: string;
     status: CatalogEntryStatus;
 };
 
 /**
- * The catalog at a glance, so the state of the whole thing is one sentence rather than a scan of
- * every entry. Updates are counted separately by whether taking them would change what gets
- * detected — the ones that cannot are safe to take together.
+ * Counts the catalog states and the consequences of waiting updates.
  */
 export type CuratedCatalogSummary = {
     editedHere: number;
     noLongerShipped: number;
-    retired: number;
+    notOffered: number;
     total: number;
     updatesChangingDetection: number;
+    updatesChangingPresentation: number;
     updatesChangingWordingOnly: number;
     yours: number;
 };
@@ -3967,6 +3969,7 @@ export type CuratedCatalogSummary = {
  */
 export type CuratedCatalog = {
     areas: Array<CuratedArea>;
+    etag: string;
     practices: Array<CuratedPracticeSummary>;
     summary: CuratedCatalogSummary;
 };
@@ -3977,7 +3980,6 @@ export type CuratedCatalog = {
 export type CuratedAreaRequest = {
     color?: string;
     description?: string;
-    displayOrder: number;
     icon?: string;
     name: string;
 };
@@ -3987,6 +3989,7 @@ export type CuratedAreaRequest = {
  */
 export type CuratedArea = {
     definition: CuratedAreaRequest;
+    position: number;
     shipped?: CuratedAreaRequest;
     slug: string;
     status: CatalogEntryStatus;
@@ -5378,6 +5381,25 @@ export type AdminCreateCuratedAreaResponses = {
 
 export type AdminCreateCuratedAreaResponse = AdminCreateCuratedAreaResponses[keyof AdminCreateCuratedAreaResponses];
 
+export type AdminReorderCuratedAreasData = {
+    body: ReorderPracticeAreasRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/areas/reorder';
+};
+
+export type AdminReorderCuratedAreasResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminReorderCuratedAreasResponse = AdminReorderCuratedAreasResponses[keyof AdminReorderCuratedAreasResponses];
+
 export type AdminGetCuratedAreaData = {
     body?: never;
     path: {
@@ -5579,6 +5601,25 @@ export type AdminCreateCuratedPracticeResponses = {
 
 export type AdminCreateCuratedPracticeResponse = AdminCreateCuratedPracticeResponses[keyof AdminCreateCuratedPracticeResponses];
 
+export type AdminReorderCuratedPracticesData = {
+    body: ReorderPracticesRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/practices/reorder';
+};
+
+export type AdminReorderCuratedPracticesResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminReorderCuratedPracticesResponse = AdminReorderCuratedPracticesResponses[keyof AdminReorderCuratedPracticesResponses];
+
 export type AdminGetCuratedPracticeData = {
     body?: never;
     path: {
@@ -5702,6 +5743,27 @@ export type AdminDeleteCuratedPracticeOverrideResponses = {
 };
 
 export type AdminDeleteCuratedPracticeOverrideResponse = AdminDeleteCuratedPracticeOverrideResponses[keyof AdminDeleteCuratedPracticeOverrideResponses];
+
+export type AdminPlaceCuratedPracticeData = {
+    body: PlacePracticeRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/placement';
+};
+
+export type AdminPlaceCuratedPracticeResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminPlaceCuratedPracticeResponse = AdminPlaceCuratedPracticeResponses[keyof AdminPlaceCuratedPracticeResponses];
 
 export type AdminUpdateCuratedPracticeStatusData = {
     body: UpdateCuratedStatusRequest;

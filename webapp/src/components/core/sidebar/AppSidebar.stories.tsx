@@ -100,6 +100,13 @@ export const AdminContext: Story = {
 		context: "admin",
 		activeWorkspace: mockWorkspace,
 	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Practice catalog")).toBeInTheDocument();
+		const content = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-content"]');
+		if (!content) throw new Error("sidebar content not found");
+		await expect(content.scrollWidth).toBeLessThanOrEqual(content.clientWidth);
+	},
 };
 
 export const AdminContextNoWorkspace: Story = {

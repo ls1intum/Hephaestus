@@ -9,14 +9,7 @@ export interface CuratedEntryCopy {
 	detail: string;
 }
 
-/**
- * One vocabulary for how a catalog entry stands, used wherever an area or a practice is shown. The
- * two are the same kind of thing, so they read the same way.
- *
- * <p>Everything here is framed as what taking the Hephaestus version would do, never as what
- * Hephaestus changed. The difference on offer includes the administrator's own edit, so an
- * attribution can be false where a consequence never is.
- */
+/** Describes the consequence of taking the Hephaestus version, not who changed what. */
 export function curatedEntryCopy(
 	status: CatalogEntryStatus,
 	kind: "practice" | "area",
@@ -39,14 +32,12 @@ export function curatedEntryCopy(
 					: `Your version has replaced the Hephaestus one, and this ${kind} is not offered to new workspaces.`,
 			};
 		case "UPDATE_WAITING":
-			// Only a change to what gets detected earns an attention tone. A rewording is cheap to
-			// take, and a definition identical to ours costs nothing at all — which happens when a
-			// newer build ships exactly what an administrator had already written here.
-			if (status.changeKind === "NONE") {
+			if (kind === "area") {
 				return {
 					label: "Update waiting",
 					tone: "info",
-					detail: `The Hephaestus version is word for word the one you already run. Taking it changes nothing, and stops this ${kind} asking again.`,
+					detail:
+						"Taking the Hephaestus version would change how this area is presented. Yours stays as it is until you do.",
 				};
 			}
 			return {

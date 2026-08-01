@@ -2,7 +2,6 @@ import { Link, useLocation } from "@tanstack/react-router";
 import {
 	BrainCircuit,
 	Building2,
-	ChevronLeft,
 	CircleDollarSign,
 	KeyRound,
 	LibraryBig,
@@ -16,8 +15,8 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { NavContextHeader } from "./NavContextHeader";
 
 /**
  * Content of the dedicated instance-admin (APP_ADMIN) shell — the `context === "admin"` sidebar.
@@ -63,12 +62,7 @@ const ADMIN_SECTIONS = [
 export function NavSuperAdmin() {
 	const { pathname } = useLocation();
 	return (
-		<>
-			<SidebarMenuButton render={<Link to="/" className="font-semibold" />}>
-				<ChevronLeft className="h-4 w-4" />
-				Back to app
-			</SidebarMenuButton>
-			<SidebarSeparator />
+		<NavContextHeader title="Back to app" backLink={<Link to="/" className="font-semibold" />}>
 			<SidebarGroup>
 				<SidebarGroupLabel>Instance administration</SidebarGroupLabel>
 				<SidebarMenu>
@@ -86,6 +80,6 @@ export function NavSuperAdmin() {
 					))}
 				</SidebarMenu>
 			</SidebarGroup>
-		</>
+		</NavContextHeader>
 	);
 }

@@ -92,7 +92,7 @@ export const Filtered: Story = {
 	args: { focusFilter: "ISSUE" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Clear the filter to drag practices.")).toBeVisible();
+		await expect(canvas.getByText("Clear the filter to reorder practices.")).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: /Move practice/ })).not.toBeInTheDocument();
 	},
 };
@@ -105,6 +105,54 @@ export const MoveToUnassigned: Story = {
 		);
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: "Unassigned" }));
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(mockPracticeLongText.slug, null, 1);
+	},
+};
+
+export const MoveWithoutDragging: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: `More actions for ${mockPracticeLongText.name}` }),
+		);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
+		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+			mockPracticeLongText.slug,
+			areas[0].slug,
+			1,
+		);
+	},
+};
+
+export const MoveAreaWithoutDragging: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: `More actions for ${areas[0].name}` }),
+		);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
+		await expect(args.onReorderAreas).toHaveBeenCalledWith([areas[1].slug, areas[0].slug]);
+	},
+};
+
+export const KeyboardReordering: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas }) => {
+		const handle = canvas.getByRole("button", {
+			name: `Reorder ${mockPracticeLongText.name}`,
+		});
+		handle.focus();
+		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
+		await screen.findByText(`Picked up ${mockPracticeLongText.name}.`);
+		handle.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }),
+		);
+		await screen.findByText(new RegExp(`Moving ${mockPracticeLongText.name}`));
+		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
+		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+			mockPracticeLongText.slug,
+			areas[0].slug,
+			1,
+		);
 	},
 };
 
@@ -145,9 +193,10 @@ export const DeletingArea: Story = {
 		});
 		await userEvent.click(actions);
 		await expect(await screen.findByRole("menuitemradio", { name: areas[1].name })).toBeEnabled();
-		await expect(
-			screen.queryByRole("menuitemradio", { name: areas[0].name }),
-		).not.toBeInTheDocument();
+		await expect(screen.getByRole("menuitemradio", { name: areas[0].name })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
 	},
 };
 

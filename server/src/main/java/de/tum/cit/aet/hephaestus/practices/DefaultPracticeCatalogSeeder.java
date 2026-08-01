@@ -12,11 +12,8 @@ import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -136,21 +133,16 @@ class DefaultPracticeCatalogSeeder {
         }
         WorkspaceContext context = WorkspaceContext.fromWorkspace(lockedWorkspace, Set.of(), null);
         EffectiveCatalog catalog = catalogService.catalog();
-        Map<String, CatalogEntry<AreaDefinition>> areas = catalog
-            .installableAreas()
-            .stream()
-            .collect(Collectors.toMap(CatalogEntry::slug, Function.identity()));
-        Set<String> seededAreas = new HashSet<>();
+        List<CatalogEntry<AreaDefinition>> areas = catalog.installableAreas();
+        int seededAreas = 0;
+        for (CatalogEntry<AreaDefinition> area : areas) {
+            if (!areaRepository.existsByWorkspaceIdAndSlug(context.id(), area.slug())) {
+                areaService.createAreaFromCatalog(context, area.slug(), area.effective(), area.position());
+                seededAreas++;
+            }
+        }
         int seededPractices = 0;
         for (CatalogEntry<PracticeDefinition> entry : catalog.installablePractices()) {
-            String areaSlug = entry.effective().areaSlug();
-            if (
-                areaSlug != null &&
-                seededAreas.add(areaSlug) &&
-                !areaRepository.existsByWorkspaceIdAndSlug(context.id(), areaSlug)
-            ) {
-                areaService.createAreaFromCatalog(context, areaSlug, areas.get(areaSlug).effective());
-            }
             if (!practiceRepository.existsByWorkspaceIdAndSlug(context.id(), entry.slug())) {
                 practiceService.createPracticeFromCatalog(context, entry.slug(), entry.effective());
                 seededPractices++;
@@ -162,7 +154,7 @@ class DefaultPracticeCatalogSeeder {
         if (seededPractices > 0) {
             log.info(
                 "Seeded practice catalog: {} areas, {} practices into workspace {}",
-                seededAreas.size(),
+                seededAreas,
                 seededPractices,
                 lockedWorkspace.getId()
             );

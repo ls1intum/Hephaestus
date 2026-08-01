@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import static de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogFixtures.practice;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ class CatalogEntryTest extends BaseUnitTest {
 
     @Test
     void anEntryNobodyHasTouchedIsWhateverTheBuildShips() {
-        CatalogEntry<PracticeDefinition> entry = CatalogEntry.shippedOnly(SLUG, SHIPPED);
+        CatalogEntry<PracticeDefinition> entry = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
 
         assertThat(entry.state()).isEqualTo(CatalogEntryState.FROM_HEPHAESTUS);
         assertThat(entry.effective()).isEqualTo(SHIPPED);
@@ -31,7 +32,7 @@ class CatalogEntryTest extends BaseUnitTest {
         PracticeDefinition newer = practice("Small PRs", "Newer criteria", "Shipped reason");
 
         // The same entry after a build that ships something else: no row, so no decision either.
-        assertThat(CatalogEntry.shippedOnly(SLUG, newer).effective()).isEqualTo(newer);
+        assertThat(CatalogEntry.shippedOnly(SLUG, newer, 0).effective()).isEqualTo(newer);
     }
 
     @Test
@@ -83,8 +84,25 @@ class CatalogEntryTest extends BaseUnitTest {
     }
 
     @Test
+    void aLocalDefinitionThatTheShippedCatalogCatchesUpWithRemainsLocal() {
+        CatalogEntry<PracticeDefinition> entry = entry(SHIPPED, SHIPPED, "0".repeat(64));
+
+        assertThat(entry.state()).isEqualTo(CatalogEntryState.EDITED_HERE);
+        assertThat(entry.changeKind()).isEqualTo(CatalogChangeKind.NONE);
+    }
+
+    @Test
+    void anAreaUpdateIsPresentationNotDetection() {
+        var mine = new AreaDefinition("Maintainability", "Our description", "Wrench", "sky");
+        var shipped = new AreaDefinition("Maintainability", "New description", "Wrench", "sky");
+        var entry = new CatalogEntry<>("maintainability", mine, shipped, mine, "0".repeat(64), false, 0, null);
+
+        assertThat(entry.changeKind()).isEqualTo(CatalogChangeKind.PRESENTATION);
+    }
+
+    @Test
     void theTagChangesWheneverAnythingAnAdministratorCouldActOnChanges() {
-        CatalogEntry<PracticeDefinition> untouched = CatalogEntry.shippedOnly(SLUG, SHIPPED);
+        CatalogEntry<PracticeDefinition> untouched = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
         // An entry with no row still has a tag, which is what lets the first edit be conditional too.
@@ -99,7 +117,7 @@ class CatalogEntryTest extends BaseUnitTest {
         String basedOnDigest
     ) {
         PracticeDefinition effective = mine != null ? mine : shipped;
-        return new CatalogEntry<>(SLUG, effective, shipped, mine, basedOnDigest, false, 1, null);
+        return new CatalogEntry<>(SLUG, effective, shipped, mine, basedOnDigest, false, 0, null);
     }
 
     private static CatalogEntry<PracticeDefinition> retired(CatalogEntry<PracticeDefinition> entry) {
@@ -110,7 +128,7 @@ class CatalogEntryTest extends BaseUnitTest {
             entry.overridden(),
             entry.basedOnDigest(),
             true,
-            entry.version(),
+            entry.position(),
             entry.updatedAt()
         );
     }

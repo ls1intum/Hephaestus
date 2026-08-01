@@ -1,6 +1,5 @@
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { curatedEntryCopy, isOrdinary } from "./curated-entry-state";
 
 const TONE_VARIANT = { neutral: "outline", info: "secondary", attention: "warning" } as const;
@@ -24,10 +23,7 @@ export function CuratedEntryBadges({ status, kind }: CuratedEntryBadgesProps) {
 		<>
 			{!status.offered && <Badge variant="outline">Not offered</Badge>}
 			{status.state !== "FROM_HEPHAESTUS" && (
-				<Tooltip>
-					<TooltipTrigger render={<Badge variant={TONE_VARIANT[copy.tone]}>{copy.label}</Badge>} />
-					<TooltipContent>{copy.detail}</TooltipContent>
-				</Tooltip>
+				<Badge variant={TONE_VARIANT[copy.tone]}>{copy.label}</Badge>
 			)}
 		</>
 	);

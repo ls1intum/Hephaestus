@@ -17,14 +17,18 @@ public record CuratedPracticeSummaryDTO(
     @NonNull String name,
     @NonNull WorkArtifact artifactType,
     @Nullable String areaSlug,
+    @NonNull Integer position,
+    @NonNull Boolean effectivelyOffered,
     @NonNull CatalogEntryStatusDTO status
 ) {
-    public static CuratedPracticeSummaryDTO from(CatalogEntry<PracticeDefinition> entry) {
+    public static CuratedPracticeSummaryDTO from(CatalogEntry<PracticeDefinition> entry, boolean effectivelyOffered) {
         return new CuratedPracticeSummaryDTO(
             entry.slug(),
             entry.effective().name(),
             entry.effective().artifactType(),
             entry.effective().areaSlug(),
+            entry.position(),
+            effectivelyOffered,
             CatalogEntryStatusDTO.from(entry)
         );
     }

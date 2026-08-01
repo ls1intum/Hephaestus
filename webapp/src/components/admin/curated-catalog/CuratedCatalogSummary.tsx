@@ -5,14 +5,7 @@ export interface CuratedCatalogSummaryProps {
 	summary: Summary;
 }
 
-/**
- * The catalog in one line, so its state is read at a glance rather than reconstructed by scanning
- * every row. Only what departs from "following Hephaestus" is counted — an instance nobody has
- * touched reads as one sentence and no badges.
- */
 export function CuratedCatalogSummary({ summary }: CuratedCatalogSummaryProps) {
-	// Everything the administrator has not spoken about. Clamped, because an update whose incoming
-	// definition matches ours is waiting without being counted in either update bucket.
 	const untouched = Math.max(
 		0,
 		summary.total -
@@ -20,7 +13,8 @@ export function CuratedCatalogSummary({ summary }: CuratedCatalogSummaryProps) {
 			summary.yours -
 			summary.noLongerShipped -
 			summary.updatesChangingDetection -
-			summary.updatesChangingWordingOnly,
+			summary.updatesChangingWordingOnly -
+			summary.updatesChangingPresentation,
 	);
 	if (summary.total === 0) {
 		return null;
@@ -38,6 +32,11 @@ export function CuratedCatalogSummary({ summary }: CuratedCatalogSummaryProps) {
 			{summary.updatesChangingWordingOnly > 0 && (
 				<Badge variant="secondary">{summary.updatesChangingWordingOnly} wording only</Badge>
 			)}
+			{summary.updatesChangingPresentation > 0 && (
+				<Badge variant="secondary">
+					{summary.updatesChangingPresentation} would change presentation
+				</Badge>
+			)}
 			{summary.editedHere > 0 && (
 				<Badge variant="secondary">{summary.editedHere} edited here</Badge>
 			)}
@@ -45,7 +44,7 @@ export function CuratedCatalogSummary({ summary }: CuratedCatalogSummaryProps) {
 			{summary.noLongerShipped > 0 && (
 				<Badge variant="outline">{summary.noLongerShipped} no longer shipped</Badge>
 			)}
-			{summary.retired > 0 && <Badge variant="outline">{summary.retired} not offered</Badge>}
+			{summary.notOffered > 0 && <Badge variant="outline">{summary.notOffered} not offered</Badge>}
 		</div>
 	);
 }

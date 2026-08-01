@@ -114,6 +114,7 @@
                 why_it_matters TEXT,
                 what_good_looks_like TEXT,
                 area_slug VARCHAR(64),
+                position INTEGER,
                 based_on_digest VARCHAR(64),
                 retired_at TIMESTAMP(6) WITH TIME ZONE,
                 created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
@@ -122,7 +123,7 @@
                 -- A row that says nothing is deleted rather than kept, so an entry with no row is
                 -- unambiguously "exactly what Hephaestus ships".
                 CONSTRAINT ck_curated_practice_override_says_something
-                    CHECK (name IS NOT NULL OR retired_at IS NOT NULL),
+                    CHECK (name IS NOT NULL OR retired_at IS NOT NULL OR position IS NOT NULL),
                 -- A definition is all of its required parts or none of them.
                 CONSTRAINT ck_curated_practice_override_shape
                     CHECK (
@@ -134,6 +135,8 @@
                     CHECK (applies_to IS NULL OR applies_to IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD')),
                 CONSTRAINT ck_curated_practice_override_trigger_events
                     CHECK (trigger_events IS NULL OR jsonb_typeof(trigger_events) = 'array'),
+                CONSTRAINT ck_curated_practice_override_position
+                    CHECK (position IS NULL OR position >= 0),
                 -- Only set when the build shipped something under this slug at the time of the edit.
                 CONSTRAINT ck_curated_practice_override_based_on
                     CHECK (based_on_digest IS NULL OR based_on_digest ~ '^[0-9a-f]{64}$')
@@ -144,7 +147,7 @@
                 slug VARCHAR(64) NOT NULL CONSTRAINT uk_curated_area_override_slug UNIQUE,
                 name VARCHAR(128),
                 description TEXT,
-                display_order INTEGER,
+                position INTEGER,
                 icon VARCHAR(64),
                 color VARCHAR(32),
                 based_on_digest VARCHAR(64),
@@ -153,12 +156,11 @@
                 updated_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
                 version BIGINT NOT NULL,
                 CONSTRAINT ck_curated_area_override_says_something
-                    CHECK (name IS NOT NULL OR retired_at IS NOT NULL),
+                    CHECK (name IS NOT NULL OR retired_at IS NOT NULL OR position IS NOT NULL),
                 CONSTRAINT ck_curated_area_override_shape
-                    CHECK (
-                        (name IS NULL AND display_order IS NULL)
-                        OR (name IS NOT NULL AND display_order IS NOT NULL AND display_order >= 0)
-                    ),
+                    CHECK (name IS NOT NULL OR (description IS NULL AND icon IS NULL AND color IS NULL)),
+                CONSTRAINT ck_curated_area_override_position
+                    CHECK (position IS NULL OR position >= 0),
                 CONSTRAINT ck_curated_area_override_based_on
                     CHECK (based_on_digest IS NULL OR based_on_digest ~ '^[0-9a-f]{64}$')
             );

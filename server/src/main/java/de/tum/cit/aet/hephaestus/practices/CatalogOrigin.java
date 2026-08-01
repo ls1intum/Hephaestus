@@ -24,12 +24,13 @@ public final class CatalogOrigin {
             return null;
         }
         CatalogEntry<PracticeDefinition> entry = catalog.practice(practice.getSourceCuratedSlug()).orElse(null);
+        boolean sourceOffered = entry != null && catalog.isEffectivelyOffered(entry);
         return describe(
             practice.getSourceCuratedSlug(),
             practice.getCurrentRevision().getDetectionFingerprint(),
             practice.getSourceCuratedFingerprint(),
             entry == null ? null : entry.effective().detectionFingerprint(entry.slug()),
-            entry != null && entry.offered()
+            sourceOffered
         );
     }
 

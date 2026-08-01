@@ -83,6 +83,24 @@ export const UpdateWaitingWordingOnly: Story = {
 	},
 };
 
+export const UpdateWaitingChangesPresentation: Story = {
+	args: {
+		kind: "area",
+		status: status({ state: "UPDATE_WAITING", changeKind: "PRESENTATION" }),
+		shipped: {
+			name: "Review-ready work",
+			description: "Make every change easy to review.",
+			icon: "PackageCheck",
+			color: "sky",
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/change how this area is presented/)).toBeVisible();
+		await expect(canvas.queryByText(/detect/)).not.toBeInTheDocument();
+	},
+};
+
 export const AddedHere: Story = { args: { status: status({ state: "YOURS" }), kind: "area" } };
 
 export const NoLongerShipped: Story = {

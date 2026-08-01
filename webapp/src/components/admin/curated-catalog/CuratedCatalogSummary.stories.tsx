@@ -12,9 +12,10 @@ const meta = {
 			total: 49,
 			updatesChangingDetection: 0,
 			updatesChangingWordingOnly: 0,
+			updatesChangingPresentation: 0,
 			editedHere: 0,
 			yours: 0,
-			retired: 0,
+			notOffered: 0,
 			noLongerShipped: 0,
 		},
 	},
@@ -32,16 +33,17 @@ export const NothingHasBeenChanged: Story = {
 	},
 };
 
-/** The two kinds of waiting update are counted apart, so the cheap ones can be cleared together. */
+/** Waiting updates are grouped by their consequence. */
 export const UpdatesWaiting: Story = {
 	args: {
 		summary: {
 			total: 49,
 			updatesChangingDetection: 2,
 			updatesChangingWordingOnly: 5,
+			updatesChangingPresentation: 1,
 			editedHere: 3,
 			yours: 0,
-			retired: 0,
+			notOffered: 0,
 			noLongerShipped: 0,
 		},
 	},
@@ -49,7 +51,8 @@ export const UpdatesWaiting: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("2 would change detection")).toBeVisible();
 		await expect(canvas.getByText("5 wording only")).toBeVisible();
-		await expect(canvas.getByText("49 practices and areas. 39 follow Hephaestus.")).toBeVisible();
+		await expect(canvas.getByText("1 would change presentation")).toBeVisible();
+		await expect(canvas.getByText("49 practices and areas. 38 follow Hephaestus.")).toBeVisible();
 	},
 };
 
@@ -59,9 +62,10 @@ export const CuratedHeavily: Story = {
 			total: 60,
 			updatesChangingDetection: 1,
 			updatesChangingWordingOnly: 0,
+			updatesChangingPresentation: 0,
 			editedHere: 8,
 			yours: 11,
-			retired: 4,
+			notOffered: 4,
 			noLongerShipped: 2,
 		},
 	},

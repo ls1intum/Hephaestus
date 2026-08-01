@@ -18,7 +18,6 @@ const initialData = {
 	slug: "review-ready-work",
 	name: "Packaging work for review",
 	description: "Make a change cheap to review before you ask for one.",
-	displayOrder: 0,
 	icon: "Package",
 	color: "sky",
 	status: status(),

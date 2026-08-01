@@ -1,13 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The catalog this instance offers: what the build ships, with the administrator's overrides laid
@@ -35,20 +32,31 @@ public record EffectiveCatalog(
             .findFirst();
     }
 
+    public String structureEtag() {
+        CanonicalDigest digest = new CanonicalDigest().addInt(areas.size());
+        areas.forEach(entry -> digest.add(entry.slug()).addInt(entry.position()));
+        digest.addInt(practices.size());
+        practices.forEach(entry ->
+            digest.add(entry.slug()).addNullable(entry.effective().areaSlug()).addInt(entry.position())
+        );
+        return digest.hex().substring(0, 16);
+    }
+
     /**
      * What a workspace created now receives: every entry an administrator still offers, minus the
      * practices filed under an area they no longer offer — an area is how its practices are
      * presented, so withholding one withholds them with it.
      */
     public List<CatalogEntry<PracticeDefinition>> installablePractices() {
-        Map<String, CatalogEntry<AreaDefinition>> bySlug = areas
-            .stream()
-            .collect(Collectors.toMap(CatalogEntry::slug, Function.identity()));
-        return practices
-            .stream()
-            .filter(CatalogEntry::offered)
-            .filter(entry -> isAreaOffered(bySlug, entry.effective().areaSlug()))
-            .toList();
+        return practices.stream().filter(this::isEffectivelyOffered).toList();
+    }
+
+    public boolean isEffectivelyOffered(CatalogEntry<PracticeDefinition> practice) {
+        if (!practice.offered()) {
+            return false;
+        }
+        String areaSlug = practice.effective().areaSlug();
+        return areaSlug == null || area(areaSlug).map(CatalogEntry::offered).orElse(false);
     }
 
     public List<CatalogEntry<AreaDefinition>> installableAreas() {
@@ -66,19 +74,20 @@ public record EffectiveCatalog(
     }
 
     public CatalogSummary summary() {
+        int total = practices.size() + areas.size();
+        int notOffered = total - installableAreas().size() - installablePractices().size();
         return new CatalogSummary(
-            practices.size() + areas.size(),
+            total,
             count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.DETECTION),
             count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.WORDING),
+            count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.PRESENTATION),
             (int) entries()
                 .filter(entry -> entry.state() == CatalogEntryState.EDITED_HERE)
                 .count(),
             (int) entries()
                 .filter(entry -> entry.state() == CatalogEntryState.YOURS)
                 .count(),
-            (int) entries()
-                .filter(entry -> !entry.offered())
-                .count(),
+            notOffered,
             (int) entries()
                 .filter(entry -> entry.state() == CatalogEntryState.NO_LONGER_SHIPPED)
                 .count()
@@ -95,30 +104,19 @@ public record EffectiveCatalog(
         return java.util.stream.Stream.concat(areas.stream(), practices.stream());
     }
 
-    private static boolean isAreaOffered(Map<String, CatalogEntry<AreaDefinition>> areas, @Nullable String slug) {
-        if (slug == null) {
-            return true;
-        }
-        CatalogEntry<AreaDefinition> area = areas.get(slug);
-        return area != null && area.offered();
-    }
-
-    /**
-     * The catalog at a glance, so an administrator reads one line instead of scanning every entry.
-     * Updates are split by whether taking them would change what gets detected — the cheap ones can
-     * then be taken together without weighing each up.
-     */
+    /** Counts the catalog states and the consequences of waiting updates. */
     public record CatalogSummary(
         int total,
         int updatesChangingDetection,
         int updatesChangingWordingOnly,
+        int updatesChangingPresentation,
         int editedHere,
         int yours,
-        int retired,
+        int notOffered,
         int noLongerShipped
     ) {
         public int updatesWaiting() {
-            return updatesChangingDetection + updatesChangingWordingOnly;
+            return updatesChangingDetection + updatesChangingWordingOnly + updatesChangingPresentation;
         }
     }
 }

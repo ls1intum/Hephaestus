@@ -30,7 +30,6 @@ export interface CuratedAreaFormValue {
 	slug: string;
 	name: string;
 	description?: string;
-	displayOrder: number;
 	icon?: string;
 	color?: string;
 }
@@ -45,7 +44,6 @@ interface FormState {
 	slug: string;
 	name: string;
 	description: string;
-	displayOrder: string;
 	icon: string | null;
 	color: string | null;
 }
@@ -72,7 +70,6 @@ function initialState(initialData?: CuratedAreaFormValue): FormState {
 		slug: initialData?.slug ?? "",
 		name: initialData?.name ?? "",
 		description: initialData?.description ?? "",
-		displayOrder: String(initialData?.displayOrder ?? 0),
 		icon: initialData?.icon ?? null,
 		color: initialData?.color ?? null,
 	};
@@ -116,26 +113,13 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 		submitted && mode === "create" && !isValidSlug(form.slug)
 			? "Use 3–64 lowercase letters, numbers and single hyphens."
 			: undefined;
-	const orderError =
-		submitted && !/^\d+$/.test(form.displayOrder)
-			? "Use a whole number, zero or greater."
-			: undefined;
-
-	const valid =
-		form.name.trim().length >= 3 &&
-		/^\d+$/.test(form.displayOrder) &&
-		(mode === "edit" || isValidSlug(form.slug));
+	const valid = form.name.trim().length >= 3 && (mode === "edit" || isValidSlug(form.slug));
 
 	const submit = (event: React.FormEvent) => {
 		event.preventDefault();
 		setSubmitted(true);
 		if (!valid) {
-			const firstInvalidId =
-				form.name.trim().length < 3
-					? "area-name"
-					: mode === "create" && !isValidSlug(form.slug)
-						? "area-slug"
-						: "area-order";
+			const firstInvalidId = form.name.trim().length < 3 ? "area-name" : "area-slug";
 			requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
 			return;
 		}
@@ -143,7 +127,6 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 			slug: form.slug,
 			name: form.name.trim(),
 			description: form.description.trim() || undefined,
-			displayOrder: Number(form.displayOrder),
 			icon: form.icon ?? undefined,
 			color: form.color ?? undefined,
 		});
@@ -364,29 +347,6 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 								<FieldDescription id="area-appearance-help">
 									The icon and color every workspace copy inherits.
 								</FieldDescription>
-							</Field>
-
-							<Field data-invalid={orderError ? "true" : undefined}>
-								<FieldLabel htmlFor="area-order">Display order</FieldLabel>
-								<Input
-									id="area-order"
-									inputMode="numeric"
-									value={form.displayOrder}
-									onChange={(event) =>
-										setForm((previous) => ({ ...previous, displayOrder: event.target.value }))
-									}
-									aria-invalid={Boolean(orderError)}
-									aria-describedby={
-										["area-order-help", orderError ? "area-order-error" : undefined]
-											.filter(Boolean)
-											.join(" ") || undefined
-									}
-								/>
-								<FieldDescription id="area-order-help">
-									Where the area sits in a new workspace. Workspaces can reorder their own areas
-									afterwards.
-								</FieldDescription>
-								{orderError && <FieldError id="area-order-error">{orderError}</FieldError>}
 							</Field>
 						</FieldGroup>
 					</section>

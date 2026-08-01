@@ -28,6 +28,12 @@ The shipped catalogue is
 plus the precompute scripts beside it. Everything else is database state, projected through the
 generated OpenAPI.
 
+Array order in that file is the shipped order. Order is presentation metadata, not part of an area
+or practice definition: an instance administrator can reorder with drag and drop, the keyboard, or
+the row actions without creating a content override or a configuration-audit entry. The instance
+stores only the positions that differ from the shipped order. Moving a practice between areas is a
+content change because its placement affects the definition and is therefore audited.
+
 ## Selection principles
 
 A practice must:
@@ -130,8 +136,8 @@ Equivalence is derived from the definition, not from the order edits happened in
 its source while everything that reaches a detection run matches — criteria, precompute script,
 slug, name, trigger events and area. Editing only what people read keeps the match; editing the
 detection criteria drops it; editing them back restores it. For an area the comparison is how it
-presents, deliberately excluding display order, because a workspace ordering its own areas is a
-layout choice rather than an edit.
+presents, deliberately excluding position, because ordering areas is a layout choice rather than a
+definition edit.
 
 Workspace-specific practices should be created through the admin UI or API, not direct SQL, so
 validation, ordering, revisions, and audit behaviour remain intact.

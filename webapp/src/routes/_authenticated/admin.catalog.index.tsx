@@ -7,11 +7,24 @@ import {
 	adminGetCuratedCatalogOptions,
 	adminGetCuratedCatalogQueryKey,
 	adminGetCuratedPracticeQueryKey,
+	adminPlaceCuratedPracticeMutation,
+	adminReorderCuratedAreasMutation,
+	adminReorderCuratedPracticesMutation,
 	adminUpdateCuratedAreaStatusMutation,
 	adminUpdateCuratedPracticeStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
+import type {
+	CuratedCatalog as Catalog,
+	CuratedArea,
+	CuratedPracticeSummary,
+} from "@/api/types.gen";
 import { CuratedCatalog } from "@/components/admin/curated-catalog/CuratedCatalog";
+import {
+	orderedPracticeSlugs,
+	placeCuratedPractice,
+	reorderCuratedAreas,
+	reorderCuratedPractices,
+} from "@/components/admin/curated-catalog/curated-catalog-cache";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
@@ -29,6 +42,7 @@ export const Route = createFileRoute("/_authenticated/admin/catalog/")({
 // Separate keys: an area and a practice may share a slug, and one must not show the other busy.
 const PRACTICE_STATUS_KEY = ["adminWriteCuratedPracticeStatus"];
 const AREA_STATUS_KEY = ["adminWriteCuratedAreaStatus"];
+const STRUCTURE_SCOPE = { id: "admin-curated-catalog-structure" };
 
 function AdminCuratedCatalogPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
@@ -48,11 +62,16 @@ function AdminCuratedCatalogPage() {
 		});
 	};
 
-	const onStatusSettled = (kind: "practice" | "area", slug: string, offered: boolean) => ({
+	const onStatusSettled = (
+		kind: "practice" | "area",
+		slug: string,
+		offered: boolean,
+		successMessage?: string,
+	) => ({
 		onSuccess: () => {
 			refreshCatalogAnd(kind, slug);
 			const noun = kind === "practice" ? "Practice" : "Area";
-			toast.success(offered ? `${noun} offered again` : `${noun} retired`);
+			toast.success(successMessage ?? (offered ? `${noun} offered again` : `${noun} retired`));
 		},
 		onError: (error: unknown) => {
 			refreshCatalogAnd(kind, slug);
@@ -71,6 +90,91 @@ function AdminCuratedCatalogPage() {
 	const updateAreaStatus = useMutation(
 		filedUnder(AREA_STATUS_KEY, adminUpdateCuratedAreaStatusMutation()),
 	);
+	const invalidateStructure = () =>
+		void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+	const structureError = (error: unknown) => {
+		toast.error(
+			problemStatusOf(error) === 412
+				? "Someone else reordered the catalog first. The current order has been reloaded."
+				: "Couldn't save the catalog order",
+			{ description: problemDetailOf(error) },
+		);
+	};
+	const reorderAreas = useMutation({
+		...adminReorderCuratedAreasMutation(),
+		scope: STRUCTURE_SCOPE,
+		onMutate: async (variables) => {
+			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+			const previous = queryClient.getQueryData<Catalog>(adminGetCuratedCatalogQueryKey());
+			if (previous) {
+				queryClient.setQueryData(
+					adminGetCuratedCatalogQueryKey(),
+					reorderCuratedAreas(previous, variables.body.orderedSlugs),
+				);
+			}
+			return { previous };
+		},
+		onSuccess: (catalog) => queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog),
+		onError: (error, _variables, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), context.previous);
+			}
+			structureError(error);
+		},
+		onSettled: invalidateStructure,
+	});
+	const reorderPractices = useMutation({
+		...adminReorderCuratedPracticesMutation(),
+		scope: STRUCTURE_SCOPE,
+		onMutate: async (variables) => {
+			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+			const previous = queryClient.getQueryData<Catalog>(adminGetCuratedCatalogQueryKey());
+			if (previous) {
+				const areaSlug = variables.body.areaSlug ?? null;
+				queryClient.setQueryData(
+					adminGetCuratedCatalogQueryKey(),
+					reorderCuratedPractices(previous, areaSlug, variables.body.orderedSlugs),
+				);
+			}
+			return { previous };
+		},
+		onSuccess: (catalog) => queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog),
+		onError: (error, _variables, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), context.previous);
+			}
+			structureError(error);
+		},
+		onSettled: invalidateStructure,
+	});
+	const placePractice = useMutation({
+		...adminPlaceCuratedPracticeMutation(),
+		scope: STRUCTURE_SCOPE,
+		onMutate: async (variables) => {
+			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+			const previous = queryClient.getQueryData<Catalog>(adminGetCuratedCatalogQueryKey());
+			if (previous) {
+				queryClient.setQueryData(
+					adminGetCuratedCatalogQueryKey(),
+					placeCuratedPractice(
+						previous,
+						variables.path.slug,
+						variables.body.areaSlug ?? null,
+						variables.body.position,
+					),
+				);
+			}
+			return { previous };
+		},
+		onSuccess: (catalog) => queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog),
+		onError: (error, _variables, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), context.previous);
+			}
+			structureError(error);
+		},
+		onSettled: invalidateStructure,
+	});
 	const pendingPracticeSlugs = usePendingMutationIds<{ path: { slug: string } }, string>(
 		PRACTICE_STATUS_KEY,
 		(variables) => variables.path.slug,
@@ -79,13 +183,15 @@ function AdminCuratedCatalogPage() {
 		AREA_STATUS_KEY,
 		(variables) => variables.path.slug,
 	);
+	const structurePending =
+		reorderAreas.isPending || reorderPractices.isPending || placePractice.isPending;
 
 	return (
 		<PageLayout>
 			<PageHeader
 				icon={<LibraryBig />}
 				title="Practice catalog"
-				description="What every new workspace receives. Hephaestus keeps it current, and your edits stay yours."
+				description="Choose what new workspaces receive. Hephaestus keeps untouched entries current; your edits stay yours."
 				// In the header rather than the toolbar, so a failed load is not a dead end.
 				actions={
 					<div className="flex flex-wrap gap-2">
@@ -129,17 +235,33 @@ function AdminCuratedCatalogPage() {
 					search={search}
 					pendingPracticeSlugs={pendingPracticeSlugs}
 					pendingAreaSlugs={pendingAreaSlugs}
+					structurePending={structurePending}
 					onSearchChange={(next) => navigate({ search: next, replace: true })}
-					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) =>
+					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
+						const parent = practice.areaSlug
+							? catalogQuery.data.areas.find((area) => area.slug === practice.areaSlug)
+							: undefined;
+						const availabilityMessage = practice.areaSlug
+							? parent
+								? parent.status.offered
+									? undefined
+									: "Practice will be offered when its area is offered"
+								: "Practice can be offered after it is moved to an available area"
+							: undefined;
 						updatePracticeStatus.mutate(
 							{
 								path: { slug: practice.slug },
 								headers: { "If-Match": `"${practice.status.etag}"` },
 								body: { status: offered ? "AVAILABLE" : "RETIRED" },
 							},
-							onStatusSettled("practice", practice.slug, offered),
-						)
-					}
+							onStatusSettled(
+								"practice",
+								practice.slug,
+								offered,
+								offered ? availabilityMessage : undefined,
+							),
+						);
+					}}
 					onAreaStatusChange={(area: CuratedArea, offered) =>
 						updateAreaStatus.mutate(
 							{
@@ -150,6 +272,36 @@ function AdminCuratedCatalogPage() {
 							onStatusSettled("area", area.slug, offered),
 						)
 					}
+					onReorderAreas={(orderedSlugs) =>
+						reorderAreas.mutate({
+							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
+							body: { orderedSlugs },
+						})
+					}
+					onPlacePractice={(practiceSlug, areaSlug, position) => {
+						const practice = catalogQuery.data.practices.find(
+							(candidate) => candidate.slug === practiceSlug,
+						);
+						if (!practice) return;
+						const optimistic = placeCuratedPractice(
+							catalogQuery.data,
+							practiceSlug,
+							areaSlug,
+							position,
+						);
+						if ((practice.areaSlug ?? null) === areaSlug) {
+							reorderPractices.mutate({
+								headers: { "If-Match": `"${catalogQuery.data.etag}"` },
+								body: { areaSlug, orderedSlugs: orderedPracticeSlugs(optimistic, areaSlug) },
+							});
+							return;
+						}
+						placePractice.mutate({
+							path: { slug: practiceSlug },
+							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
+							body: { areaSlug: areaSlug ?? undefined, position },
+						});
+					}}
 				/>
 			)}
 		</PageLayout>

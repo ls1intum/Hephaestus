@@ -77,7 +77,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         assertThat(
             scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL")
         ).isEqualTo("0");
-        // A stored row must say something: a definition, a retirement, or both.
+        // A stored row must carry a definition, a retirement, or a catalog position.
         assertThatThrownBy(() ->
             execute(
                 """

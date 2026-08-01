@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
 import java.time.Instant;
@@ -16,7 +17,6 @@ import org.jspecify.annotations.Nullable;
  *     one and the shipped definition otherwise
  * @param shipped what this build ships, or null once it ships nothing under this slug
  * @param retired whether an administrator has stopped offering it
- * @param version the override row's version, or 0 when no administrator has touched the entry
  */
 public record CatalogEntry<D extends CatalogDefinition>(
     String slug,
@@ -25,7 +25,7 @@ public record CatalogEntry<D extends CatalogDefinition>(
     @Nullable D overridden,
     @Nullable String basedOnDigest,
     boolean retired,
-    long version,
+    int position,
     @Nullable Instant updatedAt
 ) {
     public CatalogEntry {
@@ -34,8 +34,8 @@ public record CatalogEntry<D extends CatalogDefinition>(
     }
 
     /** An entry nobody has touched: what the build ships, offered as-is. */
-    public static <D extends CatalogDefinition> CatalogEntry<D> shippedOnly(String slug, D shipped) {
-        return new CatalogEntry<>(slug, shipped, shipped, null, null, false, 0, null);
+    public static <D extends CatalogDefinition> CatalogEntry<D> shippedOnly(String slug, D shipped, int position) {
+        return new CatalogEntry<>(slug, shipped, shipped, null, null, false, position, null);
     }
 
     public CatalogEntryState state() {
@@ -45,6 +45,9 @@ public record CatalogEntry<D extends CatalogDefinition>(
         }
         if (shipped == null) {
             return basedOnDigest == null ? CatalogEntryState.YOURS : CatalogEntryState.NO_LONGER_SHIPPED;
+        }
+        if (shipped.digest(slug).equals(overridden.digest(slug))) {
+            return CatalogEntryState.EDITED_HERE;
         }
         return shipped.digest(slug).equals(basedOnDigest)
             ? CatalogEntryState.EDITED_HERE
@@ -64,6 +67,9 @@ public record CatalogEntry<D extends CatalogDefinition>(
         if (shipped.digest(slug).equals(overridden.digest(slug))) {
             return CatalogChangeKind.NONE;
         }
+        if (overridden instanceof AreaDefinition) {
+            return CatalogChangeKind.PRESENTATION;
+        }
         return shipped.detectionFingerprint(slug).equals(overridden.detectionFingerprint(slug))
             ? CatalogChangeKind.WORDING
             : CatalogChangeKind.DETECTION;
@@ -81,8 +87,9 @@ public record CatalogEntry<D extends CatalogDefinition>(
     public String etag() {
         return new CanonicalDigest()
             .add(slug)
-            .addInt((int) version)
             .add(effective.digest(slug))
+            .addNullable(shipped == null ? null : shipped.digest(slug))
+            .addNullable(basedOnDigest)
             .addInt(retired ? 1 : 0)
             .hex()
             .substring(0, 16);
