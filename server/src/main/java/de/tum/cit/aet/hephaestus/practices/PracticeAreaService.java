@@ -118,6 +118,25 @@ public class PracticeAreaService {
         return area;
     }
 
+    /** The workspace's copy of a catalog area, stamped with where it came from. */
+    @Transactional
+    public PracticeArea createAreaFromCatalog(WorkspaceContext ctx, String slug, AreaDefinition definition) {
+        PracticeArea area = createArea(
+            ctx,
+            slug,
+            new AreaAttributes(
+                definition.name(),
+                definition.description(),
+                definition.displayOrder(),
+                definition.icon(),
+                definition.color()
+            )
+        );
+        area.setSourceCuratedSlug(slug);
+        area.setSourceCuratedFingerprint(definition.detectionFingerprint(slug));
+        return practiceAreaRepository.save(area);
+    }
+
     @Transactional
     public PracticeArea updateArea(WorkspaceContext ctx, String slug, AreaAttributes attributes) {
         lockWorkspace(ctx);

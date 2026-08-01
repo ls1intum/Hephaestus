@@ -9,10 +9,14 @@ import org.jspecify.annotations.Nullable;
  * would run on a plain object that no Spring proxy advises.
  *
  * @param entityType the kind of resource that changed
- * @param entityId   the resource's <em>immutable</em> key as text — the numeric primary key, never a
- *                   slug. Slugs are mutable (hence {@code workspace_slug_history}), and re-keying on
- *                   rename would silently split a resource's history in two, stranding the older half.
- *                   The slug belongs inside the snapshot, where a rename shows up as a normal diff.
+ * @param entityId   the resource's <em>immutable</em> key as text. For everything with a stable row,
+ *                   that is the numeric primary key and never a slug: slugs are mutable (hence
+ *                   {@code workspace_slug_history}), and re-keying on rename would silently split a
+ *                   resource's history in two. The catalog entries are the one inversion — a
+ *                   {@link ConfigAuditEntityType#CURATED_PRACTICE} slug cannot be renamed, while its
+ *                   override row is created and deleted as an administrator edits and reverts, so
+ *                   there the slug is the stable key and the row id is the one that would strand
+ *                   history.
  * @param workspaceId the owning workspace, or null for {@link ConfigAuditEntityType#CURATED_PRACTICE}
  * @param before     state prior to the change; {@code null} for {@link ConfigAuditAction#CREATED}
  * @param after      state after the change; {@code null} for {@link ConfigAuditAction#DELETED}

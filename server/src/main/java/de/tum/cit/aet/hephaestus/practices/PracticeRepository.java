@@ -24,18 +24,20 @@ import org.springframework.transaction.annotation.Transactional;
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
-    // @EntityGraph fetches the bound area eagerly (here and below) so callers can read area fields
-    // outside the transaction — open-in-view is disabled — without one extra SELECT per practice.
-    @EntityGraph(attributePaths = "area")
+    // @EntityGraph fetches the bound area and the current revision eagerly (here and below), because
+    // open-in-view is disabled and a response is built after the transaction closes: the area for its
+    // fields, the revision for the fingerprint that says whether this copy still matches the catalog.
+    // The catalog side of that comparison needs no fetching — it is a slug and a hash on the row.
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
     /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
-    @EntityGraph(attributePaths = "area")
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
     boolean existsByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
-    @EntityGraph(attributePaths = "area")
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     List<Practice> findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long areaId);
@@ -68,6 +70,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * Lists practices for a workspace with an optional active filter.
      * Null filter values are ignored (match all).
      */
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     @Query(
         """
         SELECT p FROM Practice p

@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, retainSearchParams } from "@tanstack/react-rou
 import {
 	CURATED_CATALOG_SEARCH_PARAMS,
 	curatedCatalogSearchSchema,
-} from "@/components/admin/curated-practices/curated-catalog-search";
+} from "@/components/admin/curated-catalog/curated-catalog-search";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog")({
 	validateSearch: curatedCatalogSearchSchema,

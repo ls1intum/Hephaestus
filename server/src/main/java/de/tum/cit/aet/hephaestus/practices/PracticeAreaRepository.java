@@ -21,9 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 )
 public interface PracticeAreaRepository extends JpaRepository<PracticeArea, Long> {
     List<PracticeArea> findByWorkspaceIdOrderByDisplayOrderAscNameAsc(Long workspaceId);
-
     List<PracticeArea> findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(Long workspaceId);
-
     Optional<PracticeArea> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);

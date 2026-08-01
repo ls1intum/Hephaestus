@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeConflictException;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticePreconditionRequiredException;
-import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedPracticeException;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogConflictException;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredException;
+import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
 import java.util.Optional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -30,21 +30,21 @@ public class PracticesControllerAdvice {
         return problem(HttpStatus.CONFLICT, "Practice area slug conflict", exception.getMessage());
     }
 
-    @ExceptionHandler(CuratedPracticeConflictException.class)
-    ProblemDetail handleCuratedConflict(CuratedPracticeConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Curated practice conflict", exception.getMessage());
+    @ExceptionHandler(CuratedCatalogConflictException.class)
+    ProblemDetail handleCuratedConflict(CuratedCatalogConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "Curated catalog conflict", exception.getMessage());
     }
 
-    @ExceptionHandler(StaleCuratedPracticeException.class)
-    ProblemDetail handleStaleCuratedPractice(StaleCuratedPracticeException exception) {
-        return problem(HttpStatus.PRECONDITION_FAILED, "Curated practice changed", exception.getMessage());
+    @ExceptionHandler(StaleCuratedEntryException.class)
+    ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
+        return problem(HttpStatus.PRECONDITION_FAILED, "Curated catalog entry changed", exception.getMessage());
     }
 
-    @ExceptionHandler(CuratedPracticePreconditionRequiredException.class)
-    ProblemDetail handleCuratedPreconditionRequired(CuratedPracticePreconditionRequiredException exception) {
+    @ExceptionHandler(CuratedPreconditionRequiredException.class)
+    ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
         return problem(
             HttpStatus.PRECONDITION_REQUIRED,
-            "Curated practice precondition required",
+            "Curated catalog precondition required",
             exception.getMessage()
         );
     }

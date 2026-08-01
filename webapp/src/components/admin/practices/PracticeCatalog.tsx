@@ -27,6 +27,7 @@ import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Practice, PracticeArea } from "@/api/types.gen";
+import { CatalogOriginBadge } from "@/components/admin/practices/CatalogOriginBadge";
 import {
 	Accordion,
 	AccordionContent,
@@ -643,6 +644,7 @@ function SortableArea({
 								Hidden from practice dashboards
 							</Badge>
 						)}
+						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
 					</span>
 				</AccordionTrigger>
 				<div className="ml-auto flex items-center gap-2">
@@ -998,6 +1000,7 @@ function PracticeRowDetails({ practice, title }: { practice: Practice; title: Re
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{ARTIFACT_LABELS[practice.artifactType]}</span>
 				{!practice.active && <Badge variant="outline">Excluded</Badge>}
+				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 				{practice.precomputeScript && <Badge variant="outline">Precompute</Badge>}
 			</ItemDescription>
 		</ItemContent>

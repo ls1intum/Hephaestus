@@ -1,0 +1,176 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+	adminDeleteCuratedPracticeOverrideMutation,
+	adminGetCuratedCatalogOptions,
+	adminGetCuratedCatalogQueryKey,
+	adminGetCuratedPracticeOptions,
+	adminGetCuratedPracticeQueryKey,
+	adminUpdateCuratedPracticeMutation,
+} from "@/api/@tanstack/react-query.gen";
+import type { CuratedArea, CuratedPractice } from "@/api/types.gen";
+import {
+	CuratedPracticeForm,
+	type CuratedPracticeFormValue,
+} from "@/components/admin/curated-catalog/CuratedPracticeForm";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageLayout } from "@/components/core/PageLayout";
+import { Spinner } from "@/components/ui/spinner";
+import { instanceAdminHead } from "@/lib/page-title";
+import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+
+export const Route = createFileRoute("/_authenticated/admin/catalog/practices/$practiceSlug")({
+	head: instanceAdminHead("Edit catalog practice"),
+	component: EditCuratedPracticePage,
+});
+
+function EditCuratedPracticePage() {
+	const { practiceSlug } = Route.useParams();
+	const practiceQuery = useQuery({
+		...adminGetCuratedPracticeOptions({ path: { slug: practiceSlug } }),
+	});
+	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
+
+	if (practiceQuery.isPending || catalogQuery.isPending) {
+		return (
+			<PageLayout>
+				<div className="flex h-64 items-center justify-center">
+					<Spinner className="size-8" />
+				</div>
+			</PageLayout>
+		);
+	}
+	if (practiceQuery.isError || catalogQuery.isError) {
+		return (
+			<PageLayout>
+				<QueryErrorAlert
+					error={practiceQuery.error ?? catalogQuery.error}
+					title="Couldn't load the practice"
+					onRetry={() => {
+						practiceQuery.refetch();
+						catalogQuery.refetch();
+					}}
+				/>
+			</PageLayout>
+		);
+	}
+
+	return (
+		<LoadedEditCuratedPracticePage
+			key={practiceSlug}
+			practiceSlug={practiceSlug}
+			initialPractice={practiceQuery.data}
+			areas={catalogQuery.data.areas}
+		/>
+	);
+}
+
+interface LoadedEditCuratedPracticePageProps {
+	practiceSlug: string;
+	initialPractice: CuratedPractice;
+	areas: CuratedArea[];
+}
+
+function LoadedEditCuratedPracticePage({
+	practiceSlug,
+	initialPractice,
+	areas,
+}: LoadedEditCuratedPracticePageProps) {
+	const navigate = useNavigate({ from: Route.fullPath });
+	const queryClient = useQueryClient();
+	const [basePractice, setBasePractice] = useState(initialPractice);
+	const [conflict, setConflict] = useState(false);
+	const [formGeneration, setFormGeneration] = useState(0);
+	const detailOptions = adminGetCuratedPracticeOptions({ path: { slug: practiceSlug } });
+	const detailQueryKey = adminGetCuratedPracticeQueryKey({ path: { slug: practiceSlug } });
+	const updatePractice = useMutation({
+		...adminUpdateCuratedPracticeMutation(),
+		onSuccess: (updated) => {
+			queryClient.setQueryData(detailQueryKey, updated);
+			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+			toast.success("Practice updated");
+			navigate({ to: "/admin/catalog" });
+		},
+		onError: (error) => {
+			if (problemStatusOf(error) === 412) {
+				setConflict(true);
+				return;
+			}
+			toast.error("Couldn't update the practice", { description: problemDetailOf(error) });
+		},
+	});
+	const deleteOverride = useMutation({
+		...adminDeleteCuratedPracticeOverrideMutation(),
+		onSuccess: (updated: CuratedPractice) => {
+			queryClient.setQueryData(detailQueryKey, updated);
+			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+			setBasePractice(updated);
+			setFormGeneration((generation) => generation + 1);
+			setConflict(false);
+			toast.success("Now using the Hephaestus version");
+		},
+		onError: (error) => {
+			if (problemStatusOf(error) === 412) {
+				setConflict(true);
+				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
+				void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+				return;
+			}
+			toast.error("Couldn't use the Hephaestus version", { description: problemDetailOf(error) });
+		},
+	});
+
+	const continueWithDraft = async () => {
+		try {
+			await queryClient.invalidateQueries({
+				queryKey: detailQueryKey,
+				exact: true,
+				refetchType: "none",
+			});
+			const latest: CuratedPractice = await queryClient.fetchQuery(detailOptions);
+			setBasePractice(latest);
+			setConflict(false);
+		} catch (error) {
+			toast.error("Couldn't refresh the latest version", { description: problemDetailOf(error) });
+		}
+	};
+
+	return (
+		<CuratedPracticeForm
+			key={`${practiceSlug}-${formGeneration}`}
+			mode="edit"
+			initialData={{
+				slug: basePractice.slug,
+				...basePractice.definition,
+				precomputeScript: basePractice.definition.precomputeScript ?? undefined,
+				whyItMatters: basePractice.definition.whyItMatters ?? undefined,
+				whatGoodLooksLike: basePractice.definition.whatGoodLooksLike ?? undefined,
+				areaSlug: basePractice.definition.areaSlug ?? undefined,
+				status: basePractice.status,
+				shipped: basePractice.shipped as Record<string, unknown> | null,
+			}}
+			areas={areas.map((area) => ({ slug: area.slug, name: area.definition.name }))}
+			isPending={updatePractice.isPending}
+			isResetPending={deleteOverride.isPending}
+			conflict={conflict}
+			onContinueWithDraft={continueWithDraft}
+			onUseBundledVersion={() => {
+				setConflict(false);
+				deleteOverride.mutate({
+					path: { slug: practiceSlug },
+					headers: { "If-Match": `"${basePractice.status.etag}"` },
+				});
+			}}
+			onSubmit={({ slug: _slug, ...definition }: CuratedPracticeFormValue) => {
+				setConflict(false);
+				updatePractice.mutate({
+					path: { slug: practiceSlug },
+					headers: { "If-Match": `"${basePractice.status.etag}"` },
+					body: definition,
+				});
+			}}
+		/>
+	);
+}

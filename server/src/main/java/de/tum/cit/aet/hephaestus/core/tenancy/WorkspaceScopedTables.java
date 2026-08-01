@@ -78,10 +78,8 @@ public class WorkspaceScopedTables {
         // Instance LLM settings singleton (egress allowlist + BYO enable); global
         "instance_llm_settings",
         // Instance-owned practice catalog; shared across all workspaces
-        "curated_practice",
-        "curated_practice_revision",
-        "curated_practice_area",
-        "curated_catalog_sync_state",
+        "curated_practice_override",
+        "curated_area_override",
         // ECB daily reference rates for display-only currency conversion; not a tenant's property
         "fx_rate",
         // Liquibase machinery

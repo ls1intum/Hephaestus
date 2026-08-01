@@ -11,17 +11,16 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPractice;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeArea;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeAreaRepository;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
+import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -30,6 +29,7 @@ import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.support.TransactionOperations;
 
+/** A workspace is given the catalog this instance offers, once, and then owns what it has. */
 class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Mock
@@ -45,10 +45,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
-    private CuratedPracticeRepository curatedPracticeRepository;
-
-    @Mock
-    private CuratedPracticeAreaRepository curatedAreaRepository;
+    private CuratedCatalogService catalogService;
 
     @Mock
     private PracticeCatalogInstallationRepository installationRepository;
@@ -59,60 +56,44 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     private final AsyncTaskExecutor directExecutor = Runnable::run;
 
     @Test
-    void shouldDoNothingWhenDisabled() {
+    void doesNothingWhenDisabled() {
         seeder(false, directExecutor).seed();
 
-        verifyNoInteractions(workspaceRepository, curatedPracticeRepository, installationRepository);
+        verifyNoInteractions(workspaceRepository, catalogService, installationRepository);
     }
 
     @Test
-    void shouldInstallEffectiveBundledDefinitionWithProvenance() {
-        Workspace workspace = workspace(1L);
-        CuratedPractice curated = curatedPractice();
-        CuratedPracticeRevision revision = curated.getCurrentRevision();
-        CuratedPracticeArea area = curatedArea();
-        when(workspaceRepository.findAll()).thenReturn(List.of(workspace));
-        when(curatedAreaRepository.findAllByOrderByDisplayOrderAscNameAsc()).thenReturn(List.of(area));
-        when(curatedPracticeRepository.findInstallableBundledPractices()).thenReturn(List.of(curated));
+    void installsWhatTheInstanceOffers() {
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
+        when(catalogService.catalog()).thenReturn(catalog());
+        when(areaService.createAreaFromCatalog(any(), any(), any())).thenReturn(new PracticeArea());
 
         seeder(true, directExecutor).seed();
 
-        verify(areaService).createArea(any(), eq("engineering"), any());
+        verify(areaService).createAreaFromCatalog(any(), eq("packaging"), any());
         ArgumentCaptor<PracticeDefinition> definition = ArgumentCaptor.forClass(PracticeDefinition.class);
-        verify(practiceService).createPracticeFromCurated(
-            any(),
-            eq("review-failures"),
-            definition.capture(),
-            eq(curated),
-            eq(revision)
-        );
-        assertThat(definition.getValue())
-            .extracting(PracticeDefinition::name, PracticeDefinition::criteria, PracticeDefinition::areaSlug)
-            .containsExactly("Review failures", "Evaluate failures", "engineering");
+        verify(practiceService).createPracticeFromCatalog(any(), eq("small-prs"), definition.capture());
+        assertThat(definition.getValue().criteria()).isEqualTo("Seed criteria");
         verify(installationRepository).save(any());
     }
 
     @Test
-    void shouldNotReinstallCompletedWorkspace() {
+    void doesNotGiveAWorkspaceTheCatalogTwice() {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(installationRepository.existsById(1L)).thenReturn(true);
 
         seeder(true, directExecutor).seed();
 
-        verifyNoInteractions(curatedPracticeRepository, curatedAreaRepository, practiceService);
+        verifyNoInteractions(catalogService, practiceService);
         verify(installationRepository, never()).save(any());
     }
 
     @Test
-    void shouldNotRecordInstallationWhenCopyFails() {
+    void recordsNothingWhenCopyingFails() {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
-        CuratedPracticeArea area = curatedArea();
-        CuratedPractice practice = curatedPractice();
-        when(curatedAreaRepository.findAllByOrderByDisplayOrderAscNameAsc()).thenReturn(List.of(area));
-        when(curatedPracticeRepository.findInstallableBundledPractices()).thenReturn(List.of(practice));
-        when(practiceService.createPracticeFromCurated(any(), any(), any(), any(), any())).thenThrow(
-            new RuntimeException("copy failed")
-        );
+        when(catalogService.catalog()).thenReturn(catalog());
+        when(areaService.createAreaFromCatalog(any(), any(), any())).thenReturn(new PracticeArea());
+        when(practiceService.createPracticeFromCatalog(any(), any(), any())).thenThrow(new RuntimeException("nope"));
 
         assertThatCode(() -> seeder(true, directExecutor).seed()).doesNotThrowAnyException();
 
@@ -120,9 +101,10 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldScheduleInstallationForCreatedWorkspace() {
+    void givesANewWorkspaceTheCatalogWithoutBlockingItsCreation() {
         AsyncTaskExecutor executor = mock(AsyncTaskExecutor.class);
         when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace(7L)));
+        when(catalogService.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
 
         seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
 
@@ -130,6 +112,24 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(executor).execute(task.capture());
         task.getValue().run();
         verify(installationRepository).save(any());
+    }
+
+    private static EffectiveCatalog catalog() {
+        AreaDefinition area = new AreaDefinition("Packaging work", null, 0, null, null);
+        PracticeDefinition practice = new PracticeDefinition(
+            "Small PRs",
+            WorkArtifact.PULL_REQUEST,
+            List.of("PullRequestCreated"),
+            "Seed criteria",
+            null,
+            "Reason",
+            null,
+            "packaging"
+        );
+        return new EffectiveCatalog(
+            List.of(CatalogEntry.shippedOnly("packaging", area)),
+            List.of(CatalogEntry.shippedOnly("small-prs", practice))
+        );
     }
 
     private DefaultPracticeCatalogSeeder seeder(boolean enabled, AsyncTaskExecutor executor) {
@@ -144,34 +144,13 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             practiceService,
             areaRepository,
             practiceRepository,
-            curatedPracticeRepository,
-            curatedAreaRepository,
+            catalogService,
             installationRepository,
             workspaceRepository,
             executor,
-            TransactionOperations.withoutTransaction()
+            TransactionOperations.withoutTransaction(),
+            Clock.systemUTC()
         );
-    }
-
-    private static CuratedPractice curatedPractice() {
-        CuratedPracticeRevision revision = mock(CuratedPracticeRevision.class);
-        when(revision.getName()).thenReturn("Review failures");
-        when(revision.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
-        when(revision.getTriggerEvents()).thenReturn(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
-        when(revision.getCriteria()).thenReturn("Evaluate failures");
-        when(revision.getAreaSlug()).thenReturn("engineering");
-        CuratedPractice practice = mock(CuratedPractice.class);
-        when(practice.getSlug()).thenReturn("review-failures");
-        when(practice.getCurrentRevision()).thenReturn(revision);
-        return practice;
-    }
-
-    private static CuratedPracticeArea curatedArea() {
-        CuratedPracticeArea area = mock(CuratedPracticeArea.class);
-        when(area.getSlug()).thenReturn("engineering");
-        when(area.getName()).thenReturn("Engineering");
-        when(area.getDisplayOrder()).thenReturn(1);
-        return area;
     }
 
     private static Workspace workspace(long id) {

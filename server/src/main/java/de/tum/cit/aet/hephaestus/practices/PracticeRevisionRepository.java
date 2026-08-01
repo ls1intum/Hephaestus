@@ -21,22 +21,27 @@ public interface PracticeRevisionRepository
 
     Optional<PracticeRevision> findFirstByPracticeIdOrderByRevisionNumberDesc(Long practiceId);
 
+    /**
+     * Revisions carrying a definition but no fingerprint — the rows the schema migration created, which
+     * SQL could not fingerprint because the hash is defined in Java.
+     */
+    @Query(
+        """
+        SELECT r FROM PracticeRevision r
+        WHERE r.practice.workspace.id = :workspaceId
+          AND r.slug IS NOT NULL
+          AND r.detectionFingerprint IS NULL
+        ORDER BY r.id
+        """
+    )
+    List<PracticeRevision> findDefinitionRevisionsMissingFingerprint(@Param("workspaceId") Long workspaceId);
+
     @Modifying
     @Query(
-        value = """
-        UPDATE practice_revision
-        SET equivalent_curated_revision_id = :curatedRevisionId,
-            detection_fingerprint = :fingerprint
-        WHERE id = :revisionId
-          AND equivalent_curated_revision_id IS NULL
-        """,
+        value = "UPDATE practice_revision SET detection_fingerprint = :fingerprint WHERE id = :revisionId",
         nativeQuery = true
     )
-    int linkEquivalentCuratedRevision(
-        @Param("revisionId") long revisionId,
-        @Param("curatedRevisionId") long curatedRevisionId,
-        @Param("fingerprint") String fingerprint
-    );
+    void setDetectionFingerprint(@Param("revisionId") long revisionId, @Param("fingerprint") String fingerprint);
 
     /**
      * Returns the definition available at {@code asOf}, so an edit during detection cannot change the

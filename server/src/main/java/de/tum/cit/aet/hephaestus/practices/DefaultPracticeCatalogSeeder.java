@@ -1,15 +1,18 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPractice;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeArea;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeAreaRepository;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
+import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -24,7 +27,16 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
+/**
+ * Gives a workspace the instance's catalog, once.
+ *
+ * <p>What it copies is the catalog as this instance has curated it — an administrator's own practice
+ * counts exactly as much as one the build shipped, and an administrator's edit to a shipped practice
+ * is what the workspace receives. What it does not do is keep copying: a workspace's practices are
+ * its own from the moment it has them, and later catalog changes never rewrite them.
+ */
 @Component
+@ConditionalOnServerRole
 class DefaultPracticeCatalogSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultPracticeCatalogSeeder.class);
@@ -34,12 +46,12 @@ class DefaultPracticeCatalogSeeder {
     private final PracticeService practiceService;
     private final PracticeAreaRepository areaRepository;
     private final PracticeRepository practiceRepository;
-    private final CuratedPracticeRepository curatedPracticeRepository;
-    private final CuratedPracticeAreaRepository curatedAreaRepository;
+    private final CuratedCatalogService catalogService;
     private final PracticeCatalogInstallationRepository installationRepository;
     private final WorkspaceRepository workspaceRepository;
     private final AsyncTaskExecutor taskExecutor;
     private final TransactionOperations transactionOperations;
+    private final Clock clock;
 
     DefaultPracticeCatalogSeeder(
         @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
@@ -47,24 +59,24 @@ class DefaultPracticeCatalogSeeder {
         PracticeService practiceService,
         PracticeAreaRepository areaRepository,
         PracticeRepository practiceRepository,
-        CuratedPracticeRepository curatedPracticeRepository,
-        CuratedPracticeAreaRepository curatedAreaRepository,
+        CuratedCatalogService catalogService,
         PracticeCatalogInstallationRepository installationRepository,
         WorkspaceRepository workspaceRepository,
         @Qualifier(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor,
-        TransactionOperations transactionOperations
+        TransactionOperations transactionOperations,
+        Clock clock
     ) {
         this.enabled = enabled;
         this.areaService = areaService;
         this.practiceService = practiceService;
         this.areaRepository = areaRepository;
         this.practiceRepository = practiceRepository;
-        this.curatedPracticeRepository = curatedPracticeRepository;
-        this.curatedAreaRepository = curatedAreaRepository;
+        this.catalogService = catalogService;
         this.installationRepository = installationRepository;
         this.workspaceRepository = workspaceRepository;
         this.taskExecutor = taskExecutor;
         this.transactionOperations = transactionOperations;
+        this.clock = clock;
     }
 
     @EventListener(WorkspacesInitializedEvent.class)
@@ -123,58 +135,37 @@ class DefaultPracticeCatalogSeeder {
             return;
         }
         WorkspaceContext context = WorkspaceContext.fromWorkspace(lockedWorkspace, Set.of(), null);
-        Map<String, CuratedPracticeArea> curatedAreas = curatedAreaRepository
-            .findAllByOrderByDisplayOrderAscNameAsc()
+        EffectiveCatalog catalog = catalogService.catalog();
+        Map<String, CatalogEntry<AreaDefinition>> areas = catalog
+            .installableAreas()
             .stream()
-            .collect(Collectors.toMap(CuratedPracticeArea::getSlug, Function.identity()));
-        int seededAreas = 0;
+            .collect(Collectors.toMap(CatalogEntry::slug, Function.identity()));
+        Set<String> seededAreas = new HashSet<>();
         int seededPractices = 0;
-        for (CuratedPractice curated : curatedPracticeRepository.findInstallableBundledPractices()) {
-            String areaSlug = curated.getCurrentRevision().getAreaSlug();
+        for (CatalogEntry<PracticeDefinition> entry : catalog.installablePractices()) {
+            String areaSlug = entry.effective().areaSlug();
             if (
                 areaSlug != null &&
-                !areaRepository.existsByWorkspaceIdAndSlug(context.id(), areaSlug) &&
-                createArea(context, curatedAreas.get(areaSlug))
+                seededAreas.add(areaSlug) &&
+                !areaRepository.existsByWorkspaceIdAndSlug(context.id(), areaSlug)
             ) {
-                seededAreas++;
+                areaService.createAreaFromCatalog(context, areaSlug, areas.get(areaSlug).effective());
             }
-            if (!practiceRepository.existsByWorkspaceIdAndSlug(context.id(), curated.getSlug())) {
-                practiceService.createPracticeFromCurated(
-                    context,
-                    curated.getSlug(),
-                    PracticeDefinition.from(curated.getCurrentRevision()),
-                    curated,
-                    curated.getCurrentRevision()
-                );
+            if (!practiceRepository.existsByWorkspaceIdAndSlug(context.id(), entry.slug())) {
+                practiceService.createPracticeFromCatalog(context, entry.slug(), entry.effective());
                 seededPractices++;
             }
         }
-        installationRepository.save(new PracticeCatalogInstallation(lockedWorkspace.getId()));
-        if (seededAreas > 0 || seededPractices > 0) {
+        Instant now = clock.instant();
+        // Linked at birth, so the one-time backfill for older workspaces never has to look at this one.
+        installationRepository.save(new PracticeCatalogInstallation(lockedWorkspace.getId(), now, now));
+        if (seededPractices > 0) {
             log.info(
-                "Seeded default practice catalog: {} areas, {} practices into workspace {}",
-                seededAreas,
+                "Seeded practice catalog: {} areas, {} practices into workspace {}",
+                seededAreas.size(),
                 seededPractices,
                 lockedWorkspace.getId()
             );
         }
-    }
-
-    private boolean createArea(WorkspaceContext context, CuratedPracticeArea area) {
-        if (area == null) {
-            throw new IllegalStateException("Bundled practice references an unknown curated area");
-        }
-        areaService.createArea(
-            context,
-            area.getSlug(),
-            new AreaAttributes(
-                area.getName(),
-                area.getDescription(),
-                area.getDisplayOrder(),
-                area.getIcon(),
-                area.getColor()
-            )
-        );
-        return true;
     }
 }

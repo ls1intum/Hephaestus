@@ -227,57 +227,37 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
-    CuratedCatalogSyncState {
-        VARCHAR(16) source PK
-        BIGINT catalog_revision "NOT NULL"
-        VARCHAR(64) content_digest
-        TIMESTAMPTZ synchronized_at
-        INTEGER provenance_backfill_version "NOT NULL"
-        TIMESTAMPTZ provenance_backfilled_at
-    }
-
-    CuratedPractice {
+    CuratedAreaOverride {
         BIGINT id PK
         VARCHAR(64) slug UK "NOT NULL"
-        BIGINT current_revision_id FK,UK
-        VARCHAR(16) source_kind "NOT NULL"
-        VARCHAR(24) sync_status "NOT NULL"
-        BIGINT latest_bundled_revision_id FK,UK
+        VARCHAR(128) name
+        TEXT description
+        INTEGER display_order
+        VARCHAR(64) icon
+        VARCHAR(32) color
+        VARCHAR(64) based_on_digest
         TIMESTAMPTZ retired_at
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
     }
 
-    CuratedPracticeArea {
+    CuratedPracticeOverride {
         BIGINT id PK
         VARCHAR(64) slug UK "NOT NULL"
-        VARCHAR(128) name "NOT NULL"
-        TEXT description
-        INTEGER display_order "NOT NULL"
-        VARCHAR(64) icon
-        VARCHAR(32) color
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
-    }
-
-    CuratedPracticeRevision {
-        BIGINT id PK,UK
-        BIGINT curated_practice_id FK,UK "NOT NULL"
-        INTEGER revision_number UK "NOT NULL"
-        VARCHAR(128) name "NOT NULL"
-        VARCHAR(32) applies_to "NOT NULL"
-        JSONB trigger_events "NOT NULL"
-        TEXT criteria "NOT NULL"
+        VARCHAR(128) name
+        VARCHAR(32) applies_to
+        JSONB trigger_events
+        TEXT criteria
         TEXT precompute_script
         TEXT why_it_matters
         TEXT what_good_looks_like
-        VARCHAR(64) area_slug FK
-        VARCHAR(64) detection_fingerprint "NOT NULL"
-        VARCHAR(24) origin "NOT NULL"
-        BIGINT bundle_revision UK
-        VARCHAR(64) definition_digest "NOT NULL"
+        VARCHAR(64) area_slug
+        VARCHAR(64) based_on_digest
+        TIMESTAMPTZ retired_at
         TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+        BIGINT version "NOT NULL"
     }
 
     Discussion {
@@ -816,7 +796,8 @@ erDiagram
         TEXT what_good_looks_like
         INTEGER display_order "NOT NULL"
         BIGINT current_revision_id FK,UK
-        BIGINT source_curated_practice_id FK
+        VARCHAR(64) source_curated_slug
+        VARCHAR(64) source_curated_fingerprint
     }
 
     PracticeArea {
@@ -831,11 +812,14 @@ erDiagram
         TIMESTAMPTZ updated_at
         VARCHAR(64) icon
         VARCHAR(32) color
+        VARCHAR(64) source_curated_slug
+        VARCHAR(64) source_curated_fingerprint
     }
 
     PracticeCatalogInstallation {
         BIGINT workspace_id PK,FK
         TIMESTAMPTZ installed_at "NOT NULL"
+        TIMESTAMPTZ provenance_linked_at
     }
 
     PracticeRevision {
@@ -857,7 +841,6 @@ erDiagram
         VARCHAR(64) area_icon
         VARCHAR(32) area_color
         VARCHAR(64) detection_fingerprint
-        BIGINT equivalent_curated_revision_id FK
     }
 
     Project {
@@ -1359,8 +1342,6 @@ erDiagram
     %% Relationships
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessageVote : has
-    CuratedPracticeRevision ||--|| CuratedPractice : current_revision_id
-    CuratedPracticeRevision ||--|| CuratedPractice : latest_bundled_revision_id
     DiscussionComment ||--|| Discussion : references
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
@@ -1392,8 +1373,6 @@ erDiagram
     Workspace ||--o{ ConfigAuditEvent : has
     Workspace ||--o{ Connection : has
     Connection ||--o{ ConnectionAudit : has
-    CuratedPracticeArea ||--o{ CuratedPracticeRevision : references
-    CuratedPractice ||--o{ CuratedPracticeRevision : has
     User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
@@ -1450,10 +1429,8 @@ erDiagram
     Connection ||--o{ OutlineDocumentEvent : has
     Workspace ||--o{ OutlineDocumentEvent : has
     PracticeArea ||--o{ Practice : has
-    CuratedPractice ||--o{ Practice : has
     Workspace ||--o{ Practice : has
     Workspace ||--o{ PracticeArea : has
-    CuratedPracticeRevision ||--o{ PracticeRevision : references
     Practice ||--o{ PracticeRevision : has
     User ||--o{ Project : created_by
     IdentityProvider ||--o{ Project : references

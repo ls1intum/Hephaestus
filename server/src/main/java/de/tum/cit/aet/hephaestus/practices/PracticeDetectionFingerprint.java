@@ -1,14 +1,18 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Identity of everything about a practice that reaches a detection run: the criteria and precompute
+ * script the sandbox executes, plus the slug, name and area written into the run's practice index.
+ * Two practices with the same fingerprint detect identically, which is what makes the fingerprint the
+ * test for whether a workspace copy still matches its curated source.
+ *
+ * <p>Deliberately excluded: {@code whyItMatters} and {@code whatGoodLooksLike}. They are read by
+ * people, never by the detector, so editing them leaves a copy equivalent to its source.
+ */
 public final class PracticeDetectionFingerprint {
 
     private PracticeDetectionFingerprint() {}
@@ -22,40 +26,8 @@ public final class PracticeDetectionFingerprint {
         @Nullable String precomputeScript,
         @Nullable String areaSlug
     ) {
-        MessageDigest digest = sha256();
-        add(digest, slug);
-        add(digest, name);
-        add(digest, artifactType.name());
-        triggerEvents
-            .stream()
-            .sorted()
-            .forEach(event -> add(digest, event));
-        add(digest, criteria);
-        addNullable(digest, precomputeScript);
-        addNullable(digest, areaSlug);
-        return HexFormat.of().formatHex(digest.digest());
-    }
-
-    private static void addNullable(MessageDigest digest, @Nullable String value) {
-        if (value == null) {
-            digest.update((byte) 0);
-            return;
-        }
-        digest.update((byte) 1);
-        add(digest, value);
-    }
-
-    private static void add(MessageDigest digest, String value) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
-        digest.update(bytes);
-    }
-
-    private static MessageDigest sha256() {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is unavailable", e);
-        }
+        CanonicalDigest digest = new CanonicalDigest().add(slug).add(name).add(artifactType.name());
+        triggerEvents.stream().sorted().forEach(digest::add);
+        return digest.add(criteria).addNullable(precomputeScript).addNullable(areaSlug).hex();
     }
 }

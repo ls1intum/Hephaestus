@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPractice;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -43,7 +42,7 @@ import tools.jackson.databind.JsonNode;
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
         @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
-        @Index(name = "idx_practice_source_curated_practice", columnList = "source_curated_practice_id"),
+        @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
     }
 )
 @Getter
@@ -87,14 +86,20 @@ public class Practice {
     @ToString.Exclude
     private PracticeArea area;
 
-    /** Catalog provenance retained after a workspace edits its copy; revision equivalence is tracked separately. */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-        name = "source_curated_practice_id",
-        foreignKey = @ForeignKey(name = "fk_practice_source_curated_practice")
-    )
-    @ToString.Exclude
-    private CuratedPractice sourceCuratedPractice;
+    /**
+     * The catalog entry this copy was made from, by slug — the catalog's durable identity. Kept after
+     * local edits, so a copy can still be told apart from a practice the workspace invented.
+     */
+    @Column(name = "source_curated_slug", length = 64)
+    private String sourceCuratedSlug;
+
+    /**
+     * The detection fingerprint of the catalog definition this copy was made from. Comparing it with
+     * the current revision's fingerprint says whether the workspace has changed it; comparing it with
+     * the catalog's fingerprint now says whether the catalog has moved on.
+     */
+    @Column(name = "source_curated_fingerprint", length = 64)
+    private String sourceCuratedFingerprint;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_revision_id", foreignKey = @ForeignKey(name = "fk_practice_current_revision"))

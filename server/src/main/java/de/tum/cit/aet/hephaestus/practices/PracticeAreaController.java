@@ -51,6 +51,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeAreaController {
 
     private final PracticeAreaService areaService;
+    private final CatalogOriginPresenter presenter;
 
     @GetMapping
     @Operation(summary = "List practice areas", description = "Returns the workspace's practice areas")
@@ -69,7 +70,7 @@ public class PracticeAreaController {
         List<PracticeAreaDTO> areas = areaService
             .listAreas(workspaceContext, activeOnly)
             .stream()
-            .map(PracticeAreaDTO::from)
+            .map(presenter::present)
             .toList();
         return ResponseEntity.ok(areas);
     }
@@ -88,7 +89,7 @@ public class PracticeAreaController {
     )
     @SecurityRequirements
     public ResponseEntity<PracticeAreaDTO> getArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
-        return ResponseEntity.ok(PracticeAreaDTO.from(areaService.getArea(workspaceContext, areaSlug)));
+        return ResponseEntity.ok(presenter.present(areaService.getArea(workspaceContext, areaSlug)));
     }
 
     @PostMapping
@@ -124,7 +125,7 @@ public class PracticeAreaController {
             .path("/{slug}")
             .buildAndExpand(area.getSlug())
             .toUri();
-        return ResponseEntity.created(location).body(PracticeAreaDTO.from(area));
+        return ResponseEntity.created(location).body(presenter.present(area));
     }
 
     @PatchMapping("/{areaSlug}")
@@ -160,7 +161,7 @@ public class PracticeAreaController {
         if (request.active() != null) {
             area = areaService.setActive(workspaceContext, areaSlug, request.active());
         }
-        return ResponseEntity.ok(PracticeAreaDTO.from(area));
+        return ResponseEntity.ok(presenter.present(area));
     }
 
     @PatchMapping("/reorder")
@@ -193,7 +194,7 @@ public class PracticeAreaController {
         List<PracticeAreaDTO> areas = areaService
             .listAreas(workspaceContext, null)
             .stream()
-            .map(PracticeAreaDTO::from)
+            .map(presenter::present)
             .toList();
         return ResponseEntity.ok(areas);
     }

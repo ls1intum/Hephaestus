@@ -3,17 +3,13 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { LibraryBig, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
-	adminGetCuratedPracticeQueryKey,
-	adminListCuratedPracticeAreasOptions,
-	adminListCuratedPracticesOptions,
-	adminListCuratedPracticesQueryKey,
+	adminGetCuratedCatalogOptions,
+	adminGetCuratedCatalogQueryKey,
+	adminUpdateCuratedAreaStatusMutation,
 	adminUpdateCuratedPracticeStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
-import {
-	CuratedPracticeCatalog,
-	type CuratedPracticeCatalogItem,
-	type CuratedPracticeStatus,
-} from "@/components/admin/curated-practices/CuratedPracticeCatalog";
+import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
+import { CuratedCatalog } from "@/components/admin/curated-catalog/CuratedCatalog";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
@@ -24,105 +20,127 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/")({
-	head: instanceAdminHead("Curated catalog"),
+	head: instanceAdminHead("Practice catalog"),
 	component: AdminCuratedCatalogPage,
 });
 
-const STATUS_MUTATION_KEY = ["adminWriteCuratedPracticeStatus"];
+const STATUS_MUTATION_KEY = ["adminWriteCuratedStatus"];
 
 function AdminCuratedCatalogPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const search = Route.useSearch();
 	const queryClient = useQueryClient();
-	const areasQuery = useQuery({ ...adminListCuratedPracticeAreasOptions() });
-	const catalogQuery = useQuery({ ...adminListCuratedPracticesOptions() });
-	const updateStatus = useMutation({
-		...filedUnder(STATUS_MUTATION_KEY, adminUpdateCuratedPracticeStatusMutation()),
-		onSuccess: (updated, variables) => {
-			queryClient.setQueryData<CuratedPracticeCatalogItem[]>(
-				adminListCuratedPracticesQueryKey(),
-				(practices) =>
-					practices?.map((practice) =>
-						practice.slug === updated.slug ? { ...practice, ...updated } : practice,
-					),
-			);
-			queryClient.setQueryData(
-				adminGetCuratedPracticeQueryKey({ path: { slug: updated.slug } }),
-				updated,
-			);
-			void queryClient.invalidateQueries({ queryKey: adminListCuratedPracticesQueryKey() });
-			toast.success(
-				variables.body.status === "AVAILABLE" ? "Practice restored" : "Practice retired",
-			);
+	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
+
+	const onStatusSettled = (kind: "practice" | "area", offered: boolean) => ({
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+			toast.success(offered ? `The ${kind} is offered again` : `The ${kind} is no longer offered`);
 		},
-		onError: (error, variables) => {
-			if (problemStatusOf(error) === 412) {
-				void queryClient.invalidateQueries({ queryKey: adminListCuratedPracticesQueryKey() });
-				void queryClient.invalidateQueries({
-					queryKey: adminGetCuratedPracticeQueryKey({ path: variables.path }),
-				});
-			}
+		onError: (error: unknown) => {
+			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 			toast.error(
 				problemStatusOf(error) === 412
-					? "The practice changed before its status could be updated"
-					: "Couldn't update the practice status",
+					? `The ${kind} changed before its status could be updated`
+					: `Couldn't update the ${kind}`,
 				{ description: problemDetailOf(error) },
 			);
 		},
 	});
+
+	const updatePracticeStatus = useMutation(
+		filedUnder(STATUS_MUTATION_KEY, adminUpdateCuratedPracticeStatusMutation()),
+	);
+	const updateAreaStatus = useMutation(
+		filedUnder(STATUS_MUTATION_KEY, adminUpdateCuratedAreaStatusMutation()),
+	);
 	const pendingSlugs = usePendingMutationIds<{ path: { slug: string } }, string>(
 		STATUS_MUTATION_KEY,
 		(variables) => variables.path.slug,
 	);
 
-	const changeStatus = (practice: CuratedPracticeCatalogItem, status: CuratedPracticeStatus) => {
-		updateStatus.mutate({
-			path: { slug: practice.slug },
-			headers: { "If-Match": `"v${practice.version}"` },
-			body: { status },
-		});
-	};
-
 	return (
 		<PageLayout>
 			<PageHeader
 				icon={<LibraryBig />}
-				title="Curated practice catalog"
-				description="Manage the versioned practices available across this instance."
+				title="Practice catalog"
+				description="What every new workspace on this instance receives. Hephaestus keeps it current; your edits stay yours."
 				actions={
-					<Button
-						nativeButton={false}
-						render={
-							<Link from={Route.fullPath} to="/admin/catalog/new" search={(previous) => previous} />
-						}
-					>
-						<Plus className="size-4" aria-hidden />
-						Create practice
-					</Button>
+					<div className="flex flex-wrap gap-2">
+						<Button
+							variant="outline"
+							nativeButton={false}
+							render={
+								<Link
+									from={Route.fullPath}
+									to="/admin/catalog/areas/new"
+									search={(previous) => previous}
+								/>
+							}
+						>
+							<Plus className="size-4" aria-hidden />
+							Add area
+						</Button>
+						<Button
+							nativeButton={false}
+							render={
+								<Link
+									from={Route.fullPath}
+									to="/admin/catalog/practices/new"
+									search={(previous) => previous}
+								/>
+							}
+						>
+							<Plus className="size-4" aria-hidden />
+							Add practice
+						</Button>
+					</div>
 				}
 			/>
 
-			{catalogQuery.isPending || areasQuery.isPending ? (
+			{catalogQuery.isPending ? (
 				<div className="flex h-64 items-center justify-center">
 					<Spinner className="size-8" />
 				</div>
-			) : catalogQuery.isError || areasQuery.isError ? (
+			) : catalogQuery.isError ? (
 				<QueryErrorAlert
-					error={catalogQuery.error ?? areasQuery.error}
-					title="Couldn't load the curated catalog"
-					onRetry={() => {
-						catalogQuery.refetch();
-						areasQuery.refetch();
-					}}
+					error={catalogQuery.error}
+					title="Couldn't load the practice catalog"
+					onRetry={() => catalogQuery.refetch()}
 				/>
 			) : (
-				<CuratedPracticeCatalog
-					areas={areasQuery.data}
-					practices={catalogQuery.data}
+				<CuratedCatalog
+					areas={catalogQuery.data.areas}
+					practices={catalogQuery.data.practices}
+					summary={catalogQuery.data.summary}
 					search={search}
 					pendingSlugs={pendingSlugs}
+					practicesInArea={(areaSlug) =>
+						catalogQuery.data.practices
+							.filter((practice) => practice.areaSlug === areaSlug && practice.status.offered)
+							.map((practice) => practice.slug)
+					}
 					onSearchChange={(next) => navigate({ search: next, replace: true })}
-					onStatusChange={changeStatus}
+					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) =>
+						updatePracticeStatus.mutate(
+							{
+								path: { slug: practice.slug },
+								headers: { "If-Match": `"${practice.status.etag}"` },
+								body: { status: offered ? "AVAILABLE" : "RETIRED" },
+							},
+							onStatusSettled("practice", offered),
+						)
+					}
+					onAreaStatusChange={(area: CuratedArea, offered) =>
+						updateAreaStatus.mutate(
+							{
+								path: { slug: area.slug },
+								headers: { "If-Match": `"${area.status.etag}"` },
+								body: { status: offered ? "AVAILABLE" : "RETIRED" },
+							},
+							onStatusSettled("area", offered),
+						)
+					}
 				/>
 			)}
 		</PageLayout>

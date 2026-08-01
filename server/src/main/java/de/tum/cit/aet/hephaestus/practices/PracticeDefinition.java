@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -18,7 +17,7 @@ public record PracticeDefinition(
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
     @Nullable String areaSlug
-) {
+) implements CatalogDefinition {
     public PracticeDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(artifactType, "artifactType");
@@ -42,23 +41,11 @@ public record PracticeDefinition(
         );
     }
 
-    public static PracticeDefinition from(CuratedPracticeRevision revision) {
-        return new PracticeDefinition(
-            revision.getName(),
-            revision.getArtifactType(),
-            TriggerEventsConverter.toList(revision.getTriggerEvents()),
-            revision.getCriteria(),
-            revision.getPrecomputeScript(),
-            revision.getWhyItMatters(),
-            revision.getWhatGoodLooksLike(),
-            revision.getAreaSlug()
-        );
-    }
-
     public JsonNode triggerEventsJson() {
         return TriggerEventsConverter.toJsonNode(triggerEvents);
     }
 
+    @Override
     public String detectionFingerprint(String slug) {
         return PracticeDetectionFingerprint.of(
             slug,
@@ -71,19 +58,9 @@ public record PracticeDefinition(
         );
     }
 
+    @Override
     public String digest(String slug) {
         return PracticeDefinitionDigest.digest(slug, this);
-    }
-
-    public boolean hasSameDetectorInputs(PracticeDefinition other) {
-        return (
-            name.equals(other.name) &&
-            artifactType == other.artifactType &&
-            triggerEvents.equals(other.triggerEvents) &&
-            criteria.equals(other.criteria) &&
-            Objects.equals(precomputeScript, other.precomputeScript) &&
-            Objects.equals(areaSlug, other.areaSlug)
-        );
     }
 
     private static String blankToNull(@Nullable String value) {

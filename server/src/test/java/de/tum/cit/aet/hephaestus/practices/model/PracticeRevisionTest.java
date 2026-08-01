@@ -52,6 +52,5 @@ class PracticeRevisionTest extends BaseUnitTest {
             )
             .containsExactly("review-quality", "Review quality", "Review work", "MessageSquare", "cyan");
         assertThat(revision.getDetectionFingerprint()).hasSize(64);
-        assertThat(revision.getEquivalentCuratedRevision()).isNull();
     }
 }

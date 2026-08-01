@@ -88,6 +88,14 @@ public class PracticeArea {
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
 
+    /** The catalog area this one was copied from, by slug. Kept after local edits. */
+    @Column(name = "source_curated_slug", length = 64)
+    private String sourceCuratedSlug;
+
+    /** The presentation fingerprint of the catalog area this copy was made from. */
+    @Column(name = "source_curated_fingerprint", length = 64)
+    private String sourceCuratedFingerprint;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

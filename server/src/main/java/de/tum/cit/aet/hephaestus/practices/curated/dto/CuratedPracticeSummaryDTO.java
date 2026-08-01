@@ -1,47 +1,31 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPractice;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeSourceKind;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeStatus;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeSyncStatus;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * A practice as the catalog list shows it.
+ *
+ * <p>Without its criteria: those are thousands of words of detection rubric each, and the list exists
+ * to be scanned. The definition, and what Hephaestus ships beside it, come with the single entry.
+ */
 public record CuratedPracticeSummaryDTO(
-    @NonNull Long id,
     @NonNull String slug,
     @NonNull String name,
     @NonNull WorkArtifact artifactType,
     @Nullable String areaSlug,
-    @NonNull Integer revisionNumber,
-    @NonNull Instant revisionCreatedAt,
-    @NonNull CuratedPracticeStatus status,
-    @NonNull CuratedPracticeSourceKind sourceKind,
-    @NonNull CuratedPracticeSyncStatus syncStatus,
-    @Nullable Long latestBundledCatalogRevision,
-    @NonNull Instant updatedAt,
-    @NonNull Long version
+    @NonNull CatalogEntryStatusDTO status
 ) {
-    public static CuratedPracticeSummaryDTO from(CuratedPractice practice) {
-        var revision = practice.getCurrentRevision();
+    public static CuratedPracticeSummaryDTO from(CatalogEntry<PracticeDefinition> entry) {
         return new CuratedPracticeSummaryDTO(
-            practice.getId(),
-            practice.getSlug(),
-            revision.getName(),
-            revision.getArtifactType(),
-            revision.getAreaSlug(),
-            revision.getRevisionNumber(),
-            revision.getCreatedAt(),
-            practice.getStatus(),
-            practice.getSourceKind(),
-            practice.getSyncStatus(),
-            practice.getLatestBundledRevision() == null
-                ? null
-                : practice.getLatestBundledRevision().getBundleRevision(),
-            practice.getUpdatedAt(),
-            practice.getVersion()
+            entry.slug(),
+            entry.effective().name(),
+            entry.effective().artifactType(),
+            entry.effective().areaSlug(),
+            CatalogEntryStatusDTO.from(entry)
         );
     }
 }

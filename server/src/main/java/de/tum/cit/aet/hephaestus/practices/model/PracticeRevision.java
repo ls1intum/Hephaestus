@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeDetectionFingerprint;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,10 +46,7 @@ import tools.jackson.databind.JsonNode;
         ),
         @UniqueConstraint(name = "uk_practice_revision_owner", columnNames = { "id", "practice_id" }),
     },
-    indexes = {
-        @Index(name = "idx_practice_revision_practice", columnList = "practice_id"),
-        @Index(name = "idx_practice_revision_equivalent_curated", columnList = "equivalent_curated_revision_id"),
-    }
+    indexes = { @Index(name = "idx_practice_revision_practice", columnList = "practice_id") }
 )
 @Getter
 @NoArgsConstructor
@@ -127,22 +123,11 @@ public class PracticeRevision {
     private String detectionFingerprint;
 
     /** Curated revision with equivalent detector inputs; independent of catalog-copy provenance. */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-        name = "equivalent_curated_revision_id",
-        foreignKey = @ForeignKey(name = "fk_practice_revision_equivalent_curated_revision")
-    )
-    @ToString.Exclude
-    private CuratedPracticeRevision equivalentCuratedRevision;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     public PracticeRevision(Practice practice, int revisionNumber) {
-        this(practice, revisionNumber, null);
-    }
-
-    public PracticeRevision(Practice practice, int revisionNumber, CuratedPracticeRevision equivalentCuratedRevision) {
         this.practice = Objects.requireNonNull(practice, "practice");
         if (revisionNumber < 1) {
             throw new IllegalArgumentException("revisionNumber must be >= 1, got " + revisionNumber);
@@ -173,7 +158,23 @@ public class PracticeRevision {
             precomputeScript,
             areaSlug
         );
-        this.equivalentCuratedRevision = equivalentCuratedRevision;
+    }
+
+    /**
+     * The fingerprint this revision's stored definition implies. Equal to {@link #detectionFingerprint}
+     * for every revision written by the application; used to fill that column in on the rows the schema
+     * migration created, which SQL could not hash.
+     */
+    public String recomputeDetectionFingerprint() {
+        return PracticeDetectionFingerprint.of(
+            slug,
+            name,
+            artifactType,
+            TriggerEventsConverter.toList(triggerEvents),
+            criteria,
+            precomputeScript,
+            areaSlug
+        );
     }
 
     @PrePersist

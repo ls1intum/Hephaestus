@@ -68,29 +68,21 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertEmptyCatalogBootstrap() throws SQLException {
-        assertThat(scalar("SELECT count(*)::text FROM curated_practice_area")).isEqualTo("0");
-        assertThat(scalar("SELECT count(*)::text FROM curated_practice")).isEqualTo("0");
-        assertThat(scalar("SELECT count(*)::text FROM curated_practice_revision")).isEqualTo("0");
+        // Nothing is stored for a catalog nobody has edited: the instance offers what the build ships,
+        // so the tables exist and stay empty until somebody says something.
+        assertThat(scalar("SELECT count(*)::text FROM curated_practice_override")).isEqualTo("0");
+        assertThat(scalar("SELECT count(*)::text FROM curated_area_override")).isEqualTo("0");
+        // Every workspace that already had a catalog is queued for provenance linking; the application
+        // fingerprints and matches its copies on the next boot, because SQL cannot compute the hash.
         assertThat(
-            scalar(
-                """
-                SELECT count(*)::text
-                FROM curated_catalog_sync_state
-                WHERE source = 'BUNDLED'
-                  AND catalog_revision = 0
-                  AND content_digest IS NULL
-                  AND synchronized_at IS NULL
-                  AND provenance_backfill_version = 0
-                  AND provenance_backfilled_at IS NULL
-                """
-            )
-        ).isEqualTo("1");
+            scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL")
+        ).isEqualTo("0");
+        // A stored row must say something: a definition, a retirement, or both.
         assertThatThrownBy(() ->
             execute(
                 """
-                UPDATE curated_catalog_sync_state
-                SET provenance_backfill_version = 2, provenance_backfilled_at = now()
-                WHERE source = 'BUNDLED'
+                INSERT INTO curated_practice_override (slug, created_at, updated_at, version)
+                VALUES ('says-nothing', now(), now(), 0)
                 """
             )
         ).isInstanceOf(SQLException.class);
@@ -164,53 +156,21 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertControlledProvenanceUpdate() throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
-            connection.setAutoCommit(false);
-            statement.execute(
-                """
-                INSERT INTO curated_practice (
-                    id, slug, source_kind, sync_status, created_at, updated_at, version
-                ) VALUES (
-                    136401, 'second-practice', 'BUNDLED', 'SYNCED', now(), now(), 0
-                )
-                """
-            );
-            statement.execute(
-                """
-                INSERT INTO curated_practice_revision (
-                    id, curated_practice_id, revision_number, name, applies_to, trigger_events,
-                    criteria, detection_fingerprint, origin, bundle_revision, definition_digest, created_at
-                ) VALUES (
-                    136402, 136401, 1, 'Second practice', 'ISSUE', '["IssuesEvent"]'::jsonb,
-                    'Second criteria', repeat('b', 64), 'BUNDLED', 1, repeat('c', 64), now()
-                )
-                """
-            );
-            statement.execute(
-                """
-                UPDATE curated_practice
-                SET current_revision_id = 136402, latest_bundled_revision_id = 136402
-                WHERE id = 136401
-                """
-            );
-            statement.execute(
-                """
-                UPDATE practice_revision
-                SET equivalent_curated_revision_id = 136402,
-                    detection_fingerprint = repeat('b', 64)
-                WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
-                """
-            );
-            connection.commit();
-        }
-
+        // The application fills in the fingerprint SQL could not compute. Nothing else about a
+        // revision may move afterwards.
+        execute(
+            """
+            UPDATE practice_revision
+            SET detection_fingerprint = repeat('b', 64)
+            WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
+            """
+        );
         assertThat(
             scalar(
                 """
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
-                  AND equivalent_curated_revision_id = 136402
                   AND detection_fingerprint = repeat('b', 64)
                 """
             )
@@ -223,9 +183,19 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
                 """
             )
-        )
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice revisions are immutable");
+        ).isInstanceOf(SQLException.class);
+
+        // Provenance is a slug and a fingerprint on the practice itself; both or neither.
+        execute(
+            """
+            UPDATE practice
+            SET source_curated_slug = 'second-practice', source_curated_fingerprint = repeat('b', 64)
+            WHERE id = 136302
+            """
+        );
+        assertThatThrownBy(() ->
+            execute("UPDATE practice SET source_curated_fingerprint = NULL WHERE id = 136302")
+        ).isInstanceOf(SQLException.class);
     }
 
     private static void assertProjectionInvariant() {
@@ -252,9 +222,35 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .hasMessageContaining("practice current revision does not match its current projection");
     }
 
-    private static void assertRevisionImmutability() {
+    private static void assertRevisionImmutability() throws SQLException {
         assertThatThrownBy(() ->
             execute("UPDATE practice_revision SET criteria = 'mutated' WHERE practice_id = 136301")
+        )
+            .isInstanceOf(SQLException.class)
+            .hasMessageContaining("practice revisions are immutable");
+
+        // The application fills in the fingerprint SQL could not compute, on its own and without a
+        // curated match to record alongside it. Refusing that would strand every migrated revision.
+        execute(
+            """
+            UPDATE practice_revision
+            SET detection_fingerprint = repeat('a', 64)
+            WHERE practice_id = 136301 AND slug IS NOT NULL AND detection_fingerprint IS NULL
+            """
+        );
+        assertThat(
+            scalar(
+                "SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301" +
+                    " AND detection_fingerprint = repeat('a', 64)"
+            )
+        ).isEqualTo("1");
+
+        // Once written it is as fixed as the definition it describes.
+        assertThatThrownBy(() ->
+            execute(
+                "UPDATE practice_revision SET detection_fingerprint = repeat('b', 64)" +
+                    " WHERE practice_id = 136301 AND slug IS NOT NULL"
+            )
         )
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("practice revisions are immutable");
@@ -327,7 +323,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             liquibase.rollback(BEFORE_CATALOG_TAG, contexts(), new LabelExpression());
         }
 
-        assertThat(scalar("SELECT to_regclass('curated_practice')::text")).isNull();
+        assertThat(scalar("SELECT to_regclass('curated_practice_override')::text")).isNull();
         assertThat(
             scalar(
                 """
@@ -339,7 +335,9 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 """
             )
         ).isEqualTo("0");
-        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301")).isEqualTo("2");
+        // Only the revisions written before this changeset remain; everything that existed to carry a
+        // definition went with the columns that held one.
+        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301")).isEqualTo("1");
         assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE criteria = 'legacy criteria'")).isEqualTo(
             "1"
         );
@@ -359,7 +357,9 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 WHERE practice.id = 136301
                 """
             )
-        ).isEqualTo("4");
+            // Re-applying derives the current definition from the practice again and numbers it after the
+            // history that survived, so the practice is left with a complete current revision either way.
+        ).isEqualTo("2");
     }
 
     private static void seedExistingWorkspaces() throws SQLException {

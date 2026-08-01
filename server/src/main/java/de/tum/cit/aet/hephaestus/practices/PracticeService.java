@@ -5,8 +5,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPractice;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.dto.ClearablePracticeField;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
@@ -24,6 +22,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -155,23 +154,18 @@ public class PracticeService {
         return createPractice(ctx, request.slug(), definition(request), null, null);
     }
 
+    /** The workspace's copy of a catalog practice, stamped with where it came from. */
     @Transactional
-    public Practice createPracticeFromCurated(
-        WorkspaceContext ctx,
-        String slug,
-        PracticeDefinition definition,
-        CuratedPractice source,
-        CuratedPracticeRevision equivalentRevision
-    ) {
-        return createPractice(ctx, slug, definition, source, equivalentRevision);
+    public Practice createPracticeFromCatalog(WorkspaceContext ctx, String slug, PracticeDefinition definition) {
+        return createPractice(ctx, slug, definition, slug, definition.detectionFingerprint(slug));
     }
 
     private Practice createPractice(
         WorkspaceContext ctx,
         String slug,
         PracticeDefinition definition,
-        CuratedPractice source,
-        CuratedPracticeRevision equivalentRevision
+        @Nullable String sourceCuratedSlug,
+        @Nullable String sourceCuratedFingerprint
     ) {
         if (practiceRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeSlugConflictException(
@@ -189,7 +183,8 @@ public class PracticeService {
                       .findByWorkspaceIdAndSlug(ctx.id(), definition.areaSlug())
                       .orElseThrow(() -> new EntityNotFoundException("PracticeArea", definition.areaSlug()));
         practice.setWorkspace(workspace);
-        practice.setSourceCuratedPractice(source);
+        practice.setSourceCuratedSlug(sourceCuratedSlug);
+        practice.setSourceCuratedFingerprint(sourceCuratedFingerprint);
         practice.setArea(area);
         practice.setDisplayOrder(
             practiceRepository.findMaxDisplayOrder(ctx.id(), area == null ? null : area.getId()) + 1
@@ -209,7 +204,7 @@ public class PracticeService {
                 ex
             );
         }
-        int revisionNumber = practiceRevisionService.append(practice, equivalentRevision).getRevisionNumber();
+        int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
         configAudit.record(
             ConfigAuditEntry.created(
                 ConfigAuditEntityType.PRACTICE_DEFINITION,

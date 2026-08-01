@@ -13,17 +13,12 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
 
     @Test
     void shouldLoadComposedDefinitionsAndScripts() {
-        BundledPracticeCatalog catalog = loader.load();
+        BundledPracticeCatalog catalog = loader.catalog();
 
-        assertThat(catalog.catalogRevision()).isEqualTo(1);
-        assertThat(catalog.contentDigest()).isEqualTo(
-            "ab744b2836878e92f69d4492b9594f47178cb2d5a07f394280e32e150b5d78d3"
+        assertThat(catalog.areas()).allSatisfy(area -> assertThat(area.definition().name()).isNotBlank());
+        assertThat(catalog.practices()).allSatisfy(practice ->
+            assertThat(practice.definition().criteria()).contains("\n\n---\n\n")
         );
-        assertThat(catalog.areas()).isNotEmpty();
-        assertThat(catalog.practices()).allSatisfy(practice -> {
-            assertThat(practice.definition().criteria()).contains("\n\n---\n\n");
-            assertThat(practice.definitionDigest()).hasSize(64);
-        });
         assertThat(catalog.practices())
             .filteredOn(practice -> practice.slug().equals("ships-tests-with-the-change"))
             .singleElement()
@@ -34,7 +29,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     void shouldKeepDetectorVocabularyOutOfLearnerCopy() {
         Pattern detectorVocabulary = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
 
-        assertThat(loader.load().practices()).allSatisfy(practice -> {
+        assertThat(loader.catalog().practices()).allSatisfy(practice -> {
             assertThat(practice.definition().whyItMatters())
                 .as("whyItMatters for '%s'", practice.slug())
                 .isNotNull()
@@ -48,7 +43,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
 
     @Test
     void shouldUseRealNewlinesInCriteria() {
-        assertThat(loader.load().practices()).allSatisfy(practice ->
+        assertThat(loader.catalog().practices()).allSatisfy(practice ->
             assertThat(practice.definition().criteria()).as("criteria for '%s'", practice.slug()).doesNotContain("\\n")
         );
     }

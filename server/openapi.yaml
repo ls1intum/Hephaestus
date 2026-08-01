@@ -56,6 +56,14 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
+- description: |-
+    What a workspace administrator can see of the instance catalog: the definition currently behind one
+     of their practices.
+
+     <p>Read-only and single-entry on purpose. A workspace whose copy has drifted needs to see what the
+     instance offers now to judge its own; browsing entries it cannot adopt would only be a list of
+     things it cannot have, and adoption is separate work.
+  name: curated-practice-catalog-controller
 - description: Read-only access to practice evaluation observations
   name: Practice Observations
 - description: Instance-admin account management
@@ -105,14 +113,14 @@ tags:
      on both success and failure; only <code>Accept: application/json</code> requests get
      4xx JSON.
   name: o-auth-callback-controller
-- description: Instance-managed curated practice definitions
-  name: Admin Practice Catalog
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
   name: Team Settings
 - description: Developer reactions to delivered feedback
   name: Feedback Reaction
+- description: The practice catalog this instance offers
+  name: Admin Practice Catalog
 - description: Identity provider discovery (public)
   name: Auth discovery
 - description: Integration sync observability and manual controls
@@ -354,6 +362,7 @@ paths:
             - PRACTICE_ACTIVE
             - PRACTICE_DEFINITION
             - CURATED_PRACTICE
+            - CURATED_PRACTICE_AREA
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -849,9 +858,193 @@ paths:
       summary: Update a login provider
       tags:
       - Admin
-  /admin/practice-catalog/areas:
+  /admin/practice-catalog:
     get:
-      operationId: adminListCuratedPracticeAreas
+      description: "Every entry with the definition in force, what Hephaestus ships\
+        \ where it differs, and a summary."
+      operationId: adminGetCuratedCatalog
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedCatalog"
+          description: OK
+      summary: Read the instance catalog
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/areas:
+    post:
+      operationId: adminCreateCuratedArea
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCuratedAreaRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedArea"
+          description: Area added
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Slug already exists
+      summary: Add an area to the catalog
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/areas/{slug}:
+    get:
+      operationId: adminGetCuratedArea
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedArea"
+          description: The area
+      summary: Read a catalog area
+      tags:
+      - Admin Practice Catalog
+    put:
+      operationId: adminUpdateCuratedArea
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CuratedAreaRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedArea"
+          description: The area
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Replace an area definition
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/areas/{slug}/keep:
+    post:
+      operationId: adminKeepCuratedArea
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedArea"
+          description: The area
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Keep this instance's definition of an area
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/areas/{slug}/override:
+    delete:
+      operationId: adminDeleteCuratedAreaOverride
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedArea"
+          description: The area
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Hephaestus ships no definition for this slug
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Use the Hephaestus definition of an area
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/areas/{slug}/practices:
+    get:
+      operationId: adminListCuratedAreaPractices
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -859,33 +1052,56 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/CuratedPracticeArea"
+                  type: string
           description: OK
-      summary: List curated practice areas
+      summary: Practices an area would withhold if it stopped being offered
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/areas/{slug}/status:
+    patch:
+      description: An area that is not offered withholds the practices filed under
+        it; nothing already installed changes.
+      operationId: adminUpdateCuratedAreaStatus
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCuratedStatusRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedArea"
+          description: The area
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: "Stop offering an area, or offer it again"
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices:
-    get:
-      operationId: adminListCuratedPractices
-      parameters:
-      - in: query
-        name: includeRetired
-        required: false
-        schema:
-          type: boolean
-          default: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CuratedPracticeSummary"
-          description: OK
-      summary: List curated practices
-      tags:
-      - Admin Practice Catalog
     post:
       operationId: adminCreateCuratedPractice
       requestBody:
@@ -899,15 +1115,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedPracticeDetail"
-          description: Curated practice created
+                $ref: "#/components/schemas/CuratedPractice"
+          description: Practice added
         "409":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Slug already exists
-      summary: Create a curated practice
+      summary: Add a practice to the catalog
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}:
@@ -924,9 +1140,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedPracticeDetail"
-          description: OK
-      summary: Get a curated practice
+                $ref: "#/components/schemas/CuratedPractice"
+          description: The practice
+      summary: Read a catalog practice
       tags:
       - Admin Practice Catalog
     put:
@@ -946,15 +1162,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateCuratedPracticeRequest"
+              $ref: "#/components/schemas/CuratedPracticeRequest"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedPracticeDetail"
-          description: Curated practice updated
+                $ref: "#/components/schemas/CuratedPractice"
+          description: The practice
         "412":
           content:
             application/json:
@@ -967,11 +1183,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: Replace a curated practice definition
+      summary: Replace a practice definition
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/practices/{slug}/keep:
+    post:
+      description: Records that the newer Hephaestus definition has been seen and
+        this instance's own is kept.
+      operationId: adminKeepCuratedPractice
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPractice"
+          description: The practice
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Keep this instance's definition of a practice
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}/override:
     delete:
+      description: "Discards this instance's definition, so the practice follows Hephaestus\
+        \ again."
       operationId: adminDeleteCuratedPracticeOverride
       parameters:
       - in: path
@@ -989,14 +1245,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedPracticeDetail"
-          description: Bundled practice definition restored
+                $ref: "#/components/schemas/CuratedPractice"
+          description: The practice
         "409":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: No bundled definition is available
+          description: Hephaestus ships no definition for this slug
         "412":
           content:
             application/json:
@@ -1009,7 +1265,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: Restore the bundled practice definition
+      summary: Use the Hephaestus definition of a practice
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}/status:
@@ -1030,15 +1286,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateCuratedPracticeStatusRequest"
+              $ref: "#/components/schemas/UpdateCuratedStatusRequest"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedPracticeDetail"
-          description: Curated practice status updated
+                $ref: "#/components/schemas/CuratedPractice"
+          description: The practice
         "412":
           content:
             application/json:
@@ -1051,7 +1307,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: Retire or restore a curated practice
+      summary: "Stop offering a practice, or offer it again"
       tags:
       - Admin Practice Catalog
   /admin/users:
@@ -1928,6 +2184,7 @@ paths:
             - PRACTICE_ACTIVE
             - PRACTICE_DEFINITION
             - CURATED_PRACTICE
+            - CURATED_PRACTICE_AREA
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -3770,29 +4027,10 @@ paths:
       summary: Update a practice area
       tags:
       - Practice Areas
-  /workspaces/{workspaceSlug}/practice-catalog:
-    get:
-      operationId: listCuratedPracticeCatalog
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CuratedPracticeCatalog"
-          description: OK
-      summary: Browse the curated practice catalog
-      tags:
-      - curated-practice-catalog
   /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
     get:
+      description: "The catalog definition a workspace copy came from, for comparison\
+        \ with the copy."
       operationId: getCuratedPracticeCatalogEntry
       parameters:
       - description: Workspace slug
@@ -3812,9 +4050,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedPracticeDetail"
+                $ref: "#/components/schemas/CuratedPractice"
           description: OK
-      summary: Inspect an available curated practice
+      summary: Read the instance's definition of a practice
       tags:
       - curated-practice-catalog
   /workspaces/{workspaceSlug}/practices:
@@ -6537,6 +6775,65 @@ components:
           - "null"
           description: Destination area slug; omit or set to null for Unassigned
           example: review-ready-work
+    CatalogEntryStatus:
+      type: object
+      description: "Where a catalog entry stands. Identical for practices and areas,\
+        \ so one badge renders either."
+      properties:
+        changeKind:
+          type: string
+          description: |-
+            what separates this instance's definition from the one Hephaestus ships now, so
+                 an update that cannot change what gets detected can be taken without weighing it up
+          enum:
+          - NONE
+          - WORDING
+          - DETECTION
+        etag:
+          type: string
+        offered:
+          type: boolean
+        retired:
+          type: boolean
+        state:
+          type: string
+          enum:
+          - FROM_HEPHAESTUS
+          - EDITED_HERE
+          - UPDATE_WAITING
+          - YOURS
+          - NO_LONGER_SHIPPED
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - changeKind
+      - etag
+      - offered
+      - retired
+      - state
+    CatalogOrigin:
+      type: object
+      description: "The catalog entry a workspace copy came from, and how far it has\
+        \ drifted"
+      properties:
+        link:
+          type: string
+          enum:
+          - LOCAL
+          - IN_SYNC
+          - LOCALLY_EDITED
+          - UPDATE_AVAILABLE
+        slug:
+          type: string
+          description: Slug of the catalog entry this copy was made from
+        sourceOffered:
+          type: boolean
+          description: Whether the instance still offers this entry to workspaces
+      required:
+      - link
+      - slug
+      - sourceOffered
     ChatMessage:
       type: object
       description: Mentor chat message in AI SDK UIMessage shape.
@@ -6684,6 +6981,7 @@ components:
           - PRACTICE_ACTIVE
           - PRACTICE_DEFINITION
           - CURATED_PRACTICE
+          - CURATED_PRACTICE_AREA
           - WORKSPACE_INSTANCE_LLM_BUDGET
           - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
@@ -6982,57 +7280,28 @@ components:
       - id
       - login
       - name
-    CreateCuratedPracticeRequest:
+    CreateCuratedAreaRequest:
       type: object
+      description: Request to add an area to the instance catalog
       properties:
-        areaSlug:
-          type: string
-          maxLength: 64
-          minLength: 0
-          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        artifactType:
-          type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-        criteria:
-          type: string
-          maxLength: 50000
-          minLength: 0
-        name:
-          type: string
-          maxLength: 128
-          minLength: 3
-        precomputeScript:
-          type: string
-          maxLength: 100000
-          minLength: 0
+        definition:
+          $ref: "#/components/schemas/CuratedAreaRequest"
         slug:
           type: string
-          maxLength: 64
-          minLength: 3
-          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        triggerEvents:
-          type: array
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
-        whatGoodLooksLike:
-          type: string
-          maxLength: 2000
-          minLength: 0
-        whyItMatters:
-          type: string
-          maxLength: 2000
-          minLength: 0
+          example: reviewing-work
       required:
-      - artifactType
-      - criteria
-      - name
-      - slug
-      - triggerEvents
+      - definition
+    CreateCuratedPracticeRequest:
+      type: object
+      description: Request to add a practice to the instance catalog
+      properties:
+        definition:
+          $ref: "#/components/schemas/CuratedPracticeRequest"
+        slug:
+          type: string
+          example: pr-description-quality
+      required:
+      - definition
     CreateLlmConnectionRequest:
       type: object
       description: Create an instance LLM provider connection
@@ -7449,45 +7718,134 @@ components:
       - displayName
       - kind
       - workspaceSlug
-    CuratedPracticeArea:
+    CuratedArea:
       type: object
+      description: "An area in the instance catalog, with what Hephaestus ships now\
+        \ when it differs."
+      properties:
+        definition:
+          $ref: "#/components/schemas/CuratedAreaRequest"
+        shipped:
+          $ref: "#/components/schemas/CuratedAreaRequest"
+        slug:
+          type: string
+        status:
+          $ref: "#/components/schemas/CatalogEntryStatus"
+      required:
+      - definition
+      - slug
+      - status
+    CuratedAreaRequest:
+      type: object
+      description: A complete curated practice area definition
       properties:
         color:
           type: string
+          maxLength: 32
+          minLength: 0
         description:
           type: string
+          maxLength: 2000
+          minLength: 0
         displayOrder:
           type: integer
           format: int32
+          minimum: 0
         icon:
           type: string
+          maxLength: 64
+          minLength: 0
         name:
           type: string
-        slug:
-          type: string
+          maxLength: 128
+          minLength: 3
       required:
       - displayOrder
       - name
-      - slug
-    CuratedPracticeCatalog:
+    CuratedCatalog:
       type: object
+      description: "The instance catalog: what it offers, and one line describing\
+        \ how it stands."
       properties:
         areas:
           type: array
           items:
-            $ref: "#/components/schemas/CuratedPracticeArea"
+            $ref: "#/components/schemas/CuratedArea"
         practices:
           type: array
           items:
             $ref: "#/components/schemas/CuratedPracticeSummary"
+        summary:
+          $ref: "#/components/schemas/CuratedCatalogSummary"
       required:
       - areas
       - practices
-    CuratedPracticeDetail:
+      - summary
+    CuratedCatalogSummary:
       type: object
+      description: |-
+        The catalog at a glance, so the state of the whole thing is one sentence rather than a scan of
+         every entry. Updates are counted separately by whether taking them would change what gets
+         detected — the ones that cannot are safe to take together.
+      properties:
+        editedHere:
+          type: integer
+          format: int32
+        noLongerShipped:
+          type: integer
+          format: int32
+        retired:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+        updatesChangingDetection:
+          type: integer
+          format: int32
+        updatesChangingWordingOnly:
+          type: integer
+          format: int32
+        yours:
+          type: integer
+          format: int32
+      required:
+      - editedHere
+      - noLongerShipped
+      - retired
+      - total
+      - updatesChangingDetection
+      - updatesChangingWordingOnly
+      - yours
+    CuratedPractice:
+      type: object
+      description: |-
+        A practice in the instance catalog.
+
+         <p><code>shipped</code> carries the definition Hephaestus offers right now whenever it differs from the
+         one in force. It is what makes taking an update a decision rather than a leap: the administrator
+         reads what they would be getting before they get it.
+      properties:
+        definition:
+          $ref: "#/components/schemas/CuratedPracticeRequest"
+        shipped:
+          $ref: "#/components/schemas/CuratedPracticeRequest"
+        slug:
+          type: string
+        status:
+          $ref: "#/components/schemas/CatalogEntryStatus"
+      required:
+      - definition
+      - slug
+      - status
+    CuratedPracticeRequest:
+      type: object
+      description: A complete curated practice definition
       properties:
         areaSlug:
           type: string
+          maxLength: 64
+          minLength: 0
         artifactType:
           type: string
           enum:
@@ -7496,72 +7854,42 @@ components:
           - CONVERSATION_THREAD
         criteria:
           type: string
-        id:
-          type: integer
-          format: int64
-        latestBundledCatalogRevision:
-          type: integer
-          format: int64
+          maxLength: 50000
+          minLength: 0
         name:
           type: string
+          maxLength: 128
+          minLength: 3
         precomputeScript:
           type: string
-        revisionCreatedAt:
-          type: string
-          format: date-time
-        revisionNumber:
-          type: integer
-          format: int32
-        slug:
-          type: string
-        sourceKind:
-          type: string
-          enum:
-          - BUNDLED
-          - INSTANCE
-        status:
-          type: string
-          enum:
-          - AVAILABLE
-          - RETIRED
-        syncStatus:
-          type: string
-          enum:
-          - SYNCED
-          - OVERRIDDEN
-          - UPDATE_AVAILABLE
-          - SOURCE_REMOVED
-          - INSTANCE
+          maxLength: 50000
+          minLength: 0
         triggerEvents:
           type: array
           items:
             type: string
-        updatedAt:
-          type: string
-          format: date-time
-        version:
-          type: integer
-          format: int64
+          maxItems: 10
+          minItems: 0
         whatGoodLooksLike:
           type: string
+          maxLength: 2000
+          minLength: 0
         whyItMatters:
           type: string
+          maxLength: 2000
+          minLength: 0
       required:
       - artifactType
       - criteria
-      - id
       - name
-      - revisionCreatedAt
-      - revisionNumber
-      - slug
-      - sourceKind
-      - status
-      - syncStatus
       - triggerEvents
-      - updatedAt
-      - version
     CuratedPracticeSummary:
       type: object
+      description: |-
+        A practice as the catalog list shows it.
+
+         <p>Without its criteria: those are thousands of words of detection rubric each, and the list exists
+         to be scanned. The definition, and what Hephaestus ships beside it, come with the single entry.
       properties:
         areaSlug:
           type: string
@@ -7571,58 +7899,17 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
-        id:
-          type: integer
-          format: int64
-        latestBundledCatalogRevision:
-          type: integer
-          format: int64
         name:
           type: string
-        revisionCreatedAt:
-          type: string
-          format: date-time
-        revisionNumber:
-          type: integer
-          format: int32
         slug:
           type: string
-        sourceKind:
-          type: string
-          enum:
-          - BUNDLED
-          - INSTANCE
         status:
-          type: string
-          enum:
-          - AVAILABLE
-          - RETIRED
-        syncStatus:
-          type: string
-          enum:
-          - SYNCED
-          - OVERRIDDEN
-          - UPDATE_AVAILABLE
-          - SOURCE_REMOVED
-          - INSTANCE
-        updatedAt:
-          type: string
-          format: date-time
-        version:
-          type: integer
-          format: int64
+          $ref: "#/components/schemas/CatalogEntryStatus"
       required:
       - artifactType
-      - id
       - name
-      - revisionCreatedAt
-      - revisionNumber
       - slug
-      - sourceKind
       - status
-      - syncStatus
-      - updatedAt
-      - version
     CurrentUserView:
       type: object
       properties:
@@ -9061,6 +9348,8 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        catalogOrigin:
+          $ref: "#/components/schemas/CatalogOrigin"
         createdAt:
           type: string
           format: date-time
@@ -9119,6 +9408,8 @@ components:
         active:
           type: boolean
           description: Whether this area is active
+        catalogOrigin:
+          $ref: "#/components/schemas/CatalogOrigin"
         color:
           type: string
           description: Optional palette colour key for the area's chip
@@ -11141,53 +11432,9 @@ components:
           - UNINSTALLED
       required:
       - state
-    UpdateCuratedPracticeRequest:
+    UpdateCuratedStatusRequest:
       type: object
-      properties:
-        areaSlug:
-          type: string
-          maxLength: 64
-          minLength: 0
-          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        artifactType:
-          type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-        criteria:
-          type: string
-          maxLength: 50000
-          minLength: 0
-        name:
-          type: string
-          maxLength: 128
-          minLength: 3
-        precomputeScript:
-          type: string
-          maxLength: 100000
-          minLength: 0
-        triggerEvents:
-          type: array
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
-        whatGoodLooksLike:
-          type: string
-          maxLength: 2000
-          minLength: 0
-        whyItMatters:
-          type: string
-          maxLength: 2000
-          minLength: 0
-      required:
-      - artifactType
-      - criteria
-      - name
-      - triggerEvents
-    UpdateCuratedPracticeStatusRequest:
-      type: object
+      description: Whether the instance offers this catalog entry to workspaces
       properties:
         status:
           type: string

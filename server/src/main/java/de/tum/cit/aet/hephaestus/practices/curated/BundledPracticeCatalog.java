@@ -1,23 +1,20 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 
+/**
+ * The catalog this build ships, parsed from the classpath.
+ *
+ * <p>It carries no version of its own. Nothing is ever "applied", so there is no applied-once state
+ * to order or to conflict: what an instance offers is computed from this and its override rows every
+ * time it is asked.
+ */
 record BundledPracticeCatalog(
-    long catalogRevision,
-    String contentDigest,
-    List<BundledArea> areas,
-    List<BundledPractice> practices
+    List<BundledEntry<AreaDefinition>> areas,
+    List<BundledEntry<PracticeDefinition>> practices
 ) {
-    record BundledArea(
-        String slug,
-        String name,
-        @Nullable String description,
-        int displayOrder,
-        @Nullable String icon,
-        @Nullable String color
-    ) {}
-
-    record BundledPractice(String slug, PracticeDefinition definition, String definitionDigest) {}
+    /** One shipped entry: its durable slug and the definition Hephaestus ships under it. */
+    record BundledEntry<D>(String slug, D definition) {}
 }

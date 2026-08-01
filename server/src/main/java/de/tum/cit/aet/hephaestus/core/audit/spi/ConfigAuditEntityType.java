@@ -41,7 +41,10 @@ public enum ConfigAuditEntityType {
     PRACTICE_ACTIVE,
     /** A practice's review definition, excluding its active state and catalog placement. */
     PRACTICE_DEFINITION,
+    /** An entry in the instance's curated practice catalog, edited by an instance admin or by a newer build. */
     CURATED_PRACTICE,
+    /** An area in the instance's curated practice catalog. Same lifecycle as {@link #CURATED_PRACTICE}. */
+    CURATED_PRACTICE_AREA,
 
     /** A workspace's monthly cap on HOST-funded LLM spend. Set by instance admins. */
     WORKSPACE_INSTANCE_LLM_BUDGET,

@@ -1,18 +1,15 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -21,33 +18,34 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * Reads the catalog shipped on the classpath.
+ *
+ * <p>Parsed once at construction: the classpath cannot change while the process runs, and every read
+ * of the effective catalog composes this with the override rows, so it is asked for often.
+ */
 @Component
-class BundledPracticeCatalogLoader {
+public class BundledPracticeCatalogLoader {
 
     private static final String CATALOG_RESOURCE = "practices/default-catalog.json";
 
-    private final JsonMapper objectMapper;
+    private final BundledPracticeCatalog catalog;
 
     BundledPracticeCatalogLoader(JsonMapper objectMapper) {
-        this.objectMapper = objectMapper;
+        this.catalog = parse(objectMapper);
     }
 
-    BundledPracticeCatalog load() {
-        JsonNode catalog = readCatalog();
-        JsonNode revisionNode = catalog.path("catalogRevision");
-        if (!revisionNode.isIntegralNumber()) {
-            throw new IllegalStateException("default practice catalog requires an integer catalogRevision");
-        }
-        long catalogRevision = revisionNode.asLong();
-        if (catalogRevision < 1) {
-            throw new IllegalStateException("default practice catalog requires catalogRevision >= 1");
-        }
+    BundledPracticeCatalog catalog() {
+        return catalog;
+    }
 
-        List<BundledPracticeCatalog.BundledArea> areas = new ArrayList<>();
-        List<BundledPracticeCatalog.BundledPractice> practices = new ArrayList<>();
+    private static BundledPracticeCatalog parse(JsonMapper objectMapper) {
+        JsonNode root = readCatalog(objectMapper);
+        List<BundledEntry<AreaDefinition>> areas = new ArrayList<>();
+        List<BundledEntry<PracticeDefinition>> practices = new ArrayList<>();
         Set<String> areaSlugs = new HashSet<>();
         Set<String> practiceSlugs = new HashSet<>();
-        JsonNode areasNode = catalog.path("areas");
+        JsonNode areasNode = root.path("areas");
         if (!areasNode.isArray()) {
             throw new IllegalStateException("default practice catalog areas must be an array");
         }
@@ -57,15 +55,18 @@ class BundledPracticeCatalogLoader {
                 throw new IllegalStateException("duplicate bundled practice area slug: " + areaSlug);
             }
             areas.add(
-                new BundledPracticeCatalog.BundledArea(
+                new BundledEntry<>(
                     areaSlug,
-                    requiredText(areaNode, "name"),
-                    text(areaNode, "description"),
-                    nonNegativeInt(areaNode, "displayOrder"),
-                    text(areaNode, "icon"),
-                    text(areaNode, "color")
+                    new AreaDefinition(
+                        requiredText(areaNode, "name"),
+                        text(areaNode, "description"),
+                        nonNegativeInt(areaNode, "displayOrder"),
+                        text(areaNode, "icon"),
+                        text(areaNode, "color")
+                    )
                 )
             );
+
             JsonNode practicesNode = areaNode.path("practices");
             if (!practicesNode.isArray()) {
                 throw new IllegalStateException("bundled practice area practices must be an array: " + areaSlug);
@@ -75,22 +76,16 @@ class BundledPracticeCatalogLoader {
                 if (!practiceSlugs.add(slug)) {
                     throw new IllegalStateException("duplicate bundled practice slug: " + slug);
                 }
-                PracticeDefinition definition = definition(catalog, areaSlug, practiceNode, slug);
-                practices.add(new BundledPracticeCatalog.BundledPractice(slug, definition, definition.digest(slug)));
+                practices.add(new BundledEntry<>(slug, definition(root, areaSlug, practiceNode, slug)));
             }
         }
         if (areas.isEmpty() || practices.isEmpty()) {
             throw new IllegalStateException("default practice catalog must contain areas and practices");
         }
-        return new BundledPracticeCatalog(
-            catalogRevision,
-            catalogDigest(areas, practices),
-            List.copyOf(areas),
-            List.copyOf(practices)
-        );
+        return new BundledPracticeCatalog(List.copyOf(areas), List.copyOf(practices));
     }
 
-    private PracticeDefinition definition(JsonNode catalog, String areaSlug, JsonNode node, String slug) {
+    private static PracticeDefinition definition(JsonNode catalog, String areaSlug, JsonNode node, String slug) {
         WorkArtifact artifactType = WorkArtifact.valueOf(requiredText(node, "artifactType"));
         JsonNode triggersNode = node.path("triggerEvents");
         if (!triggersNode.isArray()) {
@@ -124,8 +119,7 @@ class BundledPracticeCatalogLoader {
         );
     }
 
-    @Nullable
-    private String loadPrecomputeScript(String slug) {
+    private static @Nullable String loadPrecomputeScript(String slug) {
         var resource = new ClassPathResource("practices/precompute/" + slug + ".ts");
         if (!resource.exists()) {
             return null;
@@ -137,7 +131,7 @@ class BundledPracticeCatalogLoader {
         }
     }
 
-    private JsonNode readCatalog() {
+    private static JsonNode readCatalog(JsonMapper objectMapper) {
         try (InputStream input = new ClassPathResource(CATALOG_RESOURCE).getInputStream()) {
             return objectMapper.readTree(input);
         } catch (IOException exception) {
@@ -145,35 +139,8 @@ class BundledPracticeCatalogLoader {
         }
     }
 
-    private static String catalogDigest(
-        List<BundledPracticeCatalog.BundledArea> areas,
-        List<BundledPracticeCatalog.BundledPractice> practices
-    ) {
-        MessageDigest digest = sha256();
-        areas
-            .stream()
-            .sorted(Comparator.comparing(BundledPracticeCatalog.BundledArea::slug))
-            .forEach(area -> {
-                add(digest, area.slug());
-                add(digest, area.name());
-                addNullable(digest, area.description());
-                digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(area.displayOrder()).array());
-                addNullable(digest, area.icon());
-                addNullable(digest, area.color());
-            });
-        practices
-            .stream()
-            .sorted(Comparator.comparing(BundledPracticeCatalog.BundledPractice::slug))
-            .forEach(practice -> {
-                add(digest, practice.slug());
-                add(digest, practice.definitionDigest());
-            });
-        return HexFormat.of().formatHex(digest.digest());
-    }
-
     private static String composeCriteria(JsonNode catalog, String preambleKey, String criteria) {
-        String preamble = requiredText(catalog.path("criteriaPreambles"), preambleKey);
-        return preamble + "\n\n---\n\n" + criteria;
+        return requiredText(catalog.path("criteriaPreambles"), preambleKey) + "\n\n---\n\n" + criteria;
     }
 
     private static String requiredText(JsonNode node, String field) {
@@ -188,8 +155,7 @@ class BundledPracticeCatalogLoader {
         return value;
     }
 
-    @Nullable
-    private static String text(JsonNode node, String field) {
+    private static @Nullable String text(JsonNode node, String field) {
         JsonNode value = node.get(field);
         if (value == null || value.isNull()) {
             return null;
@@ -207,28 +173,5 @@ class BundledPracticeCatalogLoader {
             throw new IllegalStateException("bundled catalog field must be a non-negative integer: " + field);
         }
         return value.asInt();
-    }
-
-    private static void addNullable(MessageDigest digest, @Nullable String value) {
-        if (value == null) {
-            digest.update((byte) 0);
-        } else {
-            digest.update((byte) 1);
-            add(digest, value);
-        }
-    }
-
-    private static void add(MessageDigest digest, String value) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
-        digest.update(bytes);
-    }
-
-    private static MessageDigest sha256() {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
     }
 }

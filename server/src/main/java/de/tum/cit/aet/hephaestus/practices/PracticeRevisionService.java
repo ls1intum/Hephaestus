@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import lombok.RequiredArgsConstructor;
@@ -17,34 +16,23 @@ public class PracticeRevisionService {
     private final PracticeRepository practiceRepository;
     private final PracticeRevisionRepository practiceRevisionRepository;
 
+    /**
+     * Records the practice's current definition as the next revision.
+     *
+     * <p>The revision's fingerprint is what later says whether this copy still matches the catalog —
+     * derived from the definition itself, so editing only what people read keeps the match, editing
+     * the detection criteria drops it, and editing them back restores it.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public PracticeRevision append(Practice practice) {
-        return append(practice, null);
-    }
-
-    @Transactional(propagation = Propagation.MANDATORY)
-    public PracticeRevision append(Practice practice, @Nullable CuratedPracticeRevision equivalentCuratedRevision) {
         practiceRepository
             .findByIdForUpdate(practice.getId())
             .orElseThrow(() -> new EntityNotFoundException("Practice", String.valueOf(practice.getId())));
-        var previous = practiceRevisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId());
-        int revisionNumber = previous.map(revision -> revision.getRevisionNumber() + 1).orElse(1);
-        PracticeRevision revision = new PracticeRevision(practice, revisionNumber, equivalentCuratedRevision);
-        String detectionFingerprint = revision.getDetectionFingerprint();
-        if (
-            equivalentCuratedRevision == null &&
-            previous
-                .filter(prior -> prior.getDetectionFingerprint() != null)
-                .filter(prior -> prior.getDetectionFingerprint().equals(detectionFingerprint))
-                .isPresent()
-        ) {
-            revision = new PracticeRevision(
-                practice,
-                revisionNumber,
-                previous.orElseThrow().getEquivalentCuratedRevision()
-            );
-        }
-        PracticeRevision saved = practiceRevisionRepository.save(revision);
+        int revisionNumber = practiceRevisionRepository
+            .findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId())
+            .map(revision -> revision.getRevisionNumber() + 1)
+            .orElse(1);
+        PracticeRevision saved = practiceRevisionRepository.save(new PracticeRevision(practice, revisionNumber));
         practice.setCurrentRevision(saved);
         practiceRepository.save(practice);
         return saved;

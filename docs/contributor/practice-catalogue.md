@@ -2,22 +2,31 @@
 
 The practice catalogue turns observable engineering habits into review criteria.
 
-## Sources of truth
+## Where a definition lives
 
-- Shipped catalogue:
-  [`default-catalog.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/practices/default-catalog.json)
-  and its referenced precompute scripts
-- Effective instance catalogue: the database projection of the shipped catalogue plus explicit
-  instance overrides, managed at `/admin/catalog` or through `/admin/practice-catalog`
-- Workspace-specific catalogue: the workspace database, managed through the admin UI or REST API
-- Workspace default seed: the effective available shipped practices, copied once when the workspace
-  is initialized
-- Persisted schema and initial bootstrap: Liquibase changelogs
-- HTTP projections: generated OpenAPI
-- Product vocabulary: [Practice feedback language](practice-feedback-language.md)
+A definition exists in three places, and each one owns a different decision.
 
-The Markdown references below support curation decisions. They are not persisted practice metadata
-and are not machine-enforced.
+| Layer               | Owner             | Changes how                                 |
+| ------------------- | ----------------- | ------------------------------------------- |
+| Shipped catalogue   | this repository   | a pull request                              |
+| Instance catalogue  | an instance admin | `/admin/catalog`, or a newer build arriving |
+| Workspace catalogue | a workspace admin | the workspace's own practice administration |
+
+The middle layer is not a copy of the first. What an instance offers is computed on every read as the
+shipped catalogue with the administrator's overrides laid over it: an entry nobody has touched has no
+row at all and follows Hephaestus by saying nothing about it, and an entry an administrator wrote or
+edited is stored once, alongside the digest of the shipped definition they started from. There is no
+merged table to keep in step with its inputs and nothing that has to run when a build changes — a
+deployment changes what the instance offers the moment it starts.
+
+Areas and practices are the same kind of thing at every layer. Both carry a durable slug, the same
+override shape, and retirement; both are administered with the same operations. Where they differ is
+what a change means: an area's definition is how it presents, a practice's is what it detects.
+
+The shipped catalogue is
+[`default-catalog.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/practices/default-catalog.json)
+plus the precompute scripts beside it. Everything else is database state, projected through the
+generated OpenAPI.
 
 ## Selection principles
 
@@ -51,6 +60,11 @@ source in the proposal or pull request that changes the catalogue so reviewers c
 The slug is durable identity and participates in finding recurrence. Once findings exist, renaming a
 slug requires an explicit remapping strategy; changing only the display name is not a remap.
 
+Instance-authored slugs share one namespace with the shipped ones. If a later build ships a slug an
+instance already used, that entry starts tracking the shipped definition rather than hiding it: the
+instance's own definition stays in force and the shipped one arrives as an update to take or leave.
+Prefixing instance-only slugs keeps that from happening by accident.
+
 Learner-facing fields should be plain and specific:
 
 - **Name:** a short action or outcome.
@@ -60,38 +74,67 @@ Learner-facing fields should be plain and specific:
 
 Avoid hype, grading language, and claims broader than the artifact being reviewed.
 
-## Curation workflow
+## Changing the shipped catalogue
 
 1. State the user problem and supported artifact.
 2. Cite the evidence and classify the claim honestly.
 3. Draft applicability, positive/negative signals, exclusions, and severity.
-4. For a default that should reach every deployment, change the bundled catalogue and increment its
-   `catalogRevision`. For an instance-only practice or variation, use `/admin/catalog`.
+4. Change `default-catalog.json`. There is no revision number to bump: the file _is_ the shipped
+   layer, so every instance running the new build offers the new definition as soon as it starts.
 5. Add or update focused detection tests when the execution contract changes.
 6. Review learner-facing copy in the admin UI and a representative delivered message.
 
-On startup, a newer bundled revision is applied automatically to practices that still follow the
-shipped definition. An instance edit creates a whole-practice override instead; later bundled
-updates remain available without replacing that override. An administrator can return to the latest
-bundled definition from the editor. A deployed catalogue revision is immutable: changing bundled
-content without incrementing `catalogRevision` prevents startup, while an older application replica
-cannot roll the catalogue back.
+## What a newer build does to an instance
 
-Every effective definition change appends an immutable revision. Retirement is an instance policy:
-it hides a practice from the workspace-facing catalogue without changing its source relationship or
-existing workspace copies. A practice removed from a newer bundle is retained in history and hidden
-rather than deleted.
+Nothing runs, and nothing is rewritten. Each entry is resolved on read, so a build changes an
+instance exactly as far as the administrator has left it alone:
 
-A workspace practice retains its curated source after local edits. Its current revision remains
-equivalent only while its detector inputs match the curated revision; learner-facing edits preserve
-that equivalence.
+| The administrator has…                       | The instance now offers | The admin page shows                     |
+| -------------------------------------------- | ----------------------- | ---------------------------------------- |
+| not touched the entry                         | the new definition      | **From Hephaestus** — nothing to decide  |
+| edited it, and Hephaestus has not changed it  | their definition        | **Edited here**                          |
+| edited it, and Hephaestus has now changed it  | their definition        | **Update waiting** — take it or keep ours |
+| written the entry themselves                  | their definition        | **Yours**                                |
+| an entry the build no longer ships            | their definition        | **No longer shipped**                    |
+
+An update is never taken silently, and it is never presented as a number. The page says what the
+change is — whether taking it would change what gets detected or only what people read — and the
+shipped definition can be read in full before it is taken, next to the one in force. Wording-only
+updates are counted separately so they can be taken together without weighing each one up.
+
+Taking an update means deleting the override, at which point the entry follows Hephaestus again.
+Keeping ours means re-stamping the override with the digest of the definition just declined, which
+is what stops the same update being asked about twice — the next question comes with the next
+genuine change. A replica of an older build never rolls the catalogue back, because it never wrote
+anything down.
+
+Retirement is instance policy: it stops an entry being offered to new workspaces and changes nothing
+that already exists. Retiring an area also withholds the practices filed under it, since an area is
+how those practices are presented; the confirmation says how many that is.
+
+## What a workspace receives
+
+A workspace is given the instance catalogue once, when it is created — every entry the instance
+offers, whether Hephaestus shipped it or an administrator wrote it. From that moment the workspace's
+practices are its own. Later catalogue changes never rewrite them.
+
+That is deliberate, and it is visible rather than silent. Each workspace practice and area records
+the slug it came from and the fingerprint it was copied at — two columns, no foreign key into the
+catalogue, because a workspace's practice must survive its source being retired. Comparing three
+fingerprints (what is running here, what it was copied from, what the instance offers now) gives the
+workspace's practice administration what it shows: unchanged, changed here, or a newer catalogue
+version available. Whether to take a newer version is the workspace's decision, and the mechanism
+for taking it is separate work.
+
+Equivalence is derived from the definition, not from the order edits happened in. A practice matches
+its source while everything that reaches a detection run matches — criteria, precompute script,
+slug, name, trigger events and area. Editing only what people read keeps the match; editing the
+detection criteria drops it; editing them back restores it. For an area the comparison is how it
+presents, deliberately excluding display order, because a workspace ordering its own areas is a
+layout choice rather than an edit.
 
 Workspace-specific practices should be created through the admin UI or API, not direct SQL, so
-validation, ordering, revisions, and audit behavior remain intact.
-
-Workspace defaults are snapshots, not subscriptions. A new workspace receives the current effective
-bundled definitions with their provenance. Subsequent bundled or instance changes never rewrite
-workspace copies; administrators decide whether to adopt a newer curated revision.
+validation, ordering, revisions, and audit behaviour remain intact.
 
 ## Reference register
 

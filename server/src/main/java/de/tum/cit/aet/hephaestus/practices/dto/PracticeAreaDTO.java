@@ -20,9 +20,10 @@ public record PracticeAreaDTO(
     @NonNull @Schema(description = "Whether this area is active") Boolean active,
     @NonNull @Schema(description = "Sort order within the workspace") Integer displayOrder,
     @NonNull @Schema(description = "Timestamp when the area was created") Instant createdAt,
-    @Nullable @Schema(description = "Timestamp when the area was last updated") Instant updatedAt
+    @Nullable @Schema(description = "Timestamp when the area was last updated") Instant updatedAt,
+    @Nullable CatalogOriginDTO catalogOrigin
 ) {
-    public static PracticeAreaDTO from(PracticeArea area) {
+    public static PracticeAreaDTO from(PracticeArea area, @Nullable CatalogOriginDTO catalogOrigin) {
         return new PracticeAreaDTO(
             area.getId(),
             area.getSlug(),
@@ -33,7 +34,8 @@ public record PracticeAreaDTO(
             area.isActive(),
             area.getDisplayOrder(),
             area.getCreatedAt(),
-            area.getUpdatedAt()
+            area.getUpdatedAt(),
+            catalogOrigin
         );
     }
 }

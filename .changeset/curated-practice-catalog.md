@@ -2,7 +2,15 @@
 "hephaestus": minor
 ---
 
-Instance administrators can now curate, revise, retire, and restore a shared practice catalog. New
-catalog versions shipped with Hephaestus update untouched practices automatically while preserving
-instance overrides for explicit review. New workspaces receive the effective shipped catalog with
-revision provenance; later catalog changes and retirements never rewrite existing workspace copies.
+Instance administrators now have a practice catalog they own, under **Admin → Catalog**. Areas and
+practices can both be added, edited, retired and offered again, and two administrators editing the
+same entry no longer overwrite each other silently. New workspaces receive whatever the instance
+offers — including practices and areas written on the instance itself, not only the ones Hephaestus
+ships.
+
+Upgrading to a newer Hephaestus never overwrites an edit and never asks about one that has not
+changed. Entries nobody has touched simply follow the new version. An edited entry keeps yours, and
+the catalog page says an update is waiting, whether taking it would change what gets detected or only
+the wording, and shows the incoming definition in full beside yours before you decide. Keeping yours
+settles the question until Hephaestus changes that entry again. Retiring an area also withholds the
+practices filed under it, and the confirmation says how many that is.
