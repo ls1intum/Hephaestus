@@ -45,7 +45,17 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     private static final long WS = 42L;
     private static final String TEAM = "T1";
     private static final String CHANNEL = "C1";
-    private static final Instant ANNOUNCED = Instant.parse("2026-07-01T00:00:00Z");
+    /**
+     * The service floors every fetch at {@code max(announcement, now - retention, watermark)} and reads
+     * the clock itself, so both of these have to be relative. A fixed instant passes only until the
+     * retention window slides past it, and then fails on a day nobody touched this code.
+     */
+    private static final Instant ANNOUNCED = Instant.now().minus(Duration.ofDays(20));
+
+    /** After the announcement and still inside the retention window, so it is the floor. */
+    private static final String WATERMARK_AFTER_ANNOUNCEMENT = SlackTs.ofInstant(
+        Instant.now().minus(Duration.ofDays(10))
+    );
 
     @Mock
     private SlackMonitoredChannelRepository monitoredChannelRepository;
@@ -139,7 +149,7 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
 
     @Test
     void fetchFloor_isTheLatestOfAnnouncementAndWatermark() {
-        String watermark = "1783000000.000000"; // after the announcement
+        String watermark = WATERMARK_AFTER_ANNOUNCEMENT;
         stubChannels(channel(ANNOUNCED, watermark));
         when(
             slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
