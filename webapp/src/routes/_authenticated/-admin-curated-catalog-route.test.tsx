@@ -193,7 +193,7 @@ describe("instance catalog routes", () => {
 		fireEvent.click(
 			within(screen.getByRole("alertdialog", { name: "Use the Hephaestus version?" })).getByRole(
 				"button",
-				{ name: "Use Hephaestus version" },
+				{ name: "Use the Hephaestus version" },
 			),
 		);
 

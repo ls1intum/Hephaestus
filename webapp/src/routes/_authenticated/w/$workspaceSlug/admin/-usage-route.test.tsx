@@ -55,7 +55,7 @@ describe("workspace AI usage route", () => {
 		fireEvent.click(changeCap);
 		fireEvent.change(capField(), { target: { value: "999999999" } });
 		fireEvent.click(screen.getByRole("button", { name: "Save cap" }));
-		await screen.findByText(REJECTION, undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText(REJECTION);
 
 		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 		await waitFor(() => expect(screen.queryByText(REJECTION)).toBeNull());
@@ -86,7 +86,7 @@ describe("workspace AI usage route", () => {
 
 		releaseCapPut?.();
 
-		await screen.findByText("Couldn't save the cap", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("Couldn't save the cap");
 		screen.getByText(REJECTION);
 	});
 
@@ -97,7 +97,7 @@ describe("workspace AI usage route", () => {
 		fireEvent.change(capField(), { target: { value: "999999999" } });
 		fireEvent.click(screen.getByRole("button", { name: "Save cap" }));
 
-		await screen.findByText(REJECTION, undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText(REJECTION);
 		expect(screen.queryByText("Couldn't save the cap")).toBeNull();
 	});
 });

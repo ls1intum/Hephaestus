@@ -144,7 +144,9 @@ describe("CuratedPracticeForm", () => {
 		expect(screen.getByText(/existing workspace copies are unaffected/)).toBeTruthy();
 		expect(onUseBundledVersion).not.toHaveBeenCalled();
 
-		fireEvent.click(within(confirmation).getByRole("button", { name: "Use Hephaestus version" }));
+		fireEvent.click(
+			within(confirmation).getByRole("button", { name: "Use the Hephaestus version" }),
+		);
 		expect(onUseBundledVersion).toHaveBeenCalledOnce();
 	});
 });

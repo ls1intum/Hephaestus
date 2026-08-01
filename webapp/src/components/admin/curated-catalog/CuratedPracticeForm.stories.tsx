@@ -97,15 +97,45 @@ export const HephaestusUpdateAvailable: Story = {
 				state: "UPDATE_WAITING" as const,
 				changeKind: "DETECTION" as const,
 			},
+			shipped: { criteria: "The definition Hephaestus ships now" },
 		},
 		areas,
 		isPending: false,
 		onUseBundledVersion: fn(),
+		onKeepOurs: fn(),
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Hephaestus update available")).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Use Hephaestus version" })).toBeVisible();
+		await expect(canvas.getByText("Update waiting")).toBeVisible();
+		// The consequence of taking it, not a claim about who changed what.
+		await expect(canvas.getByText(/would change what this practice detects/)).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Show the Hephaestus version" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Use the Hephaestus version" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Keep ours" })).toBeVisible();
+	},
+};
+
+export const NewWordingWaiting: Story = {
+	args: {
+		mode: "edit",
+		initialData: {
+			...initialData,
+			status: {
+				...initialData.status,
+				state: "UPDATE_WAITING" as const,
+				changeKind: "WORDING" as const,
+			},
+			shipped: { criteria: "The definition Hephaestus ships now" },
+		},
+		areas,
+		isPending: false,
+		onUseBundledVersion: fn(),
+		onKeepOurs: fn(),
+		onSubmit: fn(),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("New wording waiting")).toBeVisible();
+		await expect(canvas.getByText(/cannot change what gets detected/)).toBeVisible();
 	},
 };
 
@@ -122,9 +152,10 @@ export const SourceRemoved: Story = {
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("No longer shipped by Hephaestus")).toBeVisible();
+		await expect(canvas.getByText("No longer shipped")).toBeVisible();
+		// Nothing to return to, so nothing is offered.
 		await expect(
-			canvas.queryByRole("button", { name: "Use Hephaestus version" }),
+			canvas.queryByRole("button", { name: "Use the Hephaestus version" }),
 		).not.toBeInTheDocument();
 	},
 };

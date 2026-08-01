@@ -95,7 +95,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isResetPending}>Keep instance version</AlertDialogCancel>
+						<AlertDialogCancel disabled={isResetPending}>Keep ours</AlertDialogCancel>
 						<AlertDialogAction
 							disabled={isResetPending}
 							onClick={() => {
@@ -103,7 +103,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 								onUseBundledVersion?.();
 							}}
 						>
-							{isResetPending ? "Using Hephaestus version…" : "Use Hephaestus version"}
+							{isResetPending ? "Using the Hephaestus version…" : "Use the Hephaestus version"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

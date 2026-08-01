@@ -120,7 +120,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isResetPending}>Keep our version</AlertDialogCancel>
+						<AlertDialogCancel disabled={isResetPending}>Keep ours</AlertDialogCancel>
 						<AlertDialogAction
 							disabled={isResetPending}
 							onClick={() => {
@@ -128,7 +128,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 								onUseHephaestusVersion?.();
 							}}
 						>
-							Use Hephaestus version
+							Use the Hephaestus version
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
