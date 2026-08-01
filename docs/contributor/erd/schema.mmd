@@ -232,7 +232,7 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name
         TEXT description
-        INTEGER display_order
+        INTEGER position
         VARCHAR(64) icon
         VARCHAR(32) color
         VARCHAR(64) based_on_digest
@@ -253,6 +253,7 @@ erDiagram
         TEXT why_it_matters
         TEXT what_good_looks_like
         VARCHAR(64) area_slug
+        INTEGER position
         VARCHAR(64) based_on_digest
         TIMESTAMPTZ retired_at
         TIMESTAMPTZ created_at "NOT NULL"
