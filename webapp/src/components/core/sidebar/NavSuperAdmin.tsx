@@ -30,9 +30,9 @@ const ADMIN_SECTIONS = [
 	{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
 	{
 		to: "/admin/catalog",
-		label: "Catalog",
+		label: "Practice catalog",
 		icon: LibraryBig,
-		tooltip: "Curated practices",
+		tooltip: "What new workspaces receive",
 	},
 	{
 		to: "/admin/login-providers",

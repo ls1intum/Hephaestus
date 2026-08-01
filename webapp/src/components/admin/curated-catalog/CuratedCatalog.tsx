@@ -1,12 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { Archive, Pencil, RotateCcw, Search, Shapes } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Shapes } from "lucide-react";
 import { useState } from "react";
 import type {
 	CuratedArea,
 	CuratedPracticeSummary,
 	CuratedCatalogSummary as Summary,
 } from "@/api/types.gen";
+import { getAreaVisual } from "@/components/admin/practices/area-visuals";
 import type { WorkArtifact } from "@/components/admin/practices/constants";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -18,15 +25,24 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import { ItemGroup } from "@/components/ui/item";
 import {
 	Select,
 	SelectContent,
@@ -34,8 +50,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
+import { CuratedEntryRow } from "./CuratedEntryRow";
 import type { CuratedCatalogSearch } from "./curated-catalog-search";
 
 export interface CuratedCatalogProps {
@@ -43,9 +64,8 @@ export interface CuratedCatalogProps {
 	practices: readonly CuratedPracticeSummary[];
 	summary: Summary;
 	search: CuratedCatalogSearch;
-	pendingSlugs?: ReadonlySet<string>;
-	/** Practices an area still holds, so retiring it can say what it withholds. */
-	practicesInArea: (areaSlug: string) => readonly string[];
+	pendingPracticeSlugs?: ReadonlySet<string>;
+	pendingAreaSlugs?: ReadonlySet<string>;
 	onSearchChange: (search: CuratedCatalogSearch) => void;
 	onPracticeStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
 	onAreaStatusChange: (area: CuratedArea, offered: boolean) => void;
@@ -60,7 +80,13 @@ const ARTIFACT_LABELS: Record<WorkArtifact, string> = {
 	CONVERSATION_THREAD: "Conversation",
 };
 
-const UNFILED = "__unfiled__";
+const STATUS_FILTERS = [
+	{ value: "OFFERED", label: "Offered" },
+	{ value: "NOT_OFFERED", label: "Not offered" },
+	{ value: "ALL", label: "All" },
+] satisfies Array<{ value: StatusFilter; label: string }>;
+
+const UNASSIGNED = "__unassigned__";
 
 function matches(haystack: (string | undefined)[], needle: string): boolean {
 	return !needle || haystack.some((value) => value?.toLowerCase().includes(needle));
@@ -71,296 +97,439 @@ export function CuratedCatalog({
 	practices,
 	summary,
 	search,
-	pendingSlugs,
-	practicesInArea,
+	pendingPracticeSlugs,
+	pendingAreaSlugs,
 	onSearchChange,
 	onPracticeStatusChange,
 	onAreaStatusChange,
 }: CuratedCatalogProps) {
 	const [retiringPractice, setRetiringPractice] = useState<CuratedPracticeSummary | null>(null);
 	const [retiringArea, setRetiringArea] = useState<CuratedArea | null>(null);
+	// Areas the administrator has collapsed. Everything else is open, so an area a filter or a
+	// search has just revealed shows its practices rather than hiding them behind a closed panel.
+	const [collapsedAreas, setCollapsedAreas] = useState<readonly string[]>([]);
 	const query = search.q ?? "";
 	const status: StatusFilter = search.status ?? "OFFERED";
 	const artifact: ArtifactFilter = search.artifact ?? "ALL";
 	const needle = query.trim().toLowerCase();
+	const isPracticePending = (slug: string) => pendingPracticeSlugs?.has(slug) ?? false;
+	const isAreaPending = (slug: string) => pendingAreaSlugs?.has(slug) ?? false;
 
-	const visibleAreas = areas.filter(
-		(area) =>
-			(status === "ALL" || (status === "OFFERED") === area.status.offered) &&
-			matches([area.definition.name, area.slug, area.definition.description ?? undefined], needle),
-	);
+	const areaBySlug = new Map(areas.map((area) => [area.slug, area]));
+	const matchesStatus = (offered: boolean) =>
+		status === "ALL" || (status === "OFFERED") === offered;
+
 	const visiblePractices = practices.filter(
 		(practice) =>
-			(status === "ALL" || (status === "OFFERED") === practice.status.offered) &&
+			matchesStatus(practice.status.offered) &&
 			(artifact === "ALL" || practice.artifactType === artifact) &&
 			matches(
 				[
 					practice.name,
 					practice.slug,
 					practice.areaSlug ?? undefined,
-					areas.find((area) => area.slug === practice.areaSlug)?.definition.name,
+					practice.areaSlug ? areaBySlug.get(practice.areaSlug)?.definition.name : undefined,
 				],
 				needle,
 			),
 	);
+	const byArea = new Map<string, CuratedPracticeSummary[]>();
+	for (const practice of visiblePractices) {
+		const key = practice.areaSlug ?? UNASSIGNED;
+		const list = byArea.get(key);
+		if (list) list.push(practice);
+		else byArea.set(key, [practice]);
+	}
+	for (const list of byArea.values()) {
+		list.sort((a, b) => a.name.localeCompare(b.name));
+	}
 
-	const grouped = visiblePractices.reduce((result, practice) => {
-		const key = practice.areaSlug ?? UNFILED;
-		result.set(key, [...(result.get(key) ?? []), practice]);
-		return result;
-	}, new Map<string, CuratedPracticeSummary[]>());
-	const orderedGroups = [...grouped.entries()].sort(([left], [right]) => {
-		if (left === UNFILED) return 1;
-		if (right === UNFILED) return -1;
-		const leftArea = areas.find((area) => area.slug === left);
-		const rightArea = areas.find((area) => area.slug === right);
-		return (
-			(leftArea?.definition.displayOrder ?? Number.MAX_SAFE_INTEGER) -
-				(rightArea?.definition.displayOrder ?? Number.MAX_SAFE_INTEGER) ||
-			(leftArea?.definition.name ?? left).localeCompare(rightArea?.definition.name ?? right)
+	// An area is shown when it matches, or when it still holds a practice that does — hiding a
+	// heading whose contents matched would make the search look broken.
+	const visibleAreas = [...areas]
+		.filter(
+			(area) =>
+				(matchesStatus(area.status.offered) &&
+					matches(
+						[area.definition.name, area.slug, area.definition.description ?? undefined],
+						needle,
+					)) ||
+				(byArea.get(area.slug)?.length ?? 0) > 0,
+		)
+		.sort(
+			(a, b) =>
+				a.definition.displayOrder - b.definition.displayOrder ||
+				a.definition.name.localeCompare(b.definition.name),
 		);
-	});
 
-	const areaBeingRetiredHolds = retiringArea ? practicesInArea(retiringArea.slug) : [];
+	const knownAreas = new Set(areas.map((area) => area.slug));
+	// A practice can outlive its area — the admin edited the practice, a newer build dropped both,
+	// so the practice survives as an override and its area does not. Never let it fall off the page.
+	const orphaned = [...byArea.entries()]
+		.filter(([key]) => key !== UNASSIGNED && !knownAreas.has(key))
+		.flatMap(([, held]) => held)
+		.sort((a, b) => a.name.localeCompare(b.name));
+	const unassigned = [...(byArea.get(UNASSIGNED) ?? []), ...orphaned].sort((a, b) =>
+		a.name.localeCompare(b.name),
+	);
+	const unassignedTotal = practices.filter(
+		(practice) => practice.areaSlug == null || !knownAreas.has(practice.areaSlug),
+	).length;
+	const nothingMatches = visibleAreas.length === 0 && unassigned.length === 0;
+	const catalogIsEmpty = areas.length === 0 && practices.length === 0;
+	const areaBeingRetiredHolds = retiringArea
+		? practices.filter(
+				(practice) => practice.areaSlug === retiringArea.slug && practice.status.offered,
+			)
+		: [];
+
+	const practiceRow = (practice: CuratedPracticeSummary) => (
+		<CuratedEntryRow
+			key={practice.slug}
+			name={practice.name}
+			kind="practice"
+			status={practice.status}
+			pending={isPracticePending(practice.slug)}
+			onOfferedChange={(offered) =>
+				offered ? onPracticeStatusChange(practice, true) : setRetiringPractice(practice)
+			}
+			title={
+				<Link
+					from="/admin/catalog"
+					to="/admin/catalog/practices/$practiceSlug"
+					params={{ practiceSlug: practice.slug }}
+					search={(previous) => previous}
+					className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{practice.name}
+				</Link>
+			}
+			meta={<span>{ARTIFACT_LABELS[practice.artifactType]}</span>}
+			actions={
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={`More actions for ${practice.name}`}
+							>
+								<MoreHorizontal className="size-4" />
+							</Button>
+						}
+					/>
+					<DropdownMenuContent align="end">
+						<DropdownMenuItem
+							render={
+								<Link
+									from="/admin/catalog"
+									to="/admin/catalog/practices/$practiceSlug"
+									params={{ practiceSlug: practice.slug }}
+									search={(previous) => previous}
+								/>
+							}
+						>
+							Edit practice
+						</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						{practice.status.offered ? (
+							<DropdownMenuItem
+								variant="destructive"
+								disabled={isPracticePending(practice.slug)}
+								onClick={() => setRetiringPractice(practice)}
+							>
+								Retire practice
+							</DropdownMenuItem>
+						) : (
+							<DropdownMenuItem
+								disabled={isPracticePending(practice.slug)}
+								onClick={() => onPracticeStatusChange(practice, true)}
+							>
+								Offer again
+							</DropdownMenuItem>
+						)}
+					</DropdownMenuContent>
+				</DropdownMenu>
+			}
+		/>
+	);
 
 	return (
 		<>
-			<div className="space-y-8">
+			<div className="space-y-4">
 				<CuratedCatalogSummary summary={summary} />
 
-				<div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-[minmax(16rem,1fr)_13rem_13rem]">
-					<div className="relative">
-						<Search
-							className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-							aria-hidden
-						/>
-						<Input
-							type="search"
-							value={query}
-							onChange={(event) =>
-								onSearchChange({ ...search, q: event.target.value || undefined })
+				<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+						<div className="relative sm:w-64">
+							<Search
+								className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+								aria-hidden
+							/>
+							<Input
+								type="search"
+								value={query}
+								onChange={(event) =>
+									onSearchChange({ ...search, q: event.target.value || undefined })
+								}
+								placeholder="Search the catalog"
+								aria-label="Search the catalog"
+								className="pl-9"
+							/>
+						</div>
+						<Select
+							items={STATUS_FILTERS}
+							value={status}
+							onValueChange={(value) =>
+								value &&
+								onSearchChange({
+									...search,
+									status: value === "OFFERED" ? undefined : (value as "NOT_OFFERED" | "ALL"),
+								})
 							}
-							placeholder="Search the catalog"
-							aria-label="Search the catalog"
-							className="pl-9"
-						/>
-					</div>
-					<Select
-						value={status}
-						onValueChange={(value) =>
-							onSearchChange({
-								...search,
-								status: value === "OFFERED" ? undefined : (value as "NOT_OFFERED" | "ALL"),
-							})
-						}
-					>
-						<SelectTrigger aria-label="Filter by status">
-							<SelectValue>
-								{status === "ALL"
-									? "All statuses"
-									: status === "OFFERED"
-										? "Offered"
-										: "Not offered"}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="OFFERED">Offered</SelectItem>
-							<SelectItem value="NOT_OFFERED">Not offered</SelectItem>
-							<SelectItem value="ALL">All statuses</SelectItem>
-						</SelectContent>
-					</Select>
-					<Select
-						value={artifact}
-						onValueChange={(value) =>
-							onSearchChange({
-								...search,
-								artifact: value === "ALL" ? undefined : (value as WorkArtifact),
-							})
-						}
-					>
-						<SelectTrigger aria-label="Filter by work type">
-							<SelectValue>
-								{artifact === "ALL" ? "All work types" : ARTIFACT_LABELS[artifact]}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="ALL">All work types</SelectItem>
-							{Object.entries(ARTIFACT_LABELS).map(([value, label]) => (
-								<SelectItem key={value} value={value}>
-									{label}
-								</SelectItem>
+						>
+							<SelectTrigger
+								className="w-full sm:hidden"
+								aria-label="Filter by whether it is offered"
+							>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{STATUS_FILTERS.map((filter) => (
+									<SelectItem key={filter.value} value={filter.value}>
+										{filter.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<ToggleGroup
+							role="toolbar"
+							value={[status]}
+							onValueChange={(value) =>
+								value[0] &&
+								onSearchChange({
+									...search,
+									status: value[0] === "OFFERED" ? undefined : (value[0] as "NOT_OFFERED" | "ALL"),
+								})
+							}
+							variant="outline"
+							size="sm"
+							aria-label="Filter by whether it is offered"
+							className="hidden sm:flex"
+						>
+							{STATUS_FILTERS.map((filter) => (
+								<ToggleGroupItem key={filter.value} value={filter.value} className="min-w-0">
+									{filter.label}
+								</ToggleGroupItem>
 							))}
-						</SelectContent>
-					</Select>
+						</ToggleGroup>
+						<Select
+							value={artifact}
+							onValueChange={(value) =>
+								onSearchChange({
+									...search,
+									artifact: value === "ALL" ? undefined : (value as WorkArtifact),
+								})
+							}
+						>
+							<SelectTrigger className="w-full sm:w-52" aria-label="Filter by work type">
+								<SelectValue>
+									{artifact === "ALL" ? "All work types" : ARTIFACT_LABELS[artifact]}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="ALL">All work types</SelectItem>
+								{Object.entries(ARTIFACT_LABELS).map(([value, label]) => (
+									<SelectItem key={value} value={value}>
+										{label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
 				</div>
 
-				<section className="space-y-3" aria-labelledby="curated-areas">
-					<div className="flex items-center gap-2">
-						<h2 id="curated-areas" className="font-semibold">
-							Areas
-						</h2>
-						<Badge variant="secondary">{visibleAreas.length}</Badge>
-					</div>
-					{visibleAreas.length === 0 ? (
-						<p className="text-muted-foreground text-sm">No areas match the search.</p>
-					) : (
-						<div className="divide-y rounded-lg border bg-card">
-							{visibleAreas.map((area) => (
-								<article
-									key={area.slug}
-									className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
-								>
-									<div className="min-w-0 space-y-2">
-										<div className="flex flex-wrap items-center gap-2">
-											<h3 className="font-medium">{area.definition.name}</h3>
-											<CuratedEntryBadges status={area.status} kind="area" />
-										</div>
-										<p className="break-all text-muted-foreground text-xs">{area.slug}</p>
-										<div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
-											<span>
-												{practicesInArea(area.slug).length}{" "}
-												{practicesInArea(area.slug).length === 1 ? "practice" : "practices"}
-											</span>
-										</div>
-									</div>
-									<div className="flex shrink-0 flex-wrap gap-2">
-										<Button
-											variant="outline"
-											nativeButton={false}
-											disabled={pendingSlugs?.has(area.slug) ?? false}
-											render={
-												<Link
-													from="/admin/catalog"
-													to="/admin/catalog/areas/$areaSlug"
-													params={{ areaSlug: area.slug }}
-													search={(previous) => previous}
-												/>
-											}
-											aria-label={`Edit ${area.definition.name}`}
-										>
-											<Pencil className="size-4" aria-hidden />
-											Edit
-										</Button>
-										{area.status.offered ? (
-											<Button
-												type="button"
-												variant="outline"
-												disabled={pendingSlugs?.has(area.slug) ?? false}
-												onClick={() => setRetiringArea(area)}
-												aria-label={`Retire ${area.definition.name}`}
-											>
-												<Archive className="size-4" aria-hidden />
-												Retire
-											</Button>
-										) : (
-											<Button
-												type="button"
-												variant="outline"
-												disabled={pendingSlugs?.has(area.slug) ?? false}
-												onClick={() => onAreaStatusChange(area, true)}
-												aria-label={`Offer ${area.definition.name} again`}
-											>
-												<RotateCcw className="size-4" aria-hidden />
-												Offer again
-											</Button>
-										)}
-									</div>
-								</article>
-							))}
-						</div>
-					)}
-				</section>
-
-				{orderedGroups.length === 0 ? (
+				{catalogIsEmpty ? (
 					<Empty className="min-h-56 border">
 						<EmptyHeader>
 							<EmptyMedia variant="icon">
 								<Shapes aria-hidden />
 							</EmptyMedia>
-							<EmptyTitle>
-								{practices.length === 0 ? "No practices in the catalog" : "No matching practices"}
-							</EmptyTitle>
+							<EmptyTitle>No practices in the catalog</EmptyTitle>
 							<EmptyDescription>
-								{practices.length === 0
-									? "Add a practice to offer it to every workspace created from now on."
-									: "Adjust the search or filters to see more of the catalog."}
+								Add a practice. Every workspace created from then on receives it.
+							</EmptyDescription>
+						</EmptyHeader>
+						<EmptyContent>
+							<Link
+								from="/admin/catalog"
+								to="/admin/catalog/practices/new"
+								search={(previous) => previous}
+								className={cn(buttonVariants())}
+							>
+								<Plus className="mr-1.5 size-4" aria-hidden />
+								Add practice
+							</Link>
+						</EmptyContent>
+					</Empty>
+				) : nothingMatches ? (
+					<Empty className="min-h-56 border">
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<Shapes aria-hidden />
+							</EmptyMedia>
+							<EmptyTitle>Nothing matches</EmptyTitle>
+							<EmptyDescription>
+								Adjust the search or filters to see more of the catalog.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
 				) : (
-					orderedGroups.map(([areaSlug, areaPractices]) => (
-						<section key={areaSlug} className="space-y-3" aria-labelledby={`area-${areaSlug}`}>
-							<div className="flex items-center gap-2">
-								<h2 id={`area-${areaSlug}`} className="font-semibold">
-									{areaSlug === UNFILED
-										? "Unfiled"
-										: (areas.find((area) => area.slug === areaSlug)?.definition.name ?? areaSlug)}
-								</h2>
-								<Badge variant="secondary">{areaPractices.length}</Badge>
-							</div>
-							<div className="divide-y rounded-lg border bg-card">
-								{areaPractices.map((practice) => (
-									<article
-										key={practice.slug}
-										className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+					<>
+						<Accordion
+							className="space-y-2"
+							multiple
+							value={visibleAreas
+								.map((area) => area.slug)
+								.filter((slug) => !collapsedAreas.includes(slug))}
+							onValueChange={(open) =>
+								setCollapsedAreas(
+									visibleAreas.map((area) => area.slug).filter((slug) => !open.includes(slug)),
+								)
+							}
+						>
+							{visibleAreas.map((area) => {
+								const held = byArea.get(area.slug) ?? [];
+								const total = practices.filter(
+									(practice) => practice.areaSlug === area.slug,
+								).length;
+								const { Icon, pill } = getAreaVisual(
+									area.slug,
+									area.definition.name,
+									area.definition.icon,
+									area.definition.color,
+								);
+								const pending = isAreaPending(area.slug);
+								return (
+									<AccordionItem
+										key={area.slug}
+										value={area.slug}
+										className="rounded-lg border bg-card"
 									>
-										<div className="min-w-0 space-y-2">
-											<div className="flex flex-wrap items-center gap-2">
-												<h3 className="font-medium">{practice.name}</h3>
-												<CuratedEntryBadges status={practice.status} kind="practice" />
-											</div>
-											<p className="break-all text-muted-foreground text-xs">{practice.slug}</p>
-											<div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
-												<span>{ARTIFACT_LABELS[practice.artifactType]}</span>
-											</div>
-										</div>
-										<div className="flex shrink-0 flex-wrap gap-2">
-											<Button
-												variant="outline"
-												nativeButton={false}
-												disabled={pendingSlugs?.has(practice.slug) ?? false}
-												render={
-													<Link
-														from="/admin/catalog"
-														to="/admin/catalog/practices/$practiceSlug"
-														params={{ practiceSlug: practice.slug }}
-														search={(previous) => previous}
-													/>
-												}
-												aria-label={`Edit ${practice.name}`}
+										<div className="flex items-center gap-2 rounded-lg px-2 [&>h3]:min-w-0 [&>h3]:flex-1">
+											<span
+												className={cn(
+													"flex size-8 shrink-0 items-center justify-center rounded-md",
+													pill,
+												)}
+												aria-hidden
 											>
-												<Pencil className="size-4" aria-hidden />
-												Edit
-											</Button>
-											{practice.status.offered ? (
-												<Button
-													type="button"
-													variant="outline"
-													disabled={pendingSlugs?.has(practice.slug) ?? false}
-													onClick={() => setRetiringPractice(practice)}
-													aria-label={`Retire ${practice.name}`}
-												>
-													<Archive className="size-4" aria-hidden />
-													Retire
-												</Button>
-											) : (
-												<Button
-													type="button"
-													variant="outline"
-													disabled={pendingSlugs?.has(practice.slug) ?? false}
-													onClick={() => onPracticeStatusChange(practice, true)}
-													aria-label={`Offer ${practice.name} again`}
-												>
-													<RotateCcw className="size-4" aria-hidden />
-													Offer again
-												</Button>
-											)}
+												<Icon className="size-4" />
+											</span>
+											<AccordionTrigger className="w-full min-w-0 py-2.5 hover:no-underline">
+												<span className="flex min-w-0 flex-wrap items-center gap-2">
+													<span className="min-w-0 break-words font-medium">
+														{area.definition.name}
+													</span>
+													<Badge variant="secondary" className="shrink-0">
+														{total}
+													</Badge>
+													<CuratedEntryBadges status={area.status} kind="area" />
+												</span>
+											</AccordionTrigger>
+											<div className="ml-auto flex items-center gap-2">
+												{pending && <Spinner className="size-4 text-muted-foreground" />}
+												<Switch
+													className="hidden sm:inline-flex"
+													checked={area.status.offered}
+													onCheckedChange={(offered) =>
+														offered ? onAreaStatusChange(area, true) : setRetiringArea(area)
+													}
+													disabled={pending}
+													aria-busy={pending}
+													aria-label={`Offer ${area.definition.name} to new workspaces`}
+												/>
+												<DropdownMenu>
+													<DropdownMenuTrigger
+														render={
+															<Button
+																variant="ghost"
+																size="icon-sm"
+																disabled={pending}
+																aria-label={`More actions for ${area.definition.name}`}
+															>
+																<MoreHorizontal className="size-4" />
+															</Button>
+														}
+													/>
+													<DropdownMenuContent align="end">
+														<DropdownMenuItem
+															render={
+																<Link
+																	from="/admin/catalog"
+																	to="/admin/catalog/areas/$areaSlug"
+																	params={{ areaSlug: area.slug }}
+																	search={(previous) => previous}
+																/>
+															}
+														>
+															Edit area
+														</DropdownMenuItem>
+														<DropdownMenuSeparator />
+														{area.status.offered ? (
+															<DropdownMenuItem
+																variant="destructive"
+																disabled={pending}
+																onClick={() => setRetiringArea(area)}
+															>
+																Retire area
+															</DropdownMenuItem>
+														) : (
+															<DropdownMenuItem
+																disabled={pending}
+																onClick={() => onAreaStatusChange(area, true)}
+															>
+																Offer again
+															</DropdownMenuItem>
+														)}
+													</DropdownMenuContent>
+												</DropdownMenu>
+											</div>
 										</div>
-									</article>
-								))}
+										<AccordionContent className="px-2 pb-2 sm:pl-9">
+											{held.length === 0 ? (
+												<p className="flex min-h-12 items-center px-2 py-3 text-muted-foreground text-sm">
+													{total > 0 ? "No matching practices." : "No practices in this area."}
+												</p>
+											) : (
+												<ItemGroup className="gap-0.5">{held.map(practiceRow)}</ItemGroup>
+											)}
+										</AccordionContent>
+									</AccordionItem>
+								);
+							})}
+						</Accordion>
+
+						<div className="rounded-lg border border-dashed">
+							<div className="flex items-center gap-2 border-b border-dashed px-3 py-2">
+								<span className="font-semibold text-muted-foreground text-sm">Unassigned</span>
+								<Badge variant="secondary">
+									{practices.filter((practice) => practice.areaSlug == null).length}
+								</Badge>
 							</div>
-						</section>
-					))
+							<div className="px-2 py-1">
+								{unassigned.length === 0 ? (
+									<p className="flex min-h-12 items-center px-2 py-3 text-muted-foreground text-sm">
+										{unassignedTotal > 0
+											? "No matching practices outside an area."
+											: "No practices sit outside an area."}
+									</p>
+								) : (
+									<ItemGroup className="gap-0.5">{unassigned.map(practiceRow)}</ItemGroup>
+								)}
+							</div>
+						</div>
+					</>
 				)}
 			</div>
 
@@ -372,10 +541,10 @@ export function CuratedCatalog({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Stop offering “{retiringPractice?.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>Retire “{retiringPractice?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							New workspaces will not receive it. Workspaces that already have it keep it,
-							unchanged.
+							unchanged. You can offer it again later.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -400,19 +569,22 @@ export function CuratedCatalog({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Stop offering “{retiringArea?.definition.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>Retire “{retiringArea?.definition.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{areaBeingRetiredHolds.length === 0
-								? "No practices are filed under this area. Workspaces that already have it keep it, unchanged."
+								? "New workspaces will not receive this area. No practice is filed under it, so nothing else changes. Workspaces that already have it keep it, unchanged."
 								: `New workspaces will receive neither this area nor the ${areaBeingRetiredHolds.length} ${
 										areaBeingRetiredHolds.length === 1 ? "practice" : "practices"
 									} filed under it. Workspaces that already have them keep them, unchanged.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{areaBeingRetiredHolds.length > 0 && (
-						<ul className="max-h-40 overflow-y-auto text-muted-foreground text-sm">
-							{areaBeingRetiredHolds.map((slug) => (
-								<li key={slug}>{slug}</li>
+						<ul
+							aria-label="Practices filed under this area"
+							className="max-h-40 list-disc overflow-y-auto pl-5 text-muted-foreground text-sm"
+						>
+							{areaBeingRetiredHolds.map((practice) => (
+								<li key={practice.slug}>{practice.name}</li>
 							))}
 						</ul>
 					)}

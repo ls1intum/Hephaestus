@@ -23,10 +23,10 @@ export const Default: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(
-			canvas.getByRole("button", { name: "Edit icon and colour for Code quality" }),
+			canvas.getByRole("button", { name: "Edit the icon and color for Code quality" }),
 		);
 
-		await userEvent.click(await screen.findByRole("button", { name: "Colour amber" }));
+		await userEvent.click(await screen.findByRole("button", { name: "amber" }));
 		await expect(args.onChange).toHaveBeenCalledWith({ color: "amber" });
 
 		await userEvent.click(await screen.findByLabelText("Git branch"));

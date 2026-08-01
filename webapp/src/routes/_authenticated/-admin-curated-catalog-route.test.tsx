@@ -65,26 +65,30 @@ describe("instance catalog routes", () => {
 		mockCatalog();
 		renderRouteAt("/admin/catalog");
 
-		await screen.findByText(/2 entries follow Hephaestus by default/, undefined, ROUTE_RENDER_WAIT);
-		expect(screen.getByText(/1 update waiting \(1 would change detection\)/)).toBeTruthy();
+		await screen.findByText(
+			"2 practices and areas. 0 follow Hephaestus.",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		expect(screen.getByText("1 would change detection")).toBeTruthy();
 	});
 
 	it("opens the practice editor from the catalog", async () => {
 		mockCatalog();
 		renderRouteAt("/admin/catalog");
 
-		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
+		fireEvent.click(await screen.findByRole("link", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
-		await screen.findByRole("heading", { name: "Create curated practice" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: "Add practice" }, ROUTE_RENDER_WAIT);
 	});
 
 	it("opens the area editor from the catalog", async () => {
 		mockCatalog();
 		renderRouteAt("/admin/catalog");
 
-		fireEvent.click(await screen.findByRole("button", { name: "Add area" }, ROUTE_RENDER_WAIT));
+		fireEvent.click(await screen.findByRole("link", { name: "Add area" }, ROUTE_RENDER_WAIT));
 
-		await screen.findByRole("heading", { name: "Add an area" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: "Add area" }, ROUTE_RENDER_WAIT);
 	});
 
 	it("says what no longer offering an area would withhold before doing it", async () => {
@@ -103,10 +107,16 @@ describe("instance catalog routes", () => {
 		renderRouteAt("/admin/catalog");
 
 		fireEvent.click(
-			await screen.findByRole("button", { name: "Retire Packaging work" }, ROUTE_RENDER_WAIT),
+			await screen.findByRole(
+				"switch",
+				{ name: "Offer Packaging work to new workspaces" },
+				ROUTE_RENDER_WAIT,
+			),
 		);
 		const confirmation = screen.getByRole("alertdialog");
 		expect(within(confirmation).getByText(/1 practice filed under it/)).toBeTruthy();
+		// Named, not slugged — the administrator picked it by name everywhere else.
+		expect(within(confirmation).getByText("Say what changed and why")).toBeTruthy();
 		fireEvent.click(within(confirmation).getByRole("button", { name: "Retire area" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"tag-1"'));
@@ -131,8 +141,8 @@ describe("instance catalog routes", () => {
 
 		fireEvent.click(
 			await screen.findByRole(
-				"button",
-				{ name: "Retire Say what changed and why" },
+				"switch",
+				{ name: "Offer Say what changed and why to new workspaces" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
@@ -200,6 +210,38 @@ describe("instance catalog routes", () => {
 		await waitFor(() => expect(ifMatch).toBe('"tag-1"'));
 	});
 
+	it("lets a waiting update be declined, not only taken", async () => {
+		mockCatalog();
+		let ifMatch: string | null = null;
+		server.use(
+			http.get("*/admin/practice-catalog/practices/:slug", () =>
+				HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					shipped: { ...practiceDefinition, criteria: "The definition Hephaestus ships now" },
+					status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
+				}),
+			),
+			http.post("*/admin/practice-catalog/practices/:slug/keep", ({ request }) => {
+				ifMatch = request.headers.get("if-match");
+				return HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					status: status({ state: "EDITED_HERE", etag: "tag-2" }),
+				});
+			}),
+		);
+		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
+
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Keep our version" }, ROUTE_RENDER_WAIT),
+		);
+
+		await waitFor(() => expect(ifMatch).toBe('"tag-1"'));
+		// Settled: the entry no longer asks, and our definition is what runs.
+		await screen.findByText("Edited here", undefined, ROUTE_RENDER_WAIT);
+	});
+
 	it("preserves the draft and refreshes the tag after an edit conflict", async () => {
 		mockCatalog();
 		let latest = false;
@@ -232,9 +274,9 @@ describe("instance catalog routes", () => {
 		const name = await screen.findByRole("textbox", { name: /Name/ }, ROUTE_RENDER_WAIT);
 		fireEvent.change(name, { target: { value: "My unsaved draft" } });
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-		await screen.findByText("A newer version was saved while you were editing");
+		await screen.findByText("Someone else saved this practice while you were editing");
 
-		fireEvent.click(screen.getByRole("button", { name: "Continue with this draft" }));
+		fireEvent.click(screen.getByRole("button", { name: "Keep my draft" }));
 		await waitFor(() =>
 			expect((screen.getByRole("textbox", { name: /Name/ }) as HTMLInputElement).value).toBe(
 				"My unsaved draft",

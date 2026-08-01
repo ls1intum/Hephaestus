@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import type { CatalogEntryStatus } from "@/api/types.gen";
+import type { CatalogEntryStatus, CuratedPracticeRequest } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
@@ -28,7 +28,7 @@ export type CuratedPracticeFormValue = PracticeDefinitionValue;
 
 export interface CuratedPracticeFormInitialValue extends CuratedPracticeFormValue {
 	status: CatalogEntryStatus;
-	shipped?: Record<string, unknown> | null;
+	shipped?: CuratedPracticeRequest;
 }
 
 interface CuratedPracticeFormBaseProps {
@@ -37,8 +37,9 @@ interface CuratedPracticeFormBaseProps {
 	conflict?: boolean;
 	onContinueWithDraft?: () => void;
 	isResetPending?: boolean;
-	onUseBundledVersion?: () => void;
-	onKeepOurs?: () => void;
+	isKeepPending?: boolean;
+	onUseHephaestusVersion?: () => void;
+	onKeepOurVersion?: () => void;
 }
 
 interface CuratedPracticeFormCreateProps extends CuratedPracticeFormBaseProps {
@@ -65,13 +66,14 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		conflict,
 		onContinueWithDraft,
 		isResetPending = false,
-		onUseBundledVersion,
+		isKeepPending = false,
+		onUseHephaestusVersion,
 		initialData,
-		onKeepOurs,
+		onKeepOurVersion,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
 	const canReset =
-		mode === "edit" && canUseHephaestusVersion(initialData.status) && onUseBundledVersion;
+		mode === "edit" && canUseHephaestusVersion(initialData.status) && onUseHephaestusVersion;
 	const cancelAction = (
 		<Link
 			from="/admin/catalog"
@@ -90,17 +92,17 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Use the Hephaestus version?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This replaces the instance override and any unsaved edits with the latest Hephaestus
-							definition. The practice's availability and existing workspace copies are unaffected.
+							Your version and any unsaved edits are discarded. From now on this practice follows
+							Hephaestus. Whether it is offered, and every workspace copy of it, stay as they are.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isResetPending}>Keep ours</AlertDialogCancel>
+						<AlertDialogCancel disabled={isResetPending}>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							disabled={isResetPending}
 							onClick={() => {
 								setResetOpen(false);
-								onUseBundledVersion?.();
+								onUseHephaestusVersion?.();
 							}}
 						>
 							{isResetPending ? "Using the Hephaestus version…" : "Use the Hephaestus version"}
@@ -115,14 +117,14 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
 			>
 				<ArrowLeft className="size-4" aria-hidden />
-				Curated catalog
+				Practice catalog
 			</Link>
 			<PageHeader
 				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
-				title={mode === "create" ? "Create curated practice" : `Edit: ${initialData.name}`}
+				title={mode === "create" ? "Add practice" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Define a practice for the shared instance catalog."
+						? "Define a practice every new workspace will receive."
 						: "Saving replaces what this instance offers. Workspaces that already have it are unaffected."
 				}
 			/>
@@ -133,9 +135,10 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					kind="practice"
 					shipped={initialData.shipped}
 					isResetPending={isResetPending}
+					isKeepPending={isKeepPending}
 					disabled={conflict ?? false}
 					onUseHephaestusVersion={canReset ? () => setResetOpen(true) : undefined}
-					onKeepOurs={onKeepOurs}
+					onKeepOurVersion={onKeepOurVersion}
 				/>
 			)}
 
@@ -143,15 +146,15 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 				<div className="max-w-3xl space-y-2">
 					<Alert variant="warning">
 						<RotateCcw />
-						<AlertTitle>A newer version was saved while you were editing</AlertTitle>
+						<AlertTitle>Someone else saved this practice while you were editing</AlertTitle>
 						<AlertDescription>
-							Your draft is unchanged. Continuing refreshes the version check; saving afterward
-							replaces the latest definition with this entire draft.
+							Your draft is untouched. If you keep it and save, their changes are overwritten by
+							everything in your draft. To see theirs instead, leave this page and open it again.
 						</AlertDescription>
 					</Alert>
 					{onContinueWithDraft && (
 						<Button type="button" variant="outline" size="sm" onClick={onContinueWithDraft}>
-							Continue with this draft
+							Keep my draft
 						</Button>
 					)}
 				</div>
@@ -171,7 +174,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					initialData={initialData}
 					areas={areas}
 					isPending={isPending}
-					isSubmitDisabled={conflict || isResetPending}
+					isSubmitDisabled={conflict || isResetPending || isKeepPending}
 					cancelAction={cancelAction}
 					onSubmit={props.onSubmit}
 				/>

@@ -109,7 +109,10 @@ const preview: Preview = {
 		// https://github.com/mui/base-ui/issues/4668
 		a11y: {
 			test: "error",
-			context: { exclude: "[data-base-ui-focus-guard]" },
+			// Monaco paints its own syntax-highlighting theme, which is vendored and not ours to
+			// restyle; axe flags every token span for contrast. Excluded here rather than suppressed
+			// story by story, so a story that mounts a code editor does not have to know about it.
+			context: { exclude: "[data-base-ui-focus-guard], .monaco-editor" },
 		},
 		controls: {
 			matchers: {

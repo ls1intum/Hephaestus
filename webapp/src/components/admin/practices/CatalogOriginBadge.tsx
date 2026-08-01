@@ -8,6 +8,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
  * <p>A workspace's copies are its own and the instance never rewrites them. Showing this is what
  * makes that a choice rather than a surprise: the workspace can see it is running an older
  * definition, and see when the instance has stopped offering the entry at all.
+ *
+ * <p>What is compared is the detection fingerprint, not the whole definition — editing only the
+ * text developers read keeps the match. The copy says that rather than claiming nothing changed.
  */
 export interface CatalogOriginBadgeProps {
 	origin?: CatalogOrigin | null;
@@ -18,21 +21,31 @@ export function CatalogOriginBadge({ origin, kind }: CatalogOriginBadgeProps) {
 	if (!origin || origin.link === "LOCAL") {
 		return null;
 	}
+	// An entry the instance has stopped offering has no newer version to take, whatever the
+	// fingerprints say. Claiming both at once would contradict itself.
+	if (!origin.sourceOffered) {
+		return (
+			<Tooltip>
+				<TooltipTrigger render={<Badge variant="outline">No longer in the catalog</Badge>} />
+				<TooltipContent>
+					{`The instance has stopped offering this ${kind} to new workspaces. Yours keeps running, unchanged.`}
+				</TooltipContent>
+			</Tooltip>
+		);
+	}
+
 	const label =
 		origin.link === "IN_SYNC"
 			? "From the catalog"
 			: origin.link === "UPDATE_AVAILABLE"
 				? "Catalog has a newer version"
-				: "Edited here";
+				: "Edited in this workspace";
 	const explanation =
 		origin.link === "IN_SYNC"
-			? `This ${kind} is exactly what the instance catalog offers.`
+			? `Everything this ${kind} detects matches what the instance catalog offers.`
 			: origin.link === "UPDATE_AVAILABLE"
-				? `Nobody has changed this ${kind} here, and the instance now offers a different version.`
-				: `This ${kind} started from the instance catalog and has since been changed here.`;
-	const retired = origin.sourceOffered
-		? ""
-		: " The instance no longer offers it to new workspaces; yours is unaffected.";
+				? `The instance now offers a different version. Nothing here changes unless you edit it.`
+				: `This ${kind} started from the instance catalog, and what it detects has since been changed here.`;
 
 	return (
 		<Tooltip>
@@ -43,10 +56,7 @@ export function CatalogOriginBadge({ origin, kind }: CatalogOriginBadgeProps) {
 					</Badge>
 				}
 			/>
-			<TooltipContent>
-				{explanation}
-				{retired}
-			</TooltipContent>
+			<TooltipContent>{explanation}</TooltipContent>
 		</Tooltip>
 	);
 }

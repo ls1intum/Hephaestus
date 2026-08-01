@@ -81,7 +81,7 @@ export const StaleEdit: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByText("A newer version was saved while you were editing"),
+			canvas.getByText("Someone else saved this practice while you were editing"),
 		).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Save changes" })).toBeDisabled();
 	},
@@ -97,12 +97,18 @@ export const HephaestusUpdateAvailable: Story = {
 				state: "UPDATE_WAITING" as const,
 				changeKind: "DETECTION" as const,
 			},
-			shipped: { criteria: "The definition Hephaestus ships now" },
+			shipped: {
+				name: "Say what changed and why",
+				artifactType: "PULL_REQUEST",
+				triggerEvents: ["PullRequestCreated"],
+				criteria: "The definition Hephaestus ships now",
+				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
+			},
 		},
 		areas,
 		isPending: false,
-		onUseBundledVersion: fn(),
-		onKeepOurs: fn(),
+		onUseHephaestusVersion: fn(),
+		onKeepOurVersion: fn(),
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
@@ -111,7 +117,7 @@ export const HephaestusUpdateAvailable: Story = {
 		await expect(canvas.getByText(/would change what this practice detects/)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Show the Hephaestus version" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Use the Hephaestus version" })).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Keep ours" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Keep our version" })).toBeVisible();
 	},
 };
 
@@ -125,17 +131,23 @@ export const NewWordingWaiting: Story = {
 				state: "UPDATE_WAITING" as const,
 				changeKind: "WORDING" as const,
 			},
-			shipped: { criteria: "The definition Hephaestus ships now" },
+			shipped: {
+				name: "Say what changed and why",
+				artifactType: "PULL_REQUEST",
+				triggerEvents: ["PullRequestCreated"],
+				criteria: "The definition Hephaestus ships now",
+				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
+			},
 		},
 		areas,
 		isPending: false,
-		onUseBundledVersion: fn(),
-		onKeepOurs: fn(),
+		onUseHephaestusVersion: fn(),
+		onKeepOurVersion: fn(),
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("New wording waiting")).toBeVisible();
-		await expect(canvas.getByText(/cannot change what gets detected/)).toBeVisible();
+		await expect(canvas.getByText("Update waiting")).toBeVisible();
+		await expect(canvas.getByText(/cannot change what this practice detects/)).toBeVisible();
 	},
 };
 
@@ -148,7 +160,7 @@ export const SourceRemoved: Story = {
 		},
 		areas,
 		isPending: false,
-		onUseBundledVersion: fn(),
+		onUseHephaestusVersion: fn(),
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {

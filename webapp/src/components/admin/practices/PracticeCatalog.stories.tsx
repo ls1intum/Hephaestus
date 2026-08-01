@@ -118,12 +118,12 @@ export const Reordering: Story = {
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByRole("button", {
-				name: `Move practice ${mockPracticeLongText.name}`,
+				name: `Reorder ${mockPracticeLongText.name}`,
 			}),
 		).toBeDisabled();
 		await expect(
 			canvas.getByRole("button", {
-				name: `Move practice ${mockUnassignedPractice.name}`,
+				name: `Reorder ${mockUnassignedPractice.name}`,
 			}),
 		).toBeEnabled();
 	},
@@ -180,7 +180,7 @@ export const CrossAreaDrag: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		const practice = mockPractices[0];
-		const handle = canvas.getByRole("button", { name: `Move practice ${practice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${practice.name}` });
 		const destinationArea = canvas
 			.getByText(mockAreas[1].name)
 			.closest('[data-slot="accordion-item"]');
@@ -239,7 +239,7 @@ export const BetweenRowsDrag: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const source = mockPractices[0];
 		const anchor = mockPractices[2];
-		const handle = canvas.getByRole("button", { name: `Move practice ${source.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${source.name}` });
 		const anchorRow = canvas.getByText(anchor.name).closest<HTMLElement>('[data-slot="item"]');
 		if (!anchorRow) throw new Error("Destination practice row not rendered");
 		const start = handle.getBoundingClientRect();
@@ -278,7 +278,7 @@ export const BlockedDestinationDrag: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		const practice = mockPractices[0];
-		const handle = canvas.getByRole("button", { name: `Move practice ${practice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${practice.name}` });
 		const destinationArea = canvas
 			.getByText(mockAreas[1].name)
 			.closest<HTMLElement>('[data-slot="accordion-item"]');

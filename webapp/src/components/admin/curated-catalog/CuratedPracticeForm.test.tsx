@@ -94,13 +94,12 @@ describe("CuratedPracticeForm", () => {
 			(screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled,
 		).toBe(true);
 		expect(
-			(screen.getByRole("button", { name: "Continue with this draft" }) as HTMLButtonElement)
-				.disabled,
+			(screen.getByRole("button", { name: "Keep my draft" }) as HTMLButtonElement).disabled,
 		).toBe(false);
 	});
 
 	it("shows the waiting Hephaestus definition and confirms before taking it", async () => {
-		const onUseBundledVersion = vi.fn();
+		const onUseHephaestusVersion = vi.fn();
 		await renderWithRouter(
 			<CuratedPracticeForm
 				mode="edit"
@@ -119,10 +118,16 @@ describe("CuratedPracticeForm", () => {
 						retired: false,
 						updatedAt: new Date("2026-07-30T12:00:00Z"),
 					},
-					shipped: { criteria: "The definition Hephaestus ships now" },
+					shipped: {
+						name: "Say what changed and why",
+						artifactType: "PULL_REQUEST",
+						triggerEvents: ["PullRequestCreated"],
+						criteria: "The definition Hephaestus ships now",
+						whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
+					},
 				}}
 				isPending={false}
-				onUseBundledVersion={onUseBundledVersion}
+				onUseHephaestusVersion={onUseHephaestusVersion}
 				onSubmit={vi.fn()}
 			/>,
 			"/admin/catalog/practices/clear-pr-description",
@@ -141,12 +146,12 @@ describe("CuratedPracticeForm", () => {
 			name: "Use the Hephaestus version?",
 		});
 		expect(confirmation).toBeTruthy();
-		expect(screen.getByText(/existing workspace copies are unaffected/)).toBeTruthy();
-		expect(onUseBundledVersion).not.toHaveBeenCalled();
+		expect(screen.getByText(/every workspace copy of it, stay as they are/)).toBeTruthy();
+		expect(onUseHephaestusVersion).not.toHaveBeenCalled();
 
 		fireEvent.click(
 			within(confirmation).getByRole("button", { name: "Use the Hephaestus version" }),
 		);
-		expect(onUseBundledVersion).toHaveBeenCalledOnce();
+		expect(onUseHephaestusVersion).toHaveBeenCalledOnce();
 	});
 });

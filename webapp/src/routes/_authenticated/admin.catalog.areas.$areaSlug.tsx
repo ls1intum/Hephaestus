@@ -7,6 +7,7 @@ import {
 	adminGetCuratedAreaOptions,
 	adminGetCuratedAreaQueryKey,
 	adminGetCuratedCatalogQueryKey,
+	adminKeepCuratedAreaMutation,
 	adminUpdateCuratedAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { CuratedArea } from "@/api/types.gen";
@@ -18,7 +19,7 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/areas/$areaSlug")({
-	head: instanceAdminHead("Edit catalog area"),
+	head: instanceAdminHead("Edit area"),
 	component: EditCuratedAreaPage,
 });
 
@@ -52,13 +53,12 @@ function EditCuratedAreaPage() {
 	);
 }
 
-function LoadedEditCuratedAreaPage({
-	areaSlug,
-	initialArea,
-}: {
+interface LoadedEditCuratedAreaPageProps {
 	areaSlug: string;
 	initialArea: CuratedArea;
-}) {
+}
+
+function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedAreaPageProps) {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
 	const [baseArea, setBaseArea] = useState(initialArea);
@@ -98,12 +98,33 @@ function LoadedEditCuratedAreaPage({
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
-				setConflict(true);
+				toast.error("Someone else changed this area first. Reopen it to see the current version.");
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				invalidateCatalog();
 				return;
 			}
 			toast.error("Couldn't use the Hephaestus version", { description: problemDetailOf(error) });
+		},
+	});
+	// Declining the update re-stamps what our version was based on, so the same change is not
+	// raised again. The definition in force does not move.
+	const keepOurVersion = useMutation({
+		...adminKeepCuratedAreaMutation(),
+		onSuccess: (updated: CuratedArea) => {
+			queryClient.setQueryData(detailQueryKey, updated);
+			invalidateCatalog();
+			setBaseArea(updated);
+			setConflict(false);
+			toast.success("Keeping our version");
+		},
+		onError: (error) => {
+			if (problemStatusOf(error) === 412) {
+				toast.error("Someone else changed this area first. Reopen it to see the current version.");
+				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
+				invalidateCatalog();
+				return;
+			}
+			toast.error("Couldn't keep our version", { description: problemDetailOf(error) });
 		},
 	});
 
@@ -118,10 +139,11 @@ function LoadedEditCuratedAreaPage({
 				icon: baseArea.definition.icon ?? undefined,
 				color: baseArea.definition.color ?? undefined,
 				status: baseArea.status,
-				shipped: baseArea.shipped as Record<string, unknown> | null,
+				shipped: baseArea.shipped,
 			}}
 			isPending={updateArea.isPending}
 			isResetPending={deleteOverride.isPending}
+			isKeepPending={keepOurVersion.isPending}
 			conflict={conflict}
 			onContinueWithDraft={async () => {
 				try {
@@ -134,7 +156,7 @@ function LoadedEditCuratedAreaPage({
 					setBaseArea(latest);
 					setConflict(false);
 				} catch (error) {
-					toast.error("Couldn't refresh the latest version", {
+					toast.error("Couldn't load the current version", {
 						description: problemDetailOf(error),
 					});
 				}
@@ -142,6 +164,13 @@ function LoadedEditCuratedAreaPage({
 			onUseHephaestusVersion={() => {
 				setConflict(false);
 				deleteOverride.mutate({
+					path: { slug: areaSlug },
+					headers: { "If-Match": `"${baseArea.status.etag}"` },
+				});
+			}}
+			onKeepOurVersion={() => {
+				setConflict(false);
+				keepOurVersion.mutate({
 					path: { slug: areaSlug },
 					headers: { "If-Match": `"${baseArea.status.etag}"` },
 				});

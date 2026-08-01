@@ -6,12 +6,11 @@ import {
 	adminGetCuratedCatalogQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { CuratedAreaForm } from "@/components/admin/curated-catalog/CuratedAreaForm";
-import { PageLayout } from "@/components/core/PageLayout";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/areas/new")({
-	head: instanceAdminHead("New catalog area"),
+	head: instanceAdminHead("Add area"),
 	component: NewCuratedAreaPage,
 });
 
@@ -22,7 +21,7 @@ function NewCuratedAreaPage() {
 		...adminCreateCuratedAreaMutation(),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			toast.success("Area added to the catalog");
+			toast.success("Area added");
 			navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) =>
@@ -30,12 +29,10 @@ function NewCuratedAreaPage() {
 	});
 
 	return (
-		<PageLayout>
-			<CuratedAreaForm
-				mode="create"
-				isPending={createArea.isPending}
-				onSubmit={({ slug, ...definition }) => createArea.mutate({ body: { slug, definition } })}
-			/>
-		</PageLayout>
+		<CuratedAreaForm
+			mode="create"
+			isPending={createArea.isPending}
+			onSubmit={({ slug, ...definition }) => createArea.mutate({ body: { slug, definition } })}
+		/>
 	);
 }

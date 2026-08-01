@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "storybook/test";
+import { fn, screen, userEvent, within } from "storybook/test";
 import type { CatalogEntryStatus, CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { CuratedCatalog } from "./CuratedCatalog";
@@ -67,6 +67,19 @@ const practices: CuratedPracticeSummary[] = [
 		areaSlug: "house-rules",
 		status: status({ state: "YOURS" }),
 	},
+	{
+		slug: "link-the-issue",
+		name: "Link the issue the change closes",
+		artifactType: "ISSUE",
+		status: status({ state: "NO_LONGER_SHIPPED" }),
+	},
+	{
+		slug: "orphaned-practice",
+		name: "Outlived the area it was filed under",
+		artifactType: "PULL_REQUEST",
+		areaSlug: "an-area-hephaestus-stopped-shipping",
+		status: status({ state: "NO_LONGER_SHIPPED" }),
+	},
 ];
 
 const meta = {
@@ -84,11 +97,9 @@ const meta = {
 			editedHere: 0,
 			yours: 2,
 			retired: 1,
-			noLongerShipped: 0,
+			noLongerShipped: 1,
 		},
 		search: {},
-		practicesInArea: (areaSlug: string) =>
-			practices.filter((practice) => practice.areaSlug === areaSlug).map((p) => p.slug),
 		onSearchChange: fn(),
 		onPracticeStatusChange: fn(),
 		onAreaStatusChange: fn(),
@@ -102,6 +113,26 @@ type Story = StoryObj<typeof meta>;
 export const OnlyWhatIsOffered: Story = {};
 
 export const Everything: Story = { args: { search: { status: "ALL" } } };
+
+/**
+ * A practice can outlive its area — the admin edited the practice, a later build dropped both. It
+ * must still be reachable, or it cannot be retired.
+ */
+export const APracticeWhoseAreaIsGone: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await canvas.findByText("Outlived the area it was filed under");
+	},
+};
+
+/** Searching reveals the area holding the match, already open. */
+export const SearchOpensTheAreaHoldingTheMatch: Story = {
+	args: { search: { q: "release note" } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await canvas.findByText("Write the release note with the change");
+	},
+};
 
 export const NothingHasBeenChanged: Story = {
 	args: {
@@ -119,11 +150,27 @@ export const NothingHasBeenChanged: Story = {
 	},
 };
 
+/** The confirmation names every practice the area would take with it. */
+export const RetiringAnAreaWithholdsItsPractices: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(
+			await canvas.findByRole("switch", {
+				name: "Offer Packaging work for review to new workspaces",
+			}),
+		);
+		const dialog = await screen.findByRole("alertdialog");
+		await within(dialog).findByText(/3 practices filed under it/);
+		// Named, not slugged: the administrator picked them by name everywhere else.
+		await within(dialog).findByText("Say what changed and why");
+	},
+};
+
 export const Empty: Story = {
 	args: {
 		areas: [],
 		practices: [],
-		practicesInArea: () => [],
 		summary: {
 			total: 0,
 			updatesChangingDetection: 0,

@@ -17,6 +17,10 @@ import {
 } from "./area-visuals";
 
 export interface AreaVisualPickerProps {
+	/** Set when a form label points at the picker; lands on the trigger, which is the control. */
+	id?: string;
+	/** Set alongside `id` so the field's help text reaches the control. */
+	describedBy?: string;
 	slug: string;
 	name: string;
 	icon?: string | null;
@@ -26,6 +30,8 @@ export interface AreaVisualPickerProps {
 }
 
 export function AreaVisualPicker({
+	id,
+	describedBy,
 	slug,
 	name,
 	icon,
@@ -38,7 +44,7 @@ export function AreaVisualPicker({
 	const activeColor = color ?? seed.color;
 	const { Icon: EffectiveIcon, pill } = getAreaVisual(slug, name, icon, color);
 	const [query, setQuery] = useState("");
-	const colourLabelId = useId();
+	const colorLabelId = useId();
 	const iconLabelId = useId();
 
 	const q = query.trim().toLowerCase();
@@ -49,10 +55,14 @@ export function AreaVisualPicker({
 			<PopoverTrigger
 				render={
 					<Button
+						id={id}
 						variant="ghost"
 						size="icon-sm"
 						disabled={disabled}
-						aria-label={`Edit icon and colour for ${name}`}
+						aria-describedby={describedBy}
+						// With a form label pointing at it the visible label is the name; adding our own
+						// would make the spoken name disagree with the one people can see and say.
+						aria-label={id ? undefined : `Edit the icon and color for ${name}`}
 					>
 						<span className={cn("flex size-6 items-center justify-center rounded-md", pill)}>
 							<EffectiveIcon className="size-4" aria-hidden="true" />
@@ -60,24 +70,24 @@ export function AreaVisualPicker({
 					</Button>
 				}
 			/>
-			<PopoverContent className="w-72 space-y-3" aria-label={`Edit icon and colour for ${name}`}>
+			<PopoverContent className="w-72 space-y-3" aria-label="Icon and color">
 				<div className="space-y-1.5">
-					<p id={colourLabelId} className="text-xs text-muted-foreground">
-						Colour
+					<p id={colorLabelId} className="text-xs text-muted-foreground">
+						Color
 					</p>
 					<ToggleGroup
 						value={[activeColor]}
 						onValueChange={(value) => value[0] && onChange({ color: value[0] })}
 						spacing={1}
 						role="toolbar"
-						aria-labelledby={colourLabelId}
+						aria-labelledby={colorLabelId}
 						className="grid w-full grid-cols-7 gap-1.5"
 					>
 						{COLOR_KEYS.map((key) => (
 							<ToggleGroupItem
 								key={key}
 								value={key}
-								aria-label={`Colour ${key}`}
+								aria-label={key}
 								className={cn(
 									"size-7 min-w-0 rounded-full border border-black/10 p-0 transition-transform hover:scale-110 dark:border-white/15",
 									PILL[key],

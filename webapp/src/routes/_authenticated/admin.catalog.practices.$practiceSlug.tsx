@@ -8,6 +8,7 @@ import {
 	adminGetCuratedCatalogQueryKey,
 	adminGetCuratedPracticeOptions,
 	adminGetCuratedPracticeQueryKey,
+	adminKeepCuratedPracticeMutation,
 	adminUpdateCuratedPracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { CuratedArea, CuratedPractice } from "@/api/types.gen";
@@ -22,7 +23,7 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/practices/$practiceSlug")({
-	head: instanceAdminHead("Edit catalog practice"),
+	head: instanceAdminHead("Edit practice"),
 	component: EditCuratedPracticePage,
 });
 
@@ -113,12 +114,37 @@ function LoadedEditCuratedPracticePage({
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
-				setConflict(true);
+				toast.error(
+					"Someone else changed this practice first. Reopen it to see the current version.",
+				);
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 				return;
 			}
 			toast.error("Couldn't use the Hephaestus version", { description: problemDetailOf(error) });
+		},
+	});
+	// Declining the update re-stamps what our version was based on, so the same change is not
+	// raised again. The definition in force does not move.
+	const keepOurVersion = useMutation({
+		...adminKeepCuratedPracticeMutation(),
+		onSuccess: (updated: CuratedPractice) => {
+			queryClient.setQueryData(detailQueryKey, updated);
+			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+			setBasePractice(updated);
+			setConflict(false);
+			toast.success("Keeping our version");
+		},
+		onError: (error) => {
+			if (problemStatusOf(error) === 412) {
+				toast.error(
+					"Someone else changed this practice first. Reopen it to see the current version.",
+				);
+				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
+				void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+				return;
+			}
+			toast.error("Couldn't keep our version", { description: problemDetailOf(error) });
 		},
 	});
 
@@ -149,16 +175,24 @@ function LoadedEditCuratedPracticePage({
 				whatGoodLooksLike: basePractice.definition.whatGoodLooksLike ?? undefined,
 				areaSlug: basePractice.definition.areaSlug ?? undefined,
 				status: basePractice.status,
-				shipped: basePractice.shipped as Record<string, unknown> | null,
+				shipped: basePractice.shipped,
 			}}
 			areas={areas.map((area) => ({ slug: area.slug, name: area.definition.name }))}
 			isPending={updatePractice.isPending}
 			isResetPending={deleteOverride.isPending}
+			isKeepPending={keepOurVersion.isPending}
 			conflict={conflict}
 			onContinueWithDraft={continueWithDraft}
-			onUseBundledVersion={() => {
+			onUseHephaestusVersion={() => {
 				setConflict(false);
 				deleteOverride.mutate({
+					path: { slug: practiceSlug },
+					headers: { "If-Match": `"${basePractice.status.etag}"` },
+				});
+			}}
+			onKeepOurVersion={() => {
+				setConflict(false);
+				keepOurVersion.mutate({
 					path: { slug: practiceSlug },
 					headers: { "If-Match": `"${basePractice.status.etag}"` },
 				});

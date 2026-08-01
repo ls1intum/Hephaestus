@@ -17,7 +17,7 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/practices/new")({
-	head: instanceAdminHead("New catalog practice"),
+	head: instanceAdminHead("Add practice"),
 	component: NewCuratedPracticePage,
 });
 
@@ -29,7 +29,7 @@ function NewCuratedPracticePage() {
 		...adminCreateCuratedPracticeMutation(),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			toast.success("Practice added to the catalog");
+			toast.success("Practice added");
 			navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) =>
@@ -50,7 +50,7 @@ function NewCuratedPracticePage() {
 			<PageLayout>
 				<QueryErrorAlert
 					error={catalogQuery.error}
-					title="Couldn't load the catalog areas"
+					title="Couldn't load the areas"
 					onRetry={() => catalogQuery.refetch()}
 				/>
 			</PageLayout>

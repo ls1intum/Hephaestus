@@ -618,7 +618,7 @@ function SortableArea({
 					variant="ghost"
 					size="icon"
 					className="touch-none shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing disabled:cursor-default"
-					aria-label={`Reorder area ${area.name}`}
+					aria-label={`Reorder ${area.name}`}
 					disabled={reorderDisabled}
 					{...attributes}
 					{...listeners}
@@ -653,7 +653,7 @@ function SortableArea({
 						checked={area.active}
 						onCheckedChange={(c) => onToggleActive(area.slug, c)}
 						disabled={pending}
-						aria-label={`${area.name} area shown on practice dashboards`}
+						aria-label={`Show ${area.name} on practice dashboards`}
 					/>
 					<DropdownMenu>
 						<DropdownMenuTrigger
@@ -889,7 +889,7 @@ function SortablePracticeRow({
 					variant="ghost"
 					size="icon-sm"
 					className="touch-none shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing disabled:cursor-default"
-					aria-label={`Move practice ${practice.name}`}
+					aria-label={`Reorder ${practice.name}`}
 					disabled={reorderDisabled || pending}
 					{...attributes}
 					{...listeners}
@@ -915,7 +915,7 @@ function SortablePracticeRow({
 					checked={practice.active}
 					onCheckedChange={(c) => onSetActive(practice.slug, c)}
 					disabled={pending}
-					aria-label={`${practice.name} included in new reviews`}
+					aria-label={`Include ${practice.name} in new reviews`}
 				/>
 				<DropdownMenu>
 					<DropdownMenuTrigger
@@ -1059,7 +1059,7 @@ function AddAreaButton({
 					<Input
 						name="areaName"
 						placeholder="New area name…"
-						aria-label="New practice area name"
+						aria-label="New area name"
 						autoComplete="off"
 						disabled={pending}
 					/>
