@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.curated.dto;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import org.jspecify.annotations.NonNull;
 
-/** Counts the catalog states and the consequences of waiting updates. */
 public record CuratedCatalogSummaryDTO(
     @NonNull Integer total,
     @NonNull Integer updatesChangingDetection,

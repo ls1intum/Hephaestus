@@ -7,13 +7,12 @@ import java.time.Instant;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/** An effective catalog entry and the bundled definition it may override. */
 public record CatalogEntry<D extends CatalogDefinition>(
     String slug,
     D effective,
     @Nullable D shipped,
     @Nullable D overridden,
-    @Nullable String basedOnDigest,
+    @Nullable String acceptedBundledDigest,
     boolean retired,
     int position,
     @Nullable Instant updatedAt
@@ -29,26 +28,20 @@ public record CatalogEntry<D extends CatalogDefinition>(
 
     public CatalogEntryState state() {
         if (overridden == null) {
-            // A row that only retires an entry leaves the definition Hephaestus ships in force.
             return shipped == null ? CatalogEntryState.NO_LONGER_SHIPPED : CatalogEntryState.FROM_HEPHAESTUS;
         }
         if (shipped == null) {
-            return basedOnDigest == null ? CatalogEntryState.YOURS : CatalogEntryState.NO_LONGER_SHIPPED;
+            return acceptedBundledDigest == null ? CatalogEntryState.YOURS : CatalogEntryState.NO_LONGER_SHIPPED;
         }
         if (shipped.digest(slug).equals(overridden.digest(slug))) {
             return CatalogEntryState.EDITED_HERE;
         }
-        return shipped.digest(slug).equals(basedOnDigest)
+        return shipped.digest(slug).equals(acceptedBundledDigest)
             ? CatalogEntryState.EDITED_HERE
             : CatalogEntryState.UPDATE_WAITING;
     }
 
-    /**
-     * What taking the shipped definition would change. This is the difference between what is in
-     * force and what Hephaestus ships, which is not the same as what Hephaestus changed — an
-     * administrator's own edit to the criteria makes the difference a detection one even if the
-     * newer build only reworded. Present it as a consequence, never as an attribution.
-     */
+    /** Classifies the consequence of applying the bundled definition, not the cause of the difference. */
     public CatalogChangeKind changeKind() {
         if (shipped == null || overridden == null) {
             return CatalogChangeKind.NONE;
@@ -59,7 +52,7 @@ public record CatalogEntry<D extends CatalogDefinition>(
         if (overridden instanceof AreaDefinition) {
             return CatalogChangeKind.PRESENTATION;
         }
-        return shipped.detectionFingerprint(slug).equals(overridden.detectionFingerprint(slug))
+        return shipped.provenanceFingerprint(slug).equals(overridden.provenanceFingerprint(slug))
             ? CatalogChangeKind.WORDING
             : CatalogChangeKind.DETECTION;
     }
@@ -73,7 +66,7 @@ public record CatalogEntry<D extends CatalogDefinition>(
             .add(slug)
             .add(effective.digest(slug))
             .addNullable(shipped == null ? null : shipped.digest(slug))
-            .addNullable(basedOnDigest)
+            .addNullable(acceptedBundledDigest)
             .add(state().name())
             .add(changeKind().name())
             .addInt(retired ? 1 : 0)

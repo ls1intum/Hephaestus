@@ -41,7 +41,6 @@ export const Route = createFileRoute("/_authenticated/admin/catalog/")({
 	component: AdminCuratedCatalogPage,
 });
 
-// Separate keys: an area and a practice may share a slug, and one must not show the other busy.
 const PRACTICE_STATUS_KEY = ["adminWriteCuratedPracticeStatus"];
 const AREA_STATUS_KEY = ["adminWriteCuratedAreaStatus"];
 const STRUCTURE_SCOPE = { id: "admin-curated-catalog-structure" };

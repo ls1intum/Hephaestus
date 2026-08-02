@@ -44,7 +44,7 @@ const policy = {
 };
 
 const meta = {
-	title: "Admin/Practices/Review settings",
+	title: "Workspace admin/Practices/Review settings",
 	component: PracticeReviewSettings,
 	parameters: {
 		layout: "padded",

@@ -118,10 +118,10 @@ class CatalogEntryTest extends BaseUnitTest {
     private static CatalogEntry<PracticeDefinition> entry(
         PracticeDefinition mine,
         PracticeDefinition shipped,
-        String basedOnDigest
+        String acceptedBundledDigest
     ) {
         PracticeDefinition effective = mine != null ? mine : shipped;
-        return new CatalogEntry<>(SLUG, effective, shipped, mine, basedOnDigest, false, 0, null);
+        return new CatalogEntry<>(SLUG, effective, shipped, mine, acceptedBundledDigest, false, 0, null);
     }
 
     private static CatalogEntry<PracticeDefinition> retired(CatalogEntry<PracticeDefinition> entry) {
@@ -130,7 +130,7 @@ class CatalogEntryTest extends BaseUnitTest {
             entry.effective(),
             entry.shipped(),
             entry.overridden(),
-            entry.basedOnDigest(),
+            entry.acceptedBundledDigest(),
             true,
             entry.position(),
             entry.updatedAt()
@@ -143,7 +143,7 @@ class CatalogEntryTest extends BaseUnitTest {
             entry.effective(),
             entry.shipped(),
             entry.overridden(),
-            entry.basedOnDigest(),
+            entry.acceptedBundledDigest(),
             entry.retired(),
             position,
             entry.updatedAt()

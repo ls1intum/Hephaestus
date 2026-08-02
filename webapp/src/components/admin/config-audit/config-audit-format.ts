@@ -134,7 +134,6 @@ export function subjectLabel(entry: ConfigAuditEntryView): { label: string; hint
 }
 
 export function changeSummary(entry: ConfigAuditEntryView): string {
-	// The row's Action badge already says Created/Deleted.
 	if (entry.action === "CREATED" || entry.action === "DELETED") return "";
 	const changes = fieldChanges(entry);
 	if (changes.length === 0) return "";
@@ -160,7 +159,6 @@ function parseSnapshot(value: string | undefined): Record<string, unknown> | nul
 	}
 }
 
-/** Resolves a dot-path leaf; arrays are compared whole, so a segment never indexes into one. */
 function leafAt(obj: Record<string, unknown>, path: string): unknown {
 	return path.split(".").reduce<unknown>((acc, segment) => {
 		if (acc && typeof acc === "object" && !Array.isArray(acc)) {

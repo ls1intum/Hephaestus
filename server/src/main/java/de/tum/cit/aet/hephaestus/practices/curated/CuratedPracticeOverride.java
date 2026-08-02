@@ -20,7 +20,6 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
-/** Sparse override; no row means the bundled practice applies unchanged. */
 @Entity
 @Table(name = "curated_practice_override")
 @Getter
@@ -62,13 +61,8 @@ public class CuratedPracticeOverride {
     @Column(name = "position")
     private @Nullable Integer position;
 
-    /**
-     * Digest of the shipped definition this edit was written against, or null when the build shipped
-     * nothing under this slug. Comparing it with what ships now is what distinguishes "you changed
-     * this" from "you changed this and Hephaestus has moved on since".
-     */
     @Column(name = "based_on_digest", length = 64)
-    private @Nullable String basedOnDigest;
+    private @Nullable String acceptedBundledDigest;
 
     @Column(name = "retired_at")
     private @Nullable Instant retiredAt;
@@ -105,7 +99,7 @@ public class CuratedPracticeOverride {
         );
     }
 
-    public void write(PracticeDefinition definition, @Nullable String basedOnDigest, Instant now) {
+    public void write(PracticeDefinition definition, @Nullable String acceptedBundledDigest, Instant now) {
         this.name = definition.name();
         this.artifactType = definition.artifactType();
         this.triggerEvents = definition.triggerEventsJson();
@@ -114,7 +108,7 @@ public class CuratedPracticeOverride {
         this.whyItMatters = definition.whyItMatters();
         this.whatGoodLooksLike = definition.whatGoodLooksLike();
         this.areaSlug = definition.areaSlug();
-        this.basedOnDigest = basedOnDigest;
+        this.acceptedBundledDigest = acceptedBundledDigest;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
@@ -127,12 +121,12 @@ public class CuratedPracticeOverride {
         this.whyItMatters = null;
         this.whatGoodLooksLike = null;
         this.areaSlug = null;
-        this.basedOnDigest = null;
+        this.acceptedBundledDigest = null;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
     public void acknowledge(@Nullable String shippedDigest, Instant now) {
-        this.basedOnDigest = shippedDigest;
+        this.acceptedBundledDigest = shippedDigest;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 

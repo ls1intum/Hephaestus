@@ -56,14 +56,6 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
-- description: |-
-    What a workspace administrator can see of the instance catalog: the definition currently behind one
-     of their practices.
-
-     <p>Read-only and single-entry on purpose. A workspace whose copy has drifted needs to see what the
-     instance offers now to judge its own; browsing entries it cannot adopt would only be a list of
-     things it cannot have, and adoption is separate work.
-  name: curated-practice-catalog-controller
 - description: Read-only access to practice evaluation observations
   name: Practice Observations
 - description: Instance-admin account management
@@ -86,6 +78,8 @@ tags:
   name: Profile
 - description: Contributor rankings and league statistics
   name: Leaderboard
+- description: Current instance definitions visible to workspace administrators
+  name: Practice Catalog
 - description: Session lifecycle
   name: Auth
 - description: Workspace-scoped practice-review policy
@@ -861,8 +855,8 @@ paths:
       - Admin
   /admin/practice-catalog:
     get:
-      description: "Every entry with its saved definition, a differing Hephaestus\
-        \ default when relevant, and a summary."
+      description: "Practice summaries, complete areas, ordering, and catalog state.\
+        \ Fetch a practice for its full definition."
       operationId: adminGetCuratedCatalog
       responses:
         "200":
@@ -4109,8 +4103,8 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
     get:
-      description: "The catalog definition a workspace copy came from, for comparison\
-        \ with the copy."
+      description: The current instance-catalog definition for comparison with a workspace
+        copy.
       operationId: getCuratedPracticeCatalogEntry
       parameters:
       - description: Workspace slug
@@ -4134,7 +4128,7 @@ paths:
           description: OK
       summary: Read the instance's definition of a practice
       tags:
-      - curated-practice-catalog
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices:
     get:
       description: "Returns all practice definitions for the workspace, optionally\
@@ -6857,14 +6851,9 @@ components:
           example: review-ready-work
     CatalogEntryStatus:
       type: object
-      description: "Where a catalog entry stands. Identical for practices and areas,\
-        \ so one badge renders either."
       properties:
         changeKind:
           type: string
-          description: |-
-            whether taking the Hephaestus definition changes wording, presentation, or
-                 detection
           enum:
           - NONE
           - WORDING
@@ -6872,6 +6861,7 @@ components:
           - DETECTION
         etag:
           type: string
+          description: Strong entity tag to send in If-Match when updating this entry
         offered:
           type: boolean
         state:
@@ -6889,8 +6879,8 @@ components:
       - state
     CatalogOrigin:
       type: object
-      description: "The catalog entry a workspace copy came from, and how far it has\
-        \ drifted"
+      description: The catalog entry a workspace copy came from and whether it differs
+        now
       properties:
         link:
           type: string
@@ -6903,7 +6893,7 @@ components:
           description: Slug of the catalog entry this copy was made from
         sourceOffered:
           type: boolean
-          description: Whether the instance still offers this entry to workspaces
+          description: Whether new workspaces receive the source entry
       required:
       - link
       - slug
@@ -7797,8 +7787,6 @@ components:
       - workspaceSlug
     CuratedArea:
       type: object
-      description: "An area in the instance catalog, with what Hephaestus ships now\
-        \ when it differs."
       properties:
         definition:
           $ref: "#/components/schemas/CuratedAreaRequest"
@@ -7840,8 +7828,6 @@ components:
       - name
     CuratedCatalog:
       type: object
-      description: "The instance catalog: what it offers, and one line describing\
-        \ how it stands."
       properties:
         areas:
           type: array
@@ -7851,6 +7837,8 @@ components:
           type: boolean
         etag:
           type: string
+          description: Strong entity tag to send in If-Match when reordering this
+            catalog
         practices:
           type: array
           items:
@@ -7865,7 +7853,6 @@ components:
       - summary
     CuratedCatalogSummary:
       type: object
-      description: Counts the catalog states and the consequences of waiting updates.
       properties:
         editedHere:
           type: integer
@@ -7902,12 +7889,6 @@ components:
       - yours
     CuratedPractice:
       type: object
-      description: |-
-        A practice in the instance catalog.
-
-         <p><code>shipped</code> carries the definition Hephaestus offers right now whenever it differs from the
-         one in force. It is what makes taking an update a decision rather than a leap: the administrator
-         reads what they would be getting before they get it.
       properties:
         definition:
           $ref: "#/components/schemas/CuratedPracticeRequest"
@@ -7972,11 +7953,6 @@ components:
       - triggerEvents
     CuratedPracticeSummary:
       type: object
-      description: |-
-        A practice as the catalog list shows it.
-
-         <p>Without its criteria: those are thousands of words of detection rubric each, and the list exists
-         to be scanned. The definition, and what Hephaestus ships beside it, come with the single entry.
       properties:
         areaSlug:
           type: string
@@ -11527,7 +11503,7 @@ components:
       - state
     UpdateCuratedStatusRequest:
       type: object
-      description: Whether the instance offers this catalog entry to workspaces
+      description: Whether new workspaces receive this catalog entry
       properties:
         status:
           type: string

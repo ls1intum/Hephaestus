@@ -37,7 +37,6 @@ export default defineConfig({
 			{ find: "@", replacement: path.resolve(dirname, "./src") }
 		]
 	},
-	// Prevent runtime dependency discovery from reloading the browser test page mid-run.
 	optimizeDeps: {
 		noDiscovery: true,
 		include: [
@@ -49,10 +48,7 @@ export default defineConfig({
 	},
 	test: {
 		name: "storybook",
-		// Concurrent browser runners can stall on resource-constrained CI.
 		fileParallelism: false,
-		// Reuse one iframe; recreating it for every story file can strand the browser runner.
-		isolate: false,
 		browser: {
 			enabled: true,
 			headless: true,

@@ -7,13 +7,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/**
- * Stamps catalog provenance on workspaces seeded before the catalog existed, before the application
- * reports itself ready.
- *
- * <p>An {@code ApplicationRunner} runs strictly before {@code ApplicationReadyEvent}, which is what
- * puts this ahead of workspace provisioning and the seeder it drives.
- */
+/** Runs pending provenance linking before application readiness. */
 @Component
 @Profile("!test & !specs")
 @ConditionalOnServerRole

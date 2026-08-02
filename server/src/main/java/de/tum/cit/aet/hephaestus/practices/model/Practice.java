@@ -86,18 +86,11 @@ public class Practice {
     @ToString.Exclude
     private PracticeArea area;
 
-    /**
-     * The catalog entry this copy was made from, by slug — the catalog's durable identity. Kept after
-     * local edits, so a copy can still be told apart from a practice the workspace invented.
-     */
+    /** Catalog slug retained across workspace edits. */
     @Column(name = "source_curated_slug", length = 64)
     private String sourceCuratedSlug;
 
-    /**
-     * The detection fingerprint of the catalog definition this copy was made from. Comparing it with
-     * the current revision's fingerprint says whether the workspace has changed it; comparing it with
-     * the catalog's fingerprint now says whether the catalog has moved on.
-     */
+    /** Catalog comparison fingerprint captured when the workspace copy is created. */
     @Column(name = "source_curated_fingerprint", length = 64)
     private String sourceCuratedFingerprint;
 

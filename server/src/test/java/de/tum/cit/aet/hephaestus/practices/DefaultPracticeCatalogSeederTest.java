@@ -33,7 +33,6 @@ import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.support.TransactionOperations;
 
-/** A workspace is given the catalog this instance offers, once, and then owns what it has. */
 class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Mock

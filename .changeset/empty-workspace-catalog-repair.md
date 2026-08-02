@@ -3,5 +3,5 @@
 ---
 
 Workspaces that upgraded with an empty practice catalog receive it on the next start, and workspaces
-created before the catalog existed are matched back to it wherever their practices and areas are
-still unchanged.
+created before the catalog existed are matched back to it where their review rules or area details
+still match the bundled defaults.

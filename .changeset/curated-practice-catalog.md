@@ -4,9 +4,9 @@
 
 Instance administrators can manage the starting practice catalog for new workspaces under **Admin →
 Practice catalog**. Areas and practices can be created, customized, included, excluded, and arranged
-by dragging, by keyboard, or through the row menu; no numeric positions need to be managed. Two
-administrators editing the same entry no longer overwrite each other silently. A custom arrangement
-can be reset to the order included with Hephaestus at any time.
+by dragging, by keyboard, or through the row menu; no numeric positions need to be managed. Concurrent
+edits are rejected rather than overwritten. A custom arrangement can be reset to the order included
+with Hephaestus at any time.
 
 New workspaces receive the entries included by the instance, including entries created there. Existing
 workspaces never change automatically. Hephaestus defaults update automatically until an instance

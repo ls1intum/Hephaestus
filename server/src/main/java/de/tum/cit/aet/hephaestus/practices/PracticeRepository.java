@@ -16,18 +16,11 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Repository for workspace-scoped practice definitions.
- */
 @Repository
 @WorkspaceAgnostic(
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
-    // @EntityGraph fetches the bound area and the current revision eagerly (here and below), because
-    // open-in-view is disabled and a response is built after the transaction closes: the area for its
-    // fields, the revision for the fingerprint that says whether this copy still matches the catalog.
-    // The catalog side of that comparison needs no fetching — it is a slug and a hash on the row.
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 

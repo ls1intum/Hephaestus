@@ -6,13 +6,6 @@ import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A practice in the instance catalog.
- *
- * <p>{@code shipped} carries the definition Hephaestus offers right now whenever it differs from the
- * one in force. It is what makes taking an update a decision rather than a leap: the administrator
- * reads what they would be getting before they get it.
- */
 public record CuratedPracticeDTO(
     @NonNull String slug,
     @NonNull Integer position,

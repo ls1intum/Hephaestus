@@ -23,8 +23,10 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService.HistoryPage;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,17 +47,10 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     private static final long WS = 42L;
     private static final String TEAM = "T1";
     private static final String CHANNEL = "C1";
-    /**
-     * The service floors every fetch at {@code max(announcement, now - retention, watermark)} and reads
-     * the clock itself, so both of these have to be relative. A fixed instant passes only until the
-     * retention window slides past it, and then fails on a day nobody touched this code.
-     */
-    private static final Instant ANNOUNCED = Instant.now().minus(Duration.ofDays(20));
-
-    /** After the announcement and still inside the retention window, so it is the floor. */
-    private static final String WATERMARK_AFTER_ANNOUNCEMENT = SlackTs.ofInstant(
-        Instant.now().minus(Duration.ofDays(10))
-    );
+    private static final Instant NOW = Instant.parse("2026-07-10T00:00:00Z");
+    private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
+    private static final Instant ANNOUNCED = NOW.minus(Duration.ofDays(20));
+    private static final String WATERMARK_AFTER_ANNOUNCEMENT = SlackTs.ofInstant(NOW.minus(Duration.ofDays(10)));
 
     @Mock
     private SlackMonitoredChannelRepository monitoredChannelRepository;
@@ -82,7 +77,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
             slackMessageService,
             ingestService,
             connectionService,
-            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true)
+            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true),
+            CLOCK
         );
         lenient().when(connectionService.findSlackNotificationConfig(WS)).thenReturn(Optional.empty());
         lenient()
@@ -196,7 +192,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
             slackMessageService,
             ingestService,
             connectionService,
-            new SlackSyncProperties("0 0 4 * * *", 1, 15, Duration.ZERO, false, 0, true)
+            new SlackSyncProperties("0 0 4 * * *", 1, 15, Duration.ZERO, false, 0, true),
+            CLOCK
         );
         stubChannels(channel(ANNOUNCED, null));
         // First page consumed the whole budget and points at a second page.
@@ -303,7 +300,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
             slackMessageService,
             ingestService,
             connectionService,
-            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 1, true)
+            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 1, true),
+            CLOCK
         );
         stubChannels(channel(ANNOUNCED, null));
         Message parent = plain("1783000007.000000", "U1", "root");

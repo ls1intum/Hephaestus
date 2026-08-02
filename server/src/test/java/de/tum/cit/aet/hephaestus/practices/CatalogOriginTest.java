@@ -13,10 +13,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * A workspace's copies are never rewritten from above, so the only question worth answering is how
- * far each has drifted. It is read off three fingerprints, which is why it cannot go stale.
- */
 class CatalogOriginTest extends BaseUnitTest {
 
     private static final String SLUG = "small-prs";
@@ -117,7 +113,7 @@ class CatalogOriginTest extends BaseUnitTest {
     }
 
     private static String fingerprintOf(String criteria) {
-        return definition(criteria).detectionFingerprint(SLUG);
+        return definition(criteria).provenanceFingerprint(SLUG);
     }
 
     private static EffectiveCatalog catalog(String criteria) {

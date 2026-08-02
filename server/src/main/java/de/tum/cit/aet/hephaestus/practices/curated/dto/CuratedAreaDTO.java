@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** An area in the instance catalog, with what Hephaestus ships now when it differs. */
 public record CuratedAreaDTO(
     @NonNull String slug,
     @NonNull Integer position,

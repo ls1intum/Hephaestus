@@ -286,7 +286,7 @@ export const adminUpdateLoginProvider = <ThrowOnError extends boolean = false>(o
 /**
  * Read the instance catalog
  *
- * Every entry with its saved definition, a differing Hephaestus default when relevant, and a summary.
+ * Practice summaries, complete areas, ordering, and catalog state. Fetch a practice for its full definition.
  */
 export const adminGetCuratedCatalog = <ThrowOnError extends boolean = false>(options?: Options<AdminGetCuratedCatalogData, ThrowOnError>) => (options?.client ?? client).get<AdminGetCuratedCatalogResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -1488,7 +1488,7 @@ export const updateArea = <ThrowOnError extends boolean = false>(options: Option
 /**
  * Read the instance's definition of a practice
  *
- * The catalog definition a workspace copy came from, for comparison with the copy.
+ * The current instance-catalog definition for comparison with a workspace copy.
  */
 export const getCuratedPracticeCatalogEntry = <ThrowOnError extends boolean = false>(options: Options<GetCuratedPracticeCatalogEntryData, ThrowOnError>) => (options.client ?? client).get<GetCuratedPracticeCatalogEntryResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

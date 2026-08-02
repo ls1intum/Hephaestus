@@ -79,19 +79,14 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertEmptyCatalogBootstrap() throws SQLException {
-        // Nothing is stored for a catalog nobody has edited: the instance offers what the build ships,
-        // so the tables exist and stay empty until somebody says something.
         assertThat(scalar("SELECT count(*)::text FROM curated_practice_override")).isEqualTo("0");
         assertThat(scalar("SELECT count(*)::text FROM curated_area_override")).isEqualTo("0");
-        // The bulk marker is closed, while a marker written later by the runtime seeder remains
-        // eligible for definition matching.
         assertThat(
             scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL")
         ).isEqualTo("1");
         assertThat(
             scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NULL")
         ).isEqualTo("1");
-        // A stored row must carry a definition, a retirement, or a catalog position.
         assertThatThrownBy(() ->
             execute(
                 """
@@ -170,8 +165,6 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertControlledProvenanceUpdate() throws SQLException {
-        // The application fills in the fingerprint SQL could not compute. Nothing else about a
-        // revision may move afterwards.
         execute(
             """
             UPDATE practice_revision
@@ -199,7 +192,6 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             )
         ).isInstanceOf(SQLException.class);
 
-        // Provenance is a slug and a fingerprint on the practice itself; both or neither.
         execute(
             """
             UPDATE practice
@@ -243,8 +235,6 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("practice revisions are immutable");
 
-        // The application fills in the fingerprint SQL could not compute, on its own and without a
-        // curated match to record alongside it. Refusing that would strand every migrated revision.
         execute(
             """
             UPDATE practice_revision
@@ -259,7 +249,6 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             )
         ).isEqualTo("1");
 
-        // Once written it is as fixed as the definition it describes.
         assertThatThrownBy(() ->
             execute(
                 "UPDATE practice_revision SET detection_fingerprint = repeat('b', 64)" +
@@ -349,8 +338,6 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 """
             )
         ).isEqualTo("0");
-        // Only the revisions written before this changeset remain; everything that existed to carry a
-        // definition went with the columns that held one.
         assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301")).isEqualTo("1");
         assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE criteria = 'legacy criteria'")).isEqualTo(
             "1"
@@ -371,8 +358,6 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 WHERE practice.id = 136301
                 """
             )
-            // Re-applying derives the current definition from the practice again and numbers it after the
-            // history that survived, so the practice is left with a complete current revision either way.
         ).isEqualTo("2");
     }
 

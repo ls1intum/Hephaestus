@@ -92,7 +92,7 @@ public class CatalogProvenanceBackfill {
 
     private void fingerprintMigratedRevisions(Long workspaceId) {
         for (PracticeRevision revision : revisionRepository.findDefinitionRevisionsMissingFingerprint(workspaceId)) {
-            revisionRepository.setDetectionFingerprint(revision.getId(), revision.recomputeDetectionFingerprint());
+            revisionRepository.setDetectionFingerprint(revision.getId(), revision.computeDetectionFingerprint());
         }
     }
 
@@ -102,13 +102,13 @@ public class CatalogProvenanceBackfill {
             if (practice.getSourceCuratedSlug() != null || practice.getCurrentRevision() == null) {
                 continue;
             }
-            String fingerprint = PracticeDefinition.from(practice).detectionFingerprint(practice.getSlug());
+            String fingerprint = PracticeDefinition.from(practice).provenanceFingerprint(practice.getSlug());
             boolean matchesCatalog = catalog
                 .practices()
                 .stream()
                 .filter(entry -> entry.slug().equals(practice.getSlug()))
                 .findFirst()
-                .map(entry -> entry.definition().detectionFingerprint(entry.slug()).equals(fingerprint))
+                .map(entry -> entry.definition().provenanceFingerprint(entry.slug()).equals(fingerprint))
                 .orElse(false);
             if (!matchesCatalog) {
                 continue;
@@ -127,13 +127,13 @@ public class CatalogProvenanceBackfill {
             if (area.getSourceCuratedSlug() != null) {
                 continue;
             }
-            String fingerprint = AreaDefinition.from(area).detectionFingerprint(area.getSlug());
+            String fingerprint = AreaDefinition.from(area).provenanceFingerprint(area.getSlug());
             boolean matchesCatalog = catalog
                 .areas()
                 .stream()
                 .filter(entry -> entry.slug().equals(area.getSlug()))
                 .findFirst()
-                .map(entry -> entry.definition().detectionFingerprint(entry.slug()).equals(fingerprint))
+                .map(entry -> entry.definition().provenanceFingerprint(entry.slug()).equals(fingerprint))
                 .orElse(false);
             if (!matchesCatalog) {
                 continue;

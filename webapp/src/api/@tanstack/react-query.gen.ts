@@ -563,7 +563,7 @@ export const adminGetCuratedCatalogQueryKey = (options?: Options<AdminGetCurated
 /**
  * Read the instance catalog
  *
- * Every entry with its saved definition, a differing Hephaestus default when relevant, and a summary.
+ * Practice summaries, complete areas, ordering, and catalog state. Fetch a practice for its full definition.
  */
 export const adminGetCuratedCatalogOptions = (options?: Options<AdminGetCuratedCatalogData>) => queryOptions<AdminGetCuratedCatalogResponse, DefaultError, AdminGetCuratedCatalogResponse, ReturnType<typeof adminGetCuratedCatalogQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -2824,12 +2824,12 @@ export const updateAreaMutation = (options?: Partial<Options<UpdateAreaData>>): 
     return mutationOptions;
 };
 
-export const getCuratedPracticeCatalogEntryQueryKey = (options: Options<GetCuratedPracticeCatalogEntryData>) => createQueryKey('getCuratedPracticeCatalogEntry', options, false, ['curated-practice-catalog']);
+export const getCuratedPracticeCatalogEntryQueryKey = (options: Options<GetCuratedPracticeCatalogEntryData>) => createQueryKey('getCuratedPracticeCatalogEntry', options, false, ['Practice Catalog']);
 
 /**
  * Read the instance's definition of a practice
  *
- * The catalog definition a workspace copy came from, for comparison with the copy.
+ * The current instance-catalog definition for comparison with a workspace copy.
  */
 export const getCuratedPracticeCatalogEntryOptions = (options: Options<GetCuratedPracticeCatalogEntryData>) => queryOptions<GetCuratedPracticeCatalogEntryResponse, DefaultError, GetCuratedPracticeCatalogEntryResponse, ReturnType<typeof getCuratedPracticeCatalogEntryQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

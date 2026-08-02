@@ -25,14 +25,7 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
-/**
- * Gives a workspace the instance's catalog, once.
- *
- * <p>What it copies is the catalog as this instance has curated it — an administrator's own practice
- * counts exactly as much as one the build shipped, and an administrator's edit to a shipped practice
- * is what the workspace receives. What it does not do is keep copying: a workspace's practices are
- * its own from the moment it has them, and later catalog changes never rewrite them.
- */
+/** Installs the effective instance catalog once; workspace copies remain independent afterwards. */
 @Component
 @ConditionalOnServerRole
 class DefaultPracticeCatalogSeeder {

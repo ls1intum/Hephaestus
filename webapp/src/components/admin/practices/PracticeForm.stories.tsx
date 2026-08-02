@@ -9,7 +9,7 @@ const createSubmit = fn();
 const editSubmit = fn();
 
 const meta = {
-	title: "Admin/Practices/Practice editor",
+	title: "Workspace admin/Practices/Practice editor",
 	component: PracticeForm,
 	parameters: {
 		layout: "fullscreen",

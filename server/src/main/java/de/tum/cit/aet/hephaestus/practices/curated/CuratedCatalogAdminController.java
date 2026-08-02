@@ -61,7 +61,7 @@ public class CuratedCatalogAdminController {
     @GetMapping
     @Operation(
         summary = "Read the instance catalog",
-        description = "Every entry with its saved definition, a differing Hephaestus default when relevant, and a summary.",
+        description = "Practice summaries, complete areas, ordering, and catalog state. Fetch a practice for its full definition.",
         operationId = "adminGetCuratedCatalog"
     )
     public ResponseEntity<CuratedCatalogDTO> catalog() {

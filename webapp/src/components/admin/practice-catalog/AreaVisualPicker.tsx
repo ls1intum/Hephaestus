@@ -105,7 +105,10 @@ export function AreaVisualPicker({
 							Icon
 						</p>
 						<div className="relative">
-							<Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+							<Search
+								className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+								aria-hidden
+							/>
 							<Input
 								value={query}
 								onChange={(e) => setQuery(e.target.value)}

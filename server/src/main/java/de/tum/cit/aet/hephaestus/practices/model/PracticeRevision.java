@@ -157,12 +157,7 @@ public class PracticeRevision {
         );
     }
 
-    /**
-     * The fingerprint this revision's stored definition implies. Equal to {@link #detectionFingerprint}
-     * for every revision written by the application; used to fill that column in on the rows the schema
-     * migration created, which SQL could not hash.
-     */
-    public String recomputeDetectionFingerprint() {
+    public String computeDetectionFingerprint() {
         return PracticeDetectionFingerprint.of(
             slug,
             name,

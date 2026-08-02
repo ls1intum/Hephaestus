@@ -38,7 +38,7 @@ final class CuratedCatalogModel {
                     areaOverrides,
                     CuratedAreaOverride::getSlug,
                     CuratedAreaOverride::definition,
-                    CuratedAreaOverride::getBasedOnDigest,
+                    CuratedAreaOverride::getAcceptedBundledDigest,
                     CuratedAreaOverride::getRetiredAt,
                     CuratedAreaOverride::getPosition,
                     CuratedAreaOverride::getUpdatedAt
@@ -51,7 +51,7 @@ final class CuratedCatalogModel {
                     practiceOverrides,
                     CuratedPracticeOverride::getSlug,
                     CuratedPracticeOverride::definition,
-                    CuratedPracticeOverride::getBasedOnDigest,
+                    CuratedPracticeOverride::getAcceptedBundledDigest,
                     CuratedPracticeOverride::getRetiredAt,
                     CuratedPracticeOverride::getPosition,
                     CuratedPracticeOverride::getUpdatedAt
@@ -215,7 +215,7 @@ final class CuratedCatalogModel {
             entry.effective(),
             entry.shipped(),
             entry.overridden(),
-            entry.basedOnDigest(),
+            entry.acceptedBundledDigest(),
             entry.retired(),
             position,
             entry.updatedAt()
@@ -228,7 +228,7 @@ final class CuratedCatalogModel {
         List<O> overrides,
         Function<O, String> slugOf,
         Function<O, @Nullable D> definitionOf,
-        Function<O, @Nullable String> basedOnDigestOf,
+        Function<O, @Nullable String> acceptedBundledDigestOf,
         Function<O, @Nullable Instant> retiredAtOf,
         Function<O, @Nullable Integer> positionOf,
         Function<O, Instant> updatedAtOf
@@ -262,7 +262,7 @@ final class CuratedCatalogModel {
                     effective,
                     shippedDefinition,
                     overridden,
-                    basedOnDigestOf.apply(override),
+                    acceptedBundledDigestOf.apply(override),
                     retiredAtOf.apply(override) != null,
                     positionOf.apply(override) != null
                         ? positionOf.apply(override)

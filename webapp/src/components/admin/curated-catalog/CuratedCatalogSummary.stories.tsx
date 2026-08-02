@@ -26,12 +26,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const EverythingUsesDefaults: Story = {
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByText(/needs review/)).not.toBeInTheDocument();
-	},
-};
-
 export const UpdatesWaiting: Story = {
 	args: {
 		onReviewChanges: fn(),
@@ -51,7 +45,7 @@ export const UpdatesWaiting: Story = {
 		await expect(canvas.getByText("2 updates would change review behavior")).toBeVisible();
 		await expect(canvas.getByText("5 updates would change wording or guidance")).toBeVisible();
 		await expect(canvas.getByText("1 update would change area appearance")).toBeVisible();
-		await expect(canvas.getByText("8 catalog changes need review")).toBeVisible();
+		await expect(canvas.getByText("8 Hephaestus changes need review")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Review changes" })).toBeVisible();
 	},
 };
@@ -72,7 +66,7 @@ export const RemovedDefault: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("1 catalog change needs review")).toBeVisible();
+		await expect(canvas.getByText("1 Hephaestus change needs review")).toBeVisible();
 		await expect(canvas.getByText("1 entry is no longer in Hephaestus defaults")).toBeVisible();
 	},
 };

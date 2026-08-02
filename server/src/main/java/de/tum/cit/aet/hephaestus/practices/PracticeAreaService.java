@@ -152,7 +152,7 @@ public class PracticeAreaService {
             false
         );
         area.setSourceCuratedSlug(slug);
-        area.setSourceCuratedFingerprint(definition.detectionFingerprint(slug));
+        area.setSourceCuratedFingerprint(definition.provenanceFingerprint(slug));
         return practiceAreaRepository.save(area);
     }
 

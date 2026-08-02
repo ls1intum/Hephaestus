@@ -1178,7 +1178,7 @@ export type UpdateInstanceLlmSettingsRequest = {
 };
 
 /**
- * Whether the instance offers this catalog entry to workspaces
+ * Whether new workspaces receive this catalog entry
  */
 export type UpdateCuratedStatusRequest = {
     status: 'AVAILABLE' | 'RETIRED';
@@ -2661,7 +2661,7 @@ export type PracticeArea = {
 };
 
 /**
- * The catalog entry a workspace copy came from, and how far it has drifted
+ * The catalog entry a workspace copy came from and whether it differs now
  */
 export type CatalogOrigin = {
     link: 'IN_SYNC' | 'LOCALLY_EDITED' | 'UPDATE_AVAILABLE';
@@ -2670,7 +2670,7 @@ export type CatalogOrigin = {
      */
     slug: string;
     /**
-     * Whether the instance still offers this entry to workspaces
+     * Whether new workspaces receive the source entry
      */
     sourceOffered: boolean;
 };
@@ -3889,12 +3889,6 @@ export type CurrentUserView = {
     username?: string;
 };
 
-/**
- * A practice as the catalog list shows it.
- *
- * <p>Without its criteria: those are thousands of words of detection rubric each, and the list exists
- * to be scanned. The definition, and what Hephaestus ships beside it, come with the single entry.
- */
 export type CuratedPracticeSummary = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
@@ -3905,15 +3899,11 @@ export type CuratedPracticeSummary = {
     status: CatalogEntryStatus;
 };
 
-/**
- * Where a catalog entry stands. Identical for practices and areas, so one badge renders either.
- */
 export type CatalogEntryStatus = {
-    /**
-     * whether taking the Hephaestus definition changes wording, presentation, or
-     * detection
-     */
     changeKind: 'NONE' | 'WORDING' | 'PRESENTATION' | 'DETECTION';
+    /**
+     * Strong entity tag to send in If-Match when updating this entry
+     */
     etag: string;
     offered: boolean;
     state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
@@ -3933,13 +3923,6 @@ export type CuratedPracticeRequest = {
     whyItMatters?: string;
 };
 
-/**
- * A practice in the instance catalog.
- *
- * <p><code>shipped</code> carries the definition Hephaestus offers right now whenever it differs from the
- * one in force. It is what makes taking an update a decision rather than a leap: the administrator
- * reads what they would be getting before they get it.
- */
 export type CuratedPractice = {
     definition: CuratedPracticeRequest;
     position: number;
@@ -3948,9 +3931,6 @@ export type CuratedPractice = {
     status: CatalogEntryStatus;
 };
 
-/**
- * Counts the catalog states and the consequences of waiting updates.
- */
 export type CuratedCatalogSummary = {
     editedHere: number;
     noLongerShipped: number;
@@ -3962,12 +3942,12 @@ export type CuratedCatalogSummary = {
     yours: number;
 };
 
-/**
- * The instance catalog: what it offers, and one line describing how it stands.
- */
 export type CuratedCatalog = {
     areas: Array<CuratedArea>;
     customOrder: boolean;
+    /**
+     * Strong entity tag to send in If-Match when reordering this catalog
+     */
     etag: string;
     practices: Array<CuratedPracticeSummary>;
     summary: CuratedCatalogSummary;
@@ -3983,9 +3963,6 @@ export type CuratedAreaRequest = {
     name: string;
 };
 
-/**
- * An area in the instance catalog, with what Hephaestus ships now when it differs.
- */
 export type CuratedArea = {
     definition: CuratedAreaRequest;
     position: number;

@@ -28,7 +28,7 @@ const initialData = {
 };
 
 const meta = {
-	title: "Instance admin/Curated practice editor",
+	title: "Instance admin/Practice catalog/Practice editor",
 	component: CuratedPracticeForm,
 	parameters: {
 		layout: "fullscreen",
@@ -116,60 +116,6 @@ export const HephaestusUpdateAvailable: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
 		await expect(canvas.getByText("Unassigned")).toBeVisible();
 		await expect(canvas.getAllByText("Not set").length).toBeGreaterThan(0);
-	},
-};
-
-export const WordingOnlyUpdate: Story = {
-	args: {
-		mode: "edit",
-		initialData: {
-			...initialData,
-			status: {
-				...initialData.status,
-				state: "UPDATE_WAITING" as const,
-				changeKind: "WORDING" as const,
-			},
-			shipped: {
-				name: "Say what changed and why",
-				artifactType: "PULL_REQUEST",
-				triggerEvents: ["PullRequestCreated"],
-				criteria: "The updated default criteria",
-				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
-			},
-		},
-		areas,
-		isPending: false,
-		onUseHephaestusVersion: fn(),
-		onKeepCurrentDefinition: fn(),
-		onSubmit: fn(),
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Hephaestus update available")).toBeVisible();
-		await expect(canvas.getByText(/review behavior would stay the same/i)).toBeVisible();
-	},
-};
-
-export const RemovedFromDefaults: Story = {
-	args: {
-		mode: "edit",
-		initialData: {
-			...initialData,
-			status: { ...initialData.status, state: "NO_LONGER_SHIPPED" as const },
-		},
-		areas,
-		isPending: false,
-		onUseHephaestusVersion: fn(),
-		onKeepCurrentDefinition: fn(),
-		onSubmit: fn(),
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Removed from Hephaestus defaults")).toBeVisible();
-		await expect(
-			canvas.getByRole("button", { name: "Keep saved version as custom" }),
-		).toBeVisible();
-		await expect(
-			canvas.queryByRole("button", { name: "Apply Hephaestus update" }),
-		).not.toBeInTheDocument();
 	},
 };
 

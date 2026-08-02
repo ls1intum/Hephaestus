@@ -88,11 +88,11 @@ public class PracticeArea {
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
 
-    /** The catalog area this one was copied from, by slug. Kept after local edits. */
+    /** Catalog slug retained across workspace edits. */
     @Column(name = "source_curated_slug", length = 64)
     private String sourceCuratedSlug;
 
-    /** The presentation fingerprint of the catalog area this copy was made from. */
+    /** Catalog comparison fingerprint captured when the workspace copy is created. */
     @Column(name = "source_curated_fingerprint", length = 64)
     private String sourceCuratedFingerprint;
 

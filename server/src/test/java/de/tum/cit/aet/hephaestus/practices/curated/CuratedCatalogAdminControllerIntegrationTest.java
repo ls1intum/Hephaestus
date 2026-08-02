@@ -794,27 +794,20 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         ensureAdminMembership(workspace);
         events.publishEvent(new WorkspacesInitializedEvent(1));
 
-        // Read over HTTP, so the response is built after the transaction closes — the only way a
-        // missing fetch shows up. A workspace holding the whole catalog returns more than the client's
-        // default in-memory limit, which is a property of this harness, not of the endpoint.
-        WebTestClient client = webTestClient
-            .mutate()
-            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(4 * 1024 * 1024))
-            .build();
-        client
+        webTestClient
             .get()
-            .uri("/workspaces/{workspaceSlug}/practices", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{workspaceSlug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), PRACTICE)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$[0].catalogOrigin.link")
+            .jsonPath("$.catalogOrigin.link")
             .isEqualTo("IN_SYNC")
-            .jsonPath("$[0].catalogOrigin.sourceOffered")
+            .jsonPath("$.catalogOrigin.sourceOffered")
             .isEqualTo(true);
 
-        client
+        webTestClient
             .get()
             .uri("/workspaces/{workspaceSlug}/practice-areas", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())

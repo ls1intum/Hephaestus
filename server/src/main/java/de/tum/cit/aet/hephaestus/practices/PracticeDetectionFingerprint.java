@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Fingerprints detector inputs; learner-facing guidance is deliberately excluded. */
+/** Fingerprints review-rule inputs, excluding why-it-matters and what-good-looks-like guidance. */
 public final class PracticeDetectionFingerprint {
 
     private PracticeDetectionFingerprint() {}

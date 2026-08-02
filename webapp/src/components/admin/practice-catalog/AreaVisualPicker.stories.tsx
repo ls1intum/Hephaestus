@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AreaVisualPicker, type AreaVisualPickerProps } from "./AreaVisualPicker";
 
 const meta = {
-	title: "Admin/Practice catalog/Building blocks/Area visual picker",
+	title: "Shared/Practice catalog/Area visual picker",
 	component: AreaVisualPicker,
 	parameters: {
 		layout: "centered",

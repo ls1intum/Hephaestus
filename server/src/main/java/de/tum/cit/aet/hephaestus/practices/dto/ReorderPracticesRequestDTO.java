@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Reorder one area's complete practice list, or the complete unassigned list, atomically. */
 @Schema(description = "Reorder one area's practices to match the supplied list")
 public record ReorderPracticesRequestDTO(
     @Schema(

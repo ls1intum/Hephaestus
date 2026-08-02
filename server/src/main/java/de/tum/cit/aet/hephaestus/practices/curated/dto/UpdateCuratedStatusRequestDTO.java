@@ -5,5 +5,5 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "Whether the instance offers this catalog entry to workspaces")
+@Schema(description = "Whether new workspaces receive this catalog entry")
 public record UpdateCuratedStatusRequestDTO(@NonNull @NotNull(message = "Status is required") CuratedStatus status) {}

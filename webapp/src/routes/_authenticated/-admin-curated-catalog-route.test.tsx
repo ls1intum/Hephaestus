@@ -65,7 +65,7 @@ describe("instance catalog routes", () => {
 		mockCatalog();
 		renderRouteAt("/admin/catalog");
 
-		await screen.findByText("1 catalog change needs review", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("1 Hephaestus change needs review", undefined, ROUTE_RENDER_WAIT);
 		expect(screen.getByText("1 update would change review behavior")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
 		expect(await screen.findByRole("button", { name: "Show all entries" })).toBeTruthy();

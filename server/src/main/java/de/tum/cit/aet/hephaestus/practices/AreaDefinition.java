@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/** Shared definition for catalog and workspace areas. */
 public record AreaDefinition(
     String name,
     @Nullable String description,
@@ -28,7 +27,7 @@ public record AreaDefinition(
     }
 
     @Override
-    public String detectionFingerprint(String slug) {
+    public String provenanceFingerprint(String slug) {
         return new CanonicalDigest()
             .add(slug)
             .add(name)

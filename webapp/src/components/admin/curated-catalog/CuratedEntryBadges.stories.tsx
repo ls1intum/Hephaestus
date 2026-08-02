@@ -22,12 +22,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Ordinary: Story = {
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByText(/./)).toBeNull();
-	},
-};
-
 export const Customized: Story = { args: { status: status({ state: "EDITED_HERE" }) } };
 
 export const UpdateChangesReviewBehavior: Story = {

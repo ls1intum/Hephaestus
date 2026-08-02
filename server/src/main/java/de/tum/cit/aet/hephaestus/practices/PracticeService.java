@@ -154,10 +154,9 @@ public class PracticeService {
         return createPractice(ctx, request.slug(), definition(request), null, null);
     }
 
-    /** The workspace's copy of a catalog practice, stamped with where it came from. */
     @Transactional
     public Practice createPracticeFromCatalog(WorkspaceContext ctx, String slug, PracticeDefinition definition) {
-        return createPractice(ctx, slug, definition, slug, definition.detectionFingerprint(slug));
+        return createPractice(ctx, slug, definition, slug, definition.provenanceFingerprint(slug));
     }
 
     private Practice createPractice(

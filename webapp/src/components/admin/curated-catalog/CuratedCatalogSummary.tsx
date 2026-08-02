@@ -25,7 +25,7 @@ export function CuratedCatalogSummary({
 	return (
 		<div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/50 bg-warning/5 p-4 text-sm">
 			<span className="font-medium">
-				{changes} catalog {changes === 1 ? "change needs" : "changes need"} review
+				{changes} Hephaestus {changes === 1 ? "change needs" : "changes need"} review
 			</span>
 			{summary.updatesChangingDetection > 0 && (
 				<Badge variant="warning">

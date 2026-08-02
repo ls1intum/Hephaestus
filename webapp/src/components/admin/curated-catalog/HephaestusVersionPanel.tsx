@@ -1,4 +1,5 @@
 import { RotateCcw } from "lucide-react";
+import { useId } from "react";
 import type {
 	CatalogEntryStatus,
 	CuratedAreaRequest,
@@ -108,6 +109,7 @@ export function HephaestusVersionPanel({
 	onUseHephaestusVersion,
 	onKeepCurrentDefinition,
 }: HephaestusVersionPanelProps) {
+	const headingId = useId();
 	const copy = curatedEntryCopy(status, kind);
 	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion;
 	const canKeep = canKeepCurrentDefinition(status) && onKeepCurrentDefinition;
@@ -120,7 +122,7 @@ export function HephaestusVersionPanel({
 
 	return (
 		<section
-			aria-label={`Hephaestus default for this ${kind}`}
+			aria-labelledby={headingId}
 			className={cn(
 				"max-w-3xl rounded-lg border p-4 text-sm",
 				copy.tone === "attention" ? "border-warning/50 bg-warning/5" : "bg-card",
@@ -129,7 +131,9 @@ export function HephaestusVersionPanel({
 			<div className="flex items-start gap-3">
 				<RotateCcw className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
 				<div className="min-w-0 flex-1">
-					<h2 className="font-medium">{copy.label}</h2>
+					<h2 id={headingId} className="font-medium">
+						{copy.label}
+					</h2>
 					<p className="mt-1 text-muted-foreground">{copy.detail}</p>
 
 					{shipped && (
@@ -141,19 +145,22 @@ export function HephaestusVersionPanel({
 									</Button>
 								}
 							/>
-							<CollapsibleContent className="mt-2 space-y-3 rounded-md border bg-muted/40 p-3">
+							<CollapsibleContent
+								render={<dl />}
+								className="mt-2 space-y-3 rounded-md border bg-muted/40 p-3"
+							>
 								{fieldEntries(kind === "area" ? AREA_FIELDS : PRACTICE_FIELDS).map(
 									([field, label]) => (
 										<div key={field} className="space-y-1">
-											<p className="font-medium text-xs">{label}</p>
-											<p
+											<dt className="font-medium text-xs">{label}</dt>
+											<dd
 												className={cn(
 													"whitespace-pre-wrap break-words text-muted-foreground text-xs",
 													field === "precomputeScript" && "font-mono",
 												)}
 											>
 												{displayValue(field, shipped[field], shipped, areaNames)}
-											</p>
+											</dd>
 										</div>
 									),
 								)}

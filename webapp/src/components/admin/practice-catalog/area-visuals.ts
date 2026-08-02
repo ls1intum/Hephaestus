@@ -265,8 +265,6 @@ const AREA_SEEDS: Record<string, Seed> = {
 	communication: { icon: "MessageCircle", color: "violet" },
 };
 
-export const SEEDED_AREA_SLUGS = Object.keys(AREA_SEEDS);
-
 const FALLBACK: Seed = { icon: "Folder", color: "slate" };
 
 export function areaSeed(slug: string, name = ""): { icon: string; color: string } {

@@ -9,10 +9,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * The identity a catalog entry keeps for life. It reaches the detection sandbox as a path segment, so
- * the shape is enforced everywhere one is accepted rather than at the point it is finally used.
- */
+/** Validates the durable identifier used by catalog provenance and detector paths. */
 @NotBlank(message = "Slug is required")
 @Size(min = 3, max = 64, message = "Slug must be between 3 and 64 characters")
 @Pattern(

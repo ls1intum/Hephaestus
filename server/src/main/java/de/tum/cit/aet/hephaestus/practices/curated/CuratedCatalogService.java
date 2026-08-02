@@ -17,19 +17,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * The instance catalog: reading what it currently offers, and recording what an administrator says
- * about it.
- *
- * <p>There is no synchronization step and nothing to keep in step. Reading composes the shipped
- * catalog with the override rows; writing stores or removes an override. An entry an administrator has
- * not touched follows Hephaestus because nothing was written about it, not because anything ran.
- */
 @Service
 @RequiredArgsConstructor
 @WorkspaceAgnostic("The instance catalog is global")
-// Deliberately not @ConditionalOnServerRole: this reads a classpath file and global catalog tables, and
-// the workspace-facing surfaces that report catalog provenance are themselves not role-gated.
 public class CuratedCatalogService {
 
     private static final String CATALOG_PRACTICE = "Catalog practice";

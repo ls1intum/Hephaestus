@@ -6,12 +6,16 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import java.util.List;
 import java.util.Optional;
 
-/** Catalog computed from the bundled definitions and sparse administrator overrides. */
 public record EffectiveCatalog(
     List<CatalogEntry<AreaDefinition>> areas,
     List<CatalogEntry<PracticeDefinition>> practices,
     boolean customOrder
 ) {
+    public EffectiveCatalog {
+        areas = List.copyOf(areas);
+        practices = List.copyOf(practices);
+    }
+
     public EffectiveCatalog(
         List<CatalogEntry<AreaDefinition>> areas,
         List<CatalogEntry<PracticeDefinition>> practices
@@ -41,11 +45,7 @@ public record EffectiveCatalog(
         return digest.hex();
     }
 
-    /**
-     * What a workspace created now receives: every entry an administrator still offers, minus the
-     * practices filed under an area they no longer offer — an area is how its practices are
-     * presented, so withholding one withholds them with it.
-     */
+    /** Returns entries included in a new workspace, respecting excluded parent areas. */
     public List<CatalogEntry<PracticeDefinition>> installablePractices() {
         return practices.stream().filter(this::isEffectivelyOffered).toList();
     }

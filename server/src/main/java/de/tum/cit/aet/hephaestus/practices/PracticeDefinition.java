@@ -46,7 +46,7 @@ public record PracticeDefinition(
     }
 
     @Override
-    public String detectionFingerprint(String slug) {
+    public String provenanceFingerprint(String slug) {
         return PracticeDetectionFingerprint.of(
             slug,
             name,

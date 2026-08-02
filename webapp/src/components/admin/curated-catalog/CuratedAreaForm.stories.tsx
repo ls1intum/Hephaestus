@@ -22,7 +22,7 @@ const initialData = {
 };
 
 const meta = {
-	title: "Instance admin/Catalog area editor",
+	title: "Instance admin/Practice catalog/Area editor",
 	component: CuratedAreaForm,
 	parameters: { layout: "fullscreen", chromatic: { viewports: [1440] } },
 	decorators: [withStandardPage],

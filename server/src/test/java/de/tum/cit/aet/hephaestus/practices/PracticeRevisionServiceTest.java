@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
-/** Every change to a practice leaves an immutable record of what it was, which findings then cite. */
 class PracticeRevisionServiceTest extends BaseUnitTest {
 
     @Mock

@@ -41,7 +41,7 @@ public class CuratedAreaOverride {
     private @Nullable String color;
 
     @Column(name = "based_on_digest", length = 64)
-    private @Nullable String basedOnDigest;
+    private @Nullable String acceptedBundledDigest;
 
     @Column(name = "retired_at")
     private @Nullable Instant retiredAt;
@@ -69,12 +69,12 @@ public class CuratedAreaOverride {
         return new AreaDefinition(name, description, icon, color);
     }
 
-    public void write(AreaDefinition definition, @Nullable String basedOnDigest, Instant now) {
+    public void write(AreaDefinition definition, @Nullable String acceptedBundledDigest, Instant now) {
         this.name = definition.name();
         this.description = definition.description();
         this.icon = definition.icon();
         this.color = definition.color();
-        this.basedOnDigest = basedOnDigest;
+        this.acceptedBundledDigest = acceptedBundledDigest;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
@@ -83,12 +83,12 @@ public class CuratedAreaOverride {
         this.description = null;
         this.icon = null;
         this.color = null;
-        this.basedOnDigest = null;
+        this.acceptedBundledDigest = null;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
     public void acknowledge(@Nullable String shippedDigest, Instant now) {
-        this.basedOnDigest = shippedDigest;
+        this.acceptedBundledDigest = shippedDigest;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 

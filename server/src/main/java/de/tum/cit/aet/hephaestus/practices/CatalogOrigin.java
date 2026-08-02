@@ -8,13 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Reads a workspace copy's drift off three fingerprints: what the copy runs now, what it was made
- * from, and what the instance offers today.
- *
- * <p>Nothing is stored about the relationship beyond the slug and the fingerprint at the time of the
- * copy, so the answer cannot go stale — and a copy edited away and back reads as in sync again.
- */
+/** Derives workspace drift from current, source, and effective catalog fingerprints. */
 public final class CatalogOrigin {
 
     private CatalogOrigin() {}
@@ -29,7 +23,7 @@ public final class CatalogOrigin {
             practice.getSourceCuratedSlug(),
             practice.getCurrentRevision().getDetectionFingerprint(),
             practice.getSourceCuratedFingerprint(),
-            entry == null ? null : entry.effective().detectionFingerprint(entry.slug()),
+            entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
             sourceOffered
         );
     }
@@ -41,9 +35,9 @@ public final class CatalogOrigin {
         CatalogEntry<AreaDefinition> entry = catalog.area(area.getSourceCuratedSlug()).orElse(null);
         return describe(
             area.getSourceCuratedSlug(),
-            AreaDefinition.from(area).detectionFingerprint(area.getSlug()),
+            AreaDefinition.from(area).provenanceFingerprint(area.getSlug()),
             area.getSourceCuratedFingerprint(),
-            entry == null ? null : entry.effective().detectionFingerprint(entry.slug()),
+            entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
             entry != null && entry.offered()
         );
     }
@@ -55,11 +49,12 @@ public final class CatalogOrigin {
         @Nullable String offeredNow,
         boolean sourceOffered
     ) {
+        boolean matchesCatalog = runningHere != null && runningHere.equals(offeredNow);
+        boolean matchesSource = runningHere != null && runningHere.equals(copiedFrom);
         CatalogLink link;
-        if (runningHere != null && runningHere.equals(offeredNow)) {
+        if (matchesCatalog) {
             link = CatalogLink.IN_SYNC;
-        } else if (runningHere != null && runningHere.equals(copiedFrom)) {
-            // Untouched here, so any difference is the instance having moved the catalog on.
+        } else if (matchesSource) {
             link = CatalogLink.UPDATE_AVAILABLE;
         } else {
             link = CatalogLink.LOCALLY_EDITED;

@@ -98,9 +98,7 @@
             <not><tableExists tableName="curated_practice_override"/></not>
         </preConditions>
         <comment>
-            What an administrator has said about the catalog this build ships. A row exists only where
-            somebody spoke; the catalog an instance offers is the shipped one with these laid over it,
-            computed on read. There is nothing to synchronize and so nothing that can fall out of step.
+            Sparse instance overrides; absence means the bundled definition and order apply.
         </comment>
         <sql splitStatements="false"><![CDATA[
             CREATE TABLE curated_practice_override (
@@ -119,11 +117,8 @@
                 created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
                 updated_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
                 version BIGINT NOT NULL,
-                -- A row that says nothing is deleted rather than kept, so an entry with no row is
-                -- unambiguously "exactly what Hephaestus ships".
                 CONSTRAINT ck_curated_practice_override_says_something
                     CHECK (name IS NOT NULL OR retired_at IS NOT NULL OR position IS NOT NULL),
-                -- A definition is all of its required parts or none of them.
                 CONSTRAINT ck_curated_practice_override_shape
                     CHECK (
                         (name IS NULL AND applies_to IS NULL AND trigger_events IS NULL AND criteria IS NULL
@@ -138,7 +133,6 @@
                     CHECK (trigger_events IS NULL OR jsonb_typeof(trigger_events) = 'array'),
                 CONSTRAINT ck_curated_practice_override_position
                     CHECK (position IS NULL OR position >= 0),
-                -- Only set when the build shipped something under this slug at the time of the edit.
                 CONSTRAINT ck_curated_practice_override_based_on
                     CHECK (based_on_digest IS NULL OR based_on_digest ~ '^[0-9a-f]{64}$')
             );
@@ -287,11 +281,7 @@
             LANGUAGE plpgsql
             AS $immutable_revision$
             BEGIN
-                -- A revision records what a practice was at a moment, and that never changes.
-                -- One column is exempt, and only ever from NULL: the detection fingerprint. It is
-                -- derived from the definition already in the row, and it is NULL on rows this schema
-                -- change created, because the hash is defined in application code and SQL cannot
-                -- compute it. Filling it in states what the row already said; it does not rewrite it.
+                -- Allow one-time fingerprint backfill; all other revision fields remain immutable.
                 IF NEW.practice_id = OLD.practice_id
                    AND NEW.revision_number = OLD.revision_number
                    AND NEW.created_at = OLD.created_at
