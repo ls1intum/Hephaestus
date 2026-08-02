@@ -63,7 +63,14 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
     }
 
     private ConversationReviewSubmissionRequest sampleRequest() {
-        return new ConversationReviewSubmissionRequest(555L, "C0ABC", "1700000000.100000", 42L, "1700000900.500000");
+        return new ConversationReviewSubmissionRequest(
+            555L,
+            "C0ABC",
+            "engineering",
+            "1700000000.100000",
+            42L,
+            "1700000900.500000"
+        );
     }
 
     @Nested
@@ -77,6 +84,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("artifact_type").asString()).isEqualTo("CONVERSATION_THREAD");
             assertThat(metadata.get("slack_thread_id").asLong()).isEqualTo(555L);
             assertThat(metadata.get("slack_channel_id").asString()).isEqualTo("C0ABC");
+            assertThat(metadata.get("slack_channel_name").asString()).isEqualTo("engineering");
             assertThat(metadata.get("slack_thread_ts").asString()).isEqualTo("1700000000.100000");
             assertThat(metadata.get("about_user_id").asLong()).isEqualTo(42L);
         }

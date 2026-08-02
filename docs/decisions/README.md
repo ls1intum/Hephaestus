@@ -58,5 +58,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0025](0025-agent-job-queue-on-postgresql.md) | Agent job queue moves off NATS onto PostgreSQL | Accepted |
 | [0026](0026-per-purpose-agent-bindings-and-llm-governance.md) | Per-purpose agent bindings and governed OpenAI-compatible LLM catalog | Accepted (amended 2026-07-26 — named-agent-config model deleted) |
 | [0027](0027-dialog-lifetime-and-where-a-write-outcome-lands.md) | Dialog lifetime, and where a write's outcome lands when the dialog is gone | Accepted |
+| [0028](0028-source-synced-practice-catalog.md) | Source-synced practice catalog with sparse instance overrides | Accepted |
 
 Template: [0000-template.md](0000-template.md).

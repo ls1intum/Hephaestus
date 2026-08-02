@@ -3,8 +3,7 @@ import { fn } from "storybook/test";
 import { LandingCTASection } from "./LandingCTASection";
 
 /**
- * Call-to-Action section component that encourages users to sign in
- * with GitHub using an officially branded CTA button.
+ * Final sign-in or workspace action for landing-page visitors.
  */
 const meta = {
 	component: LandingCTASection,
@@ -13,7 +12,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"The CTA section provides a final opportunity to convert visitors into users through a prominent call-to-action button and compelling copy.",
+					"The CTA section directs signed-out visitors to sign in and signed-in visitors to their workspace.",
 			},
 		},
 	},
@@ -24,7 +23,7 @@ const meta = {
 			action: "signed in",
 		},
 		onGoToDashboard: {
-			description: "Callback function triggered when the 'Go to Dashboard' button is clicked",
+			description: "Callback function triggered when the 'Go to dashboard' button is clicked",
 			action: "go to dashboard",
 		},
 		isSignedIn: {
@@ -43,7 +42,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default CTA section for first-time visitors.
- * Features "Sign in with GitHub" CTA button.
+ * Features the "Sign in" CTA button.
  */
 export const Default: Story = {
 	args: {
@@ -53,7 +52,7 @@ export const Default: Story = {
 
 /**
  * CTA section for authenticated users.
- * GitHub sign-in button is replaced with "Go to Dashboard".
+ * "Sign in" is replaced with "Go to dashboard".
  */
 export const SignedIn: Story = {
 	args: {

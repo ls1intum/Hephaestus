@@ -1,14 +1,21 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent, type within } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
-import { expectControlOnScreen, expectPageReflows } from "@/test/reflow";
+import { withStandardPage } from "@/stories/decorators";
+import { expectControlOnScreen, expectNoPageOverflow } from "@/test/reflow";
 import { AgentBindingsPage } from "./AgentBindingsPage";
 import { mockAvailableModels } from "./story-mock-data";
 
 type Canvas = ReturnType<typeof within>;
 
-async function openAdvancedOnFirstCard(canvas: Canvas) {
-	await userEvent.click((await canvas.findAllByRole("button", { name: /Advanced/ }))[0]);
+function purposeCard(canvas: Canvas, name: string) {
+	return within(canvas.getByRole("region", { name }));
+}
+
+async function openPracticeReviewAdvanced(canvas: Canvas) {
+	await userEvent.click(
+		purposeCard(canvas, "Practice reviews").getByRole("button", { name: /Advanced/ }),
+	);
 }
 
 const detectionBinding: AgentBinding = {
@@ -21,13 +28,10 @@ const detectionBinding: AgentBinding = {
 	allowInternet: false,
 };
 
-/**
- * The workspace's AI models page: one card per agent purpose, each binding a model and — behind an
- * "Advanced" disclosure — the run limits that binding runs under.
- */
 const meta = {
 	component: AgentBindingsPage,
 	parameters: { layout: "fullscreen" },
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "acme",
@@ -48,7 +52,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const DetectionBoundMentorUnbound: Story = {};
+export const PracticeReviewsBoundHephUnbound: Story = {};
 
 export const Loading: Story = {
 	args: { isLoading: true },
@@ -57,15 +61,13 @@ export const Loading: Story = {
 export const NoModelsAvailable: Story = {
 	args: { bindings: [], availableModels: [] },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findAllByText(/No models are available yet/)).toBeTruthy();
+		await canvas.findAllByText(/No models are available yet/);
 	},
 };
 
 export const LoadForbidden: Story = {
 	args: {
 		isError: true,
-		// The generated client throws the RFC 9457 body verbatim, so `status` lives in the body — that
-		// is where the alert reads it to decide a 403 cannot be retried away.
 		loadError: {
 			type: "about:blank",
 			title: "Forbidden",
@@ -80,45 +82,54 @@ export const LoadForbidden: Story = {
 	},
 };
 
-export const PurposeDisabledForWorkspace: Story = {
-	args: { mentorEnabled: false },
+export const ProjectReviewsDisabled: Story = {
+	args: { practicesEnabled: false },
 	play: async ({ canvas }) => {
-		await expect(
-			await canvas.findByText("Turned off for this workspace. Only your host can turn it on."),
-		).toBeInTheDocument();
+		const card = within(canvas.getByRole("region", { name: "Practice reviews" }));
+		await expect(card.getByText("Ready")).toBeInTheDocument();
+		await expect(card.getByText("Practice reviews off")).toBeInTheDocument();
+		await expect(card.getByRole("link", { name: "Open Review settings" })).toHaveAttribute(
+			"href",
+			"/w/acme/admin/practices/settings",
+		);
+		await expect(card.getByRole("button", { name: "Save assignment" })).toBeEnabled();
 	},
 };
 
 export const OnlyThePendingCardIsFrozen: Story = {
 	args: { pendingPurposes: new Set(["PRACTICE_DETECTION" as const]) },
 	play: async ({ canvas }) => {
-		const [detectionSave, mentorSave] = await canvas.findAllByRole("button", { name: "Save" });
-		await expect(detectionSave).toBeDisabled();
-		await expect(mentorSave).toBeEnabled();
+		await expect(
+			purposeCard(canvas, "Practice reviews").getByRole("button", { name: "Save assignment" }),
+		).toBeDisabled();
+		await expect(
+			purposeCard(canvas, "Heph").getByRole("button", { name: "Save assignment" }),
+		).toBeEnabled();
 	},
 };
 
 export const AdvancedDisclosure: Story = {
 	play: async ({ canvas }) => {
-		await openAdvancedOnFirstCard(canvas);
-		await expect(await canvas.findByLabelText("Timeout (seconds)")).toBeInTheDocument();
+		await openPracticeReviewAdvanced(canvas);
+		await expect(
+			purposeCard(canvas, "Practice reviews").getByLabelText("Timeout (seconds)"),
+		).toBeInTheDocument();
 	},
 };
 
-/** A cleared run limit explains itself at the field, never as a toast that pulls the eye away. */
 export const InvalidRunLimit: Story = {
 	play: async ({ canvas }) => {
-		await openAdvancedOnFirstCard(canvas);
+		const card = purposeCard(canvas, "Practice reviews");
+		await openPracticeReviewAdvanced(canvas);
 
-		await userEvent.clear(await canvas.findByLabelText("Timeout (seconds)"));
-		await userEvent.click(canvas.getAllByRole("button", { name: "Save" })[0]);
+		await userEvent.clear(card.getByLabelText("Timeout (seconds)"));
+		await userEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		await expect(await canvas.findByText("Enter a number of seconds.")).toBeInTheDocument();
 		await expect(screen.queryByRole("status")).toBeNull();
 	},
 };
 
-/** WCAG 2.2 SC 1.4.10 at 320 px: nothing here is tabular, so nothing may scroll sideways. */
 export const MobileReflow: Story = {
 	parameters: {
 		layout: "fullscreen",
@@ -126,8 +137,10 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("Practice detection");
-		await expectPageReflows();
-		await expectControlOnScreen(canvas.getAllByRole("button", { name: "Save" })[0]);
+		await canvas.findByText("Practice reviews");
+		await expectNoPageOverflow();
+		await expectControlOnScreen(
+			purposeCard(canvas, "Practice reviews").getByRole("button", { name: "Save assignment" }),
+		);
 	},
 };

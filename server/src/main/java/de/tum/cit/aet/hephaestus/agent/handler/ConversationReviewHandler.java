@@ -87,6 +87,9 @@ public class ConversationReviewHandler implements JobTypeHandler {
         metadata.put("artifact_type", WorkArtifact.CONVERSATION_THREAD.name());
         metadata.put("slack_thread_id", r.slackThreadId());
         metadata.put("slack_channel_id", r.slackChannelId());
+        if (r.slackChannelName() != null) {
+            metadata.put("slack_channel_name", r.slackChannelName());
+        }
         metadata.put("slack_thread_ts", r.slackThreadTs());
         metadata.put("about_user_id", r.aboutUserId());
 

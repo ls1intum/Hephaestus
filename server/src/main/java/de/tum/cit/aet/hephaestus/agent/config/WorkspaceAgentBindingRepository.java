@@ -4,11 +4,16 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /** Access to the per-purpose {@link WorkspaceAgentBinding}s of a workspace. */
 public interface WorkspaceAgentBindingRepository extends JpaRepository<WorkspaceAgentBinding, Long> {
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM WorkspaceAgentBinding b WHERE b.workspace.id = :workspaceId")
+    int deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     List<WorkspaceAgentBinding> findByWorkspaceId(Long workspaceId);
 
     /**

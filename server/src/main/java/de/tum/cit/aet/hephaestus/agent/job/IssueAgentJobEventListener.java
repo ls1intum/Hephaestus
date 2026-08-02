@@ -134,6 +134,7 @@ public class IssueAgentJobEventListener {
             issue.getTitle(),
             issue.getBody() != null ? issue.getBody() : "",
             issue.getState() != null ? issue.getState().name() : "OPEN",
+            issue.getHtmlUrl(),
             issue.getUpdatedAt(),
             triggerEventName
         );

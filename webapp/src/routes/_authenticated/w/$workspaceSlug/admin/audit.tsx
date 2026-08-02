@@ -5,6 +5,8 @@ import {
 	workspaceAuditSearchSchema,
 } from "@/components/admin/audit-shared/audit-search";
 import { WorkspaceConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/audit")({
@@ -13,7 +15,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/aud
 	validateSearch: workspaceAuditSearchSchema,
 });
 
-/** The settings trail alone: sign-in events are instance-scoped and stay with the instance admin. */
 function WorkspaceAuditPage() {
 	const { workspaceSlug } = Route.useParams();
 	const search = Route.useSearch();
@@ -23,22 +24,18 @@ function WorkspaceAuditPage() {
 		navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
-			<header className="space-y-1">
-				<div className="flex items-center gap-2">
-					<ScrollTextIcon className="size-6 text-muted-foreground" aria-hidden />
-					<h1 className="text-2xl font-semibold">Audit log</h1>
-				</div>
-				<p className="text-sm text-muted-foreground">
-					A permanent record of who changed which settings in this workspace.
-				</p>
-			</header>
+		<PageLayout>
+			<PageHeader
+				icon={<ScrollTextIcon />}
+				title="Audit log"
+				description="A permanent record of who changed workspace settings."
+			/>
 
 			<WorkspaceConfigAuditPanel
 				search={search}
 				onSearchChange={patchSearch}
 				workspaceSlug={workspaceSlug}
 			/>
-		</div>
+		</PageLayout>
 	);
 }

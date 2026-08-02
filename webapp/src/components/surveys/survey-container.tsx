@@ -32,7 +32,6 @@ interface SurveyContainerProps {
 
 type ErrorMap = Record<string, string>;
 
-/** Shared header with close button */
 function SurveyHeader({
 	title,
 	description,
@@ -146,7 +145,6 @@ export function SurveyContainer({
 		});
 
 		if (nextStep === null || nextStep >= totalSteps) {
-			// Report final progress before showing thank you screen
 			onProgress?.(snapshotResponses, {
 				currentStep: totalSteps,
 				totalSteps,
@@ -164,7 +162,6 @@ export function SurveyContainer({
 		currentStepIndex === totalSteps - 1 ||
 		currentQuestion.branching?.type === "end";
 
-	// Thank you screen
 	if (isCompleted) {
 		return (
 			<div className="flex max-h-[85vh] flex-col sm:max-h-[600px]">
@@ -206,7 +203,7 @@ export function SurveyContainer({
 					</span>
 					<span>{Math.round(progress)}% complete</span>
 				</div>
-				<ProgressRoot.Root value={progress} className="w-full">
+				<ProgressRoot.Root value={progress} aria-label="Survey completion" className="w-full">
 					<ProgressTrack className="h-1.5">
 						<ProgressIndicator className="absolute" />
 					</ProgressTrack>

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 
 interface ErrorSearch {
@@ -57,6 +57,7 @@ function describe(code: string | undefined): { title: string; description: strin
 }
 
 export const Route = createFileRoute("/auth/error")({
+	staticData: { surface: "auth" },
 	validateSearch: (search): ErrorSearch => ({
 		code: typeof search.code === "string" ? search.code : undefined,
 	}),
@@ -80,9 +81,9 @@ function AuthErrorPage() {
 					<CardDescription>{description}</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<Button render={<Link to="/login" />} className="w-full">
+					<Link to="/login" className={buttonVariants({ className: "w-full" })}>
 						Back to sign in
-					</Button>
+					</Link>
 				</CardContent>
 			</Card>
 		</div>

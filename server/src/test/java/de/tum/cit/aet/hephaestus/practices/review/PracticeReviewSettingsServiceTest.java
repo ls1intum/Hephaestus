@@ -34,7 +34,6 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         false,
         true,
         false,
-        "",
         15,
         false,
         false

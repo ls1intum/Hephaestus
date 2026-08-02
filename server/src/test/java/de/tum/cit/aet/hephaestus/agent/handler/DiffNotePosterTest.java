@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
@@ -33,6 +34,9 @@ import org.mockito.ArgumentCaptor;
 class DiffNotePosterTest extends BaseUnitTest {
 
     private final PullRequestCommentPoster commentPoster = mock(PullRequestCommentPoster.class);
+    private final PracticeFeedbackCommentFormatter commentFormatter = new PracticeFeedbackCommentFormatter(
+        new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
+    );
 
     private AgentJob gitlabJob() {
         AgentJob job = TestEntities.agentJob();
@@ -76,7 +80,7 @@ class DiffNotePosterTest extends BaseUnitTest {
 
     private DiffNotePoster poster(RecordingChannel channel) {
         when(commentPoster.buildTarget(any(), eq(IntegrationKind.GITLAB), eq(1L))).thenReturn(target());
-        return new DiffNotePoster(commentPoster, List.of(channel));
+        return new DiffNotePoster(commentPoster, commentFormatter, List.of(channel));
     }
 
     @Test
@@ -93,6 +97,9 @@ class DiffNotePosterTest extends BaseUnitTest {
         FindingAnchor.DiffAnchor anchor = (FindingAnchor.DiffAnchor) f.anchor();
         assertThat(anchor.filePath()).isEqualTo("src/A.java");
         assertThat(anchor.newLineNumber()).isEqualTo(14); // end line
+        assertThat(f.body()).contains(
+            "[Manage comments and Slack reminders](https://hephaestus.example/settings#practice-feedback)"
+        );
         assertThat(anchor.startLine()).isEqualTo(10); // range start
         assertThat(f.recurrenceKey()).isEqualTo("ck-multi");
     }
@@ -141,7 +148,7 @@ class DiffNotePosterTest extends BaseUnitTest {
         when(a.kind()).thenReturn(IntegrationKind.GITLAB);
         when(b.kind()).thenReturn(IntegrationKind.GITLAB);
 
-        assertThatThrownBy(() -> new DiffNotePoster(commentPoster, List.of(a, b)))
+        assertThatThrownBy(() -> new DiffNotePoster(commentPoster, commentFormatter, List.of(a, b)))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Duplicate InlineFindingChannel for kind");
     }

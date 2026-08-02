@@ -3,7 +3,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { LoginProviderView } from "@/api/types.gen";
 import { server } from "@/mocks/server";
-import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
@@ -48,7 +48,9 @@ describe("instance login providers route", () => {
 
 		renderLoginProvidersRoute();
 
-		fireEvent.click(await screen.findByRole("switch", { name: "Disable GitHub" }, TRANSFORM_WAIT));
+		fireEvent.click(
+			await screen.findByRole("switch", { name: "Disable GitHub" }, ROUTE_RENDER_WAIT),
+		);
 		await waitFor(() => expect(slowToggleCalls).toBe(1));
 		fireEvent.click(screen.getByRole("switch", { name: "Disable GitLab" }));
 		await waitFor(() =>

@@ -12,13 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/**
- * {@link ApiCredentialProvider} for Outline.
- *
- * <p>Looks up the active Connection (no ACTIVE Connection / missing blob → empty) and decrypts the
- * Outline API token via {@link CredentialBundleConverter}, returning a {@link BearerToken} bundle.
- * Callers MUST already treat empty as "no auth available".
- */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineCredentialProvider implements ApiCredentialProvider {
@@ -43,9 +36,9 @@ public class OutlineCredentialProvider implements ApiCredentialProvider {
 
     @Override
     public Optional<CredentialBundle> resolve(IntegrationRef ref) {
-        Optional<Connection> connection = connectionService.findActive(ref.workspaceId(), IntegrationKind.OUTLINE);
+        Optional<Connection> connection = connectionService.findReferenced(ref);
         if (connection.isEmpty()) {
-            log.debug("Outline credential resolve: no ACTIVE Connection for workspace={}", ref.workspaceId());
+            log.debug("Outline credential resolve: no Connection for workspace={}", ref.workspaceId());
             return Optional.empty();
         }
         Connection conn = connection.get();

@@ -19,6 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -53,6 +55,7 @@ public class AgentJobService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final PracticeReviewProperties reviewProperties;
+    private final PracticeRepository practiceRepository;
     private final LlmBudgetService llmBudgetService;
     private final LlmModelResolver llmModelResolver;
 
@@ -65,6 +68,7 @@ public class AgentJobService {
         ObjectMapper objectMapper,
         TransactionTemplate transactionTemplate,
         PracticeReviewProperties reviewProperties,
+        PracticeRepository practiceRepository,
         LlmBudgetService llmBudgetService,
         LlmModelResolver llmModelResolver
     ) {
@@ -76,11 +80,10 @@ public class AgentJobService {
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
         this.reviewProperties = reviewProperties;
+        this.practiceRepository = practiceRepository;
         this.llmBudgetService = llmBudgetService;
         this.llmModelResolver = llmModelResolver;
     }
-
-    // Read operations
 
     @Transactional(readOnly = true)
     public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Pageable pageable) {
@@ -134,6 +137,7 @@ public class AgentJobService {
             issue.getTitle(),
             issue.getBody() != null ? issue.getBody() : "",
             issue.getState() != null ? issue.getState().name() : "OPEN",
+            issue.getHtmlUrl(),
             issue.getUpdatedAt(),
             triggerEvent
         );
@@ -196,6 +200,38 @@ public class AgentJobService {
         String detectionKey = submission.idempotencyKey() + ":detection";
 
         return transactionTemplate.execute(status -> {
+            Workspace currentWorkspace = workspaceRepository
+                .findByIdForUpdate(workspace.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspace.getId().toString()));
+            if (currentWorkspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+                log.debug(
+                    "Skipping agent job submission for inactive workspace: workspaceId={}, status={}",
+                    currentWorkspace.getId(),
+                    currentWorkspace.getStatus()
+                );
+                return null;
+            }
+            if (!Boolean.TRUE.equals(currentWorkspace.getFeatures().getPracticesEnabled())) {
+                log.debug(
+                    "Skipping practice review while the workspace feature is off: workspaceId={}",
+                    workspace.getId()
+                );
+                return null;
+            }
+            if (
+                !practiceRepository.existsByWorkspaceIdAndActiveTrueAndArtifactType(
+                    workspace.getId(),
+                    artifactTypeFor(jobType)
+                )
+            ) {
+                log.debug(
+                    "Skipping practice review with no active practice for its work type: workspaceId={}, jobType={}",
+                    workspace.getId(),
+                    jobType
+                );
+                return null;
+            }
+
             WorkspaceAgentBinding binding = agentBindingRepository
                 .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_DETECTION)
                 .filter(WorkspaceAgentBinding::isEnabled)
@@ -244,7 +280,7 @@ public class AgentJobService {
             }
 
             AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
+            job.setWorkspace(currentWorkspace);
             job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
             job.setJobType(jobType);
             job.setSubjectClass(subjectClassFor(jobType));
@@ -302,6 +338,14 @@ public class AgentJobService {
             case PULL_REQUEST_REVIEW -> SubjectClass.PULL_REQUEST;
             case ISSUE_REVIEW -> SubjectClass.ISSUE;
             case CONVERSATION_REVIEW -> SubjectClass.SLACK_MESSAGE_THREAD;
+        };
+    }
+
+    private static WorkArtifact artifactTypeFor(AgentJobType jobType) {
+        return switch (jobType) {
+            case PULL_REQUEST_REVIEW -> WorkArtifact.PULL_REQUEST;
+            case ISSUE_REVIEW -> WorkArtifact.ISSUE;
+            case CONVERSATION_REVIEW -> WorkArtifact.CONVERSATION_THREAD;
         };
     }
 

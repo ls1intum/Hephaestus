@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
@@ -32,16 +32,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Handler for {@link AgentJobType#ISSUE_REVIEW} jobs — the issue counterpart of
- * {@link PullRequestReviewHandler}. Issues have NO diff: the case context is the issue body, the
- * comment thread, and the lifecycle metadata, materialised by {@code IssueContentSource} under
- * {@code inputs/context/}. There is no repo mount, no diff-scope filter, and no inline diff notes.
- *
- * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type ISSUE),
- * composes the student-facing feedback, and posts it as an issue comment via
- * {@link PullRequestCommentPoster#postIssueFormattedBody} (best-effort, suppressed on closed issues).
- */
+/** Handles issue practice reviews and delivers eligible feedback as issue comments. */
 public class IssueReviewHandler implements JobTypeHandler {
 
     private static final Logger log = LoggerFactory.getLogger(IssueReviewHandler.class);
@@ -54,7 +45,8 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final PracticeDetectionDeliveryService deliveryService;
     private final PullRequestCommentPoster commentPoster;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
-    private final SilentModeQuery silentModeQuery;
+    private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
+    private final PracticeFeedbackCommentFormatter commentFormatter;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -65,7 +57,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         PracticeDetectionDeliveryService deliveryService,
         PullRequestCommentPoster commentPoster,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
-        SilentModeQuery silentModeQuery
+        PracticeFeedbackDeliveryPolicy deliveryPolicy,
+        PracticeFeedbackCommentFormatter commentFormatter
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -75,7 +68,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.deliveryService = deliveryService;
         this.commentPoster = commentPoster;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
-        this.silentModeQuery = silentModeQuery;
+        this.deliveryPolicy = deliveryPolicy;
+        this.commentFormatter = commentFormatter;
     }
 
     @Override
@@ -99,19 +93,14 @@ public class IssueReviewHandler implements JobTypeHandler {
         metadata.put("title", r.title());
         metadata.put("body", r.body());
         metadata.put("state", r.state());
-        // Lifecycle event that triggered this job; the injector materialises only the matching practices
-        // (e.g. IssueClosed runs the retrospective set). Null = full focus set (gate-bypass dev path).
+        if (r.url() != null) {
+            metadata.put("issue_url", r.url());
+        }
         if (r.triggerEvent() != null) {
             metadata.put("trigger_event", r.triggerEvent());
         }
 
-        // Trailing freshness segment (mirrors the PR head-SHA slot): an edited issue gets a new key
-        // and re-reviews, while extractCooldownKeyPrefix strips it so cooldown scopes per-issue — NOT
-        // per-repo. Without a 4th segment the prefix would collapse to "issue_review:repo:" and block
-        // every other issue in the repo.
         String version = r.updatedAt() != null ? String.valueOf(r.updatedAt().toEpochMilli()) : "0";
-        // Phase before the version segment: an authoring pass (IssueCreated/Labeled) and a retrospective
-        // (IssueClosed) of the same issue are different reviews and must not dedup against each other.
         String phase = r.triggerEvent() != null ? r.triggerEvent() : "manual";
         String idempotencyKey =
             "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + phase + ":" + version;
@@ -144,8 +133,6 @@ public class IssueReviewHandler implements JobTypeHandler {
         }
         int issueNumber = requireInt(metadata, "issue_number");
         String repoName = requireText(metadata, "repository_full_name");
-        // Reuse the PracticeReview task kind — the agent is artifact-agnostic; the prompt + the
-        // issue context files (inputs/context/issue_summary.md, metadata.json, comments.json) drive it.
         Task task = new Task.PracticeReview(buildPrompt(issueNumber, repoName, job), issueNumber, repoName);
         return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
     }
@@ -179,9 +166,6 @@ public class IssueReviewHandler implements JobTypeHandler {
                 "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
             );
         }
-        // No diff-scope filtering: issue findings reference the thread/metadata, not diff files.
-        // Coherence coercion: defect-detector GOOD assessment -> NOT_APPLICABLE, severity sentinel.
-        // Applied once so the SAME coerced list reaches both deliver() (DB) and compose() (posted note).
         Set<String> defectDetectorSlugs =
             job.getWorkspace() == null
                 ? Set.of()
@@ -198,8 +182,6 @@ public class IssueReviewHandler implements JobTypeHandler {
             job.getId()
         );
 
-        // Stamp the keys deliver() persisted (ADR 0021 C2, mirrors the PR handler) so the composer's withheld
-        // report and the ledger address the stored observation rather than recomputing a key downstream.
         Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keysByFinding = result.observationKeys();
         for (int i = 0; i < coercedFindings.size(); i++) {
             coercedFindings.set(i, coercedFindings.get(i).withKeys(keysByFinding.get(coercedFindings.get(i))));
@@ -222,37 +204,29 @@ public class IssueReviewHandler implements JobTypeHandler {
         return commentPoster.findExistingSummaryComment(job);
     }
 
-    /**
-     * Posts the composed student-facing note as an issue comment. Best-effort: a posting failure is logged,
-     * not thrown, so a transient delivery error never marks an otherwise-successful detection job FAILED.
-     * Findings are already persisted, so the formative loop is intact even if the comment does not land.
-     * Package-private for direct testing of the suppression + soft-failure contract.
-     */
     void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
         if (delivery == null || delivery.mrNote() == null) {
             return;
         }
-        if (silentModeQuery.isSilentModeEngaged()) {
-            log.warn("Issue delivery suppressed: instance silent mode engaged, jobId={}", job.getId());
-            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
-            return;
-        }
-        JsonNode metadata = job.getMetadata();
-        if (metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""))) {
-            log.info("Issue delivery suppressed: issue closed, jobId={}", job.getId());
-            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.ARTIFACT_CLOSED);
+        PracticeFeedbackDeliveryPolicy.Decision<Issue> decision = deliveryPolicy.evaluateIssue(job);
+        if (!decision.allowed()) {
+            if (decision.suppressionReason() != null) {
+                log.info("Issue delivery suppressed: reason={}, jobId={}", decision.suppressionReason(), job.getId());
+                recordGateSuppressed(job, delivery, decision.suppressionReason());
+            } else {
+                log.info("Issue delivery disabled for workspace: jobId={}", job.getId());
+            }
             return;
         }
         String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
         if (sanitized.isBlank()) {
             log.debug("Issue note empty after sanitization, skipping post: jobId={}", job.getId());
-            // Issues have no inline lane, so a blank-sanitised body means NOTHING reached the developer.
             recordGateSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
         boolean posted = false;
         try {
-            String formatted = FeedbackDeliveryService.formatPracticeNote(sanitized, job);
+            String formatted = commentFormatter.format(sanitized, job);
             String commentId = commentPoster.postIssueFormattedBody(job, formatted);
             if (commentId != null) {
                 job.setDeliveryCommentId(commentId);
@@ -262,18 +236,12 @@ public class IssueReviewHandler implements JobTypeHandler {
                 log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
             }
         } catch (JobDeliveryException e) {
-            // A genuine delivery failure (the student saw nothing) must NOT be reported as DELIVERED — persist the
-            // composed body as FAILED (auditable), then re-throw so the job is recorded failed, matching the PR path.
             recordUndelivered(job, delivery);
             throw e;
         } catch (RuntimeException e) {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
 
-        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed: recording a
-        // DELIVERED unit (and superseding the real prior) when the student saw nothing would corrupt the ledger.
-        // Best-effort, REQUIRES_NEW + try/catch so it can never affect the note the developer already received.
-        // Issues have no inline placements.
         if (!posted) {
             recordUndelivered(job, delivery);
             return;
@@ -289,12 +257,14 @@ public class IssueReviewHandler implements JobTypeHandler {
         }
     }
 
-    /** Best-effort SUPPRESSED-unit persist for a whole-review gate — see {@link FeedbackLedgerRecorder#recordSuppressedUnit}. */
     private void recordGateSuppressed(
         AgentJob job,
         PracticeDetectionResultParser.DeliveryContent delivery,
-        FeedbackSuppressionReason reason
+        @Nullable FeedbackSuppressionReason reason
     ) {
+        if (reason == null) {
+            throw new IllegalArgumentException("Suppressed delivery requires a reason");
+        }
         try {
             feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
         } catch (RuntimeException e) {
@@ -307,7 +277,6 @@ public class IssueReviewHandler implements JobTypeHandler {
         }
     }
 
-    /** Best-effort FAILED-unit persist (two call sites). REQUIRES_NEW in the recorder + this catch mean a ledger failure never masks the delivery outcome. */
     private void recordUndelivered(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
         try {
             feedbackLedgerRecorder.recordUndelivered(job, delivery);

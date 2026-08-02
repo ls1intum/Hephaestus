@@ -65,6 +65,25 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 Practice-feedback delivery field renamed
+
+**Affected**: API clients that read or write user settings, or consume account-export JSON.
+
+The personal practice-feedback field was renamed from `aiReviewEnabled` to
+`practiceFeedbackDeliveryEnabled` so the API matches its actual scope: issue, pull-request, and
+merge-request comments plus related Slack reminders. There is no alias for the old field.
+
+Update request and response handling for `/user/settings`, and update the `preferences` object in
+account exports, before deploying the new release. No database or environment change is required.
+
+#### 🔴 Workspace purge moved to the owner-only deletion endpoint
+
+**Affected**: automation that sets a workspace status to `PURGED`.
+
+`PATCH /workspaces/{slug}/status` now accepts only `ACTIVE` and `SUSPENDED`. Replace a purge request
+with `DELETE /workspaces/{slug}` and authenticate as that workspace's owner. The old request returns
+`409 Workspace lifecycle violation`.
+
 #### 🔴 LLM provider configuration moved from env vars to the admin console
 
 **Affected**: any deployment setting `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, or an `AGENT_DEFAULT_CONFIG_*` variable.

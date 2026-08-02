@@ -1,5 +1,4 @@
 import type {ReactNode} from 'react';
-import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import Link from '@docusaurus/Link';
 
@@ -15,46 +14,46 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Code Review Gamification',
-    kicker: 'Transform code reviews into learning opportunities',
+    title: 'Practice feedback',
+    kicker: 'Specific feedback on how the work was done',
     description:
-      'Friendly competition keeps healthy review habits visible with leaderboards, leagues, and team-wide recognition.',
+      'Hephaestus reviews evidence from project work against the practices your workspace has chosen.',
     bullets: [
-      'Weekly leaderboards with GitHub integration',
-      'Team competitions across multiple repositories',
-      'Structured league system for ongoing engagement',
+      'Points to evidence in the work',
+      'Explains what worked or what could improve',
+      'Suggests a practical next step when useful',
     ],
-    cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
+    cta: {label: 'How practice feedback works', to: '/user/ai-code-review'},
   },
   {
-    title: 'Process-Aware AI Mentoring',
-    kicker: 'Heph provides guidance grounded in your repository activity',
+    title: 'Chat with Heph',
+    kicker: 'Talk through feedback and recent work',
     description:
-      'Mentoring sessions blend self-regulated learning prompts with real repo events so goals, reflections, and next steps stay actionable.',
+      'Heph can use recent project activity and feedback you have received as context.',
     bullets: [
-      'SRL-guided weekly reflection',
-      'Repo activity context for objective feedback',
-      'Goal setting and progress tracking',
+      'Ask a question about a recent change',
+      'Reflect on feedback before deciding what to do',
+      'Use the web app or a Slack direct message',
     ],
-    cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
+    cta: {label: 'How to chat with Heph', to: '/user/ai-mentor'},
   },
   {
-    title: 'Build Better Team Habits',
-    kicker: 'Creativity meets technical expertise — just like on the landing page',
+    title: 'Workspace controls',
+    kicker: 'Your repositories, practices, and settings',
     description:
-      'Our approach combines craft, collaboration, and quality so teams stay aligned while the platform scales with them.',
+      'Workspace admins choose the source repositories, project context, practice catalog, and AI model.',
     bullets: [
-      'Empower engineers with real-world feedback loops',
-      'Foster collaboration that strengthens engineering culture',
-      'Improve code quality through friendly competition',
+      'Connect GitHub or GitLab',
+      'Add selected Slack channels and Outline documents as context',
+      'Manage members and teams',
     ],
-    cta: {label: 'Dive into contributor docs', to: '/contributor/overview'},
+    cta: {label: 'Understand workspaces', to: '/user/workspace'},
   },
 ];
 
 function Feature({title, kicker, description, bullets, cta}: FeatureItem) {
   return (
-    <div className={clsx('col col--4', styles.featureColumn)}>
+    <div className={styles.featureColumn}>
       <div className={styles.featureCard}>
         <p className={styles.kicker}>{kicker}</p>
         <Heading as="h3">{title}</Heading>
@@ -76,7 +75,7 @@ export default function HomepageFeatures(): ReactNode {
   return (
     <section className={styles.features}>
       <div className="container">
-        <div className={clsx('row', styles.featureRow)}>
+        <div className={styles.featureRow}>
           {FeatureList.map((feature) => (
             <Feature key={feature.title} {...feature} />
           ))}

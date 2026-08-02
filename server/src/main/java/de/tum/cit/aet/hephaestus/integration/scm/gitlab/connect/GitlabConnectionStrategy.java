@@ -95,23 +95,24 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
         if (ref == null) {
             return;
         }
-        // The PAT itself is user-scoped and cannot be revoked by a third party, but the group
-        // webhook we registered on connect MUST be removed vendor-side or it keeps POSTing to us
-        // after disconnect (deliveries no longer resolve an ACTIVE connection and are dropped — a
-        // stale hook + live webhook secret leak). This runs while the Connection is still ACTIVE
-        // (before ConnectionService purges the PAT), which is the only window GitLab will authorize
-        // the delete. Best-effort — never throws. The Connection state change to UNINSTALLED is
-        // performed by the caller via ConnectionService.disconnect().
         log.info(
             "GitLab revoke called for workspace={} instanceKey={} (deregistering group webhook; PAT revoke is user-side)",
             ref.workspaceId(),
             ref.instanceKey()
         );
-        webhookService.deregisterActiveWebhook(ref.workspaceId());
-
-        // Webhook teardown FIRST (it needs the still-live PAT), then the local erase. Runs inside
-        // the fenced disconnect transaction — sync jobs are already cancelled/refused — and is
-        // orphan-guarded, so a project shared with another workspace survives.
+        if (ref.connectionId() == null) {
+            webhookService.deregisterActiveWebhook(ref.workspaceId());
+        } else {
+            webhookService.deregisterWebhookForConnection(ref.workspaceId(), ref.connectionId());
+        }
         contentEraser.eraseWorkspaceScmMirror(ref.workspaceId());
+    }
+
+    @Override
+    public void revokeProvider(IntegrationRef ref) {
+        if (ref == null || ref.connectionId() == null) {
+            throw new IllegalArgumentException("GitLab provider teardown requires a connection id");
+        }
+        webhookService.deregisterWebhookForConnectionStrict(ref.workspaceId(), ref.connectionId());
     }
 }

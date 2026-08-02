@@ -393,21 +393,23 @@ public class GitLabWebhookService {
         }
     }
 
-    /**
-     * Deactivation-time (AFTER_COMMIT) best-effort teardown resolved by connection id — the symmetric
-     * guard published from {@code GitLabConnectionStateListener.onDeactivated}, mirroring
-     * {@code OutlineWebhookRegistrar.deregister(workspaceId, connectionId)}. The Connection has already
-     * left ACTIVE, so it is resolved regardless of state. The manual-disconnect ({@code UNINSTALLED})
-     * delete is performed earlier by {@link #deregisterActiveWebhook} while the PAT is still live; by
-     * the time this runs the scope is no longer active and the GitLab token provider will refuse a
-     * token, so the client call typically cannot authenticate and the orphaned hook is left to
-     * GitLab's auto-disable after repeated delivery failures. Never throws; never rewrites config.
-     *
-     * @param workspaceId  the workspace the deactivated connection belongs to
-     * @param connectionId the connection that just left ACTIVE
-     */
+    /** Best-effort teardown for a connection that may no longer be active. */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deregisterWebhookForConnection(long workspaceId, long connectionId) {
+        try {
+            deregisterWebhookForConnectionStrict(workspaceId, connectionId);
+        } catch (RuntimeException e) {
+            log.info(
+                "Webhook deregistration at deactivation was a no-op (best-effort): workspaceId={}, connectionId={}, reason={}",
+                workspaceId,
+                connectionId,
+                e.getMessage()
+            );
+        }
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void deregisterWebhookForConnectionStrict(long workspaceId, long connectionId) {
         Optional<GitLabConfig> configOpt = connectionService
             .findInWorkspace(workspaceId, connectionId)
             .map(c -> c.getConfig())
@@ -420,28 +422,26 @@ public class GitLabWebhookService {
         if (config.gitlabWebhookId() == null || config.gitlabGroupId() == null) {
             return;
         }
+        Optional<BearerToken> bearer = connectionService.findBearerToken(workspaceId, connectionId);
+        if (config.serverUrl() == null || config.serverUrl().isBlank() || bearer.isEmpty()) {
+            throw new IllegalStateException("GitLab webhook credentials are unavailable");
+        }
         var client = webhookClientProvider.getIfAvailable();
         if (client == null) {
-            return;
+            throw new IllegalStateException("GitLab webhook client is unavailable");
         }
-        try {
-            client.deregisterGroupWebhook(workspaceId, config.gitlabGroupId(), config.gitlabWebhookId());
-            log.info(
-                "Deregistered GitLab webhook for deactivated connection: workspaceId={}, connectionId={}, webhookId={}",
-                workspaceId,
-                connectionId,
-                config.gitlabWebhookId()
-            );
-        } catch (Exception e) {
-            // Expected once the scope is no longer active (token provider refuses non-active scopes):
-            // the real delete already ran at revoke time; a still-registered hook auto-disables upstream.
-            log.info(
-                "Webhook deregistration at deactivation was a no-op (best-effort): workspaceId={}, connectionId={}, reason={}",
-                workspaceId,
-                connectionId,
-                e.getMessage()
-            );
-        }
+        client.deregisterGroupWebhookWithCredentials(
+            config.serverUrl(),
+            bearer.get().token(),
+            config.gitlabGroupId(),
+            config.gitlabWebhookId()
+        );
+        log.info(
+            "Deregistered GitLab webhook for deactivated connection: workspaceId={}, connectionId={}, webhookId={}",
+            workspaceId,
+            connectionId,
+            config.gitlabWebhookId()
+        );
     }
 
     /**

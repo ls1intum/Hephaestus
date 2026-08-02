@@ -32,13 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Real-Postgres proof for the {@link FeedbackObservation} join — the M:N binding {@link Feedback} to the
- * {@link Observation}s it was composed from. {@code FeedbackLedgerRecorderTest} mocks this repository, so
- * the {@code @EmbeddedId}/{@code @MapsId} key round-trip, the native {@code ON CONFLICT DO NOTHING} upsert,
- * the JPQL read that navigates {@code ff.feedback.body}/{@code deliveryState} through a LAZY association, and
- * the {@code @OnDelete} cascade are only verified end-to-end here.
- */
 class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -109,7 +102,6 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         Observation observation = saveObservation("obs-1");
 
         int first = feedbackObservationRepository.insertIfAbsent(feedback.getId(), observation.getId(), "PRIMARY", 0);
-        // Same key, different role/ordinal — the ON CONFLICT DO NOTHING upsert must NOT overwrite.
         int second = feedbackObservationRepository.insertIfAbsent(
             feedback.getId(),
             observation.getId(),
@@ -130,8 +122,8 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "findAdviceBodiesByObservationIds returns DELIVERED and FAILED bodies (the dashboard's own channel) and " +
-            "excludes PREPARED/SUPPRESSED/null-body units"
+        "findLatestAdviceBodiesByObservationIds returns DELIVERED and FAILED bodies and excludes PREPARED, " +
+            "SUPPRESSED, and null-body units"
     )
     void findAdviceBodiesIncludesFailedExcludesPreparedSuppressed() {
         Observation delivered = saveObservation("obs-delivered");
@@ -141,13 +133,12 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         Observation nullBody = saveObservation("obs-null-body");
 
         bind(saveFeedback(0, FeedbackDeliveryState.DELIVERED, "The advice the student saw"), delivered);
-        // A composed body that never reached the SCM surface still belongs on the dashboard (its own channel).
         bind(saveFeedback(4000, FeedbackDeliveryState.FAILED, "The advice the direct post could not place"), failed);
         bind(saveFeedback(1, FeedbackDeliveryState.PREPARED, "Not yet delivered"), prepared);
         bind(saveFeedback(2, FeedbackDeliveryState.SUPPRESSED, "Withheld"), suppressed);
         bind(saveFeedback(3, FeedbackDeliveryState.DELIVERED, null), nullBody);
 
-        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findAdviceBodiesByObservationIds(
+        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
             List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId())
         );
 
@@ -159,7 +150,22 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             .containsEntry(delivered.getId(), "The advice the student saw")
             .containsEntry(failed.getId(), "The advice the direct post could not place")
             .doesNotContainKeys(prepared.getId(), suppressed.getId(), nullBody.getId());
-        assertThat(bodies).allSatisfy(row -> assertThat(row.getFeedbackCreatedAt()).isNotNull());
+    }
+
+    @Test
+    void findLatestAdviceBodiesUsesIdAsDeterministicTieBreak() {
+        Observation observation = saveObservation("obs-repeated");
+        Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+        UUID lowerId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID higherId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        bind(saveFeedback(lowerId, 10, FeedbackDeliveryState.DELIVERED, "Earlier identity", createdAt), observation);
+        bind(saveFeedback(higherId, 11, FeedbackDeliveryState.DELIVERED, "Latest identity", createdAt), observation);
+
+        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+            List.of(observation.getId())
+        );
+
+        assertThat(bodies).singleElement().extracting(ObservationAdviceBody::getBody).isEqualTo("Latest identity");
     }
 
     @Test
@@ -173,7 +179,6 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         feedbackRepository.deleteById(feedback.getId());
         feedbackRepository.flush();
 
-        // The join row is gone, but the observation it pointed at survives (cascade is from feedback only).
         assertThat(feedbackObservationRepository.findAll()).isEmpty();
         assertThat(observationRepository.findById(observation.getId())).isPresent();
     }
@@ -183,8 +188,13 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private Feedback saveFeedback(int position, FeedbackDeliveryState state, String body) {
+        return saveFeedback(null, position, state, body, Instant.now());
+    }
+
+    private Feedback saveFeedback(UUID id, int position, FeedbackDeliveryState state, String body, Instant createdAt) {
         return feedbackRepository.save(
             Feedback.builder()
+                .id(id)
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
                 .artifactType(WorkArtifact.PULL_REQUEST)
@@ -196,7 +206,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 .deliveryState(state)
                 .body(body)
                 .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
+                .createdAt(createdAt)
                 .deliveredAt(state == FeedbackDeliveryState.DELIVERED ? Instant.now() : null)
                 .build()
         );

@@ -171,6 +171,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
         metadata.put("pull_request_id", prId);
+        metadata.put("repository_id", repo.getId());
+        metadata.put("repository_full_name", repo.getNameWithOwner());
+        metadata.put("pr_number", 42);
         agentJob.setMetadata(metadata);
         agentJob = agentJobRepository.save(agentJob);
     }
@@ -299,15 +302,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     class RevisionPinning {
 
         @Test
-        @DisplayName("persisted finding pins the practice's current criteria revision (SCD-2)")
+        @DisplayName("persisted finding pins the practice's current definition revision")
         void findingPinsCurrentRevision() {
             // Seeded straight through the repository, so no revision exists yet; append one as createPractice would.
             Practice practice = practiceRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
                 .orElseThrow();
-            PracticeRevision revision = practiceRevisionRepository.save(
-                new PracticeRevision(practice, 1, practice.getCriteria())
-            );
+            PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
 
             var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
 

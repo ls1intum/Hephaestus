@@ -2,9 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { RepositoryLabelsToggle } from "./RepositoryLabelsToggle";
 
-/**
- * RepositoryLabelsToggle lists available labels for a repository and lets you toggle them for a team.
- */
 const meta = {
 	component: RepositoryLabelsToggle,
 	parameters: { layout: "centered" },

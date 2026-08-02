@@ -5,12 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Request to reorder the practices within ONE area (or the unassigned bucket). Each practice's
- * {@code displayOrder} is set to its index in {@code orderedSlugs}, so the whole bucket's ordering is
- * written atomically in one request.
- */
-@Schema(description = "Reorder the practices in one area — displayOrder follows the list index")
+@Schema(description = "Reorder one area's practices to match the supplied list")
 public record ReorderPracticesRequestDTO(
     @Schema(
         description = "Slug of the area whose practices are being reordered; null reorders the unassigned bucket",

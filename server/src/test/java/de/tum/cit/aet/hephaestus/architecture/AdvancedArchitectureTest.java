@@ -396,7 +396,10 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * Tests that drive Liquibase themselves and therefore must NOT have a Spring context: the context
          * would build the schema before the test could seed the pre-migration rows it exists to migrate.
          */
-        private static final Set<String> SCHEMA_OWNING_TESTS = Set.of("LegacyAgentConfigMigrationIntegrationTest");
+        private static final Set<String> SCHEMA_OWNING_TESTS = Set.of(
+            "LegacyAgentConfigMigrationIntegrationTest",
+            "PracticeCatalogInstallationMigrationIntegrationTest"
+        );
 
         @Test
         void integrationTestsExtendBaseClasses() {

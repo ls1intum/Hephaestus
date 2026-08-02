@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
 import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { expectPageReflows, expectTablesScrollInPlace } from "@/test/reflow";
+import { withStandardPage } from "@/stories/decorators";
+import { expectNoPageOverflow, expectTablesScrollInPlace } from "@/test/reflow";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
 const FX_DISCLOSURE = /reference rate published on/;
@@ -109,13 +110,10 @@ const eurToday: FxRateInfo = {
 	source: "ECB",
 };
 
-/**
- * The workspace admin's cost-control page: two independently owned caps — the shared-model budget
- * the host sets and the provider cap the workspace sets for itself — never merged into one number.
- */
 const meta = {
 	component: AdminLlmUsagePage,
 	parameters: { layout: "fullscreen" },
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
 		month: "2026-07",
@@ -127,8 +125,6 @@ const meta = {
 		error: null,
 		now: NOW,
 		onRetry: fn(),
-		onPrevMonth: fn(),
-		onNextMonth: fn(),
 		onEditOwnProviderCap: fn(),
 	},
 } satisfies Meta<typeof AdminLlmUsagePage>;
@@ -172,7 +168,6 @@ export const DisplayCurrencyClosedMonth: Story = {
 	},
 };
 
-/** A second `$` beside the USD figure would read as dollars, so the ISO code stands in. */
 export const DisplayCurrencyWithAmbiguousSymbol: Story = {
 	args: {
 		report: {
@@ -203,7 +198,6 @@ export const ApproachingSharedBudget: Story = {
 	},
 };
 
-/** Two days in, one busy afternoon is not a pace, so the warning arrives without a date. */
 export const ApproachingWithoutProjection: Story = {
 	args: {
 		now: new Date("2026-07-02T12:00:00.000Z"),
@@ -255,10 +249,6 @@ export const SharedBudgetUnverifiable: Story = {
 	},
 };
 
-/**
- * The banner the admin can act on leads, measured by geometry: `flex-col-reverse` satisfies a
- * DOM-order assertion while rendering the two the other way up.
- */
 export const BothPaused: Story = {
 	args: {
 		report: {
@@ -288,7 +278,6 @@ export const ProviderUncapped: Story = {
 	},
 };
 
-/** A $0 cap is a cap: 100% used and paused, not "no cap". */
 export const ZeroProviderCap: Story = {
 	args: {
 		report: {
@@ -341,14 +330,12 @@ export const Empty: Story = {
 	},
 };
 
-/** Unpriced runs make both totals — and the caps reading them — a floor, which the callout says. */
 export const CallsWithNoPriceSet: Story = {
 	args: {
 		report: { ...withOwnProvider, unpricedEventCount: 42 },
 	},
 };
 
-/** The callout reads "1 run", not "1 runs". */
 export const SingleCallWithNoPriceSet: Story = {
 	args: {
 		report: { ...withOwnProvider, unpricedEventCount: 1 },
@@ -362,7 +349,6 @@ export const Loading: Story = {
 	},
 };
 
-/** A 5xx is retryable, so the alert offers a Retry; the 403 story is the contrast. */
 export const RetryableServerError: Story = {
 	args: {
 		report: undefined,
@@ -377,10 +363,6 @@ export const ForbiddenError: Story = {
 	},
 };
 
-/**
- * WCAG 2.2 SC 1.4.10 at 320 px: the page itself may not scroll sideways; the breakdown tables take
- * the data-table exception and scroll only inside their own container.
- */
 export const MobileReflow: Story = {
 	args: {
 		report: {
@@ -399,7 +381,7 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768, 1024] },
 	},
 	play: async ({ canvasElement }) => {
-		await expectPageReflows();
+		await expectNoPageOverflow();
 		await expectTablesScrollInPlace(canvasElement);
 	},
 };

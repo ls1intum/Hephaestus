@@ -1,40 +1,22 @@
 import { Code, Hammer, Users } from "lucide-react";
-import agileHephaestus from "@/assets/agile_hephaestus.png";
-import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
 import { Badge } from "@/components/ui/badge";
 
-interface LandingWhyChooseSectionProps {
-	onSignIn: (idpHint: string) => void;
-	onGoToDashboard?: () => void;
-	isSignedIn: boolean;
-}
-
-export function LandingWhyChooseSection({
-	onSignIn,
-	onGoToDashboard,
-	isSignedIn,
-}: LandingWhyChooseSectionProps) {
+export function LandingWhyChooseSection() {
 	return (
 		<section className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30">
-			<div className="container px-4 md:px-6">
-				<div className="grid gap-10 lg:grid-cols-[1fr_500px] lg:gap-12">
-					<img
-						src={agileHephaestus}
-						alt="Agile Hephaestus"
-						width="500"
-						height="350"
-						className="mx-auto rounded-lg aspect-auto object-cover lg:order-last"
-					/>
+			<div className="mx-auto w-full max-w-7xl px-4 md:px-6">
+				<div className="mx-auto max-w-3xl">
 					<div className="flex flex-col justify-center space-y-5">
 						<Badge className="w-fit" variant="outline">
-							Our Approach
+							Our approach
 						</Badge>
 						<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-							Why Choose Hephaestus?
+							Support for mentors, not a replacement
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Named after the Greek god of craftsmen, Hephaestus combines creativity with technical
-							expertise to build better team habits through process-aware, AI-guided mentoring.
+							Mentors, teachers, and maintainers cannot comment on every contribution. Hephaestus
+							helps with routine practice feedback and leaves judgement, context, and relationships
+							to people.
 						</p>
 
 						<ul className="grid gap-4 mt-4">
@@ -43,9 +25,9 @@ export function LandingWhyChooseSection({
 									<Hammer className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Empower engineers</p>
+									<p className="font-medium">Based on the work</p>
 									<p className="text-sm text-muted-foreground">
-										Tools that accelerate learning through real-world feedback
+										Practice feedback links back to evidence in the project work
 									</p>
 								</div>
 							</li>
@@ -54,9 +36,9 @@ export function LandingWhyChooseSection({
 									<Users className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Foster collaboration</p>
+									<p className="font-medium">You stay in charge</p>
 									<p className="text-sm text-muted-foreground">
-										Build team habits that strengthen your engineering culture
+										Use the feedback, question it, or skip it
 									</p>
 								</div>
 							</li>
@@ -65,23 +47,13 @@ export function LandingWhyChooseSection({
 									<Code className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Improve code quality</p>
+									<p className="font-medium">Configured by your workspace</p>
 									<p className="text-sm text-muted-foreground">
-										Motivate better code reviews through friendly competition
+										Admins choose the connected sources, practices, AI model, and optional features
 									</p>
 								</div>
 							</li>
 						</ul>
-
-						<div className="pt-4">
-							<LandingSignInCTA
-								isSignedIn={isSignedIn}
-								onSignIn={onSignIn}
-								onGoToDashboard={onGoToDashboard}
-								size="default"
-								className="w-full sm:w-auto"
-							/>
-						</div>
 					</div>
 				</div>
 			</div>

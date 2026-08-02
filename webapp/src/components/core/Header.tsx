@@ -28,35 +28,20 @@ const ENV_DOT: Record<EnvironmentTone, string> = {
 };
 
 export interface HeaderProps {
-	/** Sidebar trigger button component */
 	sidebarTrigger?: React.ReactNode;
-	/** Application version displayed beside logo (used in production) */
 	version: string;
-	/** Friendly deployment environment name, e.g. "Staging". */
 	environmentName: string;
 	isProduction: boolean;
-	/** User authentication state */
 	isAuthenticated: boolean;
-	/** Whether the authentication is currently loading */
 	isLoading: boolean;
-	/** Name of the authenticated user */
 	name?: string;
-	/** Username of the authenticated user */
 	username?: string;
-	/** Avatar URL for the authenticated user */
 	avatarUrl?: string;
-	/** Active workspace slug for routing */
 	workspaceSlug?: string;
-	/** Function to call on login button click, with optional idpHint */
 	onLogin: (idpHint?: string) => void;
-	/** Function to call on logout button click */
 	onLogout: () => void;
 }
 
-/**
- * Header component - fully presentational, receives all data via props.
- * Smart logic (hooks, auth) should be handled by the parent container.
- */
 export default function Header({
 	sidebarTrigger,
 	version,
@@ -84,15 +69,20 @@ export default function Header({
 						<Link
 							to="/w/$workspaceSlug"
 							params={{ workspaceSlug: workspaceSlug ?? "" }}
+							aria-label="Hephaestus home"
 							className="flex gap-2 items-center hover:text-muted-foreground"
 						>
 							<Hammer className="text-2xl sm:text-3xl" />
-							<span className="text-xl font-semibold">Hephaestus</span>
+							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
 						</Link>
 					) : (
-						<Link to="/" className="flex gap-2 items-center hover:text-muted-foreground">
+						<Link
+							to="/"
+							aria-label="Hephaestus home"
+							className="flex gap-2 items-center hover:text-muted-foreground"
+						>
 							<Hammer className="text-2xl sm:text-3xl" />
-							<span className="text-xl font-semibold">Hephaestus</span>
+							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
 						</Link>
 					)}
 					{badge.kind === "release" ? (
@@ -104,7 +94,7 @@ export default function Header({
 										target="_blank"
 										rel="noopener noreferrer"
 										aria-label={badge.ariaLabel}
-										className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
+										className="mt-1 hidden items-center gap-1 font-mono text-muted-foreground text-xs transition-colors hover:text-foreground sm:flex"
 									/>
 								}
 							>
@@ -117,7 +107,10 @@ export default function Header({
 						<Tooltip>
 							<TooltipTrigger
 								render={
-									<Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground" />
+									<Badge
+										variant="outline"
+										className="hidden gap-1.5 font-normal text-muted-foreground sm:inline-flex"
+									/>
 								}
 							>
 								<span className={cn("size-1.5 rounded-full", ENV_DOT[badge.tone])} />

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { PlugZap } from "lucide-react";
 import { toast } from "sonner";
 import {
 	getConnectionSyncStatusOptions,
@@ -8,9 +9,10 @@ import {
 	triggerSyncJobMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { IntegrationOverviewCard } from "@/components/admin/integrations/IntegrationOverviewCard";
-import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
@@ -32,10 +34,11 @@ function IntegrationsOverview() {
 	});
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-6 py-6">
-			<IntegrationPageHeader
+		<PageLayout>
+			<PageHeader
+				icon={<PlugZap />}
 				title="Integrations"
-				description="Connection health, sync activity and quick actions for every integration this workspace can use. Open one for its full detail — resources, controls and job history."
+				description="Monitor connections, sync activity, and available integration controls."
 			/>
 
 			{catalogQuery.isLoading ? (
@@ -56,7 +59,7 @@ function IntegrationsOverview() {
 					))}
 				</div>
 			)}
-		</div>
+		</PageLayout>
 	);
 }
 
@@ -103,8 +106,6 @@ function IntegrationOverviewCardContainer({
 			status={statusQuery.data}
 			isStatusLoading={statusQuery.isLoading}
 			isStatusError={statusQuery.isError}
-			// The card's alert needs the error and a refetch to name the failure and decide whether Retry
-			// helps; without them it can only show a title over a blank card.
 			statusError={statusQuery.error}
 			onRetryStatus={() => statusQuery.refetch()}
 			isTriggering={triggerSync.isPending}

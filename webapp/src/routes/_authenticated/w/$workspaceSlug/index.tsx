@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Navigate, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Link,
+	Navigate,
+	retainSearchParams,
+	useNavigate,
+} from "@tanstack/react-router";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
@@ -10,6 +16,7 @@ import {
 	getUserProfileOptions,
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
 import { Spinner } from "@/components/ui/spinner";
@@ -25,8 +32,6 @@ import {
 	type LeaderboardSchedule,
 } from "@/lib/timeframe";
 
-// Define search params schema for validation and types
-// Defaults are computed dynamically using the leaderboard schedule from workspace
 const leaderboardSearchSchema = z.object({
 	team: z.string().default("all"),
 	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
@@ -37,30 +42,27 @@ const leaderboardSearchSchema = z.object({
 
 type LeaderboardSearchParams = z.infer<typeof leaderboardSearchSchema>;
 
-// Export route with search param validation
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
 	validateSearch: leaderboardSearchSchema,
-	// Configure search middleware to retain params when navigating
 	search: {
 		middlewares: [retainSearchParams(["team", "sort", "after", "before", "mode"])],
 	},
 });
 
 function LeaderboardContainer() {
-	// Get the current user from auth context
 	const { username } = useAuth();
 	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { leaderboardEnabled, leaguesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const featureState = useWorkspaceFeatures(workspaceSlug);
+	const leaderboardEnabled = featureState.features?.leaderboardEnabled;
+	const leaguesEnabled = featureState.features?.leaguesEnabled;
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
 
-	// Access properly validated search params with correct types
 	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Query for workspace details (includes schedule info)
 	const workspaceQuery = useQuery({
 		...getWorkspaceOptions({
 			path: { workspaceSlug: slug },
@@ -68,7 +70,6 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace,
 	});
 
-	// Extract leaderboard schedule from workspace config
 	const getSchedule = (): LeaderboardSchedule => {
 		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
 
@@ -80,19 +81,16 @@ function LeaderboardContainer() {
 
 		return {
 			day: scheduledDay,
-			hour: hours || 9,
-			minute: minutes || 0,
+			hour: Number.isNaN(hours) ? 9 : hours,
+			minute: Number.isNaN(minutes) ? 0 : minutes,
 		};
 	};
 	const schedule = getSchedule();
 
-	// Compute effective date range - default to "this week" based on schedule
-	// This ensures dates passed to TimeframeFilter align with getLeaderboardWeekStart
 	const getEffectiveDates = () => {
 		if (after) {
 			return { after, before };
 		}
-		// Default to "this week" using the leaderboard schedule (bounded for API)
 		const now = new Date();
 		const weekStart = getLeaderboardWeekStart(now, schedule);
 		const weekEnd = getLeaderboardWeekEnd(weekStart);
@@ -109,7 +107,6 @@ function LeaderboardContainer() {
 	const parsedAfter = parseDateParam(effectiveDates.after);
 	const parsedBefore = parseDateParam(effectiveDates.before);
 
-	// Query for teams in the workspace
 	const teamsQuery = useQuery({
 		...getAllTeamsOptions({
 			path: { workspaceSlug: slug },
@@ -117,7 +114,6 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace,
 	});
 
-	// Query for leaderboard data based on filters
 	const leaderboardQuery = useQuery({
 		...getLeaderboardOptions({
 			path: { workspaceSlug: slug },
@@ -133,7 +129,6 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace && Boolean(parsedAfter && teamsQuery.data),
 	});
 
-	// Query for user profile data (mirror leaderboard filters if provided)
 	const userProfileOptions = getUserProfileOptions({
 		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
 		query: {
@@ -147,14 +142,12 @@ function LeaderboardContainer() {
 		placeholderData: (previousData) => previousData,
 		enabled: hasWorkspace && Boolean(username),
 	});
-	// Find the current user's entry in the leaderboard
 	const currentUserEntry = username
 		? leaderboardQuery.data?.find(
 				(entry) => entry.user?.login?.toLowerCase() === username.toLowerCase(),
 			)
 		: undefined;
 
-	// Compute visible teams list (exclude hidden teams)
 	type MetaTeam = {
 		id: number;
 		name: string;
@@ -162,11 +155,9 @@ function LeaderboardContainer() {
 		hidden?: boolean;
 	};
 
-	// Build a map for id->team to compute visible-only path labels
 	const teamsList = (teamsQuery.data ?? []) as MetaTeam[];
 	const teamById = new Map<number, MetaTeam>(teamsList.map((t) => [t.id, t]));
 
-	// Helper to create the visible-only path label for a team
 	const makeLabel = (t: MetaTeam): string => {
 		const names: string[] = [];
 		let cur: MetaTeam | undefined = t;
@@ -179,7 +170,6 @@ function LeaderboardContainer() {
 		return names.reverse().join(" / ");
 	};
 
-	// Valid selectable values are the full visible paths
 	const teamLabelsById = teamsList.reduce<Record<number, string>>((acc, team) => {
 		const label = makeLabel(team);
 		acc[team.id] = label.length > 0 ? label : team.name;
@@ -196,7 +186,6 @@ function LeaderboardContainer() {
 		.map(({ label }) => ({ value: label, label }))
 		.sort((a, b) => a.label.localeCompare(b.label));
 
-	// If current selected team is hidden (or no longer present), reset to 'all'
 	useEffect(() => {
 		if (team && team !== "all" && !visibleTeams.includes(team)) {
 			navigate({
@@ -230,15 +219,12 @@ function LeaderboardContainer() {
 		}
 	}, [mode, sort, navigate]);
 
-	// Calculate leaderboard end date with the correct time
 	const endDate = parsedBefore ? new Date(parsedBefore) : new Date();
 
-	// Adjust the end date to include the schedule time from server metadata
 	endDate.setHours(schedule.hour, schedule.minute, 0, 0);
 
 	const leaderboardEnd = formatISO(endDate);
 
-	// Query for league points change data (GET endpoint computes stats server-side using global leaderboard)
 	const leagueStatsQuery = useQuery({
 		...computeUserLeagueStatsOptions({
 			path: { workspaceSlug: slug, login: username || "" },
@@ -250,8 +236,13 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),
 	});
 
-	// When leaderboard is disabled, show the profile page as the home view
-	if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
+	if (
+		!featureState.isLoading &&
+		!featureState.isError &&
+		leaderboardEnabled === false &&
+		workspaceSlug &&
+		username
+	) {
 		return (
 			<Navigate
 				to="/w/$workspaceSlug/user/$username"
@@ -261,7 +252,21 @@ function LeaderboardContainer() {
 		);
 	}
 
-	if (featuresLoading || !leaderboardEnabled) {
+	if (showNoWorkspace) {
+		return <NoWorkspace />;
+	}
+
+	if (featureState.isError) {
+		return (
+			<QueryErrorAlert
+				error={featureState.error}
+				title="Couldn't load workspace features"
+				onRetry={featureState.refetch}
+			/>
+		);
+	}
+
+	if (featureState.isLoading || leaderboardEnabled !== true) {
 		return (
 			<div className="flex items-center justify-center h-96">
 				<Spinner className="size-8" />
@@ -269,11 +274,6 @@ function LeaderboardContainer() {
 		);
 	}
 
-	if (showNoWorkspace) {
-		return <NoWorkspace />;
-	}
-
-	// Handle team filter changes
 	const handleTeamChange = (team: string) => {
 		navigate({
 			search: (prev: LeaderboardSearchParams) => ({
@@ -283,7 +283,6 @@ function LeaderboardContainer() {
 		});
 	};
 
-	// Handle sort changes with the correct type
 	const handleSortChange = (sort: LeaderboardSortType) => {
 		navigate({
 			search: (prev: LeaderboardSearchParams) => ({
@@ -293,7 +292,6 @@ function LeaderboardContainer() {
 		});
 	};
 
-	// Handle timeframe changes - note we're not passing timeframe in URL anymore
 	const handleTimeframeChange = (afterDate: string, beforeDate?: string) => {
 		navigate({
 			search: (prev: LeaderboardSearchParams) => ({
@@ -304,15 +302,6 @@ function LeaderboardContainer() {
 		});
 	};
 
-	// Handle user profile navigation
-	const handleUserClick = (username: string) => {
-		if (!hasWorkspace) return;
-		navigate({
-			to: "/w/$workspaceSlug/user/$username",
-			params: { workspaceSlug: slug, username },
-		});
-	};
-
 	const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
 		navigate({
 			search: (prev: LeaderboardSearchParams) => ({
@@ -320,20 +309,6 @@ function LeaderboardContainer() {
 				mode: newMode,
 				team: newMode === "TEAM" ? "all" : prev.team,
 				sort: newMode === "TEAM" ? "SCORE" : prev.sort,
-			}),
-		});
-	};
-
-	const handleTeamClick = (teamId: number) => {
-		const label = teamLabelsById[teamId];
-		if (!label) return;
-		// Expand the team path and navigate to INDIVIDUAL mode with that team filter
-		navigate({
-			search: (prev: LeaderboardSearchParams) => ({
-				...prev,
-				mode: "INDIVIDUAL",
-				sort: "SCORE",
-				team: label,
 			}),
 		});
 	};
@@ -362,11 +337,37 @@ function LeaderboardContainer() {
 			onTeamChange={handleTeamChange}
 			onSortChange={handleSortChange}
 			onTimeframeChange={handleTimeframeChange}
-			onUserClick={handleUserClick}
+			renderUserLink={(username, children) => (
+				<Link
+					to="/w/$workspaceSlug/user/$username"
+					params={{ workspaceSlug: slug, username }}
+					className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{children}
+				</Link>
+			)}
 			selectedMode={mode}
 			onModeChange={handleModeChange}
-			onTeamClick={handleTeamClick}
-			leaguesEnabled={leaguesEnabled}
+			renderTeamLink={(teamId, children) => {
+				const label = teamLabelsById[teamId];
+				return label ? (
+					<Link
+						to="."
+						search={(previous) => ({
+							...previous,
+							mode: "INDIVIDUAL",
+							sort: "SCORE",
+							team: label,
+						})}
+						className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						{children}
+					</Link>
+				) : (
+					children
+				);
+			}}
+			leaguesEnabled={leaguesEnabled === true}
 		/>
 	);
 }

@@ -5,15 +5,21 @@ import {
 	Link,
 	Outlet,
 	useLocation,
+	useMatches,
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
 import type React from "react";
-import { getUserSettingsOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getIntegrationCatalogOptions,
+	getUserSettingsOptions,
+	listThreadsOptions,
+} from "@/api/@tanstack/react-query.gen";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
+import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
@@ -25,9 +31,11 @@ import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useMentorChat } from "@/hooks/use-mentor-chat";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
+import { isCopilotExcludedRoute } from "@/lib/copilot-route";
 import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
 
@@ -36,12 +44,27 @@ interface MyRouterContext {
 	auth: AuthContextType | undefined;
 }
 
+declare module "@tanstack/react-router" {
+	interface StaticDataRouteOption {
+		surface?: "standard" | "bleed" | "fullscreen" | "auth";
+	}
+}
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	// Fallback tab title; the deepest match that sets its own `head` wins. The static <title> in
 	// index.html stays as the pre-hydration placeholder.
 	head: () => ({ meta: [{ title: "Hephaestus" }] }),
 	component: () => {
 		const { pathname } = useLocation();
+		const surface = useMatches({
+			select: (matches) => {
+				for (let index = matches.length - 1; index >= 0; index -= 1) {
+					const matchSurface = matches[index]?.staticData.surface;
+					if (matchSurface) return matchSurface;
+				}
+				return "standard";
+			},
+		});
 		const { isAuthenticated, isLoading } = useAuth();
 		const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 		const { data: userSettings, isError: userSettingsError } = useQuery({
@@ -51,40 +74,18 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		});
 		const allowSurveys =
 			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
-		const isMentorRoute = pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
-		const isAchievementsRoute =
-			/^\/w\/[^/]+\/achievements/.test(pathname) ||
-			/^\/w\/[^/]+\/user\/[^/]+\/achievements/.test(pathname);
-		// Routes that use full-height layouts without padding or footer
-		const isFullscreenRoute = isMentorRoute || isAchievementsRoute;
+		const showCopilot =
+			!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
 
-		// Exclude routes where Copilot should not appear
-		const isExcludedRoute =
-			isMentorRoute ||
-			pathname.startsWith("/admin") ||
-			pathname.startsWith("/settings") ||
-			pathname.startsWith("/legal") ||
-			pathname === "/imprint" ||
-			pathname === "/privacy";
-
-		const showCopilot = !isLoading && isAuthenticated && hasMentorAccess && !isExcludedRoute;
-
-		// Auth screens (/login, /w/<slug>/login, /auth/*) render on a focused, full-viewport canvas with
-		// NO app chrome — no header (which otherwise duplicates the sign-in buttons), no footer, no
-		// sidebar. The page owns the whole viewport, so it can center cleanly without subtracting header/
-		// footer height.
-		const isAuthRoute =
-			pathname === "/login" ||
-			pathname.startsWith("/auth/") ||
-			/^\/w\/[^/]+\/login\/?$/.test(pathname);
-
-		if (isAuthRoute) {
+		if (surface === "auth") {
 			return (
 				<>
 					<HeadContent />
 					<CookieConsentBanner />
 					<ProviderColorScope>
-						<Outlet />
+						<main>
+							<Outlet />
+						</main>
 					</ProviderColorScope>
 					<Toaster />
 				</>
@@ -100,13 +101,26 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<ProviderColorScope>
 					<SidebarProvider>
 						<AppSidebarContainer />
-						<SidebarInset style={{ marginRight: "var(--right-sidebar-width, 0)" }}>
+						<SidebarInset
+							className="min-w-0"
+							style={{ marginRight: "var(--right-sidebar-width, 0)" }}
+						>
 							<HeaderContainer />
-							<div className="flex min-h-[calc(100dvh-4rem)] flex-col">
-								<main className={isFullscreenRoute ? "" : "flex-1 p-4"}>
-									<Outlet />
-								</main>
-								{!isFullscreenRoute && (
+							<div className="flex min-h-0 flex-1 flex-col">
+								{surface === "standard" ? (
+									<StandardPageSurface className="flex-1">
+										<Outlet />
+									</StandardPageSurface>
+								) : (
+									<div
+										className={
+											surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
+										}
+									>
+										<Outlet />
+									</div>
+								)}
+								{surface !== "fullscreen" && (
 									<Footer
 										buildInfo={environment.buildInfo}
 										isProduction={environment.deployment.isProduction}
@@ -123,9 +137,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			</>
 		);
 	},
-	// Add notFoundComponent to handle route not found errors
 	notFoundComponent: () => (
-		<div className="container py-16 flex flex-col items-center justify-center text-center">
+		<div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center py-16 text-center">
 			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
 			<p className="text-muted-foreground mb-8">
 				The page you're looking for doesn't exist or you don't have permission to view it.
@@ -138,7 +151,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function GlobalCopilot() {
-	// Independent chat state for the copilot widget
 	const mentorChat = useMentorChat({
 		onError: (error: Error) => {
 			console.error("Copilot chat error:", error);
@@ -149,6 +161,7 @@ function GlobalCopilot() {
 	const { isAuthenticated, isLoading } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { features, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
@@ -159,14 +172,10 @@ function GlobalCopilot() {
 		mentorChat.voteMessage(messageId, isUpvote);
 	};
 
-	// Edit a previous message: discard that message and all following locally, then send the edited content
 	const handleMessageEdit = (messageId: string, content: string) => {
-		const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
-		if (idx === -1) return;
-		// Keep everything before the edited message
-		mentorChat.setMessages(mentorChat.messages.slice(0, idx));
-		// Send the edited content as a new message; the server resolves the parent from the
-		// trimmed history (we only ship the new user message, not previousMessageId).
+		const messageIndex = mentorChat.messages.findIndex((message) => message.id === messageId);
+		if (messageIndex === -1) return;
+		mentorChat.setMessages(mentorChat.messages.slice(0, messageIndex));
 		mentorChat.sendMessage(content);
 	};
 
@@ -176,7 +185,14 @@ function GlobalCopilot() {
 		});
 	};
 
-	if (isLoading || !isAuthenticated || !hasMentorAccess) {
+	if (
+		isLoading ||
+		featuresLoading ||
+		!isAuthenticated ||
+		!workspaceSlug ||
+		!hasMentorAccess ||
+		!features?.mentorEnabled
+	) {
 		return null;
 	}
 
@@ -184,7 +200,6 @@ function GlobalCopilot() {
 		<Copilot
 			hasMessages={(mentorChat.messages?.length ?? 0) > 0}
 			onNewChat={() => {
-				// Reset to a fresh session by clearing messages; useMentorChat will keep a new id.
 				mentorChat.setMessages([]);
 			}}
 			onOpenFullChat={() => {
@@ -198,7 +213,6 @@ function GlobalCopilot() {
 			}}
 		>
 			<Chat
-				id={mentorChat.currentThreadId || mentorChat.id}
 				messages={mentorChat.messages as ChatMessage[]}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
@@ -212,7 +226,7 @@ function GlobalCopilot() {
 				onCopy={handleCopy}
 				onVote={handleVote}
 				inputPlaceholder="Ask me anything..."
-				disableAttachments={true}
+				disableAttachments
 				className="h-full max-h-none"
 				partRenderers={defaultPartRenderers}
 			/>
@@ -236,10 +250,6 @@ function HeaderContainer() {
 		userName: workspaceUserName,
 	} = useWorkspaceAccess();
 
-	// Inside a workspace, "you" are the account's identity for that workspace's provider (ADR 0017):
-	// e.g. a GitLab-logged-in account is its GitHub user in a GitHub workspace. Prefer that identity for
-	// the displayed name and the "My Profile" link so it points at the right per-provider profile;
-	// fall back to the global account identity outside a workspace (or before membership resolves).
 	const effectiveUsername = workspaceUserLogin ?? username;
 	const effectiveName =
 		workspaceUserName ?? (userProfile && `${userProfile.firstName} ${userProfile.lastName}`);
@@ -262,11 +272,6 @@ function HeaderContainer() {
 	);
 }
 
-/**
- * Sets `data-provider` attribute on a wrapper div so provider-aware CSS custom
- * properties (--color-provider-*) resolve to the correct palette (GitHub Primer
- * or GitLab Pajamas) based on the active workspace's provider type.
- */
 function ProviderColorScope({ children }: { children: React.ReactNode }) {
 	const { providerType } = useActiveWorkspaceSlug();
 	return <div data-provider={getProviderSlug(providerType)}>{children}</div>;
@@ -282,6 +287,24 @@ function AppSidebarContainer() {
 	const hasWorkspace = Boolean(workspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
+	const integrationCatalogQuery = useQuery({
+		...getIntegrationCatalogOptions({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+		enabled: workspaceAccess.isAdmin && Boolean(workspaceSlug),
+		placeholderData: (previousData) => previousData,
+	});
+	const integrationCatalog = Array.isArray(integrationCatalogQuery.data)
+		? integrationCatalogQuery.data
+		: [];
+	const integrationKinds = [
+		...new Set([
+			...integrationCatalog.map((entry) => entry.kind),
+			...(activeWorkspace?.providerType === "GITLAB"
+				? (["GITLAB"] as const)
+				: activeWorkspace?.providerType === "GITHUB"
+					? (["GITHUB"] as const)
+					: []),
+		]),
+	];
 
 	const sidebarContext: SidebarContext = pathname.startsWith("/admin")
 		? "admin"
@@ -289,7 +312,6 @@ function AppSidebarContainer() {
 			? "mentor"
 			: "main";
 
-	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
 		data: mentorThreads,
 		isLoading: mentorThreadsLoading,
@@ -310,8 +332,6 @@ function AppSidebarContainer() {
 		selectWorkspace(ws.workspaceSlug);
 		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
 		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		// Runtime-built internal path (slug + preserved subpath): use the typed `href` field
-		// rather than `to as never` — relative href stays an SPA navigation.
 		navigate({ href: target, replace: true });
 	};
 
@@ -325,6 +345,7 @@ function AppSidebarContainer() {
 			isAdmin={workspaceAccess.isAdmin}
 			isAppAdmin={isAppAdmin}
 			hasMentorAccess={hasMentorAccess}
+			integrationKinds={integrationKinds}
 			context={sidebarContext}
 			workspaces={workspaceList}
 			activeWorkspace={activeWorkspace}

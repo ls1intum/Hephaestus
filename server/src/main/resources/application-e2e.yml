@@ -34,6 +34,16 @@ hephaestus:
       gitlab-workspace-creation: true
   dev:
     trigger-enabled: true
+  agent:
+    enabled: true
+  # Use local JetStream and disable developer sync filters.
+  sync:
+    filters:
+      allowed-organizations: []
+      allowed-repositories: []
+    nats:
+      server: nats://localhost:4222
+      durable-consumer-name: hephaestus-e2e
   # Enable the GitLab integration so a connected workspace actually syncs MRs/commits for review.
   integration:
     gitlab:

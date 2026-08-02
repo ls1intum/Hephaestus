@@ -1,37 +1,28 @@
 import type { Meta, StoryObj } from "@storybook/react";
-
+import { fn } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "@/components/admin/types";
+import { withStandardPage } from "@/stories/decorators";
+import { expectNoPageOverflow, expectTablesScrollInPlace } from "@/test/reflow";
 import { AdminMembersPage } from "./AdminMembersPage";
 
-/**
- * Admin page for managing members and their team assignments.
- * Provides comprehensive user management with bulk operations and automatic team assignment.
- */
 const meta = {
 	component: AdminMembersPage,
 	parameters: {
 		layout: "fullscreen",
 	},
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
-	argTypes: {
-		users: {
-			description: "List of users with their team assignments",
-		},
-		teams: {
-			description: "Available teams for assignment",
-		},
-		isLoading: {
-			control: "boolean",
-			description: "Loading state for data fetching",
-		},
+	args: {
+		view: { q: "", team: "all", sort: "name", desc: false, page: 0, size: 10 },
+		onViewChange: fn(),
+		renderPageLink: (page, props) => <a {...props} href={`?page=${page}`} />,
 	},
 } satisfies Meta<typeof AdminMembersPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock data
 const mockTeams: TeamInfo[] = [
 	{
 		id: 1,
@@ -128,9 +119,6 @@ const mockUsers: ExtendedUserTeams[] = [
 	},
 ];
 
-/**
- * Default state showing the admin members page with users and teams loaded.
- */
 export const Default: Story = {
 	args: {
 		users: mockUsers,
@@ -139,9 +127,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Loading state while data is being fetched.
- */
 export const Loading: Story = {
 	args: {
 		users: [],
@@ -150,13 +135,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * State during automatic team assignment operation.
- */
-
-/**
- * Empty state with no users to manage.
- */
 export const EmptyUsers: Story = {
 	args: {
 		users: [],
@@ -165,9 +143,6 @@ export const EmptyUsers: Story = {
 	},
 };
 
-/**
- * State with no teams available for assignment.
- */
 export const NoTeams: Story = {
 	args: {
 		users: mockUsers.map((user) => ({
@@ -176,5 +151,21 @@ export const NoTeams: Story = {
 		})),
 		teams: [],
 		isLoading: false,
+	},
+};
+
+export const MobileReflow: Story = {
+	args: {
+		users: mockUsers,
+		teams: mockTeams,
+		isLoading: false,
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: async () => {
+		await expectNoPageOverflow();
+		await expectTablesScrollInPlace();
 	},
 };

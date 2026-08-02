@@ -27,14 +27,11 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/mod
 
 type Purpose = AgentBinding["purpose"];
 
-/** Save and turn-off share one prefix, so one {@link usePendingMutationIds} lookup covers both. */
 const AGENT_WRITE_MUTATION_KEY = ["workspaceWriteAgent"];
 
 function ModelsContainer() {
 	const { workspaceSlug } = Route.useParams();
 	const queryClient = useQueryClient();
-	// Scoped to the workspace: switching workspaces mid-save otherwise disables the new workspace's
-	// card on the strength of the old one's request.
 	const agentWriteKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug];
 
 	const bindingsQuery = useQuery(listAgentsOptions({ path: { workspaceSlug } }));
@@ -48,17 +45,11 @@ function ModelsContainer() {
 		staleTime: 60_000,
 	});
 
-	// In precedence order: the first to fail supplies the ProblemDetail the alert classifies on. Usage
-	// is not among them — the page is readable without it.
 	const pageQueries = [bindingsQuery, workspaceQuery, llmSettingsQuery, availableModelsQuery];
 
 	const bindingsKey = listAgentsQueryKey({ path: { workspaceSlug } });
 	const invalidateBindings = () => queryClient.invalidateQueries({ queryKey: bindingsKey });
 
-	/**
-	 * Synchronously: the reseed key changes on the very next render, and `invalidateQueries` only
-	 * schedules a refetch, so on its own it would remount the card against the pre-save array.
-	 */
 	const cacheSavedBinding = (saved: AgentBinding) =>
 		queryClient.setQueryData<AgentBinding[]>(bindingsKey, (current) => {
 			const bindings = current ?? [];
@@ -72,7 +63,6 @@ function ModelsContainer() {
 			(current ?? []).filter((b) => b.purpose !== purpose),
 		);
 
-	// Bumped only by this admin's own completed write: anything else remounts a card over an open edit.
 	const [saveRevisions, setSaveRevisions] = useState<Partial<Record<Purpose, number>>>({});
 	const bumpSaveRevision = (purpose: Purpose) =>
 		setSaveRevisions((current) => ({ ...current, [purpose]: (current[purpose] ?? 0) + 1 }));

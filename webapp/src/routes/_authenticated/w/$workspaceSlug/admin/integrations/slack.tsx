@@ -24,12 +24,13 @@ import { AdminSlackChannelsSettings } from "@/components/admin/integrations/Admi
 import { AdminSlackNotificationSettings } from "@/components/admin/integrations/AdminSlackNotificationSettings";
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
-import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { SlackIcon } from "@/components/icons/brand";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -110,8 +111,6 @@ function SlackIntegrationPage() {
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
 		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
-		// Every page is a new query key, so without this a page turn re-enters `pending` and collapses
-		// the table into skeletons. Keep the previous page on screen while the next one loads.
 		placeholderData: (previousData) => previousData,
 	});
 
@@ -143,8 +142,6 @@ function SlackIntegrationPage() {
 	const invalidateSlackChannels = () => {
 		queryClient.invalidateQueries({ queryKey: slackChannelsQueryOptions.queryKey });
 		queryClient.invalidateQueries({ queryKey: slackChannelCandidatesQueryOptions.queryKey });
-		// Adding or revoking a channel changes what this connection syncs, so the per-channel ledger
-		// below is stale the moment the mutation lands — refresh it here rather than waiting a poll.
 		if (connectionId != null) {
 			queryClient.invalidateQueries({
 				queryKey: listConnectionSyncResourcesQueryKey({
@@ -174,8 +171,6 @@ function SlackIntegrationPage() {
 				toast.success("Channel updated");
 			}
 			invalidateSlackChannels();
-			// This transition is a new row in that channel's consent history, and the history sheet is
-			// cached across open/close — without this it would reopen still denying the change.
 			queryClient.invalidateQueries({
 				queryKey: listSlackChannelConsentEventsQueryKey({
 					path: { workspaceSlug: slug, slackChannelId: variables.path.slackChannelId },
@@ -226,7 +221,6 @@ function SlackIntegrationPage() {
 					path: { workspaceSlug: slug, connectionId },
 				}),
 			});
-			// Matches SCM/Outline, which both confirm the cancel — a silent one reads as a no-op.
 			toast.success("Cancelling — stopping after current channel…");
 		},
 		onError: (e) => {
@@ -238,8 +232,8 @@ function SlackIntegrationPage() {
 	const routeError = workspaceQuery.error ?? catalogQuery.error;
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-8 py-6">
-			<IntegrationPageHeader
+		<PageLayout>
+			<PageHeader
 				icon={<SlackIcon className="size-6" />}
 				title="Slack"
 				description="Connection, weekly digest, monitored channels and sync activity for this workspace's Slack app."
@@ -276,7 +270,6 @@ function SlackIntegrationPage() {
 					label="Slack"
 					status={status}
 					isConnectionActive={isConnectionActive}
-					// Slack's only manual trigger is a reconciliation, so a bare `isPending` names it exactly.
 					triggeringType={triggerSync.isPending ? "RECONCILIATION" : null}
 					isCancelling={cancelJob.isPending}
 					onRetry={() => statusQuery.refetch()}
@@ -298,9 +291,6 @@ function SlackIntegrationPage() {
 				/>
 			)}
 
-			{/* The per-channel ledger: how many messages each monitored channel mirrors and how fresh it
-			    is, tinted against the connection's own cadence. The consent/management card below stays
-			    the place to add or revoke a channel — this one only reports. */}
 			{hasConnection && (
 				<Card>
 					<CardHeader>
@@ -315,8 +305,6 @@ function SlackIntegrationPage() {
 							onRetry={() => refetchResources()}
 							resourceNoun="channel"
 							resourceNounPlural="channels"
-							// The freshness cadence comes from the server so the client doesn't hard-code
-							// one; without it the ledger can't judge staleness.
 							syncIntervalSeconds={status?.syncIntervalSeconds}
 							expectedClassKeys={["messages"]}
 						/>
@@ -411,6 +399,6 @@ function SlackIntegrationPage() {
 					onPageChange={setJobsPage}
 				/>
 			)}
-		</div>
+		</PageLayout>
 	);
 }

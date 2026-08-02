@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService.HistoryPage;
 import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper;
 import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackChannelMessageHandler;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -62,6 +63,7 @@ public class SlackChannelHistorySyncService {
     private final SlackIngestService ingestService;
     private final ConnectionService connectionService;
     private final SlackSyncProperties properties;
+    private final Clock clock;
 
     public SlackChannelHistorySyncService(
         SlackMonitoredChannelRepository monitoredChannelRepository,
@@ -69,7 +71,8 @@ public class SlackChannelHistorySyncService {
         SlackMessageService slackMessageService,
         SlackIngestService ingestService,
         ConnectionService connectionService,
-        SlackSyncProperties properties
+        SlackSyncProperties properties,
+        Clock clock
     ) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.threadRepository = threadRepository;
@@ -77,6 +80,7 @@ public class SlackChannelHistorySyncService {
         this.ingestService = ingestService;
         this.connectionService = connectionService;
         this.properties = properties;
+        this.clock = clock;
     }
 
     /** Reconcile one workspace's ACTIVE channels within the request budget. Returns a summary for logging. */
@@ -117,7 +121,7 @@ public class SlackChannelHistorySyncService {
             properties.repliesRequestBudget(),
             properties.historyRequestInterval()
         );
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         String retentionFloor = SlackTs.ofInstant(now.minus(Duration.ofDays(retentionWindowDays(workspaceId))));
         List<SlackMonitoredChannel> channels = monitoredChannelRepository
             .findForHistorySync(workspaceId, ConsentState.ACTIVE)
@@ -246,7 +250,7 @@ public class SlackChannelHistorySyncService {
             cursor = page.nextCursor();
         } while (cursor != null);
 
-        monitoredChannelRepository.advanceHistoryWatermark(workspaceId, channelId, latest, Instant.now());
+        monitoredChannelRepository.advanceHistoryWatermark(workspaceId, channelId, latest, clock.instant());
         return ingested;
     }
 

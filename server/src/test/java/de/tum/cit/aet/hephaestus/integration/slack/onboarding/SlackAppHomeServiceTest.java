@@ -159,14 +159,14 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void mentorNotReady_rendersSetupNeededStatus() {
+    void mentorNotReady_rendersUnavailableStatus() {
         when(mentorReadinessQuery.isReady(7L)).thenReturn(false);
         when(identityResolver.resolveDeveloperLogin(7L, "T1", "U1")).thenReturn(Optional.of("octocat"));
         when(preferencesQuery.preferencesForLogin("octocat")).thenReturn(Optional.of(new PreferencesView(true, true)));
 
         View view = service.buildHomeView(7L, "T1", "U1");
 
-        assertThat(view.getBlocks().toString()).contains("Setup needed").contains("Mentor setup needed");
+        assertThat(view.getBlocks().toString()).contains("Unavailable").contains("Mentor unavailable");
     }
 
     @Test

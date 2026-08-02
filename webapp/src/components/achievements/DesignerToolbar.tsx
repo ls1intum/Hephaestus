@@ -28,21 +28,15 @@ const SNAP_GRID_OPTIONS = [24, 48, 96] as const;
 export type SnapGridSize = (typeof SNAP_GRID_OPTIONS)[number];
 
 export interface DesignerToolbarProps {
-	/** Whether nodes can be dragged */
 	isDraggable: boolean;
 	onDraggableChange: (value: boolean) => void;
-	/** Whether grid snapping is active */
 	isSnapping: boolean;
 	onSnappingChange: (value: boolean) => void;
-	/** The current snap grid size */
 	snapSize: SnapGridSize;
 	onSnapSizeChange: (size: SnapGridSize) => void;
-	/** Whether tooltips should be shown */
 	showTooltips: boolean;
 	onShowTooltipsChange: (value: boolean) => void;
-	/** Save callback */
 	onSave: () => void;
-	/** Selected edge display mode */
 	edgeDisplayMode: EdgeDisplayMode;
 	onEdgeDisplayModeChange: (mode: EdgeDisplayMode) => void;
 }
@@ -66,7 +60,6 @@ export function DesignerToolbar({
 			aria-label="Designer tools"
 			className="absolute top-4 right-4 z-50 flex items-center gap-3 bg-background/95 backdrop-blur-sm p-2.5 rounded-xl shadow-lg border border-border"
 		>
-			{/* Drag mode toggle */}
 			<div className="flex items-center gap-2">
 				<Move className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
 				<Switch id="designer-drag-mode" checked={isDraggable} onCheckedChange={onDraggableChange} />
@@ -77,7 +70,6 @@ export function DesignerToolbar({
 
 			<Separator orientation="vertical" className="h-6" />
 
-			{/* Tooltip toggle */}
 			<div className="flex items-center gap-2">
 				<MessageSquareOff className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
 				<Switch
@@ -92,7 +84,6 @@ export function DesignerToolbar({
 
 			<Separator orientation="vertical" className="h-6" />
 
-			{/* Snap toggle */}
 			<div className="flex items-center gap-2">
 				<Magnet className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
 				<Switch id="designer-snap-mode" checked={isSnapping} onCheckedChange={onSnappingChange} />
@@ -101,7 +92,6 @@ export function DesignerToolbar({
 				</Label>
 			</div>
 
-			{/* Snap grid size selector – only visible when snapping is on */}
 			{isSnapping && (
 				<div className="flex items-center gap-1 ml-1">
 					{SNAP_GRID_OPTIONS.map((size) => (
@@ -121,7 +111,6 @@ export function DesignerToolbar({
 
 			<Separator orientation="vertical" className="h-6" />
 
-			{/* Grid indicator */}
 			<div
 				className="flex items-center gap-1.5 text-muted-foreground"
 				title={`Grid size: ${isSnapping ? `${snapSize}px` : "free"}`}
@@ -132,16 +121,20 @@ export function DesignerToolbar({
 				</span>
 			</div>
 
-			{/* Edge Style Selector */}
 			<div className="flex items-center gap-2">
-				<Label className="text-xs text-muted-foreground mr-1 whitespace-nowrap">Edge Style:</Label>
+				<Label
+					htmlFor="achievement-edge-style"
+					className="text-xs text-muted-foreground mr-1 whitespace-nowrap"
+				>
+					Edge style
+				</Label>
 				<Select
 					value={edgeDisplayMode}
 					onValueChange={(val) => {
 						if (val && isEdgeDisplayMode(val)) onEdgeDisplayModeChange(val);
 					}}
 				>
-					<SelectTrigger className="w-45 h-8 text-xs">
+					<SelectTrigger id="achievement-edge-style" className="w-45 h-8 text-xs">
 						<SelectValue placeholder="Select Edge Style" />
 					</SelectTrigger>
 					<SelectContent>
@@ -156,7 +149,6 @@ export function DesignerToolbar({
 
 			<Separator orientation="vertical" className="h-6" />
 
-			{/* Save button */}
 			<Button variant="default" size="sm" onClick={onSave} className="gap-1.5">
 				<Save className="w-3.5 h-3.5" aria-hidden="true" data-icon="inline-start" />
 				Save Layout

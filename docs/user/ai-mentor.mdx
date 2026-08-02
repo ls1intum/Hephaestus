@@ -1,66 +1,58 @@
 ---
 id: ai-mentor
 sidebar_position: 5
-title: Working with the AI Mentor
-description: Learn how to run reflective sessions with Heph and manage the resulting artifacts.
+title: Chat with Heph
+description: Ask Heph about practice feedback and recent work in the web app or Slack.
 ---
 
-Heph – our process-aware AI mentor – delivers personalized, data-informed feedback grounded in the issues, commits, reviews, and pull requests you work on. It guides self-reflection, keeps track of progress, and reduces stress by organizing check-ins throughout the project lifecycle.
+Heph is the conversational AI mentor in Hephaestus. It can use your recent work and the practice feedback you received as context, so you do not need to recap everything before asking a question.
 
-## Launching a session
+Heph is one part of the Hephaestus platform. Automated practice feedback on pull requests, merge requests, and issues is described separately in [Practice feedback](./ai-code-review).
 
-Open the AI mentor from the top navigation bar and select **Start session** to begin – Heph kicks off the conversation for you.
+## Start a chat
 
-![Button that opens the AI mentor](./img/ai-mentor/mentor_button.png)
+1. Open **Heph** in the sidebar.
+2. Enter a question or describe what you want to reflect on.
+3. Continue the conversation, or select **New chat** when you want a separate thread.
 
-:::note Session history
-Previous sessions appear in the left-hand panel. Select any entry to review the conversation and generated summary.
-:::
+Previous chats appear in the Heph sidebar. Select a thread to continue it.
 
-![Start session button](./img/ai-mentor/start_session.png)
+## What Heph can use as context
 
-## Chat flow
+Depending on your workspace configuration, Heph can use:
 
-### Getting started
+- your recent pull requests, merge requests, issues, commits, and reviews
+- practice feedback that was delivered to you
+- the engineering practices configured for your workspace
+- messages from Slack channels that the workspace monitors and you have allowed Hephaestus to use
+- selected team documents from a connected Outline workspace
 
-Heph greets you with a structured introduction. Answer the opening questions to establish your goals for the week.
+Heph uses this context to answer your question. It does not have an unrestricted checkout of every connected repository, and it may ask for a specific snippet when the available context is not enough.
 
-![Chat interface when starting a session](./img/ai-mentor/getting_started.png)
+## Questions to try
 
-Your past sessions remain accessible in the sidebar for easy reference.
+- "What feedback did I get on my latest pull request?"
+- "I disagree with this comment. Can we work through it?"
+- "Which recent change would be useful to reflect on?"
+- "What could I try differently on my next review?"
+- "Summarise what we decided in this conversation."
 
-![Session history list](./img/ai-mentor/history.png)
+You do not need to use a template or follow a fixed session. Ask one concrete question and take the conversation where it is useful.
 
-:::tip Start fresh when you are ready
-Use **New session** to begin a new reflection. If the previous session is unfinished, Heph will continue to reference the earlier context.
-:::
+## Check the answer
 
-![Start a new session button](./img/ai-mentor/new_session.png)
+Heph can misunderstand your work or repeat a mistaken practice finding. Treat its answers as suggestions, not decisions.
 
-### Pull request overview
+If an answer does not match the work:
 
-Heph analyses the repositories connected to your workspace and lists pull requests active in the last week. Select the PRs relevant to your progress summary – these will inform later prompts.
+1. say what looks wrong
+2. point Heph to the relevant comment, line, or explanation
+3. ask it to reconsider using that evidence
 
-![Pull request overview within the mentor](./img/ai-mentor/pr_overview.png)
+The developer and human reviewers remain responsible for decisions about the work.
 
-### Status updates
+## Use Heph in Slack
 
-Heph walks you through what you achieved, obstacles you encountered, and what you plan next. The mentor adapts its follow-up questions based on the PRs and goals you highlighted earlier.
+When a workspace admin connects Slack, you can message Heph in a direct message. Slack direct messages and web-app chats have separate conversation histories.
 
-### Session summary
-
-At the end of each session, Heph generates a summary that doubles as a standup report. Review the summary and make edits as needed.
-
-![Session summary inside the mentor](./img/ai-mentor/summary.png)
-
-When you are satisfied, save the summary as an artifact. You can export it as Markdown, share a link with your team, or pin it to your dashboard to track follow-up actions.
-
-## Walkthrough videos
-
-- **Starting your first session:**
-
-  <iframe src="https://live.rbg.tum.de/w/artemisintro/59978?video_only=1&t=0" allowFullScreen frameBorder="0" width="600" height="350" title="AI mentor introduction" />
-
-- **Full mentor experience:**
-
-  <iframe src="https://live.rbg.tum.de/w/artemisintro/59979?video_only=1&t=0" allowFullScreen frameBorder="0" width="600" height="350" title="AI mentor walkthrough" />
+Workspace admins can separately enable monitored channels as context. Monitoring starts only after Hephaestus posts a visible announcement, and individual privacy controls apply. See your account settings or the Slack App Home for the controls available to you.

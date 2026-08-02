@@ -2,10 +2,10 @@ import { Link, useLocation } from "@tanstack/react-router";
 import {
 	BrainCircuit,
 	Building2,
-	ChevronLeft,
 	CircleDollarSign,
 	Gauge,
 	KeyRound,
+	LibraryBig,
 	ScrollText,
 	Settings2,
 	Users,
@@ -17,8 +17,8 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { NavContextHeader } from "./NavContextHeader";
 
 /**
  * Content of the dedicated instance-admin (APP_ADMIN) shell — the `context === "admin"` sidebar.
@@ -26,8 +26,9 @@ import {
  * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, the per-workspace
  * admin nav — the instance and workspace levels are never interleaved.
  *
- * Grouped (#1386) so the surfaces the 1.0 backlog keeps adding have a home: a "Detection" group
- * (catalog, labeling, evaluation) joins once #1361/#1365 land — add a new entry here.
+ * Grouped (#1386) so the surfaces the 1.0 backlog keeps adding have a home rather than extending one
+ * flat list: who can get in (Access), what we detect (Detection), what it costs (AI), and running the
+ * instance (Operations). Labeling and evaluation join Detection as they land.
  */
 const ADMIN_NAV_GROUPS = [
 	{
@@ -40,6 +41,17 @@ const ADMIN_NAV_GROUPS = [
 				label: "Login providers",
 				icon: KeyRound,
 				tooltip: "Sign-in options",
+			},
+		],
+	},
+	{
+		label: "Detection",
+		items: [
+			{
+				to: "/admin/catalog",
+				label: "Practice catalog",
+				icon: LibraryBig,
+				tooltip: "What new workspaces receive",
 			},
 		],
 	},
@@ -82,12 +94,7 @@ const ADMIN_NAV_GROUPS = [
 export function NavSuperAdmin() {
 	const { pathname } = useLocation();
 	return (
-		<>
-			<SidebarMenuButton render={<Link to="/" className="font-semibold" />}>
-				<ChevronLeft className="h-4 w-4" />
-				Back to app
-			</SidebarMenuButton>
-			<SidebarSeparator />
+		<NavContextHeader title="Back to app" backLink={<Link to="/" className="font-semibold" />}>
 			<SidebarGroup>
 				<SidebarGroupLabel>Instance administration</SidebarGroupLabel>
 				<SidebarMenu>
@@ -122,6 +129,6 @@ export function NavSuperAdmin() {
 					</SidebarMenu>
 				</SidebarGroup>
 			))}
-		</>
+		</NavContextHeader>
 	);
 }

@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/** A workspace's practice-review policy: when a review runs and where its feedback lands. */
 @WorkspaceScopedController
 @RequestMapping("/practices/review-settings")
 @Tag(name = "Practice Review Settings", description = "Workspace-scoped practice-review policy")

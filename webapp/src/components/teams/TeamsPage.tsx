@@ -1,50 +1,42 @@
+import { Users } from "lucide-react";
 import { useLayoutEffect, useMemo } from "react";
 import type { TeamInfo } from "@/api/types.gen";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { type Contributor, ContributorGrid } from "@/components/shared/ContributorGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-/**
- * TeamsPage component for displaying contributors grouped by teams
- * This is a purely presentational component that receives data via props
- */
 export interface TeamsPageProps {
 	teams: TeamInfo[];
 	isLoading: boolean;
 }
 
 export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
-	// Filter out hidden teams (do not render private/hidden ones)
 	const visibleTeams = useMemo(() => {
 		return [...teams].filter((t) => !t.hidden);
 	}, [teams]);
 
-	// Helper function to sort team members alphabetically by name
 	const sortMembers = (team: TeamInfo) => {
 		return [...(team.members ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
-	// Note: We'll build contributors after filtering descendant duplicates
-
-	// Index of all teams (including hidden) to traverse ancestry chains
 	const allTeamsById = useMemo(() => {
 		const map = new Map<number, TeamInfo>();
 		for (const t of teams) map.set(t.id, t);
 		return map;
 	}, [teams]);
 
-	// Build a parent -> children mapping to create a tree
 	const { roots, childrenMap } = useMemo(() => {
-		// Find nearest visible ancestor for a visible team; skip hidden teams in between
 		const getVisibleAncestorParentId = (team: TeamInfo): number | undefined => {
 			let pid = team.parentId;
 			const guard = new Set<number>();
 			while (pid !== undefined) {
-				if (guard.has(pid)) return undefined; // safety against cycles
+				if (guard.has(pid)) return undefined;
 				guard.add(pid);
 				const parent = allTeamsById.get(pid);
-				if (!parent) return undefined; // unknown ancestor -> treat as root
-				if (!parent.hidden) return parent.id; // nearest visible ancestor
+				if (!parent) return undefined;
+				if (!parent.hidden) return parent.id;
 				pid = parent.parentId;
 			}
 			return undefined;
@@ -60,7 +52,6 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			}
 		});
 
-		// sort children for stable output
 		for (const [k, arr] of map.entries()) {
 			arr.sort((a, b) => a.name.localeCompare(b.name));
 			map.set(k, arr);
@@ -73,7 +64,6 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 		return { roots: rootTeams, childrenMap: map };
 	}, [visibleTeams, allTeamsById]);
 
-	// Build maps to filter out parent members that exist in any visible descendant subteam
 	const membersByTeamId = useMemo(() => {
 		const m = new Map<number, Set<number>>();
 		visibleTeams.forEach((t) => {
@@ -92,16 +82,13 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			const children = childrenMap.get(teamId) ?? [];
 			const res = new Set<number>();
 			for (const child of children) {
-				// child's own members
 				(membersByTeamId.get(child.id) ?? new Set<number>()).forEach((id) => res.add(id));
-				// descendant members
 				collect(child.id).forEach((id) => res.add(id));
 			}
 			memo.set(teamId, res);
 			return res;
 		};
 
-		// prime map for all visible teams
 		visibleTeams.forEach((t) => collect(t.id));
 		return memo;
 	}, [childrenMap, membersByTeamId, visibleTeams]);
@@ -122,27 +109,49 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 		const children = childrenMap.get(team.id) ?? [];
 		const filteredContributors = getFilteredContributors(team);
 		const hasDescendantMembers = (descendantMemberIdsMap.get(team.id)?.size ?? 0) > 0;
-		const emptyStateNode = (
-			<div className="py-8 text-center">
-				<p className="text-muted-foreground">No members assigned to this team</p>
-			</div>
-		);
 		const maybeEmptyState =
-			filteredContributors.length === 0 && !hasDescendantMembers ? emptyStateNode : undefined;
+			filteredContributors.length === 0 && !hasDescendantMembers ? (
+				<p className="py-6 text-center text-sm text-muted-foreground">
+					No members assigned to this team
+				</p>
+			) : undefined;
+		const content = (
+			<>
+				<ContributorGrid
+					contributors={filteredContributors}
+					size="sm"
+					layout="compact"
+					emptyState={maybeEmptyState}
+				/>
+				{children.length > 0 && (
+					<div className="space-y-5">
+						{children.map((child) => renderTeamNode(child, depth + 1))}
+					</div>
+				)}
+			</>
+		);
+
+		if (depth > 0) {
+			return (
+				<section
+					key={team.id}
+					id={`team-${team.id}`}
+					className="min-w-0 space-y-4 border-l pl-3 sm:pl-4"
+				>
+					<h3 className="text-sm font-semibold">{team.name}</h3>
+					{content}
+				</section>
+			);
+		}
+
 		return (
-			<Card key={team.id} id={`team-${team.id}`} className="flex flex-col gap-3">
+			<Card key={team.id} id={`team-${team.id}`}>
 				<CardHeader>
-					<CardTitle>{team.name}</CardTitle>
+					<CardTitle>
+						<h2>{team.name}</h2>
+					</CardTitle>
 				</CardHeader>
-				<CardContent className="space-y-4">
-					<ContributorGrid
-						contributors={filteredContributors}
-						size="sm"
-						layout="compact"
-						emptyState={maybeEmptyState}
-					/>
-					{children.length > 0 && children.map((child) => renderTeamNode(child, depth + 1))}
-				</CardContent>
+				<CardContent className="min-w-0 space-y-5">{content}</CardContent>
 			</Card>
 		);
 	};
@@ -203,36 +212,24 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	}, []);
 
 	return (
-		<>
-			<h2 className="text-2xl font-bold mb-2">Team Contributors</h2>
-			<p className="text-muted-foreground text-sm mb-4">
-				Overview of contributors across different teams
-			</p>
+		<PageLayout>
+			<PageHeader
+				icon={<Users />}
+				title="Teams"
+				description="See contributors grouped by team and explore their activity."
+			/>
 
-			{!isLoading && (
-				<>
-					<div className="space-y-4">{roots.map((team) => renderTeamNode(team))}</div>
-
-					{roots.length === 0 && (
-						<div className="py-8 text-center">
-							<p className="text-muted-foreground">No teams found</p>
-						</div>
-					)}
-				</>
-			)}
-
-			{isLoading &&
-				Array(3)
-					.fill(null)
-					.map((_, teamIndex) => (
-						<Card key={`loading-team-${teamIndex}`} className="flex flex-col mb-8 gap-3">
+			{isLoading ? (
+				<div className="space-y-4">
+					{["a", "b", "c"].map((id) => (
+						<Card key={id}>
 							<CardHeader>
 								<Skeleton className="h-6 w-1/4" />
 							</CardHeader>
 							<CardContent>
 								<ContributorGrid
 									contributors={[]}
-									isLoading={true}
+									isLoading
 									size="sm"
 									layout="compact"
 									loadingSkeletonCount={4}
@@ -240,6 +237,12 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 							</CardContent>
 						</Card>
 					))}
-		</>
+				</div>
+			) : roots.length > 0 ? (
+				<div className="space-y-4">{roots.map((team) => renderTeamNode(team))}</div>
+			) : (
+				<p className="py-8 text-center text-muted-foreground">No teams found</p>
+			)}
+		</PageLayout>
 	);
 }

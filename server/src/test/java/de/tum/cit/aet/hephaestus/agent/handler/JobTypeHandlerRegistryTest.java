@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -75,7 +76,10 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             deliveryService,
             commentPoster,
             org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-            () -> false
+            org.mockito.Mockito.mock(PracticeFeedbackDeliveryPolicy.class),
+            new PracticeFeedbackCommentFormatter(
+                new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
+            )
         );
     }
 

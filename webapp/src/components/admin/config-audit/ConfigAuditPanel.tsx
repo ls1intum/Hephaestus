@@ -8,40 +8,35 @@ import {
 	listWorkspaceConfigAuditEventsInfiniteOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { ConfigAuditEntryView, PageConfigAuditEntryView } from "@/api/types.gen";
-import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
-import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
-import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
 	type ConfigAuditSearch,
-	dayEndIso,
-	dayStartIso,
+	dayAfterInstant,
+	dayStartInstant,
 	fromDateRange,
-	narrowToEnum,
-	nonEmpty,
 	toDateRange,
 } from "@/components/admin/audit-shared/audit-search";
-import { dedupeById } from "@/components/admin/audit-shared/dedupe-by-id";
 import { nameForRef } from "@/components/admin/audit-shared/name-for-ref";
-import { springPageParams } from "@/components/admin/audit-shared/spring-page";
 import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import {
 	ACTION_LABELS,
 	ENTITY_TYPE_LABELS,
 } from "@/components/admin/config-audit/config-audit-format";
-import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMultiSelect";
+import { DateRangeFacet } from "@/components/common/DateRangeFacet";
+import { FacetMultiSelect, toFacetOptions } from "@/components/common/FacetMultiSelect";
+import { FilterToolbar } from "@/components/common/FilterToolbar";
+import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
+import { ResultCount } from "@/components/common/ResultCount";
+import { springPageParams } from "@/integrations/tanstack-query/spring-page";
+import { dedupeById } from "@/lib/dedupe-by-id";
+import { narrowToEnum, nonEmpty } from "@/lib/search-params";
 
 const PAGE_SIZE = 50;
 
 type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;
 
-const ENTITY_TYPE_OPTIONS: FacetOption[] = Object.entries(ENTITY_TYPE_LABELS).map(
-	([value, label]) => ({ value, label }),
-);
-const ACTION_OPTIONS: FacetOption[] = Object.entries(ACTION_LABELS).map(([value, label]) => ({
-	value,
-	label,
-}));
+const ENTITY_TYPE_OPTIONS = toFacetOptions(ENTITY_TYPE_LABELS);
+const ACTION_OPTIONS = toFacetOptions(ACTION_LABELS);
 const ENTITY_TYPES = Object.keys(ENTITY_TYPE_LABELS) as EntityType[];
 const ACTIONS = Object.keys(ACTION_LABELS) as Action[];
 
@@ -52,8 +47,8 @@ function toQuery(search: ConfigAuditSearch) {
 		entityType: narrowToEnum(search.entityType, ENTITY_TYPES),
 		action: narrowToEnum(search.action, ACTIONS),
 		actorId: search.actorId,
-		from: dateRange?.from ? dayStartIso(dateRange.from) : undefined,
-		to: dateRange?.to ? dayEndIso(dateRange.to) : undefined,
+		from: dateRange?.from ? dayStartInstant(dateRange.from) : undefined,
+		to: dateRange?.to ? dayAfterInstant(dateRange.to) : undefined,
 	};
 }
 
@@ -117,10 +112,8 @@ function ConfigAuditView({
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
-	// From the narrowed query, not raw search: unrecognised enum values filter nothing, so they must
-	// not count as an active filter.
 	const query = toQuery(search);
-	const hasFilter = Boolean(
+	const hasAppliedFilter = Boolean(
 		query.entityType || query.action || query.actorId !== undefined || query.from,
 	);
 
@@ -135,7 +128,7 @@ function ConfigAuditView({
 
 	return (
 		<div className="space-y-4">
-			<AuditToolbar hasFilter={hasFilter} onReset={reset}>
+			<FilterToolbar hasFilter={hasAppliedFilter} onReset={reset}>
 				<FacetMultiSelect
 					title="Setting"
 					options={ENTITY_TYPE_OPTIONS}
@@ -148,38 +141,27 @@ function ConfigAuditView({
 					selected={search.action ?? []}
 					onChange={(values) => onSearchChange({ action: nonEmpty(values) })}
 				/>
-				<AuditDateFacet
+				<DateRangeFacet
 					value={dateRange}
 					onChange={(range) => onSearchChange(fromDateRange(range))}
 				/>
 				{search.actorId !== undefined && (
-					<AuditRefFilterPill
+					<ReferenceFilterPill
 						label="Actor"
 						id={search.actorId}
 						name={nameForRef(entries, search.actorId)}
 						onClear={() => onSearchChange({ actorId: undefined })}
 					/>
 				)}
-			</AuditToolbar>
+			</FilterToolbar>
 
-			{/* The live region is always mounted, so a count that arrives later is announced. */}
-			<span role="status" aria-live="polite" className="sr-only">
-				{total === undefined
-					? ""
-					: `${total.toLocaleString()} ${total === 1 ? "change" : "changes"}${hasFilter ? " match your filters" : ""}.`}
-			</span>
-			{total !== undefined && (
-				<p className="text-sm text-muted-foreground" aria-hidden>
-					{total.toLocaleString()} {total === 1 ? "change" : "changes"}
-					{hasFilter ? " match your filters" : ""}.
-				</p>
-			)}
+			<ResultCount total={total} noun={["change", "changes"]} hasFilter={hasAppliedFilter} />
 
 			<ConfigAuditTable
 				entries={entries}
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
-				hasFilter={hasFilter}
+				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
 				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}

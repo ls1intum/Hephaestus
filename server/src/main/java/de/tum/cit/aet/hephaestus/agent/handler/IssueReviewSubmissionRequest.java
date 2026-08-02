@@ -5,23 +5,6 @@ import java.time.Instant;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#ISSUE_REVIEW} jobs.
- *
- * <p>Carries the resolved, async-safe issue fields the handler needs to build job metadata. Unlike a
- * PR there is no head SHA / branch pair — the issue is identified by {@code (repository, number)}.
- * {@code updatedAt} plays the role the head SHA plays for a PR: it is the disposable freshness segment
- * of the idempotency key (an edited issue re-reviews; cooldown scopes per-issue).
- *
- * @param issueId            DB id of the issue
- * @param issueNumber        issue number within the repository
- * @param repositoryId       DB id of the repository
- * @param repositoryFullName {@code owner/repo}
- * @param title              issue title
- * @param body               issue body (may be empty)
- * @param state              issue state name (OPEN/CLOSED)
- * @param updatedAt          issue last-update timestamp (freshness segment; may be null)
- */
 public record IssueReviewSubmissionRequest(
     long issueId,
     int issueNumber,
@@ -30,6 +13,7 @@ public record IssueReviewSubmissionRequest(
     String title,
     String body,
     String state,
+    @Nullable String url,
     @Nullable Instant updatedAt,
     @Nullable String triggerEvent
 ) implements JobSubmissionRequest {
@@ -49,19 +33,5 @@ public record IssueReviewSubmissionRequest(
         if (repositoryId <= 0) {
             throw new IllegalArgumentException("repositoryId must be positive, got " + repositoryId);
         }
-    }
-
-    /** Back-compat constructor for callers without a trigger event (gate-bypass dev path). */
-    public IssueReviewSubmissionRequest(
-        long issueId,
-        int issueNumber,
-        long repositoryId,
-        String repositoryFullName,
-        String title,
-        String body,
-        String state,
-        @Nullable Instant updatedAt
-    ) {
-        this(issueId, issueNumber, repositoryId, repositoryFullName, title, body, state, updatedAt, null);
     }
 }

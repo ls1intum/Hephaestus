@@ -5,7 +5,7 @@ import type { ComponentPropsWithoutRef, SVGAttributes } from "react";
 import { listIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import type { IdentityProviderView } from "@/api/types.gen";
 import { DevSignInForm } from "@/components/auth/DevSignInForm";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -197,17 +197,23 @@ export function SignInButtons({
 		// GitHub nor GitLab configured there is nothing the header can render inline. It must still
 		// offer a way in: send the user to the full sign-in page rather than showing an empty header.
 		if (oauthProviders.length === 0) {
+			if (disabled) {
+				return (
+					<Button variant="outline" size="sm" disabled aria-label="Sign in">
+						<LogInIcon aria-hidden />
+						Sign in
+					</Button>
+				);
+			}
 			return (
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={disabled}
-					render={<Link to="/login" />}
+				<Link
+					to="/login"
+					className={buttonVariants({ variant: "outline", size: "sm" })}
 					aria-label="Sign in"
 				>
 					<LogInIcon aria-hidden />
 					Sign in
-				</Button>
+				</Link>
 			);
 		}
 		return (

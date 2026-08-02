@@ -1,4 +1,3 @@
-// League data structure used for mapping points to tiers in the client
 export const Leagues = [
 	{
 		name: "Bronze",
@@ -27,17 +26,10 @@ export const Leagues = [
 	},
 ];
 
-/**
- * Returns the league tier based on league points
- */
 export function getLeagueFromPoints(points: number) {
 	return Leagues.find((league) => points >= league.minPoints && points < league.maxPoints);
 }
 
-/**
- * Returns the league tier name (lowercase) based on league points
- * Used for CSS class names
- */
 export function getLeagueTier(
 	points?: number,
 ): "bronze" | "silver" | "gold" | "diamond" | "master" | "none" {
@@ -60,9 +52,6 @@ export function getLeagueTier(
 	return "master";
 }
 
-/**
- * Returns the league tier label based on tier
- */
 export function getLeagueLabel(tier: ReturnType<typeof getLeagueTier>): string {
 	const labels = {
 		none: "Not Ranked",
@@ -85,6 +74,19 @@ export function getLeagueColor(tier: ReturnType<typeof getLeagueTier>): string {
 		diamond: "bg-league-diamond",
 		master: "bg-league-master",
 	};
+
+	return labels[tier];
+}
+
+export function getLeagueForegroundColor(tier: ReturnType<typeof getLeagueTier>): string {
+	const labels = {
+		none: "text-black",
+		bronze: "text-black",
+		silver: "text-black",
+		gold: "text-black",
+		diamond: "text-white",
+		master: "text-black",
+	} satisfies Record<ReturnType<typeof getLeagueTier>, string>;
 
 	return labels[tier];
 }

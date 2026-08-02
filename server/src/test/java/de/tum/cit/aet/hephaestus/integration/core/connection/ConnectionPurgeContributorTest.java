@@ -1,18 +1,24 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
@@ -23,12 +29,8 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
-/**
- * Erasure must not be preemptable. Wired against a real {@link ConnectionService} rather than a mock
- * of it, because the property under test is precisely that the service does not fence this caller —
- * a stubbed {@code transition} could assert nothing about that.
- */
 class ConnectionPurgeContributorTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 42L;
@@ -45,12 +47,11 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
     @Mock
     private SyncJobService syncJobService;
 
-    /**
-     * Purge goes through {@code transition}, which passes no revoke callback, so the revoke transaction
-     * template is never exercised here — an unstubbed mock is enough to construct the service.
-     */
     @Mock
     private PlatformTransactionManager transactionManager;
+
+    @Mock
+    private ConnectionStrategy connectionStrategy;
 
     private CredentialBundleConverter credentialConverter;
     private ConnectionService connectionService;
@@ -70,21 +71,59 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
         Mockito.lenient()
             .when(connectionRepository.save(any(Connection.class)))
             .thenAnswer(inv -> inv.getArgument(0));
+        Mockito.lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        Mockito.lenient().when(connectionStrategy.kind()).thenReturn(IntegrationKind.GITHUB);
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
     }
 
     @Test
-    void purge_scrubsCredentialsAndNeverConsultsTheSyncFence() throws Exception {
+    void purge_revokesSuspendedProviderBeforeScrubbingCredentialsWithoutConsultingTheSyncFence() throws Exception {
+        Connection connection = activeConnectionWithCredentials();
+        connection.setState(IntegrationState.SUSPENDED);
+        when(connectionRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(connection));
+        doAnswer(invocation -> {
+            assertThat(connection.getCredentialsEncrypted()).isNotNull();
+            return null;
+        })
+            .when(connectionStrategy)
+            .revokeProvider(erasureRef(connection));
+
+        contributor(List.of(connectionStrategy)).deleteWorkspaceData(WORKSPACE_ID);
+
+        verify(connectionStrategy).revokeProvider(erasureRef(connection));
+        assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(connection.getCredentialsEncrypted()).isNull();
+        verify(syncJobService, never()).requestCancelForTeardown(anyLong());
+    }
+
+    @Test
+    void purge_preservesCredentialsWhenProviderRevokeFails() throws Exception {
+        Connection connection = activeConnectionWithCredentials();
+        when(connectionRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(connection));
+        doThrow(new RuntimeException("provider unavailable"))
+            .when(connectionStrategy)
+            .revokeProvider(erasureRef(connection));
+
+        assertThatThrownBy(() -> contributor(List.of(connectionStrategy)).deleteWorkspaceData(WORKSPACE_ID))
+            .isInstanceOf(WorkspacePurgeBlockedException.class)
+            .hasMessage(
+                "Could not confirm disconnecting GitHub. No local data was deleted; retry when the provider is available."
+            );
+
+        assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
+        assertThat(connection.getCredentialsEncrypted()).isNotNull();
+    }
+
+    @Test
+    void purge_scrubsCredentialsWhenDisabledProviderHasNoStrategy() throws Exception {
         Connection connection = activeConnectionWithCredentials();
         when(connectionRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(connection));
 
-        new ConnectionPurgeContributor(connectionRepository, connectionService).deleteWorkspaceData(WORKSPACE_ID);
+        contributor(List.of()).deleteWorkspaceData(WORKSPACE_ID);
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(connection.getCredentialsEncrypted()).isNull();
-        // Erasure is not preemptable: transition() never fences on an in-flight sync job.
-        verify(syncJobService, never()).requestCancelForTeardown(anyLong());
     }
 
     @Test
@@ -93,9 +132,23 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
         connection.setState(IntegrationState.UNINSTALLED);
         when(connectionRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(connection));
 
-        new ConnectionPurgeContributor(connectionRepository, connectionService).deleteWorkspaceData(WORKSPACE_ID);
+        contributor(List.of(connectionStrategy)).deleteWorkspaceData(WORKSPACE_ID);
 
         verify(auditRepository, never()).save(any());
+        verify(connectionStrategy, never()).revokeProvider(any());
+    }
+
+    private ConnectionPurgeContributor contributor(List<ConnectionStrategy> strategies) {
+        return new ConnectionPurgeContributor(connectionRepository, connectionService, strategies);
+    }
+
+    private static IntegrationRef erasureRef(Connection connection) {
+        return new IntegrationRef(
+            connection.getKind(),
+            connection.getWorkspace().getId(),
+            connection.getInstanceKey(),
+            connection.getId()
+        );
     }
 
     private Connection activeConnectionWithCredentials() throws Exception {
@@ -110,7 +163,6 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
         id.set(connection, 55L);
         connection.setState(IntegrationState.ACTIVE);
         connection.setCredentials(new BearerToken("ghp-secret", null), credentialConverter);
-        // Lenient: the already-UNINSTALLED case is skipped before applyTransition re-reads the row.
         Mockito.lenient()
             .when(connectionRepository.findByIdAndWorkspaceId(55L, WORKSPACE_ID))
             .thenReturn(Optional.of(connection));

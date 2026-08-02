@@ -1,11 +1,6 @@
 import { Check, Lock } from "lucide-react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
-import {
-	categoryLabels,
-	rarityLabels,
-	rarityTitleColors,
-	statusBackgrounds,
-} from "@/components/achievements/styles";
+import { categoryLabels, rarityLabels, statusBackgrounds } from "@/components/achievements/styles";
 import type {
 	AchievementCategory,
 	AchievementStatus,
@@ -27,12 +22,7 @@ export interface AchievementListViewProps {
 	achievements: UIAchievement[];
 }
 
-/**
- * Accessible list/table view of achievements.
- * Provides a screen-reader friendly alternative to the skill tree visualization.
- */
 export function AchievementsListView({ achievements }: AchievementListViewProps) {
-	// Group achievements by category for better organization
 	const groupedAchievements = achievements.reduce<
 		Partial<Record<AchievementCategory, UIAchievement[]>>
 	>((acc, achievement) => {
@@ -77,7 +67,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 
 	return (
 		<div
-			className="flex-1 overflow-auto p-6 min-h-0 h-full"
+			className="h-full min-h-0 flex-1 overflow-auto p-4 sm:p-6"
 			role="region"
 			aria-label="Achievement list"
 		>
@@ -113,10 +103,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 										const status = achievement.status;
 
 										return (
-											<TableRow
-												key={achievement.id}
-												className={cn(status === "locked" && "opacity-60")}
-											>
+											<TableRow key={achievement.id}>
 												<TableCell>
 													<div
 														className={cn(
@@ -137,12 +124,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 													</div>
 												</TableCell>
 												<TableCell>
-													<span
-														className={cn(
-															"text-sm font-semibold",
-															rarityTitleColors[achievement.rarity],
-														)}
-													>
+													<span className="text-sm font-semibold text-foreground">
 														{rarityLabels[achievement.rarity]}
 													</span>
 												</TableCell>

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.util.Collection;
@@ -56,6 +57,14 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
      * requires) and deliberately state-agnostic: deactivation cleanup runs after the row left ACTIVE.
      */
     Optional<Connection> findByIdAndWorkspaceId(Long id, long workspaceId);
+
+    @WorkspaceAgnostic("Provider uninstall guard checks whether another workspace still uses the same installation")
+    boolean existsByKindAndInstanceKeyAndStateNotAndIdNot(
+        IntegrationKind kind,
+        String instanceKey,
+        IntegrationState state,
+        Long id
+    );
 
     @Query("SELECT c FROM Connection c WHERE c.workspace.id = :workspaceId")
     List<Connection> findByWorkspaceId(@Param("workspaceId") long workspaceId);

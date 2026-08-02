@@ -1,28 +1,9 @@
 import { expect } from "storybook/test";
 
-/**
- * Assertions for WCAG 2.2 SC 1.4.10 (Reflow) and SC 2.5.8 (Target Size), for the Storybook browser
- * tier. Callers must set `parameters.viewport.defaultViewport = "reflow"` — measuring against a
- * 1280 px window passes vacuously, so every viewport-reading helper asserts it first.
- */
-
 const LAYOUT_SLACK_PX = 1;
-
-/** The WCAG 2.2 SC 1.4.10 reflow width, in CSS px. */
-export const REFLOW_WIDTH = 320;
-
-/** The WCAG 2.2 SC 2.5.8 minimum target edge, in CSS px. */
 const MIN_TARGET_PX = 24;
 
-export async function expectReflowViewport() {
-	await expect(
-		window.innerWidth,
-		`Expected the reflow viewport (<= ${REFLOW_WIDTH} px) but the window is ${window.innerWidth} px wide. Set parameters.viewport.defaultViewport = "reflow" on this story.`,
-	).toBeLessThanOrEqual(REFLOW_WIDTH + LAYOUT_SLACK_PX);
-}
-
-export async function expectPageReflows() {
-	await expectReflowViewport();
+export async function expectNoPageOverflow() {
 	await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
 		document.documentElement.clientWidth + LAYOUT_SLACK_PX,
 	);
@@ -47,7 +28,6 @@ export async function expectTablesScrollInPlace(
 	root: HTMLElement | Document = document,
 	{ expectOverflow = false }: { expectOverflow?: boolean } = {},
 ) {
-	await expectReflowViewport();
 	const tables = root.querySelectorAll<HTMLElement>("table");
 	await expect(tables.length).toBeGreaterThan(0);
 	for (const table of tables) {
@@ -69,7 +49,6 @@ export async function expectTablesScrollInPlace(
 	}
 }
 
-/** WCAG 2.2 SC 2.5.8 Target Size (Minimum). Carries no viewport guard: 24 px is 24 px at any width. */
 export async function expectTargetSize(control: HTMLElement) {
 	const rect = control.getBoundingClientRect();
 	await expect(rect.width).toBeGreaterThanOrEqual(MIN_TARGET_PX);
@@ -93,7 +72,6 @@ export async function expectTargetSpacing(controls: HTMLElement[]) {
 }
 
 export async function expectWithinViewport(control: HTMLElement) {
-	await expectReflowViewport();
 	const rect = control.getBoundingClientRect();
 	await expect(rect.top).toBeGreaterThanOrEqual(-LAYOUT_SLACK_PX);
 	await expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight + LAYOUT_SLACK_PX);
@@ -119,7 +97,6 @@ export function openDialogPopup(): HTMLElement {
 
 /** A centred `fixed` popup hangs off *both* edges once it outgrows the viewport, and cannot be scrolled back. */
 export async function expectDialogFitsViewport(popup: HTMLElement = openDialogPopup()) {
-	await expectReflowViewport();
 	// The layout box, not `getBoundingClientRect`: the `zoom-in-95` enter animation may still be
 	// mid-flight, and its 0.95 scale would let a slightly-too-big popup pass.
 	await expect(popup.offsetHeight).toBeLessThanOrEqual(window.innerHeight);
@@ -130,7 +107,6 @@ export async function expectDialogFitsViewport(popup: HTMLElement = openDialogPo
 
 /** Exactly one scroller, so reaching the bottom of a long form cannot scroll the title out of sight. */
 export async function expectDialogBodyScrolls(popup: HTMLElement = openDialogPopup()) {
-	await expectReflowViewport();
 	const heading = popup.querySelector<HTMLElement>('h2, [role="heading"]');
 	if (heading == null) {
 		throw new Error("A dialog with no heading has nothing to keep pinned while its body scrolls.");

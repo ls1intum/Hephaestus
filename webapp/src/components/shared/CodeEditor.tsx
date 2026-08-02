@@ -2,12 +2,13 @@ import Editor, { type EditorProps } from "@monaco-editor/react";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
-interface CodeEditorProps {
+export interface CodeEditorProps {
 	value: string;
 	onChange: (value: string) => void;
 	language?: string;
 	className?: string;
 	readOnly?: boolean;
+	ariaLabel?: string;
 }
 
 export function CodeEditor({
@@ -16,6 +17,7 @@ export function CodeEditor({
 	language = "typescript",
 	className,
 	readOnly = false,
+	ariaLabel,
 }: CodeEditorProps) {
 	const handleChange: EditorProps["onChange"] = (newValue) => {
 		onChange(newValue ?? "");
@@ -40,6 +42,7 @@ export function CodeEditor({
 					tabSize: 2,
 					wordWrap: "on",
 					readOnly,
+					ariaLabel,
 					renderLineHighlight: "none",
 					overviewRulerLanes: 0,
 					hideCursorInOverviewRuler: true,

@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { TeamInfo } from "@/api/types.gen";
+import { withStandardPage } from "@/stories/decorators";
+import { expectNoPageOverflow } from "@/test/reflow";
 import { TeamsPage } from "./TeamsPage";
 
 const mockTeams: TeamInfo[] = [
@@ -125,6 +127,7 @@ const meta: Meta<typeof TeamsPage> = {
 	parameters: {
 		layout: "fullscreen",
 	},
+	decorators: [withStandardPage],
 };
 
 export default meta;
@@ -149,4 +152,23 @@ export const Empty: Story = {
 		teams: [],
 		isLoading: false,
 	},
+};
+
+export const MobileHierarchy: Story = {
+	args: {
+		teams: mockTeams.map((team) =>
+			team.id === 5
+				? {
+						...team,
+						name: "Developer experience and platform enablement",
+					}
+				: team,
+		),
+		isLoading: false,
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: expectNoPageOverflow,
 };

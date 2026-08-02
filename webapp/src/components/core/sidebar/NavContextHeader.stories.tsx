@@ -1,25 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { Link } from "@tanstack/react-router";
+import { expect, within } from "storybook/test";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavContextHeader } from "./NavContextHeader";
 
-/**
- * Header navigation for a context with back button to return to main navigation.
- * Provides context and navigation controls when the sidebar is in a specific context.
- */
 const meta = {
 	component: NavContextHeader,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
-	argTypes: {
-		title: {
-			control: "text",
-			description: "Title of the context header, displayed prominently.",
-			defaultValue: "Mentor",
-		},
+	args: {
+		title: "Mentor",
+		backLink: <Link to="/" />,
 	},
 	decorators: [
 		(Story) => (
-			<SidebarProvider className="min-h-0 w-[16rem] border border-border rounded-lg p-2 bg-sidebar">
+			<SidebarProvider className="min-h-0 w-[16rem] rounded-lg border border-border bg-sidebar p-2">
 				<Story />
 			</SidebarProvider>
 		),
@@ -29,22 +24,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default context header with back navigation.
- */
-export const Default: Story = {
-	args: {
-		title: "Mentor",
-		workspaceSlug: "ls1intum",
-	},
-};
+export const Default: Story = {};
 
-/**
- * Header shown when user is a specific context, providing clear context and way back to main navigation.
- */
-export const WithContext: Story = {
-	args: {
-		title: "Mentor",
-		workspaceSlug: "ls1intum",
+export const LongTitle: Story = {
+	args: { title: "A context whose name is far too long to fit in the sidebar" },
+	play: async ({ canvasElement }) => {
+		const button = within(canvasElement).getByRole("link");
+		await expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth);
 	},
 };

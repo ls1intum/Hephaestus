@@ -2,20 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavDashboards } from "./NavDashboards";
 
-/**
- * Navigation component for dashboard features, providing access to various user
- * dashboards and analytics views.
- */
 const meta = {
 	component: NavDashboards,
 	parameters: {
 		layout: "centered",
-		docs: {
-			description: {
-				component:
-					"Dashboard navigation sidebar component with links to different analytics views and user dashboards.",
-			},
-		},
 	},
 	tags: ["autodocs"],
 	args: {
@@ -23,24 +13,6 @@ const meta = {
 		workspaceSlug: "aet",
 		achievementsEnabled: true,
 		leaderboardEnabled: true,
-	},
-	argTypes: {
-		username: {
-			control: "text",
-			description: "Username of the current user",
-		},
-		workspaceSlug: {
-			control: "text",
-			description: "Active workspace slug",
-		},
-		achievementsEnabled: {
-			control: "boolean",
-			description: "Whether achievements sidebar item is visible",
-		},
-		leaderboardEnabled: {
-			control: "boolean",
-			description: "Whether leaderboard sidebar item is visible",
-		},
 	},
 	decorators: [
 		(Story) => (
@@ -54,14 +26,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default view of the dashboards navigation sidebar.
- */
 export const Default: Story = {};
 
-/**
- * Different user's dashboard navigation.
- */
 export const DifferentUser: Story = {
 	args: {
 		username: "janeDoe",
@@ -69,9 +35,6 @@ export const DifferentUser: Story = {
 	},
 };
 
-/**
- * All optional features disabled — only Profile and Teams remain.
- */
 export const AllFeaturesDisabled: Story = {
 	args: {
 		achievementsEnabled: false,

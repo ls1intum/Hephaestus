@@ -17,21 +17,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Stores Hephaestus platform preferences for a user.
- * <p>
- * This entity is separate from {@link User} to maintain domain isolation.
- * The integration.scm module should only contain data from the Git provider (GitHub),
- * while platform-specific preferences belong in the account module.
- * <p>
- * Preferences include:
- * <ul>
- *   <li>{@link #participateInResearch} - Whether the user consents to analytics/research data collection</li>
- *   <li>{@link #aiReviewEnabled} - Whether the user wants AI-generated practice review comments on PRs</li>
- * </ul>
- *
- * @see AccountService
- */
 @Entity
 @Table(name = "user_preferences")
 @Getter
@@ -46,10 +31,6 @@ public class UserPreferences {
     @EqualsAndHashCode.Include
     private Long id;
 
-    /**
-     * The user these preferences belong to.
-     * Uses a one-to-one relationship with the User entity.
-     */
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(
         name = "user_id",
@@ -60,27 +41,12 @@ public class UserPreferences {
     @ToString.Exclude
     private User user;
 
-    /**
-     * Whether the user consents to analytics and research data collection.
-     * Defaults to true for new users.
-     * When changed from true to false, analytics data should be deleted.
-     */
     @Column(name = "participate_in_research", nullable = false)
     private boolean participateInResearch = true;
 
-    /**
-     * Whether the user wants to receive AI-generated practice review comments on their PRs.
-     * Defaults to true for new users (opt-out model).
-     * Checked before posting comments; findings are always stored regardless.
-     */
     @Column(name = "ai_review_enabled", nullable = false)
-    private boolean aiReviewEnabled = true;
+    private boolean practiceFeedbackDeliveryEnabled = true;
 
-    /**
-     * Creates a new UserPreferences instance for the given user with default settings.
-     *
-     * @param user the user these preferences belong to
-     */
     public UserPreferences(User user) {
         this.user = user;
     }

@@ -4,13 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 export function LandingTestimonialSection() {
 	return (
 		<section id="testimonials" className="w-full py-8 md:py-16 bg-background">
-			<div className="container px-4 md:px-6">
+			<div className="mx-auto w-full max-w-7xl px-4 md:px-6">
 				<div className="mb-8 text-center max-w-3xl mx-auto">
 					<Badge className="mb-4" variant="outline">
 						Testimonial
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						From Our Community
+						From our community
 					</h2>
 				</div>
 

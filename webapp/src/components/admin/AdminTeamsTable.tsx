@@ -1,6 +1,9 @@
 import { Search, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TeamTree } from "./teams/TeamTree";
@@ -8,6 +11,10 @@ import { TeamTree } from "./teams/TeamTree";
 export interface TeamsTableProps {
 	teams: TeamInfo[];
 	isLoading?: boolean;
+	error?: unknown;
+	onRetry?: () => void;
+	search: string;
+	onSearchChange: (search: string) => void;
 	onHideTeam: (teamId: number, hidden: boolean) => Promise<void>;
 	onToggleRepositoryVisibility: (
 		teamId: number,
@@ -21,21 +28,21 @@ export interface TeamsTableProps {
 export function AdminTeamsTable({
 	teams,
 	isLoading = false,
+	error,
+	onRetry,
+	search,
+	onSearchChange,
 	onHideTeam,
 	onToggleRepositoryVisibility,
 	onAddLabelToTeam,
 	onRemoveLabelFromTeam,
 }: TeamsTableProps) {
-	const [teamSearch, setTeamSearch] = useState("");
-
-	// Build full team map (do NOT exclude hidden in admin view)
 	const allTeamsById = useMemo(() => {
 		const map = new Map<number, TeamInfo>();
 		for (const t of teams) map.set(t.id, t);
 		return map;
 	}, [teams]);
 
-	// Build children map using plain parentId relationships
 	const childrenMap = useMemo(() => {
 		const map = new Map<number, TeamInfo[]>();
 		for (const t of teams) {
@@ -46,7 +53,6 @@ export function AdminTeamsTable({
 				map.set(pid, arr);
 			}
 		}
-		// sort children
 		for (const [k, arr] of map.entries()) {
 			arr.sort((a, b) => a.name.localeCompare(b.name));
 			map.set(k, arr);
@@ -54,7 +60,6 @@ export function AdminTeamsTable({
 		return map;
 	}, [teams, allTeamsById]);
 
-	// Roots are teams without a valid parent in our dataset
 	const rootsAll = useMemo(
 		() =>
 			[...teams]
@@ -63,13 +68,12 @@ export function AdminTeamsTable({
 		[teams, allTeamsById],
 	);
 
-	// Compute display set based on name search: include a node if it or any descendant matches
 	const displaySet = useMemo(() => {
-		const search = teamSearch.trim().toLowerCase();
-		if (!search) return new Set<number>(teams.map((t) => t.id));
+		const normalizedSearch = search.trim().toLowerCase();
+		if (!normalizedSearch) return new Set<number>(teams.map((t) => t.id));
 		const result = new Set<number>();
 		const memo = new Map<number, boolean>();
-		const matches = (t: TeamInfo): boolean => t.name.toLowerCase().includes(search);
+		const matches = (t: TeamInfo): boolean => t.name.toLowerCase().includes(normalizedSearch);
 		const hasMatchInSubtree = (t: TeamInfo): boolean => {
 			const cached = memo.get(t.id);
 			if (cached !== undefined) return cached;
@@ -97,46 +101,49 @@ export function AdminTeamsTable({
 			traverse(r);
 		}
 		return result;
-	}, [teamSearch, teams, childrenMap, rootsAll]);
+	}, [search, teams, childrenMap, rootsAll]);
 
-	// Repository-wide label catalog by repoId, using repository.labels provided in RepositoryInfoDTO
 	const repoLabelCatalog = useMemo(() => {
-		// Deduplicate by normalized label name, not by id, since the same repo appears under multiple teams
-		// and backend DTOs might produce different ids for identical labels.
-		const map = new Map<number, Map<string, LabelInfo>>();
+		const map = new Map<number, Map<number, LabelInfo>>();
 		for (const t of teams) {
 			for (const repo of t.repositories ?? []) {
-				const byName = map.get(repo.id) ?? new Map<string, LabelInfo>();
+				const byId = map.get(repo.id) ?? new Map<number, LabelInfo>();
 				for (const lbl of repo.labels ?? []) {
-					const key = (lbl.name ?? "").toLowerCase();
-					if (key && !byName.has(key)) byName.set(key, lbl);
+					byId.set(lbl.id, lbl);
 				}
-				map.set(repo.id, byName);
+				map.set(repo.id, byId);
 			}
 		}
 		return map;
 	}, [teams]);
 
 	const getCatalogLabels = (repoId: number): LabelInfo[] => {
-		const byName = repoLabelCatalog.get(repoId);
-		if (!byName) return [];
-		return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+		const byId = repoLabelCatalog.get(repoId);
+		if (!byId) return [];
+		return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
-	const heading = (
-		<div>
-			<h1 className="text-3xl font-bold tracking-tight">Teams</h1>
-			<p className="text-muted-foreground">
-				Teams synced from your provider. Hide a team or repository to leave it out of this
-				workspace.
-			</p>
-		</div>
+	const header = (
+		<PageHeader
+			icon={<Users />}
+			title="Teams"
+			description="Manage which synced teams and repositories participate in this workspace."
+		/>
 	);
+
+	if (error) {
+		return (
+			<PageLayout>
+				{header}
+				<QueryErrorAlert error={error} title="Couldn't load teams" onRetry={onRetry} />
+			</PageLayout>
+		);
+	}
 
 	if (isLoading) {
 		return (
-			<div className="space-y-6">
-				{heading}
+			<PageLayout>
+				{header}
 				<div className="flex items-center justify-between">
 					<Skeleton className="h-10 w-64" />
 					<Skeleton className="h-10 w-32" />
@@ -146,20 +153,21 @@ export function AdminTeamsTable({
 						<Skeleton key={`loading-${id}`} className="h-32" />
 					))}
 				</div>
-			</div>
+			</PageLayout>
 		);
 	}
 
 	return (
-		<div className="space-y-6">
-			{heading}
+		<PageLayout>
+			{header}
 			<div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
 				<div className="relative w-full sm:max-w-md">
 					<Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
 					<Input
+						aria-label="Search teams"
 						placeholder="Search teams..."
-						value={teamSearch}
-						onChange={(e) => setTeamSearch(e.target.value)}
+						value={search}
+						onChange={(e) => onSearchChange(e.target.value)}
 						className="pl-10"
 					/>
 				</div>
@@ -168,9 +176,9 @@ export function AdminTeamsTable({
 			{rootsAll.filter((t) => displaySet.has(t.id)).length === 0 ? (
 				<div className="text-center py-12">
 					<Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-					<h3 className="text-lg font-medium mb-2">No teams found</h3>
+					<h2 className="text-lg font-medium mb-2">No teams found</h2>
 					<p className="text-muted-foreground">
-						{teamSearch ? "Try different search terms." : "No teams available."}
+						{search ? "Try different search terms." : "No teams available."}
 					</p>
 				</div>
 			) : (
@@ -192,6 +200,6 @@ export function AdminTeamsTable({
 						))}
 				</div>
 			)}
-		</div>
+		</PageLayout>
 	);
 }

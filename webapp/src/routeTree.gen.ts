@@ -23,16 +23,17 @@ import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as WWorkspaceSlugLoginRouteImport } from './routes/w/$workspaceSlug/login'
-import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
 import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin.workspaces'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminUsageRouteImport } from './routes/_authenticated/admin.usage'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminModelsRouteImport } from './routes/_authenticated/admin.models'
 import { Route as AuthenticatedAdminLoginProvidersRouteImport } from './routes/_authenticated/admin.login-providers'
+import { Route as AuthenticatedAdminCatalogRouteImport } from './routes/_authenticated/admin.catalog'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as AuthenticatedWorkspacesNewIndexRouteImport } from './routes/_authenticated/workspaces/new/index'
 import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
+import { Route as AuthenticatedAdminCatalogIndexRouteImport } from './routes/_authenticated/admin.catalog.index'
 import { Route as AuthenticatedWorkspacesNewGitlabRouteImport } from './routes/_authenticated/workspaces/new/gitlab'
 import { Route as AuthenticatedWorkspacesNewGithubRouteImport } from './routes/_authenticated/workspaces/new/github'
 import { Route as AuthenticatedWWorkspaceSlugMentorRouteImport } from './routes/_authenticated/w/$workspaceSlug/mentor'
@@ -51,17 +52,31 @@ import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsRouteImport } from
 import { Route as AuthenticatedWWorkspaceSlugAdminAuditRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/audit'
 import { Route as AuthenticatedWWorkspaceSlugAdminAchievementsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/achievements'
 import { Route as AuthenticatedWWorkspaceSlugAdminAchievementDesignerRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/achievement-designer'
+import { Route as AuthenticatedAdminCatalogPracticesNewRouteImport } from './routes/_authenticated/admin.catalog.practices.new'
+import { Route as AuthenticatedAdminCatalogPracticesPracticeSlugRouteImport } from './routes/_authenticated/admin.catalog.practices.$practiceSlug'
+import { Route as AuthenticatedAdminCatalogAreasNewRouteImport } from './routes/_authenticated/admin.catalog.areas.new'
+import { Route as AuthenticatedAdminCatalogAreasAreaSlugRouteImport } from './routes/_authenticated/admin.catalog.areas.$areaSlug'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/index'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/index'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations/index'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernameAchievementsRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/achievements'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesSettingsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/settings'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesRunsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/runs'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesNewRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/new'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsSlackRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations/slack'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsScmRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations/scm'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsOutlineRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations/outline'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/index'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/$jobId'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/index'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/index'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/$findingId'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId'
 
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
@@ -133,12 +148,6 @@ const WWorkspaceSlugLoginRoute = WWorkspaceSlugLoginRouteImport.update({
   path: '/w/$workspaceSlug/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedMentorMentor_accessRoute =
-  AuthenticatedMentorMentor_accessRouteImport.update({
-    id: '/mentor/_mentor_access',
-    path: '/mentor',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedAdminWorkspacesRoute =
   AuthenticatedAdminWorkspacesRouteImport.update({
     id: '/workspaces',
@@ -173,6 +182,12 @@ const AuthenticatedAdminLoginProvidersRoute =
     path: '/login-providers',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminCatalogRoute =
+  AuthenticatedAdminCatalogRouteImport.update({
+    id: '/catalog',
+    path: '/catalog',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -189,6 +204,12 @@ const AuthenticatedWWorkspaceSlugIndexRoute =
     id: '/w/$workspaceSlug/',
     path: '/w/$workspaceSlug/',
     getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminCatalogIndexRoute =
+  AuthenticatedAdminCatalogIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminCatalogRoute,
   } as any)
 const AuthenticatedWorkspacesNewGitlabRoute =
   AuthenticatedWorkspacesNewGitlabRouteImport.update({
@@ -298,6 +319,30 @@ const AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute =
     path: '/achievement-designer',
     getParentRoute: () => AuthenticatedWWorkspaceSlugAdminRouteRoute,
   } as any)
+const AuthenticatedAdminCatalogPracticesNewRoute =
+  AuthenticatedAdminCatalogPracticesNewRouteImport.update({
+    id: '/practices/new',
+    path: '/practices/new',
+    getParentRoute: () => AuthenticatedAdminCatalogRoute,
+  } as any)
+const AuthenticatedAdminCatalogPracticesPracticeSlugRoute =
+  AuthenticatedAdminCatalogPracticesPracticeSlugRouteImport.update({
+    id: '/practices/$practiceSlug',
+    path: '/practices/$practiceSlug',
+    getParentRoute: () => AuthenticatedAdminCatalogRoute,
+  } as any)
+const AuthenticatedAdminCatalogAreasNewRoute =
+  AuthenticatedAdminCatalogAreasNewRouteImport.update({
+    id: '/areas/new',
+    path: '/areas/new',
+    getParentRoute: () => AuthenticatedAdminCatalogRoute,
+  } as any)
+const AuthenticatedAdminCatalogAreasAreaSlugRoute =
+  AuthenticatedAdminCatalogAreasAreaSlugRouteImport.update({
+    id: '/areas/$areaSlug',
+    path: '/areas/$areaSlug',
+    getParentRoute: () => AuthenticatedAdminCatalogRoute,
+  } as any)
 const AuthenticatedWWorkspaceSlugUserUsernameIndexRoute =
   AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport.update({
     id: '/w/$workspaceSlug/user/$username/',
@@ -334,6 +379,12 @@ const AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute =
     path: '/runs',
     getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesRoute,
   } as any)
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteImport.update({
+    id: '/reviews',
+    path: '/reviews',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesRoute,
+  } as any)
 const AuthenticatedWWorkspaceSlugAdminPracticesNewRoute =
   AuthenticatedWWorkspaceSlugAdminPracticesNewRouteImport.update({
     id: '/new',
@@ -364,6 +415,75 @@ const AuthenticatedWWorkspaceSlugAdminIntegrationsOutlineRoute =
     path: '/outline',
     getParentRoute: () => AuthenticatedWWorkspaceSlugAdminIntegrationsRoute,
   } as any)
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteImport.update({
+    id: '/findings',
+    path: '/findings',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteImport.update({
+    id: '/delivery',
+    path: '/delivery',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRouteImport.update({
+    id: '/$jobId',
+    path: '/$jobId',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRouteImport.update(
+    {
+      id: '/',
+      path: '/',
+      getParentRoute: () =>
+        AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute,
+    } as any,
+  )
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRouteImport.update(
+    {
+      id: '/',
+      path: '/',
+      getParentRoute: () =>
+        AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute,
+    } as any,
+  )
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRouteImport.update(
+    {
+      id: '/$findingId',
+      path: '/$findingId',
+      getParentRoute: () =>
+        AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute,
+    } as any,
+  )
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRouteImport.update(
+    {
+      id: '/$feedbackId',
+      path: '/$feedbackId',
+      getParentRoute: () =>
+        AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute,
+    } as any,
+  )
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRouteImport.update(
+    {
+      id: '/targets/$artifactType/$artifactId',
+      path: '/targets/$artifactType/$artifactId',
+      getParentRoute: () =>
+        AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
+    } as any,
+  )
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -378,13 +498,13 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/catalog': typeof AuthenticatedAdminCatalogRouteWithChildren
   '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/admin/models': typeof AuthenticatedAdminModelsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/usage': typeof AuthenticatedAdminUsageRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
-  '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
@@ -392,8 +512,13 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
+  '/admin/catalog/': typeof AuthenticatedAdminCatalogIndexRoute
   '/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
   '/workspaces/new/': typeof AuthenticatedWorkspacesNewIndexRoute
+  '/admin/catalog/areas/$areaSlug': typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
+  '/admin/catalog/areas/new': typeof AuthenticatedAdminCatalogAreasNewRoute
+  '/admin/catalog/practices/$practiceSlug': typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
+  '/admin/catalog/practices/new': typeof AuthenticatedAdminCatalogPracticesNewRoute
   '/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
   '/w/$workspaceSlug/admin/achievements': typeof AuthenticatedWWorkspaceSlugAdminAchievementsRoute
   '/w/$workspaceSlug/admin/audit': typeof AuthenticatedWWorkspaceSlugAdminAuditRoute
@@ -412,12 +537,22 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin/integrations/slack': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsSlackRoute
   '/w/$workspaceSlug/admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute
   '/w/$workspaceSlug/admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminPracticesNewRoute
+  '/w/$workspaceSlug/admin/practices/reviews': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren
   '/w/$workspaceSlug/admin/practices/runs': typeof AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute
   '/w/$workspaceSlug/admin/practices/settings': typeof AuthenticatedWWorkspaceSlugAdminPracticesSettingsRoute
   '/w/$workspaceSlug/user/$username/achievements': typeof AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute
   '/w/$workspaceSlug/admin/integrations/': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsIndexRoute
   '/w/$workspaceSlug/admin/practices/': typeof AuthenticatedWWorkspaceSlugAdminPracticesIndexRoute
   '/w/$workspaceSlug/user/$username/': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/$jobId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute
+  '/w/$workspaceSlug/admin/practices/reviews/delivery': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteWithChildren
+  '/w/$workspaceSlug/admin/practices/reviews/findings': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteWithChildren
+  '/w/$workspaceSlug/admin/practices/reviews/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute
+  '/w/$workspaceSlug/admin/practices/reviews/findings/$findingId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute
+  '/w/$workspaceSlug/admin/practices/reviews/delivery/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/findings/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -437,15 +572,19 @@ export interface FileRoutesByTo {
   '/admin/usage': typeof AuthenticatedAdminUsageRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
-  '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
   '/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
+  '/admin/catalog': typeof AuthenticatedAdminCatalogIndexRoute
   '/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugIndexRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewIndexRoute
+  '/admin/catalog/areas/$areaSlug': typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
+  '/admin/catalog/areas/new': typeof AuthenticatedAdminCatalogAreasNewRoute
+  '/admin/catalog/practices/$practiceSlug': typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
+  '/admin/catalog/practices/new': typeof AuthenticatedAdminCatalogPracticesNewRoute
   '/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
   '/w/$workspaceSlug/admin/achievements': typeof AuthenticatedWWorkspaceSlugAdminAchievementsRoute
   '/w/$workspaceSlug/admin/audit': typeof AuthenticatedWWorkspaceSlugAdminAuditRoute
@@ -468,6 +607,13 @@ export interface FileRoutesByTo {
   '/w/$workspaceSlug/admin/integrations': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsIndexRoute
   '/w/$workspaceSlug/admin/practices': typeof AuthenticatedWWorkspaceSlugAdminPracticesIndexRoute
   '/w/$workspaceSlug/user/$username': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/$jobId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute
+  '/w/$workspaceSlug/admin/practices/reviews': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute
+  '/w/$workspaceSlug/admin/practices/reviews/findings/$findingId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute
+  '/w/$workspaceSlug/admin/practices/reviews/delivery': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/findings': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -484,13 +630,13 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/_authenticated/admin/catalog': typeof AuthenticatedAdminCatalogRouteWithChildren
   '/_authenticated/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/_authenticated/admin/models': typeof AuthenticatedAdminModelsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/usage': typeof AuthenticatedAdminUsageRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
-  '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
@@ -498,8 +644,13 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
   '/_authenticated/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/_authenticated/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
+  '/_authenticated/admin/catalog/': typeof AuthenticatedAdminCatalogIndexRoute
   '/_authenticated/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
   '/_authenticated/workspaces/new/': typeof AuthenticatedWorkspacesNewIndexRoute
+  '/_authenticated/admin/catalog/areas/$areaSlug': typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
+  '/_authenticated/admin/catalog/areas/new': typeof AuthenticatedAdminCatalogAreasNewRoute
+  '/_authenticated/admin/catalog/practices/$practiceSlug': typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
+  '/_authenticated/admin/catalog/practices/new': typeof AuthenticatedAdminCatalogPracticesNewRoute
   '/_authenticated/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
   '/_authenticated/w/$workspaceSlug/admin/achievements': typeof AuthenticatedWWorkspaceSlugAdminAchievementsRoute
   '/_authenticated/w/$workspaceSlug/admin/audit': typeof AuthenticatedWWorkspaceSlugAdminAuditRoute
@@ -518,12 +669,22 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin/integrations/slack': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsSlackRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminPracticesNewRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren
   '/_authenticated/w/$workspaceSlug/admin/practices/runs': typeof AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/settings': typeof AuthenticatedWWorkspaceSlugAdminPracticesSettingsRoute
   '/_authenticated/w/$workspaceSlug/user/$username/achievements': typeof AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute
   '/_authenticated/w/$workspaceSlug/admin/integrations/': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsIndexRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/': typeof AuthenticatedWWorkspaceSlugAdminPracticesIndexRoute
   '/_authenticated/w/$workspaceSlug/user/$username/': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/$jobId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteWithChildren
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteWithChildren
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/$findingId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -540,13 +701,13 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
+    | '/admin/catalog'
     | '/admin/login-providers'
     | '/admin/models'
     | '/admin/settings'
     | '/admin/usage'
     | '/admin/users'
     | '/admin/workspaces'
-    | '/mentor'
     | '/w/$workspaceSlug/login'
     | '/admin/'
     | '/w/$workspaceSlug/admin'
@@ -554,8 +715,13 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/mentor'
     | '/workspaces/new/github'
     | '/workspaces/new/gitlab'
+    | '/admin/catalog/'
     | '/w/$workspaceSlug/'
     | '/workspaces/new/'
+    | '/admin/catalog/areas/$areaSlug'
+    | '/admin/catalog/areas/new'
+    | '/admin/catalog/practices/$practiceSlug'
+    | '/admin/catalog/practices/new'
     | '/w/$workspaceSlug/admin/achievement-designer'
     | '/w/$workspaceSlug/admin/achievements'
     | '/w/$workspaceSlug/admin/audit'
@@ -574,12 +740,22 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/integrations/slack'
     | '/w/$workspaceSlug/admin/practices/$practiceSlug'
     | '/w/$workspaceSlug/admin/practices/new'
+    | '/w/$workspaceSlug/admin/practices/reviews'
     | '/w/$workspaceSlug/admin/practices/runs'
     | '/w/$workspaceSlug/admin/practices/settings'
     | '/w/$workspaceSlug/user/$username/achievements'
     | '/w/$workspaceSlug/admin/integrations/'
     | '/w/$workspaceSlug/admin/practices/'
     | '/w/$workspaceSlug/user/$username/'
+    | '/w/$workspaceSlug/admin/practices/reviews/$jobId'
+    | '/w/$workspaceSlug/admin/practices/reviews/delivery'
+    | '/w/$workspaceSlug/admin/practices/reviews/findings'
+    | '/w/$workspaceSlug/admin/practices/reviews/'
+    | '/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId'
+    | '/w/$workspaceSlug/admin/practices/reviews/findings/$findingId'
+    | '/w/$workspaceSlug/admin/practices/reviews/delivery/'
+    | '/w/$workspaceSlug/admin/practices/reviews/findings/'
+    | '/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -599,15 +775,19 @@ export interface FileRouteTypes {
     | '/admin/usage'
     | '/admin/users'
     | '/admin/workspaces'
-    | '/mentor'
     | '/w/$workspaceSlug/login'
     | '/admin'
     | '/w/$workspaceSlug/admin'
     | '/w/$workspaceSlug/achievements'
     | '/workspaces/new/github'
     | '/workspaces/new/gitlab'
+    | '/admin/catalog'
     | '/w/$workspaceSlug'
     | '/workspaces/new'
+    | '/admin/catalog/areas/$areaSlug'
+    | '/admin/catalog/areas/new'
+    | '/admin/catalog/practices/$practiceSlug'
+    | '/admin/catalog/practices/new'
     | '/w/$workspaceSlug/admin/achievement-designer'
     | '/w/$workspaceSlug/admin/achievements'
     | '/w/$workspaceSlug/admin/audit'
@@ -630,6 +810,13 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/integrations'
     | '/w/$workspaceSlug/admin/practices'
     | '/w/$workspaceSlug/user/$username'
+    | '/w/$workspaceSlug/admin/practices/reviews/$jobId'
+    | '/w/$workspaceSlug/admin/practices/reviews'
+    | '/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId'
+    | '/w/$workspaceSlug/admin/practices/reviews/findings/$findingId'
+    | '/w/$workspaceSlug/admin/practices/reviews/delivery'
+    | '/w/$workspaceSlug/admin/practices/reviews/findings'
+    | '/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId'
   id:
     | '__root__'
     | '/'
@@ -645,13 +832,13 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/_authenticated/admin/audit'
+    | '/_authenticated/admin/catalog'
     | '/_authenticated/admin/login-providers'
     | '/_authenticated/admin/models'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/usage'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workspaces'
-    | '/_authenticated/mentor/_mentor_access'
     | '/w/$workspaceSlug/login'
     | '/_authenticated/admin/'
     | '/_authenticated/w/$workspaceSlug/admin'
@@ -659,8 +846,13 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/mentor'
     | '/_authenticated/workspaces/new/github'
     | '/_authenticated/workspaces/new/gitlab'
+    | '/_authenticated/admin/catalog/'
     | '/_authenticated/w/$workspaceSlug/'
     | '/_authenticated/workspaces/new/'
+    | '/_authenticated/admin/catalog/areas/$areaSlug'
+    | '/_authenticated/admin/catalog/areas/new'
+    | '/_authenticated/admin/catalog/practices/$practiceSlug'
+    | '/_authenticated/admin/catalog/practices/new'
     | '/_authenticated/w/$workspaceSlug/admin/achievement-designer'
     | '/_authenticated/w/$workspaceSlug/admin/achievements'
     | '/_authenticated/w/$workspaceSlug/admin/audit'
@@ -679,12 +871,22 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin/integrations/slack'
     | '/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug'
     | '/_authenticated/w/$workspaceSlug/admin/practices/new'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews'
     | '/_authenticated/w/$workspaceSlug/admin/practices/runs'
     | '/_authenticated/w/$workspaceSlug/admin/practices/settings'
     | '/_authenticated/w/$workspaceSlug/user/$username/achievements'
     | '/_authenticated/w/$workspaceSlug/admin/integrations/'
     | '/_authenticated/w/$workspaceSlug/admin/practices/'
     | '/_authenticated/w/$workspaceSlug/user/$username/'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/$jobId'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/$findingId'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -800,13 +1002,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WWorkspaceSlugLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/mentor/_mentor_access': {
-      id: '/_authenticated/mentor/_mentor_access'
-      path: '/mentor'
-      fullPath: '/mentor'
-      preLoaderRoute: typeof AuthenticatedMentorMentor_accessRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/admin/workspaces': {
       id: '/_authenticated/admin/workspaces'
       path: '/workspaces'
@@ -849,6 +1044,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLoginProvidersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/catalog': {
+      id: '/_authenticated/admin/catalog'
+      path: '/catalog'
+      fullPath: '/admin/catalog'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/audit': {
       id: '/_authenticated/admin/audit'
       path: '/audit'
@@ -869,6 +1071,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/w/$workspaceSlug/'
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/catalog/': {
+      id: '/_authenticated/admin/catalog/'
+      path: '/'
+      fullPath: '/admin/catalog/'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminCatalogRoute
     }
     '/_authenticated/workspaces/new/gitlab': {
       id: '/_authenticated/workspaces/new/gitlab'
@@ -996,6 +1205,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteRoute
     }
+    '/_authenticated/admin/catalog/practices/new': {
+      id: '/_authenticated/admin/catalog/practices/new'
+      path: '/practices/new'
+      fullPath: '/admin/catalog/practices/new'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogPracticesNewRouteImport
+      parentRoute: typeof AuthenticatedAdminCatalogRoute
+    }
+    '/_authenticated/admin/catalog/practices/$practiceSlug': {
+      id: '/_authenticated/admin/catalog/practices/$practiceSlug'
+      path: '/practices/$practiceSlug'
+      fullPath: '/admin/catalog/practices/$practiceSlug'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogPracticesPracticeSlugRouteImport
+      parentRoute: typeof AuthenticatedAdminCatalogRoute
+    }
+    '/_authenticated/admin/catalog/areas/new': {
+      id: '/_authenticated/admin/catalog/areas/new'
+      path: '/areas/new'
+      fullPath: '/admin/catalog/areas/new'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogAreasNewRouteImport
+      parentRoute: typeof AuthenticatedAdminCatalogRoute
+    }
+    '/_authenticated/admin/catalog/areas/$areaSlug': {
+      id: '/_authenticated/admin/catalog/areas/$areaSlug'
+      path: '/areas/$areaSlug'
+      fullPath: '/admin/catalog/areas/$areaSlug'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogAreasAreaSlugRouteImport
+      parentRoute: typeof AuthenticatedAdminCatalogRoute
+    }
     '/_authenticated/w/$workspaceSlug/user/$username/': {
       id: '/_authenticated/w/$workspaceSlug/user/$username/'
       path: '/w/$workspaceSlug/user/$username'
@@ -1038,6 +1275,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesRunsRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesRoute
     }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews'
+      path: '/reviews'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesRoute
+    }
     '/_authenticated/w/$workspaceSlug/admin/practices/new': {
       id: '/_authenticated/w/$workspaceSlug/admin/practices/new'
       path: '/new'
@@ -1073,11 +1317,101 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminIntegrationsOutlineRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminIntegrationsRoute
     }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/'
+      path: '/'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings'
+      path: '/findings'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/findings'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery'
+      path: '/delivery'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/delivery'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/$jobId': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/$jobId'
+      path: '/$jobId'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/$jobId'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/'
+      path: '/'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/findings/'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/'
+      path: '/'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/delivery/'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/$findingId': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/$findingId'
+      path: '/$findingId'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/findings/$findingId'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId'
+      path: '/$feedbackId'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId'
+      path: '/targets/$artifactType/$artifactId'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
+    }
   }
 }
 
+interface AuthenticatedAdminCatalogRouteChildren {
+  AuthenticatedAdminCatalogIndexRoute: typeof AuthenticatedAdminCatalogIndexRoute
+  AuthenticatedAdminCatalogAreasAreaSlugRoute: typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
+  AuthenticatedAdminCatalogAreasNewRoute: typeof AuthenticatedAdminCatalogAreasNewRoute
+  AuthenticatedAdminCatalogPracticesPracticeSlugRoute: typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
+  AuthenticatedAdminCatalogPracticesNewRoute: typeof AuthenticatedAdminCatalogPracticesNewRoute
+}
+
+const AuthenticatedAdminCatalogRouteChildren: AuthenticatedAdminCatalogRouteChildren =
+  {
+    AuthenticatedAdminCatalogIndexRoute: AuthenticatedAdminCatalogIndexRoute,
+    AuthenticatedAdminCatalogAreasAreaSlugRoute:
+      AuthenticatedAdminCatalogAreasAreaSlugRoute,
+    AuthenticatedAdminCatalogAreasNewRoute:
+      AuthenticatedAdminCatalogAreasNewRoute,
+    AuthenticatedAdminCatalogPracticesPracticeSlugRoute:
+      AuthenticatedAdminCatalogPracticesPracticeSlugRoute,
+    AuthenticatedAdminCatalogPracticesNewRoute:
+      AuthenticatedAdminCatalogPracticesNewRoute,
+  }
+
+const AuthenticatedAdminCatalogRouteWithChildren =
+  AuthenticatedAdminCatalogRoute._addFileChildren(
+    AuthenticatedAdminCatalogRouteChildren,
+  )
+
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
+  AuthenticatedAdminCatalogRoute: typeof AuthenticatedAdminCatalogRouteWithChildren
   AuthenticatedAdminLoginProvidersRoute: typeof AuthenticatedAdminLoginProvidersRoute
   AuthenticatedAdminModelsRoute: typeof AuthenticatedAdminModelsRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
@@ -1089,6 +1423,7 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
+  AuthenticatedAdminCatalogRoute: AuthenticatedAdminCatalogRouteWithChildren,
   AuthenticatedAdminLoginProvidersRoute: AuthenticatedAdminLoginProvidersRoute,
   AuthenticatedAdminModelsRoute: AuthenticatedAdminModelsRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
@@ -1125,9 +1460,73 @@ const AuthenticatedWWorkspaceSlugAdminIntegrationsRouteWithChildren =
     AuthenticatedWWorkspaceSlugAdminIntegrationsRouteChildren,
   )
 
+interface AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteChildren {
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute
+}
+
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteChildren: AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteChildren =
+  {
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryFeedbackIdRoute,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryIndexRoute,
+  }
+
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteWithChildren =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute._addFileChildren(
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteChildren,
+  )
+
+interface AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteChildren {
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute
+}
+
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteChildren: AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteChildren =
+  {
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsFindingIdRoute,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsIndexRoute,
+  }
+
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteWithChildren =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute._addFileChildren(
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteChildren,
+  )
+
+interface AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren {
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteWithChildren
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteWithChildren
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute
+}
+
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren: AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren =
+  {
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsJobIdRoute,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsDeliveryRouteWithChildren,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsFindingsRouteWithChildren,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactTypeArtifactIdRoute,
+  }
+
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute._addFileChildren(
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren,
+  )
+
 interface AuthenticatedWWorkspaceSlugAdminPracticesRouteChildren {
   AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute
   AuthenticatedWWorkspaceSlugAdminPracticesNewRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesNewRoute
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren
   AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute
   AuthenticatedWWorkspaceSlugAdminPracticesSettingsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesSettingsRoute
   AuthenticatedWWorkspaceSlugAdminPracticesIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesIndexRoute
@@ -1139,6 +1538,8 @@ const AuthenticatedWWorkspaceSlugAdminPracticesRouteChildren: AuthenticatedWWork
       AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesNewRoute:
       AuthenticatedWWorkspaceSlugAdminPracticesNewRoute,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren,
     AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute:
       AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesSettingsRoute:
@@ -1216,7 +1617,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedMentorMentor_accessRoute: typeof AuthenticatedMentorMentor_accessRoute
   AuthenticatedWWorkspaceSlugAdminRouteRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
   AuthenticatedWWorkspaceSlugAchievementsRoute: typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   AuthenticatedWWorkspaceSlugMentorRoute: typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
@@ -1233,7 +1633,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
-  AuthenticatedMentorMentor_accessRoute: AuthenticatedMentorMentor_accessRoute,
   AuthenticatedWWorkspaceSlugAdminRouteRoute:
     AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren,
   AuthenticatedWWorkspaceSlugAchievementsRoute:

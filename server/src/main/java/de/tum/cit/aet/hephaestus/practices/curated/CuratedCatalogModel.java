@@ -1,0 +1,276 @@
+package de.tum.cit.aet.hephaestus.practices.curated;
+
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
+
+final class CuratedCatalogModel {
+
+    private static final String CATALOG = "Practice catalog";
+    private static final String CATALOG_AREA = "Catalog area";
+
+    private CuratedCatalogModel() {}
+
+    static EffectiveCatalog compose(
+        BundledPracticeCatalog bundled,
+        List<CuratedAreaOverride> areaOverrides,
+        List<CuratedPracticeOverride> practiceOverrides
+    ) {
+        return new EffectiveCatalog(
+            orderAreas(
+                composeEntries(
+                    bundled.areas(),
+                    areaOverrides,
+                    CuratedAreaOverride::getSlug,
+                    CuratedAreaOverride::definition,
+                    CuratedAreaOverride::getAcceptedBundledDigest,
+                    CuratedAreaOverride::getRetiredAt,
+                    CuratedAreaOverride::getPosition,
+                    CuratedAreaOverride::getUpdatedAt
+                ),
+                positionedSlugs(areaOverrides, CuratedAreaOverride::getSlug, CuratedAreaOverride::getPosition)
+            ),
+            orderPractices(
+                composeEntries(
+                    bundled.practices(),
+                    practiceOverrides,
+                    CuratedPracticeOverride::getSlug,
+                    CuratedPracticeOverride::definition,
+                    CuratedPracticeOverride::getAcceptedBundledDigest,
+                    CuratedPracticeOverride::getRetiredAt,
+                    CuratedPracticeOverride::getPosition,
+                    CuratedPracticeOverride::getUpdatedAt
+                ),
+                positionedSlugs(
+                    practiceOverrides,
+                    CuratedPracticeOverride::getSlug,
+                    CuratedPracticeOverride::getPosition
+                )
+            ),
+            areaOverrides.stream().anyMatch(override -> override.getPosition() != null) ||
+                practiceOverrides.stream().anyMatch(override -> override.getPosition() != null)
+        );
+    }
+
+    static List<CatalogEntry<PracticeDefinition>> practicesIn(EffectiveCatalog catalog, @Nullable String areaSlug) {
+        return catalog
+            .practices()
+            .stream()
+            .filter(entry -> Objects.equals(entry.effective().areaSlug(), areaSlug))
+            .toList();
+    }
+
+    static void requireCatalog(EffectiveCatalog catalog, @Nullable CuratedVersionPrecondition precondition) {
+        if (precondition == null) {
+            throw new CuratedPreconditionRequiredException();
+        }
+        if (!precondition.matches(catalog.etag())) {
+            throw new StaleCuratedEntryException(CATALOG);
+        }
+    }
+
+    static void validateCompleteOrder(List<String> existing, List<String> requested, String type) {
+        if (new HashSet<>(requested).size() != requested.size()) {
+            throw new IllegalArgumentException("orderedSlugs must not contain duplicate slugs");
+        }
+        Set<String> existingSlugs = new HashSet<>(existing);
+        Set<String> requestedSlugs = new HashSet<>(requested);
+        if (existingSlugs.equals(requestedSlugs)) {
+            return;
+        }
+        String unknown = requestedSlugs
+            .stream()
+            .filter(slug -> !existingSlugs.contains(slug))
+            .findFirst()
+            .orElse(null);
+        if (unknown != null) {
+            throw new EntityNotFoundException(type, unknown);
+        }
+        throw new IllegalArgumentException("orderedSlugs must contain every entry in the list");
+    }
+
+    static void validatePractice(EffectiveCatalog catalog, PracticeDefinition definition) {
+        if (definition.areaSlug() != null && catalog.area(definition.areaSlug()).isEmpty()) {
+            throw new EntityNotFoundException(CATALOG_AREA, definition.areaSlug());
+        }
+        PracticeDefinitionValidator.validate(
+            definition.artifactType(),
+            definition.triggerEvents(),
+            definition.whyItMatters(),
+            definition.whatGoodLooksLike()
+        );
+    }
+
+    static <D extends CatalogDefinition> CatalogEntry<D> requireEntry(
+        java.util.Optional<CatalogEntry<D>> entry,
+        String type,
+        String slug,
+        @Nullable CuratedVersionPrecondition precondition
+    ) {
+        CatalogEntry<D> found = entry.orElseThrow(() -> new EntityNotFoundException(type, slug));
+        if (precondition == null) {
+            throw new CuratedPreconditionRequiredException();
+        }
+        if (!precondition.matches(found.etag())) {
+            throw new StaleCuratedEntryException(type + " '" + slug + "'");
+        }
+        return found;
+    }
+
+    static @Nullable String digestOf(@Nullable CatalogDefinition definition, String slug) {
+        return definition == null ? null : definition.digest(slug);
+    }
+
+    static List<CatalogEntry<AreaDefinition>> orderAreas(
+        List<CatalogEntry<AreaDefinition>> entries,
+        Set<String> positionedSlugs
+    ) {
+        boolean locallyOrdered = entries.stream().anyMatch(entry -> positionedSlugs.contains(entry.slug()));
+        Comparator<CatalogEntry<AreaDefinition>> order = Comparator.comparingInt((CatalogEntry<AreaDefinition> entry) ->
+            locallyOrdered && !positionedSlugs.contains(entry.slug()) ? 1 : 0
+        )
+            .thenComparingInt(CatalogEntry::position)
+            .thenComparing(entry -> entry.effective().name())
+            .thenComparing(CatalogEntry::slug);
+        List<CatalogEntry<AreaDefinition>> sorted = entries.stream().sorted(order).toList();
+        List<CatalogEntry<AreaDefinition>> result = new ArrayList<>(sorted.size());
+        for (int position = 0; position < sorted.size(); position++) {
+            result.add(withPosition(sorted.get(position), position));
+        }
+        return List.copyOf(result);
+    }
+
+    static List<CatalogEntry<PracticeDefinition>> orderPractices(
+        List<CatalogEntry<PracticeDefinition>> entries,
+        Set<String> positionedSlugs
+    ) {
+        Set<@Nullable String> locallyOrderedAreas = new HashSet<>();
+        entries
+            .stream()
+            .filter(entry -> positionedSlugs.contains(entry.slug()))
+            .map(entry -> entry.effective().areaSlug())
+            .forEach(locallyOrderedAreas::add);
+        Comparator<CatalogEntry<PracticeDefinition>> order = Comparator.comparing(
+            (CatalogEntry<PracticeDefinition> entry) -> entry.effective().areaSlug(),
+            Comparator.nullsLast(Comparator.naturalOrder())
+        )
+            .thenComparingInt(entry ->
+                locallyOrderedAreas.contains(entry.effective().areaSlug()) && !positionedSlugs.contains(entry.slug())
+                    ? 1
+                    : 0
+            )
+            .thenComparingInt(CatalogEntry::position)
+            .thenComparing(entry -> entry.effective().name())
+            .thenComparing(CatalogEntry::slug);
+        List<CatalogEntry<PracticeDefinition>> sorted = entries.stream().sorted(order).toList();
+        List<CatalogEntry<PracticeDefinition>> result = new ArrayList<>(sorted.size());
+        @Nullable
+        String previousArea = null;
+        int position = 0;
+        boolean first = true;
+        for (CatalogEntry<PracticeDefinition> entry : sorted) {
+            String area = entry.effective().areaSlug();
+            if (first || !Objects.equals(previousArea, area)) {
+                position = 0;
+                previousArea = area;
+                first = false;
+            } else {
+                position++;
+            }
+            result.add(withPosition(entry, position));
+        }
+        return List.copyOf(result);
+    }
+
+    private static <O> Set<String> positionedSlugs(
+        List<O> overrides,
+        Function<O, String> slugOf,
+        Function<O, @Nullable Integer> positionOf
+    ) {
+        return overrides
+            .stream()
+            .filter(override -> positionOf.apply(override) != null)
+            .map(slugOf)
+            .collect(Collectors.toSet());
+    }
+
+    private static <D extends CatalogDefinition> CatalogEntry<D> withPosition(CatalogEntry<D> entry, int position) {
+        return new CatalogEntry<>(
+            entry.slug(),
+            entry.effective(),
+            entry.shipped(),
+            entry.overridden(),
+            entry.acceptedBundledDigest(),
+            entry.retired(),
+            position,
+            entry.updatedAt()
+        );
+    }
+
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    private static <D extends CatalogDefinition, O> List<CatalogEntry<D>> composeEntries(
+        List<BundledEntry<D>> shipped,
+        List<O> overrides,
+        Function<O, String> slugOf,
+        Function<O, @Nullable D> definitionOf,
+        Function<O, @Nullable String> acceptedBundledDigestOf,
+        Function<O, @Nullable Instant> retiredAtOf,
+        Function<O, @Nullable Integer> positionOf,
+        Function<O, Instant> updatedAtOf
+    ) {
+        Map<String, O> bySlug = overrides.stream().collect(Collectors.toMap(slugOf, Function.identity()));
+        Set<String> slugs = new LinkedHashSet<>(shipped.stream().map(BundledEntry::slug).toList());
+        slugs.addAll(bySlug.keySet());
+        Map<String, D> shippedBySlug = shipped
+            .stream()
+            .collect(Collectors.toMap(BundledEntry::slug, BundledEntry::definition));
+        Map<String, Integer> shippedPositionBySlug = shipped
+            .stream()
+            .collect(Collectors.toMap(BundledEntry::slug, BundledEntry::position));
+
+        List<CatalogEntry<D>> entries = new ArrayList<>();
+        for (String slug : slugs) {
+            D shippedDefinition = shippedBySlug.get(slug);
+            O override = bySlug.get(slug);
+            if (override == null) {
+                entries.add(CatalogEntry.shippedOnly(slug, shippedDefinition, shippedPositionBySlug.get(slug)));
+                continue;
+            }
+            D overridden = definitionOf.apply(override);
+            D effective = overridden != null ? overridden : shippedDefinition;
+            if (effective == null) {
+                continue;
+            }
+            entries.add(
+                new CatalogEntry<>(
+                    slug,
+                    effective,
+                    shippedDefinition,
+                    overridden,
+                    acceptedBundledDigestOf.apply(override),
+                    retiredAtOf.apply(override) != null,
+                    positionOf.apply(override) != null
+                        ? positionOf.apply(override)
+                        : shippedPositionBySlug.getOrDefault(slug, Integer.MAX_VALUE),
+                    updatedAtOf.apply(override)
+                )
+            );
+        }
+        return entries;
+    }
+}

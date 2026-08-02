@@ -1,23 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { ListChecks } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { listAreasOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
+import type { Practice, PracticeArea } from "@/api/types.gen";
+import { generateSlug } from "@/components/admin/practice-catalog/constants";
+import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
 import {
-	createAreaMutation,
-	deleteAreaMutation,
-	deletePracticeMutation,
-	listAreasOptions,
-	listAreasQueryKey,
-	listPracticesOptions,
-	listPracticesQueryKey,
-	reorderAreasMutation,
-	reorderPracticesMutation,
-	setActiveMutation,
-	updateAreaMutation,
-} from "@/api/@tanstack/react-query.gen";
-import type { Practice } from "@/api/types.gen";
-import { generateSlug } from "@/components/admin/practices/constants";
-import { type FocusFilter, RubricTree } from "@/components/admin/practices/RubricTree";
+	PRACTICE_SEARCH_PARAMS,
+	practiceSearchSchema,
+} from "@/components/admin/practices/practice-search";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -29,169 +24,154 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
-	head: workspaceAdminHead("Practice catalog"),
-	component: RubricContainer,
+	head: workspaceAdminHead("Practices"),
+	validateSearch: practiceSearchSchema,
+	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
+	component: PracticeCatalogRoute,
 });
 
-function RubricContainer() {
-	const queryClient = useQueryClient();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
-	const slug = workspaceSlug ?? "";
+function PracticeCatalogRoute() {
+	const { workspaceSlug } = Route.useParams();
+	const { focus } = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
 
-	const [focusFilter, setFocusFilter] = useState<FocusFilter>("ALL");
-	const [togglingPractices, setTogglingPractices] = useState<Set<string>>(new Set());
+	const [deletingArea, setDeletingArea] = useState<PracticeArea | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
+	const catalog = usePracticeCatalogMutations(workspaceSlug);
 
 	const areasQuery = useQuery({
-		...listAreasOptions({ path: { workspaceSlug: slug } }),
-		enabled: !!workspaceSlug,
+		...listAreasOptions({ path: { workspaceSlug } }),
 	});
 	const practicesQuery = useQuery({
-		...listPracticesOptions({ path: { workspaceSlug: slug } }),
-		enabled: !!workspaceSlug,
+		...listPracticesOptions({ path: { workspaceSlug } }),
 	});
-
-	const invalidate = () => {
-		queryClient.invalidateQueries({
-			queryKey: listAreasQueryKey({ path: { workspaceSlug: slug } }),
-		});
-		queryClient.invalidateQueries({
-			queryKey: listPracticesQueryKey({ path: { workspaceSlug: slug } }),
-		});
-	};
-
-	const createArea = useMutation({
-		...createAreaMutation(),
-		onSuccess: () => {
-			invalidate();
-			toast.success("Practice area created");
-		},
-		onError: (error) => {
-			const status =
-				typeof error === "object" && error !== null && "status" in error
-					? (error as { status: number }).status
-					: undefined;
-			toast.error(
-				status === 409
-					? "A practice area with that name already exists"
-					: "Failed to create practice area",
-			);
-		},
-	});
-	const updateArea = useMutation({
-		...updateAreaMutation(),
-		onSuccess: () => invalidate(),
-		onError: () => toast.error("Failed to update practice area"),
-	});
-	const deleteArea = useMutation({
-		...deleteAreaMutation(),
-		onSuccess: () => {
-			invalidate();
-			toast.success("Practice area deleted");
-		},
-		onError: () => toast.error("Failed to delete practice area"),
-	});
-	const reorderAreas = useMutation({
-		...reorderAreasMutation(),
-		onSuccess: () => invalidate(),
-		onError: () => toast.error("Failed to reorder practice areas"),
-	});
-	const reorderPractices = useMutation({
-		...reorderPracticesMutation(),
-		onSuccess: () => invalidate(),
-		onError: () => toast.error("Failed to reorder practices"),
-	});
-	const deletePractice = useMutation({
-		...deletePracticeMutation(),
-		onSuccess: () => {
-			invalidate();
-			toast.success("Practice deleted");
-		},
-		onError: () => toast.error("Failed to delete practice"),
-	});
-	const setActive = useMutation({
-		...setActiveMutation(),
-		onSuccess: () => invalidate(),
-		onError: (_e, variables) => toast.error(`Failed to toggle "${variables.path.practiceSlug}"`),
-		onSettled: (_d, _e, variables) => {
-			setTogglingPractices((prev) => {
-				const next = new Set(prev);
-				next.delete(variables.path.practiceSlug);
-				return next;
-			});
-		},
-	});
-
-	if (!workspaceSlug || areasQuery.isLoading || practicesQuery.isLoading) {
-		return (
-			<div className="flex h-64 items-center justify-center">
-				<Spinner className="size-8" />
-			</div>
-		);
-	}
-
-	const isMutating =
-		createArea.isPending ||
-		updateArea.isPending ||
-		deleteArea.isPending ||
-		reorderAreas.isPending ||
-		reorderPractices.isPending;
-
-	const handleSetPracticeActive = (practiceSlug: string, active: boolean) => {
-		setTogglingPractices((prev) => new Set(prev).add(practiceSlug));
-		setActive.mutate({ path: { workspaceSlug: slug, practiceSlug }, body: { active } });
-	};
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-6 py-6">
-			<header>
-				<h1 className="text-3xl font-bold tracking-tight">Catalog</h1>
-				<p className="text-muted-foreground">
-					The practices this workspace evaluates, grouped into areas. Drag to reorder, toggle to
-					enable, or open one to see its standard and the observations it produces.
-				</p>
-			</header>
-
-			<RubricTree
-				workspaceSlug={slug}
-				areas={areasQuery.data ?? []}
-				practices={practicesQuery.data ?? []}
-				togglingPractices={togglingPractices}
-				isMutating={isMutating}
-				focusFilter={focusFilter}
-				onFocusFilterChange={setFocusFilter}
-				onCreateArea={(name) =>
-					createArea.mutate({
-						path: { workspaceSlug: slug },
-						body: { slug: generateSlug(name), name },
-					})
-				}
-				onRenameArea={(areaSlug, name) =>
-					updateArea.mutate({ path: { workspaceSlug: slug, areaSlug }, body: { name } })
-				}
-				onToggleAreaActive={(areaSlug, active) =>
-					updateArea.mutate({ path: { workspaceSlug: slug, areaSlug }, body: { active } })
-				}
-				onDeleteArea={(areaSlug) => deleteArea.mutate({ path: { workspaceSlug: slug, areaSlug } })}
-				onReorderAreas={(orderedSlugs) =>
-					reorderAreas.mutate({ path: { workspaceSlug: slug }, body: { orderedSlugs } })
-				}
-				onSetAreaVisual={(areaSlug, patch) =>
-					updateArea.mutate({ path: { workspaceSlug: slug, areaSlug }, body: patch })
-				}
-				onSetPracticeActive={handleSetPracticeActive}
-				onDeletePractice={setDeletingPractice}
-				onReorderPractices={(areaSlug, orderedSlugs) =>
-					reorderPractices.mutate({
-						path: { workspaceSlug: slug },
-						body: { areaSlug, orderedSlugs },
-					})
-				}
+		<PageLayout>
+			<PageHeader
+				icon={<ListChecks />}
+				title="Practices"
+				description="Choose the practices Hephaestus uses for new reviews in this workspace. Changes affect only this workspace."
 			/>
+			{areasQuery.isPending || practicesQuery.isPending ? (
+				<div className="flex h-64 items-center justify-center">
+					<Spinner className="size-8" />
+				</div>
+			) : areasQuery.isError || practicesQuery.isError ? (
+				<QueryErrorAlert
+					error={areasQuery.error ?? practicesQuery.error}
+					title="Couldn't load practices"
+					onRetry={() => {
+						areasQuery.refetch();
+						practicesQuery.refetch();
+					}}
+				/>
+			) : (
+				<PracticeCatalog
+					workspaceSlug={workspaceSlug}
+					areas={areasQuery.data}
+					practices={practicesQuery.data}
+					pending={{
+						areaSlugs: catalog.pendingAreaSlugs,
+						practiceSlugs: catalog.pendingPracticeSlugs,
+						areaStructure: catalog.areaStructurePending,
+						blockedMoveDestinationSlugs: catalog.blockedMoveDestinationSlugs,
+						blockedPracticeOrderBuckets: catalog.blockedPracticeOrderBuckets,
+						creatingArea: catalog.createArea.isPending,
+					}}
+					focusFilter={focus ?? "ALL"}
+					onFocusFilterChange={(next: FocusFilter) =>
+						navigate({
+							search: { focus: next === "ALL" ? undefined : next },
+						})
+					}
+					onCreateArea={async (name) => {
+						try {
+							await catalog.createArea.mutateAsync({
+								path: { workspaceSlug },
+								body: { slug: generateSlug(name), name },
+							});
+							return true;
+						} catch {
+							return false;
+						}
+					}}
+					onRenameArea={async (areaSlug, name) => {
+						try {
+							await catalog.updateArea.mutateAsync({
+								path: { workspaceSlug, areaSlug },
+								body: { name },
+							});
+							return true;
+						} catch {
+							return false;
+						}
+					}}
+					onToggleAreaActive={(areaSlug, active) =>
+						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: { active } })
+					}
+					onDeleteArea={(areaSlug) =>
+						setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
+					}
+					onReorderAreas={(orderedSlugs) =>
+						catalog.reorderAreas.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })
+					}
+					onSetAreaVisual={(areaSlug, patch) =>
+						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: patch })
+					}
+					onSetPracticeActive={(practiceSlug, active) =>
+						catalog.setActive.mutate({
+							path: { workspaceSlug, practiceSlug },
+							body: { active },
+						})
+					}
+					onDeletePractice={setDeletingPractice}
+					onPlacePractice={(practiceSlug, areaSlug, position) =>
+						catalog.placePractice.mutate({
+							path: { workspaceSlug, practiceSlug },
+							body: { areaSlug: areaSlug ?? undefined, position },
+						})
+					}
+				/>
+			)}
+
+			<AlertDialog
+				open={deletingArea !== null}
+				onOpenChange={(open) => {
+					if (!open) setDeletingArea(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete “{deletingArea?.name}”?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Practices in this area will move to Unassigned. The practices themselves won't be
+							deleted.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							className="min-w-24"
+							disabled={catalog.deleteArea.isPending}
+							onClick={() => {
+								if (!deletingArea) return;
+								catalog.deleteArea.mutate(
+									{ path: { workspaceSlug, areaSlug: deletingArea.slug } },
+									{ onSuccess: () => setDeletingArea(null) },
+								);
+							}}
+						>
+							{catalog.deleteArea.isPending ? "Deleting…" : "Delete area"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<AlertDialog
 				open={deletingPractice !== null}
@@ -203,30 +183,30 @@ function RubricContainer() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{deletingPractice?.name}&rdquo;?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently deletes the practice definition and its observations. This cannot be
-							undone.
+							This permanently deletes the practice and its findings. This can't be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
+							variant="destructive"
+							className="min-w-28"
 							onClick={() => {
 								if (deletingPractice)
-									deletePractice
-										.mutateAsync({
-											path: { workspaceSlug: slug, practiceSlug: deletingPractice.slug },
-										})
-										.then(() => setDeletingPractice(null))
-										.catch(() => {});
+									catalog.deletePractice.mutate(
+										{
+											path: { workspaceSlug, practiceSlug: deletingPractice.slug },
+										},
+										{ onSuccess: () => setDeletingPractice(null) },
+									);
 							}}
-							disabled={deletePractice.isPending}
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							disabled={catalog.deletePractice.isPending}
 						>
-							{deletePractice.isPending ? "Deleting…" : "Delete practice"}
+							{catalog.deletePractice.isPending ? "Deleting…" : "Delete practice"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</div>
+		</PageLayout>
 	);
 }

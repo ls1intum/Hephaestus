@@ -1,538 +1,175 @@
-import { ArrowLeft, ChevronDown, ChevronRight, RotateCcw, Telescope } from "lucide-react";
-import { useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { ArrowLeft, ClipboardPenLine, ListPlus } from "lucide-react";
 import type {
 	CreatePracticeRequest,
 	Practice,
 	PracticeArea,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
-import { CodeEditor } from "@/components/shared/CodeEditor";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
+	PracticeDefinitionForm,
+	type PracticeDefinitionValue,
+} from "@/components/admin/practice-catalog/PracticeDefinitionForm";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
+import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
-import {
-	FOCUS_ARTIFACT_OPTIONS,
-	generateSlug,
-	isValidSlug,
-	TRIGGER_EVENTS_BY_FOCUS,
-	triggerEventsForFocus,
-	type WorkArtifact,
-} from "./constants";
-
-/** Sentinel for the "not bound to any area" option (shadcn SelectItem cannot use an empty value). */
-const NO_AREA = "__none__";
+import { cn } from "@/lib/utils";
 
 interface PracticeFormCreateProps {
 	mode: "create";
-	/** Areas offered in the binding picker. Binding is a separate mutation the container runs after create. */
+	workspaceSlug: string;
 	areas: PracticeArea[];
 	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
-	onCancel: () => void;
 	isPending: boolean;
 	initialData?: never;
 }
 
 interface PracticeFormEditProps {
 	mode: "edit";
+	workspaceSlug: string;
 	initialData: Practice;
 	areas: PracticeArea[];
 	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
-	onCancel: () => void;
 	isPending: boolean;
 }
 
 export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
 
-interface FormState {
-	name: string;
-	slug: string;
-	focusArtifact: WorkArtifact;
-	areaSlug: string;
-	triggerEvents: string[];
-	criteria: string;
-	whyItMatters: string;
-	whatGoodLooksLike: string;
-	precomputeScript: string;
+interface PracticeFormShellProps {
+	mode: "create" | "edit";
+	workspaceSlug: string;
+	practiceName?: string;
+	children: React.ReactNode;
 }
 
-function getInitialState(mode: "create" | "edit", initialData?: Practice): FormState {
-	if (mode === "edit" && initialData) {
-		return {
-			name: initialData.name,
-			slug: initialData.slug,
-			focusArtifact: initialData.artifactType,
-			areaSlug: initialData.areaSlug ?? NO_AREA,
-			triggerEvents: [...initialData.triggerEvents],
-			criteria: initialData.criteria,
-			whyItMatters: initialData.whyItMatters ?? "",
-			whatGoodLooksLike: initialData.whatGoodLooksLike ?? "",
-			precomputeScript: initialData.precomputeScript ?? "",
-		};
-	}
+function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 	return {
-		name: "",
-		slug: "",
-		focusArtifact: "PULL_REQUEST",
-		areaSlug: NO_AREA,
-		triggerEvents: [],
-		criteria: "",
-		whyItMatters: "",
-		whatGoodLooksLike: "",
-		precomputeScript: "",
+		slug: practice.slug,
+		name: practice.name,
+		artifactType: practice.artifactType,
+		triggerEvents: practice.triggerEvents,
+		criteria: practice.criteria,
+		...(practice.areaSlug ? { areaSlug: practice.areaSlug } : {}),
+		...(practice.whyItMatters ? { whyItMatters: practice.whyItMatters } : {}),
+		...(practice.whatGoodLooksLike ? { whatGoodLooksLike: practice.whatGoodLooksLike } : {}),
+		...(practice.precomputeScript ? { precomputeScript: practice.precomputeScript } : {}),
 	};
 }
 
-export function PracticeForm({
-	mode,
-	areas,
-	onSubmit,
-	onCancel,
-	isPending,
-	initialData,
-}: PracticeFormProps) {
-	const [form, setForm] = useState<FormState>(() => getInitialState(mode, initialData));
-	const [submitted, setSubmitted] = useState(false);
-	// Precompute is optional support — the LLM does the heavy lifting — so it stays collapsed unless the
-	// practice already has a script, keeping the criteria (the product) the focus of the form.
-	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
-
-	const handleNameChange = (name: string) => {
-		setForm((prev) => {
-			const wasManuallyEdited = mode === "create" && prev.slug !== generateSlug(prev.name);
-			return {
-				...prev,
-				name,
-				...(!wasManuallyEdited ? { slug: generateSlug(name) } : {}),
-			};
-		});
-	};
-
-	const slugManuallyEdited = mode === "create" && form.slug !== generateSlug(form.name);
-
-	const handleToggleEvent = (event: string, checked: boolean) => {
-		setForm((prev) => ({
-			...prev,
-			triggerEvents: checked
-				? [...prev.triggerEvents, event]
-				: prev.triggerEvents.filter((e) => e !== event),
-		}));
-	};
-
-	const nameError =
-		submitted && form.name.length < 3 ? "Name must be at least 3 characters" : undefined;
-	const slugError =
-		submitted && mode === "create" && !isValidSlug(form.slug)
-			? "Slug must be 3-64 lowercase alphanumeric characters separated by hyphens"
-			: undefined;
-	const triggerError =
-		submitted && form.triggerEvents.length === 0 ? "Select at least one trigger event" : undefined;
-	const criteriaError =
-		submitted && form.criteria.trim().length < 3
-			? "Criteria must be at least 3 characters"
-			: undefined;
-
-	const isValid =
-		form.name.length >= 3 &&
-		form.criteria.trim().length >= 3 &&
-		form.triggerEvents.length > 0 &&
-		(mode === "edit" || isValidSlug(form.slug));
-
-	const handleSubmit = (e: React.FormEvent) => {
-		e.preventDefault();
-		setSubmitted(true);
-		if (!isValid) return;
-
-		const areaSlug = form.areaSlug === NO_AREA ? null : form.areaSlug;
-
-		if (mode === "create") {
-			const data: CreatePracticeRequest = {
-				name: form.name,
-				slug: form.slug,
-				criteria: form.criteria.trim(),
-				triggerEvents: form.triggerEvents,
-				artifactType: form.focusArtifact,
-				...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
-				...(form.whatGoodLooksLike.trim()
-					? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
-					: {}),
-				...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
-			};
-			onSubmit(data, areaSlug);
-		} else {
-			const data: UpdatePracticeRequest = {
-				name: form.name,
-				criteria: form.criteria.trim(),
-				triggerEvents: form.triggerEvents,
-				artifactType: form.focusArtifact,
-				whyItMatters: form.whyItMatters.trim() || undefined,
-				whatGoodLooksLike: form.whatGoodLooksLike.trim() || undefined,
-				precomputeScript: form.precomputeScript.trim() || undefined,
-			};
-			onSubmit(initialData.slug, data, areaSlug);
+export function PracticeForm(props: PracticeFormProps) {
+	const { mode, workspaceSlug, areas, isPending, initialData } = props;
+	const cancelAction = (
+		<Link
+			to="/w/$workspaceSlug/admin/practices"
+			params={{ workspaceSlug }}
+			search={(previous) => previous}
+			className={buttonVariants({ variant: "outline" })}
+		>
+			Cancel
+		</Link>
+	);
+	const submit = (value: PracticeDefinitionValue) => {
+		const { areaSlug, ...definition } = value;
+		if (props.mode === "create") {
+			props.onSubmit(definition, areaSlug ?? null);
+			return;
 		}
-	};
 
-	return (
-		<form onSubmit={handleSubmit} className="flex flex-col h-full">
-			<div className="flex-1 overflow-y-auto pb-24">
-				<div className="container mx-auto max-w-3xl py-6">
-					<div className="mb-8">
-						<button
-							type="button"
-							onClick={onCancel}
-							className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
-						>
-							<ArrowLeft className="size-4" />
-							Back to practices
-						</button>
-						<h1 className="text-3xl font-bold tracking-tight">
-							{mode === "create" ? "Create practice" : `Edit: ${initialData?.name}`}
-						</h1>
-						<p className="text-muted-foreground mt-1">
-							{mode === "create"
-								? "Define a new practice for evaluating developer contributions."
-								: "Update this practice definition."}
+		const clear: NonNullable<UpdatePracticeRequest["clear"]> = [];
+		if (!definition.precomputeScript) clear.push("PRECOMPUTE_SCRIPT");
+		if (!definition.whyItMatters) clear.push("WHY_IT_MATTERS");
+		if (!definition.whatGoodLooksLike) clear.push("WHAT_GOOD_LOOKS_LIKE");
+		props.onSubmit(
+			props.initialData.slug,
+			{
+				name: definition.name,
+				criteria: definition.criteria,
+				triggerEvents: definition.triggerEvents,
+				artifactType: definition.artifactType,
+				whyItMatters: definition.whyItMatters,
+				whatGoodLooksLike: definition.whatGoodLooksLike,
+				precomputeScript: definition.precomputeScript,
+				clear: clear.length > 0 ? clear : undefined,
+			},
+			areaSlug ?? null,
+		);
+	};
+	const reviewResults =
+		mode === "edit" ? (
+			<>
+				<Separator />
+				<section className="space-y-4">
+					<div>
+						<h2 className="text-lg font-semibold">Review results</h2>
+						<p className="text-sm text-muted-foreground">
+							View every finding this practice produced across the workspace.
 						</p>
 					</div>
+					<Link
+						to="/w/$workspaceSlug/admin/practices/reviews/findings"
+						params={{ workspaceSlug }}
+						search={{ practiceSlug: [initialData.slug] }}
+						className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
+					>
+						View findings
+					</Link>
+				</section>
+			</>
+		) : undefined;
 
-					<div className="space-y-8">
-						<section className="space-y-4">
-							<div>
-								<h2 className="text-lg font-semibold">General</h2>
-								<p className="text-sm text-muted-foreground">
-									Basic practice information and identification.
-								</p>
-							</div>
+	return (
+		<PracticeFormShell mode={mode} workspaceSlug={workspaceSlug} practiceName={initialData?.name}>
+			{mode === "create" ? (
+				<PracticeDefinitionForm
+					mode="create"
+					areas={areas}
+					isPending={isPending}
+					cancelAction={cancelAction}
+					onSubmit={submit}
+				/>
+			) : (
+				<PracticeDefinitionForm
+					mode="edit"
+					initialData={asDefinitionValue(initialData)}
+					areas={areas}
+					isPending={isPending}
+					cancelAction={cancelAction}
+					afterFields={reviewResults}
+					onSubmit={submit}
+				/>
+			)}
+		</PracticeFormShell>
+	);
+}
 
-							<div className="grid gap-4">
-								<div className="grid gap-2">
-									<Label htmlFor="practice-name">Name *</Label>
-									<Input
-										id="practice-name"
-										placeholder="e.g. PR Description Quality"
-										value={form.name}
-										onChange={(e) => handleNameChange(e.target.value)}
-										aria-invalid={!!nameError}
-										aria-describedby={nameError ? "name-error" : undefined}
-									/>
-									{nameError && (
-										<p id="name-error" className="text-sm text-destructive">
-											{nameError}
-										</p>
-									)}
-								</div>
-
-								<div className="grid gap-2">
-									<Label htmlFor="practice-slug">Slug {mode === "create" && "*"}</Label>
-									<div className="flex items-center gap-2">
-										<Input
-											id="practice-slug"
-											placeholder="e.g. pr-description-quality"
-											value={form.slug}
-											onChange={(e) => setForm((prev) => ({ ...prev, slug: e.target.value }))}
-											disabled={mode === "edit"}
-											aria-invalid={!!slugError}
-											aria-describedby={slugError ? "slug-error" : undefined}
-										/>
-										{slugManuallyEdited && (
-											<Button
-												type="button"
-												variant="ghost"
-												size="icon-sm"
-												onClick={() =>
-													setForm((prev) => ({ ...prev, slug: generateSlug(prev.name) }))
-												}
-												aria-label="Reset to auto-generated slug"
-											>
-												<RotateCcw className="size-3.5" />
-											</Button>
-										)}
-									</div>
-									{mode === "edit" && (
-										<p className="text-xs text-muted-foreground">
-											Slug cannot be changed after creation.
-										</p>
-									)}
-									{slugError && (
-										<p id="slug-error" className="text-sm text-destructive">
-											{slugError}
-										</p>
-									)}
-								</div>
-
-								<div className="grid gap-4 sm:grid-cols-2">
-									<div className="grid gap-2">
-										<Label htmlFor="practice-focus">Evaluates</Label>
-										<Select
-											value={form.focusArtifact}
-											onValueChange={(value) =>
-												setForm((prev) => {
-													const focusArtifact = value as WorkArtifact;
-													// Drop any selected triggers that don't belong to the new focus —
-													// the server rejects cross-focus combinations.
-													const allowed = triggerEventsForFocus(focusArtifact);
-													return {
-														...prev,
-														focusArtifact,
-														triggerEvents: prev.triggerEvents.filter((e) => allowed.includes(e)),
-													};
-												})
-											}
-										>
-											<SelectTrigger id="practice-focus">
-												<SelectValue>
-													{
-														FOCUS_ARTIFACT_OPTIONS.find((o) => o.value === form.focusArtifact)
-															?.label
-													}
-												</SelectValue>
-											</SelectTrigger>
-											<SelectContent>
-												{FOCUS_ARTIFACT_OPTIONS.map((option) => (
-													<SelectItem key={option.value} value={option.value}>
-														{option.label}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-										<p className="text-xs text-muted-foreground">
-											{FOCUS_ARTIFACT_OPTIONS.find((o) => o.value === form.focusArtifact)?.hint}
-										</p>
-									</div>
-
-									<div className="grid gap-2">
-										<Label htmlFor="practice-area">Practice Area</Label>
-										<Select
-											value={form.areaSlug}
-											onValueChange={(value) =>
-												setForm((prev) => ({ ...prev, areaSlug: value ?? NO_AREA }))
-											}
-										>
-											<SelectTrigger id="practice-area">
-												<SelectValue placeholder="Not assigned">
-													{form.areaSlug === NO_AREA
-														? undefined
-														: areas.find((g) => g.slug === form.areaSlug)?.name}
-												</SelectValue>
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value={NO_AREA}>Not assigned</SelectItem>
-												{areas.map((area) => (
-													<SelectItem key={area.slug} value={area.slug}>
-														{area.name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-										<p className="text-xs text-muted-foreground">
-											The learning objective this practice rolls up to.
-										</p>
-									</div>
-								</div>
-							</div>
-						</section>
-
-						<Separator />
-
-						<section className="space-y-4">
-							<fieldset
-								className="space-y-4"
-								aria-invalid={!!triggerError}
-								aria-describedby={triggerError ? "trigger-error" : undefined}
-							>
-								<legend className="text-lg font-semibold">Run this practice when… *</legend>
-								<p className="text-sm text-muted-foreground">
-									Pick the {form.focusArtifact === "ISSUE" ? "issue" : "pull request"} activity that
-									should trigger an evaluation.
-								</p>
-								<div className="grid grid-cols-2 gap-3">
-									{TRIGGER_EVENTS_BY_FOCUS[form.focusArtifact].map((option) => (
-										<Label
-											key={option.value}
-											htmlFor={`trigger-${option.value}`}
-											className="flex items-center gap-2 text-sm font-normal cursor-pointer"
-										>
-											<Checkbox
-												id={`trigger-${option.value}`}
-												checked={form.triggerEvents.includes(option.value)}
-												onCheckedChange={(checked) =>
-													handleToggleEvent(option.value, checked === true)
-												}
-											/>
-											{option.label}
-										</Label>
-									))}
-								</div>
-								{triggerError && (
-									<p id="trigger-error" className="text-sm text-destructive">
-										{triggerError}
-									</p>
-								)}
-							</fieldset>
-						</section>
-
-						<Separator />
-
-						<section className="space-y-4">
-							<div>
-								<h2 className="text-lg font-semibold">Evaluation Criteria *</h2>
-								<p className="text-sm text-muted-foreground">
-									Markdown-formatted criteria used by the AI agent during code review. This is the
-									single source of truth for what this practice evaluates.
-								</p>
-							</div>
-							<Textarea
-								id="practice-criteria"
-								placeholder="## Practice Name&#10;&#10;Describe what to evaluate, required elements, and anti-patterns..."
-								value={form.criteria}
-								onChange={(e) => setForm((prev) => ({ ...prev, criteria: e.target.value }))}
-								className="min-h-64 font-mono text-sm"
-								aria-invalid={!!criteriaError}
-								aria-describedby={criteriaError ? "criteria-error" : undefined}
-							/>
-							{criteriaError && (
-								<p id="criteria-error" className="text-sm text-destructive">
-									{criteriaError}
-								</p>
-							)}
-						</section>
-
-						<Separator />
-
-						<section className="space-y-4">
-							<div>
-								<h2 className="text-lg font-semibold">Learner guidance</h2>
-								<p className="text-sm text-muted-foreground">
-									Optional plain-language context shown to learners. These never influence
-									detection.
-								</p>
-							</div>
-
-							<div className="grid gap-2">
-								<Label htmlFor="practice-why-it-matters">Why it matters</Label>
-								<Textarea
-									id="practice-why-it-matters"
-									placeholder="Explain why this practice is worth caring about…"
-									value={form.whyItMatters}
-									onChange={(e) => setForm((prev) => ({ ...prev, whyItMatters: e.target.value }))}
-									className="min-h-24"
-								/>
-								<p className="text-xs text-muted-foreground">
-									Developer-facing — shown to learners, never the detection criteria.
-								</p>
-							</div>
-
-							<div className="grid gap-2">
-								<Label htmlFor="practice-what-good-looks-like">What good looks like</Label>
-								<Textarea
-									id="practice-what-good-looks-like"
-									placeholder="Describe a concrete example of doing this well…"
-									value={form.whatGoodLooksLike}
-									onChange={(e) =>
-										setForm((prev) => ({ ...prev, whatGoodLooksLike: e.target.value }))
-									}
-									className="min-h-24"
-								/>
-								<p className="text-xs text-muted-foreground">
-									Developer-facing — shown to learners, never the detection criteria.
-								</p>
-							</div>
-						</section>
-
-						<Separator />
-
-						<section className="space-y-4">
-							<button
-								type="button"
-								onClick={() => setShowAdvanced((open) => !open)}
-								className="flex items-center gap-1.5 text-lg font-semibold"
-								aria-expanded={showAdvanced}
-							>
-								{showAdvanced ? (
-									<ChevronDown className="size-4" />
-								) : (
-									<ChevronRight className="size-4" />
-								)}
-								Advanced
-								<span className="text-sm font-normal text-muted-foreground">
-									— precompute script (optional)
-								</span>
-							</button>
-							{showAdvanced && (
-								<>
-									<p className="text-sm text-muted-foreground">
-										An optional TypeScript/Bun script that runs static analysis before the AI review
-										and feeds it structured hints. Most practices need none — the AI evaluates the
-										criteria directly.
-									</p>
-									<CodeEditor
-										value={form.precomputeScript}
-										onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
-										language="typescript"
-										className="h-[400px]"
-									/>
-								</>
-							)}
-						</section>
-
-						{/* Activity summary placeholder — no aggregate observation/feedback endpoint yet
-						    (ls1intum/Hephaestus#1339). */}
-						{mode === "edit" && (
-							<>
-								<Separator />
-								<section className="space-y-4">
-									<div>
-										<h2 className="text-lg font-semibold">Observations &amp; feedback</h2>
-										<p className="text-sm text-muted-foreground">
-											What this practice has produced across the workspace.
-										</p>
-									</div>
-									<div className="rounded-lg border border-dashed bg-muted/30 px-6 py-10 text-center">
-										<Telescope className="mx-auto mb-3 size-6 text-muted-foreground" />
-										<p className="text-sm font-medium">Activity will surface here</p>
-										<p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-											Once this practice is evaluated, the observations it records — and the
-											feedback delivered from them — will appear on this page, with how often it
-											fires and how developers respond. Feedback itself stays developer-facing.
-										</p>
-									</div>
-								</section>
-							</>
-						)}
-					</div>
-				</div>
-			</div>
-
-			<div className="sticky bottom-0 border-t bg-background px-6 py-4 z-10">
-				<div className="container mx-auto max-w-3xl flex justify-between">
-					<Button type="button" variant="outline" onClick={onCancel}>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={isPending}>
-						{isPending ? (
-							<>
-								<Spinner className="mr-2 size-4" />
-								{mode === "create" ? "Creating..." : "Saving..."}
-							</>
-						) : mode === "create" ? (
-							"Create practice"
-						) : (
-							"Save changes"
-						)}
-					</Button>
-				</div>
-			</div>
-		</form>
+export function PracticeFormShell({
+	mode,
+	workspaceSlug,
+	practiceName,
+	children,
+}: PracticeFormShellProps) {
+	return (
+		<PageLayout>
+			<Link
+				to="/w/$workspaceSlug/admin/practices"
+				params={{ workspaceSlug }}
+				search={(previous) => previous}
+				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
+			>
+				<ArrowLeft className="size-4" aria-hidden />
+				Practices
+			</Link>
+			<PageHeader
+				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
+				title={mode === "create" ? "Create practice" : `Edit: ${practiceName ?? "practice"}`}
+				description={
+					mode === "create"
+						? "Define what Hephaestus should look for in reviewed work."
+						: "Update how this practice evaluates reviewed work."
+				}
+			/>
+			{children}
+		</PageLayout>
 	);
 }

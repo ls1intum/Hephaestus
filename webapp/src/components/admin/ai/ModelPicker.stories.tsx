@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AvailableLlmModel } from "@/api/types.gen";
+import { Label } from "@/components/ui/label";
 import { ModelPicker } from "./ModelPicker";
 
 const mockModels: AvailableLlmModel[] = [
@@ -37,6 +38,7 @@ const meta = {
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: {
+		id: "review-model",
 		availableModels: mockModels,
 		value: null,
 		onChange: fn(),
@@ -44,6 +46,9 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<div className="w-80">
+				<Label htmlFor="review-model" className="mb-2">
+					Review model
+				</Label>
 				<Story />
 			</div>
 		),
@@ -67,7 +72,6 @@ export const NoModelsYet: Story = {
 	args: { availableModels: [] },
 };
 
-/** `Field` wires no ids on its own, so the trigger has to point at the explanation itself. */
 export const Invalid: Story = {
 	args: { invalid: true, "aria-describedby": "model-picker-error" },
 	render: (args) => (

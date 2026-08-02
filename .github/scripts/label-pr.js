@@ -31,7 +31,7 @@ module.exports = async ({ github, context }) => {
     /^docs\/contributor\/erd\/.*\.mmd$/, // Generated Mermaid ERD diagrams
 
     // Lock files (not code, just dependency resolution)
-    /package-lock\.json$/,
+    /pnpm-lock\.yaml$/,
     /\.lock$/,
   ];
 

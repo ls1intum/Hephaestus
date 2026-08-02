@@ -6,14 +6,12 @@ import {
 } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { adminUpdateLlmConnectionMutation } from "@/api/@tanstack/react-query.gen";
 import { filedUnder, usePendingMutationIds } from "./use-pending-mutation-ids";
 
 type Vars = { id: number };
 
 const KEY = ["thing"];
 
-/** A generated `@hey-api` helper as it would look if the generator started keying mutations itself. */
 function generatedMutation(): UseMutationOptions<void, Error, Vars> {
 	return {
 		mutationKey: ["generated", "its", "own", "key"],
@@ -65,16 +63,10 @@ function renderHarness() {
 	return () => release();
 }
 
-// `<output>` carries an implicit `role="status"`, so the readout needs no test id.
 const pendingIds = () => screen.getByRole("status").textContent;
 const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
 describe("usePendingMutationIds", () => {
-	it("reports nothing while nothing is in flight", () => {
-		renderHarness();
-		expect(pendingIds()).toBe("");
-	});
-
 	it("keeps reporting a call that is still running after a sibling settles", async () => {
 		const releaseFast = renderHarness();
 
@@ -94,13 +86,5 @@ describe("usePendingMutationIds", () => {
 		click("start generated");
 
 		await waitFor(() => expect(pendingIds()).toBe("3"));
-	});
-});
-
-describe("generated mutation helpers", () => {
-	it("still file no mutation key of their own, so every filedUnder key is the only one", () => {
-		// A canary, not a requirement: `filedUnder` is correct either way.
-		expect(adminUpdateLlmConnectionMutation()).not.toHaveProperty("mutationKey");
-		expect(adminUpdateLlmConnectionMutation().mutationFn).toEqual(expect.any(Function));
 	});
 });

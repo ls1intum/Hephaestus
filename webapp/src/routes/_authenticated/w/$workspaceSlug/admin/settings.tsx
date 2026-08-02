@@ -1,20 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
+import { Settings2 } from "lucide-react";
 import {
-	computeUserLeagueStatsQueryKey,
-	getLeaderboardQueryKey,
 	getWorkspaceOptions,
-	listWorkspacesQueryKey,
 	resetAndRecalculateLeaguesMutation,
-	updateFeaturesMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { Options } from "@/api/sdk.gen";
-import type { ComputeUserLeagueStatsData, GetLeaderboardData } from "@/api/types.gen";
 import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
+import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/settings")({
@@ -29,7 +28,7 @@ function AdminSettings() {
 	const workspaceQueryOptions = getWorkspaceOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
-	const { data: workspaceData } = useQuery({
+	const workspaceQuery = useQuery({
 		...workspaceQueryOptions,
 		enabled: Boolean(workspaceSlug),
 	});
@@ -38,48 +37,25 @@ function AdminSettings() {
 		...resetAndRecalculateLeaguesMutation(),
 		onSuccess: (_data, variables) => {
 			const resetSlug = variables.path.workspaceSlug;
-			// Both keys deliberately carry only `path`, so every cached time range and mode goes at
-			// once. The cast is what lets a *prefix* through a signature written for a *fetch*.
-			for (const queryKey of [
-				getLeaderboardQueryKey({
-					path: { workspaceSlug: resetSlug },
-				} as Options<GetLeaderboardData>),
-				computeUserLeagueStatsQueryKey({
-					path: { workspaceSlug: resetSlug },
-				} as Options<ComputeUserLeagueStatsData>),
-			]) {
-				queryClient.invalidateQueries({ queryKey });
-			}
+			queryClient.invalidateQueries({
+				queryKey: [{ tags: ["Leaderboard"], path: { workspaceSlug: resetSlug } }],
+			});
 		},
 	});
 
-	const updateFeatures = useMutation({
-		...updateFeaturesMutation(),
-		onSuccess: () => {
-			if (!workspaceSlug) {
-				return;
-			}
-			queryClient.invalidateQueries({
-				queryKey: workspaceQueryOptions.queryKey,
-			});
-			queryClient.invalidateQueries({
-				queryKey: listWorkspacesQueryKey(),
-			});
-			toast.success("Feature settings updated");
-		},
-		onError: () => {
-			toast.error("Failed to update feature settings");
-		},
+	const updateFeatures = useUpdateWorkspaceFeatures(workspaceSlug ?? "", {
+		success: "Feature settings updated",
+		error: "Failed to update feature settings",
 	});
 
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
 	}
 
+	const workspaceData = workspaceQuery.data;
+
 	const handleToggleFeature = (feature: FeatureKey, enabled: boolean) => {
-		if (!workspaceSlug) {
-			return;
-		}
+		if (!workspaceSlug) return;
 		updateFeatures.mutate({
 			path: { workspaceSlug },
 			body: { [feature]: enabled },
@@ -87,27 +63,42 @@ function AdminSettings() {
 	};
 
 	return (
-		<AdminSettingsPage
-			isResettingLeagues={resetLeagues.isPending}
-			onResetLeagues={() => {
-				if (!workspaceSlug) {
-					return;
-				}
-				resetLeagues.mutate({ path: { workspaceSlug } });
-			}}
-			features={{
-				practicesEnabled: workspaceData?.practicesEnabled ?? false,
-				mentorEnabled: workspaceData?.mentorEnabled ?? false,
-				achievementsEnabled: workspaceData?.achievementsEnabled ?? false,
-				leaderboardEnabled: workspaceData?.leaderboardEnabled ?? false,
-				progressionEnabled: workspaceData?.progressionEnabled ?? false,
-				leaguesEnabled: workspaceData?.leaguesEnabled ?? false,
-				practiceReviewAutoTriggerEnabled: workspaceData?.practiceReviewAutoTriggerEnabled ?? true,
-				practiceReviewManualTriggerEnabled:
-					workspaceData?.practiceReviewManualTriggerEnabled ?? true,
-			}}
-			isSavingFeatures={updateFeatures.isPending}
-			onToggleFeature={handleToggleFeature}
-		/>
+		<PageLayout>
+			<PageHeader
+				icon={<Settings2 />}
+				title="Workspace settings"
+				description="Configure workspace features, leagues, and lifecycle."
+			/>
+			{!workspaceSlug || workspaceQuery.isLoading ? (
+				<div className="flex h-40 max-w-4xl items-center justify-center">
+					<Spinner className="size-6" />
+				</div>
+			) : workspaceQuery.isError || !workspaceData ? (
+				<div className="max-w-4xl">
+					<QueryErrorAlert
+						error={workspaceQuery.error}
+						title="Couldn't load workspace settings"
+						onRetry={() => workspaceQuery.refetch()}
+					/>
+				</div>
+			) : (
+				<AdminSettingsPage
+					isResettingLeagues={resetLeagues.isPending}
+					onResetLeagues={() => {
+						resetLeagues.mutate({ path: { workspaceSlug } });
+					}}
+					features={{
+						mentorEnabled: workspaceData.mentorEnabled,
+						achievementsEnabled: workspaceData.achievementsEnabled,
+						leaderboardEnabled: workspaceData.leaderboardEnabled,
+						progressionEnabled: workspaceData.progressionEnabled,
+						leaguesEnabled: workspaceData.leaguesEnabled,
+					}}
+					isSavingFeatures={updateFeatures.isPending}
+					onToggleFeature={handleToggleFeature}
+					workspaceSlug={workspaceSlug}
+				/>
+			)}
+		</PageLayout>
 	);
 }

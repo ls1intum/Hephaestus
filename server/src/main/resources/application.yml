@@ -405,8 +405,6 @@ hephaestus:
         skip-drafts: ${PRACTICE_REVIEW_SKIP_DRAFTS:true}
         # whether to deliver feedback to already-merged PRs
         deliver-to-merged: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:false}
-        # base URL of the Hephaestus app (for preferences footer link); empty = no link
-        app-base-url: ${PRACTICE_REVIEW_APP_BASE_URL:}
         # minimum minutes between reviews for the same PR (0 = no cooldown)
         cooldown-minutes: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:15}
 
@@ -458,8 +456,7 @@ hephaestus:
         # instead of requeued again. Authoritative budget lives on agent_job.retry_count.
         max-retries: ${AGENT_MAX_RETRIES:5}
         heartbeat-interval: 25s
-        # Retention: AgentJobRetentionService. payload-retention strips container_logs/
-        # output to NULL past this age; row-retention deletes the whole terminal row past this age.
+        # Strip heavy job payloads after payload-retention; delete unreferenced terminal jobs after row-retention.
         payload-retention: ${AGENT_PAYLOAD_RETENTION:P14D}
         row-retention: ${AGENT_ROW_RETENTION:P90D}
 

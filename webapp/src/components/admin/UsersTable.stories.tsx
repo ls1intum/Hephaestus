@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
@@ -124,16 +124,12 @@ const meta: Meta<typeof UsersTable> = {
 	component: UsersTable,
 	parameters: {
 		layout: "fullscreen",
-		docs: {
-			description: {
-				component:
-					"A comprehensive data table for managing users and their team assignments in the workspace.",
-			},
-		},
 	},
 	args: {
 		users: mockUsers,
 		teams: mockTeams,
+		view: { q: "", team: "all", sort: "name", desc: false, page: 0, size: 10 },
+		onViewChange: fn(),
 	},
 };
 

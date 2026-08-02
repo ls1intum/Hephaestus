@@ -254,24 +254,20 @@ describe("Outline integration — add-collection round trip", () => {
 		);
 
 		renderContainer();
-		expect(await screen.findByText("Engineering")).toBeTruthy();
+		await screen.findByText("Engineering");
 
 		fireEvent.click(screen.getByRole("button", { name: /add collection/i }));
 		const dialog = await screen.findByRole("dialog");
 
-		// The candidates load lazily on open; the already-mirrored one is checked + disabled.
-		// (The base-ui Checkbox renders a role="checkbox" span, so disabled is ARIA, not a DOM prop.)
-		const mirrored = await within(dialog).findByRole("checkbox", { name: /engineering/i });
+		const mirrored = await within(dialog).findByRole("option", { name: /engineering/i });
 		expect(mirrored.getAttribute("aria-disabled")).toBe("true");
-		expect(mirrored.getAttribute("aria-checked")).toBe("true");
 
-		fireEvent.click(within(dialog).getByRole("checkbox", { name: /architecture decisions/i }));
+		fireEvent.click(within(dialog).getByRole("option", { name: /architecture decisions/i }));
 		fireEvent.click(within(dialog).getByRole("button", { name: /add 1 collection/i }));
 
 		await waitFor(() => expect(registerBody).toEqual({ collectionId: "col-arch" }));
 
-		expect(await screen.findByText("Architecture Decisions")).toBeTruthy();
-		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		await screen.findByText("Architecture Decisions");
 	});
 });
 

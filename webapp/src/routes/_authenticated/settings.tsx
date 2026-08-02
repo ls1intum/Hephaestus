@@ -34,11 +34,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function RouteComponent() {
 	const queryClient = useQueryClient();
-	const { logout, linkAccount, hasRole } = useAuth();
+	const { logout, linkAccount } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
-
-	// Feature flag: AI review section visible only for users with the practice review role
-	const showAiReviewSection = hasRole("run_practice_review");
 
 	const {
 		data: settings,
@@ -101,7 +98,8 @@ function RouteComponent() {
 		});
 	};
 
-	const handleAiReviewToggle = (checked: boolean) => updateSetting({ aiReviewEnabled: checked });
+	const handlePracticeFeedbackToggle = (checked: boolean) =>
+		updateSetting({ practiceFeedbackDeliveryEnabled: checked });
 
 	const handleResearchToggle = (checked: boolean) =>
 		updateSetting({ participateInResearch: checked });
@@ -228,12 +226,11 @@ function RouteComponent() {
 			isLoading={isLoading}
 			settingsError={settingsError}
 			onRetrySettings={() => refetchSettings()}
-			aiReviewProps={{
-				aiReviewEnabled: settings?.aiReviewEnabled ?? true,
-				onToggleAiReview: handleAiReviewToggle,
+			practiceFeedbackProps={{
+				practiceFeedbackDeliveryEnabled: settings?.practiceFeedbackDeliveryEnabled ?? true,
+				onTogglePracticeFeedback: handlePracticeFeedbackToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
-			showAiReviewSection={showAiReviewSection}
 			showResearchSection={analyticsConfigured}
 			researchProps={{
 				participateInResearch: settings?.participateInResearch ?? true,

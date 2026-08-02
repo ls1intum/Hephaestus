@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import com.slack.api.model.assistant.SuggestedPrompt;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import java.util.List;
 import java.util.Optional;
@@ -10,11 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Handles Slack's agent Messages tab lifecycle: when a member opens the mentor DM, seed the top of the
- * Messages tab with suggested prompts so the first turn is a click, not a blank box. Best-effort — a Slack
- * failure is swallowed.
- */
+/** Installs suggested prompts when a member opens the Slack agent Messages tab. */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackAssistantEventHandler {
@@ -33,18 +30,18 @@ public class SlackAssistantEventHandler {
 
     private final SlackWorkspaceResolver workspaceResolver;
     private final SlackMessageService messageService;
+    private final MentorReadinessQuery mentorReadinessQuery;
 
-    public SlackAssistantEventHandler(SlackWorkspaceResolver workspaceResolver, SlackMessageService messageService) {
+    public SlackAssistantEventHandler(
+        SlackWorkspaceResolver workspaceResolver,
+        SlackMessageService messageService,
+        MentorReadinessQuery mentorReadinessQuery
+    ) {
         this.workspaceResolver = workspaceResolver;
         this.messageService = messageService;
+        this.mentorReadinessQuery = mentorReadinessQuery;
     }
 
-    /**
-     * Set the suggested prompts for the agent Messages tab.
-     *
-     * @param teamId the Slack {@code T…} workspace id from the verified envelope
-     * @param event  the {@code app_home_opened} event node with {@code tab=messages}
-     */
     public void onMessagesOpened(String teamId, JsonNode event) {
         String channelId = event.path("channel").asString("");
         if (channelId.isEmpty()) {
@@ -55,6 +52,11 @@ public class SlackAssistantEventHandler {
             log.debug("slack.agent: messages tab opened for team={} with no active connection", teamId);
             return;
         }
-        messageService.setSuggestedPrompts(workspaceId.get(), channelId, PROMPT_TITLE, PROMPTS);
+        long workspace = workspaceId.get();
+        if (!mentorReadinessQuery.isReady(workspace)) {
+            log.debug("slack.agent: mentor unavailable for workspace={}", workspace);
+            return;
+        }
+        messageService.setSuggestedPrompts(workspace, channelId, PROMPT_TITLE, PROMPTS);
     }
 }

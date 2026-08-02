@@ -5,6 +5,7 @@ import {
 	type ResolvedLegalContent,
 	type resolveLegalContent,
 } from "@/lib/legal";
+import { withStandardPage } from "@/stories/decorators";
 import { LegalPage } from "./LegalPage";
 
 const TUM_IMPRINT = `Information in accordance with § 5 DDG — German Digital Services Act.
@@ -63,39 +64,22 @@ function makeResolver(key: FixtureKey): typeof resolveLegalContent {
 	});
 }
 
-/**
- * Renders an imprint or privacy page from Markdown resolved through the
- * operator-override → bundled-profile → disclaimer cascade. Stories inject a
- * fixture resolver so each variant mounts without network I/O.
- */
 const meta = {
 	component: LegalPage,
 	tags: ["autodocs"],
 	parameters: {
-		layout: "padded",
-		docs: {
-			description: {
-				component:
-					"Legal-page shell used by `/imprint` and `/privacy`. Resolves the Markdown body through a three-layer cascade and surfaces a disclaimer banner when the shipped fallback is active.",
-			},
-		},
+		layout: "fullscreen",
 	},
+	decorators: [withStandardPage],
 	argTypes: {
 		page: {
-			description: "Which legal page to render.",
 			control: { type: "inline-radio" },
 			options: ["imprint", "privacy"] satisfies LegalPageId[],
 		},
-		title: {
-			description: "Page title (shown above the Markdown body).",
-			control: "text",
-		},
 		resolver: {
-			description: "Injected async resolver (fixture in stories, real fetcher in prod).",
 			control: false,
 		},
 		profileOverride: {
-			description: "Forces a specific profile; production reads `environment.legal.profile`.",
 			control: false,
 		},
 	},
@@ -104,7 +88,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** `tumaet` profile — canonical upstream imprint. */
 export const TumaetImprint: Story = {
 	args: {
 		page: "imprint",
@@ -113,7 +96,6 @@ export const TumaetImprint: Story = {
 	},
 };
 
-/** `tumaet` profile — canonical upstream privacy statement. */
 export const TumaetPrivacy: Story = {
 	args: {
 		page: "privacy",
@@ -122,7 +104,6 @@ export const TumaetPrivacy: Story = {
 	},
 };
 
-/** Safety fallback shown when no profile is configured (imprint). */
 export const DisclaimerImprint: Story = {
 	args: {
 		page: "imprint",
@@ -131,7 +112,6 @@ export const DisclaimerImprint: Story = {
 	},
 };
 
-/** Safety fallback shown when no profile is configured (privacy). */
 export const DisclaimerPrivacy: Story = {
 	args: {
 		page: "privacy",

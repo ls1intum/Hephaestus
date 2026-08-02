@@ -12,8 +12,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$t
 function ThreadContainer() {
 	const { threadId } = Route.useParams();
 
-	// Initialize mentor chat hook. The empty-thread greeting renders statically inside
-	// <Chat /> when messages are empty; no server roundtrip needed.
 	const mentorChat = useMentorChat({
 		threadId,
 		onError: (error: Error) => {
@@ -43,15 +41,12 @@ function ThreadContainer() {
 		mentorChat.sendMessage(content);
 	};
 
-	// Show loading state while fetching thread with a chat-like skeleton
 	if (mentorChat.isThreadLoading) {
 		return (
 			<div className="flex flex-col flex-1 min-h-0">
-				<div className="relative h-[calc(100dvh-4rem)] flex flex-col">
-					{/* Messages area */}
+				<div className="relative flex min-h-0 flex-1 flex-col">
 					<div className="flex-1 overflow-y-auto p-4 sm:p-6">
 						<div className="flex flex-col w-full pb-16 min-w-0 gap-8 flex-1 pt-4 relative mx-auto md:max-w-3xl">
-							{/* User bubble */}
 							<div className="flex items-start gap-3 justify-end">
 								<div className="space-y-2 max-w-[75%] text-right">
 									<Skeleton className="h-4 w-56 ml-auto" />
@@ -59,7 +54,6 @@ function ThreadContainer() {
 								</div>
 							</div>
 
-							{/* Assistant bubble */}
 							<div className="flex items-start gap-3">
 								<Skeleton className="h-8 w-8 rounded-full" />
 								<div className="space-y-2 max-w-[75%]">
@@ -69,7 +63,6 @@ function ThreadContainer() {
 								</div>
 							</div>
 
-							{/* User bubble */}
 							<div className="flex items-start gap-3 justify-end">
 								<div className="space-y-2 max-w-[75%] text-right">
 									<Skeleton className="h-4 w-75 ml-auto" />
@@ -78,7 +71,6 @@ function ThreadContainer() {
 								</div>
 							</div>
 
-							{/* Assistant bubble */}
 							<div className="flex items-start gap-3">
 								<Skeleton className="h-8 w-8 rounded-full" />
 								<div className="space-y-2 max-w-[75%]">
@@ -90,7 +82,6 @@ function ThreadContainer() {
 						</div>
 					</div>
 
-					{/* Bottom input bar */}
 					<div className="flex flex-col gap-2 items-center w-full px-4 pb-2 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
 						<div className="w-full max-w-3xl space-y-2">
 							<Skeleton className="h-20 flex-1" />
@@ -102,7 +93,6 @@ function ThreadContainer() {
 		);
 	}
 
-	// Show error state if thread fetch failed
 	if (mentorChat.threadError) {
 		return (
 			<div className="h-full flex items-center justify-center p-6">
@@ -118,7 +108,6 @@ function ThreadContainer() {
 		);
 	}
 
-	// Show error if no thread data
 	if (!mentorChat.threadDetail && !mentorChat.isThreadLoading) {
 		return (
 			<div className="h-full flex items-center justify-center p-6">
@@ -132,27 +121,25 @@ function ThreadContainer() {
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<Chat
-				id={mentorChat.currentThreadId || threadId}
 				messages={mentorChat.messages as unknown as ChatMessage[]}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}
-				attachments={[]} // Empty since attachments are disabled
+				attachments={[]}
 				onMessageSubmit={handleMessageSubmit}
 				onMessageEdit={handleMessageEdit}
 				onStop={mentorChat.stop}
 				onReload={() => {
-					// Clear the error banner, then re-run the last turn so the "Try again" button isn't a dead end.
 					mentorChat.clearError();
 					mentorChat.regenerate();
 				}}
-				onFileUpload={() => Promise.resolve([])} // No-op since attachments are disabled
-				onAttachmentsChange={() => {}} // No-op since attachments are disabled
+				onFileUpload={() => Promise.resolve([])}
+				onAttachmentsChange={() => {}}
 				onCopy={handleCopy}
 				onVote={handleVote}
 				inputPlaceholder="Continue the conversation..."
-				disableAttachments={true}
-				className="h-[calc(100dvh-4rem)]"
+				disableAttachments
+				className="h-full"
 				partRenderers={defaultPartRenderers}
 			/>
 		</div>

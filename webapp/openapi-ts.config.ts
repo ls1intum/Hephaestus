@@ -6,16 +6,17 @@ export default defineConfig({
 	plugins: [
 		...defaultPlugins,
 		"@hey-api/client-fetch",
-		"@tanstack/react-query",
+		{
+			name: "@tanstack/react-query",
+			queryKeys: { tags: true }
+		},
 		{
 			dates: true,
 			bigInt: false,
 			name: "@hey-api/transformers"
 		}
 	],
-	// Exclude SSE endpoints - openapi-ts react-query plugin doesn't handle them correctly
-	// (tries to destructure 'data' from ServerSentEventsResult which has 'stream' instead).
-	// The mentor chat uses a custom transport in use-mentor-chat.ts.
+	// Generated query hooks do not support SSE responses; Mentor uses use-mentor-chat.ts.
 	parser: {
 		filters: {
 			operations: {

@@ -4,7 +4,7 @@ import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { LabelBadge } from "@/components/shared/LabelBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { RepositoryLabelsToggle } from "./RepositoryLabelsToggle";
 
@@ -101,12 +101,20 @@ export function RepositoryCard({
 						<Popover>
 							<PopoverTrigger
 								render={
-									<Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-7 w-7 p-0"
+										aria-label={`Configure labels for ${repository.nameWithOwner}`}
+									>
 										<Settings className="h-3 w-3" />
 									</Button>
 								}
 							/>
 							<PopoverContent className="w-[32rem] max-w-[calc(100vw-2rem)] p-3 sm:p-4" align="end">
+								<PopoverTitle className="sr-only">
+									Labels for {repository.nameWithOwner}
+								</PopoverTitle>
 								<RepositoryLabelsToggle
 									team={team}
 									repository={repository}

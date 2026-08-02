@@ -4,17 +4,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface MessageEditorProps {
-	/** Initial text content to edit */
 	initialContent: string;
-	/** Whether the editor is currently submitting */
 	isSubmitting?: boolean;
-	/** Placeholder text for the textarea */
 	placeholder?: string;
-	/** Callback when cancel is clicked */
 	onCancel: () => void;
-	/** Callback when send is clicked with the edited content */
 	onSend: (content: string) => void;
-	/** Optional CSS class name */
 	className?: string;
 }
 
@@ -36,18 +30,12 @@ export function MessageEditor({
 		}
 	};
 
-	// Initial height adjustment
-	// biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
 	useEffect(() => {
-		if (textareaRef.current) {
-			adjustHeight();
-		}
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+		textarea.style.height = "auto";
+		textarea.style.height = `${textarea.scrollHeight + 2}px`;
 	}, []);
-
-	// Update internal state when initialContent changes
-	useEffect(() => {
-		setDraftContent(initialContent);
-	}, [initialContent]);
 
 	const handleInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
 		setDraftContent(event.target.value);
@@ -75,9 +63,7 @@ export function MessageEditor({
 	return (
 		<div
 			className={cn(
-				// Base textarea styling from ui/textarea - exact copy
 				"border-input placeholder:text-muted-foreground focus-within:border-ring focus-within:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input flex field-sizing-content min-h-16 w-full rounded-xl border bg-white px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-within:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-				// Custom layout styling
 				"flex-col gap-1",
 				className,
 			)}
@@ -86,6 +72,7 @@ export function MessageEditor({
 				<Textarea
 					data-testid="message-editor"
 					ref={textareaRef}
+					aria-label="Edit message"
 					className="border-0 bg-transparent outline-none overflow-hidden resize-none !text-base w-full p-0 shadow-none focus-visible:ring-0 min-h-0"
 					placeholder={placeholder}
 					value={draftContent}

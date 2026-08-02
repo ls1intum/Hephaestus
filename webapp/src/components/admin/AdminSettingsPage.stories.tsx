@@ -1,22 +1,32 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { HttpResponse, http } from "msw";
 import { expect, fn, within } from "storybook/test";
+import { withStandardPage } from "@/stories/decorators";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
 const allOff: FeatureValues = {
-	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
 	leaderboardEnabled: false,
 	progressionEnabled: false,
 	leaguesEnabled: false,
-	practiceReviewAutoTriggerEnabled: true,
-	practiceReviewManualTriggerEnabled: true,
 };
+
+const membershipRead = [
+	http.get("*/workspaces/:workspaceSlug/members/me", () =>
+		HttpResponse.json({ role: "OWNER", userLogin: "ada" }),
+	),
+];
 
 const meta = {
 	component: AdminSettingsPage,
-	parameters: { layout: "padded" },
+	parameters: {
+		layout: "fullscreen",
+		msw: { handlers: membershipRead },
+		chromatic: { viewports: [320, 1440] },
+	},
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
 		isResettingLeagues: false,
@@ -24,18 +34,21 @@ const meta = {
 		features: allOff,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
+		workspaceSlug: "ase",
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Every feature off — the Features section still renders; only the league card is conditional. */
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("heading", { name: /^features$/i })).toBeInTheDocument();
+		await expect(
+			canvas.getByRole("heading", { name: "Workspace capabilities" }),
+		).toBeInTheDocument();
 		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
+		await canvas.findByRole("button", { name: /^delete workspace$/i });
 	},
 };
 
@@ -43,17 +56,10 @@ export const ResettingLeagues: Story = {
 	args: { isResettingLeagues: true, features: { ...allOff, leaguesEnabled: true } },
 };
 
-export const PracticeReviewWithSubToggles: Story = {
-	args: {
-		features: {
-			...allOff,
-			practicesEnabled: true,
-			practiceReviewAutoTriggerEnabled: true,
-			practiceReviewManualTriggerEnabled: false,
-		},
-	},
-};
-
 export const LeaguesEnabled: Story = {
 	args: { features: { ...allOff, leaguesEnabled: true } },
+};
+
+export const WorkspaceUnresolved: Story = {
+	args: { workspaceSlug: undefined },
 };

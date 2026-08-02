@@ -48,7 +48,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
-/** Width of the right sidebar — keep in sync with the CSS variable value. */
 const SIDEBAR_WIDTH = "20rem";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
@@ -65,16 +64,10 @@ export interface AchievementSidebarProps {
 	isLoading: boolean;
 	isError: boolean;
 	achievements: UIAchievement[];
-	/** Whether the viewer is looking at their own achievements. */
 	isOwnProfile: boolean;
-	/** Username of the user whose achievements are being displayed. */
 	targetUsername: string;
 }
 
-/**
- * Shared sidebar content rendered identically on desktop (fixed panel) and
- * mobile (Sheet overlay). Extracted so both paths stay in sync.
- */
 function SidebarBody({
 	viewMode,
 	onViewModeChange,
@@ -95,7 +88,6 @@ function SidebarBody({
 
 	return (
 		<>
-			{/* ── Header: Title + Status ── */}
 			<SidebarHeader className="px-5 pt-5 pb-3">
 				<div className="flex items-center gap-3">
 					<div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center shadow-[0_0_15px_rgba(var(--shadow-rgb),0.15)]">
@@ -118,7 +110,7 @@ function SidebarBody({
 					</div>
 				)}
 				{isError && (
-					<div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-full border border-destructive/20 text-xs font-medium">
+					<div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-foreground rounded-full border border-destructive/20 text-xs font-medium">
 						<div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
 						Failed to load achievement data
 					</div>
@@ -126,7 +118,6 @@ function SidebarBody({
 			</SidebarHeader>
 
 			<SidebarContent className="px-3 overflow-x-hidden">
-				{/* ── View Mode Toggle ── */}
 				<SidebarGroup>
 					<SidebarGroupLabel>View</SidebarGroupLabel>
 					<SidebarGroupContent>
@@ -134,11 +125,11 @@ function SidebarBody({
 							<ToggleGroup
 								value={[viewMode]}
 								onValueChange={(value) => {
-									// Ensure at least one value is selected (last one clicked wins)
 									const newValue =
 										value.length > 0 ? (value[value.length - 1] as ViewMode) : viewMode;
 									if (newValue !== viewMode) onViewModeChange(newValue);
 								}}
+								role="toolbar"
 								aria-label="View mode"
 								className="bg-secondary/50 rounded-lg p-1 flex-1"
 							>
@@ -161,7 +152,6 @@ function SidebarBody({
 							</ToggleGroup>
 						</div>
 
-						{/* Zoom controls – only in tree mode */}
 						{viewMode === "tree" && (
 							<div className="flex items-center gap-1 mt-2 bg-secondary/50 rounded-lg p-1">
 								<Button
@@ -198,7 +188,6 @@ function SidebarBody({
 
 				<SidebarSeparator />
 
-				{/* ── Overall Progress ── */}
 				<SidebarGroup>
 					<SidebarGroupLabel>
 						<Trophy className="w-4 h-4 mr-1.5" />
@@ -230,7 +219,6 @@ function SidebarBody({
 					</SidebarGroupContent>
 				</SidebarGroup>
 
-				{/* ── Category Breakdown ── */}
 				<SidebarGroup>
 					<SidebarGroupLabel>Categories</SidebarGroupLabel>
 					<SidebarGroupContent className="space-y-2">
@@ -275,7 +263,6 @@ function SidebarBody({
 					</SidebarGroupContent>
 				</SidebarGroup>
 
-				{/* ── Recent Unlocks ── */}
 				<SidebarGroup>
 					<SidebarGroupLabel>Recent Unlocks</SidebarGroupLabel>
 					<SidebarGroupContent className="space-y-1.5">
@@ -321,13 +308,11 @@ function SidebarBody({
 				</SidebarGroup>
 			</SidebarContent>
 
-			{/* ── Legend (pinned to bottom) ── */}
 			<SidebarFooter className="border-t border-sidebar-border px-4 py-3">
 				<span className="text-xs font-semibold text-sidebar-foreground/70 uppercase tracking-wider mb-1">
 					Legend
 				</span>
 				<div className="flex gap-6 text-xs">
-					{/* Status column */}
 					<div className="space-y-1.5">
 						<span className="text-muted-foreground font-medium">Status</span>
 						<div className="flex items-center gap-1.5">
@@ -343,7 +328,6 @@ function SidebarBody({
 							<span className="text-muted-foreground">Locked</span>
 						</div>
 					</div>
-					{/* Rarity column */}
 					<div className="space-y-1.5">
 						<span className="text-muted-foreground font-medium">Rarity</span>
 						{(["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map(
@@ -376,8 +360,6 @@ export function AchievementSidebar(props: AchievementSidebarProps) {
 	const handleZoomOut = () => reactFlow.zoomOut();
 	const handleFitView = () => reactFlow.fitView({ padding: 0.15 });
 
-	// On desktop, set a CSS variable on <html> so the root layout's SidebarInset
-	// can add a matching right margin — keeping the global header in line.
 	useEffect(() => {
 		if (!isMobile) {
 			document.documentElement.style.setProperty("--right-sidebar-width", SIDEBAR_WIDTH);
@@ -394,7 +376,6 @@ export function AchievementSidebar(props: AchievementSidebarProps) {
 		onFitView: handleFitView,
 	};
 
-	/* ── Mobile: Sheet overlay triggered by a floating button ── */
 	if (isMobile) {
 		return (
 			<>
@@ -420,7 +401,6 @@ export function AchievementSidebar(props: AchievementSidebarProps) {
 		);
 	}
 
-	/* ── Desktop: Fixed right panel ── */
 	return (
 		<div
 			className="fixed top-0 right-0 h-dvh bg-sidebar text-sidebar-foreground border-l border-sidebar-border flex flex-col overflow-y-auto z-10"

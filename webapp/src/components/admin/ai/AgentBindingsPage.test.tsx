@@ -45,9 +45,8 @@ function renderPage(overrides: Partial<AgentBindingsPageProps> = {}) {
 	return { onSave, onTurnOff };
 }
 
-/** One card per purpose, so an assertion has to be scoped to a card, not to the page. */
 function practiceDetectionCard(): HTMLElement {
-	const field = screen.getByLabelText("Practice detection runs on");
+	const field = screen.getByLabelText("Practice reviews model");
 	const form = field.closest("form");
 	if (form == null) throw new Error("practice-detection card has no form");
 	return form;
@@ -56,23 +55,27 @@ function practiceDetectionCard(): HTMLElement {
 describe("AgentBindingsPage", () => {
 	it("renders an assignment card for each purpose", () => {
 		renderPage();
-		expect(screen.getByText("Practice detection")).toBeTruthy();
-		expect(screen.getByText("Mentor")).toBeTruthy();
-	});
+		screen.getByText("Practice reviews");
+		screen.getByText("Heph");
 
-	it("shows a Not ready badge when the bound model cannot run", () => {
-		renderPage();
-		expect(screen.getByText("Not ready")).toBeTruthy();
+		const unassignedSwitch = within(screen.getByRole("region", { name: "Heph" })).getByRole(
+			"switch",
+			{ name: "Use this model" },
+		);
+		expect(unassignedSwitch.getAttribute("aria-checked")).toBe("false");
+		expect(unassignedSwitch.getAttribute("aria-disabled")).toBe("true");
 	});
 
 	it("shows the binding it saves, so the payload cannot disagree with the controls", () => {
 		const { onSave } = renderPage();
 
 		const card = within(practiceDetectionCard());
-		expect(card.getByLabelText("Practice detection runs on").textContent).toContain("GPT Test");
-		expect(card.getByRole("switch", { name: "Active" }).getAttribute("aria-checked")).toBe("true");
+		card.getByText(/GPT Test/);
+		expect(card.getByRole("switch", { name: "Use this model" }).getAttribute("aria-checked")).toBe(
+			"true",
+		);
 
-		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		expect(onSave).toHaveBeenCalledWith(
 			"PRACTICE_DETECTION",
@@ -83,44 +86,44 @@ describe("AgentBindingsPage", () => {
 	it("exposes the advanced settings as a disclosure", () => {
 		renderPage();
 
-		const trigger = screen.getAllByRole("button", { name: /Advanced/ })[0];
+		const card = within(practiceDetectionCard());
+		const trigger = card.getByRole("button", { name: /Advanced/ });
 		expect(trigger.getAttribute("aria-expanded")).toBe("false");
-		expect(screen.queryByLabelText("Timeout (seconds)")).toBeNull();
+		expect(card.queryByLabelText("Timeout (seconds)")).toBeNull();
 
 		fireEvent.click(trigger);
 
 		expect(trigger.getAttribute("aria-expanded")).toBe("true");
-		const panelId = trigger.getAttribute("aria-controls");
-		expect(panelId).toBeTruthy();
-		const timeout = screen.getByLabelText("Timeout (seconds)");
-		expect(panelId && document.getElementById(panelId)?.contains(timeout)).toBe(true);
+		card.getByLabelText("Timeout (seconds)");
 	});
 
 	it("refuses to save a cleared timeout instead of sending a zero", () => {
 		const { onSave } = renderPage();
+		const card = within(practiceDetectionCard());
 
-		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
-		fireEvent.change(screen.getByLabelText("Timeout (seconds)"), { target: { value: "" } });
-		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
+		fireEvent.change(card.getByLabelText("Timeout (seconds)"), { target: { value: "" } });
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
-		expect(screen.getByText("Enter a number of seconds.")).toBeTruthy();
-		expect(screen.getByLabelText("Timeout (seconds)").getAttribute("aria-invalid")).toBe("true");
+		card.getByText("Enter a number of seconds.");
+		expect(card.getByLabelText("Timeout (seconds)").getAttribute("aria-invalid")).toBe("true");
 		expect(onSave).not.toHaveBeenCalled();
 	});
 
 	it("rejects a timeout below the floor and only saves once it is corrected", () => {
 		const { onSave } = renderPage();
+		const card = within(practiceDetectionCard());
 
-		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
-		const timeout = screen.getByLabelText("Timeout (seconds)");
+		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
+		const timeout = card.getByLabelText("Timeout (seconds)");
 		fireEvent.change(timeout, { target: { value: "5" } });
-		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
-		expect(screen.getByText("Enter a whole number of seconds, 30 or more.")).toBeTruthy();
+		card.getByText("Enter a whole number of seconds, 30 or more.");
 		expect(onSave).not.toHaveBeenCalled();
 
 		fireEvent.change(timeout, { target: { value: "45" } });
-		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		expect(onSave).toHaveBeenCalledWith(
 			"PRACTICE_DETECTION",
@@ -130,20 +133,19 @@ describe("AgentBindingsPage", () => {
 
 	it("rejects a timeout above the ceiling, says why, and accepts the ceiling itself", () => {
 		const { onSave } = renderPage();
+		const card = within(practiceDetectionCard());
 
-		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
-		const timeout = screen.getByLabelText("Timeout (seconds)");
+		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
+		const timeout = card.getByLabelText("Timeout (seconds)");
 		fireEvent.change(timeout, { target: { value: "7200" } });
-		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
-		expect(
-			screen.getByText("Runs stop after an hour, so enter 3600 seconds or less."),
-		).toBeTruthy();
+		card.getByText("Runs stop after an hour, so enter 3600 seconds or less.");
 		expect(timeout.getAttribute("aria-invalid")).toBe("true");
 		expect(onSave).not.toHaveBeenCalled();
 
 		fireEvent.change(timeout, { target: { value: "3600" } });
-		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		expect(onSave).toHaveBeenCalledWith(
 			"PRACTICE_DETECTION",
@@ -153,25 +155,45 @@ describe("AgentBindingsPage", () => {
 
 	it("reopens the advanced disclosure when the field that blocked the save is inside it", () => {
 		renderPage();
+		const card = within(practiceDetectionCard());
 
-		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
-		fireEvent.change(screen.getByLabelText("Max concurrent runs"), { target: { value: "0" } });
-		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
-		expect(screen.queryByLabelText("Max concurrent runs")).toBeNull();
+		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
+		fireEvent.change(card.getByLabelText("Max concurrent runs"), { target: { value: "0" } });
+		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
+		expect(card.queryByLabelText("Max concurrent runs")).toBeNull();
 
-		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
-		expect(screen.getByText("Enter a whole number of runs, 1 or more.")).toBeTruthy();
+		card.getByText("Enter a whole number of runs, 1 or more.");
+		expect(document.activeElement).toBe(card.getByLabelText("Max concurrent runs"));
 	});
 
-	it("offers Turn off only for a purpose that is actually bound", () => {
+	it("keeps unrelated validation errors visible while another field is corrected", () => {
+		renderPage();
+		const card = within(practiceDetectionCard());
+
+		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
+		const timeout = card.getByLabelText("Timeout (seconds)");
+		const concurrency = card.getByLabelText("Max concurrent runs");
+		fireEvent.change(timeout, { target: { value: "" } });
+		fireEvent.change(concurrency, { target: { value: "0" } });
+		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
+
+		fireEvent.change(timeout, { target: { value: "60" } });
+
+		expect(card.queryByText("Enter a number of seconds.")).toBeNull();
+		card.getByText("Enter a whole number of runs, 1 or more.");
+	});
+
+	it("offers Clear assignment only for a purpose that is actually bound", () => {
 		const { onTurnOff } = renderPage();
 
-		const turnOff = screen.getByRole("button", { name: "Turn off" });
-		expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(2);
-		expect(turnOff.closest("form")?.textContent).toContain("Practice detection");
+		const clearAssignment = within(practiceDetectionCard()).getByRole("button", {
+			name: "Clear assignment",
+		});
+		expect(screen.getAllByRole("button", { name: "Clear assignment" })).toHaveLength(1);
 
-		fireEvent.click(turnOff);
+		fireEvent.click(clearAssignment);
 
 		expect(onTurnOff).toHaveBeenCalledWith("PRACTICE_DETECTION");
 	});

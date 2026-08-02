@@ -4,14 +4,11 @@ import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage, type AdminSettingsPageProps } from "./AdminSettingsPage";
 
 const features: FeatureValues = {
-	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
 	leaderboardEnabled: false,
 	progressionEnabled: false,
 	leaguesEnabled: false,
-	practiceReviewAutoTriggerEnabled: true,
-	practiceReviewManualTriggerEnabled: true,
 };
 
 function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
@@ -35,6 +32,11 @@ describe("AdminSettingsPage — non-integration content", () => {
 
 	it("shows the league reset card when leagues are enabled", () => {
 		setup({ features: { ...features, leaguesEnabled: true } });
-		expect(screen.getByText(/reset and recalculate leagues/i)).toBeTruthy();
+		screen.getByText(/reset and recalculate leagues/i);
+	});
+
+	it("leaves the danger zone out until the active workspace has resolved", () => {
+		setup({ workspaceSlug: undefined });
+		expect(screen.queryByRole("heading", { name: /danger zone/i })).toBeNull();
 	});
 });

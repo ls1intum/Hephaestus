@@ -26,6 +26,7 @@ function entry(over: Partial<ConfigAuditEntryView>): ConfigAuditEntryView {
 describe("label mapping", () => {
 	it("maps known types and actions to human labels", () => {
 		expect(entityTypeLabel("AGENT_CONFIG")).toBe("Agent config");
+		expect(entityTypeLabel("PRACTICE_DEFINITION")).toBe("Practice");
 		expect(actionLabel("CREATED")).toBe("Created");
 	});
 	it("names which purse a budget row is about, under either spelling", () => {

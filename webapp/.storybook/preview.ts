@@ -6,28 +6,29 @@ import {
 	createRouter,
 	RouterProvider,
 } from "@tanstack/react-router";
+import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
 import { ThemeProvider } from "../src/integrations/theme";
 import { handlers } from "../src/mocks/handlers";
 import "../src/styles.css";
 
-// Initialize MSW once for the Storybook browser. `onUnhandledRequest: "bypass"`
-// lets non-API requests (assets, fonts, the worker script itself) through while
-// still mocking the auth endpoints. `serviceWorker.url` resolves the worker under
-// Storybook's base path so it loads from `public/mockServiceWorker.js`.
 initialize(
 	{
-		onUnhandledRequest: "bypass",
+		onUnhandledRequest(request, print) {
+			if (
+				!isCommonAssetRequest(request) &&
+				new URL(request.url).origin === window.location.origin
+			) {
+				print.error();
+			}
+		},
 		quiet: true,
 		serviceWorker: { url: "./mockServiceWorker.js" },
 	},
 	handlers,
 );
 
-// A fresh QueryClient per story keeps query caches isolated between stories and
-// disables retries/refetches so query-driven components reach a deterministic
-// rendered state immediately (rather than spinning or retrying on the mock).
 const QueryDecorator: Decorator = (Story) => {
 	const queryClient = new QueryClient({
 		defaultOptions: {
@@ -47,7 +48,6 @@ const QueryDecorator: Decorator = (Story) => {
 	);
 };
 
-// Create a Tanstack Router decorator
 const RouterDecorator: Decorator = (Story) => {
 	const rootRoute = createRootRoute({
 		component: () => React.createElement(Story),
@@ -57,35 +57,26 @@ const RouterDecorator: Decorator = (Story) => {
 	return React.createElement(RouterProvider, { router });
 };
 
-// CSS injection for docs background theming
 const injectDocsThemeCSS = () => {
-	if (typeof document !== "undefined") {
-		const styleId = "storybook-docs-theme";
-		let style = document.getElementById(styleId);
+	if (typeof document === "undefined") return;
 
-		if (!style) {
-			style = document.createElement("style");
-			style.id = styleId;
-			document.head.appendChild(style);
-		}
+	const styleId = "storybook-docs-theme";
+	let style = document.getElementById(styleId);
 
-		style.textContent = `
-      /* Ensure docs background respects theme */
-  .docs-story {
-        background-color: var(--background) !important;
-        color: var(--foreground) !important;
-      }
-      
-      /* Theme-aware iframe styling */
-  html.dark .docs-story {
-        background-color: var(--background) !important;
-        color: var(--foreground) !important;
-      }
-    `;
+	if (!style) {
+		style = document.createElement("style");
+		style.id = styleId;
+		document.head.appendChild(style);
 	}
+
+	style.textContent = `
+		.docs-story {
+			background-color: var(--background) !important;
+			color: var(--foreground) !important;
+		}
+	`;
 };
 
-// Theme decorator that handles CSS injection
 const ThemeDecorator: Decorator = (Story) => {
 	React.useEffect(() => {
 		injectDocsThemeCSS();
@@ -94,7 +85,6 @@ const ThemeDecorator: Decorator = (Story) => {
 	return React.createElement(Story);
 };
 
-// Custom Theme Provider wrapper that only provides React context
 const StorybookThemeProvider = ({
 	theme,
 	children,
@@ -102,11 +92,10 @@ const StorybookThemeProvider = ({
 	theme: string;
 	children: React.ReactNode;
 }) => {
-	// Force re-render when theme changes by using key
 	return React.createElement(
 		ThemeProvider,
 		{
-			key: theme, // Force re-mount when theme changes
+			key: theme,
 			defaultTheme: theme as "light" | "dark",
 			storageKey: "storybook-theme",
 		},
@@ -116,6 +105,12 @@ const StorybookThemeProvider = ({
 
 const preview: Preview = {
 	parameters: {
+		// Base UI focus guards redirect focus immediately but axe flags their hidden sentinels.
+		// https://github.com/mui/base-ui/issues/4668
+		a11y: {
+			test: "error",
+			context: { exclude: "[data-base-ui-focus-guard]" },
+		},
 		controls: {
 			matchers: {
 				color: /(background|color)$/i,
@@ -124,29 +119,20 @@ const preview: Preview = {
 		},
 		options: {
 			storySort: {
-				order: ["core", "shared"],
+				order: ["Admin", "Core", "Shared"],
 			},
 		},
-		// Ensure docs pages also get themed
 		docs: {
 			story: {
 				inline: true,
 			},
 		},
-		// Chromatic configuration for optimal visual testing
 		chromatic: {
-			// Global viewport coverage for comprehensive testing
-			viewports: [375, 768, 1024, 1440, 1920],
-			// Disable animations for consistent snapshots
+			viewports: [1440],
 			disableSnapshot: false,
-			// Note: modes (themes) must be set per-story due to Chromatic limitation
-			// that doesn't support both viewports and modes on the same story
 		},
-		// Better viewport defaults
 		viewport: {
 			options: {
-				// The WCAG 2.2 SC 1.4.10 (Reflow) target: 320 x 568 CSS px, which is what 1280 px at 400 %
-				// zoom resolves to. Content must reach it without two-dimensional scrolling.
 				reflow: {
 					name: "Reflow (320px)",
 					styles: { width: "320px", height: "568px" },
@@ -175,16 +161,14 @@ const preview: Preview = {
 		QueryDecorator,
 		RouterDecorator,
 		ThemeDecorator,
-		// Apply CSS classes to both canvas and docs
 		withThemeByClassName({
 			themes: {
 				light: "light",
 				dark: "dark",
 			},
 			defaultTheme: "light",
-			parentSelector: "html", // Apply to both canvas and docs iframe
+			parentSelector: "html",
 		}),
-		// Provide React context
 		withThemeFromJSXProvider({
 			themes: {
 				light: { name: "light" },

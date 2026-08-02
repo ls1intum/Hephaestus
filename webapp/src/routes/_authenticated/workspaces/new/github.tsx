@@ -4,7 +4,7 @@ import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
 import { getProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import { GithubIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/github")({
@@ -20,7 +20,7 @@ function GitHubSetupPage() {
 	const appUrl = providers?.github?.appInstallationUrl;
 
 	return (
-		<div className="mx-auto max-w-2xl py-8">
+		<div className="mx-auto w-full max-w-2xl">
 			<Link
 				to="/workspaces/new"
 				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
@@ -57,14 +57,16 @@ function GitHubSetupPage() {
 						<Spinner />
 					</div>
 				) : appUrl ? (
-					<Button
-						render={<a href={appUrl} target="_blank" rel="noopener noreferrer" />}
-						className="w-full"
+					<a
+						href={appUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						className={buttonVariants({ className: "w-full" })}
 					>
 						<GithubIcon className="mr-2 size-4" />
 						Install GitHub App
 						<ExternalLinkIcon className="ml-2 size-3.5" />
-					</Button>
+					</a>
 				) : (
 					<Alert>
 						<AlertTitle>GitHub App not configured</AlertTitle>

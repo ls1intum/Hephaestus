@@ -68,7 +68,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @BeforeAll
     static void migrateAcrossSeededLegacyData() throws Exception {
         assertThat(updateUpToTheReleaseChangelog())
-            .as("the release changelog must still be the tail of master.xml for this test to mean anything")
+            .as("the release changelog must still contribute changesets for this test to mean anything")
             .isPositive();
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(PRE_RELEASE_TAG);
@@ -357,29 +357,21 @@ class LegacyAgentConfigMigrationIntegrationTest {
 
     // ── migration driver ────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Applies every changeset that precedes the release changelog, so the tag taken next marks the
-     * pre-release state exactly. Counting from the <em>front</em> (rather than subtracting the release's
-     * own changesets from the total) keeps this correct once later changelogs are appended after it —
-     * otherwise the update would run past the release and the tag would land on one of its rows.
-     *
-     * @return how many changesets the release changelog contributes, i.e. how many were NOT applied.
-     */
+    /** @return how many changesets the release changelog contributes, i.e. how many were NOT applied. */
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
-            int beforeRelease = 0;
-            while (
-                beforeRelease < pending.size() && !pending.get(beforeRelease).getFilePath().endsWith(RELEASE_CHANGELOG)
-            ) {
-                beforeRelease++;
+            List<Integer> releaseIndexes = new ArrayList<>();
+            for (int index = 0; index < pending.size(); index++) {
+                if (pending.get(index).getFilePath().endsWith(RELEASE_CHANGELOG)) {
+                    releaseIndexes.add(index);
+                }
             }
-            long release = pending
-                .stream()
-                .filter(cs -> cs.getFilePath().endsWith(RELEASE_CHANGELOG))
-                .count();
-            liquibase.update(beforeRelease, contexts(), new LabelExpression());
-            return (int) release;
+            if (releaseIndexes.isEmpty()) {
+                return 0;
+            }
+            liquibase.update(releaseIndexes.getFirst(), contexts(), new LabelExpression());
+            return releaseIndexes.size();
         }
     }
 

@@ -21,12 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 )
 public interface PracticeAreaRepository extends JpaRepository<PracticeArea, Long> {
     List<PracticeArea> findByWorkspaceIdOrderByDisplayOrderAscNameAsc(Long workspaceId);
-
     List<PracticeArea> findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(Long workspaceId);
-
     Optional<PracticeArea> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
+
+    @Query("SELECT COALESCE(MAX(a.displayOrder), -1) FROM PracticeArea a WHERE a.workspace.id = :workspaceId")
+    int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId);
 
     /** Deletes all areas for the workspace. Practices' {@code practice_area_id} is SET NULL by the FK. */
     @Modifying

@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 public record ConfigAuditEntryViewDTO(
     Long id,
     Instant occurredAt,
-    Long workspaceId,
+    @Nullable Long workspaceId,
     ConfigAuditEntityType entityType,
     String entityId,
     ConfigAuditAction action,

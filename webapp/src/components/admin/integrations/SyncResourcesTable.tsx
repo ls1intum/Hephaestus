@@ -796,6 +796,7 @@ export function SyncResourcesTable({
 						}}
 						variant="outline"
 						size="sm"
+						role="toolbar"
 						aria-label={`Filter ${resourceNounPlural} by status`}
 					>
 						<ToggleGroupItem value="all">All</ToggleGroupItem>

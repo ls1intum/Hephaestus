@@ -3,22 +3,25 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
+import feedbackPreviewDark from '../../images/readme/landing-feedback-preview-dark.png';
+import feedbackPreviewLight from '../../images/readme/landing-feedback-preview-light.png';
+import HomepageFeatures from '../components/HomepageFeatures';
 
 import styles from './index.module.css';
 
 const guideLinks = [
   {
-    title: 'User Guide',
-    description: 'Navigate weekly rituals, mentoring flows, and leaderboard insights.',
+    title: 'User guide',
+    description: 'Learn how practice feedback works and how to chat with Heph about your work.',
     to: '/user/overview',
   },
   {
-    title: 'Contributor Guide',
+    title: 'Contributor guide',
     description: 'Set up local services, follow coding standards, and ship with confidence.',
     to: '/contributor/overview',
   },
   {
-    title: 'Admin Guide',
+    title: 'Admin guide',
     description: 'Install Hephaestus on your own server and operate it.',
     to: '/admin/install',
   },
@@ -28,20 +31,36 @@ function HomepageHeader() {
   return (
     <header className={styles.heroSection}>
       <div className="container">
-        <div className={styles.heroCopy}>
-          <Heading as="h1" className={styles.heroTitle}>
-            Process-Aware Mentoring for Agile Software Teams
-          </Heading>
-          <p className={styles.heroSubtitle}>
-            Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.
-          </p>
-          <div className={styles.heroActions}>
-            <Link className="button button--primary button--lg" to="/user/overview">
-              Browse the User Guide
-            </Link>
-            <Link className="button button--link button--lg" href="https://hephaestus.aet.cit.tum.de">
-              Open Hephaestus
-            </Link>
+        <div className={styles.heroGrid}>
+          <div className={styles.heroCopy}>
+            <span className={styles.heroKicker}>Practice feedback for software teams</span>
+            <Heading as="h1" className={styles.heroTitle}>
+              Learn from the work you&apos;re <span className={styles.heroHighlight}>already doing</span>
+            </Heading>
+            <p className={styles.heroSubtitle}>
+              Hephaestus turns project activity already recorded in your team&apos;s tools into feedback on engineering practices. See what worked, what could improve, and what to try next.
+            </p>
+            <div className={styles.heroActions}>
+              <Link className="button button--primary button--lg" to="/user/overview">
+                Read the user guide
+              </Link>
+              <Link className="button button--link button--lg" href="https://hephaestus.aet.cit.tum.de">
+                Open Hephaestus
+              </Link>
+            </div>
+          </div>
+          <div className={styles.heroVisual}>
+            <img
+              className={styles.heroVisualLight}
+              src={feedbackPreviewLight}
+              alt="An example of practice feedback and a question answered by Heph."
+            />
+            <img
+              className={styles.heroVisualDark}
+              src={feedbackPreviewDark}
+              alt="An example of practice feedback and a question answered by Heph."
+            />
+            <p>Practice feedback, followed by a conversation with Heph</p>
           </div>
         </div>
       </div>
@@ -56,8 +75,7 @@ function QuickstartGuides(): ReactNode {
         <div className={styles.quickstartHeader}>
           <Heading as="h2">Pick the guide that matches your role</Heading>
           <p>
-            Whether you&apos;re exploring the mentor experience, extending the platform, or running production operations, the
-            docs below map directly to the workflows in the Hephaestus webapp.
+            Learn to use Hephaestus, contribute to the project, or run your own deployment.
           </p>
         </div>
         <div className={styles.quickstartGrid}>
@@ -81,9 +99,10 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Process-Aware Mentoring for Agile Software Teams with AI guidance, gamified reviews, and actionable analytics.">
+      description="Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps.">
       <HomepageHeader />
       <main>
+        <HomepageFeatures />
         <QuickstartGuides />
       </main>
     </Layout>

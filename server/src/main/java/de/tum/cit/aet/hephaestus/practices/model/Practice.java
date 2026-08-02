@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -30,25 +31,6 @@ import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Workspace-scoped practice definition — the standard a contribution is evaluated against and the unit
- * of detection in the practice-feedback model (ADR 0021 / ADR 0022).
- *
- * <p>A practice is a coding or process standard detected on a work artifact (a pull request or an issue
- * today), routed by its {@link #artifactType} discriminator. It belongs to exactly one workspace and is
- * identified by a slug that is unique within that workspace ({@code uk_practice_workspace_slug}); the
- * slug is the stable key that survives a {@link #name} rename. A practice optionally rolls up to one
- * {@link PracticeArea} ({@link #area}).
- *
- * <p>{@link #criteria} is the detection rubric and is mutable. Each criteria change is snapshotted into
- * the append-only {@link PracticeRevision} history (SCD-2 over {@code criteria}), so a past
- * {@link Observation} can still be reproduced against the rubric that actually fired it; edits that leave
- * criteria unchanged (a name- or trigger-only edit) add no revision. {@link #getCriteria()} remains the
- * current projection.
- *
- * @see Observation for detection results
- * @see PracticeRevision for the criteria snapshot history each observation pins to
- */
 @Entity
 @Table(
     name = "practice",
@@ -57,12 +39,10 @@ import tools.jackson.databind.JsonNode;
         columnNames = { "workspace_id", "slug" }
     ),
     indexes = {
-        // Tenant-scoped active-catalog list (the admin practice list filtered to active practices in a workspace).
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
-        // Area-scoped reads (the developer's Reflection dashboard) join observation→practice→area; index the FK.
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
-        // Per-area ordered catalogue read (the admin Rubric tree sorts practices within their area).
         @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
+        @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
     }
 )
 @Getter
@@ -95,36 +75,30 @@ public class Practice {
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
-    /**
-     * The artifact kind this practice applies to (PR vs ISSUE). The discriminator that routes the trigger
-     * gate, the case-context builder, the {@code AgentJobType}/handler, and the delivery surface. Persisted
-     * to the column {@code applies_to} (the field/column names differ deliberately). The allowed set is held
-     * by the {@link WorkArtifact} enum alone — the {@code practice} table carries no DB CHECK on this column
-     * (only the {@code observation} table constrains its own {@code artifact_type}).
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "applies_to", nullable = false, length = 32)
     @ColumnDefault("'PULL_REQUEST'")
     private WorkArtifact artifactType = WorkArtifact.PULL_REQUEST;
 
-    /**
-     * Optional {@link PracticeArea} this practice rolls up to (NULL = ungrouped). 1:N (one area owns
-     * many practices; a practice belongs to at most one area): the single owning bucket keeps the
-     * per-area acted-on/total progress denominator unambiguous. Do not loosen to a join table without
-     * also switching progress math to per-(area, practice) rows.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_area"))
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ToString.Exclude
     private PracticeArea area;
 
-    /**
-     * Position of this practice within its area (or within the unassigned bucket), lowest first. Set on
-     * create (appended to the end of the area) and rewritten atomically by the reorder endpoint. Ordering
-     * is per-area: values are only comparable among practices that share an {@link #area} (or are both
-     * unassigned), so the catalogue sorts by (area.displayOrder, practice.displayOrder, name).
-     */
+    /** Catalog slug retained across workspace edits. */
+    @Column(name = "source_curated_slug", length = 64)
+    private String sourceCuratedSlug;
+
+    /** Catalog comparison fingerprint captured when the workspace copy is created. */
+    @Column(name = "source_curated_fingerprint", length = 64)
+    private String sourceCuratedFingerprint;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_revision_id", foreignKey = @ForeignKey(name = "fk_practice_current_revision"))
+    @ToString.Exclude
+    private PracticeRevision currentRevision;
+
     @Column(name = "display_order", nullable = false)
     @ColumnDefault("0")
     private int displayOrder = 0;
@@ -141,8 +115,8 @@ public class Practice {
 
     /**
      * The detection rubric the agent evaluates the artifact against — the rule's normative text, never shown
-     * to learners. Mutable; every edit is snapshotted into {@link PracticeRevision} (SCD-2), and the
-     * {@code DEFECT-DETECTOR DISCIPLINE} marker token (see {@link #isDefectDetector()}) lives in this text.
+     * to learners. The {@code DEFECT-DETECTOR DISCIPLINE} marker token (see {@link #isDefectDetector()}) lives
+     * in this text.
      */
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude

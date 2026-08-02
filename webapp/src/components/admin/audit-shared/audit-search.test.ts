@@ -1,24 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
 	auditSearchSchema,
-	dayEndIso,
-	dayStartIso,
+	dayAfterInstant,
+	dayStartInstant,
 	fromDayParam,
-	narrowToEnum,
 	toDateRange,
 } from "./audit-search";
 
 describe("day bounds", () => {
 	it("sends the next midnight as the exclusive upper bound", () => {
-		expect(String(dayEndIso(new Date(2026, 6, 15)))).toMatch(/^2026-07-16T00:00:00/);
+		const bound = dayAfterInstant(new Date(2026, 6, 15));
+		expect(bound).toBeInstanceOf(Date);
+		expect(bound.getDate()).toBe(16);
+		expect(bound.getHours()).toBe(0);
 	});
 
 	it("sends midnight of the picked day as the inclusive lower bound", () => {
-		expect(String(dayStartIso(new Date(2026, 6, 15)))).toMatch(/^2026-07-15T00:00:00/);
-	});
-
-	it("carries the local offset so a shared link means the same day to everyone", () => {
-		expect(String(dayStartIso(new Date(2026, 6, 15)))).toMatch(/([+-]\d{2}:\d{2}|Z)$/);
+		const bound = dayStartInstant(new Date(2026, 6, 15));
+		expect(bound).toBeInstanceOf(Date);
+		expect(bound.getDate()).toBe(15);
+		expect(bound.getHours()).toBe(0);
 	});
 });
 
@@ -39,22 +40,6 @@ describe("toDateRange", () => {
 
 	it("is undefined when neither bound is usable", () => {
 		expect(toDateRange({ from: undefined, to: undefined })).toBeUndefined();
-	});
-});
-
-describe("narrowToEnum", () => {
-	const allowed = ["CREATED", "UPDATED"] as const;
-
-	it("drops values the API would reject", () => {
-		expect(narrowToEnum(["CREATED", "RETIRED"], allowed)).toEqual(["CREATED"]);
-	});
-
-	it("returns undefined when every value is unknown, so the query is unfiltered rather than empty", () => {
-		expect(narrowToEnum(["RETIRED"], allowed)).toBeUndefined();
-	});
-
-	it("treats an empty selection as no selection", () => {
-		expect(narrowToEnum([], allowed)).toBeUndefined();
 	});
 });
 

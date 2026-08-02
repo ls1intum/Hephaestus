@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { type InputHTMLAttributes, useState } from "react";
 import { Streamdown } from "streamdown";
 import type { ChatMessageVote } from "@/api/types.gen";
+import { MarkdownCode } from "@/components/common/MarkdownCode";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { MentorAvatar } from "./MentorAvatar";
@@ -11,29 +12,27 @@ import { PreviewAttachment } from "./PreviewAttachment";
 import type { PartRenderer, PartRendererMap, ToolPart } from "./renderers/types";
 
 export interface MessageProps {
-	/** The message to display */
 	message: ChatMessage;
-	/** Current vote state for this message */
 	vote?: ChatMessageVote;
-	/** Whether the message is currently being processed */
 	isLoading?: boolean;
-	/** Whether the message is in readonly mode (disables actions) */
 	readonly?: boolean;
-	/** Layout variant for different contexts */
 	variant?: "default" | "artifact";
-	/** Handler for message editing submission */
 	onMessageEdit?: (messageId: string, newContent: string) => void;
-	/** Handler for copying message content */
 	onCopy?: (content: string) => void;
-	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Optional CSS class name */
 	className?: string;
-	/** Whether to show the edit mode initially */
 	initialEditMode?: boolean;
-	/** Injected renderers for tool parts (keeps component presentational) */
 	partRenderers?: PartRendererMap;
 }
+
+function MarkdownTaskCheckbox(props: InputHTMLAttributes<HTMLInputElement>) {
+	return <input {...props} aria-label={props.checked ? "Completed task" : "Incomplete task"} />;
+}
+
+const MESSAGE_MARKDOWN_COMPONENTS = {
+	code: MarkdownCode,
+	input: MarkdownTaskCheckbox,
+};
 
 export function PreviewMessage({
 	message,
@@ -65,8 +64,8 @@ export function PreviewMessage({
 					},
 					className,
 				)}
-				initial={{ y: 5, opacity: 0 }}
-				animate={{ y: 0, opacity: 1 }}
+				initial={{ y: 5 }}
+				animate={{ y: 0 }}
 				data-role={message.role}
 			>
 				<div
@@ -109,12 +108,13 @@ export function PreviewMessage({
 											key={key}
 											data-testid="message-content"
 											className={cn("flex flex-col gap-4", {
-												// User bubbles should shrink to their content, align right, with a small left inset
 												"self-end w-fit min-w-0 bg-primary text-primary-foreground px-3 py-2 rounded-xl ml-5":
 													message.role === "user",
 											})}
 										>
-											<Streamdown>{sanitizeText(part.text)}</Streamdown>
+											<Streamdown components={MESSAGE_MARKDOWN_COMPONENTS}>
+												{sanitizeText(part.text)}
+											</Streamdown>
 										</div>
 									);
 								}
@@ -196,8 +196,8 @@ export const ThinkingMessage = () => {
 		<motion.div
 			data-testid="message-assistant-loading"
 			className="w-full mx-auto max-w-3xl px-4 group/message min-h-96"
-			initial={{ y: 5, opacity: 0 }}
-			animate={{ y: 0, opacity: 1 }}
+			initial={{ y: 5 }}
+			animate={{ y: 0 }}
 			data-role={role}
 		>
 			<div

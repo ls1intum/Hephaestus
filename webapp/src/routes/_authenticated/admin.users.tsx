@@ -1,8 +1,9 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, ShieldOff, UserCog, Users } from "lucide-react";
 import { useDeferredValue, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import {
 	adminListUsersInfiniteOptions,
 	adminListUsersQueryKey,
@@ -14,6 +15,8 @@ import type { AdminAccountView } from "@/api/types.gen";
 import { AdminUsersTable } from "@/components/admin/users/AdminUsersTable";
 import { ChangeRoleDialog } from "@/components/admin/users/ChangeRoleDialog";
 import { ImpersonateDialog } from "@/components/admin/users/ImpersonateDialog";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -34,6 +37,7 @@ const PAGE_SIZE = 25;
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
 	head: instanceAdminHead("Users"),
+	validateSearch: z.object({ q: z.string().max(200).optional().catch(undefined) }),
 	component: AdminUsersPage,
 });
 
@@ -42,23 +46,17 @@ type DialogTarget = { user: AdminAccountView } | null;
 function AdminUsersPage() {
 	const queryClient = useQueryClient();
 	const { getUserId } = useAuth();
-	// `getUserId()` is undefined until the current user loads; only coerce a real id so the
-	// self-impersonation guard never compares against NaN during the load window.
+	const navigate = useNavigate({ from: Route.fullPath });
+	const search = Route.useSearch().q ?? "";
 	const userId = getUserId();
 	const currentUserId = userId != null ? Number(userId) : undefined;
 
-	// Server has no search param (AdminListUsersData.query is { page, size } only), so we
-	// filter the already-loaded rows client-side. useDeferredValue keeps the input responsive
-	// by deprioritizing the heavy re-filter render (it does not debounce/throttle).
-	const [search, setSearch] = useState("");
 	const deferredSearch = useDeferredValue(search);
 
 	const [roleTarget, setRoleTarget] = useState<DialogTarget>(null);
 	const [impersonateTarget, setImpersonateTarget] = useState<DialogTarget>(null);
 	const [signOutTarget, setSignOutTarget] = useState<DialogTarget>(null);
 
-	// Offset pagination: the endpoint returns a bare array with no total/cursor, so we treat
-	// a full page as "there may be more" and stop when a short page comes back.
 	const listQuery = useInfiniteQuery({
 		...adminListUsersInfiniteOptions({ query: { size: PAGE_SIZE } }),
 		initialPageParam: 0,
@@ -68,9 +66,6 @@ function AdminUsersPage() {
 
 	const allUsers: AdminAccountView[] = listQuery.data?.pages.flat() ?? [];
 
-	// Search filters loaded rows client-side (the API has no `q` param). While a term is active,
-	// eagerly pull the remaining pages so the filter sees EVERY user — otherwise a match on an
-	// un-fetched page shows a false "No users found".
 	useEffect(() => {
 		if (deferredSearch.trim() && listQuery.hasNextPage && !listQuery.isFetchingNextPage) {
 			listQuery.fetchNextPage();
@@ -103,13 +98,10 @@ function AdminUsersPage() {
 			toast.success(`Role updated to ${variables.body.appRole}.`);
 			setRoleTarget(null);
 		},
-		// Errors (e.g. the last-admin 409) are surfaced inline in the dialog, which stays open so the
-		// blocked action and its reason sit together — not a detached toast that auto-dismisses.
 	});
 
 	const impersonate = useMutation({
 		...impersonateMutation(),
-		// Errors surfaced inline in the dialog (see updateRole).
 	});
 
 	const forceSignOut = useMutation({
@@ -147,8 +139,6 @@ function AdminUsersPage() {
 			{
 				onSuccess: () => {
 					setImpersonateTarget(null);
-					// Full navigation home re-resolves the session cookie + current-user, from which the
-					// impersonation banner renders — the cleanest reset for an app-wide identity switch.
 					window.location.assign("/");
 				},
 			},
@@ -156,16 +146,12 @@ function AdminUsersPage() {
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
-			<header className="space-y-1">
-				<div className="flex items-center gap-2">
-					<UserCog className="size-6 text-muted-foreground" aria-hidden />
-					<h1 className="text-2xl font-semibold">Users</h1>
-				</div>
-				<p className="text-sm text-muted-foreground">
-					Manage application accounts: change roles and impersonate users for support.
-				</p>
-			</header>
+		<PageLayout>
+			<PageHeader
+				icon={<UserCog />}
+				title="Users"
+				description="Manage application accounts, roles, sessions, and support access."
+			/>
 
 			<div className="relative w-full sm:max-w-sm">
 				<Label htmlFor="admin-users-search" className="sr-only">
@@ -177,7 +163,12 @@ function AdminUsersPage() {
 					type="search"
 					placeholder="Search by name, email, role, or status…"
 					value={search}
-					onChange={(event) => setSearch(event.target.value)}
+					onChange={(event) =>
+						navigate({
+							search: { q: event.target.value || undefined },
+							replace: true,
+						})
+					}
 					className="pl-9"
 				/>
 			</div>
@@ -193,7 +184,7 @@ function AdminUsersPage() {
 				isFetchingNextPage={listQuery.isFetchingNextPage}
 				onLoadMore={() => listQuery.fetchNextPage()}
 				onChangeRole={(user) => {
-					updateRole.reset(); // clear any prior error so a fresh dialog starts clean
+					updateRole.reset();
 					setRoleTarget({ user });
 				}}
 				onImpersonate={(user) => {
@@ -270,6 +261,6 @@ function AdminUsersPage() {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</div>
+		</PageLayout>
 	);
 }

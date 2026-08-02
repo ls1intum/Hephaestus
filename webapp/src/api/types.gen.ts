@@ -638,13 +638,13 @@ export type TeamSummary = {
  */
 export type UserSettings = {
     /**
-     * Whether the user wants to receive AI-generated practice review comments on pull requests
-     */
-    aiReviewEnabled: boolean;
-    /**
      * Whether the user consents to participate in research studies
      */
     participateInResearch: boolean;
+    /**
+     * Whether new practice-feedback comments may be delivered on issues, pull requests, and merge requests authored by the user, together with related Slack reminders
+     */
+    practiceFeedbackDeliveryEnabled: boolean;
 };
 
 /**
@@ -696,9 +696,9 @@ export type UpdateWorkspaceTokenRequest = {
  */
 export type UpdateWorkspaceStatusRequest = {
     /**
-     * New lifecycle status (PENDING, ACTIVE, ARCHIVED)
+     * Target lifecycle status. PURGED is not a status transition: purge is irreversible and owner-only, so it lives at DELETE /workspaces/{workspaceSlug}.
      */
-    status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
+    status: 'ACTIVE' | 'SUSPENDED';
 };
 
 /**
@@ -927,13 +927,21 @@ export type UpdatePracticeReviewSettingsRequest = {
 };
 
 /**
- * Request to update an existing practice definition (PATCH — only non-null fields applied)
+ * Request to update a practice; omitted fields remain unchanged
  */
 export type UpdatePracticeRequest = {
+    /**
+     * Catalog placement to apply with the definition update; omit to leave unchanged
+     */
+    area?: BindPracticeAreaRequest;
     /**
      * Artifact this practice evaluates
      */
     artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Optional fields to clear before applying supplied values
+     */
+    clear?: Array<'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE'>;
     /**
      * Practice evaluation criteria
      */
@@ -947,7 +955,7 @@ export type UpdatePracticeRequest = {
      */
     precomputeScript?: string;
     /**
-     * Domain events that trigger detection
+     * Domain events that trigger detection; empty for scheduled conversation reviews
      */
     triggerEvents?: Array<string>;
     /**
@@ -958,6 +966,16 @@ export type UpdatePracticeRequest = {
      * Developer-facing rationale (learner layer); plain language, never the detection rubric
      */
     whyItMatters?: string;
+};
+
+/**
+ * Request to move a practice to an area or Unassigned
+ */
+export type BindPracticeAreaRequest = {
+    /**
+     * Destination area slug; omit or set to null for Unassigned
+     */
+    areaSlug?: string | null;
 };
 
 /**
@@ -1162,6 +1180,13 @@ export type UpdateInstanceLlmSettingsRequest = {
      * Comma/newline-delimited egress host allowlist; blank clears it
      */
     allowedEgressHosts?: string;
+};
+
+/**
+ * Whether new workspaces receive this catalog entry
+ */
+export type UpdateCuratedStatusRequest = {
+    status: 'AVAILABLE' | 'RETIRED';
 };
 
 /**
@@ -1596,6 +1621,416 @@ export type RevokeSessionsResult = {
     revoked?: number;
 };
 
+export type ReviewSubject = {
+    avatarUrl?: string;
+    id: number;
+    /**
+     * Login on the source provider
+     */
+    login: string;
+    /**
+     * Display name, when known
+     */
+    name?: string;
+};
+
+/**
+ * Work reviewed by an agent job
+ */
+export type ReviewRunTarget = {
+    channelName?: string;
+    /**
+     * Internal artifact entity ID, when recorded
+     */
+    id?: number;
+    /**
+     * Provider-visible work-item number
+     */
+    number?: number;
+    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    repositoryName?: string;
+    title: string;
+    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    url?: string;
+};
+
+/**
+ * A review run with finding and feedback outcome counts
+ */
+export type ReviewRunSummary = {
+    createdAt: Date;
+    feedback: ReviewFeedbackCounts;
+    findings: ReviewFindingCounts;
+    id: string;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+    target: ReviewRunTarget;
+};
+
+/**
+ * Counts of findings by assessment
+ */
+export type ReviewFindingCounts = {
+    notApplicable: number;
+    problems: number;
+    strengths: number;
+};
+
+/**
+ * Counts of feedback by delivery state
+ */
+export type ReviewFeedbackCounts = {
+    delivered: number;
+    failed: number;
+    prepared: number;
+    superseded: number;
+    suppressed: number;
+};
+
+export type ReviewPracticeArea = {
+    /**
+     * Palette color key
+     */
+    color?: string;
+    /**
+     * Lucide icon name
+     */
+    icon?: string;
+    name: string;
+    slug: string;
+};
+
+/**
+ * A recorded message placement
+ */
+export type ReviewPlacement = {
+    /**
+     * Last anchored line (1-based)
+     */
+    anchorEndLine?: number;
+    /**
+     * Anchor granularity; null for non-inline placements
+     */
+    anchorKind?: 'LINE' | 'RANGE' | 'FILE' | 'IMAGE';
+    /**
+     * Head-side path of the anchored file
+     */
+    anchorPath?: string;
+    /**
+     * Diff side of the anchor
+     */
+    anchorSide?: 'OLD' | 'NEW';
+    /**
+     * First anchored line (1-based)
+     */
+    anchorStartLine?: number;
+    /**
+     * Mentor chat-message identifier
+     */
+    chatMessageId?: string;
+    id: string;
+    placementType: 'SUMMARY' | 'INLINE' | 'CONVERSATION_TURN';
+    /**
+     * Provider-native comment identifier
+     */
+    postedCommentRef?: string;
+};
+
+/**
+ * A finding with evidence and linked feedback
+ */
+export type ReviewFindingDetail = {
+    agentJobId: string;
+    /**
+     * Practice area; null when the practice is Unassigned
+     */
+    area?: ReviewPracticeArea;
+    artifact: ReviewArtifact;
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * Detector confidence
+     */
+    confidence: number;
+    evidence?: unknown;
+    /**
+     * Linked feedback, newest first
+     */
+    feedback: Array<ReviewBoundFeedback>;
+    id: string;
+    observedAt: Date;
+    practiceName: string;
+    /**
+     * Criteria revision selected as of job start, when available
+     */
+    practiceRevisionId?: number;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    reasoning?: string;
+    /**
+     * Cross-run locus key; null when continuity is unavailable
+     */
+    recurrenceKey?: string;
+    /**
+     * Severity band (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Whose work the finding is about; null when the identity is no longer resolvable
+     */
+    subject?: ReviewSubject;
+    title: string;
+};
+
+/**
+ * A message composed from a finding
+ */
+export type ReviewBoundFeedback = {
+    agentJobId: string;
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    createdAt: Date;
+    /**
+     * When the message was placed; null if it was not delivered
+     */
+    deliveredAt?: Date;
+    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    feedbackId: string;
+    /**
+     * Whether the finding led the message or reinforced it
+     */
+    role: 'PRIMARY' | 'SUPPORTING';
+    /**
+     * Why the message was withheld; null unless the state is SUPPRESSED
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+};
+
+export type ReviewArtifact = {
+    /**
+     * Slack channel name for conversation artifacts
+     */
+    channelName?: string;
+    /**
+     * Internal artifact entity ID
+     */
+    id: number;
+    /**
+     * Provider-visible work-item number
+     */
+    number?: number;
+    /**
+     * Source provider, when recorded
+     */
+    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    /**
+     * Provider-qualified repository path for SCM artifacts
+     */
+    repositoryName?: string;
+    title: string;
+    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Provider URL, when one is available
+     */
+    url?: string;
+};
+
+/**
+ * A practice review finding with its linked feedback outcomes
+ */
+export type ReviewFinding = {
+    agentJobId: string;
+    /**
+     * Practice area; null when the practice is Unassigned
+     */
+    area?: ReviewPracticeArea;
+    artifact: ReviewArtifact;
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * Detector confidence
+     */
+    confidence: number;
+    /**
+     * Counts of linked messages by delivery state
+     */
+    feedbackDisposition: ReviewFeedbackDisposition;
+    id: string;
+    observedAt: Date;
+    practiceName: string;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Cross-run locus key; null when continuity is unavailable
+     */
+    recurrenceKey?: string;
+    /**
+     * Severity band (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Whose work the finding is about; null when the identity is no longer resolvable
+     */
+    subject?: ReviewSubject;
+    title: string;
+};
+
+/**
+ * Counts of feedback by delivery state
+ */
+export type ReviewFeedbackDisposition = {
+    /**
+     * Linked messages delivered
+     */
+    delivered: number;
+    /**
+     * Linked messages whose delivery failed
+     */
+    failed: number;
+    /**
+     * Linked messages awaiting delivery
+     */
+    prepared: number;
+    /**
+     * Linked messages delivered and later replaced
+     */
+    superseded: number;
+    /**
+     * Linked messages withheld by policy
+     */
+    suppressed: number;
+};
+
+/**
+ * Full feedback detail including the stored composed body
+ */
+export type ReviewFeedbackDetail = {
+    agentJobId: string;
+    /**
+     * Work item the message targets; null for an unanchored message
+     */
+    artifact?: ReviewArtifact;
+    /**
+     * Stored composed body; null when none was produced
+     */
+    body?: string;
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    createdAt: Date;
+    /**
+     * When the message was placed; null if it was not delivered
+     */
+    deliveredAt?: Date;
+    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    /**
+     * Source findings in render order
+     */
+    findings: Array<ReviewBoundFinding>;
+    id: string;
+    /**
+     * Recorded placements; empty when none
+     */
+    placements: Array<ReviewPlacement>;
+    /**
+     * Who the message is addressed to; null when the identity is no longer resolvable
+     */
+    recipient?: ReviewSubject;
+    /**
+     * The message this one replaced; null on a first delivery
+     */
+    replacesId?: string;
+    /**
+     * Whose work the message addresses; may equal the recipient
+     */
+    subject?: ReviewSubject;
+    /**
+     * Why the message was withheld; null unless the state is SUPPRESSED
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+    /**
+     * Cross-run continuity key tying successive deliveries together
+     */
+    threadKey?: string;
+};
+
+/**
+ * A finding that contributed to a message
+ */
+export type ReviewBoundFinding = {
+    /**
+     * Practice area; null when the practice is Unassigned
+     */
+    area?: ReviewPracticeArea;
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * Detector confidence
+     */
+    confidence: number;
+    findingId: string;
+    observedAt: Date;
+    /**
+     * Render order within the message (lower renders earlier)
+     */
+    ordinal: number;
+    practiceName: string;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Whether the finding leads the message or reinforces it
+     */
+    role: 'PRIMARY' | 'SUPPORTING';
+    /**
+     * Severity band (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    title: string;
+};
+
+export type ReviewFeedback = {
+    agentJobId: string;
+    /**
+     * Work item the message targets; null for an unanchored message
+     */
+    artifact?: ReviewArtifact;
+    /**
+     * Leading characters of the composed body; null when the message carries no body
+     */
+    bodyPreview?: string;
+    bodyTruncated: boolean;
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    createdAt: Date;
+    /**
+     * When the message was placed; null if it was not delivered
+     */
+    deliveredAt?: Date;
+    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    /**
+     * Number of findings used to compose the message
+     */
+    findingCount: number;
+    id: string;
+    /**
+     * Who the message is addressed to; null when the identity is no longer resolvable
+     */
+    recipient?: ReviewSubject;
+    /**
+     * The message this one replaced; null on a first delivery
+     */
+    replacesId?: string;
+    /**
+     * Whose work the message addresses; may equal the recipient
+     */
+    subject?: ReviewSubject;
+    /**
+     * Why the message was withheld; null unless the state is SUPPRESSED
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+};
+
 /**
  * Resource-level rollup for the connection overview badge
  */
@@ -1619,7 +2054,7 @@ export type ResourceCounts = {
 };
 
 /**
- * Reorder the practices in one area — displayOrder follows the list index
+ * Reorder one area's practices to match the supplied list
  */
 export type ReorderPracticesRequest = {
     /**
@@ -1633,7 +2068,7 @@ export type ReorderPracticesRequest = {
 };
 
 /**
- * Reorder practice areas — displayOrder follows the list index
+ * Reorder practice areas to match the supplied list
  */
 export type ReorderPracticeAreasRequest = {
     /**
@@ -2191,6 +2626,7 @@ export type PracticeArea = {
      * Whether this area is active
      */
     active: boolean;
+    catalogOrigin?: CatalogOrigin;
     /**
      * Optional palette colour key for the area's chip
      */
@@ -2230,6 +2666,21 @@ export type PracticeArea = {
 };
 
 /**
+ * The catalog entry a workspace copy came from and whether it differs now
+ */
+export type CatalogOrigin = {
+    link: 'IN_SYNC' | 'LOCALLY_EDITED' | 'UPDATE_AVAILABLE';
+    /**
+     * Slug of the catalog entry this copy was made from
+     */
+    slug: string;
+    /**
+     * Whether new workspaces receive the source entry
+     */
+    sourceOffered: boolean;
+};
+
+/**
  * Practice definition for evaluating developer contributions
  */
 export type Practice = {
@@ -2245,6 +2696,7 @@ export type Practice = {
      * Artifact this practice evaluates
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    catalogOrigin?: CatalogOrigin;
     /**
      * Timestamp when the practice was created
      */
@@ -2289,6 +2741,42 @@ export type Practice = {
      * Developer-facing rationale (learner layer)
      */
     whyItMatters?: string;
+};
+
+/**
+ * A practice's position in the catalog
+ */
+export type PlacePracticeRequest = {
+    /**
+     * Destination area slug; omit to place the practice in Unassigned
+     */
+    areaSlug?: string;
+    /**
+     * Zero-based position in the destination
+     */
+    position: number;
+};
+
+export type PagedModelReviewRunSummary = {
+    content?: Array<ReviewRunSummary>;
+    page?: PageMetadata;
+};
+
+export type PageMetadata = {
+    number?: number;
+    size?: number;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+export type PagedModelReviewFinding = {
+    content?: Array<ReviewFinding>;
+    page?: PageMetadata;
+};
+
+export type PagedModelReviewFeedback = {
+    content?: Array<ReviewFeedback>;
+    page?: PageMetadata;
 };
 
 export type PageableObject = {
@@ -2430,7 +2918,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -2598,6 +3086,10 @@ export type AgentJob = {
      * Current job status
      */
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+    /**
+     * Work item reviewed by this job
+     */
+    target: ReviewRunTarget;
 };
 
 /**
@@ -3409,6 +3901,88 @@ export type CurrentUserView = {
     username?: string;
 };
 
+export type CuratedPracticeSummary = {
+    areaSlug?: string;
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    effectivelyOffered: boolean;
+    name: string;
+    position: number;
+    slug: string;
+    status: CatalogEntryStatus;
+};
+
+export type CatalogEntryStatus = {
+    changeKind: 'NONE' | 'WORDING' | 'PRESENTATION' | 'DETECTION';
+    /**
+     * Strong entity tag to send in If-Match when updating this entry
+     */
+    etag: string;
+    offered: boolean;
+    state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
+};
+
+/**
+ * A complete curated practice definition
+ */
+export type CuratedPracticeRequest = {
+    areaSlug?: string;
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    criteria: string;
+    name: string;
+    precomputeScript?: string;
+    triggerEvents: Array<string>;
+    whatGoodLooksLike?: string;
+    whyItMatters?: string;
+};
+
+export type CuratedPractice = {
+    definition: CuratedPracticeRequest;
+    position: number;
+    shipped?: CuratedPracticeRequest;
+    slug: string;
+    status: CatalogEntryStatus;
+};
+
+export type CuratedCatalogSummary = {
+    editedHere: number;
+    noLongerShipped: number;
+    notOffered: number;
+    total: number;
+    updatesChangingDetection: number;
+    updatesChangingPresentation: number;
+    updatesChangingWordingOnly: number;
+    yours: number;
+};
+
+export type CuratedCatalog = {
+    areas: Array<CuratedArea>;
+    customOrder: boolean;
+    /**
+     * Strong entity tag to send in If-Match when reordering this catalog
+     */
+    etag: string;
+    practices: Array<CuratedPracticeSummary>;
+    summary: CuratedCatalogSummary;
+};
+
+/**
+ * A complete curated practice area definition
+ */
+export type CuratedAreaRequest = {
+    color?: string;
+    description?: string;
+    icon?: string;
+    name: string;
+};
+
+export type CuratedArea = {
+    definition: CuratedAreaRequest;
+    position: number;
+    shipped?: CuratedAreaRequest;
+    slug: string;
+    status: CatalogEntryStatus;
+};
+
 /**
  * Request to create a new workspace
  */
@@ -3560,6 +4134,10 @@ export type CreateReaction = {
  */
 export type CreatePracticeRequest = {
     /**
+     * Practice area to add the practice to. Omit or set to null for Unassigned.
+     */
+    areaSlug?: string | null;
+    /**
      * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
      */
     artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
@@ -3580,11 +4158,11 @@ export type CreatePracticeRequest = {
      */
     slug: string;
     /**
-     * Domain events that trigger detection
+     * Domain events that trigger detection; empty for scheduled conversation reviews
      */
     triggerEvents: Array<string>;
     /**
-     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     * Developer-facing exemplar; a concrete instance, not the assessment criteria
      */
     whatGoodLooksLike?: string;
     /**
@@ -3606,7 +4184,7 @@ export type CreatePracticeAreaRequest = {
      */
     description?: string;
     /**
-     * Sort order within the workspace. Defaults to 0 when omitted.
+     * Sort order within the workspace. Appended when omitted.
      */
     displayOrder?: number;
     /**
@@ -3714,6 +4292,22 @@ export type CreateLlmConnectionRequest = {
      * Optional internal slug; generated from displayName when omitted
      */
     slug?: string;
+};
+
+/**
+ * Request to add a practice to the instance catalog
+ */
+export type CreateCuratedPracticeRequest = {
+    definition: CuratedPracticeRequest;
+    slug: string;
+};
+
+/**
+ * Request to add an area to the instance catalog
+ */
+export type CreateCuratedAreaRequest = {
+    definition: CuratedAreaRequest;
+    slug: string;
 };
 
 /**
@@ -3950,16 +4544,6 @@ export type ChatMessageVote = {
     isUpvoted?: boolean;
     messageId?: string;
     updatedAt?: Date;
-};
-
-/**
- * Request to bind a practice to an area, or unbind it when areaSlug is null
- */
-export type BindPracticeAreaRequest = {
-    /**
-     * Slug of the area to bind to, or null to unbind
-     */
-    areaSlug?: string;
 };
 
 /**
@@ -4278,7 +4862,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -4743,6 +5327,466 @@ export type AdminUpdateLoginProviderResponses = {
 };
 
 export type AdminUpdateLoginProviderResponse = AdminUpdateLoginProviderResponses[keyof AdminUpdateLoginProviderResponses];
+
+export type AdminGetCuratedCatalogData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog';
+};
+
+export type AdminGetCuratedCatalogResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminGetCuratedCatalogResponse = AdminGetCuratedCatalogResponses[keyof AdminGetCuratedCatalogResponses];
+
+export type AdminCreateCuratedAreaData = {
+    body: CreateCuratedAreaRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/areas';
+};
+
+export type AdminCreateCuratedAreaErrors = {
+    /**
+     * Slug already exists
+     */
+    409: ProblemDetail;
+};
+
+export type AdminCreateCuratedAreaError = AdminCreateCuratedAreaErrors[keyof AdminCreateCuratedAreaErrors];
+
+export type AdminCreateCuratedAreaResponses = {
+    /**
+     * Area added
+     */
+    201: CuratedArea;
+};
+
+export type AdminCreateCuratedAreaResponse = AdminCreateCuratedAreaResponses[keyof AdminCreateCuratedAreaResponses];
+
+export type AdminReorderCuratedAreasData = {
+    body: ReorderPracticeAreasRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/areas/reorder';
+};
+
+export type AdminReorderCuratedAreasResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminReorderCuratedAreasResponse = AdminReorderCuratedAreasResponses[keyof AdminReorderCuratedAreasResponses];
+
+export type AdminGetCuratedAreaData = {
+    body?: never;
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/areas/{slug}';
+};
+
+export type AdminGetCuratedAreaResponses = {
+    /**
+     * The area
+     */
+    200: CuratedArea;
+};
+
+export type AdminGetCuratedAreaResponse = AdminGetCuratedAreaResponses[keyof AdminGetCuratedAreaResponses];
+
+export type AdminUpdateCuratedAreaData = {
+    body: CuratedAreaRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/areas/{slug}';
+};
+
+export type AdminUpdateCuratedAreaErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminUpdateCuratedAreaError = AdminUpdateCuratedAreaErrors[keyof AdminUpdateCuratedAreaErrors];
+
+export type AdminUpdateCuratedAreaResponses = {
+    /**
+     * The area
+     */
+    200: CuratedArea;
+};
+
+export type AdminUpdateCuratedAreaResponse = AdminUpdateCuratedAreaResponses[keyof AdminUpdateCuratedAreaResponses];
+
+export type AdminDeleteCuratedAreaOverrideData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/areas/{slug}/override';
+};
+
+export type AdminDeleteCuratedAreaOverrideErrors = {
+    /**
+     * Hephaestus ships no definition for this slug
+     */
+    409: ProblemDetail;
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminDeleteCuratedAreaOverrideError = AdminDeleteCuratedAreaOverrideErrors[keyof AdminDeleteCuratedAreaOverrideErrors];
+
+export type AdminDeleteCuratedAreaOverrideResponses = {
+    /**
+     * The area
+     */
+    200: CuratedArea;
+};
+
+export type AdminDeleteCuratedAreaOverrideResponse = AdminDeleteCuratedAreaOverrideResponses[keyof AdminDeleteCuratedAreaOverrideResponses];
+
+export type AdminKeepCuratedAreaData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/areas/{slug}/override/acknowledgement';
+};
+
+export type AdminKeepCuratedAreaErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminKeepCuratedAreaError = AdminKeepCuratedAreaErrors[keyof AdminKeepCuratedAreaErrors];
+
+export type AdminKeepCuratedAreaResponses = {
+    /**
+     * The area
+     */
+    200: CuratedArea;
+};
+
+export type AdminKeepCuratedAreaResponse = AdminKeepCuratedAreaResponses[keyof AdminKeepCuratedAreaResponses];
+
+export type AdminUpdateCuratedAreaStatusData = {
+    body: UpdateCuratedStatusRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/areas/{slug}/status';
+};
+
+export type AdminUpdateCuratedAreaStatusErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminUpdateCuratedAreaStatusError = AdminUpdateCuratedAreaStatusErrors[keyof AdminUpdateCuratedAreaStatusErrors];
+
+export type AdminUpdateCuratedAreaStatusResponses = {
+    /**
+     * The updated catalog
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminUpdateCuratedAreaStatusResponse = AdminUpdateCuratedAreaStatusResponses[keyof AdminUpdateCuratedAreaStatusResponses];
+
+export type AdminResetCuratedCatalogOrderData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/order';
+};
+
+export type AdminResetCuratedCatalogOrderResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminResetCuratedCatalogOrderResponse = AdminResetCuratedCatalogOrderResponses[keyof AdminResetCuratedCatalogOrderResponses];
+
+export type AdminCreateCuratedPracticeData = {
+    body: CreateCuratedPracticeRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/practices';
+};
+
+export type AdminCreateCuratedPracticeErrors = {
+    /**
+     * Slug already exists
+     */
+    409: ProblemDetail;
+};
+
+export type AdminCreateCuratedPracticeError = AdminCreateCuratedPracticeErrors[keyof AdminCreateCuratedPracticeErrors];
+
+export type AdminCreateCuratedPracticeResponses = {
+    /**
+     * Practice added
+     */
+    201: CuratedPractice;
+};
+
+export type AdminCreateCuratedPracticeResponse = AdminCreateCuratedPracticeResponses[keyof AdminCreateCuratedPracticeResponses];
+
+export type AdminReorderCuratedPracticesData = {
+    body: ReorderPracticesRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/practices/reorder';
+};
+
+export type AdminReorderCuratedPracticesResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminReorderCuratedPracticesResponse = AdminReorderCuratedPracticesResponses[keyof AdminReorderCuratedPracticesResponses];
+
+export type AdminGetCuratedPracticeData = {
+    body?: never;
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}';
+};
+
+export type AdminGetCuratedPracticeResponses = {
+    /**
+     * The practice
+     */
+    200: CuratedPractice;
+};
+
+export type AdminGetCuratedPracticeResponse = AdminGetCuratedPracticeResponses[keyof AdminGetCuratedPracticeResponses];
+
+export type AdminUpdateCuratedPracticeData = {
+    body: CuratedPracticeRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}';
+};
+
+export type AdminUpdateCuratedPracticeErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminUpdateCuratedPracticeError = AdminUpdateCuratedPracticeErrors[keyof AdminUpdateCuratedPracticeErrors];
+
+export type AdminUpdateCuratedPracticeResponses = {
+    /**
+     * The practice
+     */
+    200: CuratedPractice;
+};
+
+export type AdminUpdateCuratedPracticeResponse = AdminUpdateCuratedPracticeResponses[keyof AdminUpdateCuratedPracticeResponses];
+
+export type AdminDeleteCuratedPracticeOverrideData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/override';
+};
+
+export type AdminDeleteCuratedPracticeOverrideErrors = {
+    /**
+     * Hephaestus ships no definition for this slug
+     */
+    409: ProblemDetail;
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminDeleteCuratedPracticeOverrideError = AdminDeleteCuratedPracticeOverrideErrors[keyof AdminDeleteCuratedPracticeOverrideErrors];
+
+export type AdminDeleteCuratedPracticeOverrideResponses = {
+    /**
+     * The practice
+     */
+    200: CuratedPractice;
+};
+
+export type AdminDeleteCuratedPracticeOverrideResponse = AdminDeleteCuratedPracticeOverrideResponses[keyof AdminDeleteCuratedPracticeOverrideResponses];
+
+export type AdminKeepCuratedPracticeData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/override/acknowledgement';
+};
+
+export type AdminKeepCuratedPracticeErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminKeepCuratedPracticeError = AdminKeepCuratedPracticeErrors[keyof AdminKeepCuratedPracticeErrors];
+
+export type AdminKeepCuratedPracticeResponses = {
+    /**
+     * The practice
+     */
+    200: CuratedPractice;
+};
+
+export type AdminKeepCuratedPracticeResponse = AdminKeepCuratedPracticeResponses[keyof AdminKeepCuratedPracticeResponses];
+
+export type AdminPlaceCuratedPracticeData = {
+    body: PlacePracticeRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/placement';
+};
+
+export type AdminPlaceCuratedPracticeResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminPlaceCuratedPracticeResponse = AdminPlaceCuratedPracticeResponses[keyof AdminPlaceCuratedPracticeResponses];
+
+export type AdminUpdateCuratedPracticeStatusData = {
+    body: UpdateCuratedStatusRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/status';
+};
+
+export type AdminUpdateCuratedPracticeStatusErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminUpdateCuratedPracticeStatusError = AdminUpdateCuratedPracticeStatusErrors[keyof AdminUpdateCuratedPracticeStatusErrors];
+
+export type AdminUpdateCuratedPracticeStatusResponses = {
+    /**
+     * The practice
+     */
+    200: CuratedPractice;
+};
+
+export type AdminUpdateCuratedPracticeStatusResponse = AdminUpdateCuratedPracticeStatusResponses[keyof AdminUpdateCuratedPracticeStatusResponses];
 
 export type AdminGetInstanceSettingsData = {
     body?: never;
@@ -5575,7 +6619,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -7143,6 +8187,28 @@ export type UpdateAreaResponses = {
 
 export type UpdateAreaResponse = UpdateAreaResponses[keyof UpdateAreaResponses];
 
+export type GetCuratedPracticeCatalogEntryData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/practices/{slug}';
+};
+
+export type GetCuratedPracticeCatalogEntryResponses = {
+    /**
+     * OK
+     */
+    200: CuratedPractice;
+};
+
+export type GetCuratedPracticeCatalogEntryResponse = GetCuratedPracticeCatalogEntryResponses[keyof GetCuratedPracticeCatalogEntryResponses];
+
 export type ListPracticesData = {
     body?: never;
     path: {
@@ -7183,10 +8249,16 @@ export type CreatePracticeData = {
 
 export type CreatePracticeErrors = {
     /**
+     * Practice area not found
+     */
+    404: ProblemDetail;
+    /**
      * Practice slug already exists in this workspace
      */
-    409: unknown;
+    409: ProblemDetail;
 };
+
+export type CreatePracticeError = CreatePracticeErrors[keyof CreatePracticeErrors];
 
 export type CreatePracticeResponses = {
     /**
@@ -7450,8 +8522,10 @@ export type ReorderPracticesErrors = {
     /**
      * orderedSlugs is empty, has duplicates, or is not the area's complete set
      */
-    400: unknown;
+    400: ProblemDetail;
 };
+
+export type ReorderPracticesError = ReorderPracticesErrors[keyof ReorderPracticesErrors];
 
 export type ReorderPracticesResponses = {
     /**
@@ -7504,6 +8578,210 @@ export type UpdatePracticeReviewSettingsResponses = {
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
+export type ListPracticeReviewsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews';
+};
+
+export type ListPracticeReviewsErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewsError = ListPracticeReviewsErrors[keyof ListPracticeReviewsErrors];
+
+export type ListPracticeReviewsResponses = {
+    /**
+     * Paginated review summaries returned
+     */
+    200: PagedModelReviewRunSummary;
+};
+
+export type ListPracticeReviewsResponse = ListPracticeReviewsResponses[keyof ListPracticeReviewsResponses];
+
+export type ListPracticeReviewFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED'>;
+        channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
+        agentJobId?: string;
+        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+        /**
+         * Artifact ID; requires artifactType
+         */
+        artifactId?: number;
+        recipientUserId?: number;
+        /**
+         * Inclusive lower bound
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound
+         */
+        to?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback';
+};
+
+export type ListPracticeReviewFeedbackErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewFeedbackError = ListPracticeReviewFeedbackErrors[keyof ListPracticeReviewFeedbackErrors];
+
+export type ListPracticeReviewFeedbackResponses = {
+    /**
+     * Paginated messages returned
+     */
+    200: PagedModelReviewFeedback;
+};
+
+export type ListPracticeReviewFeedbackResponse = ListPracticeReviewFeedbackResponses[keyof ListPracticeReviewFeedbackResponses];
+
+export type GetPracticeReviewFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}';
+};
+
+export type GetPracticeReviewFeedbackErrors = {
+    /**
+     * Feedback not found in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeReviewFeedbackError = GetPracticeReviewFeedbackErrors[keyof GetPracticeReviewFeedbackErrors];
+
+export type GetPracticeReviewFeedbackResponses = {
+    /**
+     * Message details returned
+     */
+    200: ReviewFeedbackDetail;
+};
+
+export type GetPracticeReviewFeedbackResponse = GetPracticeReviewFeedbackResponses[keyof GetPracticeReviewFeedbackResponses];
+
+export type ListPracticeReviewFindingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        /**
+         * Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, then not-applicable findings; ties are newest first.
+         */
+        sort?: 'NEWEST' | 'ACTIONABILITY';
+        practiceSlug?: Array<string>;
+        areaSlug?: Array<string>;
+        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE'>;
+        assessment?: Array<'GOOD' | 'BAD'>;
+        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        agentJobId?: string;
+        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+        /**
+         * Artifact ID; requires artifactType
+         */
+        artifactId?: number;
+        subjectUserId?: number;
+        /**
+         * Inclusive lower bound
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound
+         */
+        to?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/findings';
+};
+
+export type ListPracticeReviewFindingsErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewFindingsError = ListPracticeReviewFindingsErrors[keyof ListPracticeReviewFindingsErrors];
+
+export type ListPracticeReviewFindingsResponses = {
+    /**
+     * Paginated findings returned
+     */
+    200: PagedModelReviewFinding;
+};
+
+export type ListPracticeReviewFindingsResponse = ListPracticeReviewFindingsResponses[keyof ListPracticeReviewFindingsResponses];
+
+export type GetPracticeReviewFindingData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}';
+};
+
+export type GetPracticeReviewFindingErrors = {
+    /**
+     * Finding not found in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeReviewFindingError = GetPracticeReviewFindingErrors[keyof GetPracticeReviewFindingErrors];
+
+export type GetPracticeReviewFindingResponses = {
+    /**
+     * Finding detail returned
+     */
+    200: ReviewFindingDetail;
+};
+
+export type GetPracticeReviewFindingResponse = GetPracticeReviewFindingResponses[keyof GetPracticeReviewFindingResponses];
+
 export type DeletePracticeData = {
     body?: never;
     path: {
@@ -7521,8 +8799,10 @@ export type DeletePracticeErrors = {
     /**
      * Practice not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type DeletePracticeError = DeletePracticeErrors[keyof DeletePracticeErrors];
 
 export type DeletePracticeResponses = {
     /**
@@ -7550,8 +8830,10 @@ export type GetPracticeErrors = {
     /**
      * Practice not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type GetPracticeError = GetPracticeErrors[keyof GetPracticeErrors];
 
 export type GetPracticeResponses = {
     /**
@@ -7577,10 +8859,12 @@ export type UpdatePracticeData = {
 
 export type UpdatePracticeErrors = {
     /**
-     * Practice not found
+     * Practice or practice area not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type UpdatePracticeError = UpdatePracticeErrors[keyof UpdatePracticeErrors];
 
 export type UpdatePracticeResponses = {
     /**
@@ -7608,8 +8892,10 @@ export type SetActiveErrors = {
     /**
      * Practice not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type SetActiveError = SetActiveErrors[keyof SetActiveErrors];
 
 export type SetActiveResponses = {
     /**
@@ -7637,17 +8923,54 @@ export type BindAreaErrors = {
     /**
      * Practice or area not found
      */
-    404: unknown;
+    404: ProblemDetail;
 };
+
+export type BindAreaError = BindAreaErrors[keyof BindAreaErrors];
 
 export type BindAreaResponses = {
     /**
-     * Binding updated
+     * Practice moved
      */
     200: Practice;
 };
 
 export type BindAreaResponse = BindAreaResponses[keyof BindAreaResponses];
+
+export type PlacePracticeData = {
+    body: PlacePracticeRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/placement';
+};
+
+export type PlacePracticeErrors = {
+    /**
+     * position is missing, negative, or beyond the destination
+     */
+    400: ProblemDetail;
+    /**
+     * Practice or area not found
+     */
+    404: ProblemDetail;
+};
+
+export type PlacePracticeError = PlacePracticeErrors[keyof PlacePracticeErrors];
+
+export type PlacePracticeResponses = {
+    /**
+     * Practice placed; the full updated practice list is returned
+     */
+    200: Array<Practice>;
+};
+
+export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
 
 export type GetUserProfileData = {
     body?: never;

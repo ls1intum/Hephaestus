@@ -7,9 +7,6 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Request DTO for creating a new practice area.
- */
 @Schema(description = "Request to create a new practice area")
 public record CreatePracticeAreaRequestDTO(
     @NotBlank(message = "Slug is required")
@@ -33,7 +30,7 @@ public record CreatePracticeAreaRequestDTO(
     String description,
 
     @PositiveOrZero(message = "Display order must be zero or positive")
-    @Schema(description = "Sort order within the workspace. Defaults to 0 when omitted.", example = "1")
+    @Schema(description = "Sort order within the workspace. Appended when omitted.", example = "1")
     @Nullable
     Integer displayOrder,
 

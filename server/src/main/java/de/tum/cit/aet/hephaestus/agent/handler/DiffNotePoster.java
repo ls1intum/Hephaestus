@@ -16,12 +16,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Posts inline diff notes on PRs/MRs by dispatching to the per-vendor
- * {@link InlineFindingChannel}. Sanitization and DiffNote→InlineFinding mapping
- * live here; the GraphQL calls live in the channel under
- * {@code integration/<kind>/feedback/}.
- */
+/** Reconciles sanitized inline findings through the provider-specific channel. */
 class DiffNotePoster {
 
     private static final Logger log = LoggerFactory.getLogger(DiffNotePoster.class);
@@ -30,10 +25,16 @@ class DiffNotePoster {
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
 
     private final PullRequestCommentPoster commentPoster;
+    private final PracticeFeedbackCommentFormatter commentFormatter;
     private final Map<IntegrationKind, InlineFindingChannel> channels;
 
-    DiffNotePoster(PullRequestCommentPoster commentPoster, List<InlineFindingChannel> inlineFindingChannels) {
+    DiffNotePoster(
+        PullRequestCommentPoster commentPoster,
+        PracticeFeedbackCommentFormatter commentFormatter,
+        List<InlineFindingChannel> inlineFindingChannels
+    ) {
         this.commentPoster = commentPoster;
+        this.commentFormatter = commentFormatter;
         EnumMap<IntegrationKind, InlineFindingChannel> map = new EnumMap<>(IntegrationKind.class);
         for (InlineFindingChannel channel : inlineFindingChannels) {
             InlineFindingChannel previous = map.putIfAbsent(channel.kind(), channel);
@@ -51,14 +52,6 @@ class DiffNotePoster {
         this.channels = map;
     }
 
-    /**
-     * Posts diff notes for the given job by routing to the per-kind
-     * {@link InlineFindingChannel}.
-     *
-     * @param job       the completed agent job (must have metadata with repository info)
-     * @param diffNotes the sanitized diff notes to post
-     * @return result with posted/failed counts
-     */
     DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes) {
         IntegrationKind kind = Objects.requireNonNull(
             job.getIntegrationKind(),
@@ -77,14 +70,7 @@ class DiffNotePoster {
 
         List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes == null ? List.of() : diffNotes);
 
-        // No inline findings this run — reached when the model emitted no diff notes OR every note's body
-        // sanitized to blank in mapFindings — so there is nothing to reconcile against and any prior inline
-        // notes are stale: clear this run's prior inline notes outright (the empty-diff pathology where a
-        // re-reviewed PR keeps line-numbered notes on code no longer in the diff). When there ARE findings we
-        // DON'T clear-then-post; postInlineFindings reconciles by correlation
-        // key (edit-in-place / preserve-human / delete-truly-gone), so a stable finding keeps its one thread
-        // instead of being destroyed and re-created every run. On GitHub (append-only threads) clearStaleFindings
-        // does not delete — it minimizes the vanished threads as OUTDATED — so it is NOT a no-op there.
+        // An empty reconcile clears stale notes; non-empty channels reconcile by recurrence key.
         if (findings.isEmpty()) {
             try {
                 channel.clearStaleFindings(target, HEPHAESTUS_MARKER);
@@ -108,41 +94,35 @@ class DiffNotePoster {
                 result.failed(),
                 job.getId()
             );
-            // Surface the per-finding DeliveredSignals so the ledger recorder can persist each placement's
-            // external_ref / thread_external_ref / posted_state instead of hardcoding POSTED + null. Channels
-            // that cannot reconcile per-thread (GitHub) report empty signals and the placement stays anchor-only.
             return new DiffNoteResult(result.posted(), result.failed(), result.signals());
         } catch (FeedbackDeliveryException e) {
             throw new JobDeliveryException(e.getMessage(), e);
         }
     }
 
-    private static List<InlineFindingChannel.InlineFinding> mapFindings(List<DiffNote> diffNotes) {
+    private List<InlineFindingChannel.InlineFinding> mapFindings(List<DiffNote> diffNotes) {
         List<InlineFindingChannel.InlineFinding> findings = new ArrayList<>(diffNotes.size());
         for (DiffNote note : diffNotes) {
             String sanitized = PullRequestCommentPoster.sanitize(note.body());
             if (sanitized.isBlank()) {
                 continue;
             }
-            // DiffNote uses (startLine, endLine) where endLine==null means single-line.
-            // DiffAnchor uses (newLineNumber, startLine) where startLine==null means single-line:
-            //   newLineNumber is the END line that the annotation attaches to, and startLine
-            //   the (optional) range start. For single-line notes, both shapes converge.
+            // A multi-line DiffAnchor stores the end first and optional range start second.
             boolean isMultiLine = note.endLine() != null && note.endLine() > note.startLine();
             FindingAnchor.DiffAnchor anchor = isMultiLine
                 ? new FindingAnchor.DiffAnchor(note.filePath(), note.endLine(), note.startLine())
                 : new FindingAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
             findings.add(
-                new InlineFindingChannel.InlineFinding(anchor, sanitized, HEPHAESTUS_MARKER, note.recurrenceKey())
+                new InlineFindingChannel.InlineFinding(
+                    anchor,
+                    commentFormatter.appendSettingsNotice(sanitized),
+                    HEPHAESTUS_MARKER,
+                    note.recurrenceKey()
+                )
             );
         }
         return findings;
     }
 
-    /**
-     * Outcome of an inline-note reconcile. {@code signals} carries the per-finding
-     * {@link InlineFindingChannel.DeliveredSignal}s so the caller can persist each placement's durable
-     * handle; it is empty for the zero-note clear path and for channels that cannot reconcile per-thread.
-     */
     record DiffNoteResult(int posted, int failed, List<InlineFindingChannel.DeliveredSignal> signals) {}
 }

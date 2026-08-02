@@ -1,41 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect } from "storybook/test";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavAdmin } from "./NavAdmin";
 
-/**
- * Navigation component for administrative features, providing access to user
- * management and workspace settings.
- */
 const meta = {
 	component: NavAdmin,
 	parameters: {
 		layout: "centered",
-		docs: {
-			description: {
-				component:
-					"Administration navigation sidebar component with links to member management and workspace settings.",
-			},
-		},
 	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "aet",
 		achievementsEnabled: true,
-		practicesEnabled: true,
-	},
-	argTypes: {
-		workspaceSlug: {
-			control: "text",
-			description: "Active workspace slug",
-		},
-		achievementsEnabled: {
-			control: "boolean",
-			description: "Whether achievement management is available",
-		},
-		practicesEnabled: {
-			control: "boolean",
-			description: "Whether practice management is available",
-		},
+		integrationKinds: ["GITHUB", "SLACK", "OUTLINE"],
 	},
 	decorators: [
 		(Story) => (
@@ -49,36 +26,43 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default view of the administration navigation sidebar with all features enabled.
- */
 export const Default: Story = {};
 
-/** Admin navigation with achievements feature disabled. */
 export const AchievementsDisabled: Story = {
 	args: {
 		achievementsEnabled: false,
 	},
 };
 
-/** Admin navigation with practices feature disabled. */
-export const PracticesDisabled: Story = {
-	args: {
-		practicesEnabled: false,
-	},
-};
-
-/** Admin navigation with all optional features disabled. */
-export const AllFeaturesDisabled: Story = {
-	args: {
-		achievementsEnabled: false,
-		practicesEnabled: false,
-	},
-};
-
-/** A GitLab-backed workspace — the Integrations sub-item is labeled and iconed for GitLab. */
 export const GitLabWorkspace: Story = {
 	args: {
 		scmProviderType: "GITLAB",
+		integrationKinds: ["GITLAB", "SLACK", "OUTLINE"],
+	},
+};
+
+export const ExpandedNavigation: Story = {
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Practices" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Integrations" }));
+
+		await expect(canvas.getByRole("link", { name: "Practice setup" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Practice reviews" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Overview" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+	},
+};
+
+export const OptionalIntegrationsUnavailable: Story = {
+	args: {
+		integrationKinds: ["GITHUB"],
+	},
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Integrations" }));
+
+		await expect(canvas.getByRole("link", { name: "Overview" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+		await expect(canvas.queryByRole("link", { name: "Slack" })).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("link", { name: "Outline" })).not.toBeInTheDocument();
 	},
 };

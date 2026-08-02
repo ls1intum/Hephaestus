@@ -156,11 +156,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     @Nested
     class PracticesControllerTests {
 
-        /**
-         * Allowlist: PracticeCatalogController (practice CRUD), PracticeAreaController (goal CRUD +
-         * binding), ObservationController (contributor findings API), ReactionController (contributor
-         * reactions), PracticeReviewSettingsController (per-workspace review policy).
-         */
         @Test
         void practicesHasDedicatedController() {
             ArchRule rule = classes()
@@ -178,9 +173,16 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleName("ReactionController")
                 .orShould()
                 .haveSimpleName("PracticeReviewSettingsController")
+                .orShould()
+                .haveSimpleName("PracticeReviewOutputController")
+                .orShould()
+                .haveSimpleName("CuratedCatalogAdminController")
+                .orShould()
+                .haveSimpleName("CuratedPracticeCatalogController")
                 .because(
                     "Only PracticeCatalogController, PracticeAreaController, ObservationController, " +
-                        "ReactionController, and PracticeReviewSettingsController are allowed REST entry points"
+                        "ReactionController, PracticeReviewSettingsController, PracticeReviewOutputController, " +
+                        "CuratedCatalogAdminController, and CuratedPracticeCatalogController are allowed REST entry points"
                 );
             rule.check(classes);
         }

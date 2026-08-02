@@ -46,13 +46,6 @@ const events: SlackChannelConsentEvent[] = [
 	{ id: 1, slackChannelId: channel.slackChannelId, toState: "PENDING", createdAt: iso(9) },
 ];
 
-/**
- * The per-channel consent audit trail. Transitions are rendered as badge → badge through the
- * shared consent vocabulary, never as the wire enum. The query is lazy: it only runs while the
- * sheet is open, so listing channels never fans out N history requests.
- *
- * The sheet renders in a portal, so the plays query the document rather than the story canvas.
- */
 const meta = {
 	component: ChannelHistorySheet,
 	parameters: { layout: "centered" },
@@ -67,23 +60,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The full audit trail, newest first — each entry showing where the channel came from. */
 export const Populated: Story = {
 	parameters: {
 		msw: { handlers: [http.get(CONSENT_EVENTS_URL, () => HttpResponse.json(events))] },
 	},
 	play: async () => {
 		const sheet = within(await screen.findByRole("dialog"));
-		// The wire enum must never leak; a state can appear twice (left, then entered).
-		await expect((await sheet.findAllByText("Monitoring")).length).toBeGreaterThan(0);
-		await expect(sheet.getAllByText("Not started").length).toBeGreaterThan(0);
+		await sheet.findAllByText("Monitoring");
+		sheet.getAllByText("Not started");
 		await expect(sheet.getByText("Exam week")).toBeInTheDocument();
 		await expect(sheet.queryByText("ACTIVE")).not.toBeInTheDocument();
 		await expect(sheet.queryByText("PENDING")).not.toBeInTheDocument();
 	},
 };
 
-/** Nothing recorded yet — the Empty primitive, not a bare sentence. */
 export const EmptyHistory: Story = {
 	parameters: {
 		msw: { handlers: [http.get(CONSENT_EVENTS_URL, () => HttpResponse.json([]))] },
@@ -94,7 +84,6 @@ export const EmptyHistory: Story = {
 	},
 };
 
-/** In flight — skeleton rows hold the shape of the trail. */
 export const Loading: Story = {
 	parameters: {
 		msw: {
@@ -108,7 +97,6 @@ export const Loading: Story = {
 	},
 };
 
-/** The audit-trail request failed — the shared error alert, with a retry. */
 export const LoadError: Story = {
 	parameters: {
 		msw: {
@@ -122,7 +110,6 @@ export const LoadError: Story = {
 	},
 };
 
-/** Closed — the sheet renders nothing and the lazy query never fires. */
 export const Closed: Story = {
 	args: { channel: null },
 	play: async () => {

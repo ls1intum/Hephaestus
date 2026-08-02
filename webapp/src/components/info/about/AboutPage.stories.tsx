@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { withStandardPage } from "@/stories/decorators";
 import { AboutPage } from "./AboutPage";
 import type { ProjectManager } from "./ProjectManagerCard";
 
@@ -6,15 +7,14 @@ const projectManager: ProjectManager = {
 	id: 5898705,
 	login: "felixtjdietrich",
 	name: "Felix T.J. Dietrich",
-	title: "Project Architect & Vision Lead",
+	title: "Project lead",
 	description:
-		"Forging Hephaestus from concept to reality, Felix combines technical mastery with a passion for creating tools that empower software teams to achieve their full potential through data-driven insights and collaborative learning.",
+		"Felix started Hephaestus as part of his doctoral research at TUM and leads the open-source project. His research studies how feedback on day-to-day software work can support developer learning.",
 	avatarUrl: "https://avatars.githubusercontent.com/u/5898705",
 	htmlUrl: "https://github.com/felixtjdietrich",
 	websiteUrl: "https://aet.cit.tum.de/people/dietrich/",
 };
 
-// Mock data for the stories
 const mockContributors = [
 	{
 		id: 1,
@@ -74,54 +74,18 @@ const mockContributors = [
 	},
 ];
 
-/**
- * About page component that showcases the Hephaestus project, highlighting its mission and team.
- * Features a clean hero section, focused feature cards, engaging testimonials, and team information.
- * Gracefully handles loading and error states with appropriate visual feedback.
- */
 const meta = {
 	component: AboutPage,
 	tags: ["autodocs"],
 	parameters: {
-		layout: "padded",
-		docs: {
-			description: {
-				component:
-					"A clean, focused page that highlights the Hephaestus project mission, its core features, and showcases the team behind it.",
-			},
-		},
+		layout: "fullscreen",
 	},
-	argTypes: {
-		isPending: {
-			description: "Indicates if contributors data is being loaded",
-			control: "boolean",
-		},
-		isError: {
-			description: "Indicates if there was an error loading contributors",
-			control: "boolean",
-		},
-		error: {
-			description: "Optional error object when loading fails",
-			control: "object",
-		},
-		projectManager: {
-			description: "Project manager information to display",
-			control: "object",
-		},
-		otherContributors: {
-			description: "List of project contributors to display",
-			control: "object",
-		},
-	},
+	decorators: [withStandardPage],
 } satisfies Meta<typeof AboutPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The showcase view displays the full About page with mission statement, features,
- * testimonials, and a complete list of contributors.
- */
 export const Showcase: Story = {
 	args: {
 		isPending: false,
@@ -131,10 +95,6 @@ export const Showcase: Story = {
 	},
 };
 
-/**
- * Loading state when contributor data is being fetched.
- * Shows skeleton placeholders while the data loads.
- */
 export const IsLoading: Story = {
 	args: {
 		isPending: true,
@@ -144,10 +104,6 @@ export const IsLoading: Story = {
 	},
 };
 
-/**
- * Error state when contributor data fetching fails.
- * Displays a user-friendly error message with explanation.
- */
 export const IsError: Story = {
 	args: {
 		isPending: false,
@@ -157,10 +113,6 @@ export const IsError: Story = {
 	},
 };
 
-/**
- * View when there are no contributors yet.
- * Shows an encouraging message to be the first contributor.
- */
 export const NoContributors: Story = {
 	args: {
 		isPending: false,

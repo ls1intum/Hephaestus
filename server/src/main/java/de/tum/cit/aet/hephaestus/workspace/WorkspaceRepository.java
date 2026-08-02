@@ -17,6 +17,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Workspace is the tenant root - queries manage workspaces themselves")
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
+    Optional<Workspace> findFirstByOrderByIdAsc();
+
     /**
      * Pessimistic lock, for a read whose value is about to be snapshotted and mutated (the audited
      * AI-settings writes). Without it the before-snapshot and the write are not serialized: two
@@ -55,6 +57,21 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         return findByGitHubInstallationInstanceKey(installationId.toString());
     }
 
+    default Optional<Workspace> findByInstallationIdForUpdate(Long installationId) {
+        if (installationId == null) {
+            return Optional.empty();
+        }
+        return findWorkspaceIdByGitHubInstallationInstanceKey(installationId.toString()).flatMap(
+            this::findByIdForUpdate
+        );
+    }
+
+    default Optional<Workspace> findActiveByInstallationIdForUpdate(Long installationId) {
+        return findByInstallationIdForUpdate(installationId).filter(
+            workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE
+        );
+    }
+
     @Query(
         """
         SELECT c.workspace
@@ -64,6 +81,16 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         """
     )
     Optional<Workspace> findByGitHubInstallationInstanceKey(@Param("instanceKey") String instanceKey);
+
+    @Query(
+        """
+        SELECT c.workspace.id
+        FROM Connection c
+        WHERE c.kind = de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITHUB
+          AND c.instanceKey = :instanceKey
+        """
+    )
+    Optional<Long> findWorkspaceIdByGitHubInstallationInstanceKey(@Param("instanceKey") String instanceKey);
 
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
     Optional<Workspace> findByOrganization_Login(String login);
@@ -78,6 +105,12 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Long> findOrganizationProviderIdByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     Optional<Workspace> findByAccountLoginIgnoreCase(String login);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
+    @Query("SELECT w FROM Workspace w WHERE LOWER(w.accountLogin) = LOWER(:login)")
+    Optional<Workspace> findByAccountLoginIgnoreCaseForUpdate(@Param("login") String login);
+
     List<Workspace> findAllByAccountLoginIgnoreCase(String login);
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
     boolean existsByWorkspaceSlug(String workspaceSlug);

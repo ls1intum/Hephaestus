@@ -1,7 +1,7 @@
 import {
 	type ColumnDef,
-	type ColumnFiltersState,
 	flexRender,
+	functionalUpdate,
 	getCoreRowModel,
 	getFilteredRowModel,
 	getPaginationRowModel,
@@ -11,7 +11,8 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import type { ComponentProps, ReactElement } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -46,21 +48,37 @@ interface UsersTableProps {
 	teams: TeamInfo[];
 	isLoading?: boolean;
 	onToggleHidden?: (userId: number, hidden: boolean) => void;
+	view: UsersTableView;
+	onViewChange: (patch: Partial<UsersTableView>) => void;
+	renderPageLink?: (page: number, props: ComponentProps<"a">) => ReactElement;
 }
 
-export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: UsersTableProps) {
-	const [sorting, setSorting] = useState<SortingState>([]);
-	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-	const [globalFilter, setGlobalFilter] = useState("");
-	const [teamFilter, setTeamFilter] = useState<string>("all");
+export interface UsersTableView {
+	q: string;
+	team: string;
+	sort: "name" | "username";
+	desc: boolean;
+	page: number;
+	size: number;
+}
 
-	// IMPORTANT: TanStack Table requires stable references for columns to prevent infinite re-renders
-	// See: https://tanstack.com/table/v8/docs/faq#why-is-my-component-rerendering-infinitely
+export function UsersTable({
+	users,
+	teams,
+	isLoading = false,
+	onToggleHidden,
+	view,
+	onViewChange,
+	renderPageLink,
+}: UsersTableProps) {
+	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+	const sorting: SortingState = [{ id: view.sort, desc: view.desc }];
+
 	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
 		() => [
 			{
-				accessorKey: "user.name",
+				id: "name",
+				accessorFn: (row) => row.user.name,
 				header: ({ column }) => {
 					return (
 						<Button
@@ -76,7 +94,8 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 				cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
 			},
 			{
-				accessorKey: "user.login",
+				id: "username",
+				accessorFn: (row) => row.user.login,
 				header: ({ column }) => {
 					return (
 						<Button
@@ -121,24 +140,20 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 		[onToggleHidden],
 	);
 
-	// IMPORTANT: TanStack Table requires stable references for data to prevent infinite re-renders
-	// See: https://tanstack.com/table/v8/docs/guide/data
 	const filteredData = useMemo(
 		() =>
 			users.filter((user) => {
-				if (teamFilter === "all") return true;
-				return user.teams?.some((team) => team.id.toString() === teamFilter) || false;
+				if (view.team === "all") return true;
+				return user.teams?.some((team) => team.id.toString() === view.team) || false;
 			}),
-		[users, teamFilter],
+		[users, view.team],
 	);
 
-	// Memoize sorted teams to avoid creating new array on every render
 	const sortedTeams = useMemo(
 		() => [...teams].sort((a, b) => a.name.localeCompare(b.name)),
 		[teams],
 	);
 
-	// Items for team filter Select
 	const teamFilterItems = useMemo(
 		() => [
 			{ value: "all", label: "All teams" },
@@ -147,52 +162,71 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 		[sortedTeams],
 	);
 
-	// Items for page size Select
-	const pageSizeItems = useMemo(
-		() => [10, 20, 30, 40, 50].map((size) => ({ value: `${size}`, label: `${size}` })),
-		[],
-	);
+	const pageSizeItems = [10, 20, 30, 40, 50].map((size) => ({
+		value: `${size}`,
+		label: `${size}`,
+	}));
 
 	const table = useReactTable({
 		data: filteredData,
 		columns,
-		onSortingChange: setSorting,
-		onColumnFiltersChange: setColumnFilters,
+		autoResetPageIndex: false,
+		onSortingChange: (updater) => {
+			const [next] = functionalUpdate(updater, sorting);
+			onViewChange({
+				sort: next?.id === "username" ? "username" : "name",
+				desc: next?.desc ?? false,
+				page: 0,
+			});
+		},
 		getCoreRowModel: getCoreRowModel(),
 		getPaginationRowModel: getPaginationRowModel(),
 		getSortedRowModel: getSortedRowModel(),
 		getFilteredRowModel: getFilteredRowModel(),
 		onColumnVisibilityChange: setColumnVisibility,
-		onGlobalFilterChange: setGlobalFilter,
 		globalFilterFn: "includesString",
+		onPaginationChange: (updater) => {
+			const next = functionalUpdate(updater, { pageIndex: view.page, pageSize: view.size });
+			if (next.pageIndex !== view.page || next.pageSize !== view.size) {
+				onViewChange({ page: next.pageIndex, size: next.pageSize });
+			}
+		},
 		state: {
 			sorting,
-			columnFilters,
 			columnVisibility,
-			globalFilter,
+			globalFilter: view.q.trim(),
+			pagination: { pageIndex: view.page, pageSize: view.size },
 		},
 	});
+	const lastPage = Math.max(0, table.getPageCount() - 1);
+
+	useEffect(() => {
+		if (!isLoading && view.page > lastPage) onViewChange({ page: lastPage });
+	}, [isLoading, lastPage, onViewChange, view.page]);
 
 	return (
 		<div className="w-full space-y-4">
-			{/* Enhanced Header with search and filters */}
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 				<div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
 					<div className="relative w-full sm:w-auto">
 						<Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
 						<Input
 							placeholder="Search by name or username..."
-							value={globalFilter}
-							onChange={(event) => setGlobalFilter(event.target.value)}
+							value={view.q}
+							onChange={(event) => onViewChange({ q: event.target.value, page: 0 })}
 							className="pl-9 w-full sm:w-[300px]"
 						/>
 					</div>
 					<Select
-						value={teamFilter}
-						onValueChange={(value) => value && setTeamFilter(value)}
+						value={view.team}
+						onValueChange={(value) => value && onViewChange({ team: value, page: 0 })}
 						items={teamFilterItems}
 					>
-						<SelectTrigger className="w-full sm:w-[200px]">
+						<SelectTrigger
+							id="member-team-filter"
+							className="w-full sm:w-[200px]"
+							aria-label="Filter members by team"
+						>
 							<Filter className="mr-2 h-4 w-4" />
 							<SelectValue placeholder="Filter by team" />
 						</SelectTrigger>
@@ -214,11 +248,11 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 					</Select>
 				</div>
 				<div className="flex items-center space-x-2">
-					{globalFilter && (
+					{view.q && (
 						<Button
 							variant="ghost"
 							size="sm"
-							onClick={() => setGlobalFilter("")}
+							onClick={() => onViewChange({ q: "", page: 0 })}
 							className="h-8 px-2 lg:px-3"
 						>
 							Clear search
@@ -253,7 +287,6 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 				</div>
 			</div>
 
-			{/* Table */}
 			<div className="rounded-md border">
 				<Table>
 					<TableHeader>
@@ -302,7 +335,7 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 										<Users className="h-8 w-8 text-muted-foreground" />
 										<p className="text-sm font-medium">No users found</p>
 										<p className="text-xs text-muted-foreground">
-											{globalFilter || teamFilter !== "all"
+											{view.q || view.team !== "all"
 												? "Try adjusting your search or filter criteria"
 												: "No users have been added to the workspace yet"}
 										</p>
@@ -314,7 +347,6 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 				</Table>
 			</div>
 
-			{/* Enhanced Pagination */}
 			<div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 sm:space-x-2 py-4">
 				<div className="flex-1 text-sm text-muted-foreground order-2 sm:order-1">
 					<div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
@@ -325,7 +357,9 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<p className="text-sm font-medium whitespace-nowrap">Rows per page</p>
+						<Label htmlFor="member-rows-per-page" className="whitespace-nowrap">
+							Rows per page
+						</Label>
 						<Select
 							value={`${table.getState().pagination.pageSize}`}
 							onValueChange={(value) => {
@@ -333,7 +367,7 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 							}}
 							items={pageSizeItems}
 						>
-							<SelectTrigger className="h-8 w-[70px]">
+							<SelectTrigger id="member-rows-per-page" className="h-8 w-[70px]">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent side="top">
@@ -349,7 +383,9 @@ export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: 
 					<TablePagination
 						page={table.getState().pagination.pageIndex}
 						totalPages={table.getPageCount()}
-						onPageChange={(page) => table.setPageIndex(page)}
+						{...(renderPageLink
+							? { renderPageLink }
+							: { onPageChange: (page: number) => table.setPageIndex(page) })}
 					/>
 				</div>
 			</div>

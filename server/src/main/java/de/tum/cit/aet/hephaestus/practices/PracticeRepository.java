@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -15,28 +16,34 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Repository for workspace-scoped practice definitions.
- */
 @Repository
 @WorkspaceAgnostic(
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
-    // @EntityGraph fetches the bound area eagerly (here and below) so callers can read area fields
-    // outside the transaction — open-in-view is disabled — without one extra SELECT per practice.
-    @EntityGraph(attributePaths = "area")
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
     /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
-    @EntityGraph(attributePaths = "area")
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
-    @EntityGraph(attributePaths = "area")
+    boolean existsByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    /** Practices bound to an area (the per-area dashboard aggregation key). */
-    List<Practice> findByWorkspaceIdAndAreaId(Long workspaceId, Long areaId);
+    List<Practice> findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long areaId);
+
+    @Query(
+        """
+        SELECT COALESCE(MAX(p.displayOrder), -1)
+        FROM Practice p
+        WHERE p.workspace.id = :workspaceId
+        AND ((:areaId IS NULL AND p.area IS NULL) OR p.area.id = :areaId)
+        """
+    )
+    int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId, @Param("areaId") @Nullable Long areaId);
 
     /**
      * Acquire a row-level write lock on a practice ({@code SELECT ... FOR UPDATE}). Used to serialise
@@ -56,6 +63,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * Lists practices for a workspace with an optional active filter.
      * Null filter values are ignored (match all).
      */
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     @Query(
         """
         SELECT p FROM Practice p

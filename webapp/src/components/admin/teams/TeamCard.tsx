@@ -9,19 +9,28 @@ export interface TeamCardProps {
 	team: TeamInfo;
 	memberCount: number;
 	labelFilter?: string;
+	headingLevel?: 2 | 3 | 4 | 5 | 6;
 	onToggleVisibility: (hidden: boolean) => void;
 	getCatalogLabels: (repoId: number) => LabelInfo[];
 	children?: ReactNode;
 }
 
-export function TeamCard({ team, memberCount, onToggleVisibility, children }: TeamCardProps) {
+export function TeamCard({
+	team,
+	memberCount,
+	headingLevel = 2,
+	onToggleVisibility,
+	children,
+}: TeamCardProps) {
+	const Heading = `h${headingLevel}` as const;
+
 	return (
 		<Card className={cn("flex flex-col gap-3", team.hidden ? "bg-muted/40" : "")}>
 			<CardHeader className="pb-4">
 				<div className="flex flex-wrap items-start justify-between gap-2">
 					<div className="min-w-0 flex-1">
 						<div className="flex items-center gap-2 min-w-0">
-							<h3
+							<Heading
 								className={cn(
 									"font-semibold text-lg truncate",
 									team.hidden ? "text-muted-foreground" : "",
@@ -29,7 +38,7 @@ export function TeamCard({ team, memberCount, onToggleVisibility, children }: Te
 								title={team.name}
 							>
 								{team.name}
-							</h3>
+							</Heading>
 							{team.hidden && (
 								<span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide">
 									Hidden

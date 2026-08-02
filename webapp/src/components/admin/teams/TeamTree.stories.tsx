@@ -2,9 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { TeamTree } from "./TeamTree";
 
-/**
- * TeamTree renders a team with its repositories and nested child teams.
- */
 const meta = {
 	component: TeamTree,
 	parameters: { layout: "centered" },

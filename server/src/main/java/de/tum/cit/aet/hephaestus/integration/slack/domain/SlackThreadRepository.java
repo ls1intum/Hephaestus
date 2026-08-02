@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -141,25 +140,19 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     long countByWorkspaceId(Long workspaceId);
 
     /**
-     * Agent-owned {@code ConversationCandidateSource} SPI: threads on an {@code ACTIVE} channel that have grown
-     * past their review watermark and have at least {@code minMessageCount} messages, oldest {@code last_ts}
-     * first. Rows come back as {@code Object[]} rather than a JPQL constructor expression into the agent's
-     * {@link ConversationThreadCandidate} record: that record's {@code workspaceId}/{@code threadId} components
-     * are primitive {@code long}, and Hibernate's "SELECT new" constructor resolution is not guaranteed to widen
-     * a boxed {@code Long} into a primitive constructor parameter —
-     * {@link SlackConversationCandidateSource#toCandidate} unboxes explicitly. Columns: {@code workspace_id},
-     * {@code id}, {@code slack_channel_id}, {@code slack_thread_ts}, {@code last_ts}, {@code last_reviewed_ts},
-     * {@code participant_member_ids}.
-     *
-     * <p>Deliberately unscoped — cross-workspace by design; each returned candidate carries its own
-     * {@code workspaceId}. The join predicate still mentions {@code workspace_id} in the emitted SQL, so the
-     * runtime tenancy inspector passes without a bypass; the compile-time repository-scoping check is satisfied
-     * via the explicit allowlist in {@code SlackIntegrationArchitectureTest}. The caller
-     * ({@code SlackConversationCandidateSource.settledCandidates}) is itself {@code @WorkspaceAgnostic}.
+     * Deliberately unscoped: the scheduler scans settled threads across workspaces, and every result carries its
+     * workspace id.
      */
     @Query(
         """
-        SELECT t.workspaceId, t.id, t.slackChannelId, t.slackThreadTs, t.lastTs, t.lastReviewedTs, t.participantMemberIds
+        SELECT t.workspaceId AS workspaceId,
+               t.id AS threadId,
+               t.slackChannelId AS slackChannelId,
+               c.channelName AS slackChannelName,
+               t.slackThreadTs AS slackThreadTs,
+               t.lastTs AS lastTs,
+               t.lastReviewedTs AS lastReviewedTs,
+               t.participantMemberIds AS participantMemberIds
         FROM SlackThread t
         JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId
         WHERE c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
@@ -169,7 +162,24 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         ORDER BY t.lastTs ASC
         """
     )
-    List<Object[]> findSettledCandidateRows(@Param("minMessageCount") int minMessageCount);
+    List<SettledCandidateRow> findSettledCandidateRows(@Param("minMessageCount") int minMessageCount);
+
+    interface SettledCandidateRow {
+        long getWorkspaceId();
+        long getThreadId();
+        String getSlackChannelId();
+
+        @Nullable
+        String getSlackChannelName();
+
+        String getSlackThreadTs();
+        String getLastTs();
+
+        @Nullable
+        String getLastReviewedTs();
+
+        long[] getParticipantMemberIds();
+    }
 
     /**
      * Agent-owned {@code ConversationSourceLiveness} SPI: the subset of {@code threadIds} whose source channel

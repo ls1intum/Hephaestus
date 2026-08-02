@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 import { Sparkles, Trophy, User, Users } from "lucide-react";
 import {
 	SidebarGroup,
@@ -11,14 +11,20 @@ import {
 export function NavDashboards({
 	username,
 	workspaceSlug,
-	achievementsEnabled = true,
-	leaderboardEnabled = true,
+	achievementsEnabled,
+	leaderboardEnabled,
 }: {
 	username: string;
 	workspaceSlug: string;
-	achievementsEnabled?: boolean;
-	leaderboardEnabled?: boolean;
+	achievementsEnabled: boolean;
+	leaderboardEnabled: boolean;
 }) {
+	const matchRoute = useMatchRoute();
+	const onProfile = Boolean(matchRoute({ to: "/w/$workspaceSlug/user/$username", fuzzy: true }));
+	const onAchievements = Boolean(matchRoute({ to: "/w/$workspaceSlug/achievements", fuzzy: true }));
+	const onLeaderboard = Boolean(matchRoute({ to: "/w/$workspaceSlug", fuzzy: false }));
+	const onTeams = Boolean(matchRoute({ to: "/w/$workspaceSlug/teams", fuzzy: true }));
+
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Dashboards</SidebarGroupLabel>
@@ -26,6 +32,7 @@ export function NavDashboards({
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Profile"
+						isActive={onProfile}
 						render={
 							<Link
 								to="/w/$workspaceSlug/user/$username"
@@ -41,6 +48,7 @@ export function NavDashboards({
 					<SidebarMenuItem>
 						<SidebarMenuButton
 							tooltip="Achievements"
+							isActive={onAchievements}
 							render={<Link to="/w/$workspaceSlug/achievements" params={{ workspaceSlug }} />}
 						>
 							<Sparkles />
@@ -52,6 +60,7 @@ export function NavDashboards({
 					<SidebarMenuItem>
 						<SidebarMenuButton
 							tooltip="Leaderboard"
+							isActive={onLeaderboard}
 							render={<Link to="/w/$workspaceSlug" params={{ workspaceSlug }} />}
 						>
 							<Trophy />
@@ -62,6 +71,7 @@ export function NavDashboards({
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Teams"
+						isActive={onTeams}
 						render={<Link to="/w/$workspaceSlug/teams" params={{ workspaceSlug }} />}
 					>
 						<Users />

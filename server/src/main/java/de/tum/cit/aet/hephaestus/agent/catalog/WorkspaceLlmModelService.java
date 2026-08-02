@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
+import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.math.BigDecimal;
@@ -13,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -265,14 +265,6 @@ public class WorkspaceLlmModelService {
     }
 
     private static boolean isUpstreamIdConflict(DataIntegrityViolationException e) {
-        Throwable cur = e;
-        while (cur != null) {
-            if (cur instanceof ConstraintViolationException cve) {
-                String name = cve.getConstraintName();
-                return name != null && name.equalsIgnoreCase("ux_ws_llm_model_connection_upstream");
-            }
-            cur = cur.getCause();
-        }
-        return false;
+        return DataIntegrityViolationConstraints.hasName(e, "ux_ws_llm_model_connection_upstream");
     }
 }
