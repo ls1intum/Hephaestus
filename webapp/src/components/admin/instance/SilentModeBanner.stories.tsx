@@ -35,3 +35,14 @@ export const WithoutMetadata: Story = {
 		settings: { silentModeEngaged: true },
 	},
 };
+
+/** Past a day the title stops reporting and starts asking — a forgotten brake is the likelier incident. */
+export const StillEngagedAfterADay: Story = {
+	args: {
+		settings: { ...engaged, silentModeChangedAt: new Date(Date.now() - 30 * 3_600_000) },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/is that still intentional/i)).toBeInTheDocument();
+	},
+};

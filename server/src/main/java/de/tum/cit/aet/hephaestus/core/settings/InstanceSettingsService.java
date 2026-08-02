@@ -77,7 +77,9 @@ public class InstanceSettingsService implements SilentModeQuery {
             actor,
             trimmedReason
         );
+        InstanceSettings saved = repository.save(settings);
         // auth_event, not config_audit_event: the latter's workspace_id is NOT NULL and this is instance-level.
+        // Written after the save so the trail never claims a change the database rejected.
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("engaged", engaged);
         if (trimmedReason != null) {
@@ -90,6 +92,6 @@ public class InstanceSettingsService implements SilentModeQuery {
                 .details(objectMapper.writeValueAsString(details))
                 .record()
         );
-        return repository.save(settings);
+        return saved;
     }
 }

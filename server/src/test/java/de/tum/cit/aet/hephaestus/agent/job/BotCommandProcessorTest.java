@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -195,7 +196,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
     @Nested
     class EyesReaction {
 
-        private final ScmCommentReactionSink sink = org.mockito.Mockito.mock(ScmCommentReactionSink.class);
+        private final ScmCommentReactionSink sink = mock(ScmCommentReactionSink.class);
 
         private BotCommandProcessor processorWithSink() {
             when(sink.kind()).thenReturn(IntegrationKind.GITLAB);

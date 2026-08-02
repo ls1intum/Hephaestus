@@ -19,7 +19,6 @@ export const Engaged: Story = {
 	args: {
 		settings: {
 			silentModeEngaged: true,
-			silentModeReason: "Investigating incident #42",
 			silentModeChangedAt: new Date(Date.now() - 2 * 3_600_000),
 			silentModeChangedBy: "felixtjdietrich",
 		},
@@ -28,4 +27,8 @@ export const Engaged: Story = {
 
 export const Loading: Story = {
 	args: { settings: undefined, isLoading: true },
+};
+
+export const Unavailable: Story = {
+	args: { settings: undefined, isError: true },
 };

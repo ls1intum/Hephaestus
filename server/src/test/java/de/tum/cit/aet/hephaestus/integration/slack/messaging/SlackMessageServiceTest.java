@@ -3,9 +3,11 @@ package de.tum.cit.aet.hephaestus.integration.slack.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.slack.api.methods.SlackApiException;
+import com.slack.api.model.view.View;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -51,7 +53,7 @@ class SlackMessageServiceTest extends BaseUnitTest {
         assertThatThrownBy(() -> send.run(service))
             .isInstanceOf(SlackSendException.class)
             .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
-        org.mockito.Mockito.verifyNoInteractions(credentialProvider);
+        verifyNoInteractions(credentialProvider);
     }
 
     @FunctionalInterface
@@ -66,7 +68,14 @@ class SlackMessageServiceTest extends BaseUnitTest {
                 "sendEphemeralForWorkspace",
                 (ThrowingSend) s -> s.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "f")
             ),
-            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi"))
+            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
+            Arguments.of("setStatus", (ThrowingSend) s -> s.setStatus(7L, "C1ABCDEFGH", "171234.5678", "Thinking…")),
+            Arguments.of(
+                "setSuggestedPrompts",
+                (ThrowingSend) s -> s.setSuggestedPrompts(7L, "C1ABCDEFGH", "Try", List.of())
+            ),
+            Arguments.of("publishHomeView", (ThrowingSend) s -> s.publishHomeView(7L, "U123", View.builder().build())),
+            Arguments.of("joinPublicChannel", (ThrowingSend) s -> s.joinPublicChannel(7L, "C1ABCDEFGH"))
         );
     }
 

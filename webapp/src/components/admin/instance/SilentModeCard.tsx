@@ -57,6 +57,17 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 	const [confirmWord, setConfirmWord] = useState("");
 	const [mismatch, setMismatch] = useState(false);
 
+	// Each dialog stays open until the toggle it asked for actually lands, so its pending state is
+	// reachable and a failed request leaves the operator in the dialog rather than back on the card.
+	// Adjusting during render (rather than in an effect) is React's documented pattern for this.
+	if (engageOpen && engaged) setEngageOpen(false);
+	if (releaseOpen && !engaged) setReleaseOpen(false);
+
+	const closeUnlessPending = (setOpen: (open: boolean) => void) => (open: boolean) => {
+		if (!open && isPending) return;
+		setOpen(open);
+	};
+
 	const openEngage = () => {
 		setReason("");
 		setEngageOpen(true);
@@ -74,7 +85,6 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 			return;
 		}
 		onRelease();
-		setReleaseOpen(false);
 	};
 
 	return (
@@ -101,11 +111,16 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 					) : (
 						<Badge variant="success">Released</Badge>
 					)}
-					{settings.silentModeChangedAt ? (
+					{settings.silentModeChangedBy || settings.silentModeChangedAt ? (
 						<span className="text-sm text-muted-foreground">
 							{engaged ? "engaged" : "last changed"}
-							{settings.silentModeChangedBy ? ` by ${settings.silentModeChangedBy}` : ""}{" "}
-							<RelativeTime value={settings.silentModeChangedAt} />
+							{settings.silentModeChangedBy ? ` by ${settings.silentModeChangedBy}` : ""}
+							{settings.silentModeChangedAt ? (
+								<>
+									{" "}
+									<RelativeTime value={settings.silentModeChangedAt} />
+								</>
+							) : null}
 						</span>
 					) : null}
 				</div>
@@ -127,7 +142,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 				)}
 			</CardFooter>
 
-			<Dialog open={engageOpen} onOpenChange={setEngageOpen}>
+			<Dialog open={engageOpen} onOpenChange={closeUnlessPending(setEngageOpen)}>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Engage silent mode</DialogTitle>
@@ -156,22 +171,22 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 						</FieldDescription>
 					</Field>
 					<DialogFooter>
-						<DialogClose render={<Button variant="outline">Cancel</Button>} />
+						<DialogClose render={<Button variant="outline" disabled={isPending} />}>
+							Cancel
+						</DialogClose>
 						<Button
 							variant="destructive"
-							onClick={() => {
-								onEngage(reason.trim() === "" ? undefined : reason.trim());
-								setEngageOpen(false);
-							}}
+							disabled={isPending}
+							onClick={() => onEngage(reason.trim() === "" ? undefined : reason.trim())}
 						>
-							<VolumeX aria-hidden />
+							{isPending ? <Spinner aria-hidden /> : <VolumeX aria-hidden />}
 							Engage silent mode
 						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
-			<AlertDialog open={releaseOpen} onOpenChange={setReleaseOpen}>
+			<AlertDialog open={releaseOpen} onOpenChange={closeUnlessPending(setReleaseOpen)}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Release silent mode?</AlertDialogTitle>

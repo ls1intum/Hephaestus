@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useMatchRoute } from "@tanstack/react-router";
 import { adminGetInstanceSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { SilentModeBanner } from "@/components/admin/instance/SilentModeBanner";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -26,9 +26,11 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 function AdminLayout() {
 	const settingsQuery = useQuery(adminGetInstanceSettingsOptions());
+	// The settings page owns this query's error; a second alert here would just stack on it.
+	const onSettingsPage = !!useMatchRoute()({ to: "/admin/settings" });
 	const topStrip = settingsQuery.data?.silentModeEngaged ? (
 		<SilentModeBanner settings={settingsQuery.data} />
-	) : settingsQuery.isError ? (
+	) : settingsQuery.isError && !onSettingsPage ? (
 		// Unknown delivery state is not "delivering": say so rather than silently showing nothing.
 		<QueryErrorAlert
 			error={settingsQuery.error}

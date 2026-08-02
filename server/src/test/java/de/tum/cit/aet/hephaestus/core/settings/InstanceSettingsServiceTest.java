@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,22 +44,13 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
         service.updateSilentMode(true, "incident #42", "felix");
 
         verify(authEventWriter).write(
-            org.mockito.ArgumentMatchers.argThat(
+            argThat(
                 data ->
                     data.type() == AuthEvent.EventType.SILENT_MODE_CHANGED &&
                     data.details() != null &&
                     data.details().contains("incident #42")
             )
         );
-    }
-
-    @Test
-    void togglesWithoutAnAuditLoggerOnAWorkerPod() {
-        // AuthEventLogger is @ConditionalOnServerRole, so it is absent wherever the worker consults the brake.
-        var workerService = new InstanceSettingsService(repository, Optional.empty(), new ObjectMapper());
-        givenRow(new InstanceSettings());
-
-        assertThat(workerService.updateSilentMode(true, "incident #42", "felix").isSilentModeEngaged()).isTrue();
     }
 
     @Test

@@ -858,7 +858,7 @@ export const adminUpdateCuratedPracticeStatusMutation = (options?: Partial<Optio
     return mutationOptions;
 };
 
-export const adminGetInstanceSettingsQueryKey = (options?: Options<AdminGetInstanceSettingsData>) => createQueryKey('adminGetInstanceSettings', options, false, ['Admin']);
+export const adminGetInstanceSettingsQueryKey = (options?: Options<AdminGetInstanceSettingsData>) => createQueryKey('adminGetInstanceSettings', options, false, ['Instance Settings']);
 
 /**
  * Get instance settings

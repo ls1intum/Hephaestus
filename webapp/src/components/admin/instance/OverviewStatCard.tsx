@@ -27,7 +27,6 @@ export function OverviewStatCard({
 	return (
 		<Link
 			to={to}
-			aria-label={`${label}: ${isError ? "unavailable" : value}`}
 			className="group block rounded-xl outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 		>
 			<Card className="h-full transition-colors group-hover:border-primary/40">
@@ -37,7 +36,16 @@ export function OverviewStatCard({
 						{isLoading ? (
 							<Skeleton className="h-8 w-16" />
 						) : (
-							<p className="text-2xl font-semibold tabular-nums">{isError ? "—" : value}</p>
+							<p className="text-2xl font-semibold tabular-nums">
+								{isError ? (
+									<>
+										<span aria-hidden>—</span>
+										<span className="sr-only">unavailable</span>
+									</>
+								) : (
+									value
+								)}
+							</p>
 						)}
 						{!isLoading && (
 							<p className="text-xs text-muted-foreground">{isError ? "Couldn't load" : hint}</p>

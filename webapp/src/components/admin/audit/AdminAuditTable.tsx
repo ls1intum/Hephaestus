@@ -26,7 +26,13 @@ import {
 import { FilterLink } from "../audit-shared/FilterLink";
 import { refLabel } from "../audit-shared/ref-label";
 import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
-import { eventLabel, eventSeverity, resultLabel, severityDotClass } from "./audit-format";
+import {
+	eventLabel,
+	eventSeverity,
+	resultLabel,
+	severityDotClass,
+	severityScreenReaderPrefix,
+} from "./audit-format";
 
 export interface AdminAuditTableProps {
 	events: AuthEventView[];
@@ -141,9 +147,8 @@ export function AdminAuditTable({
 												className={`size-1.5 shrink-0 rounded-full ${severityDotClass(severity)}`}
 												aria-hidden
 											/>
-											{severity === "warning" && (
-												// The dot's hue is the only other marker of a high-risk event.
-												<span className="sr-only">High-risk event: </span>
+											{severityScreenReaderPrefix(severity) && (
+												<span className="sr-only">{severityScreenReaderPrefix(severity)}</span>
 											)}
 											<span className="text-sm">{eventLabel(e.eventType)}</span>
 										</span>

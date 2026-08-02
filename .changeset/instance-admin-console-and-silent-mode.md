@@ -3,10 +3,9 @@
 ---
 
 The instance-admin console now opens on an **overview dashboard** instead of a blank page: whether
-delivery is running, how many workspaces and memberships the instance has, which sign-in providers
-are enabled, and the latest authentication activity — each tile linking to the page that manages it.
-The sidebar is grouped (Access, AI, Operations) rather than one flat list, so the console has room to
-grow without turning into a wall of links.
+delivery is running, how many workspaces and memberships the instance has, and the latest
+authentication activity — each tile linking to the page that manages it. The sidebar is grouped
+(Access, Practices, AI, Operations) rather than one flat list.
 
 A new **Instance settings** page carries the emergency **silent mode** switch. While it is engaged,
 Hephaestus posts nothing outward anywhere on the instance — no practice feedback on pull requests,

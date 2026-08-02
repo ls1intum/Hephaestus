@@ -310,6 +310,7 @@ public class SlackMessageService {
      * best-effort).
      */
     public void publishHomeView(long workspaceId, String slackUserId, View view) {
+        ensureNotSilenced(workspaceId, slackUserId);
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection")
         );
@@ -343,6 +344,7 @@ public class SlackMessageService {
      * failure (e.g. a plain DM thread) is swallowed.
      */
     public void setStatus(long workspaceId, String channel, String threadTs, String status) {
+        ensureNotSilenced(workspaceId, channel);
         Optional<String> token = resolveToken(workspaceId);
         if (token.isEmpty()) {
             return;
@@ -361,6 +363,7 @@ public class SlackMessageService {
      * a failure is swallowed.
      */
     public void setSuggestedPrompts(long workspaceId, String channel, String title, List<SuggestedPrompt> prompts) {
+        ensureNotSilenced(workspaceId, channel);
         Optional<String> token = resolveToken(workspaceId);
         if (token.isEmpty() || prompts.isEmpty()) {
             return;
@@ -611,6 +614,7 @@ public class SlackMessageService {
     public record HistoryPage(List<com.slack.api.model.Message> messages, @Nullable String nextCursor) {}
 
     public void joinPublicChannel(long workspaceId, String channelId) {
+        ensureNotSilenced(workspaceId, channelId);
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );

@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @WorkspaceAgnostic("Instance-wide operator settings — deliberately cross-tenant, app_admin only")
 @RequestMapping("/admin/settings")
-@Tag(name = "Admin", description = "Instance-admin settings")
+@Tag(name = "Instance Settings", description = "Instance-wide operator settings")
 @PreAuthorize("hasAuthority('app_admin')")
 public class InstanceSettingsAdminController {
 

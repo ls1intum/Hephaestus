@@ -27,3 +27,7 @@ export const Zero: Story = {
 export const Loading: Story = {
 	args: { isLoading: true },
 };
+
+export const Unavailable: Story = {
+	args: { isError: true },
+};

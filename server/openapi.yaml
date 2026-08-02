@@ -40,8 +40,6 @@ tags:
   name: LLM Usage
 - description: Manage practice areas
   name: Practice Areas
-- description: Instance-admin settings
-  name: Admin
 - description: Workspace-scoped mentor chat threads
   name: Mentor Threads
 - description: |-
@@ -78,6 +76,8 @@ tags:
   name: Workspace LLM
 - description: User profile and activity data
   name: Profile
+- description: Instance-wide operator settings
+  name: Instance Settings
 - description: Contributor rankings and league statistics
   name: Leaderboard
 - description: Current instance definitions visible to workspace administrators
@@ -1399,7 +1399,7 @@ paths:
           description: OK
       summary: Get instance settings
       tags:
-      - Admin
+      - Instance Settings
   /admin/settings/silent-mode:
     put:
       operationId: adminUpdateSilentMode
@@ -1418,7 +1418,7 @@ paths:
           description: OK
       summary: Engage or release the instance-wide silent mode
       tags:
-      - Admin
+      - Instance Settings
   /admin/users:
     get:
       operationId: adminListUsers
