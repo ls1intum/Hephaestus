@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLlmConnectionData, AdminCreateLlmConnectionErrors, AdminCreateLlmConnectionResponses, AdminCreateLlmModelData, AdminCreateLlmModelErrors, AdminCreateLlmModelResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLlmConnectionData, AdminDeleteLlmConnectionErrors, AdminDeleteLlmConnectionResponses, AdminDeleteLlmModelData, AdminDeleteLlmModelErrors, AdminDeleteLlmModelResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminGetLlmConnectionData, AdminGetLlmConnectionErrors, AdminGetLlmConnectionResponses, AdminGetLlmModelData, AdminGetLlmModelErrors, AdminGetLlmModelResponses, AdminGetLlmSettingsData, AdminGetLlmSettingsResponses, AdminGetLlmUsageReportData, AdminGetLlmUsageReportResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListConfigAuditEventsData, AdminListConfigAuditEventsResponses, AdminListLlmConnectionsData, AdminListLlmConnectionsResponses, AdminListLlmModelsData, AdminListLlmModelsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminProbeLlmConnectionData, AdminProbeLlmConnectionDraftData, AdminProbeLlmConnectionDraftResponses, AdminProbeLlmConnectionResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLlmConnectionData, AdminUpdateLlmConnectionErrors, AdminUpdateLlmConnectionResponses, AdminUpdateLlmModelData, AdminUpdateLlmModelErrors, AdminUpdateLlmModelPriceData, AdminUpdateLlmModelPriceErrors, AdminUpdateLlmModelPriceResponses, AdminUpdateLlmModelResponses, AdminUpdateLlmModelSharingData, AdminUpdateLlmModelSharingErrors, AdminUpdateLlmModelSharingResponses, AdminUpdateLlmSettingsData, AdminUpdateLlmSettingsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AdminUpdateWorkspaceLlmBudgetData, AdminUpdateWorkspaceLlmBudgetResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelAgentJobData, CancelAgentJobErrors, CancelAgentJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, ConfigureAgentData, ConfigureAgentErrors, ConfigureAgentResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeleteOutlineCollectionData, DeleteOutlineCollectionErrors, DeleteOutlineCollectionResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAgentJobData, GetAgentJobErrors, GetAgentJobResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConnectionSyncStatusData, GetConnectionSyncStatusResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetIntegrationCatalogData, GetIntegrationCatalogResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetLlmUsageReportData, GetLlmUsageReportResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetOutlineCollectionData, GetOutlineCollectionErrors, GetOutlineCollectionResponses, GetOutlineTokenStatusData, GetOutlineTokenStatusErrors, GetOutlineTokenStatusResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetPracticeReviewFeedbackData, GetPracticeReviewFeedbackErrors, GetPracticeReviewFeedbackResponses, GetPracticeReviewFindingData, GetPracticeReviewFindingErrors, GetPracticeReviewFindingResponses, GetPracticeReviewSettingsData, GetPracticeReviewSettingsResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSlackUserPreferencesData, GetSlackUserPreferencesResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, InitiateData, InitiateResponses, ListAgentJobsData, ListAgentJobsResponses, ListAgentsData, ListAgentsResponses, ListAreasData, ListAreasResponses, ListConnectionSyncJobsData, ListConnectionSyncJobsResponses, ListConnectionSyncResourcesData, ListConnectionSyncResourcesResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesErrors, ListOutlineCollectionCandidatesResponses, ListOutlineCollectionsData, ListOutlineCollectionsErrors, ListOutlineCollectionsResponses, ListPracticeReviewFeedbackData, ListPracticeReviewFeedbackErrors, ListPracticeReviewFeedbackResponses, ListPracticeReviewFindingsData, ListPracticeReviewFindingsErrors, ListPracticeReviewFindingsResponses, ListPracticeReviewsData, ListPracticeReviewsErrors, ListPracticeReviewsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponses, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponses, ListSlackChannelsData, ListSlackChannelsResponses, ListThreadsData, ListThreadsResponses, ListWorkspaceConfigAuditEventsData, ListWorkspaceConfigAuditEventsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PlacePracticeData, PlacePracticeErrors, PlacePracticeResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, RegisterOutlineCollectionData, RegisterOutlineCollectionErrors, RegisterOutlineCollectionResponses, RegisterSlackChannelData, RegisterSlackChannelResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryAgentJobDeliveryData, RetryAgentJobDeliveryErrors, RetryAgentJobDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendSlackTestMessageData, SendSlackTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, TriggerSyncJobData, TriggerSyncJobErrors, TriggerSyncJobResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConnectionStatusData, UpdateConnectionStatusResponses, UpdateConnectionSyncJobData, UpdateConnectionSyncJobErrors, UpdateConnectionSyncJobResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateErrors, UpdateOutlineCollectionStateResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponses, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, UpdateWorkspaceLlmBudgetData, UpdateWorkspaceLlmBudgetResponses, VoteData, VoteErrors, VoteResponses, WorkspaceCreateLlmConnectionData, WorkspaceCreateLlmConnectionErrors, WorkspaceCreateLlmConnectionResponses, WorkspaceCreateLlmModelData, WorkspaceCreateLlmModelErrors, WorkspaceCreateLlmModelResponses, WorkspaceDeleteLlmConnectionData, WorkspaceDeleteLlmConnectionErrors, WorkspaceDeleteLlmConnectionResponses, WorkspaceDeleteLlmModelData, WorkspaceDeleteLlmModelErrors, WorkspaceDeleteLlmModelResponses, WorkspaceGetLlmConnectionData, WorkspaceGetLlmConnectionErrors, WorkspaceGetLlmConnectionResponses, WorkspaceGetLlmModelData, WorkspaceGetLlmModelErrors, WorkspaceGetLlmModelResponses, WorkspaceGetLlmSettingsData, WorkspaceGetLlmSettingsResponses, WorkspaceListAvailableLlmModelsData, WorkspaceListAvailableLlmModelsResponses, WorkspaceListLlmConnectionsData, WorkspaceListLlmConnectionsResponses, WorkspaceListLlmModelsData, WorkspaceListLlmModelsResponses, WorkspaceProbeLlmConnectionData, WorkspaceProbeLlmConnectionResponses, WorkspaceUpdateLlmConnectionData, WorkspaceUpdateLlmConnectionErrors, WorkspaceUpdateLlmConnectionResponses, WorkspaceUpdateLlmModelData, WorkspaceUpdateLlmModelErrors, WorkspaceUpdateLlmModelResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateCuratedAreaData, AdminCreateCuratedAreaErrors, AdminCreateCuratedAreaResponses, AdminCreateCuratedPracticeData, AdminCreateCuratedPracticeErrors, AdminCreateCuratedPracticeResponses, AdminCreateLlmConnectionData, AdminCreateLlmConnectionErrors, AdminCreateLlmConnectionResponses, AdminCreateLlmModelData, AdminCreateLlmModelErrors, AdminCreateLlmModelResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteCuratedAreaOverrideData, AdminDeleteCuratedAreaOverrideErrors, AdminDeleteCuratedAreaOverrideResponses, AdminDeleteCuratedPracticeOverrideData, AdminDeleteCuratedPracticeOverrideErrors, AdminDeleteCuratedPracticeOverrideResponses, AdminDeleteLlmConnectionData, AdminDeleteLlmConnectionErrors, AdminDeleteLlmConnectionResponses, AdminDeleteLlmModelData, AdminDeleteLlmModelErrors, AdminDeleteLlmModelResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminGetCuratedAreaData, AdminGetCuratedAreaResponses, AdminGetCuratedCatalogData, AdminGetCuratedCatalogResponses, AdminGetCuratedPracticeData, AdminGetCuratedPracticeResponses, AdminGetLlmConnectionData, AdminGetLlmConnectionErrors, AdminGetLlmConnectionResponses, AdminGetLlmModelData, AdminGetLlmModelErrors, AdminGetLlmModelResponses, AdminGetLlmSettingsData, AdminGetLlmSettingsResponses, AdminGetLlmUsageReportData, AdminGetLlmUsageReportResponses, AdminKeepCuratedAreaData, AdminKeepCuratedAreaErrors, AdminKeepCuratedAreaResponses, AdminKeepCuratedPracticeData, AdminKeepCuratedPracticeErrors, AdminKeepCuratedPracticeResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListConfigAuditEventsData, AdminListConfigAuditEventsResponses, AdminListLlmConnectionsData, AdminListLlmConnectionsResponses, AdminListLlmModelsData, AdminListLlmModelsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminPlaceCuratedPracticeData, AdminPlaceCuratedPracticeResponses, AdminProbeLlmConnectionData, AdminProbeLlmConnectionDraftData, AdminProbeLlmConnectionDraftResponses, AdminProbeLlmConnectionResponses, AdminReorderCuratedAreasData, AdminReorderCuratedAreasResponses, AdminReorderCuratedPracticesData, AdminReorderCuratedPracticesResponses, AdminResetCuratedCatalogOrderData, AdminResetCuratedCatalogOrderResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateCuratedAreaData, AdminUpdateCuratedAreaErrors, AdminUpdateCuratedAreaResponses, AdminUpdateCuratedAreaStatusData, AdminUpdateCuratedAreaStatusErrors, AdminUpdateCuratedAreaStatusResponses, AdminUpdateCuratedPracticeData, AdminUpdateCuratedPracticeErrors, AdminUpdateCuratedPracticeResponses, AdminUpdateCuratedPracticeStatusData, AdminUpdateCuratedPracticeStatusErrors, AdminUpdateCuratedPracticeStatusResponses, AdminUpdateLlmConnectionData, AdminUpdateLlmConnectionErrors, AdminUpdateLlmConnectionResponses, AdminUpdateLlmModelData, AdminUpdateLlmModelErrors, AdminUpdateLlmModelPriceData, AdminUpdateLlmModelPriceErrors, AdminUpdateLlmModelPriceResponses, AdminUpdateLlmModelResponses, AdminUpdateLlmModelSharingData, AdminUpdateLlmModelSharingErrors, AdminUpdateLlmModelSharingResponses, AdminUpdateLlmSettingsData, AdminUpdateLlmSettingsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AdminUpdateWorkspaceLlmBudgetData, AdminUpdateWorkspaceLlmBudgetResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelAgentJobData, CancelAgentJobErrors, CancelAgentJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, ConfigureAgentData, ConfigureAgentErrors, ConfigureAgentResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeleteOutlineCollectionData, DeleteOutlineCollectionErrors, DeleteOutlineCollectionResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAgentJobData, GetAgentJobErrors, GetAgentJobResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConnectionSyncStatusData, GetConnectionSyncStatusResponses, GetCuratedPracticeCatalogEntryData, GetCuratedPracticeCatalogEntryResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetIntegrationCatalogData, GetIntegrationCatalogResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetLlmUsageReportData, GetLlmUsageReportResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetOutlineCollectionData, GetOutlineCollectionErrors, GetOutlineCollectionResponses, GetOutlineTokenStatusData, GetOutlineTokenStatusErrors, GetOutlineTokenStatusResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetPracticeReviewFeedbackData, GetPracticeReviewFeedbackErrors, GetPracticeReviewFeedbackResponses, GetPracticeReviewFindingData, GetPracticeReviewFindingErrors, GetPracticeReviewFindingResponses, GetPracticeReviewSettingsData, GetPracticeReviewSettingsResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSlackUserPreferencesData, GetSlackUserPreferencesResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, InitiateData, InitiateResponses, ListAgentJobsData, ListAgentJobsResponses, ListAgentsData, ListAgentsResponses, ListAreasData, ListAreasResponses, ListConnectionSyncJobsData, ListConnectionSyncJobsResponses, ListConnectionSyncResourcesData, ListConnectionSyncResourcesResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesErrors, ListOutlineCollectionCandidatesResponses, ListOutlineCollectionsData, ListOutlineCollectionsErrors, ListOutlineCollectionsResponses, ListPracticeReviewFeedbackData, ListPracticeReviewFeedbackErrors, ListPracticeReviewFeedbackResponses, ListPracticeReviewFindingsData, ListPracticeReviewFindingsErrors, ListPracticeReviewFindingsResponses, ListPracticeReviewsData, ListPracticeReviewsErrors, ListPracticeReviewsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponses, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponses, ListSlackChannelsData, ListSlackChannelsResponses, ListThreadsData, ListThreadsResponses, ListWorkspaceConfigAuditEventsData, ListWorkspaceConfigAuditEventsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PlacePracticeData, PlacePracticeErrors, PlacePracticeResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, RegisterOutlineCollectionData, RegisterOutlineCollectionErrors, RegisterOutlineCollectionResponses, RegisterSlackChannelData, RegisterSlackChannelResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryAgentJobDeliveryData, RetryAgentJobDeliveryErrors, RetryAgentJobDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendSlackTestMessageData, SendSlackTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, TriggerSyncJobData, TriggerSyncJobErrors, TriggerSyncJobResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConnectionStatusData, UpdateConnectionStatusResponses, UpdateConnectionSyncJobData, UpdateConnectionSyncJobErrors, UpdateConnectionSyncJobResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateErrors, UpdateOutlineCollectionStateResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponses, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, UpdateWorkspaceLlmBudgetData, UpdateWorkspaceLlmBudgetResponses, VoteData, VoteErrors, VoteResponses, WorkspaceCreateLlmConnectionData, WorkspaceCreateLlmConnectionErrors, WorkspaceCreateLlmConnectionResponses, WorkspaceCreateLlmModelData, WorkspaceCreateLlmModelErrors, WorkspaceCreateLlmModelResponses, WorkspaceDeleteLlmConnectionData, WorkspaceDeleteLlmConnectionErrors, WorkspaceDeleteLlmConnectionResponses, WorkspaceDeleteLlmModelData, WorkspaceDeleteLlmModelErrors, WorkspaceDeleteLlmModelResponses, WorkspaceGetLlmConnectionData, WorkspaceGetLlmConnectionErrors, WorkspaceGetLlmConnectionResponses, WorkspaceGetLlmModelData, WorkspaceGetLlmModelErrors, WorkspaceGetLlmModelResponses, WorkspaceGetLlmSettingsData, WorkspaceGetLlmSettingsResponses, WorkspaceListAvailableLlmModelsData, WorkspaceListAvailableLlmModelsResponses, WorkspaceListLlmConnectionsData, WorkspaceListLlmConnectionsResponses, WorkspaceListLlmModelsData, WorkspaceListLlmModelsResponses, WorkspaceProbeLlmConnectionData, WorkspaceProbeLlmConnectionResponses, WorkspaceUpdateLlmConnectionData, WorkspaceUpdateLlmConnectionErrors, WorkspaceUpdateLlmConnectionResponses, WorkspaceUpdateLlmModelData, WorkspaceUpdateLlmModelErrors, WorkspaceUpdateLlmModelResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -276,6 +276,203 @@ export const adminDeleteLoginProvider = <ThrowOnError extends boolean = false>(o
 export const adminUpdateLoginProvider = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLoginProviderData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateLoginProviderResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/login-providers/{registrationId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Read the instance catalog
+ *
+ * Practice summaries, complete areas, ordering, and catalog state. Fetch a practice for its full definition.
+ */
+export const adminGetCuratedCatalog = <ThrowOnError extends boolean = false>(options?: Options<AdminGetCuratedCatalogData, ThrowOnError>) => (options?.client ?? client).get<AdminGetCuratedCatalogResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog',
+    ...options
+});
+
+/**
+ * Add an area to the catalog
+ */
+export const adminCreateCuratedArea = <ThrowOnError extends boolean = false>(options: Options<AdminCreateCuratedAreaData, ThrowOnError>) => (options.client ?? client).post<AdminCreateCuratedAreaResponses, AdminCreateCuratedAreaErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/areas',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Reorder catalog areas
+ */
+export const adminReorderCuratedAreas = <ThrowOnError extends boolean = false>(options: Options<AdminReorderCuratedAreasData, ThrowOnError>) => (options.client ?? client).patch<AdminReorderCuratedAreasResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/areas/reorder',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Read a catalog area
+ */
+export const adminGetCuratedArea = <ThrowOnError extends boolean = false>(options: Options<AdminGetCuratedAreaData, ThrowOnError>) => (options.client ?? client).get<AdminGetCuratedAreaResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/areas/{slug}',
+    ...options
+});
+
+/**
+ * Replace an area definition
+ */
+export const adminUpdateCuratedArea = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCuratedAreaData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateCuratedAreaResponses, AdminUpdateCuratedAreaErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/areas/{slug}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Use the Hephaestus definition of an area
+ */
+export const adminDeleteCuratedAreaOverride = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteCuratedAreaOverrideData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteCuratedAreaOverrideResponses, AdminDeleteCuratedAreaOverrideErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/areas/{slug}/override',
+    ...options
+});
+
+/**
+ * Keep the saved area customization
+ */
+export const adminKeepCuratedArea = <ThrowOnError extends boolean = false>(options: Options<AdminKeepCuratedAreaData, ThrowOnError>) => (options.client ?? client).put<AdminKeepCuratedAreaResponses, AdminKeepCuratedAreaErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/areas/{slug}/override/acknowledgement',
+    ...options
+});
+
+/**
+ * Exclude an area from new workspaces, or include it again
+ *
+ * Excluding an area also excludes its practices from new workspaces; existing workspaces do not change.
+ */
+export const adminUpdateCuratedAreaStatus = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCuratedAreaStatusData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateCuratedAreaStatusResponses, AdminUpdateCuratedAreaStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/areas/{slug}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Use the Hephaestus default order
+ */
+export const adminResetCuratedCatalogOrder = <ThrowOnError extends boolean = false>(options: Options<AdminResetCuratedCatalogOrderData, ThrowOnError>) => (options.client ?? client).delete<AdminResetCuratedCatalogOrderResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/order',
+    ...options
+});
+
+/**
+ * Add a practice to the catalog
+ */
+export const adminCreateCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminCreateCuratedPracticeData, ThrowOnError>) => (options.client ?? client).post<AdminCreateCuratedPracticeResponses, AdminCreateCuratedPracticeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Reorder practices within one catalog area
+ */
+export const adminReorderCuratedPractices = <ThrowOnError extends boolean = false>(options: Options<AdminReorderCuratedPracticesData, ThrowOnError>) => (options.client ?? client).patch<AdminReorderCuratedPracticesResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices/reorder',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Read a catalog practice
+ */
+export const adminGetCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminGetCuratedPracticeData, ThrowOnError>) => (options.client ?? client).get<AdminGetCuratedPracticeResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices/{slug}',
+    ...options
+});
+
+/**
+ * Replace a practice definition
+ */
+export const adminUpdateCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCuratedPracticeData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateCuratedPracticeResponses, AdminUpdateCuratedPracticeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices/{slug}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Use the Hephaestus definition of a practice
+ *
+ * Discards the customization, so the practice follows the Hephaestus default again.
+ */
+export const adminDeleteCuratedPracticeOverride = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteCuratedPracticeOverrideData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteCuratedPracticeOverrideResponses, AdminDeleteCuratedPracticeOverrideErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices/{slug}/override',
+    ...options
+});
+
+/**
+ * Keep the saved practice customization
+ *
+ * Records that the Hephaestus update was reviewed and keeps the saved definition.
+ */
+export const adminKeepCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminKeepCuratedPracticeData, ThrowOnError>) => (options.client ?? client).put<AdminKeepCuratedPracticeResponses, AdminKeepCuratedPracticeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices/{slug}/override/acknowledgement',
+    ...options
+});
+
+/**
+ * Move a practice to another catalog area
+ */
+export const adminPlaceCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminPlaceCuratedPracticeData, ThrowOnError>) => (options.client ?? client).patch<AdminPlaceCuratedPracticeResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices/{slug}/placement',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Exclude a practice from new workspaces, or include it again
+ */
+export const adminUpdateCuratedPracticeStatus = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCuratedPracticeStatusData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateCuratedPracticeStatusResponses, AdminUpdateCuratedPracticeStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/practice-catalog/practices/{slug}/status',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -1286,6 +1483,17 @@ export const updateArea = <ThrowOnError extends boolean = false>(options: Option
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Read the instance's definition of a practice
+ *
+ * The current instance-catalog definition for comparison with a workspace copy.
+ */
+export const getCuratedPracticeCatalogEntry = <ThrowOnError extends boolean = false>(options: Options<GetCuratedPracticeCatalogEntryData, ThrowOnError>) => (options.client ?? client).get<GetCuratedPracticeCatalogEntryResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practice-catalog/practices/{slug}',
+    ...options
 });
 
 /**

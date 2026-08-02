@@ -46,7 +46,7 @@ export const ExpandedNavigation: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Practices" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Integrations" }));
 
-		await expect(canvas.getByRole("link", { name: "Catalog" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Practice setup" })).toBeInTheDocument();
 		await expect(canvas.getByRole("link", { name: "Practice reviews" })).toBeInTheDocument();
 		await expect(canvas.getByRole("link", { name: "Overview" })).toBeInTheDocument();
 		await expect(canvas.getByRole("link", { name: "GitHub" })).toBeInTheDocument();

@@ -164,7 +164,9 @@ export function ConfigAuditTable({
 									</TableCell>
 									{showWorkspace && (
 										<TableCell className="max-w-[10rem] truncate text-sm text-muted-foreground">
-											{entry.workspaceId != null ? (workspaceName ?? `#${entry.workspaceId}`) : "—"}
+											{entry.workspaceId != null
+												? (workspaceName ?? `#${entry.workspaceId}`)
+												: "Instance-wide"}
 										</TableCell>
 									)}
 									<TableCell className="max-w-[14rem]">

@@ -45,7 +45,7 @@ const idlePending = {
 };
 
 const meta = {
-	title: "Admin/Practices/Catalog",
+	title: "Workspace admin/Practices/Practice setup",
 	component: PracticeCatalog,
 	parameters: {
 		layout: "padded",
@@ -92,7 +92,7 @@ export const Filtered: Story = {
 	args: { focusFilter: "ISSUE" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Clear the filter to drag practices.")).toBeVisible();
+		await expect(canvas.getByText("Clear the filter to reorder practices.")).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: /Move practice/ })).not.toBeInTheDocument();
 	},
 };
@@ -108,6 +108,54 @@ export const MoveToUnassigned: Story = {
 	},
 };
 
+export const MoveWithoutDragging: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: `More actions for ${mockPracticeLongText.name}` }),
+		);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
+		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+			mockPracticeLongText.slug,
+			areas[0].slug,
+			1,
+		);
+	},
+};
+
+export const MoveAreaWithoutDragging: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: `More actions for ${areas[0].name}` }),
+		);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
+		await expect(args.onReorderAreas).toHaveBeenCalledWith([areas[1].slug, areas[0].slug]);
+	},
+};
+
+export const KeyboardReordering: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas }) => {
+		const handle = canvas.getByRole("button", {
+			name: `Reorder ${mockPracticeLongText.name}`,
+		});
+		handle.focus();
+		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
+		await screen.findByText(`Picked up ${mockPracticeLongText.name}.`);
+		handle.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }),
+		);
+		await screen.findByText(new RegExp(`Moving ${mockPracticeLongText.name}`));
+		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
+		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+			mockPracticeLongText.slug,
+			areas[0].slug,
+			1,
+		);
+	},
+};
+
 export const Reordering: Story = {
 	args: {
 		pending: {
@@ -118,12 +166,12 @@ export const Reordering: Story = {
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByRole("button", {
-				name: `Move practice ${mockPracticeLongText.name}`,
+				name: `Reorder ${mockPracticeLongText.name}`,
 			}),
 		).toBeDisabled();
 		await expect(
 			canvas.getByRole("button", {
-				name: `Move practice ${mockUnassignedPractice.name}`,
+				name: `Reorder ${mockUnassignedPractice.name}`,
 			}),
 		).toBeEnabled();
 	},
@@ -145,9 +193,10 @@ export const DeletingArea: Story = {
 		});
 		await userEvent.click(actions);
 		await expect(await screen.findByRole("menuitemradio", { name: areas[1].name })).toBeEnabled();
-		await expect(
-			screen.queryByRole("menuitemradio", { name: areas[0].name }),
-		).not.toBeInTheDocument();
+		await expect(screen.getByRole("menuitemradio", { name: areas[0].name })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
 	},
 };
 
@@ -180,7 +229,7 @@ export const CrossAreaDrag: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		const practice = mockPractices[0];
-		const handle = canvas.getByRole("button", { name: `Move practice ${practice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${practice.name}` });
 		const destinationArea = canvas
 			.getByText(mockAreas[1].name)
 			.closest('[data-slot="accordion-item"]');
@@ -239,7 +288,7 @@ export const BetweenRowsDrag: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const source = mockPractices[0];
 		const anchor = mockPractices[2];
-		const handle = canvas.getByRole("button", { name: `Move practice ${source.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${source.name}` });
 		const anchorRow = canvas.getByText(anchor.name).closest<HTMLElement>('[data-slot="item"]');
 		if (!anchorRow) throw new Error("Destination practice row not rendered");
 		const start = handle.getBoundingClientRect();
@@ -278,7 +327,7 @@ export const BlockedDestinationDrag: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		const practice = mockPractices[0];
-		const handle = canvas.getByRole("button", { name: `Move practice ${practice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${practice.name}` });
 		const destinationArea = canvas
 			.getByText(mockAreas[1].name)
 			.closest<HTMLElement>('[data-slot="accordion-item"]');

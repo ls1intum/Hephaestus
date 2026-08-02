@@ -5,6 +5,7 @@ names may differ, but should not leak into product copy.
 
 Within a surface already titled **Practice reviews**, shorten **practice feedback** to **feedback**.
 Use the full term when the surrounding context does not establish which kind of feedback is meant.
+Within **Practice setup** or **Practice catalog**, shorten **practice area** to **area**.
 
 | Term                  | Meaning                                                                         | Avoid for this concept             |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------- |
@@ -23,6 +24,18 @@ Use the full term when the surrounding context does not establish which kind of 
 | **Heph**              | The conversational assistant                                                    | agent, bot                         |
 | **Mentor**            | The product area for conversations with Heph                                    |                                    |
 | **Hephaestus**        | The application that runs reviews and prepares feedback                         | agent                              |
+| **Hephaestus default** | A practice or area bundled with the running Hephaestus release                  | shipped entry                      |
+| **Instance catalog**  | The starting set copied into each new workspace                                  | curated catalog                    |
+| **Workspace practices** | Independent definitions used for reviews in one workspace                     | workspace catalog                  |
+| **Review rules**      | Inputs and criteria that determine review behavior                               | detector configuration             |
+| **Developer guidance** | Explanatory text that does not change review behavior                           | learner guidance                   |
+| **Customize**         | Change a default or catalog-based definition                                     | override                           |
+| **Include / exclude** | Whether an instance entry is copied into new workspaces                          | offer, retire                      |
+| **No Hephaestus default** | An instance-maintained entry with no bundled definition                      | ours, yours                        |
 
 Use provider-specific names such as **pull request** or **merge request** when the provider is known;
 otherwise write **pull or merge request**.
+
+Use **used in new reviews** for workspace participation. Do not use _shipped_, _offered_, _retired_,
+_ours_, _yours_, or _here_ in catalog UI copy; those terms expose implementation or depend on who is
+reading.

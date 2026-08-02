@@ -1,0 +1,81 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn, within } from "storybook/test";
+import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
+
+const meta = {
+	title: "Instance admin/Practice catalog/Summary",
+	component: CuratedCatalogSummary,
+	parameters: { layout: "padded" },
+	tags: ["autodocs"],
+	args: {
+		onReviewChanges: fn(),
+		removedDefaultsToReview: 0,
+		summary: {
+			total: 49,
+			updatesChangingDetection: 0,
+			updatesChangingWordingOnly: 0,
+			updatesChangingPresentation: 0,
+			editedHere: 0,
+			yours: 0,
+			notOffered: 0,
+			noLongerShipped: 0,
+		},
+	},
+} satisfies Meta<typeof CuratedCatalogSummary>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const UpdatesWaiting: Story = {
+	args: {
+		onReviewChanges: fn(),
+		summary: {
+			total: 49,
+			updatesChangingDetection: 2,
+			updatesChangingWordingOnly: 5,
+			updatesChangingPresentation: 1,
+			editedHere: 3,
+			yours: 0,
+			notOffered: 0,
+			noLongerShipped: 0,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("2 updates would change review behavior")).toBeVisible();
+		await expect(canvas.getByText("5 updates would change wording or guidance")).toBeVisible();
+		await expect(canvas.getByText("1 update would change area appearance")).toBeVisible();
+		await expect(canvas.getByText("8 Hephaestus changes need review")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Review changes" })).toBeVisible();
+	},
+};
+
+export const RemovedDefault: Story = {
+	args: {
+		removedDefaultsToReview: 1,
+		summary: {
+			total: 49,
+			updatesChangingDetection: 0,
+			updatesChangingWordingOnly: 0,
+			updatesChangingPresentation: 0,
+			editedHere: 1,
+			yours: 0,
+			notOffered: 0,
+			noLongerShipped: 1,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("1 Hephaestus change needs review")).toBeVisible();
+		await expect(canvas.getByText("1 entry is no longer in Hephaestus defaults")).toBeVisible();
+	},
+};
+
+export const ReviewingChanges: Story = {
+	args: { ...UpdatesWaiting.args, reviewing: true },
+	play: async ({ canvasElement }) => {
+		await expect(
+			within(canvasElement).queryByRole("button", { name: "Review changes" }),
+		).not.toBeInTheDocument();
+	},
+};

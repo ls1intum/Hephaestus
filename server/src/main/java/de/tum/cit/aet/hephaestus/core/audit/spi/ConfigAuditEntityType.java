@@ -41,6 +41,9 @@ public enum ConfigAuditEntityType {
     PRACTICE_ACTIVE,
     /** A practice's review definition, excluding its active state and catalog placement. */
     PRACTICE_DEFINITION,
+    PRACTICE_AREA,
+    CURATED_PRACTICE,
+    CURATED_PRACTICE_AREA,
 
     /** A workspace's monthly cap on HOST-funded LLM spend. Set by instance admins. */
     WORKSPACE_INSTANCE_LLM_BUDGET,
@@ -51,11 +54,6 @@ public enum ConfigAuditEntityType {
     /** Historical only — see {@link #WORKSPACE_LLM_BUDGET}. */
     WORKSPACE_BYO_LLM_BUDGET,
 
-    /**
-     * A workspace's own "bring your own" LLM provider connection. Tenant-scoped, unlike the instance
-     * catalog, which is GLOBAL and therefore audited on {@code auth_event} instead — this port cannot
-     * carry a null {@code workspace_id}.
-     */
     WORKSPACE_LLM_CONNECTION,
     /** A model on a workspace's own BYO connection, including its inline price and enablement. */
     WORKSPACE_LLM_MODEL,

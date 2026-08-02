@@ -29,7 +29,8 @@ import org.jspecify.annotations.Nullable;
  * accompanying REVOKE does not currently bind — the app connects as the bootstrap superuser — so the
  * trigger is the only live control; it holds against application bugs, not against the operator.
  *
- * <p>{@code workspace_id} is NOT NULL: every producer is workspace-scoped.
+ * <p>{@code workspace_id} is null for instance-curated catalog events; every workspace resource must
+ * identify its workspace. The database CHECK constraint enforces this boundary.
  */
 @Entity
 @Table(name = "config_audit_event")
@@ -44,7 +45,8 @@ public class ConfigAuditEvent {
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
-    @Column(name = "workspace_id", nullable = false)
+    @Column(name = "workspace_id")
+    @Nullable
     private Long workspaceId;
 
     @Enumerated(EnumType.STRING)
@@ -96,7 +98,7 @@ public class ConfigAuditEvent {
     /** Only sanctioned construction path; keeps the entity {@code @Getter}-only (append-only invariant). */
     static ConfigAuditEvent create(
         Instant occurredAt,
-        Long workspaceId,
+        @Nullable Long workspaceId,
         ConfigAuditActor actor,
         ConfigAuditEntityType entityType,
         String entityId,

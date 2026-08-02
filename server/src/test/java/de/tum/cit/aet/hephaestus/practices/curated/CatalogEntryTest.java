@@ -1,0 +1,152 @@
+package de.tum.cit.aet.hephaestus.practices.curated;
+
+import static de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogFixtures.practice;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import org.junit.jupiter.api.Test;
+
+class CatalogEntryTest extends BaseUnitTest {
+
+    private static final String SLUG = "small-prs";
+    private static final PracticeDefinition SHIPPED = practice("Small PRs", "Shipped criteria", "Shipped reason");
+
+    @Test
+    void anEntryNobodyHasTouchedIsWhateverTheBuildShips() {
+        CatalogEntry<PracticeDefinition> entry = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
+
+        assertThat(entry.state()).isEqualTo(CatalogEntryState.FROM_HEPHAESTUS);
+        assertThat(entry.effective()).isEqualTo(SHIPPED);
+        assertThat(entry.changeKind()).isEqualTo(CatalogChangeKind.NONE);
+        assertThat(entry.offered()).isTrue();
+    }
+
+    @Test
+    void aNewerBuildReachesAnUntouchedEntryWithNothingHavingToRun() {
+        PracticeDefinition newer = practice("Small PRs", "Newer criteria", "Shipped reason");
+
+        assertThat(CatalogEntry.shippedOnly(SLUG, newer, 0).effective()).isEqualTo(newer);
+    }
+
+    @Test
+    void anEditIsHeldAgainstTheDefinitionItWasWrittenAgainst() {
+        PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
+
+        assertThat(entry(mine, SHIPPED, SHIPPED.digest(SLUG)).state()).isEqualTo(CatalogEntryState.EDITED_HERE);
+    }
+
+    @Test
+    void aBuildThatMovesOnLeavesTheEditInForceAndTheNewDefinitionWaiting() {
+        PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
+        PracticeDefinition newer = practice("Small PRs", "Newer criteria", "Shipped reason");
+        CatalogEntry<PracticeDefinition> entry = entry(mine, newer, SHIPPED.digest(SLUG));
+
+        assertThat(entry.state()).isEqualTo(CatalogEntryState.UPDATE_WAITING);
+        assertThat(entry.effective()).isEqualTo(mine);
+        assertThat(entry.shipped()).isEqualTo(newer);
+    }
+
+    @Test
+    void anEntryThisInstanceWroteIsItsOwn() {
+        PracticeDefinition mine = practice("House rule", "Our criteria", "Our reason");
+
+        assertThat(entry(mine, null, null).state()).isEqualTo(CatalogEntryState.YOURS);
+    }
+
+    @Test
+    void anEntryTheBuildStopsShippingKeepsTheInstancesOwnDefinition() {
+        PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
+
+        assertThat(entry(mine, null, SHIPPED.digest(SLUG)).state()).isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
+    }
+
+    @Test
+    void anUpdateThatOnlyChangesWhatPeopleReadIsMarkedAsSuch() {
+        PracticeDefinition mine = practice("Small PRs", "Shipped criteria", "Our reason");
+        PracticeDefinition newer = practice("Small PRs", "Shipped criteria", "Better reason");
+
+        assertThat(entry(mine, newer, "0".repeat(64)).changeKind()).isEqualTo(CatalogChangeKind.WORDING);
+    }
+
+    @Test
+    void anUpdateThatChangesWhatGetsDetectedIsMarkedAsSuch() {
+        PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
+        PracticeDefinition newer = practice("Small PRs", "Newer criteria", "Shipped reason");
+
+        assertThat(entry(mine, newer, "0".repeat(64)).changeKind()).isEqualTo(CatalogChangeKind.DETECTION);
+    }
+
+    @Test
+    void aLocalDefinitionThatTheShippedCatalogCatchesUpWithRemainsLocal() {
+        CatalogEntry<PracticeDefinition> entry = entry(SHIPPED, SHIPPED, "0".repeat(64));
+
+        assertThat(entry.state()).isEqualTo(CatalogEntryState.EDITED_HERE);
+        assertThat(entry.changeKind()).isEqualTo(CatalogChangeKind.NONE);
+    }
+
+    @Test
+    void tagDistinguishesAnIdenticalLocalDefinitionFromFollowingTheDefault() {
+        CatalogEntry<PracticeDefinition> local = entry(SHIPPED, SHIPPED, null);
+        CatalogEntry<PracticeDefinition> following = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
+
+        assertThat(local.state()).isEqualTo(CatalogEntryState.EDITED_HERE);
+        assertThat(local.etag()).isNotEqualTo(following.etag());
+    }
+
+    @Test
+    void anAreaUpdateIsPresentationNotDetection() {
+        var mine = new AreaDefinition("Maintainability", "Our description", "Wrench", "sky");
+        var shipped = new AreaDefinition("Maintainability", "New description", "Wrench", "sky");
+        var entry = new CatalogEntry<>("maintainability", mine, shipped, mine, "0".repeat(64), false, 0, null);
+
+        assertThat(entry.changeKind()).isEqualTo(CatalogChangeKind.PRESENTATION);
+    }
+
+    @Test
+    void theTagCoversTheEntryWithoutCouplingEditsToCatalogOrder() {
+        CatalogEntry<PracticeDefinition> untouched = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
+        PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
+
+        assertThat(untouched.etag()).isNotBlank();
+        assertThat(entry(mine, SHIPPED, SHIPPED.digest(SLUG)).etag()).isNotEqualTo(untouched.etag());
+        assertThat(retired(untouched).etag()).isNotEqualTo(untouched.etag());
+        assertThat(withPosition(untouched, 1).etag()).isEqualTo(untouched.etag());
+    }
+
+    private static CatalogEntry<PracticeDefinition> entry(
+        PracticeDefinition mine,
+        PracticeDefinition shipped,
+        String acceptedBundledDigest
+    ) {
+        PracticeDefinition effective = mine != null ? mine : shipped;
+        return new CatalogEntry<>(SLUG, effective, shipped, mine, acceptedBundledDigest, false, 0, null);
+    }
+
+    private static CatalogEntry<PracticeDefinition> retired(CatalogEntry<PracticeDefinition> entry) {
+        return new CatalogEntry<>(
+            entry.slug(),
+            entry.effective(),
+            entry.shipped(),
+            entry.overridden(),
+            entry.acceptedBundledDigest(),
+            true,
+            entry.position(),
+            entry.updatedAt()
+        );
+    }
+
+    private static CatalogEntry<PracticeDefinition> withPosition(CatalogEntry<PracticeDefinition> entry, int position) {
+        return new CatalogEntry<>(
+            entry.slug(),
+            entry.effective(),
+            entry.shipped(),
+            entry.overridden(),
+            entry.acceptedBundledDigest(),
+            entry.retired(),
+            position,
+            entry.updatedAt()
+        );
+    }
+}

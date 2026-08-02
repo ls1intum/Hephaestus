@@ -28,9 +28,10 @@ public record PracticeDTO(
     @Nullable @Schema(description = "Developer-facing exemplar (learner layer)") String whatGoodLooksLike,
     @NonNull @Schema(description = "Whether this practice is actively being detected") Boolean active,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,
-    @NonNull @Schema(description = "Timestamp when the practice was last updated") Instant updatedAt
+    @NonNull @Schema(description = "Timestamp when the practice was last updated") Instant updatedAt,
+    @Nullable CatalogOriginDTO catalogOrigin
 ) {
-    public static PracticeDTO from(Practice practice) {
+    public static PracticeDTO from(Practice practice, @Nullable CatalogOriginDTO catalogOrigin) {
         return new PracticeDTO(
             practice.getId(),
             practice.getSlug(),
@@ -45,7 +46,8 @@ public record PracticeDTO(
             practice.getWhatGoodLooksLike(),
             practice.isActive(),
             practice.getCreatedAt(),
-            practice.getUpdatedAt()
+            practice.getUpdatedAt(),
+            catalogOrigin
         );
     }
 }

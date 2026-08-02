@@ -8,6 +8,7 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "practice_catalog_installation")
@@ -22,8 +23,16 @@ public class PracticeCatalogInstallation {
     @Column(name = "installed_at", nullable = false, updatable = false)
     private Instant installedAt;
 
-    public PracticeCatalogInstallation(Long workspaceId) {
+    @Column(name = "provenance_linked_at")
+    private @Nullable Instant provenanceLinkedAt;
+
+    public PracticeCatalogInstallation(Long workspaceId, Instant installedAt, @Nullable Instant provenanceLinkedAt) {
         this.workspaceId = workspaceId;
-        this.installedAt = Instant.now();
+        this.installedAt = installedAt;
+        this.provenanceLinkedAt = provenanceLinkedAt;
+    }
+
+    public void markProvenanceLinked(Instant now) {
+        this.provenanceLinkedAt = now;
     }
 }

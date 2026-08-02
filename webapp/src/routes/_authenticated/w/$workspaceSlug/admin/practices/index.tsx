@@ -4,7 +4,7 @@ import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import { listAreasOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
-import { generateSlug } from "@/components/admin/practices/constants";
+import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
 import {
 	PRACTICE_SEARCH_PARAMS,
@@ -28,7 +28,7 @@ import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutati
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
-	head: workspaceAdminHead("Practice catalog"),
+	head: workspaceAdminHead("Practices"),
 	validateSearch: practiceSearchSchema,
 	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
 	component: PracticeCatalogRoute,
@@ -54,8 +54,8 @@ function PracticeCatalogRoute() {
 		<PageLayout>
 			<PageHeader
 				icon={<ListChecks />}
-				title="Practice catalog"
-				description="Organize the practices Hephaestus uses to review work."
+				title="Practices"
+				description="Choose the practices Hephaestus uses for new reviews in this workspace. Changes affect only this workspace."
 			/>
 			{areasQuery.isPending || practicesQuery.isPending ? (
 				<div className="flex h-64 items-center justify-center">
@@ -64,7 +64,7 @@ function PracticeCatalogRoute() {
 			) : areasQuery.isError || practicesQuery.isError ? (
 				<QueryErrorAlert
 					error={areasQuery.error ?? practicesQuery.error}
-					title="Couldn't load the practice catalog"
+					title="Couldn't load practices"
 					onRetry={() => {
 						areasQuery.refetch();
 						practicesQuery.refetch();
@@ -154,7 +154,7 @@ function PracticeCatalogRoute() {
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel>Keep area</AlertDialogCancel>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
 							className="min-w-24"

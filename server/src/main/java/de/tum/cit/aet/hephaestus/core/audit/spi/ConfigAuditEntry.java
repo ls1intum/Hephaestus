@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.audit.spi;
 
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -8,18 +9,15 @@ import org.jspecify.annotations.Nullable;
  * would run on a plain object that no Spring proxy advises.
  *
  * @param entityType the kind of resource that changed
- * @param entityId   the resource's <em>immutable</em> key as text — the numeric primary key, never a
- *                   slug. Slugs are mutable (hence {@code workspace_slug_history}), and re-keying on
- *                   rename would silently split a resource's history in two, stranding the older half.
- *                   The slug belongs inside the snapshot, where a rename shows up as a normal diff.
- * @param workspaceId the owning workspace
+ * @param entityId the resource's immutable key: normally its numeric ID, or the immutable catalog slug
+ * @param workspaceId the owning workspace, or null for instance-curated catalog entries
  * @param before     state prior to the change; {@code null} for {@link ConfigAuditAction#CREATED}
  * @param after      state after the change; {@code null} for {@link ConfigAuditAction#DELETED}
  */
 public record ConfigAuditEntry(
     ConfigAuditEntityType entityType,
     String entityId,
-    Long workspaceId,
+    @Nullable Long workspaceId,
     @Nullable ConfigAuditSnapshot before,
     @Nullable ConfigAuditSnapshot after
 ) {
@@ -38,7 +36,7 @@ public record ConfigAuditEntry(
         return new ConfigAuditEntry(
             entityType,
             String.valueOf(entityId),
-            workspaceId,
+            Objects.requireNonNull(workspaceId, "workspaceId"),
             null,
             requireSnapshot(after, "after")
         );
@@ -57,7 +55,7 @@ public record ConfigAuditEntry(
         return new ConfigAuditEntry(
             entityType,
             String.valueOf(entityId),
-            workspaceId,
+            Objects.requireNonNull(workspaceId, "workspaceId"),
             requireSnapshot(before, "before"),
             requireSnapshot(after, "after")
         );
@@ -72,9 +70,32 @@ public record ConfigAuditEntry(
         return new ConfigAuditEntry(
             entityType,
             String.valueOf(entityId),
-            workspaceId,
+            Objects.requireNonNull(workspaceId, "workspaceId"),
             requireSnapshot(before, "before"),
             null
+        );
+    }
+
+    public static ConfigAuditEntry instanceCreated(
+        ConfigAuditEntityType entityType,
+        Object entityId,
+        ConfigAuditSnapshot after
+    ) {
+        return new ConfigAuditEntry(entityType, String.valueOf(entityId), null, null, requireSnapshot(after, "after"));
+    }
+
+    public static ConfigAuditEntry instanceUpdated(
+        ConfigAuditEntityType entityType,
+        Object entityId,
+        ConfigAuditSnapshot before,
+        ConfigAuditSnapshot after
+    ) {
+        return new ConfigAuditEntry(
+            entityType,
+            String.valueOf(entityId),
+            null,
+            requireSnapshot(before, "before"),
+            requireSnapshot(after, "after")
         );
     }
 

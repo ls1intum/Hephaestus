@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -29,6 +32,8 @@ public class PracticeAreaService {
 
     private final PracticeAreaRepository practiceAreaRepository;
     private final PracticeRepository practiceRepository;
+    private final PracticeRevisionService practiceRevisionService;
+    private final ConfigAuditPort configAudit;
     private final WorkspaceRepository workspaceRepository;
 
     @Transactional(readOnly = true)
@@ -78,6 +83,10 @@ public class PracticeAreaService {
 
     @Transactional
     public PracticeArea createArea(WorkspaceContext ctx, String slug, AreaAttributes attributes) {
+        return createArea(ctx, slug, attributes, true);
+    }
+
+    private PracticeArea createArea(WorkspaceContext ctx, String slug, AreaAttributes attributes, boolean recordAudit) {
         if (practiceAreaRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeAreaSlugConflictException(
                 "A practice area with slug '" + slug + "' already exists in this workspace."
@@ -109,16 +118,64 @@ public class PracticeAreaService {
                 ex
             );
         }
+        if (recordAudit) {
+            configAudit.record(
+                ConfigAuditEntry.created(
+                    ConfigAuditEntityType.PRACTICE_AREA,
+                    area.getId(),
+                    ctx.id(),
+                    PracticeAreaSnapshot.of(area)
+                )
+            );
+        }
         log.info("Created practice area '{}' (slug={}) in workspace {}", area.getName(), area.getSlug(), ctx.slug());
         return area;
     }
 
     @Transactional
+    public PracticeArea createAreaFromCatalog(
+        WorkspaceContext ctx,
+        String slug,
+        AreaDefinition definition,
+        int displayOrder
+    ) {
+        PracticeArea area = createArea(
+            ctx,
+            slug,
+            new AreaAttributes(
+                definition.name(),
+                definition.description(),
+                displayOrder,
+                definition.icon(),
+                definition.color()
+            ),
+            false
+        );
+        area.setSourceCuratedSlug(slug);
+        area.setSourceCuratedFingerprint(definition.provenanceFingerprint(slug));
+        return practiceAreaRepository.save(area);
+    }
+
+    @Transactional
     public PracticeArea updateArea(WorkspaceContext ctx, String slug, AreaAttributes attributes) {
-        if (attributes.displayOrder() != null) {
-            lockWorkspace(ctx);
-        }
+        return updateArea(ctx, slug, attributes, null);
+    }
+
+    @Transactional
+    public PracticeArea updateArea(
+        WorkspaceContext ctx,
+        String slug,
+        AreaAttributes attributes,
+        @Nullable Boolean active
+    ) {
+        lockWorkspace(ctx);
         PracticeArea area = getArea(ctx, slug);
+        PracticeAreaSnapshot before = PracticeAreaSnapshot.of(area);
+        boolean snapshotChanged =
+            (attributes.name() != null && !Objects.equals(attributes.name(), area.getName())) ||
+            (attributes.description() != null && !Objects.equals(attributes.description(), area.getDescription())) ||
+            (attributes.icon() != null && !Objects.equals(attributes.icon(), area.getIcon())) ||
+            (attributes.color() != null && !Objects.equals(attributes.color(), area.getColor()));
         if (attributes.name() != null) {
             area.setName(attributes.name());
         }
@@ -134,30 +191,54 @@ public class PracticeAreaService {
         if (attributes.color() != null) {
             area.setColor(attributes.color());
         }
-        return practiceAreaRepository.save(area);
-    }
-
-    @Transactional
-    public PracticeArea setActive(WorkspaceContext ctx, String slug, boolean active) {
-        PracticeArea area = getArea(ctx, slug);
-        area.setActive(active);
-        return practiceAreaRepository.save(area);
+        if (active != null) {
+            area.setActive(active);
+        }
+        area = practiceAreaRepository.save(area);
+        if (snapshotChanged) {
+            for (Practice practice : practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
+                ctx.id(),
+                area.getId()
+            )) {
+                practiceRevisionService.append(practice);
+            }
+        }
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_AREA,
+                area.getId(),
+                ctx.id(),
+                before,
+                PracticeAreaSnapshot.of(area)
+            )
+        );
+        return area;
     }
 
     @Transactional
     public void deleteArea(WorkspaceContext ctx, String slug) {
         lockWorkspace(ctx);
         PracticeArea area = getArea(ctx, slug);
+        PracticeAreaSnapshot areaBefore = PracticeAreaSnapshot.of(area);
         int nextOrder = practiceRepository.findMaxDisplayOrder(ctx.id(), null) + 1;
         for (Practice practice : practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
             ctx.id(),
             area.getId()
         )) {
+            PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(
+                practice,
+                practiceRevisionService.currentRevisionNumber(practice)
+            );
             practice.setArea(null);
             practice.setDisplayOrder(nextOrder++);
             practiceRepository.save(practice);
+            int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
+            recordPlacementChange(ctx, practice, before, revisionNumber);
         }
         practiceAreaRepository.delete(area);
+        configAudit.record(
+            ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_AREA, area.getId(), ctx.id(), areaBefore)
+        );
         log.info("Deleted practice area (slug={}) in workspace {}", slug, ctx.slug());
     }
 
@@ -168,10 +249,17 @@ public class PracticeAreaService {
             .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
 
+        PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(
+            practice,
+            practiceRevisionService.currentRevisionNumber(practice)
+        );
         if (!applyBinding(ctx, practice, areaSlug)) {
             return practice;
         }
-        return practiceRepository.save(practice);
+        practice = practiceRepository.save(practice);
+        int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
+        recordPlacementChange(ctx, practice, before, revisionNumber);
+        return practice;
     }
 
     boolean applyBinding(WorkspaceContext ctx, Practice practice, @Nullable String areaSlug) {
@@ -199,5 +287,22 @@ public class PracticeAreaService {
         return workspaceRepository
             .findByIdForUpdate(ctx.id())
             .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
+    }
+
+    private void recordPlacementChange(
+        WorkspaceContext ctx,
+        Practice practice,
+        PracticeDefinitionSnapshot before,
+        int revisionNumber
+    ) {
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_DEFINITION,
+                practice.getId(),
+                ctx.id(),
+                before,
+                PracticeDefinitionSnapshot.of(practice, revisionNumber)
+            )
+        );
     }
 }

@@ -179,7 +179,7 @@ erDiagram
     ConfigAuditEvent {
         BIGINT id PK
         TIMESTAMPTZ occurred_at "NOT NULL"
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT workspace_id FK
         VARCHAR(16) actor_kind "NOT NULL"
         BIGINT actor_account_id FK
         BIGINT acting_account_id FK
@@ -225,6 +225,38 @@ erDiagram
         VARCHAR(64) correlation_id
         JSONB detail
         TIMESTAMPTZ occurred_at "NOT NULL"
+    }
+
+    CuratedAreaOverride {
+        VARCHAR(64) slug PK
+        VARCHAR(128) name
+        TEXT description
+        INTEGER position
+        VARCHAR(64) icon
+        VARCHAR(32) color
+        VARCHAR(64) based_on_digest
+        TIMESTAMPTZ retired_at
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+        BIGINT version "NOT NULL"
+    }
+
+    CuratedPracticeOverride {
+        VARCHAR(64) slug PK
+        VARCHAR(128) name
+        VARCHAR(32) applies_to
+        JSONB trigger_events
+        TEXT criteria
+        TEXT precompute_script
+        TEXT why_it_matters
+        TEXT what_good_looks_like
+        VARCHAR(64) area_slug
+        INTEGER position
+        VARCHAR(64) based_on_digest
+        TIMESTAMPTZ retired_at
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+        BIGINT version "NOT NULL"
     }
 
     Discussion {
@@ -762,6 +794,9 @@ erDiagram
         TEXT why_it_matters
         TEXT what_good_looks_like
         INTEGER display_order "NOT NULL"
+        BIGINT current_revision_id FK,UK
+        VARCHAR(64) source_curated_slug
+        VARCHAR(64) source_curated_fingerprint
     }
 
     PracticeArea {
@@ -776,11 +811,14 @@ erDiagram
         TIMESTAMPTZ updated_at
         VARCHAR(64) icon
         VARCHAR(32) color
+        VARCHAR(64) source_curated_slug
+        VARCHAR(64) source_curated_fingerprint
     }
 
     PracticeCatalogInstallation {
         BIGINT workspace_id PK,FK
         TIMESTAMPTZ installed_at "NOT NULL"
+        TIMESTAMPTZ provenance_linked_at
     }
 
     PracticeRevision {
@@ -789,6 +827,19 @@ erDiagram
         INTEGER revision_number UK "NOT NULL"
         TEXT criteria "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
+        VARCHAR(64) slug
+        VARCHAR(128) name
+        VARCHAR(32) applies_to
+        JSONB trigger_events
+        TEXT precompute_script
+        TEXT why_it_matters
+        TEXT what_good_looks_like
+        VARCHAR(64) area_slug
+        VARCHAR(128) area_name
+        TEXT area_description
+        VARCHAR(64) area_icon
+        VARCHAR(32) area_color
+        VARCHAR(64) detection_fingerprint
     }
 
     Project {
@@ -1289,151 +1340,149 @@ erDiagram
 
     %% Relationships
     %% One-to-One relationships
-    Account ||--|| AccountFeature : has
-    Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessageVote : has
-    GitCommit ||--|| CommitContributor : has
-    Workspace ||--|| Connection : has
-    Repository ||--|| Discussion : has
     DiscussionComment ||--|| Discussion : references
-    IdentityProvider ||--|| Discussion : references
-    Repository ||--|| DiscussionCategory : has
-    IdentityProvider ||--|| DiscussionComment : commented_on
-    AgentJob ||--|| Feedback : has
-    Repository ||--|| GitCommit : has
-    Repository ||--|| Issue : has
-    IdentityProvider ||--|| Issue : references
-    IdentityProvider ||--|| IssueComment : commented_on
-    Repository ||--|| Label : labeled
-    IdentityProvider ||--|| Label : labeled
-    LlmConnection ||--|| LlmModel : has
-    Workspace ||--|| MentorSlackThread : has
-    Repository ||--|| Milestone : has
-    IdentityProvider ||--|| Milestone : references
-    IdentityProvider ||--|| Organization : references
-    Workspace ||--|| OutlineCollection : has
-    Connection ||--|| OutlineCollection : has
-    Workspace ||--|| OutlineDocument : has
-    Connection ||--|| OutlineDocument : has
-    Workspace ||--|| Practice : has
-    Workspace ||--|| PracticeArea : has
+    PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
-    Practice ||--|| PracticeRevision : has
-    IdentityProvider ||--|| Project : references
-    Project ||--|| ProjectField : has
-    ProjectItem ||--|| ProjectFieldValue : has
-    ProjectField ||--|| ProjectFieldValue : has
-    Project ||--|| ProjectItem : has
-    IdentityProvider ||--|| ProjectItem : references
-    IdentityProvider ||--|| ProjectStatusUpdate : references
-    IdentityProvider ||--|| PullRequestReview : reviewed
-    IdentityProvider ||--|| PullRequestReviewComment : commented_on
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
-    IdentityProvider ||--|| PullRequestReviewThread : reviewed
-    IdentityProvider ||--|| Repository : references
-    Workspace ||--|| SlackMessage : has
-    Workspace ||--|| SlackMonitoredChannel : has
-    Workspace ||--|| SlackParticipantConsent : has
-    Workspace ||--|| SlackThread : has
-    IdentityProvider ||--|| Team : references
-    IdentityProvider ||--|| User : references
-    User ||--|| UserAchievement : has
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
-    Workspace ||--|| WorkspaceAgentBinding : has
-    WorkspaceLlmModel ||--|| WorkspaceAgentBinding : has
-    Workspace ||--|| WorkspaceLlmConnection : has
-    Workspace ||--|| WorkspaceLlmModel : has
-    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : workspace_id
-    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : connection_id
-    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : connection_id
-    User ||--|| WorkspaceMembership : belongs_to
-    Workspace ||--|| WorkspaceMembership : belongs_to
 
     %% One-to-Many relationships
     Account ||--o{ AccountExport : has
+    Account ||--o{ AccountFeature : has
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
+    Workspace ||--o{ ActivityEvent : has
     Workspace ||--o{ AgentJob : has
     Account ||--o{ AuthEvent : account_id
     Account ||--o{ AuthEvent : acting_account_id
     IdentityProvider ||--o{ AuthEvent : references
-    Workspace ||--o{ AuthEvent : has
     IdentityLink ||--o{ AuthEvent : has
-    ChatMessage ||--o{ ChatMessage : references
+    Workspace ||--o{ AuthEvent : has
     ChatThread ||--o{ ChatMessage : has
+    ChatMessage ||--o{ ChatMessage : references
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
+    GitCommit ||--o{ CommitContributor : has
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
-    Workspace ||--o{ ConfigAuditEvent : has
-    Account ||--o{ ConfigAuditEvent : actor_account_id
     Account ||--o{ ConfigAuditEvent : acting_account_id
+    Account ||--o{ ConfigAuditEvent : actor_account_id
+    Workspace ||--o{ ConfigAuditEvent : has
+    Workspace ||--o{ Connection : has
     Connection ||--o{ ConnectionAudit : has
+    User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
-    User ||--o{ Discussion : references
-    Discussion ||--o{ DiscussionComment : commented_on
+    IdentityProvider ||--o{ Discussion : references
+    Repository ||--o{ Discussion : has
+    Repository ||--o{ DiscussionCategory : has
     User ||--o{ DiscussionComment : commented_on
+    Discussion ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
-    Workspace ||--o{ Feedback : has
+    IdentityProvider ||--o{ DiscussionComment : commented_on
+    AgentJob ||--o{ Feedback : has
     User ||--o{ Feedback : recipient_user_id
-    User ||--o{ Feedback : about_user_id
     Feedback ||--o{ Feedback : references
+    User ||--o{ Feedback : about_user_id
+    Workspace ||--o{ Feedback : has
     Feedback ||--o{ FeedbackPlacement : has
     ChatMessage ||--o{ FeedbackPlacement : has
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
+    Repository ||--o{ GitCommit : has
     Account ||--o{ IdentityLink : has
     IdentityProvider ||--o{ IdentityLink : references
-    User ||--o{ Issue : authored_by
+    Repository ||--o{ Issue : has
     Milestone ||--o{ Issue : has
-    User ||--o{ Issue : merged_by
-    Issue ||--o{ Issue : has
     IssueType ||--o{ Issue : has
-    User ||--o{ IssueComment : commented_on
+    Issue ||--o{ Issue : has
+    IdentityProvider ||--o{ Issue : references
+    User ||--o{ Issue : merged_by
+    User ||--o{ Issue : authored_by
     Issue ||--o{ IssueComment : commented_on
+    IdentityProvider ||--o{ IssueComment : commented_on
+    User ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
+    Repository ||--o{ Label : labeled
+    IdentityProvider ||--o{ Label : labeled
+    LlmConnection ||--o{ LlmModel : has
     LlmModel ||--o{ LlmModelPrice : has
     Workspace ||--o{ LlmUsageEvent : has
     ChatThread ||--o{ MentorSlackThread : has
+    Workspace ||--o{ MentorSlackThread : has
+    IdentityProvider ||--o{ Milestone : references
+    Repository ||--o{ Milestone : has
     User ||--o{ Milestone : created_by
-    AgentJob ||--o{ Observation : has
     Practice ||--o{ Observation : has
-    User ||--o{ Observation : has
     PracticeRevision ||--o{ Observation : has
-    Workspace ||--o{ OutlineDocumentEvent : has
+    AgentJob ||--o{ Observation : has
+    User ||--o{ Observation : has
+    IdentityProvider ||--o{ Organization : references
+    Connection ||--o{ OutlineCollection : has
+    Workspace ||--o{ OutlineCollection : has
+    Connection ||--o{ OutlineDocument : has
+    Workspace ||--o{ OutlineDocument : has
     Connection ||--o{ OutlineDocumentEvent : has
+    Workspace ||--o{ OutlineDocumentEvent : has
     PracticeArea ||--o{ Practice : has
+    Workspace ||--o{ Practice : has
+    Workspace ||--o{ PracticeArea : has
+    Practice ||--o{ PracticeRevision : has
     User ||--o{ Project : created_by
-    Issue ||--o{ ProjectItem : has
+    IdentityProvider ||--o{ Project : references
+    Project ||--o{ ProjectField : has
+    ProjectField ||--o{ ProjectFieldValue : has
+    ProjectItem ||--o{ ProjectFieldValue : has
     User ||--o{ ProjectItem : created_by
-    Project ||--o{ ProjectStatusUpdate : has
+    Issue ||--o{ ProjectItem : has
+    Project ||--o{ ProjectItem : has
+    IdentityProvider ||--o{ ProjectItem : references
     User ||--o{ ProjectStatusUpdate : created_by
+    Project ||--o{ ProjectStatusUpdate : has
+    IdentityProvider ||--o{ ProjectStatusUpdate : references
+    IdentityProvider ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
-    User ||--o{ PullRequestReviewComment : commented_on
-    Issue ||--o{ PullRequestReviewComment : commented_on
-    PullRequestReview ||--o{ PullRequestReviewComment : commented_on
-    PullRequestReviewThread ||--o{ PullRequestReviewComment : commented_on
+    IdentityProvider ||--o{ PullRequestReviewComment : commented_on
     PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReviewThread ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReview ||--o{ PullRequestReviewComment : commented_on
+    Issue ||--o{ PullRequestReviewComment : commented_on
+    User ||--o{ PullRequestReviewComment : commented_on
+    IdentityProvider ||--o{ PullRequestReviewThread : reviewed
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
-    User ||--o{ Reaction : has
     Feedback ||--o{ Reaction : has
+    User ||--o{ Reaction : has
     Organization ||--o{ Repository : has
+    IdentityProvider ||--o{ Repository : references
     Workspace ||--o{ RepositoryToMonitor : monitors
-    Workspace ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackChannelConsentEvent : has
+    Workspace ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackMessage : authored_by
+    Workspace ||--o{ SlackMessage : has
+    Workspace ||--o{ SlackMonitoredChannel : has
+    Workspace ||--o{ SlackParticipantConsent : has
+    Workspace ||--o{ SlackThread : has
+    Connection ||--o{ SyncJob : connection_id
+    Connection ||--o{ SyncJob : connection_id
     Workspace ||--o{ SyncJob : has
-    Connection ||--o{ SyncJob : references
-    Connection ||--o{ SyncJob : connection_id
-    Connection ||--o{ SyncJob : connection_id
+    IdentityProvider ||--o{ Team : references
+    IdentityProvider ||--o{ User : references
+    User ||--o{ UserAchievement : has
     LlmModel ||--o{ WorkspaceAgentBinding : references
+    Workspace ||--o{ WorkspaceAgentBinding : has
     WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id
     WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id
+    Workspace ||--o{ WorkspaceLlmConnection : has
+    WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
+    Workspace ||--o{ WorkspaceLlmModel : has
+    WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
+    User ||--o{ WorkspaceMembership : belongs_to
+    Workspace ||--o{ WorkspaceMembership : belongs_to
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
@@ -1445,8 +1494,8 @@ erDiagram
     Label }o--o{ DiscussionLabel : labeled
     Feedback }o--o{ FeedbackObservation : has
     Observation }o--o{ FeedbackObservation : has
-    Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
+    Issue }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : blocked_issue_id
     Issue }o--o{ IssueBlocking : blocking_issue_id
     Issue }o--o{ IssueLabel : labeled
@@ -1459,16 +1508,16 @@ erDiagram
     User }o--o{ RepositoryCollaborator : has
     User }o--o{ TeamMembership : belongs_to
     Team }o--o{ TeamMembership : belongs_to
-    Repository }o--o{ TeamRepositoryPermission : has
     Team }o--o{ TeamRepositoryPermission : has
-    Workspace }o--o{ WorkspaceTeamLabelFilter : labeled
-    Team }o--o{ WorkspaceTeamLabelFilter : labeled
+    Repository }o--o{ TeamRepositoryPermission : has
     Label }o--o{ WorkspaceTeamLabelFilter : labeled
-    Workspace }o--o{ WorkspaceTeamRepositorySetting : has
-    Team }o--o{ WorkspaceTeamRepositorySetting : has
+    Team }o--o{ WorkspaceTeamLabelFilter : labeled
+    Workspace }o--o{ WorkspaceTeamLabelFilter : labeled
     Repository }o--o{ WorkspaceTeamRepositorySetting : has
-    Workspace }o--o{ WorkspaceTeamSetting : has
+    Team }o--o{ WorkspaceTeamRepositorySetting : has
+    Workspace }o--o{ WorkspaceTeamRepositorySetting : has
     Team }o--o{ WorkspaceTeamSetting : has
+    Workspace }o--o{ WorkspaceTeamSetting : has
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px

@@ -16,26 +16,21 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Repository for workspace-scoped practice definitions.
- */
 @Repository
 @WorkspaceAgnostic(
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
-    // @EntityGraph fetches the bound area eagerly (here and below) so callers can read area fields
-    // outside the transaction — open-in-view is disabled — without one extra SELECT per practice.
-    @EntityGraph(attributePaths = "area")
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
     /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
-    @EntityGraph(attributePaths = "area")
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
     boolean existsByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
-    @EntityGraph(attributePaths = "area")
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     List<Practice> findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long areaId);
@@ -68,6 +63,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * Lists practices for a workspace with an optional active filter.
      * Null filter values are ignored (match all).
      */
+    @EntityGraph(attributePaths = { "area", "currentRevision" })
     @Query(
         """
         SELECT p FROM Practice p

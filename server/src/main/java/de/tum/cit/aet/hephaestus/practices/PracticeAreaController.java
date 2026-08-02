@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
@@ -49,6 +51,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeAreaController {
 
     private final PracticeAreaService areaService;
+    private final CatalogOriginPresenter presenter;
 
     @GetMapping
     @Operation(summary = "List practice areas", description = "Returns the workspace's practice areas")
@@ -64,11 +67,7 @@ public class PracticeAreaController {
             description = "Return only active areas"
         ) Boolean activeOnly
     ) {
-        List<PracticeAreaDTO> areas = areaService
-            .listAreas(workspaceContext, activeOnly)
-            .stream()
-            .map(PracticeAreaDTO::from)
-            .toList();
+        List<PracticeAreaDTO> areas = presenter.presentAreas(areaService.listAreas(workspaceContext, activeOnly));
         return ResponseEntity.ok(areas);
     }
 
@@ -86,7 +85,7 @@ public class PracticeAreaController {
     )
     @SecurityRequirements
     public ResponseEntity<PracticeAreaDTO> getArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
-        return ResponseEntity.ok(PracticeAreaDTO.from(areaService.getArea(workspaceContext, areaSlug)));
+        return ResponseEntity.ok(presenter.present(areaService.getArea(workspaceContext, areaSlug)));
     }
 
     @PostMapping
@@ -102,7 +101,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
     public ResponseEntity<PracticeAreaDTO> createArea(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeAreaRequestDTO request
@@ -122,7 +121,7 @@ public class PracticeAreaController {
             .path("/{slug}")
             .buildAndExpand(area.getSlug())
             .toUri();
-        return ResponseEntity.created(location).body(PracticeAreaDTO.from(area));
+        return ResponseEntity.created(location).body(presenter.present(area));
     }
 
     @PatchMapping("/{areaSlug}")
@@ -138,7 +137,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
     public ResponseEntity<PracticeAreaDTO> updateArea(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
@@ -153,12 +152,10 @@ public class PracticeAreaController {
                 request.displayOrder(),
                 request.icon(),
                 request.color()
-            )
+            ),
+            request.active()
         );
-        if (request.active() != null) {
-            area = areaService.setActive(workspaceContext, areaSlug, request.active());
-        }
-        return ResponseEntity.ok(PracticeAreaDTO.from(area));
+        return ResponseEntity.ok(presenter.present(area));
     }
 
     @PatchMapping("/reorder")
@@ -188,11 +185,7 @@ public class PracticeAreaController {
         @Valid @RequestBody ReorderPracticeAreasRequestDTO request
     ) {
         areaService.reorder(workspaceContext, request.orderedSlugs());
-        List<PracticeAreaDTO> areas = areaService
-            .listAreas(workspaceContext, null)
-            .stream()
-            .map(PracticeAreaDTO::from)
-            .toList();
+        List<PracticeAreaDTO> areas = presenter.presentAreas(areaService.listAreas(workspaceContext, null));
         return ResponseEntity.ok(areas);
     }
 
@@ -208,7 +201,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
     public ResponseEntity<Void> deleteArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
         areaService.deleteArea(workspaceContext, areaSlug);
         return ResponseEntity.noContent().build();

@@ -81,7 +81,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas) =>
 				areas ? upsertArea(areas, created) : areas,
 			);
-			toast.success("Practice area created");
+			toast.success("Area created");
 		},
 		onError: (error) => {
 			const status =
@@ -89,9 +89,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					? (error as { status: number }).status
 					: undefined;
 			toast.error(
-				status === 409
-					? "A practice area with that name already exists"
-					: "Failed to create practice area",
+				status === 409 ? "An area with that name already exists" : "Couldn't create the area",
 			);
 		},
 		onSettled: invalidateAreasAfterLastWrite,
@@ -99,6 +97,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 
 	const updateArea = useMutation({
 		...filedUnder(areaMutationKey, updateAreaMutation()),
+		scope: structuralScope,
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: areasQueryKey });
 			const previous = queryClient
@@ -116,7 +115,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					patchArea(areas, previous.slug, selectAreaPatch(previous, variables.body)),
 				);
 			}
-			toast.error("Failed to update practice area");
+			toast.error("Couldn't update the area");
 		},
 		onSuccess: (updated, variables) => {
 			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
@@ -151,9 +150,9 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					slug: practiceSlug,
 				})),
 			);
-			toast.success("Practice area deleted");
+			toast.success("Area deleted");
 		},
-		onError: () => toast.error("Failed to delete practice area"),
+		onError: () => toast.error("Couldn't delete the area"),
 		onSettled: () => {
 			invalidateAreasAfterLastWrite();
 			if (queryClient.isMutating({ mutationKey: practiceMutationKey }) === 0) {
@@ -184,7 +183,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					applyDisplayOrder(areas, previousOrder),
 				);
 			}
-			toast.error("Failed to reorder practice areas");
+			toast.error("Couldn't reorder the areas");
 		},
 		onSuccess: (updated) => {
 			const order = [...updated]
@@ -229,7 +228,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			if (previous) {
 				applyPlacementCaches(previous);
 			}
-			toast.error("Failed to move practice");
+			toast.error("Couldn't move the practice");
 		},
 		onSuccess: (updated) => {
 			applyPlacementCaches(
@@ -271,7 +270,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			});
 			toast.success("Practice deleted");
 		},
-		onError: () => toast.error("Failed to delete practice"),
+		onError: () => toast.error("Couldn't delete the practice"),
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
@@ -297,7 +296,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					}),
 				);
 			}
-			toast.error(`Failed to toggle "${variables.path.practiceSlug}"`);
+			toast.error("Couldn't update the practice");
 		},
 		onSuccess: (updated) => {
 			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>

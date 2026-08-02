@@ -100,13 +100,13 @@ export function ConfigAuditDetailSheet({
 								)}
 							</DetailRow>
 							{actor.actingAs && <DetailRow label="Impersonating">{actor.actingAs}</DetailRow>}
-							{entry.workspaceId != null && (
-								<DetailRow label="Workspace">
-									{workspaceName
+							<DetailRow label="Workspace">
+								{entry.workspaceId == null
+									? "Instance-wide"
+									: workspaceName
 										? `${workspaceName} (#${entry.workspaceId})`
 										: `#${entry.workspaceId}`}
-								</DetailRow>
-							)}
+							</DetailRow>
 						</dl>
 
 						<div>

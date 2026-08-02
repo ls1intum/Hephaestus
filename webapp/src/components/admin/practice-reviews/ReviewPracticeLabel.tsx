@@ -1,5 +1,5 @@
 import type { ReviewPracticeArea } from "@/api/types.gen";
-import { getAreaVisual } from "@/components/admin/practices/area-visuals";
+import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
 import { cn } from "@/lib/utils";
 
 export interface ReviewPracticeLabelProps {

@@ -88,6 +88,14 @@ public class PracticeArea {
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
 
+    /** Catalog slug retained across workspace edits. */
+    @Column(name = "source_curated_slug", length = 64)
+    private String sourceCuratedSlug;
+
+    /** Catalog comparison fingerprint captured when the workspace copy is created. */
+    @Column(name = "source_curated_fingerprint", length = 64)
+    private String sourceCuratedFingerprint;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

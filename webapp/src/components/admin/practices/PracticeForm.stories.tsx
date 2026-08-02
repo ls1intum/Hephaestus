@@ -9,7 +9,7 @@ const createSubmit = fn();
 const editSubmit = fn();
 
 const meta = {
-	title: "Admin/Practices/Practice editor",
+	title: "Workspace admin/Practices/Practice editor",
 	component: PracticeForm,
 	parameters: {
 		layout: "fullscreen",
@@ -58,6 +58,9 @@ export const Submitting: Story = {
 	render: () => (
 		<PracticeForm mode="create" workspaceSlug="demo" areas={mockAreas} onSubmit={fn()} isPending />
 	),
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
+	},
 };
 
 export const EditClearsOptionalGuidance: Story = {

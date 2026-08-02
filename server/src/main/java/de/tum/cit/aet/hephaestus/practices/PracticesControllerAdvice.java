@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogConflictException;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredException;
+import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
 import java.util.Optional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -25,6 +28,21 @@ public class PracticesControllerAdvice {
     @ExceptionHandler(PracticeAreaSlugConflictException.class)
     ProblemDetail handleAreaSlugConflict(PracticeAreaSlugConflictException exception) {
         return problem(HttpStatus.CONFLICT, "Practice area slug conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(CuratedCatalogConflictException.class)
+    ProblemDetail handleCuratedConflict(CuratedCatalogConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "Practice catalog conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(StaleCuratedEntryException.class)
+    ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
+        return problem(HttpStatus.PRECONDITION_FAILED, "Practice catalog changed", exception.getMessage());
+    }
+
+    @ExceptionHandler(CuratedPreconditionRequiredException.class)
+    ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
+        return problem(HttpStatus.PRECONDITION_REQUIRED, "Practice catalog version required", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

@@ -2,9 +2,9 @@ import { Link, useLocation } from "@tanstack/react-router";
 import {
 	BrainCircuit,
 	Building2,
-	ChevronLeft,
 	CircleDollarSign,
 	KeyRound,
+	LibraryBig,
 	ScrollText,
 	Users,
 } from "lucide-react";
@@ -15,18 +15,18 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { NavContextHeader } from "./NavContextHeader";
 
-/**
- * Content of the dedicated instance-admin (APP_ADMIN) shell — the `context === "admin"` sidebar.
- * It is workspace-independent (no workspace switcher; a "Back to app" link returns to the dashboard)
- * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, which is the
- * per-workspace admin nav.
- */
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 	{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
+	{
+		to: "/admin/catalog",
+		label: "Practice catalog",
+		icon: LibraryBig,
+		tooltip: "What new workspaces receive",
+	},
 	{
 		to: "/admin/login-providers",
 		label: "Login providers",
@@ -56,12 +56,7 @@ const ADMIN_SECTIONS = [
 export function NavSuperAdmin() {
 	const { pathname } = useLocation();
 	return (
-		<>
-			<SidebarMenuButton render={<Link to="/" className="font-semibold" />}>
-				<ChevronLeft className="h-4 w-4" />
-				Back to app
-			</SidebarMenuButton>
-			<SidebarSeparator />
+		<NavContextHeader title="Back to app" backLink={<Link to="/" className="font-semibold" />}>
 			<SidebarGroup>
 				<SidebarGroupLabel>Instance administration</SidebarGroupLabel>
 				<SidebarMenu>
@@ -79,6 +74,6 @@ export function NavSuperAdmin() {
 					))}
 				</SidebarMenu>
 			</SidebarGroup>
-		</>
+		</NavContextHeader>
 	);
 }

@@ -57,6 +57,7 @@ export POSTGRES_PORT="$POSTGRES_PORT"
 export NATS_SERVER="$NATS_SERVER"
 export SERVER_PORT="$APP_PORT"
 export MANAGEMENT_PORT="$MANAGEMENT_PORT"
+export SPRING_DOCKER_COMPOSE_ENABLED=false
 # The public route strips /api at Traefik. Tomcat native forwarded-header handling
 # restores scheme/host without folding X-Forwarded-Prefix into {baseUrl}; auth.api-base-path
 # is the single owner of the public /api prefix for OAuth init + callback URLs.

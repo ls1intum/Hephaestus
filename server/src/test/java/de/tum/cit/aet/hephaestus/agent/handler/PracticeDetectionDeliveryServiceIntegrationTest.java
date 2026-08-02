@@ -302,15 +302,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     class RevisionPinning {
 
         @Test
-        @DisplayName("persisted finding pins the practice's current criteria revision (SCD-2)")
+        @DisplayName("persisted finding pins the practice's current definition revision")
         void findingPinsCurrentRevision() {
             // Seeded straight through the repository, so no revision exists yet; append one as createPractice would.
             Practice practice = practiceRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
                 .orElseThrow();
-            PracticeRevision revision = practiceRevisionRepository.save(
-                new PracticeRevision(practice, 1, practice.getCriteria())
-            );
+            PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
 
             var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
 

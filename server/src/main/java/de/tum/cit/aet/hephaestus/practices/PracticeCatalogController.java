@@ -50,6 +50,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeCatalogController {
 
     private final PracticeService practiceService;
+    private final CatalogOriginPresenter presenter;
     private final PracticeAreaService areaService;
 
     @GetMapping
@@ -69,11 +70,9 @@ public class PracticeCatalogController {
             description = "Filter by active state"
         ) Boolean active
     ) {
-        List<PracticeDTO> practices = practiceService
-            .listPractices(workspaceContext, active)
-            .stream()
-            .map(PracticeDTO::from)
-            .toList();
+        List<PracticeDTO> practices = presenter.presentPractices(
+            practiceService.listPractices(workspaceContext, active)
+        );
         return ResponseEntity.ok(practices);
     }
 
@@ -119,7 +118,7 @@ public class PracticeCatalogController {
         @PathVariable String practiceSlug
     ) {
         Practice practice = practiceService.getPractice(workspaceContext, practiceSlug);
-        return ResponseEntity.ok(PracticeDTO.from(practice));
+        return ResponseEntity.ok(presenter.present(practice));
     }
 
     @PostMapping
@@ -156,7 +155,7 @@ public class PracticeCatalogController {
             .path("/{slug}")
             .buildAndExpand(practice.getSlug())
             .toUri();
-        return ResponseEntity.created(location).body(PracticeDTO.from(practice));
+        return ResponseEntity.created(location).body(presenter.present(practice));
     }
 
     @PatchMapping("/reorder")
@@ -184,11 +183,7 @@ public class PracticeCatalogController {
         @Valid @RequestBody ReorderPracticesRequestDTO request
     ) {
         practiceService.reorderPractices(workspaceContext, request.areaSlug(), request.orderedSlugs());
-        List<PracticeDTO> practices = practiceService
-            .listPractices(workspaceContext, null)
-            .stream()
-            .map(PracticeDTO::from)
-            .toList();
+        List<PracticeDTO> practices = presenter.presentPractices(practiceService.listPractices(workspaceContext, null));
         return ResponseEntity.ok(practices);
     }
 
@@ -215,7 +210,7 @@ public class PracticeCatalogController {
         @Valid @RequestBody UpdatePracticeRequestDTO request
     ) {
         Practice practice = practiceService.updatePractice(workspaceContext, practiceSlug, request);
-        return ResponseEntity.ok(PracticeDTO.from(practice));
+        return ResponseEntity.ok(presenter.present(practice));
     }
 
     @PatchMapping("/{practiceSlug}/active")
@@ -241,7 +236,7 @@ public class PracticeCatalogController {
         @Valid @RequestBody UpdatePracticeActiveRequestDTO request
     ) {
         Practice practice = practiceService.setActive(workspaceContext, practiceSlug, request.active());
-        return ResponseEntity.ok(PracticeDTO.from(practice));
+        return ResponseEntity.ok(presenter.present(practice));
     }
 
     @PutMapping("/{practiceSlug}/area")
@@ -263,14 +258,14 @@ public class PracticeCatalogController {
         )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<PracticeDTO> bindArea(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
         @Valid @RequestBody BindPracticeAreaRequestDTO request
     ) {
         Practice practice = areaService.bindPractice(workspaceContext, practiceSlug, request.areaSlug());
-        return ResponseEntity.ok(PracticeDTO.from(practice));
+        return ResponseEntity.ok(presenter.present(practice));
     }
 
     @PutMapping("/{practiceSlug}/placement")
@@ -300,17 +295,15 @@ public class PracticeCatalogController {
         )
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<List<PracticeDTO>> placePractice(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
         @Valid @RequestBody PlacePracticeRequestDTO request
     ) {
-        List<PracticeDTO> practices = practiceService
-            .placePractice(workspaceContext, practiceSlug, request.areaSlug(), request.position())
-            .stream()
-            .map(PracticeDTO::from)
-            .toList();
+        List<PracticeDTO> practices = presenter.presentPractices(
+            practiceService.placePractice(workspaceContext, practiceSlug, request.areaSlug(), request.position())
+        );
         return ResponseEntity.ok(practices);
     }
 
