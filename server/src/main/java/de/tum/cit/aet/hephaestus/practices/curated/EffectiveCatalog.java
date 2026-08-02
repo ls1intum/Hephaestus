@@ -6,18 +6,19 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * The catalog this instance offers: what the build ships, with the administrator's overrides laid
- * over it.
- *
- * <p>Computed on demand, never stored. That is the whole design: there is no merged copy to keep in
- * step with its inputs, so an entry nobody has touched follows Hephaestus by simply having nothing
- * said about it, and a newer build changes what is offered without anything having to run.
- */
+/** Catalog computed from the bundled definitions and sparse administrator overrides. */
 public record EffectiveCatalog(
     List<CatalogEntry<AreaDefinition>> areas,
-    List<CatalogEntry<PracticeDefinition>> practices
+    List<CatalogEntry<PracticeDefinition>> practices,
+    boolean customOrder
 ) {
+    public EffectiveCatalog(
+        List<CatalogEntry<AreaDefinition>> areas,
+        List<CatalogEntry<PracticeDefinition>> practices
+    ) {
+        this(areas, practices, false);
+    }
+
     public Optional<CatalogEntry<PracticeDefinition>> practice(String slug) {
         return practices
             .stream()
@@ -32,14 +33,12 @@ public record EffectiveCatalog(
             .findFirst();
     }
 
-    public String structureEtag() {
-        CanonicalDigest digest = new CanonicalDigest().addInt(areas.size());
-        areas.forEach(entry -> digest.add(entry.slug()).addInt(entry.position()));
+    public String etag() {
+        CanonicalDigest digest = new CanonicalDigest().addInt(customOrder ? 1 : 0).addInt(areas.size());
+        areas.forEach(entry -> digest.add(entry.etag()).addInt(entry.position()));
         digest.addInt(practices.size());
-        practices.forEach(entry ->
-            digest.add(entry.slug()).addNullable(entry.effective().areaSlug()).addInt(entry.position())
-        );
-        return digest.hex().substring(0, 16);
+        practices.forEach(entry -> digest.add(entry.etag()).addInt(entry.position()));
+        return digest.hex();
     }
 
     /**
@@ -63,7 +62,6 @@ public record EffectiveCatalog(
         return areas.stream().filter(CatalogEntry::offered).toList();
     }
 
-    /** Slugs of the practices an area still holds — what retiring it would withhold. */
     public List<String> offeredPracticesIn(String areaSlug) {
         return practices
             .stream()
@@ -104,7 +102,6 @@ public record EffectiveCatalog(
         return java.util.stream.Stream.concat(areas.stream(), practices.stream());
     }
 
-    /** Counts the catalog states and the consequences of waiting updates. */
     public record CatalogSummary(
         int total,
         int updatesChangingDetection,

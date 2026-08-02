@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -19,30 +20,31 @@ public final class PracticeDefinitionValidator {
         @Nullable String whatGoodLooksLike
     ) {
         validateTriggers(artifactType, triggerEvents);
-        rejectDetectorVocabulary("whyItMatters", whyItMatters);
-        rejectDetectorVocabulary("whatGoodLooksLike", whatGoodLooksLike);
+        rejectDetectorVocabulary("Why it matters", whyItMatters);
+        rejectDetectorVocabulary("What good looks like", whatGoodLooksLike);
     }
 
     private static void validateTriggers(WorkArtifact artifactType, List<String> triggerEvents) {
+        if (new HashSet<>(triggerEvents).size() != triggerEvents.size()) {
+            throw new IllegalArgumentException("Trigger events must not contain duplicates");
+        }
         Set<String> allowed = TriggerEventCatalog.eligibleFor(artifactType);
         if (artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
-            throw new IllegalArgumentException("At least one trigger event is required for " + artifactType);
+            throw new IllegalArgumentException("Choose at least one event that starts a review");
         }
         List<String> incompatible = triggerEvents
             .stream()
             .filter(event -> !allowed.contains(event))
             .toList();
         if (!incompatible.isEmpty()) {
-            throw new IllegalArgumentException(
-                "Trigger events " + incompatible + " are not valid for a " + artifactType
-            );
+            throw new IllegalArgumentException("Choose review events available for the selected work type");
         }
     }
 
     private static void rejectDetectorVocabulary(String field, @Nullable String value) {
         if (value != null && DETECTOR_VOCAB.matcher(value).find()) {
             throw new IllegalArgumentException(
-                field + " is learner-facing and must not contain detector assessment vocabulary"
+                field + " is guidance for people and must not use detector result labels"
             );
         }
     }

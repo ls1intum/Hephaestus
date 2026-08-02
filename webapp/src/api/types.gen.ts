@@ -2913,7 +2913,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -3916,9 +3916,7 @@ export type CatalogEntryStatus = {
     changeKind: 'NONE' | 'WORDING' | 'PRESENTATION' | 'DETECTION';
     etag: string;
     offered: boolean;
-    retired: boolean;
     state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
-    updatedAt?: Date;
 };
 
 /**
@@ -3969,6 +3967,7 @@ export type CuratedCatalogSummary = {
  */
 export type CuratedCatalog = {
     areas: Array<CuratedArea>;
+    customOrder: boolean;
     etag: string;
     practices: Array<CuratedPracticeSummary>;
     summary: CuratedCatalogSummary;
@@ -4311,7 +4310,7 @@ export type CreateLlmConnectionRequest = {
  */
 export type CreateCuratedPracticeRequest = {
     definition: CuratedPracticeRequest;
-    slug?: string;
+    slug: string;
 };
 
 /**
@@ -4319,7 +4318,7 @@ export type CreateCuratedPracticeRequest = {
  */
 export type CreateCuratedAreaRequest = {
     definition: CuratedAreaRequest;
-    slug?: string;
+    slug: string;
 };
 
 /**
@@ -4874,7 +4873,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -5452,40 +5451,6 @@ export type AdminUpdateCuratedAreaResponses = {
 
 export type AdminUpdateCuratedAreaResponse = AdminUpdateCuratedAreaResponses[keyof AdminUpdateCuratedAreaResponses];
 
-export type AdminKeepCuratedAreaData = {
-    body?: never;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/areas/{slug}/keep';
-};
-
-export type AdminKeepCuratedAreaErrors = {
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdminKeepCuratedAreaError = AdminKeepCuratedAreaErrors[keyof AdminKeepCuratedAreaErrors];
-
-export type AdminKeepCuratedAreaResponses = {
-    /**
-     * The area
-     */
-    200: CuratedArea;
-};
-
-export type AdminKeepCuratedAreaResponse = AdminKeepCuratedAreaResponses[keyof AdminKeepCuratedAreaResponses];
-
 export type AdminDeleteCuratedAreaOverrideData = {
     body?: never;
     headers: {
@@ -5524,23 +5489,39 @@ export type AdminDeleteCuratedAreaOverrideResponses = {
 
 export type AdminDeleteCuratedAreaOverrideResponse = AdminDeleteCuratedAreaOverrideResponses[keyof AdminDeleteCuratedAreaOverrideResponses];
 
-export type AdminListCuratedAreaPracticesData = {
+export type AdminKeepCuratedAreaData = {
     body?: never;
+    headers: {
+        'If-Match': string;
+    };
     path: {
         slug: string;
     };
     query?: never;
-    url: '/admin/practice-catalog/areas/{slug}/practices';
+    url: '/admin/practice-catalog/areas/{slug}/override/acknowledgement';
 };
 
-export type AdminListCuratedAreaPracticesResponses = {
+export type AdminKeepCuratedAreaErrors = {
     /**
-     * OK
+     * The supplied ETag is stale
      */
-    200: Array<string>;
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
 };
 
-export type AdminListCuratedAreaPracticesResponse = AdminListCuratedAreaPracticesResponses[keyof AdminListCuratedAreaPracticesResponses];
+export type AdminKeepCuratedAreaError = AdminKeepCuratedAreaErrors[keyof AdminKeepCuratedAreaErrors];
+
+export type AdminKeepCuratedAreaResponses = {
+    /**
+     * The area
+     */
+    200: CuratedArea;
+};
+
+export type AdminKeepCuratedAreaResponse = AdminKeepCuratedAreaResponses[keyof AdminKeepCuratedAreaResponses];
 
 export type AdminUpdateCuratedAreaStatusData = {
     body: UpdateCuratedStatusRequest;
@@ -5575,6 +5556,25 @@ export type AdminUpdateCuratedAreaStatusResponses = {
 };
 
 export type AdminUpdateCuratedAreaStatusResponse = AdminUpdateCuratedAreaStatusResponses[keyof AdminUpdateCuratedAreaStatusResponses];
+
+export type AdminResetCuratedCatalogOrderData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/order';
+};
+
+export type AdminResetCuratedCatalogOrderResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminResetCuratedCatalogOrderResponse = AdminResetCuratedCatalogOrderResponses[keyof AdminResetCuratedCatalogOrderResponses];
 
 export type AdminCreateCuratedPracticeData = {
     body: CreateCuratedPracticeRequest;
@@ -5672,40 +5672,6 @@ export type AdminUpdateCuratedPracticeResponses = {
 
 export type AdminUpdateCuratedPracticeResponse = AdminUpdateCuratedPracticeResponses[keyof AdminUpdateCuratedPracticeResponses];
 
-export type AdminKeepCuratedPracticeData = {
-    body?: never;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/practices/{slug}/keep';
-};
-
-export type AdminKeepCuratedPracticeErrors = {
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdminKeepCuratedPracticeError = AdminKeepCuratedPracticeErrors[keyof AdminKeepCuratedPracticeErrors];
-
-export type AdminKeepCuratedPracticeResponses = {
-    /**
-     * The practice
-     */
-    200: CuratedPractice;
-};
-
-export type AdminKeepCuratedPracticeResponse = AdminKeepCuratedPracticeResponses[keyof AdminKeepCuratedPracticeResponses];
-
 export type AdminDeleteCuratedPracticeOverrideData = {
     body?: never;
     headers: {
@@ -5743,6 +5709,40 @@ export type AdminDeleteCuratedPracticeOverrideResponses = {
 };
 
 export type AdminDeleteCuratedPracticeOverrideResponse = AdminDeleteCuratedPracticeOverrideResponses[keyof AdminDeleteCuratedPracticeOverrideResponses];
+
+export type AdminKeepCuratedPracticeData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/override/acknowledgement';
+};
+
+export type AdminKeepCuratedPracticeErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminKeepCuratedPracticeError = AdminKeepCuratedPracticeErrors[keyof AdminKeepCuratedPracticeErrors];
+
+export type AdminKeepCuratedPracticeResponses = {
+    /**
+     * The practice
+     */
+    200: CuratedPractice;
+};
+
+export type AdminKeepCuratedPracticeResponse = AdminKeepCuratedPracticeResponses[keyof AdminKeepCuratedPracticeResponses];
 
 export type AdminPlaceCuratedPracticeData = {
     body: PlacePracticeRequest;
@@ -6598,7 +6598,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;

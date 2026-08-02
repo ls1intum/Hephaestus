@@ -10,12 +10,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/**
- * Renders a workspace's practices and areas together with where each came from.
- *
- * <p>The catalog is read once per response rather than once per row, because drift is answered by
- * comparing against the same catalog for every entry in the list.
- */
 @Component
 @RequiredArgsConstructor
 public class CatalogOriginPresenter {

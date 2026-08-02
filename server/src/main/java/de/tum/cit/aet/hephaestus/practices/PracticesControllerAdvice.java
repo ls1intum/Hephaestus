@@ -32,21 +32,17 @@ public class PracticesControllerAdvice {
 
     @ExceptionHandler(CuratedCatalogConflictException.class)
     ProblemDetail handleCuratedConflict(CuratedCatalogConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Curated catalog conflict", exception.getMessage());
+        return problem(HttpStatus.CONFLICT, "Practice catalog conflict", exception.getMessage());
     }
 
     @ExceptionHandler(StaleCuratedEntryException.class)
     ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
-        return problem(HttpStatus.PRECONDITION_FAILED, "Curated catalog entry changed", exception.getMessage());
+        return problem(HttpStatus.PRECONDITION_FAILED, "Practice catalog changed", exception.getMessage());
     }
 
     @ExceptionHandler(CuratedPreconditionRequiredException.class)
     ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
-        return problem(
-            HttpStatus.PRECONDITION_REQUIRED,
-            "Curated catalog precondition required",
-            exception.getMessage()
-        );
+        return problem(HttpStatus.PRECONDITION_REQUIRED, "Practice catalog version required", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

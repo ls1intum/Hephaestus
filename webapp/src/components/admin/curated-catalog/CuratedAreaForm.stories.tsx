@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { CuratedAreaForm } from "./CuratedAreaForm";
@@ -9,8 +9,6 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 	state: "FROM_HEPHAESTUS",
 	changeKind: "NONE",
 	offered: true,
-	retired: false,
-	updatedAt: new Date("2026-07-30T12:00:00Z"),
 	...overrides,
 });
 
@@ -52,4 +50,11 @@ export const HephaestusUpdateAvailable: Story = {
 
 export const StaleEdit: Story = {
 	args: { mode: "edit", initialData, conflict: true, onContinueWithDraft: fn() },
+};
+
+export const Submitting: Story = {
+	args: { mode: "edit", initialData, isPending: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
+	},
 };

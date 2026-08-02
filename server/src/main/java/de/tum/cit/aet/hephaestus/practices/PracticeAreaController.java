@@ -101,7 +101,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog organization affects dashboards, not review execution or delivery")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
     public ResponseEntity<PracticeAreaDTO> createArea(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeAreaRequestDTO request
@@ -137,7 +137,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "area visuals and learner grouping do not change review execution")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
     public ResponseEntity<PracticeAreaDTO> updateArea(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
@@ -152,11 +152,9 @@ public class PracticeAreaController {
                 request.displayOrder(),
                 request.icon(),
                 request.color()
-            )
+            ),
+            request.active()
         );
-        if (request.active() != null) {
-            area = areaService.setActive(workspaceContext, areaSlug, request.active());
-        }
         return ResponseEntity.ok(presenter.present(area));
     }
 
@@ -203,7 +201,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
     public ResponseEntity<Void> deleteArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
         areaService.deleteArea(workspaceContext, areaSlug);
         return ResponseEntity.noContent().build();

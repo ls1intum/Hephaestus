@@ -30,9 +30,12 @@ generated OpenAPI.
 
 Array order in that file is the shipped order. Order is presentation metadata, not part of an area
 or practice definition: an instance administrator can reorder with drag and drop, the keyboard, or
-the row actions without creating a content override or a configuration-audit entry. The instance
-stores only the positions that differ from the shipped order. Moving a practice between areas is a
-content change because its placement affects the definition and is therefore audited.
+the row actions without creating a content override or a configuration-audit entry. Until an
+administrator reorders anything, bundled entries continue to follow the repository order and custom
+entries append without freezing it. The first deliberate reorder records the complete order of the
+affected list. **Use Hephaestus order** clears all recorded positions and resumes following the
+repository order. Moving a practice between areas is a content change because its placement affects
+the definition and is therefore audited.
 
 ## Selection principles
 
@@ -117,7 +120,8 @@ The catalog resolves each entry from the running Hephaestus default and any inst
 | customized it; its default has not changed | the customization     | **Customized on this instance**       |
 | customized it; its default has changed    | the customization     | **Hephaestus update available**       |
 | created or retained an entry with no default | the saved definition | **No Hephaestus default**            |
-| an entry the build no longer includes     | the saved definition  | **Removed from Hephaestus defaults**  |
+| not customized an entry the build removes | no catalog entry      | the entry disappears                  |
+| customized an entry the build removes     | the customization     | **Removed from Hephaestus defaults**  |
 
 An update never replaces a customization silently. The page says whether it changes review behavior,
 wording or guidance, or area appearance. The updated default can be read before it is applied.
@@ -125,6 +129,11 @@ wording or guidance, or area appearance. The updated default can be read before 
 Applying an update removes the definition customization, so the entry uses the Hephaestus default
 again; exclusion and local ordering are preserved. Keeping the customization records that the
 administrator reviewed this default, so the same update is not raised twice.
+
+The catalog has no separate revision counter. Git history versions the Hephaestus defaults; full
+content digests provide conditional-write ETags; and the configuration audit trail timestamps every
+administrator decision. A materialized revision table would duplicate the definitions already owned
+by the repository and the sparse overrides without adding a decision the product needs to expose.
 
 Exclusion is instance policy: it stops an entry being copied into new workspaces and changes nothing
 that already exists. Excluding an area also excludes the practices in it; the confirmation names
@@ -140,8 +149,8 @@ That is deliberate, and it is visible rather than silent. Each workspace practic
 the slug it came from and the fingerprint it was copied at — two columns, no foreign key into the
 catalog, because a workspace's practice must survive its source being retired. Comparing three
 fingerprints (what is running here, what it was copied from, what the instance offers now) gives the workspace practice administration what it shows. The ordinary matching state has no badge.
-Exceptions say **Customized for this workspace**, **Instance catalog changed**, or **No longer
-included in new workspaces**. A catalog change does not promise an update action;
+Exceptions say **Customized for this workspace**, **Instance catalog changed**, or **Not in the
+current instance catalog**. A catalog change does not promise an update action;
 the mechanism for adopting it is separate work.
 
 Equivalence is derived from the definition, not from the order edits happened in. A practice's

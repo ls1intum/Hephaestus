@@ -2,8 +2,8 @@ import { Link, useBlocker } from "@tanstack/react-router";
 import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { CatalogEntryStatus, CuratedAreaRequest } from "@/api/types.gen";
-import { AreaVisualPicker } from "@/components/admin/practices/AreaVisualPicker";
-import { generateSlug, isValidSlug } from "@/components/admin/practices/constants";
+import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
+import { generateSlug, isValidSlug } from "@/components/admin/practice-catalog/constants";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -90,11 +90,12 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	const [resetOpen, setResetOpen] = useState(false);
 	const [form, setForm] = useState<FormState>(() => initialState(initialData));
 	const [submitted, setSubmitted] = useState(false);
+	const formDisabled = isPending || isResetPending || isKeepPending;
 	const isDirty = JSON.stringify(form) !== JSON.stringify(initialState(initialData));
 	const blocker = useBlocker({
 		shouldBlockFn: () => isDirty,
 		enableBeforeUnload: isDirty,
-		disabled: !isDirty || isPending,
+		disabled: !isDirty || formDisabled,
 		withResolver: true,
 	});
 
@@ -239,118 +240,123 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 			)}
 
 			<form onSubmit={submit} className="flex flex-col gap-8" noValidate>
-				<div className="max-w-3xl space-y-8">
-					<p className="text-muted-foreground text-sm">
-						Fields marked <span aria-hidden>*</span> are required.
-					</p>
+				<fieldset disabled={formDisabled} className="contents">
+					<div className="max-w-3xl space-y-8">
+						<p className="text-muted-foreground text-sm">
+							Fields marked <span aria-hidden>*</span> are required.
+						</p>
 
-					<section className="space-y-4">
-						<h2 className="font-semibold text-lg">General</h2>
-						<FieldGroup className="gap-4">
-							<Field data-invalid={nameError ? "true" : undefined}>
-								<FieldLabel htmlFor="area-name">Name *</FieldLabel>
-								<Input
-									id="area-name"
-									value={form.name}
-									onChange={(event) => handleNameChange(event.target.value)}
-									placeholder="e.g. Code review"
-									required
-									minLength={3}
-									maxLength={128}
-									aria-invalid={Boolean(nameError)}
-									aria-describedby={nameError ? "area-name-error" : undefined}
-								/>
-								{nameError && <FieldError id="area-name-error">{nameError}</FieldError>}
-							</Field>
-
-							<Field data-invalid={slugError ? "true" : undefined}>
-								<FieldLabel htmlFor="area-slug">Identifier {mode === "create" && "*"}</FieldLabel>
-								<div className="flex items-center gap-2">
+						<section className="space-y-4">
+							<h2 className="font-semibold text-lg">General</h2>
+							<FieldGroup className="gap-4">
+								<Field data-invalid={nameError ? "true" : undefined}>
+									<FieldLabel htmlFor="area-name">Name *</FieldLabel>
 									<Input
-										id="area-slug"
-										value={form.slug}
-										onChange={(event) =>
-											setForm((previous) => ({ ...previous, slug: event.target.value }))
-										}
-										disabled={mode === "edit"}
-										required={mode === "create"}
+										id="area-name"
+										value={form.name}
+										onChange={(event) => handleNameChange(event.target.value)}
+										placeholder="e.g. Code review"
+										required
 										minLength={3}
-										maxLength={64}
-										aria-invalid={Boolean(slugError)}
-										aria-describedby={
-											["area-slug-description", slugError ? "area-slug-error" : undefined]
-												.filter(Boolean)
-												.join(" ") || undefined
-										}
+										maxLength={128}
+										aria-invalid={Boolean(nameError)}
+										aria-describedby={nameError ? "area-name-error" : undefined}
 									/>
-									{slugWasEdited && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon-sm"
-											onClick={() =>
-												setForm((previous) => ({ ...previous, slug: generateSlug(previous.name) }))
+									{nameError && <FieldError id="area-name-error">{nameError}</FieldError>}
+								</Field>
+
+								<Field data-invalid={slugError ? "true" : undefined}>
+									<FieldLabel htmlFor="area-slug">Identifier {mode === "create" && "*"}</FieldLabel>
+									<div className="flex items-center gap-2">
+										<Input
+											id="area-slug"
+											value={form.slug}
+											onChange={(event) =>
+												setForm((previous) => ({ ...previous, slug: event.target.value }))
 											}
-											aria-label="Reset to generated identifier"
-										>
-											<RotateCcw className="size-3.5" aria-hidden />
-										</Button>
-									)}
-								</div>
-								<FieldDescription id="area-slug-description">
-									Used in URLs and integrations. It can't be changed later.
-								</FieldDescription>
-								{slugError && <FieldError id="area-slug-error">{slugError}</FieldError>}
-							</Field>
+											disabled={mode === "edit"}
+											required={mode === "create"}
+											minLength={3}
+											maxLength={64}
+											aria-invalid={Boolean(slugError)}
+											aria-describedby={
+												["area-slug-description", slugError ? "area-slug-error" : undefined]
+													.filter(Boolean)
+													.join(" ") || undefined
+											}
+										/>
+										{slugWasEdited && (
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon-sm"
+												onClick={() =>
+													setForm((previous) => ({
+														...previous,
+														slug: generateSlug(previous.name),
+													}))
+												}
+												aria-label="Reset to generated identifier"
+											>
+												<RotateCcw className="size-3.5" aria-hidden />
+											</Button>
+										)}
+									</div>
+									<FieldDescription id="area-slug-description">
+										Used in URLs and integrations. It can't be changed later.
+									</FieldDescription>
+									{slugError && <FieldError id="area-slug-error">{slugError}</FieldError>}
+								</Field>
 
-							<Field>
-								<FieldLabel htmlFor="area-description">Description</FieldLabel>
-								<Textarea
-									id="area-description"
-									value={form.description}
-									rows={3}
-									onChange={(event) =>
-										setForm((previous) => ({ ...previous, description: event.target.value }))
-									}
-									placeholder="e.g. Reviewing a change so problems surface early"
-									maxLength={500}
-									aria-describedby="area-description-help"
-								/>
-								<FieldDescription id="area-description-help">
-									What this area develops, in the words a developer would use.
-								</FieldDescription>
-							</Field>
-						</FieldGroup>
-					</section>
+								<Field>
+									<FieldLabel htmlFor="area-description">Description</FieldLabel>
+									<Textarea
+										id="area-description"
+										value={form.description}
+										rows={3}
+										onChange={(event) =>
+											setForm((previous) => ({ ...previous, description: event.target.value }))
+										}
+										placeholder="e.g. Reviewing a change so problems surface early"
+										maxLength={500}
+										aria-describedby="area-description-help"
+									/>
+									<FieldDescription id="area-description-help">
+										What this area develops, in the words a developer would use.
+									</FieldDescription>
+								</Field>
+							</FieldGroup>
+						</section>
 
-					<section className="space-y-4">
-						<h2 className="font-semibold text-lg">Presentation</h2>
-						<FieldGroup className="gap-4">
-							<Field>
-								<FieldLabel htmlFor="area-appearance">Appearance</FieldLabel>
-								<AreaVisualPicker
-									id="area-appearance"
-									describedBy="area-appearance-help"
-									slug={form.slug}
-									name={form.name}
-									icon={form.icon}
-									color={form.color}
-									onChange={(patch) =>
-										setForm((previous) => ({
-											...previous,
-											...(patch.icon !== undefined ? { icon: patch.icon } : {}),
-											...(patch.color !== undefined ? { color: patch.color } : {}),
-										}))
-									}
-									disabled={isPending || isResetPending || isKeepPending}
-								/>
-								<FieldDescription id="area-appearance-help">
-									New workspace copies use this icon and color.
-								</FieldDescription>
-							</Field>
-						</FieldGroup>
-					</section>
-				</div>
+						<section className="space-y-4">
+							<h2 className="font-semibold text-lg">Presentation</h2>
+							<FieldGroup className="gap-4">
+								<Field>
+									<FieldLabel htmlFor="area-appearance">Appearance</FieldLabel>
+									<AreaVisualPicker
+										id="area-appearance"
+										describedBy="area-appearance-help"
+										slug={form.slug}
+										name={form.name}
+										icon={form.icon}
+										color={form.color}
+										onChange={(patch) =>
+											setForm((previous) => ({
+												...previous,
+												...(patch.icon !== undefined ? { icon: patch.icon } : {}),
+												...(patch.color !== undefined ? { color: patch.color } : {}),
+											}))
+										}
+										disabled={formDisabled}
+									/>
+									<FieldDescription id="area-appearance-help">
+										New workspace copies use this icon and color.
+									</FieldDescription>
+								</Field>
+							</FieldGroup>
+						</section>
+					</div>
+				</fieldset>
 
 				<div className="flex max-w-3xl justify-between border-t pt-4">
 					<Link
@@ -361,7 +367,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 					>
 						Cancel
 					</Link>
-					<Button type="submit" disabled={isPending || conflict || isResetPending || isKeepPending}>
+					<Button type="submit" disabled={formDisabled || conflict}>
 						{isPending && <Spinner className="size-4" />}
 						{isPending
 							? mode === "create"

@@ -3,8 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -15,7 +13,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.jspecify.annotations.Nullable;
 
-/** What an administrator said about one area. Exactly the shape of {@link CuratedPracticeOverride}. */
 @Entity
 @Table(name = "curated_area_override")
 @Getter
@@ -24,11 +21,8 @@ import org.jspecify.annotations.Nullable;
 public class CuratedAreaOverride {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
-    private Long id;
-
-    @Column(name = "slug", nullable = false, unique = true, length = 64, updatable = false)
+    @Column(name = "slug", nullable = false, length = 64, updatable = false)
     private String slug;
 
     @Column(name = "name", length = 128)
@@ -60,7 +54,7 @@ public class CuratedAreaOverride {
 
     @Version
     @Column(name = "version", nullable = false)
-    private long version;
+    private @Nullable Long version;
 
     public CuratedAreaOverride(String slug, Instant now) {
         this.slug = Objects.requireNonNull(slug, "slug");
@@ -105,6 +99,11 @@ public class CuratedAreaOverride {
 
     public void setPosition(int position, Instant now) {
         this.position = position;
+        this.updatedAt = Objects.requireNonNull(now, "now");
+    }
+
+    public void clearPosition(Instant now) {
+        this.position = null;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 

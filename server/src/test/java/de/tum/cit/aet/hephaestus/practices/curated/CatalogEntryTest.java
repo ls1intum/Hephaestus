@@ -8,10 +8,6 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
-/**
- * Where a catalog entry stands is read off two things: what the build ships, and what an
- * administrator wrote. Nothing is stored, so these are the whole of the rule.
- */
 class CatalogEntryTest extends BaseUnitTest {
 
     private static final String SLUG = "small-prs";
@@ -92,6 +88,15 @@ class CatalogEntryTest extends BaseUnitTest {
     }
 
     @Test
+    void tagDistinguishesAnIdenticalLocalDefinitionFromFollowingTheDefault() {
+        CatalogEntry<PracticeDefinition> local = entry(SHIPPED, SHIPPED, null);
+        CatalogEntry<PracticeDefinition> following = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
+
+        assertThat(local.state()).isEqualTo(CatalogEntryState.EDITED_HERE);
+        assertThat(local.etag()).isNotEqualTo(following.etag());
+    }
+
+    @Test
     void anAreaUpdateIsPresentationNotDetection() {
         var mine = new AreaDefinition("Maintainability", "Our description", "Wrench", "sky");
         var shipped = new AreaDefinition("Maintainability", "New description", "Wrench", "sky");
@@ -101,7 +106,7 @@ class CatalogEntryTest extends BaseUnitTest {
     }
 
     @Test
-    void theTagChangesWheneverAnythingAnAdministratorCouldActOnChanges() {
+    void theTagCoversTheEntryWithoutCouplingEditsToCatalogOrder() {
         CatalogEntry<PracticeDefinition> untouched = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
@@ -109,6 +114,7 @@ class CatalogEntryTest extends BaseUnitTest {
         assertThat(untouched.etag()).isNotBlank();
         assertThat(entry(mine, SHIPPED, SHIPPED.digest(SLUG)).etag()).isNotEqualTo(untouched.etag());
         assertThat(retired(untouched).etag()).isNotEqualTo(untouched.etag());
+        assertThat(withPosition(untouched, 1).etag()).isEqualTo(untouched.etag());
     }
 
     private static CatalogEntry<PracticeDefinition> entry(
@@ -129,6 +135,19 @@ class CatalogEntryTest extends BaseUnitTest {
             entry.basedOnDigest(),
             true,
             entry.position(),
+            entry.updatedAt()
+        );
+    }
+
+    private static CatalogEntry<PracticeDefinition> withPosition(CatalogEntry<PracticeDefinition> entry, int position) {
+        return new CatalogEntry<>(
+            entry.slug(),
+            entry.effective(),
+            entry.shipped(),
+            entry.overridden(),
+            entry.basedOnDigest(),
+            entry.retired(),
+            position,
             entry.updatedAt()
         );
     }

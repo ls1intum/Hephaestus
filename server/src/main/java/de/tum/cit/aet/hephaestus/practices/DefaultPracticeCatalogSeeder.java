@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -44,6 +45,7 @@ class DefaultPracticeCatalogSeeder {
     private final PracticeAreaRepository areaRepository;
     private final PracticeRepository practiceRepository;
     private final CuratedCatalogService catalogService;
+    private final CuratedCatalogLock catalogLock;
     private final PracticeCatalogInstallationRepository installationRepository;
     private final WorkspaceRepository workspaceRepository;
     private final AsyncTaskExecutor taskExecutor;
@@ -57,6 +59,7 @@ class DefaultPracticeCatalogSeeder {
         PracticeAreaRepository areaRepository,
         PracticeRepository practiceRepository,
         CuratedCatalogService catalogService,
+        CuratedCatalogLock catalogLock,
         PracticeCatalogInstallationRepository installationRepository,
         WorkspaceRepository workspaceRepository,
         @Qualifier(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor,
@@ -69,6 +72,7 @@ class DefaultPracticeCatalogSeeder {
         this.areaRepository = areaRepository;
         this.practiceRepository = practiceRepository;
         this.catalogService = catalogService;
+        this.catalogLock = catalogLock;
         this.installationRepository = installationRepository;
         this.workspaceRepository = workspaceRepository;
         this.taskExecutor = taskExecutor;
@@ -127,6 +131,7 @@ class DefaultPracticeCatalogSeeder {
     }
 
     private void seedCatalog(Workspace workspace) {
+        catalogLock.acquire();
         Workspace lockedWorkspace = workspaceRepository.findByIdForUpdate(workspace.getId()).orElse(null);
         if (lockedWorkspace == null || installationRepository.existsById(lockedWorkspace.getId())) {
             return;
@@ -149,7 +154,6 @@ class DefaultPracticeCatalogSeeder {
             }
         }
         Instant now = clock.instant();
-        // Linked at birth, so the one-time backfill for older workspaces never has to look at this one.
         installationRepository.save(new PracticeCatalogInstallation(lockedWorkspace.getId(), now, now));
         if (seededPractices > 0) {
             log.info(

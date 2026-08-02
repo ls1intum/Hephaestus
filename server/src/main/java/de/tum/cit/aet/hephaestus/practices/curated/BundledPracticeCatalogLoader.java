@@ -18,12 +18,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Reads the catalog shipped on the classpath.
- *
- * <p>Parsed once at construction: the classpath cannot change while the process runs, and every read
- * of the effective catalog composes this with the override rows, so it is asked for often.
- */
 @Component
 public class BundledPracticeCatalogLoader {
 

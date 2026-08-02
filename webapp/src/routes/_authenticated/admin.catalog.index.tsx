@@ -10,12 +10,14 @@ import {
 	adminPlaceCuratedPracticeMutation,
 	adminReorderCuratedAreasMutation,
 	adminReorderCuratedPracticesMutation,
+	adminResetCuratedCatalogOrderMutation,
 	adminUpdateCuratedAreaStatusMutation,
 	adminUpdateCuratedPracticeStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	CuratedCatalog as Catalog,
 	CuratedArea,
+	CuratedPractice,
 	CuratedPracticeSummary,
 } from "@/api/types.gen";
 import { CuratedCatalog } from "@/components/admin/curated-catalog/CuratedCatalog";
@@ -50,16 +52,12 @@ function AdminCuratedCatalogPage() {
 	const queryClient = useQueryClient();
 	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
 
-	// The entry's own detail is cached too; leaving it stale hands the editor an old ETag and turns
-	// the next save into a conflict the administrator did nothing to cause.
-	const refreshCatalogAnd = (kind: "practice" | "area", slug: string) => {
+	const detailKey = (kind: "practice" | "area", slug: string) =>
+		kind === "practice"
+			? adminGetCuratedPracticeQueryKey({ path: { slug } })
+			: adminGetCuratedAreaQueryKey({ path: { slug } });
+	const invalidateCatalog = () => {
 		void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-		void queryClient.invalidateQueries({
-			queryKey:
-				kind === "practice"
-					? adminGetCuratedPracticeQueryKey({ path: { slug } })
-					: adminGetCuratedAreaQueryKey({ path: { slug } }),
-		});
 	};
 
 	const onStatusSettled = (
@@ -68,8 +66,9 @@ function AdminCuratedCatalogPage() {
 		offered: boolean,
 		successMessage?: string,
 	) => ({
-		onSuccess: () => {
-			refreshCatalogAnd(kind, slug);
+		onSuccess: (updated: CuratedPractice | CuratedArea) => {
+			queryClient.setQueryData(detailKey(kind, slug), updated);
+			invalidateCatalog();
 			const noun = kind === "practice" ? "Practice" : "Area";
 			toast.success(
 				successMessage ??
@@ -77,7 +76,8 @@ function AdminCuratedCatalogPage() {
 			);
 		},
 		onError: (error: unknown) => {
-			refreshCatalogAnd(kind, slug);
+			queryClient.removeQueries({ queryKey: detailKey(kind, slug), exact: true });
+			invalidateCatalog();
 			toast.error(
 				problemStatusOf(error) === 412
 					? `The catalog changed before this action was saved. We reloaded the ${kind}.`
@@ -93,8 +93,7 @@ function AdminCuratedCatalogPage() {
 	const updateAreaStatus = useMutation(
 		filedUnder(AREA_STATUS_KEY, adminUpdateCuratedAreaStatusMutation()),
 	);
-	const invalidateStructure = () =>
-		void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+	const invalidateStructure = invalidateCatalog;
 	const structureError = (error: unknown) => {
 		toast.error(
 			problemStatusOf(error) === 412
@@ -169,13 +168,29 @@ function AdminCuratedCatalogPage() {
 			}
 			return { previous };
 		},
-		onSuccess: (catalog) => queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog),
+		onSuccess: (catalog, variables) => {
+			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
+			queryClient.removeQueries({
+				queryKey: adminGetCuratedPracticeQueryKey({ path: { slug: variables.path.slug } }),
+				exact: true,
+			});
+		},
 		onError: (error, _variables, context) => {
 			if (context?.previous) {
 				queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), context.previous);
 			}
 			structureError(error);
 		},
+		onSettled: invalidateStructure,
+	});
+	const resetOrder = useMutation({
+		...adminResetCuratedCatalogOrderMutation(),
+		scope: STRUCTURE_SCOPE,
+		onSuccess: (catalog) => {
+			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
+			toast.success("Hephaestus order restored");
+		},
+		onError: structureError,
 		onSettled: invalidateStructure,
 	});
 	const pendingPracticeSlugs = usePendingMutationIds<{ path: { slug: string } }, string>(
@@ -187,14 +202,19 @@ function AdminCuratedCatalogPage() {
 		(variables) => variables.path.slug,
 	);
 	const structurePending =
-		reorderAreas.isPending || reorderPractices.isPending || placePractice.isPending;
+		reorderAreas.isPending ||
+		reorderPractices.isPending ||
+		placePractice.isPending ||
+		resetOrder.isPending;
+	const writePending =
+		structurePending || pendingAreaSlugs.size > 0 || pendingPracticeSlugs.size > 0;
 
 	return (
 		<PageLayout>
 			<PageHeader
 				icon={<LibraryBig />}
 				title="Practice catalog"
-				description="Set what each new workspace starts with. Hephaestus defaults update automatically until you customize them. Existing workspaces never change automatically."
+				description="Set what each new workspace starts with. Each Hephaestus default updates automatically until you customize that entry. Existing workspaces never change automatically."
 				actions={
 					<div className="flex flex-wrap gap-2">
 						<Link
@@ -235,9 +255,10 @@ function AdminCuratedCatalogPage() {
 					practices={catalogQuery.data.practices}
 					summary={catalogQuery.data.summary}
 					search={search}
+					customOrder={catalogQuery.data.customOrder}
 					pendingPracticeSlugs={pendingPracticeSlugs}
 					pendingAreaSlugs={pendingAreaSlugs}
-					structurePending={structurePending}
+					writePending={writePending}
 					onSearchChange={(next) => navigate({ search: next, replace: true })}
 					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
 						const parent = practice.areaSlug
@@ -268,7 +289,7 @@ function AdminCuratedCatalogPage() {
 						updateAreaStatus.mutate(
 							{
 								path: { slug: area.slug },
-								headers: { "If-Match": `"${area.status.etag}"` },
+								headers: { "If-Match": `"${catalogQuery.data.etag}"` },
 								body: { status: offered ? "AVAILABLE" : "RETIRED" },
 							},
 							onStatusSettled("area", area.slug, offered),
@@ -278,6 +299,11 @@ function AdminCuratedCatalogPage() {
 						reorderAreas.mutate({
 							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
 							body: { orderedSlugs },
+						})
+					}
+					onResetOrder={() =>
+						resetOrder.mutate({
+							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
 						})
 					}
 					onPlacePractice={(practiceSlug, areaSlug, position) => {

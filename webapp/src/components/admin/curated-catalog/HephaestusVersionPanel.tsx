@@ -7,7 +7,7 @@ import type {
 import {
 	FOCUS_ARTIFACT_OPTIONS,
 	TRIGGER_EVENTS_BY_FOCUS,
-} from "@/components/admin/practices/constants";
+} from "@/components/admin/practice-catalog/constants";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Spinner } from "@/components/ui/spinner";
@@ -18,7 +18,6 @@ import {
 	curatedEntryCopy,
 } from "./curated-entry-state";
 
-/** Every field either definition can carry, so a new one cannot silently reach the page unlabelled. */
 type ShippedDefinition = Partial<
 	Record<keyof CuratedPracticeRequest | keyof CuratedAreaRequest, unknown>
 >;
@@ -35,22 +34,26 @@ export interface HephaestusVersionPanelProps {
 	onKeepCurrentDefinition?: () => void;
 }
 
-const FIELD_LABELS: Record<keyof CuratedPracticeRequest | keyof CuratedAreaRequest, string> = {
+const AREA_FIELDS = {
 	name: "Name",
+	description: "Description",
+	icon: "Icon",
+	color: "Color",
+} satisfies Record<keyof CuratedAreaRequest, string>;
+
+const PRACTICE_FIELDS = {
+	name: "Name",
+	artifactType: "Evaluates",
+	areaSlug: "Area",
+	triggerEvents: "Starts a review when",
 	criteria: "Evaluation criteria",
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Precompute script",
-	triggerEvents: "Starts a review when",
-	description: "Description",
-	areaSlug: "Area",
-	artifactType: "Applies to",
-	icon: "Icon",
-	color: "Color",
-};
+} satisfies Record<keyof CuratedPracticeRequest, string>;
 
-function labelFor(field: string): string {
-	return FIELD_LABELS[field as keyof typeof FIELD_LABELS] ?? field;
+function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
+	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
 }
 
 function displayValue(
@@ -59,6 +62,12 @@ function displayValue(
 	shipped: ShippedDefinition,
 	areaNames: Readonly<Record<string, string>>,
 ): string {
+	if (value === null || value === undefined || value === "") {
+		return field === "areaSlug" ? "Unassigned" : "Not set";
+	}
+	if (field === "triggerEvents" && Array.isArray(value) && value.length === 0) {
+		return "No automatic trigger";
+	}
 	const words = (token: string) =>
 		token
 			.replace(/_/g, " ")
@@ -133,21 +142,21 @@ export function HephaestusVersionPanel({
 								}
 							/>
 							<CollapsibleContent className="mt-2 space-y-3 rounded-md border bg-muted/40 p-3">
-								{Object.entries(shipped)
-									.filter(([, value]) => value !== null && value !== undefined && value !== "")
-									.map(([field, value]) => (
+								{fieldEntries(kind === "area" ? AREA_FIELDS : PRACTICE_FIELDS).map(
+									([field, label]) => (
 										<div key={field} className="space-y-1">
-											<p className="font-medium text-xs">{labelFor(field)}</p>
+											<p className="font-medium text-xs">{label}</p>
 											<p
 												className={cn(
 													"whitespace-pre-wrap break-words text-muted-foreground text-xs",
 													field === "precomputeScript" && "font-mono",
 												)}
 											>
-												{displayValue(field, value, shipped, areaNames)}
+												{displayValue(field, shipped[field], shipped, areaNames)}
 											</p>
 										</div>
-									))}
+									),
+								)}
 							</CollapsibleContent>
 						</Collapsible>
 					)}

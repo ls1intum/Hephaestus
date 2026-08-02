@@ -61,7 +61,9 @@ final class CuratedCatalogModel {
                     CuratedPracticeOverride::getSlug,
                     CuratedPracticeOverride::getPosition
                 )
-            )
+            ),
+            areaOverrides.stream().anyMatch(override -> override.getPosition() != null) ||
+                practiceOverrides.stream().anyMatch(override -> override.getPosition() != null)
         );
     }
 
@@ -73,12 +75,12 @@ final class CuratedCatalogModel {
             .toList();
     }
 
-    static void requireStructure(EffectiveCatalog catalog, @Nullable CuratedVersionPrecondition precondition) {
+    static void requireCatalog(EffectiveCatalog catalog, @Nullable CuratedVersionPrecondition precondition) {
         if (precondition == null) {
             throw new CuratedPreconditionRequiredException();
         }
-        if (!precondition.matches(catalog.structureEtag())) {
-            throw new StaleCuratedEntryException(CATALOG, "structure");
+        if (!precondition.matches(catalog.etag())) {
+            throw new StaleCuratedEntryException(CATALOG);
         }
     }
 
@@ -125,7 +127,7 @@ final class CuratedCatalogModel {
             throw new CuratedPreconditionRequiredException();
         }
         if (!precondition.matches(found.etag())) {
-            throw new StaleCuratedEntryException(type, slug);
+            throw new StaleCuratedEntryException(type + " '" + slug + "'");
         }
         return found;
     }
@@ -143,7 +145,8 @@ final class CuratedCatalogModel {
             locallyOrdered && !positionedSlugs.contains(entry.slug()) ? 1 : 0
         )
             .thenComparingInt(CatalogEntry::position)
-            .thenComparing(entry -> entry.effective().name());
+            .thenComparing(entry -> entry.effective().name())
+            .thenComparing(CatalogEntry::slug);
         List<CatalogEntry<AreaDefinition>> sorted = entries.stream().sorted(order).toList();
         List<CatalogEntry<AreaDefinition>> result = new ArrayList<>(sorted.size());
         for (int position = 0; position < sorted.size(); position++) {
@@ -172,7 +175,8 @@ final class CuratedCatalogModel {
                     : 0
             )
             .thenComparingInt(CatalogEntry::position)
-            .thenComparing(entry -> entry.effective().name());
+            .thenComparing(entry -> entry.effective().name())
+            .thenComparing(CatalogEntry::slug);
         List<CatalogEntry<PracticeDefinition>> sorted = entries.stream().sorted(order).toList();
         List<CatalogEntry<PracticeDefinition>> result = new ArrayList<>(sorted.size());
         @Nullable

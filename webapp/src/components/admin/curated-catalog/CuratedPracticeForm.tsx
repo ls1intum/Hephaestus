@@ -5,7 +5,7 @@ import type { CatalogEntryStatus, CuratedPracticeRequest } from "@/api/types.gen
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
-} from "@/components/admin/practices/PracticeDefinitionForm";
+} from "@/components/admin/practice-catalog/PracticeDefinitionForm";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -75,6 +75,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 	const canReset =
 		mode === "edit" && canUseHephaestusVersion(initialData.status) && onUseHephaestusVersion;
 	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
+	const formDisabled = isResetPending || isKeepPending;
 	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
 	const cancelAction = (
 		<Link
@@ -170,6 +171,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
+					disabled={formDisabled}
 					cancelAction={cancelAction}
 					onSubmit={props.onSubmit}
 				/>
@@ -179,6 +181,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					initialData={initialData}
 					areas={areas}
 					isPending={isPending}
+					disabled={formDisabled}
 					isSubmitDisabled={conflict || isResetPending || isKeepPending}
 					cancelAction={cancelAction}
 					onSubmit={props.onSubmit}

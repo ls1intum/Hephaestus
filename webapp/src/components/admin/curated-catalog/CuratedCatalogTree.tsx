@@ -1,14 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal } from "lucide-react";
 import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
-import { getAreaVisual } from "@/components/admin/practices/area-visuals";
-import type { WorkArtifact } from "@/components/admin/practices/constants";
+import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
+import { WORK_ARTIFACT_LABELS } from "@/components/admin/practice-catalog/constants";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
-} from "@/components/admin/practices/SortableCatalogTree";
+} from "@/components/admin/practice-catalog/SortableCatalogTree";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,12 +35,6 @@ type TreePractice = CuratedPracticeSummary & {
 	moveSourceAreaSlug?: string;
 };
 
-const ARTIFACT_LABELS: Record<WorkArtifact, string> = {
-	PULL_REQUEST: "Pull or merge request",
-	ISSUE: "Issue",
-	CONVERSATION_THREAD: "Conversation",
-};
-
 export interface CuratedCatalogTreeProps {
 	areas: readonly CuratedArea[];
 	practices: readonly CuratedPracticeSummary[];
@@ -48,7 +42,7 @@ export interface CuratedCatalogTreeProps {
 	visiblePracticeSlugs: ReadonlySet<string>;
 	forceOpenAreaSlugs?: ReadonlySet<string>;
 	canReorder: boolean;
-	structurePending: boolean;
+	writePending: boolean;
 	pendingPracticeSlugs: ReadonlySet<string>;
 	pendingAreaSlugs: ReadonlySet<string>;
 	onPracticeStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
@@ -66,7 +60,7 @@ export function CuratedCatalogTree({
 	visiblePracticeSlugs,
 	forceOpenAreaSlugs,
 	canReorder,
-	structurePending,
+	writePending,
 	pendingPracticeSlugs,
 	pendingAreaSlugs,
 	onPracticeStatusChange,
@@ -92,8 +86,6 @@ export function CuratedCatalogTree({
 		moveSourceAreaSlug:
 			practice.areaSlug && !knownAreas.has(practice.areaSlug) ? practice.areaSlug : undefined,
 	}));
-	const anyWritePending =
-		structurePending || pendingAreaSlugs.size > 0 || pendingPracticeSlugs.size > 0;
 	const blockedBuckets = canReorder
 		? new Set<string>()
 		: new Set([...areas.map((area) => area.slug), UNASSIGNED_CATALOG_BUCKET]);
@@ -104,12 +96,12 @@ export function CuratedCatalogTree({
 			entries={treePractices}
 			visibleEntrySlugs={visiblePracticeSlugs}
 			forceOpenAreaSlugs={forceOpenAreaSlugs}
-			areaReorderDisabled={!canReorder || anyWritePending}
+			areaReorderDisabled={!canReorder || writePending}
 			disabledAreaSlugs={pendingAreaSlugs}
 			disabledEntrySlugs={pendingPracticeSlugs}
 			blockedEntryOrderBuckets={blockedBuckets}
 			blockedMoveDestinationSlugs={blockedBuckets}
-			showEntryReorderHandles={canReorder && !anyWritePending}
+			showEntryReorderHandles={canReorder && !writePending}
 			onReorderAreas={onReorderAreas}
 			onPlaceEntry={onPlacePractice}
 			renderAreaLeading={(area) => <AreaIcon area={area} />}
@@ -118,7 +110,8 @@ export function CuratedCatalogTree({
 				<AreaActions
 					area={area}
 					move={move}
-					pending={structurePending || pendingAreaSlugs.has(area.slug)}
+					pending={pendingAreaSlugs.has(area.slug)}
+					disabled={writePending}
 					onStatusChange={onAreaStatusChange}
 					onExclude={onExcludeArea}
 				/>
@@ -129,7 +122,8 @@ export function CuratedCatalogTree({
 					practice={practice}
 					areas={treeAreas}
 					move={move}
-					pending={structurePending || pendingPracticeSlugs.has(practice.slug)}
+					pending={pendingPracticeSlugs.has(practice.slug)}
+					disabled={writePending}
 					onStatusChange={onPracticeStatusChange}
 					onExclude={onExcludePractice}
 				/>
@@ -164,12 +158,14 @@ function AreaActions({
 	area,
 	move,
 	pending,
+	disabled,
 	onStatusChange,
 	onExclude,
 }: {
 	area: TreeArea;
 	move: CatalogMoveActions;
 	pending: boolean;
+	disabled: boolean;
 	onStatusChange: (area: CuratedArea, offered: boolean) => void;
 	onExclude: (area: CuratedArea) => void;
 }) {
@@ -180,7 +176,7 @@ function AreaActions({
 				className="hidden sm:inline-flex"
 				checked={area.status.offered}
 				onCheckedChange={(offered) => (offered ? onStatusChange(area, true) : onExclude(area))}
-				disabled={pending}
+				disabled={disabled}
 				aria-busy={pending}
 				aria-label={`Include ${area.definition.name} in new workspaces`}
 			/>
@@ -191,7 +187,7 @@ function AreaActions({
 							ref={move.actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
-							disabled={pending}
+							disabled={disabled}
 							aria-label={`More actions for ${area.definition.name}`}
 						>
 							<MoreHorizontal className="size-4" />
@@ -254,7 +250,7 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 				</Link>
 			</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<span>{ARTIFACT_LABELS[practice.artifactType]}</span>
+				<span>{WORK_ARTIFACT_LABELS[practice.artifactType]}</span>
 				{parentUnavailable && (
 					<Badge variant="outline">
 						{practice.missingAreaSlug
@@ -273,6 +269,7 @@ function PracticeActions({
 	areas,
 	move,
 	pending,
+	disabled,
 	onStatusChange,
 	onExclude,
 }: {
@@ -280,6 +277,7 @@ function PracticeActions({
 	areas: readonly TreeArea[];
 	move: CatalogEntryMoveActions;
 	pending: boolean;
+	disabled: boolean;
 	onStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
 	onExclude: (practice: CuratedPracticeSummary) => void;
 }) {
@@ -311,7 +309,7 @@ function PracticeActions({
 				onCheckedChange={(offered) =>
 					offered ? onStatusChange(persistedPractice, true) : onExclude(persistedPractice)
 				}
-				disabled={pending || parentUnavailable}
+				disabled={disabled || parentUnavailable}
 				aria-busy={pending}
 				aria-label={switchLabel}
 			/>
@@ -322,7 +320,7 @@ function PracticeActions({
 							ref={move.actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
-							disabled={pending}
+							disabled={disabled}
 							aria-label={`More actions for ${practice.name}`}
 						>
 							<MoreHorizontal className="size-4" />
@@ -415,7 +413,7 @@ function PracticeDragPreview({ practice }: { practice: TreePractice }) {
 			</div>
 			<ItemContent className="min-w-0">
 				<ItemTitle className="break-words line-clamp-none">{practice.name}</ItemTitle>
-				<ItemDescription>{ARTIFACT_LABELS[practice.artifactType]}</ItemDescription>
+				<ItemDescription>{WORK_ARTIFACT_LABELS[practice.artifactType]}</ItemDescription>
 			</ItemContent>
 		</Item>
 	);

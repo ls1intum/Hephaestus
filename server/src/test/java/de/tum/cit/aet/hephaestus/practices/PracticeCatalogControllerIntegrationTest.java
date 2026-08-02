@@ -1924,7 +1924,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(problem).isNotNull();
             assertThat(problem.getStatus()).isEqualTo(400);
-            assertThat(problem.getDetail()).contains("PullRequestCreated").contains("not valid for a ISSUE");
+            assertThat(problem.getDetail()).isEqualTo("Choose review events available for the selected work type");
             assertThat(
                 practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), "focus-flip")
@@ -1966,7 +1966,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(problem).isNotNull();
             assertThat(problem.getStatus()).isEqualTo(400);
-            assertThat(problem.getDetail()).contains("ReviewSubmitted").contains("not valid for a ISSUE");
+            assertThat(problem.getDetail()).isEqualTo("Choose review events available for the selected work type");
             assertThat(
                 practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "issue-with-pr-trigger")
             ).isEmpty();

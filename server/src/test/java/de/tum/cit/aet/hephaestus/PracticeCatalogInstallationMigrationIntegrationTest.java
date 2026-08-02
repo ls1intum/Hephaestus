@@ -45,6 +45,17 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         seedExistingWorkspaces();
         updateOnly(MARKER_CHANGELOG);
         execute("DELETE FROM practice_catalog_installation WHERE workspace_id = 136104");
+        execute(
+            """
+            UPDATE practice_catalog_installation
+            SET installed_at = (
+                SELECT dateexecuted + INTERVAL '1 second'
+                FROM databasechangelog
+                WHERE id = '1785274902740-4' AND author = 'hephaestus'
+            )
+            WHERE workspace_id = 136103
+            """
+        );
 
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(BEFORE_CATALOG_TAG);
@@ -72,11 +83,14 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         // so the tables exist and stay empty until somebody says something.
         assertThat(scalar("SELECT count(*)::text FROM curated_practice_override")).isEqualTo("0");
         assertThat(scalar("SELECT count(*)::text FROM curated_area_override")).isEqualTo("0");
-        // Every workspace that already had a catalog is queued for provenance linking; the application
-        // fingerprints and matches its copies on the next boot, because SQL cannot compute the hash.
+        // The bulk marker is closed, while a marker written later by the runtime seeder remains
+        // eligible for definition matching.
         assertThat(
             scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL")
-        ).isEqualTo("0");
+        ).isEqualTo("1");
+        assertThat(
+            scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NULL")
+        ).isEqualTo("1");
         // A stored row must carry a definition, a retirement, or a catalog position.
         assertThatThrownBy(() ->
             execute(

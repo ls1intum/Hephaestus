@@ -6,12 +6,15 @@ import type {
 	PracticeArea,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
+import {
+	PracticeDefinitionForm,
+	type PracticeDefinitionValue,
+} from "@/components/admin/practice-catalog/PracticeDefinitionForm";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
 interface PracticeFormCreateProps {
 	mode: "create";

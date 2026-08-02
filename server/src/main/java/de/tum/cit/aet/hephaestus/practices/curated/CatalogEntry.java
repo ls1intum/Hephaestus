@@ -7,17 +7,7 @@ import java.time.Instant;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * One entry of the catalog this instance offers: the definition in force, where it came from, and —
- * when the two differ — the definition Hephaestus ships now, so an administrator can see what they
- * would be taking before they take it.
- *
- * @param <D> the definition shape, {@code PracticeDefinition} or {@code AreaDefinition}
- * @param effective what this instance offers, which is the administrator's definition when there is
- *     one and the shipped definition otherwise
- * @param shipped what this build ships, or null once it ships nothing under this slug
- * @param retired whether an administrator has stopped offering it
- */
+/** An effective catalog entry and the bundled definition it may override. */
 public record CatalogEntry<D extends CatalogDefinition>(
     String slug,
     D effective,
@@ -33,7 +23,6 @@ public record CatalogEntry<D extends CatalogDefinition>(
         Objects.requireNonNull(effective, "effective");
     }
 
-    /** An entry nobody has touched: what the build ships, offered as-is. */
     public static <D extends CatalogDefinition> CatalogEntry<D> shippedOnly(String slug, D shipped, int position) {
         return new CatalogEntry<>(slug, shipped, shipped, null, null, false, position, null);
     }
@@ -75,23 +64,19 @@ public record CatalogEntry<D extends CatalogDefinition>(
             : CatalogChangeKind.DETECTION;
     }
 
-    /** Whether a workspace created now would receive this entry. */
     public boolean offered() {
         return !retired;
     }
 
-    /**
-     * A tag for the entry as a whole, so a write can be conditioned on it whether or not an override
-     * row exists yet. Two administrators editing the same entry is ordinary; the second is told.
-     */
     public String etag() {
         return new CanonicalDigest()
             .add(slug)
             .add(effective.digest(slug))
             .addNullable(shipped == null ? null : shipped.digest(slug))
             .addNullable(basedOnDigest)
+            .add(state().name())
+            .add(changeKind().name())
             .addInt(retired ? 1 : 0)
-            .hex()
-            .substring(0, 16);
+            .hex();
     }
 }

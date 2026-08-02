@@ -7,8 +7,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -22,17 +20,7 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
-/**
- * What an administrator said about one practice in the catalog.
- *
- * <p>A row exists only where somebody spoke. No row means the practice is exactly what this build
- * ships — which is also why a newer build updates it without anyone doing anything: there is nothing
- * here to overwrite. The effective catalog is the shipped one with these rows laid over it.
- *
- * <p>A row says one or both of two things: <em>use this definition instead</em>, and <em>do not offer
- * this</em>. {@link #basedOnDigest} records which shipped definition the administrator was looking at
- * when they wrote theirs, which is the whole of how "a newer version is waiting" is known.
- */
+/** Sparse override; no row means the bundled practice applies unchanged. */
 @Entity
 @Table(name = "curated_practice_override")
 @Getter
@@ -41,11 +29,8 @@ import tools.jackson.databind.JsonNode;
 public class CuratedPracticeOverride {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
-    private Long id;
-
-    @Column(name = "slug", nullable = false, unique = true, length = 64, updatable = false)
+    @Column(name = "slug", nullable = false, length = 64, updatable = false)
     private String slug;
 
     @Column(name = "name", length = 128)
@@ -96,7 +81,7 @@ public class CuratedPracticeOverride {
 
     @Version
     @Column(name = "version", nullable = false)
-    private long version;
+    private @Nullable Long version;
 
     public CuratedPracticeOverride(String slug, Instant now) {
         this.slug = Objects.requireNonNull(slug, "slug");
@@ -104,7 +89,6 @@ public class CuratedPracticeOverride {
         this.updatedAt = now;
     }
 
-    /** The administrator's definition, or null when this row only records retirement. */
     public @Nullable PracticeDefinition definition() {
         if (name == null || artifactType == null || triggerEvents == null || criteria == null) {
             return null;
@@ -134,7 +118,6 @@ public class CuratedPracticeOverride {
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
-    /** Drops the definition, leaving any retirement in place. The row is deleted when nothing is left. */
     public void clearDefinition(Instant now) {
         this.name = null;
         this.artifactType = null;
@@ -148,7 +131,6 @@ public class CuratedPracticeOverride {
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
-    /** Records that the administrator has seen what ships now and is keeping their own definition. */
     public void acknowledge(@Nullable String shippedDigest, Instant now) {
         this.basedOnDigest = shippedDigest;
         this.updatedAt = Objects.requireNonNull(now, "now");
@@ -164,7 +146,11 @@ public class CuratedPracticeOverride {
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
-    /** Whether this row still says anything. A row that says nothing is deleted rather than kept. */
+    public void clearPosition(Instant now) {
+        this.position = null;
+        this.updatedAt = Objects.requireNonNull(now, "now");
+    }
+
     public boolean isEmpty() {
         return definition() == null && retiredAt == null && position == null;
     }

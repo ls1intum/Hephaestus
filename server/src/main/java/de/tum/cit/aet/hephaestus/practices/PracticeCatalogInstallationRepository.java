@@ -15,9 +15,12 @@ public interface PracticeCatalogInstallationRepository extends Repository<Practi
 
     boolean existsById(Long workspaceId);
 
-    /** Workspaces whose copies still have no link back to the catalog entries they came from. */
     @Query(
-        "SELECT i.workspaceId FROM PracticeCatalogInstallation i WHERE i.provenanceLinkedAt IS NULL ORDER BY i.workspaceId"
+        """
+        SELECT i.workspaceId
+        FROM PracticeCatalogInstallation i
+        WHERE i.provenanceLinkedAt IS NULL
+        """
     )
     List<Long> findWorkspaceIdsAwaitingProvenanceLink();
 

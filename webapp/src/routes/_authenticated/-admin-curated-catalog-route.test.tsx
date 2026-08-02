@@ -11,8 +11,6 @@ const status = (overrides: Record<string, unknown> = {}) => ({
 	state: "FROM_HEPHAESTUS",
 	changeKind: "NONE",
 	offered: true,
-	retired: false,
-	updatedAt: "2026-07-30T12:00:00Z",
 	...overrides,
 });
 
@@ -31,36 +29,35 @@ const practiceDefinition = {
 };
 
 function mockCatalog(overrides: Record<string, unknown> = {}) {
-	server.use(
-		http.get("*/admin/practice-catalog", () =>
-			HttpResponse.json({
-				etag: "structure-1",
-				summary: {
-					total: 2,
-					updatesChangingDetection: 1,
-					updatesChangingWordingOnly: 0,
-					updatesChangingPresentation: 0,
-					editedHere: 1,
-					yours: 0,
-					notOffered: 0,
-					noLongerShipped: 0,
-				},
-				areas: [{ slug: "packaging", position: 0, definition: areaDefinition, status: status() }],
-				practices: [
-					{
-						slug: "describe-what-and-why",
-						name: practiceDefinition.name,
-						artifactType: "PULL_REQUEST",
-						areaSlug: "packaging",
-						position: 0,
-						effectivelyOffered: true,
-						status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
-					},
-				],
-				...overrides,
-			}),
-		),
-	);
+	const catalog = {
+		etag: "structure-1",
+		customOrder: false,
+		summary: {
+			total: 2,
+			updatesChangingDetection: 1,
+			updatesChangingWordingOnly: 0,
+			updatesChangingPresentation: 0,
+			editedHere: 1,
+			yours: 0,
+			notOffered: 0,
+			noLongerShipped: 0,
+		},
+		areas: [{ slug: "packaging", position: 0, definition: areaDefinition, status: status() }],
+		practices: [
+			{
+				slug: "describe-what-and-why",
+				name: practiceDefinition.name,
+				artifactType: "PULL_REQUEST",
+				areaSlug: "packaging",
+				position: 0,
+				effectivelyOffered: true,
+				status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
+			},
+		],
+		...overrides,
+	};
+	server.use(http.get("*/admin/practice-catalog", () => HttpResponse.json(catalog)));
+	return catalog;
 }
 
 describe("instance catalog routes", () => {
@@ -148,6 +145,26 @@ describe("instance catalog routes", () => {
 		expect(body).toEqual({ orderedSlugs: ["delivery", "packaging"] });
 	});
 
+	it("restores the Hephaestus order with the catalog tag", async () => {
+		const catalog = mockCatalog({ customOrder: true });
+		let ifMatch: string | null = null;
+		server.use(
+			http.delete("*/admin/practice-catalog/order", ({ request }) => {
+				ifMatch = request.headers.get("If-Match");
+				return HttpResponse.json({ ...catalog, customOrder: false, etag: "structure-2" });
+			}),
+		);
+		renderRouteAt("/admin/catalog");
+
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Use Hephaestus order" }, ROUTE_RENDER_WAIT),
+		);
+		const dialog = await screen.findByRole("alertdialog");
+		fireEvent.click(within(dialog).getByRole("button", { name: "Use Hephaestus order" }));
+
+		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
+	});
+
 	it("restores the order and focus after a reorder conflict", async () => {
 		const secondArea = {
 			slug: "delivery",
@@ -204,6 +221,60 @@ describe("instance catalog routes", () => {
 		await waitFor(() => expect(document.activeElement).toBe(trigger));
 	});
 
+	it("loads the new area when a moved practice editor is reopened", async () => {
+		const deliveryArea = {
+			slug: "delivery",
+			position: 1,
+			definition: { ...areaDefinition, name: "Delivery" },
+			status: status(),
+		};
+		const catalog = mockCatalog({
+			areas: [
+				{ slug: "packaging", position: 0, definition: areaDefinition, status: status() },
+				deliveryArea,
+			],
+		});
+		let latestArea = "packaging";
+		server.use(
+			http.get("*/admin/practice-catalog/practices/:slug", () =>
+				HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: { ...practiceDefinition, areaSlug: latestArea },
+					status: status(),
+				}),
+			),
+			http.patch("*/admin/practice-catalog/practices/:slug/placement", () => {
+				latestArea = "delivery";
+				return HttpResponse.json({
+					...catalog,
+					etag: "structure-2",
+					practices: catalog.practices.map((practice) => ({
+						...practice,
+						areaSlug: "delivery",
+					})),
+				});
+			}),
+		);
+		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
+
+		fireEvent.click(await screen.findByRole("link", { name: "Cancel" }, ROUTE_RENDER_WAIT));
+		fireEvent.click(
+			await screen.findByRole(
+				"button",
+				{ name: `More actions for ${practiceDefinition.name}` },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+		fireEvent.click(await screen.findByRole("menuitemradio", { name: "Delivery" }));
+		await waitFor(() => expect(latestArea).toBe("delivery"));
+
+		fireEvent.click(await screen.findByRole("link", { name: practiceDefinition.name }));
+		expect(
+			(await screen.findByRole("combobox", { name: "Practice area" }, ROUTE_RENDER_WAIT))
+				.textContent,
+		).toContain("Delivery");
+	});
+
 	it("explains which practices area exclusion affects", async () => {
 		mockCatalog();
 		let ifMatch: string | null = null;
@@ -213,7 +284,7 @@ describe("instance catalog routes", () => {
 				return HttpResponse.json({
 					slug: "packaging",
 					definition: areaDefinition,
-					status: status({ offered: false, retired: true }),
+					status: status({ offered: false }),
 				});
 			}),
 		);
@@ -233,7 +304,53 @@ describe("instance catalog routes", () => {
 		expect(within(confirmation).getByText("Say what changed and why")).toBeTruthy();
 		fireEvent.click(within(confirmation).getByRole("button", { name: "Exclude area" }));
 
-		await waitFor(() => expect(ifMatch).toBe('"tag-1"'));
+		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
+	});
+
+	it("prevents a second catalog write while an area update is pending", async () => {
+		mockCatalog({
+			customOrder: true,
+			areas: [
+				{ slug: "packaging", position: 0, definition: areaDefinition, status: status() },
+				{
+					slug: "delivery",
+					position: 1,
+					definition: { ...areaDefinition, name: "Delivery" },
+					status: status(),
+				},
+			],
+		});
+		server.use(
+			http.patch("*/admin/practice-catalog/areas/:slug/status", async () => {
+				await delay(500);
+				return HttpResponse.json({
+					slug: "packaging",
+					definition: areaDefinition,
+					status: status({ offered: false }),
+				});
+			}),
+		);
+		renderRouteAt("/admin/catalog");
+
+		fireEvent.click(
+			await screen.findByRole(
+				"switch",
+				{ name: "Include Packaging work in new workspaces" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Exclude area" }));
+
+		await waitFor(() =>
+			expect(
+				screen
+					.getByRole("switch", { name: "Include Delivery in new workspaces" })
+					.getAttribute("aria-disabled"),
+			).toBe("true"),
+		);
+		expect(
+			screen.getByRole("button", { name: "Use Hephaestus order" }).hasAttribute("disabled"),
+		).toBe(true);
 	});
 
 	it("sends the entry's tag when it stops offering a practice", async () => {
@@ -247,7 +364,7 @@ describe("instance catalog routes", () => {
 				return HttpResponse.json({
 					slug: "describe-what-and-why",
 					definition: practiceDefinition,
-					status: status({ offered: false, retired: true }),
+					status: status({ offered: false }),
 				});
 			}),
 		);
@@ -264,6 +381,56 @@ describe("instance catalog routes", () => {
 
 		await waitFor(() => expect(ifMatch).toBe('"tag-1"'));
 		expect(body).toEqual({ status: "RETIRED" });
+	});
+
+	it("uses the status response tag when an inactive editor is reopened", async () => {
+		mockCatalog();
+		let latestTag = "tag-1";
+		let updateIfMatch: string | null = null;
+		server.use(
+			http.get("*/admin/practice-catalog/practices/:slug", () =>
+				HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					status: status({ etag: latestTag }),
+				}),
+			),
+			http.patch("*/admin/practice-catalog/practices/:slug/status", () => {
+				latestTag = "tag-2";
+				return HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					status: status({ etag: latestTag, offered: false }),
+				});
+			}),
+			http.put("*/admin/practice-catalog/practices/:slug", ({ request }) => {
+				updateIfMatch = request.headers.get("if-match");
+				return HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: { ...practiceDefinition, name: "Updated name" },
+					status: status({ etag: "tag-3", offered: false }),
+				});
+			}),
+		);
+		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
+
+		fireEvent.click(await screen.findByRole("link", { name: "Cancel" }, ROUTE_RENDER_WAIT));
+		fireEvent.click(
+			await screen.findByRole(
+				"switch",
+				{ name: "Include Say what changed and why in new workspaces" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Exclude practice" }));
+		await waitFor(() => expect(latestTag).toBe("tag-2"));
+
+		fireEvent.click(await screen.findByRole("link", { name: practiceDefinition.name }));
+		const name = await screen.findByRole("textbox", { name: /Name/ }, ROUTE_RENDER_WAIT);
+		fireEvent.change(name, { target: { value: "Updated name" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+		await waitFor(() => expect(updateIfMatch).toBe('"tag-2"'));
 	});
 
 	it("shows the Hephaestus version before it is taken", async () => {
@@ -335,14 +502,17 @@ describe("instance catalog routes", () => {
 					status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
 				}),
 			),
-			http.post("*/admin/practice-catalog/practices/:slug/keep", ({ request }) => {
-				ifMatch = request.headers.get("if-match");
-				return HttpResponse.json({
-					slug: "describe-what-and-why",
-					definition: practiceDefinition,
-					status: status({ state: "EDITED_HERE", etag: "tag-2" }),
-				});
-			}),
+			http.put(
+				"*/admin/practice-catalog/practices/:slug/override/acknowledgement",
+				({ request }) => {
+					ifMatch = request.headers.get("if-match");
+					return HttpResponse.json({
+						slug: "describe-what-and-why",
+						definition: practiceDefinition,
+						status: status({ state: "EDITED_HERE", etag: "tag-2" }),
+					});
+				},
+			),
 		);
 		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
 		const name = await screen.findByRole("textbox", { name: /Name/ }, ROUTE_RENDER_WAIT);
@@ -368,14 +538,17 @@ describe("instance catalog routes", () => {
 					status: status({ state: "NO_LONGER_SHIPPED" }),
 				}),
 			),
-			http.post("*/admin/practice-catalog/practices/:slug/keep", ({ request }) => {
-				ifMatch = request.headers.get("if-match");
-				return HttpResponse.json({
-					slug: "describe-what-and-why",
-					definition: practiceDefinition,
-					status: status({ state: "YOURS", etag: "tag-2" }),
-				});
-			}),
+			http.put(
+				"*/admin/practice-catalog/practices/:slug/override/acknowledgement",
+				({ request }) => {
+					ifMatch = request.headers.get("if-match");
+					return HttpResponse.json({
+						slug: "describe-what-and-why",
+						definition: practiceDefinition,
+						status: status({ state: "YOURS", etag: "tag-2" }),
+					});
+				},
+			),
 		);
 		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
 

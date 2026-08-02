@@ -377,6 +377,9 @@ export function SortableCatalogTree<
 				}
 				const target = getCatalogDropTarget(entries, entry.slug, areaSlug);
 				if (!target) return;
+				if (target.areaSlug) {
+					setCollapsedAreas((collapsed) => collapsed.filter((slug) => slug !== target.areaSlug));
+				}
 				prepareFocus(focusKey);
 				onPlaceEntry(entry.slug, target.areaSlug, target.position);
 			},
@@ -427,6 +430,7 @@ export function SortableCatalogTree<
 							area={area}
 							entries={(byArea.get(area.slug) ?? []).sort(byDisplayOrder)}
 							total={totalByArea.get(area.slug) ?? 0}
+							collapseDisabled={forceOpenAreaSlugs?.has(area.slug) ?? false}
 							reorderDisabled={areaReorderDisabled || disabledAreaSlugs.has(area.slug)}
 							entryReorderDisabled={blockedEntryOrderBuckets.has(area.slug)}
 							blockedMoveDestinationSlugs={blockedMoveDestinationSlugs}
@@ -486,6 +490,7 @@ interface SortableAreaSectionProps<
 	area: TArea;
 	entries: TEntry[];
 	total: number;
+	collapseDisabled: boolean;
 	reorderDisabled: boolean;
 	entryReorderDisabled: boolean;
 	blockedMoveDestinationSlugs: ReadonlySet<string>;
@@ -507,6 +512,7 @@ function SortableAreaSection<
 	area,
 	entries,
 	total,
+	collapseDisabled,
 	reorderDisabled,
 	entryReorderDisabled,
 	blockedMoveDestinationSlugs,
@@ -568,7 +574,10 @@ function SortableAreaSection<
 					<GripVertical className="size-4" />
 				</Button>
 				{renderLeading?.(area)}
-				<AccordionTrigger className="w-full min-w-0 py-2.5 hover:no-underline">
+				<AccordionTrigger
+					disabled={collapseDisabled}
+					className="w-full min-w-0 py-2.5 hover:no-underline disabled:opacity-100"
+				>
 					<span className="flex min-w-0 flex-wrap items-center gap-2">
 						<span className="min-w-0 break-words font-medium">{area.name}</span>
 						<Badge variant="secondary" className="shrink-0">

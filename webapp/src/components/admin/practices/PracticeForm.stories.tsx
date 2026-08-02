@@ -14,7 +14,6 @@ const meta = {
 	parameters: {
 		layout: "fullscreen",
 		chromatic: { viewports: [1440] },
-		a11y: { context: { exclude: ".monaco-editor" } },
 	},
 	tags: ["autodocs"],
 	decorators: [withStandardPage],
@@ -59,6 +58,9 @@ export const Submitting: Story = {
 	render: () => (
 		<PracticeForm mode="create" workspaceSlug="demo" areas={mockAreas} onSubmit={fn()} isPending />
 	),
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
+	},
 };
 
 export const EditClearsOptionalGuidance: Story = {

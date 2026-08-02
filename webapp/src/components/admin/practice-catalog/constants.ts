@@ -25,18 +25,34 @@ export function triggerEventsForFocus(focus: WorkArtifact): string[] {
 	return TRIGGER_EVENTS_BY_FOCUS[focus].map((e) => e.value);
 }
 
+export const WORK_ARTIFACT_LABELS = {
+	PULL_REQUEST: "Pull or merge request",
+	ISSUE: "Issue",
+	CONVERSATION_THREAD: "Conversation",
+} satisfies Record<WorkArtifact, string>;
+
 export const FOCUS_ARTIFACT_OPTIONS = [
 	{
 		value: "PULL_REQUEST",
-		label: "Pull or merge request",
+		label: WORK_ARTIFACT_LABELS.PULL_REQUEST,
 		hint: "Evaluates the diff, commits, and review thread",
 	},
-	{ value: "ISSUE", label: "Issue", hint: "Evaluates the issue title, body, labels, and comments" },
+	{
+		value: "ISSUE",
+		label: WORK_ARTIFACT_LABELS.ISSUE,
+		hint: "Evaluates the issue title, body, labels, and comments",
+	},
 	{
 		value: "CONVERSATION_THREAD",
-		label: "Conversation",
+		label: WORK_ARTIFACT_LABELS.CONVERSATION_THREAD,
 		hint: "Evaluates recent messages when the scheduled conversation review runs",
 	},
+] as const;
+
+export const WORK_ARTIFACT_FILTER_OPTIONS = [
+	{ value: "PULL_REQUEST", label: "Pull or merge requests" },
+	{ value: "ISSUE", label: "Issues" },
+	{ value: "CONVERSATION_THREAD", label: "Conversations" },
 ] as const;
 
 export function generateSlug(name: string): string {

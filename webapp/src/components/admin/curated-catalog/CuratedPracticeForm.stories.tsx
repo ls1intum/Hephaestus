@@ -24,8 +24,6 @@ const initialData = {
 		state: "FROM_HEPHAESTUS" as const,
 		changeKind: "NONE" as const,
 		offered: true,
-		retired: false,
-		updatedAt: new Date("2026-07-30T12:00:00Z"),
 	},
 };
 
@@ -35,7 +33,6 @@ const meta = {
 	parameters: {
 		layout: "fullscreen",
 		chromatic: { viewports: [1440] },
-		a11y: { context: { exclude: ".monaco-editor" } },
 	},
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
@@ -110,12 +107,15 @@ export const HephaestusUpdateAvailable: Story = {
 		onKeepCurrentDefinition: fn(),
 		onSubmit: fn(),
 	},
-	play: async ({ canvas }) => {
+	play: async ({ canvas, userEvent }) => {
 		await expect(canvas.getByText("Hephaestus update available")).toBeVisible();
 		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Review Hephaestus update" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Apply Hephaestus update" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Keep saved version" })).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
+		await expect(canvas.getByText("Unassigned")).toBeVisible();
+		await expect(canvas.getAllByText("Not set").length).toBeGreaterThan(0);
 	},
 };
 
@@ -199,5 +199,8 @@ export const Submitting: Story = {
 		areas,
 		isPending: true,
 		onSubmit: fn(),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };

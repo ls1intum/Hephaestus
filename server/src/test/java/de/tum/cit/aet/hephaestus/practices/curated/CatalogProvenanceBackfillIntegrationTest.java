@@ -14,15 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionOperations;
 
-/**
- * Workspaces seeded before the catalog existed. Every one of them has to be matched back to it, not
- * just the oldest — an instance can hold many, and the ones left unstamped could never take part in
- * anything the catalog offers later.
- */
 @Tag("integration")
 class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
-    /** A practice the shipped catalog really contains, so a match is a genuine one. */
     private static final String SHIPPED_SLUG = "describe-what-and-why";
 
     @Autowired
@@ -48,32 +42,45 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     @Test
-    void stampsEveryWorkspaceWhoseCopiesStillMatchAndLeavesEditedOnesAlone() {
-        seedLegacyWorkspace(matching, shipped().criteria());
-        seedLegacyWorkspace(edited, "Rewritten here, so no longer the catalog's");
+    void stampsEachEligibleInstallationThatStillMatchesTheBundledCatalog() {
+        seedLegacyWorkspace(matching, shipped().criteria(), true);
+        seedLegacyWorkspace(edited, shipped().criteria(), true);
 
         CatalogProvenanceBackfill.Stamped stamped = backfill.run();
 
-        assertThat(stamped.practices()).isOne();
+        assertThat(stamped.practices()).isEqualTo(2);
         assertThat(stampedPractices(matching)).isOne();
-        assertThat(stampedPractices(edited)).isZero();
+        assertThat(stampedPractices(edited)).isOne();
         assertThat(unfingerprintedRevisions()).isZero();
         assertThat(workspacesAwaiting()).isZero();
     }
 
     @Test
     void looksAtEachWorkspaceOnlyOnce() {
-        seedLegacyWorkspace(matching, shipped().criteria());
+        seedLegacyWorkspace(matching, shipped().criteria(), true);
         backfill.run();
 
         assertThat(backfill.run().practices()).isZero();
+    }
+
+    @Test
+    void leavesAnEditedLegacySeedUnlinked() {
+        seedLegacyWorkspace(matching, "The workspace changed these criteria", true);
+        seedLegacyWorkspace(edited, shipped().criteria(), false);
+
+        CatalogProvenanceBackfill.Stamped stamped = backfill.run();
+
+        assertThat(stamped.practices()).isZero();
+        assertThat(stampedPractices(matching)).isZero();
+        assertThat(unfingerprintedRevisions()).isZero();
+        assertThat(workspacesAwaiting()).isZero();
     }
 
     private PracticeDefinition shipped() {
         return catalogService.catalog().practice(SHIPPED_SLUG).orElseThrow().effective();
     }
 
-    private void seedLegacyWorkspace(Workspace workspace, String criteria) {
+    private void seedLegacyWorkspace(Workspace workspace, String criteria, boolean provenancePending) {
         PracticeDefinition shipped = shipped();
         transactionOperations.executeWithoutResult(ignored -> {
             Long areaId = jdbcTemplate.queryForObject(
@@ -103,8 +110,6 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 triggerEventsJson(shipped),
                 criteria
             );
-            // The shape the schema change leaves behind: a full definition with no fingerprint, which
-            // SQL could not compute.
             Long revisionId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO practice_revision (
@@ -124,8 +129,12 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
             );
             jdbcTemplate.update("UPDATE practice SET current_revision_id = ? WHERE id = ?", revisionId, practiceId);
             jdbcTemplate.update(
-                "INSERT INTO practice_catalog_installation (workspace_id, installed_at) VALUES (?, now())",
-                workspace.getId()
+                """
+                INSERT INTO practice_catalog_installation (workspace_id, installed_at, provenance_linked_at)
+                VALUES (?, now(), CASE WHEN ? THEN NULL ELSE now() END)
+                """,
+                workspace.getId(),
+                provenancePending
             );
         });
     }

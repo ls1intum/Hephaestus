@@ -4,9 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogChangeKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
-import java.time.Instant;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Where a catalog entry stands. Identical for practices and areas, so one badge renders either.
@@ -19,18 +17,9 @@ public record CatalogEntryStatusDTO(
     @NonNull String etag,
     @NonNull CatalogEntryState state,
     @NonNull CatalogChangeKind changeKind,
-    @NonNull Boolean offered,
-    @NonNull Boolean retired,
-    @Nullable Instant updatedAt
+    @NonNull Boolean offered
 ) {
     public static <D extends CatalogDefinition> CatalogEntryStatusDTO from(CatalogEntry<D> entry) {
-        return new CatalogEntryStatusDTO(
-            entry.etag(),
-            entry.state(),
-            entry.changeKind(),
-            entry.offered(),
-            entry.retired(),
-            entry.updatedAt()
-        );
+        return new CatalogEntryStatusDTO(entry.etag(), entry.state(), entry.changeKind(), entry.offered());
     }
 }

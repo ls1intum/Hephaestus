@@ -77,8 +77,6 @@ describe("CuratedPracticeForm", () => {
 						state: "FROM_HEPHAESTUS",
 						changeKind: "NONE",
 						offered: true,
-						retired: false,
-						updatedAt: new Date("2026-07-30T12:00:00Z"),
 					},
 				}}
 				isPending={false}
@@ -116,8 +114,6 @@ describe("CuratedPracticeForm", () => {
 						state: "UPDATE_WAITING",
 						changeKind: "DETECTION",
 						offered: true,
-						retired: false,
-						updatedAt: new Date("2026-07-30T12:00:00Z"),
 					},
 					shipped: {
 						name: "Say what changed and why",

@@ -11,6 +11,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
@@ -28,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
@@ -91,6 +94,26 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void createArea_recordsItsConfiguration() {
+        when(practiceAreaRepository.save(any())).thenAnswer(invocation -> {
+            PracticeArea area = invocation.getArgument(0);
+            area.setId(9L);
+            return area;
+        });
+
+        service.createArea(CTX, "review-comms", new AreaAttributes("Review communication", null, 0, null, null));
+
+        ConfigAuditEntry entry = capturedAuditEntry();
+        assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_AREA);
+        assertThat(entry.entityId()).isEqualTo("9");
+        assertThat(entry.workspaceId()).isEqualTo(1L);
+        assertThat(entry.before()).isNull();
+        assertThat(entry.after()).isEqualTo(
+            new PracticeAreaSnapshot("review-comms", "Review communication", null, true, null, null)
+        );
+    }
+
+    @Test
     void createArea_duplicateSlug_throwsConflict() {
         when(practiceAreaRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
 
@@ -133,6 +156,23 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         assertThat(updated.getIcon()).isEqualTo("Eye");
         assertThat(updated.getDescription()).isEqualTo("original blurb");
         assertThat(updated.getColor()).isEqualTo("slate");
+    }
+
+    @Test
+    void updateArea_recordsBeforeAndAfter() {
+        PracticeArea area = area("guidance");
+        area.setId(7L);
+        area.setName("Old");
+        area.setActive(true);
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "guidance")).thenReturn(Optional.of(area));
+        when(practiceAreaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updateArea(CTX, "guidance", new AreaAttributes("New", null, null, null, null), false);
+
+        ConfigAuditEntry entry = capturedAuditEntry();
+        assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_AREA);
+        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("guidance", "Old", null, true, null, null));
+        assertThat(entry.after()).isEqualTo(new PracticeAreaSnapshot("guidance", "New", null, false, null, null));
     }
 
     @Test
@@ -247,6 +287,27 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         verify(practiceRevisionService).append(first);
         verify(practiceRevisionService).append(second);
         verify(practiceAreaRepository).delete(area);
+    }
+
+    @Test
+    void deleteArea_recordsTheDeletedConfiguration() {
+        PracticeArea area = area("deleted");
+        area.setId(20L);
+        area.setName("Deleted");
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "deleted")).thenReturn(Optional.of(area));
+
+        service.deleteArea(CTX, "deleted");
+
+        ConfigAuditEntry entry = capturedAuditEntry();
+        assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_AREA);
+        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("deleted", "Deleted", null, true, null, null));
+        assertThat(entry.after()).isNull();
+    }
+
+    private ConfigAuditEntry capturedAuditEntry() {
+        ArgumentCaptor<ConfigAuditEntry> captor = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+        verify(configAudit).record(captor.capture());
+        return captor.getValue();
     }
 
     private static PracticeArea area(String slug) {

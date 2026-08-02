@@ -4,7 +4,7 @@ import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import { listAreasOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
-import { generateSlug } from "@/components/admin/practices/constants";
+import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
 import {
 	PRACTICE_SEARCH_PARAMS,

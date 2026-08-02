@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.support.TransactionOperations;
@@ -47,6 +50,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Mock
     private CuratedCatalogService catalogService;
+
+    @Mock
+    private CuratedCatalogLock catalogLock;
 
     @Mock
     private PracticeCatalogInstallationRepository installationRepository;
@@ -76,6 +82,10 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(practiceService).createPracticeFromCatalog(any(), eq("small-prs"), definition.capture());
         assertThat(definition.getValue().criteria()).isEqualTo("Seed criteria");
         verify(installationRepository).save(any());
+        InOrder order = inOrder(catalogLock, workspaceRepository, catalogService);
+        order.verify(catalogLock).acquire();
+        order.verify(workspaceRepository).findByIdForUpdate(1L);
+        order.verify(catalogService).catalog();
     }
 
     @Test
@@ -146,6 +156,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             areaRepository,
             practiceRepository,
             catalogService,
+            catalogLock,
             installationRepository,
             workspaceRepository,
             executor,

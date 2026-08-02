@@ -44,7 +44,6 @@ import tools.jackson.databind.JsonNode;
             name = "uk_practice_revision_practice_number",
             columnNames = { "practice_id", "revision_number" }
         ),
-        @UniqueConstraint(name = "uk_practice_revision_owner", columnNames = { "id", "practice_id" }),
     },
     indexes = { @Index(name = "idx_practice_revision_practice", columnList = "practice_id") }
 )
@@ -121,8 +120,6 @@ public class PracticeRevision {
 
     @Column(name = "detection_fingerprint", length = 64)
     private String detectionFingerprint;
-
-    /** Curated revision with equivalent detector inputs; independent of catalog-copy provenance. */
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

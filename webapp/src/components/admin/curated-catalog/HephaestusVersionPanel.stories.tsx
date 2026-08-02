@@ -8,8 +8,6 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 	state: "FROM_HEPHAESTUS",
 	changeKind: "NONE",
 	offered: true,
-	retired: false,
-	updatedAt: new Date("2026-07-30T12:00:00Z"),
 	...overrides,
 });
 

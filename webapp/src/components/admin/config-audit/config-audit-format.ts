@@ -24,6 +24,7 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	WORKSPACE_VISIBILITY: "Visibility",
 	PRACTICE_ACTIVE: "Practice active",
 	PRACTICE_DEFINITION: "Practice",
+	PRACTICE_AREA: "Practice area",
 	CURATED_PRACTICE: "Catalog practice",
 	CURATED_PRACTICE_AREA: "Catalog area",
 	WORKSPACE_INSTANCE_LLM_BUDGET: "Shared-model AI budget",

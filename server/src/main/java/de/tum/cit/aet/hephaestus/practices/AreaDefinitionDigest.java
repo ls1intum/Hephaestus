@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-/** Identity of a whole area definition. */
 final class AreaDefinitionDigest {
 
     private AreaDefinitionDigest() {}

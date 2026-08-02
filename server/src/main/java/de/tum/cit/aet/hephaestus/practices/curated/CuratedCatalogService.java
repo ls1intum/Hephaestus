@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,7 +36,7 @@ public class CuratedCatalogService {
     private static final String CATALOG_AREA = "Catalog area";
 
     private final BundledPracticeCatalogLoader loader;
-    private final EntityManager entityManager;
+    private final CuratedCatalogLock catalogLock;
     private final CuratedPracticeOverrideRepository practiceOverrides;
     private final CuratedAreaOverrideRepository areaOverrides;
     private final ConfigAuditPort configAudit;
@@ -102,18 +101,15 @@ public class CuratedCatalogService {
             throw new CuratedCatalogConflictException("A practice with slug '" + slug + "' already exists.");
         }
         Instant now = clock.instant();
-        List<CatalogEntry<PracticeDefinition>> bucket = CuratedCatalogModel.practicesIn(before, definition.areaSlug());
-        resequencePractices(bucket.stream().map(CatalogEntry::slug).toList(), now);
         CuratedPracticeOverride override = new CuratedPracticeOverride(slug, now);
         override.write(definition, null, now);
-        override.setPosition(bucket.size(), now);
         practiceOverrides.save(override);
         CatalogEntry<PracticeDefinition> created = practice(slug);
         configAudit.record(
             ConfigAuditEntry.instanceCreated(
                 ConfigAuditEntityType.CURATED_PRACTICE,
                 created.slug(),
-                CatalogEntrySnapshot.of(created)
+                CuratedPracticeSnapshot.of(created)
             )
         );
         return created;
@@ -234,17 +230,15 @@ public class CuratedCatalogService {
             throw new CuratedCatalogConflictException("An area with slug '" + slug + "' already exists.");
         }
         Instant now = clock.instant();
-        resequenceAreas(before.areas().stream().map(CatalogEntry::slug).toList(), now);
         CuratedAreaOverride override = new CuratedAreaOverride(slug, now);
         override.write(definition, null, now);
-        override.setPosition(before.areas().size(), now);
         areaOverrides.save(override);
         CatalogEntry<AreaDefinition> created = area(slug);
         configAudit.record(
             ConfigAuditEntry.instanceCreated(
                 ConfigAuditEntityType.CURATED_PRACTICE_AREA,
                 created.slug(),
-                CatalogEntrySnapshot.of(created)
+                CuratedAreaSnapshot.of(created)
             )
         );
         return created;
@@ -300,12 +294,11 @@ public class CuratedCatalogService {
         CuratedStatus status
     ) {
         lockCatalog();
-        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
-            catalog().area(slug),
-            CATALOG_AREA,
-            slug,
-            precondition
-        );
+        EffectiveCatalog before = catalog();
+        CuratedCatalogModel.requireCatalog(before, precondition);
+        CatalogEntry<AreaDefinition> entry = before
+            .area(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
         if (entry.retired() == (status == CuratedStatus.RETIRED)) {
             return entry;
         }
@@ -325,12 +318,15 @@ public class CuratedCatalogService {
     public EffectiveCatalog reorderAreas(@Nullable CuratedVersionPrecondition precondition, List<String> orderedSlugs) {
         lockCatalog();
         EffectiveCatalog before = catalog();
-        CuratedCatalogModel.requireStructure(before, precondition);
+        CuratedCatalogModel.requireCatalog(before, precondition);
         CuratedCatalogModel.validateCompleteOrder(
             before.areas().stream().map(CatalogEntry::slug).toList(),
             orderedSlugs,
             CATALOG_AREA
         );
+        if (before.areas().stream().map(CatalogEntry::slug).toList().equals(orderedSlugs)) {
+            return before;
+        }
         Instant now = clock.instant();
         for (int position = 0; position < orderedSlugs.size(); position++) {
             CuratedAreaOverride override = areaOverride(orderedSlugs.get(position), now);
@@ -348,7 +344,7 @@ public class CuratedCatalogService {
     ) {
         lockCatalog();
         EffectiveCatalog before = catalog();
-        CuratedCatalogModel.requireStructure(before, precondition);
+        CuratedCatalogModel.requireCatalog(before, precondition);
         if (areaSlug != null && before.area(areaSlug).isEmpty()) {
             throw new EntityNotFoundException(CATALOG_AREA, areaSlug);
         }
@@ -357,7 +353,46 @@ public class CuratedCatalogService {
             .map(CatalogEntry::slug)
             .toList();
         CuratedCatalogModel.validateCompleteOrder(existing, orderedSlugs, CATALOG_PRACTICE);
+        if (existing.equals(orderedSlugs)) {
+            return before;
+        }
         resequencePractices(orderedSlugs, clock.instant());
+        return catalog();
+    }
+
+    @Transactional
+    public EffectiveCatalog resetOrder(@Nullable CuratedVersionPrecondition precondition) {
+        lockCatalog();
+        EffectiveCatalog before = catalog();
+        CuratedCatalogModel.requireCatalog(before, precondition);
+        if (!before.customOrder()) {
+            return before;
+        }
+        Instant now = clock.instant();
+        practiceOverrides
+            .findAll()
+            .stream()
+            .filter(override -> override.getPosition() != null)
+            .forEach(override -> {
+                override.clearPosition(now);
+                if (override.isEmpty()) {
+                    practiceOverrides.delete(override);
+                } else {
+                    practiceOverrides.save(override);
+                }
+            });
+        areaOverrides
+            .findAll()
+            .stream()
+            .filter(override -> override.getPosition() != null)
+            .forEach(override -> {
+                override.clearPosition(now);
+                if (override.isEmpty()) {
+                    areaOverrides.delete(override);
+                } else {
+                    areaOverrides.save(override);
+                }
+            });
         return catalog();
     }
 
@@ -370,7 +405,7 @@ public class CuratedCatalogService {
     ) {
         lockCatalog();
         EffectiveCatalog before = catalog();
-        CuratedCatalogModel.requireStructure(before, precondition);
+        CuratedCatalogModel.requireCatalog(before, precondition);
         CatalogEntry<PracticeDefinition> entry = before
             .practice(slug)
             .orElseThrow(() -> new EntityNotFoundException(CATALOG_PRACTICE, slug));
@@ -422,8 +457,8 @@ public class CuratedCatalogService {
             ConfigAuditEntry.instanceUpdated(
                 ConfigAuditEntityType.CURATED_PRACTICE,
                 slug,
-                CatalogEntrySnapshot.of(before),
-                CatalogEntrySnapshot.of(after)
+                CuratedPracticeSnapshot.of(before),
+                CuratedPracticeSnapshot.of(after)
             )
         );
         return after;
@@ -435,19 +470,15 @@ public class CuratedCatalogService {
             ConfigAuditEntry.instanceUpdated(
                 ConfigAuditEntityType.CURATED_PRACTICE_AREA,
                 slug,
-                CatalogEntrySnapshot.of(before),
-                CatalogEntrySnapshot.of(after)
+                CuratedAreaSnapshot.of(before),
+                CuratedAreaSnapshot.of(after)
             )
         );
         return after;
     }
 
     private void lockCatalog() {
-        entityManager
-            .createNativeQuery(
-                "SELECT pg_advisory_xact_lock(hashtext('hephaestus'), hashtext('curated-practice-catalog'))"
-            )
-            .getSingleResult();
+        catalogLock.acquire();
     }
 
     private CuratedPracticeOverride practiceOverride(String slug, Instant now) {

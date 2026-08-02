@@ -15,10 +15,10 @@ export function CatalogOriginBadge({ origin, kind }: CatalogOriginBadgeProps) {
 		return (
 			<Tooltip>
 				<TooltipTrigger className={badgeVariants({ variant: "outline" })}>
-					No longer included in new workspaces
+					Not in the current instance catalog
 				</TooltipTrigger>
 				<TooltipContent>
-					{`The instance catalog no longer includes this ${kind} in new workspaces. This workspace's version remains unchanged.`}
+					{`New workspaces no longer receive this ${kind} from the instance catalog. This workspace keeps its version.`}
 				</TooltipContent>
 			</Tooltip>
 		);

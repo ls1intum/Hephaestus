@@ -7,7 +7,7 @@ import org.springframework.data.repository.Repository;
 
 @org.springframework.stereotype.Repository
 @WorkspaceAgnostic("The instance catalog is global")
-public interface CuratedAreaOverrideRepository extends Repository<CuratedAreaOverride, Long> {
+public interface CuratedAreaOverrideRepository extends Repository<CuratedAreaOverride, String> {
     CuratedAreaOverride save(CuratedAreaOverride override);
 
     void delete(CuratedAreaOverride override);

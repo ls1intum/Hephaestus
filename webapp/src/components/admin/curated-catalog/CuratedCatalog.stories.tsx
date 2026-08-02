@@ -12,8 +12,6 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 	state: "FROM_HEPHAESTUS",
 	changeKind: "NONE",
 	offered: true,
-	retired: false,
-	updatedAt: new Date("2026-07-30T12:00:00Z"),
 	...overrides,
 });
 
@@ -39,7 +37,7 @@ const areas: CuratedArea[] = [
 		slug: "not-offered",
 		position: 2,
 		definition: { name: "Legacy conventions" },
-		status: status({ offered: false, retired: true }),
+		status: status({ offered: false }),
 	},
 ];
 
@@ -95,7 +93,7 @@ const practices: CuratedPracticeSummary[] = [
 		artifactType: "PULL_REQUEST",
 		areaSlug: "an-area-hephaestus-stopped-shipping",
 		effectivelyOffered: false,
-		status: status({ state: "NO_LONGER_SHIPPED", offered: false, retired: true }),
+		status: status({ state: "NO_LONGER_SHIPPED", offered: false }),
 	},
 ];
 
@@ -118,11 +116,13 @@ const meta = {
 			noLongerShipped: 1,
 		},
 		search: {},
+		customOrder: false,
 		onSearchChange: fn(),
 		onPracticeStatusChange: fn(),
 		onAreaStatusChange: fn(),
 		onReorderAreas: fn(),
 		onPlacePractice: fn(),
+		onResetOrder: fn(),
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof CuratedCatalog>;
@@ -131,6 +131,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Everything: Story = {};
+
+export const CustomOrder: Story = {
+	args: { customOrder: true },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: "Use Hephaestus order" }));
+		const dialog = await screen.findByRole("alertdialog");
+		await expect(dialog).toHaveAccessibleDescription(/Definitions and inclusion will not change/);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Use Hephaestus order" }));
+		await expect(args.onResetOrder).toHaveBeenCalledOnce();
+	},
+};
 
 export const OnlyIncluded: Story = { args: { search: { status: "OFFERED" } } };
 
@@ -191,8 +203,10 @@ export const FilteringOpensMatchingAreas: Story = {
 		const area = canvas.getByRole("button", { name: /^Packaging work for review 3$/ });
 		await userEvent.click(area);
 		await userEvent.click(canvas.getByRole("combobox", { name: "Filter by work type" }));
-		await userEvent.click(await screen.findByRole("option", { name: "Pull or merge request" }));
+		await userEvent.click(await screen.findByRole("option", { name: "Pull or merge requests" }));
 		await canvas.findByText("Keep a change to one concern");
+		await expect(area).toHaveAttribute("aria-expanded", "true");
+		await expect(area).toHaveAttribute("aria-disabled", "true");
 	},
 };
 
@@ -249,7 +263,7 @@ export const PracticeInsideExcludedArea: Story = {
 				...practices[1],
 				areaSlug: areas[2].slug,
 				effectivelyOffered: false,
-				status: status({ offered: false, retired: true }),
+				status: status({ offered: false }),
 			},
 		],
 	},
@@ -276,7 +290,7 @@ export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
 			{
 				...practices[1],
 				effectivelyOffered: false,
-				status: status({ offered: false, retired: true }),
+				status: status({ offered: false }),
 			},
 		],
 	},
@@ -302,7 +316,7 @@ export const ExcludingAnAreaDoesNotRecountExcludedPractices: Story = {
 				...practices[0],
 				areaSlug: areas[0].slug,
 				effectivelyOffered: false,
-				status: status({ offered: false, retired: true }),
+				status: status({ offered: false }),
 			},
 		],
 		summary: {

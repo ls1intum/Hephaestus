@@ -21,10 +21,16 @@ public interface PracticeRevisionRepository
 
     Optional<PracticeRevision> findFirstByPracticeIdOrderByRevisionNumberDesc(Long practiceId);
 
-    /**
-     * Revisions carrying a definition but no fingerprint — the rows the schema migration created, which
-     * SQL could not fingerprint because the hash is defined in Java.
-     */
+    @Query(
+        """
+        SELECT DISTINCT r.practice.workspace.id FROM PracticeRevision r
+        WHERE r.slug IS NOT NULL
+          AND r.detectionFingerprint IS NULL
+        ORDER BY r.practice.workspace.id
+        """
+    )
+    List<Long> findWorkspaceIdsWithDefinitionRevisionsMissingFingerprint();
+
     @Query(
         """
         SELECT r FROM PracticeRevision r

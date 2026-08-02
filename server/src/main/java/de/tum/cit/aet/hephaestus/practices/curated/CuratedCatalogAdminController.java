@@ -47,18 +47,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/**
- * The instance catalog. Areas and practices get the same operations, because they are the same kind
- * of thing: read, add, replace, keep mine, use the Hephaestus one, and stop offering it.
- *
- * <p>Every write carries {@code If-Match}. The tag is derived from the entry's content, so it works
- * the same whether or not anybody has edited the entry before.
- */
 @RestController
 @RequestMapping("/admin/practice-catalog")
 @PreAuthorize("hasAuthority('app_admin')")
 @ConditionalOnServerRole
-@Tag(name = "Admin Practice Catalog", description = "The practice catalog this instance offers")
+@Tag(name = "Admin Practice Catalog", description = "The starting catalog copied into new workspaces")
 @RequiredArgsConstructor
 @Validated
 public class CuratedCatalogAdminController {
@@ -68,7 +61,7 @@ public class CuratedCatalogAdminController {
     @GetMapping
     @Operation(
         summary = "Read the instance catalog",
-        description = "Every entry with the definition in force, what Hephaestus ships where it differs, and a summary.",
+        description = "Every entry with its saved definition, a differing Hephaestus default when relevant, and a summary.",
         operationId = "adminGetCuratedCatalog"
     )
     public ResponseEntity<CuratedCatalogDTO> catalog() {
@@ -138,7 +131,7 @@ public class CuratedCatalogAdminController {
 
     @PatchMapping("/practices/{slug}/status")
     @Operation(
-        summary = "Stop offering a practice, or offer it again",
+        summary = "Exclude a practice from new workspaces, or include it again",
         operationId = "adminUpdateCuratedPracticeStatus"
     )
     @ApiResponse(
@@ -171,7 +164,7 @@ public class CuratedCatalogAdminController {
     @DeleteMapping("/practices/{slug}/override")
     @Operation(
         summary = "Use the Hephaestus definition of a practice",
-        description = "Discards this instance's definition, so the practice follows Hephaestus again.",
+        description = "Discards the customization, so the practice follows the Hephaestus default again.",
         operationId = "adminDeleteCuratedPracticeOverride"
     )
     @ApiResponse(
@@ -205,10 +198,10 @@ public class CuratedCatalogAdminController {
         return ok(service.resetPractice(slug, precondition(ifMatch)), CuratedPracticeDTO::from);
     }
 
-    @PostMapping("/practices/{slug}/keep")
+    @PutMapping("/practices/{slug}/override/acknowledgement")
     @Operation(
-        summary = "Keep this instance's definition of a practice",
-        description = "Records that the newer Hephaestus definition has been seen and this instance's own is kept.",
+        summary = "Keep the saved practice customization",
+        description = "Records that the Hephaestus update was reviewed and keeps the saved definition.",
         operationId = "adminKeepCuratedPractice"
     )
     @ApiResponse(
@@ -279,16 +272,6 @@ public class CuratedCatalogAdminController {
         return ok(service.area(slug), CuratedAreaDTO::from);
     }
 
-    @GetMapping("/areas/{slug}/practices")
-    @Operation(
-        summary = "Practices an area would withhold if it stopped being offered",
-        operationId = "adminListCuratedAreaPractices"
-    )
-    public ResponseEntity<List<String>> getAreaPractices(@PathVariable String slug) {
-        service.area(slug);
-        return ResponseEntity.ok(service.catalog().offeredPracticesIn(slug));
-    }
-
     @PostMapping("/areas")
     @Operation(summary = "Add an area to the catalog", operationId = "adminCreateCuratedArea")
     @ApiResponse(
@@ -338,8 +321,8 @@ public class CuratedCatalogAdminController {
 
     @PatchMapping("/areas/{slug}/status")
     @Operation(
-        summary = "Stop offering an area, or offer it again",
-        description = "An area that is not offered withholds the practices filed under it; nothing already installed changes.",
+        summary = "Exclude an area from new workspaces, or include it again",
+        description = "Excluding an area also excludes its practices from new workspaces; existing workspaces do not change.",
         operationId = "adminUpdateCuratedAreaStatus"
     )
     @ApiResponse(
@@ -402,8 +385,8 @@ public class CuratedCatalogAdminController {
         return ok(service.resetArea(slug, precondition(ifMatch)), CuratedAreaDTO::from);
     }
 
-    @PostMapping("/areas/{slug}/keep")
-    @Operation(summary = "Keep this instance's definition of an area", operationId = "adminKeepCuratedArea")
+    @PutMapping("/areas/{slug}/override/acknowledgement")
+    @Operation(summary = "Keep the saved area customization", operationId = "adminKeepCuratedArea")
     @ApiResponse(
         responseCode = "200",
         description = "The area",
@@ -443,9 +426,22 @@ public class CuratedCatalogAdminController {
         return catalogResponse(service.reorderAreas(precondition(ifMatch), request.orderedSlugs()));
     }
 
+    @DeleteMapping("/order")
+    @Operation(summary = "Use the Hephaestus default order", operationId = "adminResetCuratedCatalogOrder")
+    @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
+    public ResponseEntity<CuratedCatalogDTO> resetOrder(
+        @Parameter(required = true) @RequestHeader(
+            name = HttpHeaders.IF_MATCH,
+            required = false
+        ) @Nullable String ifMatch
+    ) {
+        return catalogResponse(service.resetOrder(precondition(ifMatch)));
+    }
+
     private static ResponseEntity<CuratedCatalogDTO> catalogResponse(EffectiveCatalog catalog) {
         CuratedCatalogDTO body = new CuratedCatalogDTO(
-            catalog.structureEtag(),
+            catalog.etag(),
+            catalog.customOrder(),
             CuratedCatalogSummaryDTO.from(catalog.summary()),
             catalog.areas().stream().map(CuratedAreaDTO::from).toList(),
             catalog
@@ -454,7 +450,7 @@ public class CuratedCatalogAdminController {
                 .map(entry -> CuratedPracticeSummaryDTO.from(entry, catalog.isEffectivelyOffered(entry)))
                 .toList()
         );
-        return ResponseEntity.ok().eTag(etag(catalog.structureEtag())).body(body);
+        return ResponseEntity.ok().eTag(etag(catalog.etag())).body(body);
     }
 
     private static <D extends CatalogDefinition, T> ResponseEntity<T> ok(

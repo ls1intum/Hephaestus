@@ -77,6 +77,8 @@ tags:
 - description: "Workspace-admin access to review runs, findings, and message delivery\
     \ history"
   name: Practice reviews
+- description: The starting catalog copied into new workspaces
+  name: Admin Practice Catalog
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
@@ -119,8 +121,6 @@ tags:
   name: Team Settings
 - description: Developer reactions to delivered feedback
   name: Feedback Reaction
-- description: The practice catalog this instance offers
-  name: Admin Practice Catalog
 - description: Identity provider discovery (public)
   name: Auth discovery
 - description: Integration sync observability and manual controls
@@ -361,6 +361,7 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - PRACTICE_DEFINITION
+            - PRACTICE_AREA
             - CURATED_PRACTICE
             - CURATED_PRACTICE_AREA
             - WORKSPACE_INSTANCE_LLM_BUDGET
@@ -860,8 +861,8 @@ paths:
       - Admin
   /admin/practice-catalog:
     get:
-      description: "Every entry with the definition in force, what Hephaestus ships\
-        \ where it differs, and a summary."
+      description: "Every entry with its saved definition, a differing Hephaestus\
+        \ default when relevant, and a summary."
       operationId: adminGetCuratedCatalog
       responses:
         "200":
@@ -983,42 +984,6 @@ paths:
       summary: Replace an area definition
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas/{slug}/keep:
-    post:
-      operationId: adminKeepCuratedArea
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      - in: header
-        name: If-Match
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CuratedArea"
-          description: The area
-        "412":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The supplied ETag is stale
-        "428":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: If-Match is required
-      summary: Keep this instance's definition of an area
-      tags:
-      - Admin Practice Catalog
   /admin/practice-catalog/areas/{slug}/override:
     delete:
       operationId: adminDeleteCuratedAreaOverride
@@ -1061,12 +1026,17 @@ paths:
       summary: Use the Hephaestus definition of an area
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas/{slug}/practices:
-    get:
-      operationId: adminListCuratedAreaPractices
+  /admin/practice-catalog/areas/{slug}/override/acknowledgement:
+    put:
+      operationId: adminKeepCuratedArea
       parameters:
       - in: path
         name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
         required: true
         schema:
           type: string
@@ -1075,17 +1045,27 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-          description: OK
-      summary: Practices an area would withhold if it stopped being offered
+                $ref: "#/components/schemas/CuratedArea"
+          description: The area
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Keep the saved area customization
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/areas/{slug}/status:
     patch:
-      description: An area that is not offered withholds the practices filed under
-        it; nothing already installed changes.
+      description: Excluding an area also excludes its practices from new workspaces;
+        existing workspaces do not change.
       operationId: adminUpdateCuratedAreaStatus
       parameters:
       - in: path
@@ -1123,7 +1103,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: "Stop offering an area, or offer it again"
+      summary: "Exclude an area from new workspaces, or include it again"
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/order:
+    delete:
+      operationId: adminResetCuratedCatalogOrder
+      parameters:
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedCatalog"
+          description: OK
+      summary: Use the Hephaestus default order
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices:
@@ -1236,48 +1235,10 @@ paths:
       summary: Replace a practice definition
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/practices/{slug}/keep:
-    post:
-      description: Records that the newer Hephaestus definition has been seen and
-        this instance's own is kept.
-      operationId: adminKeepCuratedPractice
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      - in: header
-        name: If-Match
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CuratedPractice"
-          description: The practice
-        "412":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The supplied ETag is stale
-        "428":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: If-Match is required
-      summary: Keep this instance's definition of a practice
-      tags:
-      - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}/override:
     delete:
-      description: "Discards this instance's definition, so the practice follows Hephaestus\
-        \ again."
+      description: "Discards the customization, so the practice follows the Hephaestus\
+        \ default again."
       operationId: adminDeleteCuratedPracticeOverride
       parameters:
       - in: path
@@ -1316,6 +1277,44 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
       summary: Use the Hephaestus definition of a practice
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/practices/{slug}/override/acknowledgement:
+    put:
+      description: Records that the Hephaestus update was reviewed and keeps the saved
+        definition.
+      operationId: adminKeepCuratedPractice
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CuratedPractice"
+          description: The practice
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required
+      summary: Keep the saved practice customization
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}/placement:
@@ -1387,7 +1386,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: "Stop offering a practice, or offer it again"
+      summary: "Exclude a practice from new workspaces, or include it again"
       tags:
       - Admin Practice Catalog
   /admin/users:
@@ -2263,6 +2262,7 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - PRACTICE_DEFINITION
+            - PRACTICE_AREA
             - CURATED_PRACTICE
             - CURATED_PRACTICE_AREA
             - WORKSPACE_INSTANCE_LLM_BUDGET
@@ -6874,8 +6874,6 @@ components:
           type: string
         offered:
           type: boolean
-        retired:
-          type: boolean
         state:
           type: string
           enum:
@@ -6884,14 +6882,10 @@ components:
           - UPDATE_WAITING
           - YOURS
           - NO_LONGER_SHIPPED
-        updatedAt:
-          type: string
-          format: date-time
       required:
       - changeKind
       - etag
       - offered
-      - retired
       - state
     CatalogOrigin:
       type: object
@@ -7060,6 +7054,7 @@ components:
           - WORKSPACE_VISIBILITY
           - PRACTICE_ACTIVE
           - PRACTICE_DEFINITION
+          - PRACTICE_AREA
           - CURATED_PRACTICE
           - CURATED_PRACTICE_AREA
           - WORKSPACE_INSTANCE_LLM_BUDGET
@@ -7371,6 +7366,7 @@ components:
           example: reviewing-work
       required:
       - definition
+      - slug
     CreateCuratedPracticeRequest:
       type: object
       description: Request to add a practice to the instance catalog
@@ -7382,6 +7378,7 @@ components:
           example: pr-description-quality
       required:
       - definition
+      - slug
     CreateLlmConnectionRequest:
       type: object
       description: Create an instance LLM provider connection
@@ -7850,6 +7847,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CuratedArea"
+        customOrder:
+          type: boolean
         etag:
           type: string
         practices:
@@ -7860,6 +7859,7 @@ components:
           $ref: "#/components/schemas/CuratedCatalogSummary"
       required:
       - areas
+      - customOrder
       - etag
       - practices
       - summary

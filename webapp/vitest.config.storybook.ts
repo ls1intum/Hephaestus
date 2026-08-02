@@ -29,15 +29,19 @@ export default defineConfig({
 		})
 	],
 	resolve: {
-		alias: {
-			"@": path.resolve(dirname, "./src")
-		}
+		alias: [
+			{
+				find: "@monaco-editor/react",
+				replacement: path.resolve(dirname, "./src/test/monaco-editor-react.mock.tsx")
+			},
+			{ find: "@", replacement: path.resolve(dirname, "./src") }
+		]
 	},
 	// Prevent runtime dependency discovery from reloading the browser test page mid-run.
 	optimizeDeps: {
 		noDiscovery: true,
 		include: [
-			...runtimeDeps,
+			...runtimeDeps.filter((dependency) => dependency !== "@monaco-editor/react"),
 			"posthog-js/react",
 			"use-sync-external-store/shim",
 			"use-sync-external-store/shim/with-selector"

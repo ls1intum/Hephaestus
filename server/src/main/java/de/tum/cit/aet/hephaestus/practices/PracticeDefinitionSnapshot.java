@@ -4,10 +4,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -30,20 +26,11 @@ record PracticeDefinitionSnapshot(
             practice.getArtifactType(),
             TriggerEventsConverter.toList(practice.getTriggerEvents()).stream().sorted().toList(),
             criteriaRevision,
-            sha256(practice.getCriteria()),
-            practice.getPrecomputeScript() == null ? null : sha256(practice.getPrecomputeScript()),
+            CanonicalDigest.sha256Hex(practice.getCriteria()),
+            practice.getPrecomputeScript() == null ? null : CanonicalDigest.sha256Hex(practice.getPrecomputeScript()),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
             practice.getArea() == null ? null : practice.getArea().getSlug()
         );
-    }
-
-    private static String sha256(String content) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is unavailable", e);
-        }
     }
 }

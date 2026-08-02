@@ -97,6 +97,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 
 	const updateArea = useMutation({
 		...filedUnder(areaMutationKey, updateAreaMutation()),
+		scope: structuralScope,
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: areasQueryKey });
 			const previous = queryClient

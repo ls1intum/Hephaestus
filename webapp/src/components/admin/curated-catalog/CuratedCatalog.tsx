@@ -1,12 +1,16 @@
 import { Link } from "@tanstack/react-router";
-import { Plus, Search, Shapes } from "lucide-react";
+import { Plus, RotateCcw, Search, Shapes } from "lucide-react";
 import { useState } from "react";
 import type {
 	CuratedArea,
 	CuratedPracticeSummary,
 	CuratedCatalogSummary as Summary,
 } from "@/api/types.gen";
-import type { WorkArtifact } from "@/components/admin/practices/constants";
+import {
+	WORK_ARTIFACT_FILTER_OPTIONS,
+	WORK_ARTIFACT_LABELS,
+	type WorkArtifact,
+} from "@/components/admin/practice-catalog/constants";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -45,7 +49,8 @@ export interface CuratedCatalogProps {
 	practices: readonly CuratedPracticeSummary[];
 	summary: Summary;
 	search: CuratedCatalogSearch;
-	structurePending?: boolean;
+	customOrder: boolean;
+	writePending?: boolean;
 	pendingPracticeSlugs?: ReadonlySet<string>;
 	pendingAreaSlugs?: ReadonlySet<string>;
 	onSearchChange: (search: CuratedCatalogSearch) => void;
@@ -53,16 +58,11 @@ export interface CuratedCatalogProps {
 	onAreaStatusChange: (area: CuratedArea, offered: boolean) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
+	onResetOrder: () => void;
 }
 
 type StatusFilter = "OFFERED" | "NOT_OFFERED" | "ALL";
 type ArtifactFilter = WorkArtifact | "ALL";
-
-const ARTIFACT_LABELS: Record<WorkArtifact, string> = {
-	PULL_REQUEST: "Pull or merge request",
-	ISSUE: "Issue",
-	CONVERSATION_THREAD: "Conversation",
-};
 
 const STATUS_FILTERS = [
 	{ value: "ALL", label: "All" },
@@ -79,7 +79,8 @@ export function CuratedCatalog({
 	practices,
 	summary,
 	search,
-	structurePending = false,
+	customOrder,
+	writePending = false,
 	pendingPracticeSlugs = new Set(),
 	pendingAreaSlugs = new Set(),
 	onSearchChange,
@@ -87,9 +88,11 @@ export function CuratedCatalog({
 	onAreaStatusChange,
 	onReorderAreas,
 	onPlacePractice,
+	onResetOrder,
 }: CuratedCatalogProps) {
 	const [excludingPractice, setExcludingPractice] = useState<CuratedPracticeSummary | null>(null);
 	const [excludingArea, setExcludingArea] = useState<CuratedArea | null>(null);
+	const [resettingOrder, setResettingOrder] = useState(false);
 	const query = search.q ?? "";
 	const status: StatusFilter = search.status ?? "ALL";
 	const artifact: ArtifactFilter = search.artifact ?? "ALL";
@@ -161,6 +164,22 @@ export function CuratedCatalog({
 					onReviewChanges={() => onSearchChange({ review: true })}
 				/>
 				<CatalogFilters search={search} onSearchChange={onSearchChange} />
+				{customOrder && (
+					<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+						<p className="text-muted-foreground">
+							This catalog keeps your custom order when Hephaestus changes.
+						</p>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={writePending}
+							onClick={() => setResettingOrder(true)}
+						>
+							<RotateCcw className="mr-1.5 size-4" aria-hidden />
+							Use Hephaestus order
+						</Button>
+					</div>
+				)}
 				{!canReorder && !catalogIsEmpty && (
 					<p className="text-muted-foreground text-sm">
 						Clear the search and filters to reorder the catalog.
@@ -215,7 +234,7 @@ export function CuratedCatalog({
 						visiblePracticeSlugs={visiblePracticeSlugs}
 						forceOpenAreaSlugs={forcedOpenAreas}
 						canReorder={canReorder}
-						structurePending={structurePending}
+						writePending={writePending}
 						pendingAreaSlugs={pendingAreaSlugs}
 						pendingPracticeSlugs={pendingPracticeSlugs}
 						onAreaStatusChange={onAreaStatusChange}
@@ -227,6 +246,29 @@ export function CuratedCatalog({
 					/>
 				)}
 			</div>
+
+			<AlertDialog open={resettingOrder} onOpenChange={setResettingOrder}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Use the Hephaestus order?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Areas and practices will return to the order included with this Hephaestus version.
+							Definitions and inclusion will not change.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => {
+								onResetOrder();
+								setResettingOrder(false);
+							}}
+						>
+							Use Hephaestus order
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<AlertDialog
 				open={excludingPractice !== null}
@@ -396,12 +438,12 @@ function CatalogFilters({
 			>
 				<SelectTrigger className="w-full lg:w-52" aria-label="Filter by work type">
 					<SelectValue>
-						{artifact === "ALL" ? "All work types" : ARTIFACT_LABELS[artifact]}
+						{artifact === "ALL" ? "All work types" : WORK_ARTIFACT_LABELS[artifact]}
 					</SelectValue>
 				</SelectTrigger>
 				<SelectContent>
 					<SelectItem value="ALL">All work types</SelectItem>
-					{Object.entries(ARTIFACT_LABELS).map(([value, label]) => (
+					{WORK_ARTIFACT_FILTER_OPTIONS.map(({ value, label }) => (
 						<SelectItem key={value} value={value}>
 							{label}
 						</SelectItem>

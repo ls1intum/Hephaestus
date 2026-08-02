@@ -2,6 +2,17 @@ import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Practice, PracticeArea } from "@/api/types.gen";
+import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
+import {
+	WORK_ARTIFACT_FILTER_OPTIONS,
+	WORK_ARTIFACT_LABELS,
+} from "@/components/admin/practice-catalog/constants";
+import {
+	type CatalogEntryMoveActions,
+	type CatalogMoveActions,
+	SortableCatalogTree,
+	UNASSIGNED_CATALOG_BUCKET,
+} from "@/components/admin/practice-catalog/SortableCatalogTree";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -36,14 +47,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
-import { AreaVisualPicker } from "./AreaVisualPicker";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
-import {
-	type CatalogEntryMoveActions,
-	type CatalogMoveActions,
-	SortableCatalogTree,
-	UNASSIGNED_CATALOG_BUCKET,
-} from "./SortableCatalogTree";
 
 export type FocusFilter = "ALL" | Practice["artifactType"];
 
@@ -76,16 +80,8 @@ export interface PracticeCatalogProps {
 
 const FOCUS_FILTERS = [
 	{ value: "ALL", label: "All work types" },
-	{ value: "PULL_REQUEST", label: "Pull or merge requests" },
-	{ value: "ISSUE", label: "Issues" },
-	{ value: "CONVERSATION_THREAD", label: "Conversations" },
+	...WORK_ARTIFACT_FILTER_OPTIONS,
 ] satisfies Array<{ value: FocusFilter; label: string }>;
-
-const ARTIFACT_LABELS: Record<Practice["artifactType"], string> = {
-	PULL_REQUEST: "Pull or merge request",
-	ISSUE: "Issue",
-	CONVERSATION_THREAD: "Conversation",
-};
 
 export function PracticeCatalog({
 	workspaceSlug,
@@ -110,6 +106,15 @@ export function PracticeCatalog({
 			.filter((practice) => focusFilter === "ALL" || practice.artifactType === focusFilter)
 			.map((practice) => practice.slug),
 	);
+	const forceOpenAreaSlugs =
+		focusFilter === "ALL"
+			? undefined
+			: new Set(
+					practices
+						.filter((practice) => visiblePracticeSlugs.has(practice.slug))
+						.map((practice) => practice.areaSlug)
+						.filter((slug): slug is string => Boolean(slug)),
+				);
 
 	return (
 		<div className="space-y-4">
@@ -129,6 +134,7 @@ export function PracticeCatalog({
 				areas={areas}
 				entries={practices}
 				visibleEntrySlugs={visiblePracticeSlugs}
+				forceOpenAreaSlugs={forceOpenAreaSlugs}
 				areaReorderDisabled={pending.areaStructure}
 				disabledAreaSlugs={pending.areaSlugs}
 				disabledEntrySlugs={pending.practiceSlugs}
@@ -259,21 +265,19 @@ function CatalogToolbar({
 				aria-label="Filter by work type"
 				className="hidden sm:flex"
 			>
-				<ToggleGroupItem value="ALL" className="min-w-0">
-					All
-				</ToggleGroupItem>
-				<ToggleGroupItem
-					value="PULL_REQUEST"
-					className="h-auto min-h-7 min-w-0 whitespace-normal py-1 sm:whitespace-nowrap"
-				>
-					Pull or merge requests
-				</ToggleGroupItem>
-				<ToggleGroupItem value="ISSUE" className="min-w-0">
-					Issues
-				</ToggleGroupItem>
-				<ToggleGroupItem value="CONVERSATION_THREAD" className="min-w-0">
-					Conversations
-				</ToggleGroupItem>
+				{FOCUS_FILTERS.map((filter) => (
+					<ToggleGroupItem
+						key={filter.value}
+						value={filter.value}
+						className={cn(
+							"min-w-0",
+							filter.value === "PULL_REQUEST" &&
+								"h-auto min-h-7 whitespace-normal py-1 sm:whitespace-nowrap",
+						)}
+					>
+						{filter.value === "ALL" ? "All" : filter.label}
+					</ToggleGroupItem>
+				))}
 			</ToggleGroup>
 			<div className="grid grid-cols-2 gap-2 sm:flex">
 				<CreateAreaButton
@@ -532,7 +536,7 @@ function PracticeRowDetails({ practice, title }: { practice: Practice; title: Re
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<span>{ARTIFACT_LABELS[practice.artifactType]}</span>
+				<span>{WORK_ARTIFACT_LABELS[practice.artifactType]}</span>
 				{!practice.active && <Badge variant="outline">Not used in new reviews</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</ItemDescription>

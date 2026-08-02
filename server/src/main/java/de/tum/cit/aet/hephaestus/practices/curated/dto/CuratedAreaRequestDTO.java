@@ -4,13 +4,14 @@ import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** A whole curated area definition. The same body creates one and replaces one. */
 @Schema(description = "A complete curated practice area definition")
 public record CuratedAreaRequestDTO(
     @NotBlank(message = "Name is required")
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
+    @NonNull
     String name,
 
     @Size(max = 2000, message = "Description must be at most 2000 characters") @Nullable String description,

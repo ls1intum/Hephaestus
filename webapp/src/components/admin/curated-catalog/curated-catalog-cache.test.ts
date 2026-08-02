@@ -12,11 +12,11 @@ const status: CatalogEntryStatus = {
 	state: "FROM_HEPHAESTUS",
 	changeKind: "NONE",
 	offered: true,
-	retired: false,
 };
 
 const catalog = {
 	etag: "structure",
+	customOrder: false,
 	summary: {
 		total: 5,
 		updatesChangingDetection: 0,

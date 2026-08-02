@@ -228,8 +228,7 @@ erDiagram
     }
 
     CuratedAreaOverride {
-        BIGINT id PK
-        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(64) slug PK
         VARCHAR(128) name
         TEXT description
         INTEGER position
@@ -243,8 +242,7 @@ erDiagram
     }
 
     CuratedPracticeOverride {
-        BIGINT id PK
-        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(64) slug PK
         VARCHAR(128) name
         VARCHAR(32) applies_to
         JSONB trigger_events
@@ -824,7 +822,7 @@ erDiagram
     }
 
     PracticeRevision {
-        BIGINT id PK,UK
+        BIGINT id PK
         BIGINT practice_id FK,UK "NOT NULL"
         INTEGER revision_number UK "NOT NULL"
         TEXT criteria "NOT NULL"

@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-/** Identity of a whole practice definition, including the copy only humans read. */
 final class PracticeDefinitionDigest {
 
     private PracticeDefinitionDigest() {}

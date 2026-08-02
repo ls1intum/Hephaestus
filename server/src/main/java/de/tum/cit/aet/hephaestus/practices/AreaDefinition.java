@@ -4,10 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The canonical shape of a practice area, shared by the curated catalog and the workspace copies —
- * the area counterpart of {@link PracticeDefinition}.
- */
+/** Shared definition for catalog and workspace areas. */
 public record AreaDefinition(
     String name,
     @Nullable String description,
@@ -30,7 +27,6 @@ public record AreaDefinition(
         return AreaDefinitionDigest.digest(slug, this);
     }
 
-    /** Identity of how the area is presented. Areas do not participate in detection. */
     @Override
     public String detectionFingerprint(String slug) {
         return new CanonicalDigest()

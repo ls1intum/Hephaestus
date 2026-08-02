@@ -49,7 +49,7 @@
                     'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
                     'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
                     'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
-                    'PRACTICE_DEFINITION', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                    'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
                     'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
                     'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
                     'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
@@ -73,7 +73,7 @@
                     END IF;
                     IF NOT EXISTS (
                         SELECT 1 FROM config_audit_event
-                        WHERE entity_type IN ('CURATED_PRACTICE', 'CURATED_PRACTICE_AREA')
+                        WHERE entity_type IN ('PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA')
                     ) THEN
                         ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
                         ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
@@ -104,8 +104,7 @@
         </comment>
         <sql splitStatements="false"><![CDATA[
             CREATE TABLE curated_practice_override (
-                id BIGSERIAL PRIMARY KEY,
-                slug VARCHAR(64) NOT NULL CONSTRAINT uk_curated_practice_override_slug UNIQUE,
+                slug VARCHAR(64) PRIMARY KEY,
                 name VARCHAR(128),
                 applies_to VARCHAR(32),
                 trigger_events JSONB,
@@ -127,7 +126,9 @@
                 -- A definition is all of its required parts or none of them.
                 CONSTRAINT ck_curated_practice_override_shape
                     CHECK (
-                        (name IS NULL AND applies_to IS NULL AND trigger_events IS NULL AND criteria IS NULL)
+                        (name IS NULL AND applies_to IS NULL AND trigger_events IS NULL AND criteria IS NULL
+                            AND precompute_script IS NULL AND why_it_matters IS NULL
+                            AND what_good_looks_like IS NULL AND area_slug IS NULL AND based_on_digest IS NULL)
                         OR (name IS NOT NULL AND applies_to IS NOT NULL AND trigger_events IS NOT NULL
                             AND criteria IS NOT NULL)
                     ),
@@ -143,8 +144,7 @@
             );
 
             CREATE TABLE curated_area_override (
-                id BIGSERIAL PRIMARY KEY,
-                slug VARCHAR(64) NOT NULL CONSTRAINT uk_curated_area_override_slug UNIQUE,
+                slug VARCHAR(64) PRIMARY KEY,
                 name VARCHAR(128),
                 description TEXT,
                 position INTEGER,
@@ -158,7 +158,10 @@
                 CONSTRAINT ck_curated_area_override_says_something
                     CHECK (name IS NOT NULL OR retired_at IS NOT NULL OR position IS NOT NULL),
                 CONSTRAINT ck_curated_area_override_shape
-                    CHECK (name IS NOT NULL OR (description IS NULL AND icon IS NULL AND color IS NULL)),
+                    CHECK (
+                        name IS NOT NULL
+                        OR (description IS NULL AND icon IS NULL AND color IS NULL AND based_on_digest IS NULL)
+                    ),
                 CONSTRAINT ck_curated_area_override_position
                     CHECK (position IS NULL OR position >= 0),
                 CONSTRAINT ck_curated_area_override_based_on
@@ -240,7 +243,6 @@
               );
 
             ALTER TABLE practice_revision
-                ADD CONSTRAINT uk_practice_revision_owner UNIQUE (id, practice_id),
                 ADD CONSTRAINT ck_practice_revision_number
                     CHECK (revision_number >= 1),
                 ADD CONSTRAINT ck_practice_revision_definition_shape
@@ -380,7 +382,6 @@
                 DROP INDEX IF EXISTS idx_practice_source_curated_slug;
 
                 ALTER TABLE practice_revision
-                    DROP CONSTRAINT IF EXISTS uk_practice_revision_owner,
                     DROP CONSTRAINT IF EXISTS ck_practice_revision_number,
                     DROP CONSTRAINT IF EXISTS ck_practice_revision_definition_shape,
                     DROP CONSTRAINT IF EXISTS ck_practice_revision_applies_to,
@@ -433,6 +434,20 @@
 
             ALTER TABLE practice_catalog_installation
                 ADD COLUMN provenance_linked_at TIMESTAMP(6) WITH TIME ZONE;
+
+            -- The released marker changeset inserted one row for every workspace, whether or not it
+            -- installed the catalog. Close those ambiguous bulk markers, except for the legacy
+            -- lowest-id workspace. Markers written later by the runtime seeder remain eligible for
+            -- immutable-definition matching.
+            UPDATE practice_catalog_installation
+            SET provenance_linked_at = installed_at
+            WHERE workspace_id <> (SELECT MIN(id) FROM workspace)
+              AND installed_at <= (
+                  SELECT MAX(dateexecuted)
+                  FROM databasechangelog
+                  WHERE id = '1785274902740-4'
+                    AND author = 'hephaestus'
+              );
         ]]></sql>
         <rollback>
             <sql splitStatements="false"><![CDATA[

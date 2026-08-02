@@ -32,4 +32,25 @@ class EffectiveCatalogTest extends BaseUnitTest {
 
         assertThat(catalog.summary().notOffered()).isEqualTo(2);
     }
+
+    @Test
+    void catalogTagIncludesWhetherTheInstanceOwnsTheOrder() {
+        var areaDefinition = area("Quality", "Make work easy to change");
+        var areas = List.of(CatalogEntry.shippedOnly("quality", areaDefinition, 0));
+
+        assertThat(new EffectiveCatalog(areas, List.of(), true).etag()).isNotEqualTo(
+            new EffectiveCatalog(areas, List.of(), false).etag()
+        );
+    }
+
+    @Test
+    void catalogTagIncludesEntryPositions() {
+        var areaDefinition = area("Quality", "Make work easy to change");
+        var first = CatalogEntry.shippedOnly("quality", areaDefinition, 0);
+        var moved = CatalogEntry.shippedOnly("quality", areaDefinition, 1);
+
+        assertThat(new EffectiveCatalog(List.of(first), List.of()).etag()).isNotEqualTo(
+            new EffectiveCatalog(List.of(moved), List.of()).etag()
+        );
+    }
 }

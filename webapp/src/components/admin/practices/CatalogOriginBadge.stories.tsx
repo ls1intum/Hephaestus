@@ -64,11 +64,11 @@ export const NoLongerIncluded: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		const status = canvas.getByRole("button", {
-			name: "No longer included in new workspaces",
+			name: "Not in the current instance catalog",
 		});
 		status.focus();
 		const tooltip = await within(document.body).findByText(
-			"The instance catalog no longer includes this practice in new workspaces. This workspace's version remains unchanged.",
+			"New workspaces no longer receive this practice from the instance catalog. This workspace keeps its version.",
 		);
 		await waitFor(() => expect(tooltip).toBeVisible());
 	},

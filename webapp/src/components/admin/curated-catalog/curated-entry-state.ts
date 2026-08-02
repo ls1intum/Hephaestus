@@ -27,7 +27,7 @@ export function curatedEntryCopy(
 				label: "Customized on this instance",
 				tone: "info",
 				detail: status.offered
-					? `New workspaces receive this customized ${kind}. Hephaestus updates require review.`
+					? `This ${kind} is customized on this instance. Hephaestus updates require review.`
 					: `This customized ${kind} is excluded from new workspaces.`,
 			};
 		case "UPDATE_WAITING":
@@ -36,7 +36,7 @@ export function curatedEntryCopy(
 					label: "Hephaestus update available",
 					tone: "info",
 					detail:
-						"Applying this update would change the area's name, description, icon, or color. The current version remains active until you decide.",
+						"Applying this update would change the area's name, description, icon, or color. Your saved version stays in place until you decide.",
 				};
 			}
 			return {
@@ -45,7 +45,7 @@ export function curatedEntryCopy(
 				detail:
 					status.changeKind === "WORDING"
 						? "Applying this update would change wording or developer guidance only. Review behavior would stay the same."
-						: "Applying this update would change review behavior. The current version remains active until you decide.",
+						: "Applying this update would change review behavior. Your saved version stays in place until you decide.",
 			};
 		case "NO_LONGER_SHIPPED":
 			return {

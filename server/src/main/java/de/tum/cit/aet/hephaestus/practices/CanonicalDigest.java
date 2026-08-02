@@ -23,7 +23,6 @@ public final class CanonicalDigest {
         return this;
     }
 
-    /** A present value is distinguished from an absent one by a leading marker byte. */
     public CanonicalDigest addNullable(@Nullable String value) {
         if (value == null) {
             digest.update((byte) 0);
@@ -40,6 +39,10 @@ public final class CanonicalDigest {
 
     public String hex() {
         return HexFormat.of().formatHex(digest.digest());
+    }
+
+    public static String sha256Hex(String value) {
+        return HexFormat.of().formatHex(sha256().digest(value.getBytes(StandardCharsets.UTF_8)));
     }
 
     private static MessageDigest sha256() {

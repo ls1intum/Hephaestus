@@ -8,8 +8,6 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 	state: "FROM_HEPHAESTUS",
 	changeKind: "NONE",
 	offered: true,
-	retired: false,
-	updatedAt: new Date("2026-07-30T12:00:00Z"),
 	...overrides,
 });
 
@@ -47,7 +45,7 @@ export const RemovedFromDefaults: Story = {
 };
 
 export const Excluded: Story = {
-	args: { status: status({ offered: false, retired: true }), kind: "area" },
+	args: { status: status({ offered: false }), kind: "area" },
 	play: async ({ canvasElement }) => {
 		await expect(within(canvasElement).getByText("Excluded from new workspaces")).toBeVisible();
 	},

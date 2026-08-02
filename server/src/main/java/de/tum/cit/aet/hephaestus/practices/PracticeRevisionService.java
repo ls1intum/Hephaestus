@@ -16,13 +16,6 @@ public class PracticeRevisionService {
     private final PracticeRepository practiceRepository;
     private final PracticeRevisionRepository practiceRevisionRepository;
 
-    /**
-     * Records the practice's current definition as the next revision.
-     *
-     * <p>The revision's fingerprint is what later says whether this copy still matches the catalog —
-     * derived from the definition itself, so editing only what people read keeps the match, editing
-     * the detection criteria drops it, and editing them back restores it.
-     */
     @Transactional(propagation = Propagation.MANDATORY)
     public PracticeRevision append(Practice practice) {
         practiceRepository

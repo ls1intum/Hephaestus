@@ -29,8 +29,8 @@ import org.jspecify.annotations.Nullable;
  * accompanying REVOKE does not currently bind — the app connects as the bootstrap superuser — so the
  * trigger is the only live control; it holds against application bugs, not against the operator.
  *
- * <p>{@code workspace_id} is null only for {@code CURATED_PRACTICE} events; every other entity type
- * must identify its workspace. The database CHECK constraint enforces this boundary.
+ * <p>{@code workspace_id} is null for instance-curated catalog events; every workspace resource must
+ * identify its workspace. The database CHECK constraint enforces this boundary.
  */
 @Entity
 @Table(name = "config_audit_event")
