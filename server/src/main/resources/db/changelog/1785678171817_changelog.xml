@@ -67,4 +67,39 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-admin-console" id="1785678171817-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="ck_auth_event_event_type not present to widen">
+            <!-- auth_event is RANGE-partitioned, so the CHECK exists once per partition as well as on the
+                 parent; scope the count to the parent or this precondition fails and MARK_RAN silently
+                 skips the widening, leaving the toggle unauditable. -->
+            <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'ck_auth_event_event_type' AND conrelid = 'auth_event'::regclass</sqlCheck>
+        </preConditions>
+        <comment>
+            Admit SILENT_MODE_CHANGED on auth_event. The instance silent-mode brake is global, and
+            config_audit_event.workspace_id is NOT NULL, so it cannot live there. Without this the
+            insert violates the CHECK and the toggle commits UNAUDITED, because the audit write runs
+            in its own transaction and its failure cannot roll the settings change back.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE auth_event DROP CONSTRAINT ck_auth_event_event_type;
+            ALTER TABLE auth_event ADD CONSTRAINT ck_auth_event_event_type CHECK (event_type IN (
+                'LOGIN', 'LOGIN_FAILED', 'LOGOUT', 'TOKEN_REFRESH', 'JWT_REVOKED',
+                'IDENTITY_LINKED', 'IDENTITY_UNLINKED',
+                'IMPERSONATION_BEGIN', 'IMPERSONATION_END',
+                'ACCOUNT_DELETED',
+                'EXPORT_REQUESTED', 'APP_ROLE_CHANGED',
+                'RESEARCH_CONSENT_REVOKED',
+                'LLM_CONNECTION_CREATED', 'LLM_CONNECTION_UPDATED', 'LLM_CONNECTION_DELETED',
+                'LLM_MODEL_CREATED', 'LLM_MODEL_UPDATED', 'LLM_MODEL_DELETED',
+                'LLM_MODEL_PRICE_CHANGED', 'LLM_MODEL_SHARING_CHANGED', 'LLM_SETTINGS_CHANGED',
+                'LOGIN_PROVIDER_CREATED', 'LOGIN_PROVIDER_UPDATED', 'LOGIN_PROVIDER_DELETED',
+                'SILENT_MODE_CHANGED'
+            ));
+        ]]></sql>
+        <!-- Empty: re-adding the narrow CHECK fails the moment any row carries SILENT_MODE_CHANGED,
+             and a data-preserving downgrade would mean deleting or remapping audit rows, which a
+             rollback must never do silently. -->
+        <rollback/>
+    </changeSet>
+
 </databaseChangeLog>
