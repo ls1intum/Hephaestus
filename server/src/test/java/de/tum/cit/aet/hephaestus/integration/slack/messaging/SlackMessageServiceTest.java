@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -44,7 +45,7 @@ class SlackMessageServiceTest extends BaseUnitTest {
         );
     }
 
-    /** One private guard fronts all three; parameterizing keeps each entry point pinned without triplicating. */
+    /** One guard fronts every content send; parameterizing pins each entry point without triplicating. */
     @ParameterizedTest(name = "{0} is refused while silent mode is engaged")
     @MethodSource("outboundSends")
     void silentModeRefusesEveryOutboundSend(String name, ThrowingSend send) {
@@ -68,7 +69,22 @@ class SlackMessageServiceTest extends BaseUnitTest {
                 "sendEphemeralForWorkspace",
                 (ThrowingSend) s -> s.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "f")
             ),
-            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
+            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi"))
+        );
+    }
+
+    /** These ride inbound events whose handlers do not catch, so a throw would NAK into the poison alarm. */
+    @ParameterizedTest(name = "{0} is skipped, not refused, while silent mode is engaged")
+    @MethodSource("decorationCalls")
+    void silentModeSkipsDecorationCallsWithoutThrowing(String name, ThrowingSend call) {
+        silentModeEngaged = true;
+
+        assertThatCode(() -> call.run(service)).doesNotThrowAnyException();
+        verifyNoInteractions(credentialProvider);
+    }
+
+    private static Stream<Arguments> decorationCalls() {
+        return Stream.of(
             Arguments.of("setStatus", (ThrowingSend) s -> s.setStatus(7L, "C1ABCDEFGH", "171234.5678", "Thinking…")),
             Arguments.of(
                 "setSuggestedPrompts",

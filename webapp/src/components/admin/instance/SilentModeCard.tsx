@@ -59,14 +59,9 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 
 	// Each dialog stays open until the toggle it asked for actually lands, so its pending state is
 	// reachable and a failed request leaves the operator in the dialog rather than back on the card.
-	// Adjusting during render (rather than in an effect) is React's documented pattern for this.
+	// Dismissal stays available throughout: a request that never settles must not trap the operator.
 	if (engageOpen && engaged) setEngageOpen(false);
 	if (releaseOpen && !engaged) setReleaseOpen(false);
-
-	const closeUnlessPending = (setOpen: (open: boolean) => void) => (open: boolean) => {
-		if (!open && isPending) return;
-		setOpen(open);
-	};
 
 	const openEngage = () => {
 		setReason("");
@@ -142,7 +137,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 				)}
 			</CardFooter>
 
-			<Dialog open={engageOpen} onOpenChange={closeUnlessPending(setEngageOpen)}>
+			<Dialog open={engageOpen} onOpenChange={setEngageOpen}>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Engage silent mode</DialogTitle>
@@ -186,7 +181,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 				</DialogContent>
 			</Dialog>
 
-			<AlertDialog open={releaseOpen} onOpenChange={closeUnlessPending(setReleaseOpen)}>
+			<AlertDialog open={releaseOpen} onOpenChange={setReleaseOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Release silent mode?</AlertDialogTitle>
@@ -224,7 +219,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 							)}
 						</Field>
 						<AlertDialogFooter>
-							<AlertDialogCancel disabled={isPending}>Keep silent mode on</AlertDialogCancel>
+							<AlertDialogCancel>Keep silent mode on</AlertDialogCancel>
 							<AlertDialogAction type="submit" variant="destructive" disabled={isPending}>
 								{isPending && <Spinner aria-hidden />}
 								Release silent mode

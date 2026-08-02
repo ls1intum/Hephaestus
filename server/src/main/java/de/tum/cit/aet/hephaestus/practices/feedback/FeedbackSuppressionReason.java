@@ -28,6 +28,6 @@ public enum FeedbackSuppressionReason {
     RECIPIENT_OPTED_OUT,
     /** The composed body sanitised to blank and no inline note was placed. */
     EMPTY_AFTER_SANITIZE,
-    /** The instance-wide silent-mode brake was engaged, so nothing was posted anywhere (#1386). */
+    /** The instance-wide silent-mode brake was engaged, so nothing was posted anywhere. */
     INSTANCE_SILENCED,
 }

@@ -69,3 +69,18 @@ export const Engaged: Story = {
 export const Pending: Story = {
 	args: { settings: engaged, isPending: true },
 };
+
+/** The dialog is dismissed by the settings landing, not by the click — so a failed request keeps it open. */
+export const ClosesWhenTheToggleLands: Story = {
+	play: async ({ canvasElement, args }) => {
+		const canvas = within(canvasElement);
+		const body = within(canvasElement.ownerDocument.body);
+		await userEvent.click(canvas.getByRole("button", { name: /engage silent mode/i }));
+		await expect(await body.findByRole("dialog")).toBeInTheDocument();
+
+		await userEvent.click(body.getByRole("button", { name: /^engage silent mode$/i }));
+		await expect(args.onEngage).toHaveBeenCalled();
+		// The parent has not flipped `settings` yet, so the dialog is still up.
+		await expect(body.getByRole("dialog")).toBeInTheDocument();
+	},
+};

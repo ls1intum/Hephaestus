@@ -79,7 +79,8 @@ public class InstanceSettingsService implements SilentModeQuery {
         );
         InstanceSettings saved = repository.save(settings);
         // auth_event, not config_audit_event: the latter's workspace_id is NOT NULL and this is instance-level.
-        // Written after the save so the trail never claims a change the database rejected.
+        // The writer commits in its own transaction, so the trail survives a rollback of this one — an
+        // over-recorded toggle beats a silently unaudited one for a control this consequential.
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("engaged", engaged);
         if (trimmedReason != null) {
