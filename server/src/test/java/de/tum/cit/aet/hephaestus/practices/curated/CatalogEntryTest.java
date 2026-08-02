@@ -27,7 +27,6 @@ class CatalogEntryTest extends BaseUnitTest {
     void aNewerBuildReachesAnUntouchedEntryWithNothingHavingToRun() {
         PracticeDefinition newer = practice("Small PRs", "Newer criteria", "Shipped reason");
 
-        // The same entry after a build that ships something else: no row, so no decision either.
         assertThat(CatalogEntry.shippedOnly(SLUG, newer, 0).effective()).isEqualTo(newer);
     }
 
@@ -110,7 +109,6 @@ class CatalogEntryTest extends BaseUnitTest {
         CatalogEntry<PracticeDefinition> untouched = CatalogEntry.shippedOnly(SLUG, SHIPPED, 0);
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
-        // An entry with no row still has a tag, which is what lets the first edit be conditional too.
         assertThat(untouched.etag()).isNotBlank();
         assertThat(entry(mine, SHIPPED, SHIPPED.digest(SLUG)).etag()).isNotEqualTo(untouched.etag());
         assertThat(retired(untouched).etag()).isNotEqualTo(untouched.etag());

@@ -1089,8 +1089,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedArea"
-          description: The area
+                $ref: "#/components/schemas/CuratedCatalog"
+          description: The updated catalog
         "412":
           content:
             application/json:

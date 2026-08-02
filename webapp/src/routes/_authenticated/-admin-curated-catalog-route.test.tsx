@@ -276,15 +276,18 @@ describe("instance catalog routes", () => {
 	});
 
 	it("explains which practices area exclusion affects", async () => {
-		mockCatalog();
+		const catalog = mockCatalog();
 		let ifMatch: string | null = null;
 		server.use(
 			http.patch("*/admin/practice-catalog/areas/:slug/status", ({ request }) => {
 				ifMatch = request.headers.get("if-match");
 				return HttpResponse.json({
-					slug: "packaging",
-					definition: areaDefinition,
-					status: status({ offered: false }),
+					...catalog,
+					etag: "structure-2",
+					areas: catalog.areas.map((area) => ({
+						...area,
+						status: status({ offered: false }),
+					})),
 				});
 			}),
 		);
@@ -308,7 +311,7 @@ describe("instance catalog routes", () => {
 	});
 
 	it("prevents a second catalog write while an area update is pending", async () => {
-		mockCatalog({
+		const catalog = mockCatalog({
 			customOrder: true,
 			areas: [
 				{ slug: "packaging", position: 0, definition: areaDefinition, status: status() },
@@ -324,9 +327,12 @@ describe("instance catalog routes", () => {
 			http.patch("*/admin/practice-catalog/areas/:slug/status", async () => {
 				await delay(500);
 				return HttpResponse.json({
-					slug: "packaging",
-					definition: areaDefinition,
-					status: status({ offered: false }),
+					...catalog,
+					etag: "structure-2",
+					areas: catalog.areas.map((area) => ({
+						...area,
+						status: status({ offered: false }),
+					})),
 				});
 			}),
 		);
@@ -351,6 +357,10 @@ describe("instance catalog routes", () => {
 		expect(
 			screen.getByRole("button", { name: "Use Hephaestus order" }).hasAttribute("disabled"),
 		).toBe(true);
+		expect(screen.getByRole("button", { name: "Create area" }).hasAttribute("disabled")).toBe(true);
+		expect(screen.getByRole("button", { name: "Create practice" }).hasAttribute("disabled")).toBe(
+			true,
+		);
 	});
 
 	it("sends the entry's tag when it stops offering a practice", async () => {

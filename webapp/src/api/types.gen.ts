@@ -5550,9 +5550,9 @@ export type AdminUpdateCuratedAreaStatusError = AdminUpdateCuratedAreaStatusErro
 
 export type AdminUpdateCuratedAreaStatusResponses = {
     /**
-     * The area
+     * The updated catalog
      */
-    200: CuratedArea;
+    200: CuratedCatalog;
 };
 
 export type AdminUpdateCuratedAreaStatusResponse = AdminUpdateCuratedAreaStatusResponses[keyof AdminUpdateCuratedAreaStatusResponses];

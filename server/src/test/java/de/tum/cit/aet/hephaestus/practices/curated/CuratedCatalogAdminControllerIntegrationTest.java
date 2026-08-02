@@ -41,7 +41,6 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     private static final String ADMIN_TOKEN = "mock-jwt-token-for-admin-user";
     private static final String MENTOR_TOKEN = "mock-jwt-token-for-mentor-user";
     private static final String CATALOG = "/admin/practice-catalog";
-    /** Real entries of the shipped catalog, so these cases run against what an instance actually gets. */
     private static final String PRACTICE = "describe-what-and-why";
     private static final String AREA = "review-ready-work";
 
@@ -105,8 +104,6 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
         CuratedPracticeDTO edited = getPractice();
 
-        // Without this, "use the Hephaestus version" would be asking somebody to accept text they
-        // cannot read.
         assertThat(edited.shipped()).isNotNull();
         assertThat(edited.shipped().criteria()).isNotEqualTo(edited.definition().criteria());
         assertThat(edited.status().changeKind()).isEqualTo(CatalogChangeKind.DETECTION);
@@ -220,10 +217,75 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
     @Test
     void guardsTheFirstEditOfAnEntryNobodyHasTouched() {
-        // The case with no stored row is exactly where two administrators are most likely to collide,
-        // so the tag has to exist before the row does.
         assertThat(overrideRows()).isZero();
         putPractice("\"nonsense\"", "Our own criteria").expectStatus().isEqualTo(412);
+    }
+
+    @Test
+    void acknowledgingEntriesWithoutCustomDefinitionsIsAnIdempotentNoOp() {
+        CuratedPracticeDTO practice = getPractice();
+        webTestClient
+            .patch()
+            .uri(CATALOG + "/practices/" + PRACTICE + "/status")
+            .headers(headers -> {
+                headers.setBearerAuth(ADMIN_TOKEN);
+                headers.set(HttpHeaders.IF_MATCH, etagOf(practice));
+            })
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateCuratedStatusRequestDTO(CuratedStatus.RETIRED))
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        CuratedCatalogDTO catalog = getCatalog();
+        webTestClient
+            .patch()
+            .uri(CATALOG + "/areas/" + AREA + "/status")
+            .headers(headers -> {
+                headers.setBearerAuth(ADMIN_TOKEN);
+                headers.set(HttpHeaders.IF_MATCH, quote(catalog.etag()));
+            })
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateCuratedStatusRequestDTO(CuratedStatus.RETIRED))
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        webTestClient
+            .put()
+            .uri(CATALOG + "/practices/" + PRACTICE + "/override/acknowledgement")
+            .headers(headers -> {
+                headers.setBearerAuth(ADMIN_TOKEN);
+                headers.set(HttpHeaders.IF_MATCH, etagOf(getPractice()));
+            })
+            .exchange()
+            .expectStatus()
+            .isOk();
+        webTestClient
+            .put()
+            .uri(CATALOG + "/areas/" + AREA + "/override/acknowledgement")
+            .headers(headers -> {
+                headers.setBearerAuth(ADMIN_TOKEN);
+                headers.set(HttpHeaders.IF_MATCH, etagOf(getArea(AREA)));
+            })
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM curated_practice_override WHERE slug = ? AND based_on_digest IS NULL",
+                Long.class,
+                PRACTICE
+            )
+        ).isOne();
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM curated_area_override WHERE slug = ? AND based_on_digest IS NULL",
+                Long.class,
+                AREA
+            )
+        ).isOne();
     }
 
     @Test
@@ -421,7 +483,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     void notOfferingAnAreaWithholdsThePracticesFiledUnderIt() {
         ensureAdminMembership(workspace);
         String catalogTag = tag(CATALOG);
-        webTestClient
+        var result = webTestClient
             .patch()
             .uri(CATALOG + "/areas/" + AREA + "/status")
             .headers(headers -> {
@@ -432,7 +494,13 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .bodyValue(new UpdateCuratedStatusRequestDTO(CuratedStatus.RETIRED))
             .exchange()
             .expectStatus()
-            .isOk();
+            .isOk()
+            .expectBody(CuratedCatalogDTO.class)
+            .returnResult();
+
+        CuratedCatalogDTO updated = result.getResponseBody();
+        assertThat(updated).isNotNull();
+        assertThat(result.getResponseHeaders().getETag()).isEqualTo(quote(updated.etag()));
 
         assertThat(getPractice().status().offered()).isTrue();
         CuratedCatalogDTO catalog = webTestClient

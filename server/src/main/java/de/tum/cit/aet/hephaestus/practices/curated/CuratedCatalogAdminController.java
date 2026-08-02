@@ -327,8 +327,8 @@ public class CuratedCatalogAdminController {
     )
     @ApiResponse(
         responseCode = "200",
-        description = "The area",
-        content = @Content(schema = @Schema(implementation = CuratedAreaDTO.class))
+        description = "The updated catalog",
+        content = @Content(schema = @Schema(implementation = CuratedCatalogDTO.class))
     )
     @ApiResponse(
         responseCode = "412",
@@ -341,7 +341,7 @@ public class CuratedCatalogAdminController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))
     )
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_AREA")
-    public ResponseEntity<CuratedAreaDTO> updateAreaStatus(
+    public ResponseEntity<CuratedCatalogDTO> updateAreaStatus(
         @PathVariable String slug,
         @Parameter(required = true) @RequestHeader(
             name = HttpHeaders.IF_MATCH,
@@ -349,7 +349,7 @@ public class CuratedCatalogAdminController {
         ) @Nullable String ifMatch,
         @Valid @RequestBody UpdateCuratedStatusRequestDTO request
     ) {
-        return ok(service.setAreaStatus(slug, precondition(ifMatch), request.status()), CuratedAreaDTO::from);
+        return catalogResponse(service.setAreaStatus(slug, precondition(ifMatch), request.status()));
     }
 
     @DeleteMapping("/areas/{slug}/override")

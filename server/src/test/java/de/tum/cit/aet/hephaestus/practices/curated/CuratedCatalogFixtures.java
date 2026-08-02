@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
 
-/** Definitions for tests, so a case describes content rather than construction. */
 final class CuratedCatalogFixtures {
 
     private CuratedCatalogFixtures() {}

@@ -91,7 +91,6 @@ public class CuratedCatalogService {
         return recordPractice(slug, entry);
     }
 
-    /** Adds a practice this instance authors. The slug must be free in the offered catalog. */
     @Transactional
     public CatalogEntry<PracticeDefinition> createPractice(String slug, PracticeDefinition definition) {
         lockCatalog();
@@ -115,7 +114,6 @@ public class CuratedCatalogService {
         return created;
     }
 
-    /** Discards this instance's definition, so the entry follows Hephaestus again. */
     @Transactional
     public CatalogEntry<PracticeDefinition> resetPractice(
         String slug,
@@ -144,7 +142,6 @@ public class CuratedCatalogService {
         return recordPractice(slug, entry);
     }
 
-    /** Records that the administrator has seen what ships now and is keeping their own definition. */
     @Transactional
     public CatalogEntry<PracticeDefinition> keepPractice(
         String slug,
@@ -157,6 +154,9 @@ public class CuratedCatalogService {
             slug,
             precondition
         );
+        if (entry.overridden() == null) {
+            return entry;
+        }
         practiceOverrides
             .findBySlug(slug)
             .ifPresent(override -> {
@@ -278,6 +278,9 @@ public class CuratedCatalogService {
             slug,
             precondition
         );
+        if (entry.overridden() == null) {
+            return entry;
+        }
         areaOverrides
             .findBySlug(slug)
             .ifPresent(override -> {
@@ -288,7 +291,7 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public CatalogEntry<AreaDefinition> setAreaStatus(
+    public EffectiveCatalog setAreaStatus(
         String slug,
         @Nullable CuratedVersionPrecondition precondition,
         CuratedStatus status
@@ -300,7 +303,7 @@ public class CuratedCatalogService {
             .area(slug)
             .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
         if (entry.retired() == (status == CuratedStatus.RETIRED)) {
-            return entry;
+            return before;
         }
         CuratedAreaOverride override = areaOverrides
             .findBySlug(slug)
@@ -311,7 +314,8 @@ public class CuratedCatalogService {
         } else {
             areaOverrides.save(override);
         }
-        return recordArea(slug, entry);
+        recordArea(slug, entry);
+        return catalog();
     }
 
     @Transactional
