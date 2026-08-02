@@ -10,12 +10,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * The singleton instance-wide settings row (id = {@link #SINGLETON_ID}, seeded by Liquibase so
- * reads never race a lazy bootstrap). Instance-scoped, deliberately not workspace-scoped —
- * registered in {@code WorkspaceScopedTables.GLOBAL_TABLES}.
- *
- * <p>{@code silentModeReason} / {@code silentModeChangedBy} are operator-facing breadcrumbs shown on
- * the admin console banner (why is everything silent, who did it, since when).
+ * Singleton instance-wide settings row (id = {@link #SINGLETON_ID}). Deliberately not
+ * workspace-scoped — listed in {@code WorkspaceScopedTables.GLOBAL_TABLES}.
  */
 @Entity
 @Table(name = "instance_settings")

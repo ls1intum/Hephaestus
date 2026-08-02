@@ -93,11 +93,8 @@ public class SlackMessageService {
     }
 
     /**
-     * Instance-wide emergency brake (#1386): while engaged, a new outbound send ({@code sendForWorkspace},
-     * {@code sendEphemeralForWorkspace}, {@code startStream}) fails with the {@code silent_mode_engaged}
-     * error code, so callers log-and-swallow it exactly like any other send failure. An <em>in-flight</em>
-     * stream ({@code appendStream}/{@code stopStream}) is deliberately left to finish rather than tear off
-     * mid-message; read-side calls (lookups, history) are unaffected.
+     * An <em>in-flight</em> stream ({@code appendStream}/{@code stopStream}) is deliberately allowed to
+     * finish rather than tear off mid-message; read-side calls are unaffected.
      */
     private void ensureNotSilenced(long workspaceId, String channelId) {
         if (silentModeQuery.isSilentModeEngaged()) {

@@ -17,13 +17,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface SilentModeStatusCardProps {
 	settings?: InstanceSettings;
 	isLoading?: boolean;
+	/** Unknown delivery state must not read as "delivering". */
+	isError?: boolean;
 }
 
-/**
- * The overview's delivery-state tile: is the instance-wide silent mode engaged? Read-only — the
- * control itself (with its asymmetric friction) lives on the instance settings page.
- */
-export function SilentModeStatusCard({ settings, isLoading = false }: SilentModeStatusCardProps) {
+/** Read-only status tile; the control itself lives on the instance settings page. */
+export function SilentModeStatusCard({
+	settings,
+	isLoading = false,
+	isError = false,
+}: SilentModeStatusCardProps) {
 	const engaged = settings?.silentModeEngaged === true;
 	return (
 		<Card>
@@ -47,6 +50,13 @@ export function SilentModeStatusCard({ settings, isLoading = false }: SilentMode
 			<CardContent>
 				{isLoading ? (
 					<Skeleton className="h-6 w-40" />
+				) : isError ? (
+					<div className="space-y-1">
+						<Badge variant="outline">Unknown</Badge>
+						<p className="text-sm text-muted-foreground">
+							Couldn&rsquo;t read the delivery state — open instance settings to check.
+						</p>
+					</div>
 				) : engaged ? (
 					<div className="space-y-1">
 						<Badge variant="destructive">Silent mode engaged</Badge>

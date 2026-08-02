@@ -1,9 +1,11 @@
 import { Volume2, VolumeX } from "lucide-react";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import type { InstanceSettings } from "@/api/types.gen";
-import { formatTimestamp } from "@/components/admin/audit-shared/time-format";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import {
 	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
 	AlertDialogContent,
 	AlertDialogDescription,
 	AlertDialogFooter,
@@ -22,32 +24,30 @@ import {
 } from "@/components/ui/card";
 import {
 	Dialog,
+	DialogClose,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
-/** The word the admin types to release the brake — matches the action verb. */
 const RELEASE_CONFIRM_WORD = "release";
 
 interface SilentModeCardProps {
 	settings: InstanceSettings;
 	isPending: boolean;
-	/** Engage the brake with an optional operator-facing reason. */
 	onEngage: (reason: string | undefined) => void;
-	/** Release the brake — delivery resumes instance-wide immediately. */
 	onRelease: () => void;
 }
 
 /**
- * The emergency silent-mode control (#1386), with asymmetric friction: engaging is one click plus an
- * optional reason; releasing (re-opens delivery to every workspace at once) takes a heavy
- * type-to-confirm dialog. Cheap to silence, expensive to un-silence.
+ * Deliberately asymmetric friction: cheap to silence, expensive to un-silence, because releasing
+ * re-opens delivery to every workspace at once.
  */
 export function SilentModeCard({ settings, isPending, onEngage, onRelease }: SilentModeCardProps) {
 	const engaged = settings.silentModeEngaged;
@@ -55,10 +55,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 	const [releaseOpen, setReleaseOpen] = useState(false);
 	const [reason, setReason] = useState("");
 	const [confirmWord, setConfirmWord] = useState("");
-
-	const changedAt = settings.silentModeChangedAt
-		? formatTimestamp(settings.silentModeChangedAt)
-		: null;
+	const [mismatch, setMismatch] = useState(false);
 
 	const openEngage = () => {
 		setReason("");
@@ -66,7 +63,18 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 	};
 	const openRelease = () => {
 		setConfirmWord("");
+		setMismatch(false);
 		setReleaseOpen(true);
+	};
+
+	const confirmRelease = (event: FormEvent) => {
+		event.preventDefault();
+		if (confirmWord.trim() !== RELEASE_CONFIRM_WORD) {
+			setMismatch(true);
+			return;
+		}
+		onRelease();
+		setReleaseOpen(false);
 	};
 
 	return (
@@ -81,26 +89,23 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 					Silent mode
 				</CardTitle>
 				<CardDescription>
-					The instance-wide emergency brake. While engaged, Hephaestus posts no practice feedback
-					and sends no Slack messages — for any workspace. Workspace settings are untouched and
-					apply again the moment silent mode is released.
+					The instance-wide emergency brake. While engaged, Hephaestus posts no practice feedback on
+					pull requests, merge requests or issues, and sends no Slack messages — for any workspace.
+					Workspace settings are untouched and apply again the moment silent mode is released.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-2">
-				<div className="flex items-center gap-2">
+				<div className="flex flex-wrap items-center gap-2">
 					{engaged ? (
 						<Badge variant="destructive">Engaged</Badge>
 					) : (
 						<Badge variant="success">Released</Badge>
 					)}
-					{changedAt ? (
-						<span
-							className="text-sm text-muted-foreground"
-							title={`${changedAt.local} (${changedAt.isoUtc})`}
-						>
+					{settings.silentModeChangedAt ? (
+						<span className="text-sm text-muted-foreground">
 							{engaged ? "engaged" : "last changed"}
-							{settings.silentModeChangedBy ? ` by ${settings.silentModeChangedBy}` : ""} —{" "}
-							{changedAt.local}
+							{settings.silentModeChangedBy ? ` by ${settings.silentModeChangedBy}` : ""}{" "}
+							<RelativeTime value={settings.silentModeChangedAt} />
 						</span>
 					) : null}
 				</div>
@@ -111,30 +116,33 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 			<CardFooter>
 				{engaged ? (
 					<Button variant="outline" onClick={openRelease} disabled={isPending}>
-						<Volume2 aria-hidden />
+						{isPending ? <Spinner aria-hidden /> : <Volume2 aria-hidden />}
 						Release silent mode…
 					</Button>
 				) : (
 					<Button variant="destructive-outline" onClick={openEngage} disabled={isPending}>
-						<VolumeX aria-hidden />
+						{isPending ? <Spinner aria-hidden /> : <VolumeX aria-hidden />}
 						Engage silent mode…
 					</Button>
 				)}
 			</CardFooter>
 
-			{/* Engage: deliberately cheap — one confirm, optional reason. */}
 			<Dialog open={engageOpen} onOpenChange={setEngageOpen}>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Engage silent mode</DialogTitle>
 						<DialogDescription>
-							All outbound delivery stops immediately: PR/MR feedback comments, Slack messages, and
-							mentor replies in Slack, across every workspace. Reviews still run and their findings
-							are saved — they are only held back from posting, and are not auto-posted on release.
+							Nothing will be posted to GitHub, GitLab or Slack from any workspace — no feedback on
+							pull requests, merge requests or issues, no Slack messages, not even the
+							acknowledgement reaction. Reviews keep running and keep costing AI budget; their
+							findings are saved and marked withheld, and anything withheld while silent mode is on
+							is never posted, not even after you release it.
 						</DialogDescription>
 					</DialogHeader>
 					<Field>
-						<FieldLabel htmlFor="silent-mode-reason">Reason</FieldLabel>
+						<FieldLabel htmlFor="silent-mode-reason">
+							Why are you silencing the instance?
+						</FieldLabel>
 						<Textarea
 							id="silent-mode-reason"
 							value={reason}
@@ -144,16 +152,13 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 							rows={3}
 						/>
 						<FieldDescription>
-							Optional, but it is what other admins will see on the banner.
+							Shown on the banner to every admin, and recorded in the audit log.
 						</FieldDescription>
 					</Field>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setEngageOpen(false)}>
-							Cancel
-						</Button>
+						<DialogClose render={<Button variant="outline">Cancel</Button>} />
 						<Button
 							variant="destructive"
-							disabled={isPending}
 							onClick={() => {
 								onEngage(reason.trim() === "" ? undefined : reason.trim());
 								setEngageOpen(false);
@@ -166,46 +171,51 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 				</DialogContent>
 			</Dialog>
 
-			{/* Release: deliberately heavy — restate consequences + type-to-confirm. */}
 			<AlertDialog open={releaseOpen} onOpenChange={setReleaseOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Release silent mode?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Delivery resumes for every workspace immediately: practice feedback lands on PRs and
-							MRs again and Slack messages go out. Make sure whatever prompted the brake is resolved
-							first.
+							Feedback starts landing on pull requests and merge requests again, and Slack messages
+							go out — for every workspace, immediately. Anything withheld while silent mode was on
+							stays withheld; releasing does not post it. If a bad review is what prompted this,
+							check that it is fixed first: the next completed review posts for real.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					<Field>
-						<FieldLabel htmlFor="silent-mode-release-confirm">
-							Type <span className="font-mono font-semibold">{RELEASE_CONFIRM_WORD}</span> to
-							confirm
-						</FieldLabel>
-						<Input
-							id="silent-mode-release-confirm"
-							value={confirmWord}
-							onChange={(event) => setConfirmWord(event.target.value)}
-							placeholder={RELEASE_CONFIRM_WORD}
-							autoComplete="off"
-						/>
-					</Field>
-					<AlertDialogFooter>
-						<Button variant="outline" onClick={() => setReleaseOpen(false)}>
-							Cancel
-						</Button>
-						<Button
-							variant="destructive"
-							disabled={isPending || confirmWord.trim().toLowerCase() !== RELEASE_CONFIRM_WORD}
-							onClick={() => {
-								onRelease();
-								setReleaseOpen(false);
-							}}
-						>
-							<Volume2 aria-hidden />
-							Release silent mode
-						</Button>
-					</AlertDialogFooter>
+					<form onSubmit={confirmRelease} className="grid gap-4">
+						<Field data-invalid={mismatch}>
+							<FieldLabel htmlFor="silent-mode-release-confirm">
+								Type <span className="font-mono font-medium">{RELEASE_CONFIRM_WORD}</span> to
+								confirm
+							</FieldLabel>
+							<Input
+								id="silent-mode-release-confirm"
+								value={confirmWord}
+								disabled={isPending}
+								onChange={(event) => {
+									setConfirmWord(event.target.value);
+									setMismatch(false);
+								}}
+								autoComplete="off"
+								autoCapitalize="off"
+								spellCheck={false}
+								aria-invalid={mismatch}
+								aria-describedby={mismatch ? "silent-mode-release-error" : undefined}
+							/>
+							{mismatch && (
+								<FieldError id="silent-mode-release-error">
+									That does not match. Type “{RELEASE_CONFIRM_WORD}” exactly.
+								</FieldError>
+							)}
+						</Field>
+						<AlertDialogFooter>
+							<AlertDialogCancel disabled={isPending}>Keep silent mode on</AlertDialogCancel>
+							<AlertDialogAction type="submit" variant="destructive" disabled={isPending}>
+								{isPending && <Spinner aria-hidden />}
+								Release silent mode
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</form>
 				</AlertDialogContent>
 			</AlertDialog>
 		</Card>

@@ -1,4 +1,4 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
 	BrainCircuit,
 	Building2,
@@ -26,9 +26,8 @@ import { NavContextHeader } from "./NavContextHeader";
  * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, the per-workspace
  * admin nav — the instance and workspace levels are never interleaved.
  *
- * Grouped (#1386) so the surfaces the 1.0 backlog keeps adding have a home rather than extending one
- * flat list: who can get in (Access), what we detect (Detection), what it costs (AI), and running the
- * instance (Operations). Labeling and evaluation join Detection as they land.
+ * Grouped by concern rather than one flat list: who can get in (Access), what is reviewed
+ * (Practices), what it costs (AI), and running the instance (Operations).
  */
 const ADMIN_NAV_GROUPS = [
 	{
@@ -45,7 +44,7 @@ const ADMIN_NAV_GROUPS = [
 		],
 	},
 	{
-		label: "Detection",
+		label: "Practices",
 		items: [
 			{
 				to: "/admin/catalog",
@@ -92,7 +91,7 @@ const ADMIN_NAV_GROUPS = [
 ] as const;
 
 export function NavSuperAdmin() {
-	const { pathname } = useLocation();
+	const matchRoute = useMatchRoute();
 	return (
 		<NavContextHeader title="Back to app" backLink={<Link to="/" className="font-semibold" />}>
 			<SidebarGroup>
@@ -101,7 +100,7 @@ export function NavSuperAdmin() {
 					<SidebarMenuItem>
 						<SidebarMenuButton
 							tooltip="Instance overview"
-							isActive={pathname === "/admin" || pathname === "/admin/"}
+							isActive={!!matchRoute({ to: "/admin" })}
 							render={<Link to="/admin" />}
 						>
 							<Gauge />
@@ -118,7 +117,7 @@ export function NavSuperAdmin() {
 							<SidebarMenuItem key={item.to}>
 								<SidebarMenuButton
 									tooltip={item.tooltip}
-									isActive={pathname.startsWith(item.to)}
+									isActive={!!matchRoute({ to: item.to, fuzzy: true })}
 									render={<Link to={item.to} />}
 								>
 									<item.icon />

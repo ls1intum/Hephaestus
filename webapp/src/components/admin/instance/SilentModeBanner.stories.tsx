@@ -29,7 +29,7 @@ export const Engaged: Story = {
 	},
 };
 
-/** An engaged brake with no breadcrumbs (e.g. set before the changed-by tracking existed). */
+/** Engaged with no breadcrumbs — every metadata field is nullable. */
 export const WithoutMetadata: Story = {
 	args: {
 		settings: { silentModeEngaged: true },

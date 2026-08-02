@@ -42,34 +42,32 @@ class SlackMessageServiceTest extends BaseUnitTest {
         );
     }
 
-    @Test
-    void sendForWorkspace_silentMode_throwsBeforeTokenResolution() {
+    /** One private guard fronts all three; parameterizing keeps each entry point pinned without triplicating. */
+    @ParameterizedTest(name = "{0} is refused while silent mode is engaged")
+    @MethodSource("outboundSends")
+    void silentModeRefusesEveryOutboundSend(String name, ThrowingSend send) {
         silentModeEngaged = true;
 
-        assertThatThrownBy(() -> service.sendForWorkspace(7L, "C1ABCDEFGH", List.of(), "fallback"))
+        assertThatThrownBy(() -> send.run(service))
             .isInstanceOf(SlackSendException.class)
             .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
         org.mockito.Mockito.verifyNoInteractions(credentialProvider);
     }
 
-    @Test
-    void startStream_silentMode_throws() {
-        silentModeEngaged = true;
-
-        assertThatThrownBy(() -> service.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi"))
-            .isInstanceOf(SlackSendException.class)
-            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
-        org.mockito.Mockito.verifyNoInteractions(credentialProvider);
+    @FunctionalInterface
+    interface ThrowingSend {
+        void run(SlackMessageService service);
     }
 
-    @Test
-    void sendEphemeralForWorkspace_silentMode_throws() {
-        silentModeEngaged = true;
-
-        assertThatThrownBy(() -> service.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "fallback"))
-            .isInstanceOf(SlackSendException.class)
-            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
-        org.mockito.Mockito.verifyNoInteractions(credentialProvider);
+    private static Stream<Arguments> outboundSends() {
+        return Stream.of(
+            Arguments.of("sendForWorkspace", (ThrowingSend) s -> s.sendForWorkspace(7L, "C1ABCDEFGH", List.of(), "f")),
+            Arguments.of(
+                "sendEphemeralForWorkspace",
+                (ThrowingSend) s -> s.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "f")
+            ),
+            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi"))
+        );
     }
 
     @Test

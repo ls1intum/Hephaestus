@@ -2,11 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, ScrollText } from "lucide-react";
 import type { AuthEventView } from "@/api/types.gen";
 import {
-	type AuditSeverity,
 	eventLabel,
 	eventSeverity,
+	severityDotClass,
+	severityScreenReaderPrefix,
 } from "@/components/admin/audit/audit-format";
 import { refLabel } from "@/components/admin/audit-shared/ref-label";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,23 +28,20 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** Mirrors the audit table's severity dots so the overview and the full log read the same. */
-const SEVERITY_DOT: Record<AuditSeverity, string> = {
-	error: "bg-destructive",
-	warning: "bg-amber-500",
-	info: "bg-muted-foreground/40",
-};
-
 interface RecentAuthActivityCardProps {
 	events: AuthEventView[];
 	isLoading?: boolean;
+	/** Set when the log could not be read, so the empty state never doubles as "nothing happened". */
+	error?: unknown;
+	onRetry?: () => void;
 }
 
-/**
- * The overview's "is anything unusual happening" panel: the latest auth/audit events, one line each,
- * drilling into the full audit log.
- */
-export function RecentAuthActivityCard({ events, isLoading = false }: RecentAuthActivityCardProps) {
+export function RecentAuthActivityCard({
+	events,
+	isLoading = false,
+	error,
+	onRetry,
+}: RecentAuthActivityCardProps) {
 	return (
 		<Card>
 			<CardHeader>
@@ -60,7 +59,9 @@ export function RecentAuthActivityCard({ events, isLoading = false }: RecentAuth
 				</CardAction>
 			</CardHeader>
 			<CardContent>
-				{isLoading ? (
+				{error ? (
+					<QueryErrorAlert error={error} title="Couldn't load recent activity" onRetry={onRetry} />
+				) : isLoading ? (
 					<div className="space-y-3">
 						{["a", "b", "c", "d"].map((row) => (
 							<Skeleton key={row} className="h-5 w-full" />
@@ -82,17 +83,21 @@ export function RecentAuthActivityCard({ events, isLoading = false }: RecentAuth
 					<ul className="space-y-2.5">
 						{events.map((event) => {
 							const severity = eventSeverity(event.eventType, event.result);
+							const screenReaderPrefix = severityScreenReaderPrefix(severity);
 							const actor =
 								refLabel(event.actor, event.actingAccountId) ??
 								refLabel(event.account, event.accountId);
 							return (
-								<li key={event.id} className="flex items-center gap-2 text-sm">
+								<li key={event.id} className="flex min-w-0 items-center gap-2 text-sm">
 									<span
-										className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
+										className={`size-1.5 shrink-0 rounded-full ${severityDotClass(severity)}`}
 										aria-hidden
 									/>
-									<span className="truncate">{eventLabel(event.eventType)}</span>
-									{actor ? <span className="truncate text-muted-foreground">{actor}</span> : null}
+									{screenReaderPrefix && <span className="sr-only">{screenReaderPrefix}</span>}
+									<span className="min-w-0 truncate">{eventLabel(event.eventType)}</span>
+									{actor ? (
+										<span className="min-w-0 truncate text-muted-foreground">{actor}</span>
+									) : null}
 									<RelativeTime
 										value={event.occurredAt}
 										className="ml-auto shrink-0 whitespace-nowrap text-xs"

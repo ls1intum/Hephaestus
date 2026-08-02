@@ -48,17 +48,9 @@ class PracticeFeedbackDeliveryPolicy {
         this.silentModeQuery = silentModeQuery;
     }
 
-    /**
-     * The instance-wide emergency brake (#1386), checked ahead of every per-workspace and per-recipient
-     * rule: while it is engaged nothing may leave the instance, whatever the rest of the policy says.
-     */
-    private boolean silenced() {
-        return silentModeQuery.isSilentModeEngaged();
-    }
-
     @Transactional(readOnly = true)
     Decision<Issue> evaluateIssue(AgentJob job) {
-        if (silenced()) {
+        if (silentModeQuery.isSilentModeEngaged()) {
             return Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED);
         }
         long workspaceId = requireWorkspaceId(job);
@@ -85,7 +77,7 @@ class PracticeFeedbackDeliveryPolicy {
 
     @Transactional(readOnly = true)
     Decision<PullRequest> evaluatePullRequest(AgentJob job) {
-        if (silenced()) {
+        if (silentModeQuery.isSilentModeEngaged()) {
             return Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED);
         }
         long workspaceId = requireWorkspaceId(job);

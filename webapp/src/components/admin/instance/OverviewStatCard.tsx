@@ -9,12 +9,12 @@ interface OverviewStatCardProps {
 	/** Secondary line under the value, e.g. "3 active". */
 	hint?: string;
 	icon: LucideIcon;
-	/** The admin page this stat drills into. */
 	to: LinkProps["to"];
 	isLoading?: boolean;
+	/** A tile that could not load shows a dash — a zero would read as a fact. */
+	isError?: boolean;
 }
 
-/** One glanceable metric on the instance overview, linking to the page that manages it. */
 export function OverviewStatCard({
 	label,
 	value,
@@ -22,22 +22,26 @@ export function OverviewStatCard({
 	icon: Icon,
 	to,
 	isLoading = false,
+	isError = false,
 }: OverviewStatCardProps) {
 	return (
 		<Link
 			to={to}
-			className="group block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			aria-label={`${label}: ${isError ? "unavailable" : value}`}
+			className="group block rounded-xl outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 		>
 			<Card className="h-full transition-colors group-hover:border-primary/40">
 				<CardContent className="flex items-start justify-between gap-3">
-					<div className="space-y-1">
+					<div className="min-w-0 space-y-1">
 						<p className="text-sm text-muted-foreground">{label}</p>
 						{isLoading ? (
 							<Skeleton className="h-8 w-16" />
 						) : (
-							<p className="text-2xl font-semibold tabular-nums">{value}</p>
+							<p className="text-2xl font-semibold tabular-nums">{isError ? "—" : value}</p>
 						)}
-						{hint && !isLoading ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+						{!isLoading && (
+							<p className="text-xs text-muted-foreground">{isError ? "Couldn't load" : hint}</p>
+						)}
 					</div>
 					<div className="rounded-full bg-muted p-2">
 						<Icon className="size-4 text-muted-foreground" aria-hidden />

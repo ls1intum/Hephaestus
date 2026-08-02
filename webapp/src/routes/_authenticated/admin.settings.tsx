@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings2, TriangleAlert } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import {
 	adminGetInstanceSettingsOptions,
@@ -8,19 +8,18 @@ import {
 	adminUpdateSilentModeMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { SilentModeCard } from "@/components/admin/instance/SilentModeCard";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PageHeader } from "@/components/core/PageHeader";
+import { PageLayout } from "@/components/core/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/settings")({
+	head: instanceAdminHead("Instance settings"),
 	component: AdminSettingsPage,
 });
 
-/**
- * Instance settings (#1386) — seeded with the emergency silent-mode brake. The instance-level
- * rollout controls (channel force-offs) join this page with #1357.
- */
 function AdminSettingsPage() {
 	const queryClient = useQueryClient();
 	const settingsQuery = useQuery(adminGetInstanceSettingsOptions());
@@ -29,23 +28,22 @@ function AdminSettingsPage() {
 		...adminUpdateSilentModeMutation(),
 		onSuccess: (data) => {
 			queryClient.setQueryData(adminGetInstanceSettingsQueryKey(), data);
-			toast.success(data.silentModeEngaged ? "Silent mode engaged" : "Silent mode released");
+			toast.success(
+				data.silentModeEngaged
+					? "Silent mode engaged — nothing will be posted until you release it"
+					: "Silent mode released — feedback and Slack messages go out again",
+			);
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not update silent mode")),
 	});
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
-			<header className="space-y-1">
-				<div className="flex items-center gap-2">
-					<Settings2 className="size-6 text-muted-foreground" aria-hidden />
-					<h1 className="text-2xl font-semibold">Instance settings</h1>
-				</div>
-				<p className="text-sm text-muted-foreground">
-					Instance-wide operator controls. These apply across every workspace and override workspace
-					settings while active.
-				</p>
-			</header>
+		<PageLayout className="py-6">
+			<PageHeader
+				icon={<Settings2 />}
+				title="Instance settings"
+				description="Instance-wide operator controls. These apply across every workspace and override workspace settings while active."
+			/>
 
 			{settingsQuery.data ? (
 				<SilentModeCard
@@ -55,26 +53,15 @@ function AdminSettingsPage() {
 					onRelease={() => silentModeMutation.mutate({ body: { engaged: false } })}
 				/>
 			) : settingsQuery.isError ? (
-				// This is the page an operator reaches to engage the brake during an incident — if the
-				// state won't load, surface an error + retry, never a skeleton that hides the control.
-				<Alert variant="destructive">
-					<TriangleAlert aria-hidden />
-					<AlertTitle>Couldn't load instance settings</AlertTitle>
-					<AlertDescription>
-						{problemDetailOf(settingsQuery.error, "The silent-mode control is unavailable.")}{" "}
-						<Button
-							variant="link"
-							className="h-auto p-0"
-							onClick={() => settingsQuery.refetch()}
-							disabled={settingsQuery.isFetching}
-						>
-							Retry
-						</Button>
-					</AlertDescription>
-				</Alert>
+				// Incident-time page: on load failure show an error, never a skeleton that hides the control.
+				<QueryErrorAlert
+					error={settingsQuery.error}
+					title="Couldn't load instance settings"
+					onRetry={() => settingsQuery.refetch()}
+				/>
 			) : (
 				<Skeleton className="h-52 w-full rounded-xl" />
 			)}
-		</div>
+		</PageLayout>
 	);
 }

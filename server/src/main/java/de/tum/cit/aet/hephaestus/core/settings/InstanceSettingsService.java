@@ -17,14 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Reads and updates the singleton {@link InstanceSettings} row. Unconditional bean (no runtime-role
- * gate): the server role serves the admin API, while the worker role consults
- * {@link SilentModeQuery} on every outbound delivery.
- *
- * <p>Because this bean boots on every role, it must not hard-require a server-only collaborator —
- * {@link AuthEventLogger} is {@code @ConditionalOnServerRole} and is therefore absent on a worker-only
- * pod. Only {@link #updateSilentMode} needs it, and that runs behind the admin API, which exists solely
- * on the server.
+ * Boots on every runtime role: the server serves the admin API, the worker consults
+ * {@link SilentModeQuery} on every outbound delivery. It therefore must not hard-require a
+ * server-only collaborator — {@link AuthEventLogger} is {@code @ConditionalOnServerRole} and is
+ * absent on a worker-only pod, so it is injected as an {@link java.util.Optional}.
  */
 @Service
 @WorkspaceAgnostic("Singleton instance-wide settings row — no tenant dimension exists")
@@ -46,42 +42,30 @@ public class InstanceSettingsService implements SilentModeQuery {
         this.objectMapper = objectMapper;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public InstanceSettings get() {
-        return repository.findById(InstanceSettings.SINGLETON_ID).orElseGet(this::seedSingleton);
-    }
-
-    /**
-     * Production seeds the row via Liquibase; schemas built without migrations (tests use
-     * {@code ddl-auto: create}) self-heal here. The insert is an idempotent {@code ON CONFLICT DO
-     * NOTHING} upsert, so a concurrent seed is a no-op rather than a PK violation that would abort the
-     * surrounding transaction — the subsequent read then always finds the row.
-     */
-    private InstanceSettings seedSingleton() {
-        repository.insertSingletonIfAbsent(InstanceSettings.SINGLETON_ID);
-        return repository
-            .findById(InstanceSettings.SINGLETON_ID)
-            .orElseThrow(() -> new IllegalStateException("instance_settings singleton absent after seed upsert"));
+        return repository.findById(InstanceSettings.SINGLETON_ID).orElseGet(InstanceSettings::new);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean isSilentModeEngaged() {
-        // No self-heal on the delivery path: an absent row cannot carry an engaged brake, so absent = released.
         return repository
             .findById(InstanceSettings.SINGLETON_ID)
             .map(InstanceSettings::isSilentModeEngaged)
             .orElse(false);
     }
 
-    /**
-     * Flips the silent-mode brake. Idempotent full replacement of the silent-mode state (PUT
-     * semantics — an emergency engage may be retried blindly). Logged at WARN in both directions so
-     * the incident timeline is reconstructable from server logs alone.
-     */
+    /** Logged at WARN in both directions so the incident timeline is reconstructable from logs alone. */
     @Transactional
     public InstanceSettings updateSilentMode(boolean engaged, @Nullable String reason, @Nullable String actor) {
-        InstanceSettings settings = get();
+        InstanceSettings settings = repository
+            .findById(InstanceSettings.SINGLETON_ID)
+            .orElseGet(() -> {
+                InstanceSettings row = new InstanceSettings();
+                row.setId(InstanceSettings.SINGLETON_ID);
+                return row;
+            });
         String trimmedReason = reason == null || reason.isBlank() ? null : reason.trim();
         settings.setSilentModeEngaged(engaged);
         settings.setSilentModeReason(engaged ? trimmedReason : null);
@@ -93,9 +77,7 @@ public class InstanceSettingsService implements SilentModeQuery {
             actor,
             trimmedReason
         );
-        // On the auth_event trail (not config_audit_event, whose workspace_id is NOT NULL): this is an
-        // instance-level action. Logs alone are not a trail — an incident review needs to see who silenced
-        // the instance, when, and why, next to the sign-ins and role changes around it.
+        // auth_event, not config_audit_event: the latter's workspace_id is NOT NULL and this is instance-level.
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("engaged", engaged);
         if (trimmedReason != null) {
@@ -108,6 +90,6 @@ public class InstanceSettingsService implements SilentModeQuery {
                 .details(objectMapper.writeValueAsString(details))
                 .record()
         );
-        return settings;
+        return repository.save(settings);
     }
 }

@@ -127,7 +127,7 @@ public class AuthEvent {
         LOGIN_PROVIDER_CREATED,
         LOGIN_PROVIDER_UPDATED,
         LOGIN_PROVIDER_DELETED,
-        // Instance emergency brake: GLOBAL, and it decides whether the instance talks to anyone at all.
+        // Instance emergency brake: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
         SILENT_MODE_CHANGED,
     }
 

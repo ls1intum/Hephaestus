@@ -16,11 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * The silent-mode read the delivery paths consult, and the toggle's reason/actor bookkeeping. Uses a
- * mock repository — the logic under test is the absent-row default and the engage/release field
- * mapping, not persistence (the DB round-trip is covered by the controller integration test).
- */
+/** Mock repository: the DB round-trip is covered by {@link InstanceSettingsAdminControllerIntegrationTest}. */
 class InstanceSettingsServiceTest extends BaseUnitTest {
 
     @Mock
@@ -46,7 +42,6 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
 
         service.updateSilentMode(true, "incident #42", "felix");
 
-        // Server logs are not a trail: an incident review reads who silenced the instance off auth_event.
         verify(authEventWriter).write(
             org.mockito.ArgumentMatchers.argThat(
                 data ->
@@ -55,6 +50,15 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
                     data.details().contains("incident #42")
             )
         );
+    }
+
+    @Test
+    void togglesWithoutAnAuditLoggerOnAWorkerPod() {
+        // AuthEventLogger is @ConditionalOnServerRole, so it is absent wherever the worker consults the brake.
+        var workerService = new InstanceSettingsService(repository, Optional.empty(), new ObjectMapper());
+        givenRow(new InstanceSettings());
+
+        assertThat(workerService.updateSilentMode(true, "incident #42", "felix").isSilentModeEngaged()).isTrue();
     }
 
     @Test
@@ -105,5 +109,6 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
     private void givenRow(InstanceSettings row) {
         row.setId(InstanceSettings.SINGLETON_ID);
         when(repository.findById(InstanceSettings.SINGLETON_ID)).thenReturn(Optional.of(row));
+        when(repository.save(any(InstanceSettings.class))).thenAnswer(call -> call.getArgument(0));
     }
 }

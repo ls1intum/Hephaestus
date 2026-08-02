@@ -34,9 +34,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * when a non-system MR comment matches a known command pattern. Runs asynchronously
  * to avoid blocking webhook processing.
  *
- * <p>On receiving a recognized command, reacts to the comment with an eyes emoji
- * (via GitLab GraphQL {@code awardEmojiAdd} mutation) to acknowledge receipt,
- * then processes the command.
+ * <p>On a recognized command, acknowledges with an eyes reaction — skipped while instance silent
+ * mode is engaged — then processes it.
  *
  * <p>The command prefix is {@code /hephaestus} (case-insensitive). Supported commands:
  * <ul>
@@ -77,9 +76,7 @@ public class BotCommandProcessor {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBotCommandReceived(BotCommandReceivedEvent event) {
-        // Instance-wide silent mode (#1386) suppresses the acknowledgement reaction too: while the brake
-        // is engaged the review would not be delivered, so acking it with an 👀 would be a misleading
-        // external write onto the MR. The command is otherwise processed (findings still persist).
+        // The ack is itself an external write: while silenced it would promise a review that won't post.
         if (!silentModeQuery.isSilentModeEngaged()) {
             addEyesReaction(event);
         }

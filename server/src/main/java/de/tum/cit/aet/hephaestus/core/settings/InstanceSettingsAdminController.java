@@ -22,9 +22,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Instance-admin settings API, guarded by the namespaced {@code app_admin} authority. Thin adapter
- * over {@link InstanceSettingsService}. The silent-mode transition is a {@code PUT} (idempotent
- * full replacement of the silent-mode subresource) so an emergency engage can be retried blindly.
+ * Instance-admin settings API, guarded by the namespaced {@code app_admin} authority. The
+ * silent-mode transition is a {@code PUT} — an idempotent full replacement, so an emergency engage
+ * can be retried blindly.
  */
 @ConditionalOnServerRole
 @RestController
@@ -57,9 +57,8 @@ public class InstanceSettingsAdminController {
     }
 
     public record UpdateSilentModeRequestDTO(
-        // Boxed @NotNull on purpose: a primitive would let Jackson default a missing field to false,
-        // silently releasing the brake on a malformed request. (Kept out of the record Javadoc so it
-        // doesn't leak into the generated OpenAPI schema description.)
+        // Boxed on purpose: a primitive would let Jackson default a missing field to false, silently
+        // releasing the brake on a malformed request.
         @NonNull @NotNull Boolean engaged,
         @Nullable @Size(max = 500) String reason
     ) {}
