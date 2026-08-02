@@ -134,6 +134,7 @@ export function AdminAuditTable({
 					<TableBody>
 						{events.map((e) => {
 							const severity = eventSeverity(e.eventType, e.result);
+							const screenReaderPrefix = severityScreenReaderPrefix(severity);
 							const account = refLabel(e.account, e.accountId);
 							const actor = refLabel(e.actor, e.actingAccountId);
 							return (
@@ -147,9 +148,7 @@ export function AdminAuditTable({
 												className={`size-1.5 shrink-0 rounded-full ${severityDotClass(severity)}`}
 												aria-hidden
 											/>
-											{severityScreenReaderPrefix(severity) && (
-												<span className="sr-only">{severityScreenReaderPrefix(severity)}</span>
-											)}
+											{screenReaderPrefix && <span className="sr-only">{screenReaderPrefix}</span>}
 											<span className="text-sm">{eventLabel(e.eventType)}</span>
 										</span>
 									</TableCell>

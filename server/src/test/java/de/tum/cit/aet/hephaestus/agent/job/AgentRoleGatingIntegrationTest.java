@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,6 +56,20 @@ class AgentRoleGatingIntegrationTest extends BaseIntegrationTest {
         assertThat(context.containsBean("llmProxyFilterChain"))
             .as("the dedicated /internal/llm/** security chain must wire alongside the controller")
             .isTrue();
+    }
+
+    @Test
+    @DisplayName("the silent-mode read port wires without the server-only audit logger")
+    void silentModeQueryWiresOnWorkerOnlyPod() {
+        // Every outbound delivery consults this port, so it must boot here — while AuthEventLogger, which
+        // its implementation writes the toggle's audit row through, is @ConditionalOnServerRole and absent.
+        assertThat(context.getBeansOfType(SilentModeQuery.class))
+            .as("delivery cannot consult a brake whose bean failed to wire")
+            .isNotEmpty();
+        assertThat(context.getBeansOfType(AuthEventLogger.class))
+            .as("the audit logger is server-only; the settings bean must tolerate its absence")
+            .isEmpty();
+        assertThat(context.getBean(SilentModeQuery.class).isSilentModeEngaged()).isFalse();
     }
 
     @Test

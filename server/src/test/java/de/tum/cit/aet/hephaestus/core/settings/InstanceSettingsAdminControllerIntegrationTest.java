@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import java.util.HashMap;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,15 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     /** The same bean the delivery paths inject — proves the API engage is visible to enforcement. */
     @Autowired
     private SilentModeQuery silentModeQuery;
+
+    @Autowired
+    private InstanceSettingsService instanceSettingsService;
+
+    /** The brake is a global singleton: a failed assertion must not leave the shared context silenced. */
+    @AfterEach
+    void releaseSilentMode() {
+        instanceSettingsService.updateSilentMode(false, null, null);
+    }
 
     @Test
     @WithUser
