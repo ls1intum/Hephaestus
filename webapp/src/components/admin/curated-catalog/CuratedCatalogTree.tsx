@@ -53,8 +53,8 @@ export interface CuratedCatalogTreeProps {
 	pendingAreaSlugs: ReadonlySet<string>;
 	onPracticeStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
 	onAreaStatusChange: (area: CuratedArea, offered: boolean) => void;
-	onRetirePractice: (practice: CuratedPracticeSummary) => void;
-	onRetireArea: (area: CuratedArea) => void;
+	onExcludePractice: (practice: CuratedPracticeSummary) => void;
+	onExcludeArea: (area: CuratedArea) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
 }
@@ -71,8 +71,8 @@ export function CuratedCatalogTree({
 	pendingAreaSlugs,
 	onPracticeStatusChange,
 	onAreaStatusChange,
-	onRetirePractice,
-	onRetireArea,
+	onExcludePractice,
+	onExcludeArea,
 	onReorderAreas,
 	onPlacePractice,
 }: CuratedCatalogTreeProps) {
@@ -120,7 +120,7 @@ export function CuratedCatalogTree({
 					move={move}
 					pending={structurePending || pendingAreaSlugs.has(area.slug)}
 					onStatusChange={onAreaStatusChange}
-					onRetire={onRetireArea}
+					onExclude={onExcludeArea}
 				/>
 			)}
 			renderEntryContent={(practice) => <PracticeDetails practice={practice} />}
@@ -131,15 +131,13 @@ export function CuratedCatalogTree({
 					move={move}
 					pending={structurePending || pendingPracticeSlugs.has(practice.slug)}
 					onStatusChange={onPracticeStatusChange}
-					onRetire={onRetirePractice}
+					onExclude={onExcludePractice}
 				/>
 			)}
 			renderEntryPreview={(practice) => <PracticeDragPreview practice={practice} />}
 			getEmptyLabel={(areaSlug, total) => {
 				if (total > 0) return "No matching practices.";
-				return areaSlug === null
-					? "No practices sit outside an area."
-					: "No practices in this area.";
+				return areaSlug === null ? "No unassigned practices." : "No practices in this area.";
 			}}
 		/>
 	);
@@ -167,13 +165,13 @@ function AreaActions({
 	move,
 	pending,
 	onStatusChange,
-	onRetire,
+	onExclude,
 }: {
 	area: TreeArea;
 	move: CatalogMoveActions;
 	pending: boolean;
 	onStatusChange: (area: CuratedArea, offered: boolean) => void;
-	onRetire: (area: CuratedArea) => void;
+	onExclude: (area: CuratedArea) => void;
 }) {
 	return (
 		<>
@@ -181,10 +179,10 @@ function AreaActions({
 			<Switch
 				className="hidden sm:inline-flex"
 				checked={area.status.offered}
-				onCheckedChange={(offered) => (offered ? onStatusChange(area, true) : onRetire(area))}
+				onCheckedChange={(offered) => (offered ? onStatusChange(area, true) : onExclude(area))}
 				disabled={pending}
 				aria-busy={pending}
-				aria-label={`Offer ${area.definition.name} to new workspaces`}
+				aria-label={`Include ${area.definition.name} in new workspaces`}
 			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger
@@ -225,12 +223,12 @@ function AreaActions({
 					</DropdownMenuGroup>
 					<DropdownMenuSeparator />
 					{area.status.offered ? (
-						<DropdownMenuItem variant="destructive" onClick={() => onRetire(area)}>
-							Retire area
+						<DropdownMenuItem variant="destructive" onClick={() => onExclude(area)}>
+							Exclude from new workspaces
 						</DropdownMenuItem>
 					) : (
 						<DropdownMenuItem onClick={() => onStatusChange(area, true)}>
-							Offer again
+							Include in new workspaces
 						</DropdownMenuItem>
 					)}
 				</DropdownMenuContent>
@@ -240,7 +238,8 @@ function AreaActions({
 }
 
 function PracticeDetails({ practice }: { practice: TreePractice }) {
-	const parentUnavailable = practice.status.offered && !practice.effectivelyOffered;
+	const parentUnavailable =
+		Boolean(practice.missingAreaSlug) || (practice.status.offered && !practice.effectivelyOffered);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">
@@ -258,7 +257,9 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 				<span>{ARTIFACT_LABELS[practice.artifactType]}</span>
 				{parentUnavailable && (
 					<Badge variant="outline">
-						{practice.missingAreaSlug ? "Area no longer available" : "Area not offered"}
+						{practice.missingAreaSlug
+							? "Area no longer exists"
+							: "Excluded because its area is excluded"}
 					</Badge>
 				)}
 				<CuratedEntryBadges status={practice.status} kind="practice" />
@@ -273,24 +274,31 @@ function PracticeActions({
 	move,
 	pending,
 	onStatusChange,
-	onRetire,
+	onExclude,
 }: {
 	practice: TreePractice;
 	areas: readonly TreeArea[];
 	move: CatalogEntryMoveActions;
 	pending: boolean;
 	onStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
-	onRetire: (practice: CuratedPracticeSummary) => void;
+	onExclude: (practice: CuratedPracticeSummary) => void;
 }) {
 	const area = practice.areaSlug
 		? areas.find((candidate) => candidate.slug === practice.areaSlug)
 		: undefined;
 	const parentUnavailable = Boolean(practice.missingAreaSlug) || area?.status.offered === false;
-	const offerLabel = practice.missingAreaSlug
-		? "Offer after moving to an available area"
+	const includeLabel = practice.missingAreaSlug
+		? "Move to Unassigned or an included area first"
 		: parentUnavailable
-			? "Offer when area is offered"
-			: "Offer again";
+			? "Include when its area is included"
+			: "Include in new workspaces";
+	const switchLabel = practice.missingAreaSlug
+		? `${practice.name} cannot be included until it is moved out of the missing area`
+		: parentUnavailable
+			? practice.status.offered
+				? `${practice.name} is excluded because its area is excluded`
+				: `${practice.name} is excluded from new workspaces`
+			: `Include ${practice.name} in new workspaces`;
 	const persistedPractice = practice.missingAreaSlug
 		? { ...practice, areaSlug: practice.missingAreaSlug }
 		: practice;
@@ -299,19 +307,13 @@ function PracticeActions({
 			{pending && <Spinner className="size-4 text-muted-foreground" />}
 			<Switch
 				className="hidden sm:inline-flex"
-				checked={practice.status.offered}
+				checked={practice.effectivelyOffered}
 				onCheckedChange={(offered) =>
-					offered ? onStatusChange(persistedPractice, true) : onRetire(persistedPractice)
+					offered ? onStatusChange(persistedPractice, true) : onExclude(persistedPractice)
 				}
-				disabled={pending}
+				disabled={pending || parentUnavailable}
 				aria-busy={pending}
-				aria-label={
-					practice.missingAreaSlug
-						? `Offer ${practice.name} after moving it to an available area`
-						: parentUnavailable
-							? `Offer ${practice.name} when its area is offered`
-							: `Offer ${practice.name} to new workspaces`
-				}
+				aria-label={switchLabel}
 			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger
@@ -376,19 +378,22 @@ function PracticeActions({
 									closeOnClick
 								>
 									{destination.definition.name}
-									{!destination.status.offered && " (not offered)"}
+									{!destination.status.offered && " (excluded)"}
 								</DropdownMenuRadioItem>
 							))}
 						</DropdownMenuRadioGroup>
 					</DropdownMenuGroup>
 					<DropdownMenuSeparator />
 					{practice.status.offered ? (
-						<DropdownMenuItem variant="destructive" onClick={() => onRetire(persistedPractice)}>
-							Retire practice
+						<DropdownMenuItem variant="destructive" onClick={() => onExclude(persistedPractice)}>
+							Exclude from new workspaces
 						</DropdownMenuItem>
 					) : (
-						<DropdownMenuItem onClick={() => onStatusChange(persistedPractice, true)}>
-							{offerLabel}
+						<DropdownMenuItem
+							disabled={Boolean(practice.missingAreaSlug)}
+							onClick={() => onStatusChange(persistedPractice, true)}
+						>
+							{includeLabel}
 						</DropdownMenuItem>
 					)}
 				</DropdownMenuContent>

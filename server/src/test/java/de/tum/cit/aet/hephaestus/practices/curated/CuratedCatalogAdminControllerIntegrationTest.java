@@ -443,6 +443,108 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     @Test
+    void keepsRemovedDefaultsAsCustomEntries() {
+        String practiceSlug = "removed-practice";
+        CuratedPracticeDTO template = getPractice();
+        webTestClient
+            .post()
+            .uri(CATALOG + "/practices")
+            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new CreateCuratedPracticeRequestDTO(practiceSlug, definitionOf(template, "Saved criteria")))
+            .exchange()
+            .expectStatus()
+            .isCreated();
+
+        String areaSlug = "removed-area";
+        webTestClient
+            .post()
+            .uri(CATALOG + "/areas")
+            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(
+                new CreateCuratedAreaRequestDTO(
+                    areaSlug,
+                    new CuratedAreaRequestDTO("Removed area", "Saved description", "Folder", "slate")
+                )
+            )
+            .exchange()
+            .expectStatus()
+            .isCreated();
+
+        jdbcTemplate.update(
+            "UPDATE curated_practice_override SET based_on_digest = 'removed' WHERE slug = ?",
+            practiceSlug
+        );
+        jdbcTemplate.update("UPDATE curated_area_override SET based_on_digest = 'removed' WHERE slug = ?", areaSlug);
+
+        CuratedPracticeDTO removedPractice = getPractice(practiceSlug);
+        CuratedAreaDTO removedArea = getArea(areaSlug);
+        assertThat(removedPractice.status().state()).isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
+        assertThat(removedArea.status().state()).isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
+
+        webTestClient
+            .post()
+            .uri(CATALOG + "/practices/" + practiceSlug + "/keep")
+            .headers(headers -> {
+                headers.setBearerAuth(ADMIN_TOKEN);
+                headers.set(HttpHeaders.IF_MATCH, "\"stale\"");
+            })
+            .exchange()
+            .expectStatus()
+            .isEqualTo(412);
+
+        webTestClient
+            .post()
+            .uri(CATALOG + "/practices/" + practiceSlug + "/keep")
+            .headers(headers -> {
+                headers.setBearerAuth(ADMIN_TOKEN);
+                headers.set(HttpHeaders.IF_MATCH, etagOf(removedPractice));
+            })
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.status.state")
+            .isEqualTo("YOURS");
+
+        webTestClient
+            .post()
+            .uri(CATALOG + "/areas/" + areaSlug + "/keep")
+            .headers(headers -> {
+                headers.setBearerAuth(ADMIN_TOKEN);
+                headers.set(HttpHeaders.IF_MATCH, etagOf(removedArea));
+            })
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.status.state")
+            .isEqualTo("YOURS");
+
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM curated_practice_override WHERE slug = ? AND based_on_digest IS NULL",
+                Long.class,
+                practiceSlug
+            )
+        ).isOne();
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM curated_area_override WHERE slug = ? AND based_on_digest IS NULL",
+                Long.class,
+                areaSlug
+            )
+        ).isOne();
+        assertThat(auditValues("CURATED_PRACTICE", practiceSlug)).anySatisfy(value ->
+            assertThat(value).contains("YOURS")
+        );
+        assertThat(auditValues("CURATED_PRACTICE_AREA", areaSlug)).anySatisfy(value ->
+            assertThat(value).contains("YOURS")
+        );
+    }
+
+    @Test
     void customEntriesAppendAndEstablishCompleteLocalOrders() {
         CuratedCatalogDTO beforeArea = getCatalog();
         webTestClient
@@ -618,9 +720,13 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     private CuratedPracticeDTO getPractice() {
+        return getPractice(PRACTICE);
+    }
+
+    private CuratedPracticeDTO getPractice(String slug) {
         return webTestClient
             .get()
-            .uri(CATALOG + "/practices/" + PRACTICE)
+            .uri(CATALOG + "/practices/" + slug)
             .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
             .exchange()
             .expectStatus()
@@ -648,9 +754,13 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     private CuratedAreaDTO getArea() {
+        return getArea(AREA);
+    }
+
+    private CuratedAreaDTO getArea(String slug) {
         return webTestClient
             .get()
-            .uri(CATALOG + "/areas/" + AREA)
+            .uri(CATALOG + "/areas/" + slug)
             .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
             .exchange()
             .expectStatus()
@@ -686,6 +796,20 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         return jdbcTemplate.queryForObject(
             "SELECT (SELECT count(*) FROM curated_practice_override) + (SELECT count(*) FROM curated_area_override)",
             Long.class
+        );
+    }
+
+    private List<String> auditValues(String entityType, String entityId) {
+        return jdbcTemplate.queryForList(
+            """
+            SELECT new_value::text
+            FROM config_audit_event
+            WHERE entity_type = ? AND entity_id = ?
+            ORDER BY id DESC
+            """,
+            String.class,
+            entityType,
+            entityId
         );
     }
 }

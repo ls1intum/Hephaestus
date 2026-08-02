@@ -81,9 +81,7 @@ export const StaleEdit: Story = {
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByText("Someone else saved this practice while you were editing"),
-		).toBeVisible();
+		await expect(canvas.getByText("This practice changed while you were editing")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Save changes" })).toBeDisabled();
 	},
 };
@@ -102,27 +100,26 @@ export const HephaestusUpdateAvailable: Story = {
 				name: "Say what changed and why",
 				artifactType: "PULL_REQUEST",
 				triggerEvents: ["PullRequestCreated"],
-				criteria: "The definition Hephaestus ships now",
+				criteria: "The updated default criteria",
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},
 		},
 		areas,
 		isPending: false,
 		onUseHephaestusVersion: fn(),
-		onKeepOurVersion: fn(),
+		onKeepCurrentDefinition: fn(),
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Update waiting")).toBeVisible();
-		// The consequence of taking it, not a claim about who changed what.
-		await expect(canvas.getByText(/would change what this practice detects/)).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Show the Hephaestus version" })).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Use the Hephaestus version" })).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Keep our version" })).toBeVisible();
+		await expect(canvas.getByText("Hephaestus update available")).toBeVisible();
+		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Review Hephaestus update" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Apply Hephaestus update" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Keep saved version" })).toBeVisible();
 	},
 };
 
-export const NewWordingWaiting: Story = {
+export const WordingOnlyUpdate: Story = {
 	args: {
 		mode: "edit",
 		initialData: {
@@ -136,23 +133,23 @@ export const NewWordingWaiting: Story = {
 				name: "Say what changed and why",
 				artifactType: "PULL_REQUEST",
 				triggerEvents: ["PullRequestCreated"],
-				criteria: "The definition Hephaestus ships now",
+				criteria: "The updated default criteria",
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},
 		},
 		areas,
 		isPending: false,
 		onUseHephaestusVersion: fn(),
-		onKeepOurVersion: fn(),
+		onKeepCurrentDefinition: fn(),
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Update waiting")).toBeVisible();
-		await expect(canvas.getByText(/cannot change what this practice detects/)).toBeVisible();
+		await expect(canvas.getByText("Hephaestus update available")).toBeVisible();
+		await expect(canvas.getByText(/review behavior would stay the same/i)).toBeVisible();
 	},
 };
 
-export const SourceRemoved: Story = {
+export const RemovedFromDefaults: Story = {
 	args: {
 		mode: "edit",
 		initialData: {
@@ -162,13 +159,16 @@ export const SourceRemoved: Story = {
 		areas,
 		isPending: false,
 		onUseHephaestusVersion: fn(),
+		onKeepCurrentDefinition: fn(),
 		onSubmit: fn(),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("No longer shipped")).toBeVisible();
-		// Nothing to return to, so nothing is offered.
+		await expect(canvas.getByText("Removed from Hephaestus defaults")).toBeVisible();
 		await expect(
-			canvas.queryByRole("button", { name: "Use the Hephaestus version" }),
+			canvas.getByRole("button", { name: "Keep saved version as custom" }),
+		).toBeVisible();
+		await expect(
+			canvas.queryByRole("button", { name: "Apply Hephaestus update" }),
 		).not.toBeInTheDocument();
 	},
 };

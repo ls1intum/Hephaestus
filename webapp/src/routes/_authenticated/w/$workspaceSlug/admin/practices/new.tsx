@@ -18,7 +18,7 @@ import { practiceCatalogStructureScope, upsertPractice } from "@/hooks/practice-
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/new")({
-	head: workspaceAdminHead("New practice"),
+	head: workspaceAdminHead("Create practice"),
 	validateSearch: practiceSearchSchema,
 	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
 	component: CreatePracticeContainer,
@@ -55,7 +55,7 @@ function CreatePracticeContainer() {
 			void queryClient.invalidateQueries({
 				queryKey: practicesQueryKey,
 			});
-			toast.success("Practice created successfully");
+			toast.success("Practice created");
 			navigate({ to: ".." });
 		} catch (error) {
 			const status =
@@ -64,8 +64,8 @@ function CreatePracticeContainer() {
 					: undefined;
 			toast.error(
 				status === 409
-					? "A practice with this slug already exists in this workspace"
-					: "Failed to create practice",
+					? "A practice with this identifier already exists in this workspace"
+					: "Couldn't create the practice",
 			);
 		}
 	};

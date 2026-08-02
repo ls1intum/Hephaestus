@@ -57,9 +57,9 @@ describe("NavAdmin", () => {
 	});
 
 	it.each([
-		["/w/acme/admin/practices", "Catalog"],
-		["/w/acme/admin/practices/new", "Catalog"],
-		["/w/acme/admin/practices/clean-code", "Catalog"],
+		["/w/acme/admin/practices", "Practice setup"],
+		["/w/acme/admin/practices/new", "Practice setup"],
+		["/w/acme/admin/practices/clean-code", "Practice setup"],
 		["/w/acme/admin/practices/settings", "Review settings"],
 		["/w/acme/admin/integrations/scm", "GitHub"],
 	])("marks only the destination for %s as current", async (path, currentLabel) => {
@@ -88,6 +88,6 @@ describe("NavAdmin", () => {
 		const practices = await screen.findByRole("button", { name: "Practices" });
 		fireEvent.click(practices);
 
-		await screen.findByRole("link", { name: "Catalog" });
+		await screen.findByRole("link", { name: "Practice setup" });
 	});
 });

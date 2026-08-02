@@ -17,12 +17,12 @@ const shipped = {
 	name: "Say what changed and why",
 	artifactType: "PULL_REQUEST" as const,
 	triggerEvents: ["PullRequestCreated"],
-	criteria: "The definition Hephaestus ships now.",
+	criteria: "The updated default criteria.",
 	whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 };
 
 const meta = {
-	title: "Instance admin/Practice catalog/Hephaestus version panel",
+	title: "Instance admin/Practice catalog/Hephaestus default panel",
 	component: HephaestusVersionPanel,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
@@ -32,58 +32,57 @@ const meta = {
 		isResetPending: false,
 		disabled: false,
 		onUseHephaestusVersion: fn(),
-		onKeepOurVersion: fn(),
+		onKeepCurrentDefinition: fn(),
 	},
 } satisfies Meta<typeof HephaestusVersionPanel>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The ordinary case: nothing to decide, so nothing is offered. */
-export const FromHephaestus: Story = {
+export const UsesDefault: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("From Hephaestus")).toBeVisible();
+		await expect(canvas.getByText("Uses Hephaestus default")).toBeVisible();
 		await expect(
-			canvas.queryByRole("button", { name: "Use the Hephaestus version" }),
+			canvas.queryByRole("button", { name: "Apply Hephaestus update" }),
 		).not.toBeInTheDocument();
 	},
 };
 
-export const EditedHere: Story = {
+export const Customized: Story = {
 	args: { status: status({ state: "EDITED_HERE" }) },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Returning to Hephaestus is always available once ours differs; there is no update to decline.
-		await expect(canvas.getByRole("button", { name: "Use the Hephaestus version" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Restore Hephaestus default" })).toBeVisible();
 		await expect(
-			canvas.queryByRole("button", { name: "Keep our version" }),
+			canvas.queryByRole("button", { name: "Keep saved version" }),
 		).not.toBeInTheDocument();
 	},
 };
 
-/** The only state that asks anything: both answers are offered, and the incoming text is readable. */
-export const UpdateWaitingChangesDetection: Story = {
+export const UpdateChangesReviewBehavior: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }), shipped },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/would change what this practice detects/)).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "Show the Hephaestus version" }));
-		await expect(await canvas.findByText("The definition Hephaestus ships now.")).toBeVisible();
+		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
+		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("Starts a review when")).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Keep our version" })).toBeVisible();
+		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
+		await expect(canvas.queryByText("PullRequestCreated")).not.toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: "Keep saved version" })).toBeVisible();
 	},
 };
 
-export const UpdateWaitingWordingOnly: Story = {
+export const WordingOnlyUpdate: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "WORDING" }), shipped },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/cannot change what this practice detects/)).toBeVisible();
+		await expect(canvas.getByText(/review behavior would stay the same/i)).toBeVisible();
 	},
 };
 
-export const UpdateWaitingChangesPresentation: Story = {
+export const AreaAppearanceUpdate: Story = {
 	args: {
 		kind: "area",
 		status: status({ state: "UPDATE_WAITING", changeKind: "PRESENTATION" }),
@@ -96,20 +95,26 @@ export const UpdateWaitingChangesPresentation: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/change how this area is presented/)).toBeVisible();
+		await expect(
+			canvas.getByText(/would change the area's name, description, icon, or color/),
+		).toBeVisible();
 		await expect(canvas.queryByText(/detect/)).not.toBeInTheDocument();
 	},
 };
 
-export const AddedHere: Story = { args: { status: status({ state: "YOURS" }), kind: "area" } };
+export const NoHephaestusDefault: Story = {
+	args: { status: status({ state: "YOURS" }), kind: "area" },
+};
 
-export const NoLongerShipped: Story = {
+export const RemovedFromDefaults: Story = {
 	args: { status: status({ state: "NO_LONGER_SHIPPED" }) },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Nothing to return to, so neither decision is offered.
 		await expect(
-			canvas.queryByRole("button", { name: "Use the Hephaestus version" }),
+			canvas.getByRole("button", { name: "Keep saved version as custom" }),
+		).toBeVisible();
+		await expect(
+			canvas.queryByRole("button", { name: "Apply Hephaestus update" }),
 		).not.toBeInTheDocument();
 	},
 };
@@ -122,7 +127,7 @@ export const TakingTheUpdate: Story = {
 	},
 };
 
-export const KeepingOurVersion: Story = {
+export const KeepingSavedVersion: Story = {
 	args: {
 		status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
 		shipped,

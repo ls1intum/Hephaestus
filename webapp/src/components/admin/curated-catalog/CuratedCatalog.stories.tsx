@@ -32,13 +32,13 @@ const areas: CuratedArea[] = [
 	{
 		slug: "house-rules",
 		position: 1,
-		definition: { name: "Our own conventions", icon: "Scale", color: "amber" },
+		definition: { name: "Team conventions", icon: "Scale", color: "amber" },
 		status: status({ state: "YOURS" }),
 	},
 	{
 		slug: "not-offered",
 		position: 2,
-		definition: { name: "Something we stopped using" },
+		definition: { name: "Legacy conventions" },
 		status: status({ offered: false, retired: true }),
 	},
 ];
@@ -95,7 +95,7 @@ const practices: CuratedPracticeSummary[] = [
 		artifactType: "PULL_REQUEST",
 		areaSlug: "an-area-hephaestus-stopped-shipping",
 		effectivelyOffered: false,
-		status: status({ state: "NO_LONGER_SHIPPED" }),
+		status: status({ state: "NO_LONGER_SHIPPED", offered: false, retired: true }),
 	},
 ];
 
@@ -132,16 +132,29 @@ type Story = StoryObj<typeof meta>;
 
 export const Everything: Story = {};
 
-export const OnlyWhatIsOffered: Story = { args: { search: { status: "OFFERED" } } };
+export const OnlyIncluded: Story = { args: { search: { status: "OFFERED" } } };
 
 export const APracticeWhoseAreaIsGone: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		await canvas.findByText("Outlived the area it was filed under");
-		await canvas.findByText("Area no longer available");
-		await canvas.findByRole("switch", {
-			name: "Offer Outlived the area it was filed under after moving it to an available area",
-		});
+		await canvas.findByText("Area no longer exists");
+		await expect(
+			canvas.getByRole("switch", {
+				name: "Outlived the area it was filed under cannot be included until it is moved out of the missing area",
+			}),
+		).toHaveAttribute("aria-disabled", "true");
+		await userEvent.click(
+			canvas.getByRole("button", {
+				name: "More actions for Outlived the area it was filed under",
+			}),
+		);
+		await expect(
+			await screen.findByRole("menuitem", {
+				name: "Move to Unassigned or an included area first",
+			}),
+		).toHaveAttribute("aria-disabled", "true");
+		await userEvent.keyboard("{Escape}");
 		await userEvent.click(
 			canvas.getByRole("button", {
 				name: "More actions for Outlived the area it was filed under",
@@ -149,15 +162,6 @@ export const APracticeWhoseAreaIsGone: Story = {
 		);
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: "Unassigned" }));
 		expect(args.onPlacePractice).toHaveBeenCalledWith("orphaned-practice", null, 1);
-		await userEvent.click(
-			canvas.getByRole("button", {
-				name: "More actions for Outlived the area it was filed under",
-			}),
-		);
-		await userEvent.click(await screen.findByRole("menuitem", { name: "Retire practice" }));
-		await screen.findByText(
-			"It is already unavailable because its area is not offered. Retiring it keeps it unavailable if the area becomes available again. Workspaces that already have it keep it unchanged.",
-		);
 	},
 };
 
@@ -169,7 +173,7 @@ export const UnavailableMoveDestinationIsNamed: Story = {
 			canvas.getByRole("button", { name: "More actions for Link the issue the change closes" }),
 		);
 		await screen.findByRole("menuitemradio", {
-			name: "Something we stopped using (not offered)",
+			name: "Legacy conventions (excluded)",
 		});
 	},
 };
@@ -217,18 +221,107 @@ export const NothingHasBeenChanged: Story = {
 	},
 };
 
-export const RetiringAnAreaWithholdsItsPractices: Story = {
+export const ExcludingAnAreaListsItsPractices: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(
 			await canvas.findByRole("switch", {
-				name: "Offer Packaging work for review to new workspaces",
+				name: "Include Packaging work for review in new workspaces",
 			}),
 		);
 		const dialog = await screen.findByRole("alertdialog");
-		await within(dialog).findByText(/3 practices filed under it/);
+		await within(dialog).findByText(/also excludes 3 currently included practices/);
 		await within(dialog).findByText("Say what changed and why");
+	},
+};
+
+export const PracticeInsideExcludedArea: Story = {
+	args: {
+		areas: [areas[2]],
+		practices: [
+			{
+				...practices[0],
+				areaSlug: areas[2].slug,
+				effectivelyOffered: false,
+			},
+			{
+				...practices[1],
+				areaSlug: areas[2].slug,
+				effectivelyOffered: false,
+				status: status({ offered: false, retired: true }),
+			},
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const inheritedSwitch = await canvas.findByRole("switch", {
+			name: "Keep a change to one concern is excluded because its area is excluded",
+		});
+		await expect(inheritedSwitch).not.toBeChecked();
+		await expect(inheritedSwitch).toHaveAttribute("aria-disabled", "true");
+		const directlyExcludedSwitch = await canvas.findByRole("switch", {
+			name: "Say what changed and why is excluded from new workspaces",
+		});
+		await expect(directlyExcludedSwitch).not.toBeChecked();
+		await expect(directlyExcludedSwitch).toHaveAttribute("aria-disabled", "true");
+	},
+};
+
+export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
+	args: {
+		areas: [areas[0]],
+		practices: [
+			practices[0],
+			{
+				...practices[1],
+				effectivelyOffered: false,
+				status: status({ offered: false, retired: true }),
+			},
+		],
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvasElement }) => {
+		await userEvent.click(
+			await within(canvasElement).findByRole("switch", {
+				name: "Include Packaging work for review in new workspaces",
+			}),
+		);
+		const dialog = await screen.findByRole("alertdialog");
+		await within(dialog).findByText(/also excludes 1 currently included practice/);
+		await within(dialog).findByText("Keep a change to one concern");
+		await expect(within(dialog).queryByText("Say what changed and why")).not.toBeInTheDocument();
+	},
+};
+
+export const ExcludingAnAreaDoesNotRecountExcludedPractices: Story = {
+	args: {
+		areas: [areas[0]],
+		practices: [
+			{
+				...practices[0],
+				areaSlug: areas[0].slug,
+				effectivelyOffered: false,
+				status: status({ offered: false, retired: true }),
+			},
+		],
+		summary: {
+			...meta.args.summary,
+			total: 2,
+			updatesChangingDetection: 0,
+			updatesChangingWordingOnly: 0,
+			noLongerShipped: 0,
+		},
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(
+			await canvas.findByRole("switch", {
+				name: "Include Packaging work for review in new workspaces",
+			}),
+		);
+		await screen.findByText(/No additional practices will be excluded/);
 	},
 };
 

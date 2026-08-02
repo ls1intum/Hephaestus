@@ -39,12 +39,12 @@ export const Create: Story = { args: { mode: "create" } };
 
 export const Edit: Story = { args: { mode: "edit", initialData } };
 
-export const HephaestusUpdateWaiting: Story = {
+export const HephaestusUpdateAvailable: Story = {
 	args: {
 		mode: "edit",
 		initialData: {
 			...initialData,
-			status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
+			status: status({ state: "UPDATE_WAITING", changeKind: "PRESENTATION" }),
 		},
 		onUseHephaestusVersion: fn(),
 	},

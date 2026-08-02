@@ -1,50 +1,64 @@
 import type { CuratedCatalogSummary as Summary } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export interface CuratedCatalogSummaryProps {
 	summary: Summary;
+	removedDefaultsToReview: number;
+	reviewing?: boolean;
+	onReviewChanges: () => void;
 }
 
-export function CuratedCatalogSummary({ summary }: CuratedCatalogSummaryProps) {
-	const untouched = Math.max(
-		0,
-		summary.total -
-			summary.editedHere -
-			summary.yours -
-			summary.noLongerShipped -
-			summary.updatesChangingDetection -
-			summary.updatesChangingWordingOnly -
-			summary.updatesChangingPresentation,
-	);
-	if (summary.total === 0) {
-		return null;
-	}
+export function CuratedCatalogSummary({
+	summary,
+	removedDefaultsToReview,
+	reviewing = false,
+	onReviewChanges,
+}: CuratedCatalogSummaryProps) {
+	const updates =
+		summary.updatesChangingDetection +
+		summary.updatesChangingWordingOnly +
+		summary.updatesChangingPresentation;
+	const changes = updates + removedDefaultsToReview;
+	if (changes === 0) return null;
+
 	return (
-		<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-4 text-sm">
+		<div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/50 bg-warning/5 p-4 text-sm">
 			<span className="font-medium">
-				{untouched === summary.total
-					? `All ${summary.total} practices and areas follow Hephaestus.`
-					: `${summary.total} practices and areas. ${untouched} ${untouched === 1 ? "follows" : "follow"} Hephaestus.`}
+				{changes} catalog {changes === 1 ? "change needs" : "changes need"} review
 			</span>
 			{summary.updatesChangingDetection > 0 && (
-				<Badge variant="warning">{summary.updatesChangingDetection} would change detection</Badge>
+				<Badge variant="warning">
+					{summary.updatesChangingDetection}{" "}
+					{summary.updatesChangingDetection === 1 ? "update would" : "updates would"} change review
+					behavior
+				</Badge>
 			)}
 			{summary.updatesChangingWordingOnly > 0 && (
-				<Badge variant="secondary">{summary.updatesChangingWordingOnly} wording only</Badge>
+				<Badge variant="secondary">
+					{summary.updatesChangingWordingOnly}{" "}
+					{summary.updatesChangingWordingOnly === 1 ? "update would" : "updates would"} change
+					wording or guidance
+				</Badge>
 			)}
 			{summary.updatesChangingPresentation > 0 && (
 				<Badge variant="secondary">
-					{summary.updatesChangingPresentation} would change presentation
+					{summary.updatesChangingPresentation}{" "}
+					{summary.updatesChangingPresentation === 1 ? "update would" : "updates would"} change area
+					appearance
 				</Badge>
 			)}
-			{summary.editedHere > 0 && (
-				<Badge variant="secondary">{summary.editedHere} edited here</Badge>
+			{removedDefaultsToReview > 0 && (
+				<Badge variant="outline">
+					{removedDefaultsToReview} {removedDefaultsToReview === 1 ? "entry is" : "entries are"} no
+					longer in Hephaestus defaults
+				</Badge>
 			)}
-			{summary.yours > 0 && <Badge variant="secondary">{summary.yours} added here</Badge>}
-			{summary.noLongerShipped > 0 && (
-				<Badge variant="outline">{summary.noLongerShipped} no longer shipped</Badge>
+			{!reviewing && (
+				<Button variant="outline" size="sm" className="ml-auto" onClick={onReviewChanges}>
+					Review changes
+				</Button>
 			)}
-			{summary.notOffered > 0 && <Badge variant="outline">{summary.notOffered} not offered</Badge>}
 		</div>
 	);
 }

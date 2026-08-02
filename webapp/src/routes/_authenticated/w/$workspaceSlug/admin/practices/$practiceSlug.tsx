@@ -85,10 +85,10 @@ function EditPracticeContainer() {
 			);
 			void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 			void queryClient.invalidateQueries({ queryKey: listQueryKey });
-			toast.success("Practice updated successfully");
+			toast.success("Practice saved");
 			navigate({ to: ".." });
 		} catch {
-			toast.error("Failed to update practice");
+			toast.error("Couldn't save the practice");
 		}
 	};
 

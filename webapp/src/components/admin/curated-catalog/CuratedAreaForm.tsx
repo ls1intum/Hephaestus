@@ -36,7 +36,6 @@ export interface CuratedAreaFormValue {
 
 export interface CuratedAreaFormInitialValue extends CuratedAreaFormValue {
 	status: CatalogEntryStatus;
-	/** What Hephaestus ships now, when it differs — shown before anything is taken. */
 	shipped?: CuratedAreaRequest;
 }
 
@@ -55,7 +54,7 @@ interface CuratedAreaFormBaseProps {
 	isResetPending?: boolean;
 	isKeepPending?: boolean;
 	onUseHephaestusVersion?: () => void;
-	onKeepOurVersion?: () => void;
+	onKeepCurrentDefinition?: () => void;
 	onSubmit: (value: CuratedAreaFormValue) => void;
 }
 
@@ -85,7 +84,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 		isKeepPending = false,
 		onUseHephaestusVersion,
 		initialData,
-		onKeepOurVersion,
+		onKeepCurrentDefinition,
 		onSubmit,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
@@ -114,6 +113,8 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 			? "Use 3–64 lowercase letters, numbers and single hyphens."
 			: undefined;
 	const valid = form.name.trim().length >= 3 && (mode === "edit" || isValidSlug(form.slug));
+	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
+	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
 
 	const submit = (event: React.FormEvent) => {
 		event.preventDefault();
@@ -137,10 +138,11 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 			<AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Use the Hephaestus version?</AlertDialogTitle>
+						<AlertDialogTitle>{resetLabel}?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Your version and any unsaved edits are discarded. From now on this area follows
-							Hephaestus. Whether it is offered, and every workspace copy of it, stay as they are.
+							This replaces the customization and discards unsaved changes. It does not change
+							whether the area is included in new workspaces. Existing workspaces remain unchanged.
+							Future Hephaestus updates apply automatically until the area is customized again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -152,7 +154,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 								onUseHephaestusVersion?.();
 							}}
 						>
-							{isResetPending ? "Using the Hephaestus version…" : "Use the Hephaestus version"}
+							{isResetPending ? `${resetLabel}…` : resetLabel}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -193,11 +195,11 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 			</Link>
 			<PageHeader
 				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
-				title={mode === "create" ? "Add area" : `Edit: ${initialData.name}`}
+				title={mode === "create" ? "Create area" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Areas group the practices a workspace receives."
-						: "Saving replaces what this instance offers. Workspaces that already have it are unaffected."
+						? "Use areas to group related practices in the instance catalog."
+						: "Saving updates the instance catalog. Existing workspaces will not change."
 				}
 			/>
 
@@ -214,7 +216,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 							? () => setResetOpen(true)
 							: undefined
 					}
-					onKeepOurVersion={onKeepOurVersion}
+					onKeepCurrentDefinition={onKeepCurrentDefinition}
 				/>
 			)}
 
@@ -222,15 +224,15 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 				<div className="max-w-3xl space-y-2">
 					<Alert variant="warning">
 						<RotateCcw />
-						<AlertTitle>Someone else saved this area while you were editing</AlertTitle>
+						<AlertTitle>This area changed while you were editing</AlertTitle>
 						<AlertDescription>
-							Your draft is untouched. If you keep it and save, their changes are overwritten by
-							everything in your draft. To see theirs instead, leave this page and open it again.
+							Your draft is safe. Continue with it and save to replace the latest changes, or leave
+							this page and reopen the area to see them.
 						</AlertDescription>
 					</Alert>
 					{onContinueWithDraft && (
 						<Button type="button" variant="outline" size="sm" onClick={onContinueWithDraft}>
-							Keep my draft
+							Continue with my draft
 						</Button>
 					)}
 				</div>
@@ -262,7 +264,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 							</Field>
 
 							<Field data-invalid={slugError ? "true" : undefined}>
-								<FieldLabel htmlFor="area-slug">Slug {mode === "create" && "*"}</FieldLabel>
+								<FieldLabel htmlFor="area-slug">Identifier {mode === "create" && "*"}</FieldLabel>
 								<div className="flex items-center gap-2">
 									<Input
 										id="area-slug"
@@ -289,16 +291,14 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 											onClick={() =>
 												setForm((previous) => ({ ...previous, slug: generateSlug(previous.name) }))
 											}
-											aria-label="Reset to auto-generated slug"
+											aria-label="Reset to generated identifier"
 										>
 											<RotateCcw className="size-3.5" aria-hidden />
 										</Button>
 									)}
 								</div>
 								<FieldDescription id="area-slug-description">
-									{mode === "edit"
-										? "Slug cannot be changed after creation."
-										: "A permanent id, not shown to developers. It cannot be changed later."}
+									Used in URLs and integrations. It can't be changed later.
 								</FieldDescription>
 								{slugError && <FieldError id="area-slug-error">{slugError}</FieldError>}
 							</Field>
@@ -345,7 +345,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 									disabled={isPending || isResetPending || isKeepPending}
 								/>
 								<FieldDescription id="area-appearance-help">
-									The icon and color every workspace copy inherits.
+									New workspace copies use this icon and color.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
@@ -365,10 +365,10 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 						{isPending && <Spinner className="size-4" />}
 						{isPending
 							? mode === "create"
-								? "Adding…"
+								? "Creating…"
 								: "Saving…"
 							: mode === "create"
-								? "Add area"
+								? "Create area"
 								: "Save changes"}
 					</Button>
 				</div>

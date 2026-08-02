@@ -17,7 +17,7 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/practices/new")({
-	head: instanceAdminHead("Add practice"),
+	head: instanceAdminHead("Create practice"),
 	component: NewCuratedPracticePage,
 });
 
@@ -29,11 +29,11 @@ function NewCuratedPracticePage() {
 		...adminCreateCuratedPracticeMutation(),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			toast.success("Practice added");
+			toast.success("Practice created");
 			navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) =>
-			toast.error("Couldn't add the practice", { description: problemDetailOf(error) }),
+			toast.error("Couldn't create the practice", { description: problemDetailOf(error) }),
 	});
 
 	if (catalogQuery.isPending) {

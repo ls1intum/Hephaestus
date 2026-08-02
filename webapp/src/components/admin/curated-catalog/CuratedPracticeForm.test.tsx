@@ -94,7 +94,8 @@ describe("CuratedPracticeForm", () => {
 			(screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled,
 		).toBe(true);
 		expect(
-			(screen.getByRole("button", { name: "Keep my draft" }) as HTMLButtonElement).disabled,
+			(screen.getByRole("button", { name: "Continue with my draft" }) as HTMLButtonElement)
+				.disabled,
 		).toBe(false);
 	});
 
@@ -122,7 +123,7 @@ describe("CuratedPracticeForm", () => {
 						name: "Say what changed and why",
 						artifactType: "PULL_REQUEST",
 						triggerEvents: ["PullRequestCreated"],
-						criteria: "The definition Hephaestus ships now",
+						criteria: "The updated default criteria",
 						whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 					},
 				}}
@@ -133,25 +134,23 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		expect(screen.getByText("Update waiting")).toBeTruthy();
-		expect(screen.getByText(/would change what this practice detects/)).toBeTruthy();
+		expect(screen.getByText("Hephaestus update available")).toBeTruthy();
+		expect(screen.getByText(/would change review behavior/)).toBeTruthy();
 
-		// The incoming definition must be readable before it can be accepted.
-		fireEvent.click(screen.getByRole("button", { name: "Show the Hephaestus version" }));
-		expect(await screen.findByText("The definition Hephaestus ships now")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Review Hephaestus update" }));
+		expect(await screen.findByText("The updated default criteria")).toBeTruthy();
 
-		fireEvent.click(screen.getByRole("button", { name: "Use the Hephaestus version" }));
+		fireEvent.click(screen.getByRole("button", { name: "Apply Hephaestus update" }));
 
 		const confirmation = screen.getByRole("alertdialog", {
-			name: "Use the Hephaestus version?",
+			name: "Apply Hephaestus update?",
 		});
 		expect(confirmation).toBeTruthy();
-		expect(screen.getByText(/every workspace copy of it, stay as they are/)).toBeTruthy();
+		expect(screen.getByText(/Existing workspaces remain unchanged/)).toBeTruthy();
+		expect(screen.getByText(/Future Hephaestus updates apply automatically/)).toBeTruthy();
 		expect(onUseHephaestusVersion).not.toHaveBeenCalled();
 
-		fireEvent.click(
-			within(confirmation).getByRole("button", { name: "Use the Hephaestus version" }),
-		);
+		fireEvent.click(within(confirmation).getByRole("button", { name: "Apply Hephaestus update" }));
 		expect(onUseHephaestusVersion).toHaveBeenCalledOnce();
 	});
 });

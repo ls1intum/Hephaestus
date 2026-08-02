@@ -94,37 +94,47 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 			setBaseArea(updated);
 			setFormGeneration((generation) => generation + 1);
 			setConflict(false);
-			toast.success("Now using the Hephaestus version");
+			toast.success(
+				baseArea.status.state === "UPDATE_WAITING"
+					? "Hephaestus update applied"
+					: "Hephaestus default restored",
+			);
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
-				toast.error("Someone else changed this area first. Reopen it to see the current version.");
+				toast.error(
+					"The catalog changed before this action was saved. Reopen the area to see the latest version.",
+				);
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				invalidateCatalog();
 				return;
 			}
-			toast.error("Couldn't use the Hephaestus version", { description: problemDetailOf(error) });
+			toast.error("Couldn't apply the default", { description: problemDetailOf(error) });
 		},
 	});
-	// Declining the update re-stamps what our version was based on, so the same change is not
-	// raised again. The definition in force does not move.
-	const keepOurVersion = useMutation({
+	const keepCurrentDefinition = useMutation({
 		...adminKeepCuratedAreaMutation(),
 		onSuccess: (updated: CuratedArea) => {
 			queryClient.setQueryData(detailQueryKey, updated);
 			invalidateCatalog();
 			setBaseArea(updated);
 			setConflict(false);
-			toast.success("Keeping our version");
+			toast.success(
+				baseArea.status.state === "NO_LONGER_SHIPPED"
+					? "Saved area is now custom"
+					: "Saved version kept",
+			);
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
-				toast.error("Someone else changed this area first. Reopen it to see the current version.");
+				toast.error(
+					"The catalog changed before this action was saved. Reopen the area to see the latest version.",
+				);
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				invalidateCatalog();
 				return;
 			}
-			toast.error("Couldn't keep our version", { description: problemDetailOf(error) });
+			toast.error("Couldn't keep the saved version", { description: problemDetailOf(error) });
 		},
 	});
 
@@ -143,7 +153,7 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 			}}
 			isPending={updateArea.isPending}
 			isResetPending={deleteOverride.isPending}
-			isKeepPending={keepOurVersion.isPending}
+			isKeepPending={keepCurrentDefinition.isPending}
 			conflict={conflict}
 			onContinueWithDraft={async () => {
 				try {
@@ -168,9 +178,9 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 					headers: { "If-Match": `"${baseArea.status.etag}"` },
 				});
 			}}
-			onKeepOurVersion={() => {
+			onKeepCurrentDefinition={() => {
 				setConflict(false);
-				keepOurVersion.mutate({
+				keepCurrentDefinition.mutate({
 					path: { slug: areaSlug },
 					headers: { "If-Match": `"${baseArea.status.etag}"` },
 				});

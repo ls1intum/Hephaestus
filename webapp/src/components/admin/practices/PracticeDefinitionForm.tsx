@@ -150,7 +150,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		submitted && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
 	const slugError =
 		submitted && mode === "create" && !isValidSlug(form.slug)
-			? "Slug must be 3-64 lowercase alphanumeric characters separated by hyphens"
+			? "Use 3–64 lowercase letters, numbers, and single hyphens."
 			: undefined;
 	const triggerError =
 		submitted && form.artifactType !== "CONVERSATION_THREAD" && form.triggerEvents.length === 0
@@ -250,7 +250,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						</Field>
 
 						<Field data-invalid={slugError ? "true" : undefined}>
-							<FieldLabel htmlFor="practice-slug">Slug {mode === "create" && "*"}</FieldLabel>
+							<FieldLabel htmlFor="practice-slug">Identifier {mode === "create" && "*"}</FieldLabel>
 							<div className="flex items-center gap-2">
 								<Input
 									id="practice-slug"
@@ -264,10 +264,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									maxLength={64}
 									aria-invalid={Boolean(slugError)}
 									aria-describedby={
-										[
-											mode === "edit" ? "practice-slug-description" : undefined,
-											slugError ? "practice-slug-error" : undefined,
-										]
+										["practice-slug-description", slugError ? "practice-slug-error" : undefined]
 											.filter(Boolean)
 											.join(" ") || undefined
 									}
@@ -283,17 +280,15 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 												slug: generateSlug(previous.name),
 											}))
 										}
-										aria-label="Reset to auto-generated slug"
+										aria-label="Reset to generated identifier"
 									>
 										<RotateCcw className="size-3.5" aria-hidden />
 									</Button>
 								)}
 							</div>
-							{mode === "edit" && (
-								<FieldDescription id="practice-slug-description">
-									Slug cannot be changed after creation.
-								</FieldDescription>
-							)}
+							<FieldDescription id="practice-slug-description">
+								Used in URLs and integrations. It can't be changed later.
+							</FieldDescription>
 							{slugError && <FieldError id="practice-slug-error">{slugError}</FieldError>}
 						</Field>
 
@@ -444,7 +439,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					<div>
 						<h2 className="text-lg font-semibold">Developer guidance</h2>
 						<p className="text-sm text-muted-foreground">
-							Optional guidance shown to developers. It does not affect the assessment.
+							Optional guidance shown to developers. It does not change review behavior.
 						</p>
 					</div>
 					<Field>

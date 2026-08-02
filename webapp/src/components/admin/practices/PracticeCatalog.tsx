@@ -276,7 +276,7 @@ function CatalogToolbar({
 				</ToggleGroupItem>
 			</ToggleGroup>
 			<div className="grid grid-cols-2 gap-2 sm:flex">
-				<AddAreaButton
+				<CreateAreaButton
 					onCreate={onCreateArea}
 					pending={creatingArea}
 					disabled={areaStructurePending && !creatingArea}
@@ -287,7 +287,7 @@ function CatalogToolbar({
 					className={cn(buttonVariants(), "w-full sm:w-auto")}
 				>
 					<Plus className="mr-1.5 size-4" />
-					New practice
+					Create practice
 				</Link>
 			</div>
 		</div>
@@ -392,7 +392,7 @@ function PracticeActions({
 				checked={practice.active}
 				onCheckedChange={(active) => onSetActive(practice.slug, active)}
 				disabled={pending}
-				aria-label={`Include ${practice.name} in new reviews`}
+				aria-label={`Use ${practice.name} in new reviews`}
 			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger
@@ -422,7 +422,7 @@ function PracticeActions({
 						disabled={pending}
 						onClick={() => onSetActive(practice.slug, !practice.active)}
 					>
-						{practice.active ? "Exclude from new reviews" : "Include in new reviews"}
+						{practice.active ? "Stop using in new reviews" : "Use in new reviews"}
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
@@ -533,9 +533,8 @@ function PracticeRowDetails({ practice, title }: { practice: Practice; title: Re
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{ARTIFACT_LABELS[practice.artifactType]}</span>
-				{!practice.active && <Badge variant="outline">Excluded</Badge>}
+				{!practice.active && <Badge variant="outline">Not used in new reviews</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
-				{practice.precomputeScript && <Badge variant="outline">Precompute</Badge>}
 			</ItemDescription>
 		</ItemContent>
 	);
@@ -560,7 +559,7 @@ function PracticeDragPreview({ practice }: { practice: Practice }) {
 	);
 }
 
-function AddAreaButton({
+function CreateAreaButton({
 	onCreate,
 	pending,
 	disabled,
@@ -576,7 +575,7 @@ function AddAreaButton({
 				render={
 					<Button variant="outline" disabled={disabled}>
 						<Plus className="mr-1.5 size-4" />
-						Add area
+						Create area
 					</Button>
 				}
 			/>
@@ -598,7 +597,7 @@ function AddAreaButton({
 						disabled={pending}
 					/>
 					<Button type="submit" size="sm" className="min-w-16" disabled={pending}>
-						{pending ? "Adding…" : "Add"}
+						{pending ? "Creating…" : "Create"}
 					</Button>
 				</form>
 			</PopoverContent>

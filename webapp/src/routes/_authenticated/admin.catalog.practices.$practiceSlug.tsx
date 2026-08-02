@@ -110,41 +110,47 @@ function LoadedEditCuratedPracticePage({
 			setBasePractice(updated);
 			setFormGeneration((generation) => generation + 1);
 			setConflict(false);
-			toast.success("Now using the Hephaestus version");
+			toast.success(
+				basePractice.status.state === "UPDATE_WAITING"
+					? "Hephaestus update applied"
+					: "Hephaestus default restored",
+			);
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
 				toast.error(
-					"Someone else changed this practice first. Reopen it to see the current version.",
+					"The catalog changed before this action was saved. Reopen the practice to see the latest version.",
 				);
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 				return;
 			}
-			toast.error("Couldn't use the Hephaestus version", { description: problemDetailOf(error) });
+			toast.error("Couldn't apply the default", { description: problemDetailOf(error) });
 		},
 	});
-	// Declining the update re-stamps what our version was based on, so the same change is not
-	// raised again. The definition in force does not move.
-	const keepOurVersion = useMutation({
+	const keepCurrentDefinition = useMutation({
 		...adminKeepCuratedPracticeMutation(),
 		onSuccess: (updated: CuratedPractice) => {
 			queryClient.setQueryData(detailQueryKey, updated);
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 			setBasePractice(updated);
 			setConflict(false);
-			toast.success("Keeping our version");
+			toast.success(
+				basePractice.status.state === "NO_LONGER_SHIPPED"
+					? "Saved practice is now custom"
+					: "Saved version kept",
+			);
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
 				toast.error(
-					"Someone else changed this practice first. Reopen it to see the current version.",
+					"The catalog changed before this action was saved. Reopen the practice to see the latest version.",
 				);
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 				return;
 			}
-			toast.error("Couldn't keep our version", { description: problemDetailOf(error) });
+			toast.error("Couldn't keep the saved version", { description: problemDetailOf(error) });
 		},
 	});
 
@@ -180,7 +186,7 @@ function LoadedEditCuratedPracticePage({
 			areas={areas.map((area) => ({ slug: area.slug, name: area.definition.name }))}
 			isPending={updatePractice.isPending}
 			isResetPending={deleteOverride.isPending}
-			isKeepPending={keepOurVersion.isPending}
+			isKeepPending={keepCurrentDefinition.isPending}
 			conflict={conflict}
 			onContinueWithDraft={continueWithDraft}
 			onUseHephaestusVersion={() => {
@@ -190,9 +196,9 @@ function LoadedEditCuratedPracticePage({
 					headers: { "If-Match": `"${basePractice.status.etag}"` },
 				});
 			}}
-			onKeepOurVersion={() => {
+			onKeepCurrentDefinition={() => {
 				setConflict(false);
-				keepOurVersion.mutate({
+				keepCurrentDefinition.mutate({
 					path: { slug: practiceSlug },
 					headers: { "If-Match": `"${basePractice.status.etag}"` },
 				});

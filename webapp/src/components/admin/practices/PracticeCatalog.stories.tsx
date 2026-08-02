@@ -45,7 +45,7 @@ const idlePending = {
 };
 
 const meta = {
-	title: "Admin/Practices/Catalog",
+	title: "Workspace admin/Practices/Practice setup",
 	component: PracticeCatalog,
 	parameters: {
 		layout: "padded",

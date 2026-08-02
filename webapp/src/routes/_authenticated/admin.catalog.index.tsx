@@ -71,13 +71,16 @@ function AdminCuratedCatalogPage() {
 		onSuccess: () => {
 			refreshCatalogAnd(kind, slug);
 			const noun = kind === "practice" ? "Practice" : "Area";
-			toast.success(successMessage ?? (offered ? `${noun} offered again` : `${noun} retired`));
+			toast.success(
+				successMessage ??
+					(offered ? `${noun} included in new workspaces` : `${noun} excluded from new workspaces`),
+			);
 		},
 		onError: (error: unknown) => {
 			refreshCatalogAnd(kind, slug);
 			toast.error(
 				problemStatusOf(error) === 412
-					? `Someone else changed this ${kind} first. Reload to see the current state.`
+					? `The catalog changed before this action was saved. We reloaded the ${kind}.`
 					: `Couldn't update the ${kind}`,
 				{ description: problemDetailOf(error) },
 			);
@@ -95,7 +98,7 @@ function AdminCuratedCatalogPage() {
 	const structureError = (error: unknown) => {
 		toast.error(
 			problemStatusOf(error) === 412
-				? "Someone else reordered the catalog first. The current order has been reloaded."
+				? "The catalog order changed before this move was saved. We reloaded the latest order."
 				: "Couldn't save the catalog order",
 			{ description: problemDetailOf(error) },
 		);
@@ -191,8 +194,7 @@ function AdminCuratedCatalogPage() {
 			<PageHeader
 				icon={<LibraryBig />}
 				title="Practice catalog"
-				description="Choose what new workspaces receive. Hephaestus keeps untouched entries current; your edits stay yours."
-				// In the header rather than the toolbar, so a failed load is not a dead end.
+				description="Set what each new workspace starts with. Hephaestus defaults update automatically until you customize them. Existing workspaces never change automatically."
 				actions={
 					<div className="flex flex-wrap gap-2">
 						<Link
@@ -202,7 +204,7 @@ function AdminCuratedCatalogPage() {
 							className={buttonVariants({ variant: "outline" })}
 						>
 							<Plus className="mr-1.5 size-4" aria-hidden />
-							Add area
+							Create area
 						</Link>
 						<Link
 							from={Route.fullPath}
@@ -211,7 +213,7 @@ function AdminCuratedCatalogPage() {
 							className={buttonVariants()}
 						>
 							<Plus className="mr-1.5 size-4" aria-hidden />
-							Add practice
+							Create practice
 						</Link>
 					</div>
 				}
@@ -245,8 +247,8 @@ function AdminCuratedCatalogPage() {
 							? parent
 								? parent.status.offered
 									? undefined
-									: "Practice will be offered when its area is offered"
-								: "Practice can be offered after it is moved to an available area"
+									: "Practice will be included when its area is included"
+								: "Move the practice to an included area first"
 							: undefined;
 						updatePracticeStatus.mutate(
 							{

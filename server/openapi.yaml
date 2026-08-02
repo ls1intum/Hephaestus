@@ -6901,7 +6901,6 @@ components:
         link:
           type: string
           enum:
-          - LOCAL
           - IN_SYNC
           - LOCALLY_EDITED
           - UPDATE_AVAILABLE

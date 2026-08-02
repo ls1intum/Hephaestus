@@ -39,7 +39,7 @@ interface CuratedPracticeFormBaseProps {
 	isResetPending?: boolean;
 	isKeepPending?: boolean;
 	onUseHephaestusVersion?: () => void;
-	onKeepOurVersion?: () => void;
+	onKeepCurrentDefinition?: () => void;
 }
 
 interface CuratedPracticeFormCreateProps extends CuratedPracticeFormBaseProps {
@@ -69,11 +69,13 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		isKeepPending = false,
 		onUseHephaestusVersion,
 		initialData,
-		onKeepOurVersion,
+		onKeepCurrentDefinition,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
 	const canReset =
 		mode === "edit" && canUseHephaestusVersion(initialData.status) && onUseHephaestusVersion;
+	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
+	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
 	const cancelAction = (
 		<Link
 			from="/admin/catalog"
@@ -90,10 +92,12 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 			<AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Use the Hephaestus version?</AlertDialogTitle>
+						<AlertDialogTitle>{resetLabel}?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Your version and any unsaved edits are discarded. From now on this practice follows
-							Hephaestus. Whether it is offered, and every workspace copy of it, stay as they are.
+							This replaces the customization and discards unsaved changes. It does not change
+							whether the practice is included in new workspaces. Existing workspaces remain
+							unchanged. Future Hephaestus updates apply automatically until the practice is
+							customized again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -105,7 +109,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 								onUseHephaestusVersion?.();
 							}}
 						>
-							{isResetPending ? "Using the Hephaestus version…" : "Use the Hephaestus version"}
+							{isResetPending ? `${resetLabel}…` : resetLabel}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -121,11 +125,11 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 			</Link>
 			<PageHeader
 				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
-				title={mode === "create" ? "Add practice" : `Edit: ${initialData.name}`}
+				title={mode === "create" ? "Create practice" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Define a practice every new workspace will receive."
-						: "Saving replaces what this instance offers. Workspaces that already have it are unaffected."
+						? "Define a practice for the instance catalog."
+						: "Saving updates the instance catalog. Existing workspaces will not change."
 				}
 			/>
 
@@ -134,11 +138,12 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					status={initialData.status}
 					kind="practice"
 					shipped={initialData.shipped}
+					areaNames={Object.fromEntries(areas.map((area) => [area.slug, area.name]))}
 					isResetPending={isResetPending}
 					isKeepPending={isKeepPending}
 					disabled={conflict ?? false}
 					onUseHephaestusVersion={canReset ? () => setResetOpen(true) : undefined}
-					onKeepOurVersion={onKeepOurVersion}
+					onKeepCurrentDefinition={onKeepCurrentDefinition}
 				/>
 			)}
 
@@ -146,15 +151,15 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 				<div className="max-w-3xl space-y-2">
 					<Alert variant="warning">
 						<RotateCcw />
-						<AlertTitle>Someone else saved this practice while you were editing</AlertTitle>
+						<AlertTitle>This practice changed while you were editing</AlertTitle>
 						<AlertDescription>
-							Your draft is untouched. If you keep it and save, their changes are overwritten by
-							everything in your draft. To see theirs instead, leave this page and open it again.
+							Your draft is safe. Continue with it and save to replace the latest changes, or leave
+							this page and reopen the practice to see them.
 						</AlertDescription>
 					</Alert>
 					{onContinueWithDraft && (
 						<Button type="button" variant="outline" size="sm" onClick={onContinueWithDraft}>
-							Keep my draft
+							Continue with my draft
 						</Button>
 					)}
 				</div>

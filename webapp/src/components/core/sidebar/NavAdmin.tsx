@@ -192,7 +192,7 @@ export function NavAdmin({
 							}
 						>
 							<ListChecks />
-							<span>Catalog</span>
+							<span>Practice setup</span>
 						</SidebarMenuSubButton>
 					</SidebarMenuSubItem>
 					<SidebarMenuSubItem>

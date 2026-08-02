@@ -155,7 +155,7 @@ export function PracticeFormShell({
 				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
 			>
 				<ArrowLeft className="size-4" aria-hidden />
-				Practice catalog
+				Practices
 			</Link>
 			<PageHeader
 				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}

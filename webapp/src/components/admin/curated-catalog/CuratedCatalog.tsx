@@ -66,8 +66,8 @@ const ARTIFACT_LABELS: Record<WorkArtifact, string> = {
 
 const STATUS_FILTERS = [
 	{ value: "ALL", label: "All" },
-	{ value: "OFFERED", label: "Offered" },
-	{ value: "NOT_OFFERED", label: "Not offered" },
+	{ value: "OFFERED", label: "Included" },
+	{ value: "NOT_OFFERED", label: "Excluded" },
 ] satisfies Array<{ value: StatusFilter; label: string }>;
 
 function matches(haystack: (string | undefined)[], needle: string): boolean {
@@ -88,11 +88,18 @@ export function CuratedCatalog({
 	onReorderAreas,
 	onPlacePractice,
 }: CuratedCatalogProps) {
-	const [retiringPractice, setRetiringPractice] = useState<CuratedPracticeSummary | null>(null);
-	const [retiringArea, setRetiringArea] = useState<CuratedArea | null>(null);
+	const [excludingPractice, setExcludingPractice] = useState<CuratedPracticeSummary | null>(null);
+	const [excludingArea, setExcludingArea] = useState<CuratedArea | null>(null);
 	const query = search.q ?? "";
 	const status: StatusFilter = search.status ?? "ALL";
 	const artifact: ArtifactFilter = search.artifact ?? "ALL";
+	const reviewOnly = search.review === true;
+	const removedDefaultsToReview =
+		areas.filter((area) => area.status.state === "NO_LONGER_SHIPPED" && area.status.offered)
+			.length +
+		practices.filter(
+			(practice) => practice.status.state === "NO_LONGER_SHIPPED" && practice.effectivelyOffered,
+		).length;
 	const needle = query.trim().toLowerCase();
 	const areaBySlug = new Map(areas.map((area) => [area.slug, area]));
 	const matchesStatus = (offered: boolean) =>
@@ -100,6 +107,9 @@ export function CuratedCatalog({
 
 	const visiblePractices = practices.filter(
 		(practice) =>
+			(!reviewOnly ||
+				practice.status.state === "UPDATE_WAITING" ||
+				(practice.status.state === "NO_LONGER_SHIPPED" && practice.effectivelyOffered)) &&
 			matchesStatus(practice.effectivelyOffered) &&
 			(artifact === "ALL" || practice.artifactType === artifact) &&
 			matches(
@@ -120,6 +130,9 @@ export function CuratedCatalog({
 		(area) =>
 			areasHoldingMatches.has(area.slug) ||
 			(artifact === "ALL" &&
+				(!reviewOnly ||
+					area.status.state === "UPDATE_WAITING" ||
+					(area.status.state === "NO_LONGER_SHIPPED" && area.status.offered)) &&
 				matchesStatus(area.status.offered) &&
 				matches(
 					[area.definition.name, area.slug, area.definition.description ?? undefined],
@@ -128,20 +141,25 @@ export function CuratedCatalog({
 	);
 
 	const visibleAreaSlugs = new Set(visibleAreas.map((area) => area.slug));
-	const canReorder = !needle && status === "ALL" && artifact === "ALL";
+	const canReorder = !needle && status === "ALL" && artifact === "ALL" && !reviewOnly;
 	const forcedOpenAreas = canReorder ? undefined : visibleAreaSlugs;
 	const catalogIsEmpty = areas.length === 0 && practices.length === 0;
 	const nothingMatches = visibleAreas.length === 0 && visiblePractices.length === 0;
-	const areaBeingRetiredHolds = retiringArea
+	const practicesExcludedWithArea = excludingArea
 		? practices.filter(
-				(practice) => practice.areaSlug === retiringArea.slug && practice.status.offered,
+				(practice) => practice.areaSlug === excludingArea.slug && practice.status.offered,
 			)
 		: [];
 
 	return (
 		<>
 			<div className="space-y-4">
-				<CuratedCatalogSummary summary={summary} />
+				<CuratedCatalogSummary
+					summary={summary}
+					removedDefaultsToReview={removedDefaultsToReview}
+					reviewing={reviewOnly}
+					onReviewChanges={() => onSearchChange({ review: true })}
+				/>
 				<CatalogFilters search={search} onSearchChange={onSearchChange} />
 				{!canReorder && !catalogIsEmpty && (
 					<p className="text-muted-foreground text-sm">
@@ -155,9 +173,9 @@ export function CuratedCatalog({
 							<EmptyMedia variant="icon">
 								<Shapes aria-hidden />
 							</EmptyMedia>
-							<EmptyTitle>No practices in the catalog</EmptyTitle>
+							<EmptyTitle>The catalog is empty</EmptyTitle>
 							<EmptyDescription>
-								Add a practice. Every workspace created from then on receives it.
+								Create a practice or area to build the starting configuration for new workspaces.
 							</EmptyDescription>
 						</EmptyHeader>
 						<EmptyContent>
@@ -168,7 +186,7 @@ export function CuratedCatalog({
 								className={cn(buttonVariants())}
 							>
 								<Plus className="mr-1.5 size-4" aria-hidden />
-								Add practice
+								Create practice
 							</Link>
 						</EmptyContent>
 					</Empty>
@@ -202,8 +220,8 @@ export function CuratedCatalog({
 						pendingPracticeSlugs={pendingPracticeSlugs}
 						onAreaStatusChange={onAreaStatusChange}
 						onPracticeStatusChange={onPracticeStatusChange}
-						onRetireArea={setRetiringArea}
-						onRetirePractice={setRetiringPractice}
+						onExcludeArea={setExcludingArea}
+						onExcludePractice={setExcludingPractice}
 						onReorderAreas={onReorderAreas}
 						onPlacePractice={onPlacePractice}
 					/>
@@ -211,72 +229,74 @@ export function CuratedCatalog({
 			</div>
 
 			<AlertDialog
-				open={retiringPractice !== null}
+				open={excludingPractice !== null}
 				onOpenChange={(open) => {
-					if (!open) setRetiringPractice(null);
+					if (!open) setExcludingPractice(null);
 				}}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Retire “{retiringPractice?.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>
+							Exclude “{excludingPractice?.name}” from new workspaces?
+						</AlertDialogTitle>
 						<AlertDialogDescription>
-							{retiringPractice?.effectivelyOffered === false
-								? "It is already unavailable because its area is not offered. Retiring it keeps it unavailable if the area becomes available again. Workspaces that already have it keep it unchanged."
-								: "New workspaces will not receive it. Workspaces that already have it keep it unchanged. You can offer it again later."}
+							{excludingPractice?.effectivelyOffered === false
+								? "Its area is already excluded. This keeps the practice excluded if the area is included again. Existing workspaces will not change."
+								: "New workspaces will not receive this practice. Existing workspaces will not change. You can include it again later."}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel>
-							{retiringPractice?.effectivelyOffered === false ? "Leave as is" : "Keep offering it"}
-						</AlertDialogCancel>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={() => {
-								if (retiringPractice) onPracticeStatusChange(retiringPractice, false);
-								setRetiringPractice(null);
+								if (excludingPractice) onPracticeStatusChange(excludingPractice, false);
+								setExcludingPractice(null);
 							}}
 						>
-							Retire practice
+							Exclude practice
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
 
 			<AlertDialog
-				open={retiringArea !== null}
+				open={excludingArea !== null}
 				onOpenChange={(open) => {
-					if (!open) setRetiringArea(null);
+					if (!open) setExcludingArea(null);
 				}}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Retire “{retiringArea?.definition.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>
+							Exclude “{excludingArea?.definition.name}” from new workspaces?
+						</AlertDialogTitle>
 						<AlertDialogDescription>
-							{areaBeingRetiredHolds.length === 0
-								? "New workspaces will not receive this area. No practice is filed under it, so nothing else changes. Workspaces that already have it keep it, unchanged."
-								: `New workspaces will receive neither this area nor the ${areaBeingRetiredHolds.length} ${
-										areaBeingRetiredHolds.length === 1 ? "practice" : "practices"
-									} filed under it. Workspaces that already have them keep them, unchanged.`}
+							{practicesExcludedWithArea.length === 0
+								? "New workspaces will not receive this area. No additional practices will be excluded. Existing workspaces will not change."
+								: `New workspaces will not receive this area. This also excludes ${practicesExcludedWithArea.length} currently included ${
+										practicesExcludedWithArea.length === 1 ? "practice" : "practices"
+									}. Existing workspaces will not change.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					{areaBeingRetiredHolds.length > 0 && (
+					{practicesExcludedWithArea.length > 0 && (
 						<ul
-							aria-label="Practices filed under this area"
+							aria-label="Practices this also excludes"
 							className="max-h-40 list-disc overflow-y-auto pl-5 text-muted-foreground text-sm"
 						>
-							{areaBeingRetiredHolds.map((practice) => (
+							{practicesExcludedWithArea.map((practice) => (
 								<li key={practice.slug}>{practice.name}</li>
 							))}
 						</ul>
 					)}
 					<AlertDialogFooter>
-						<AlertDialogCancel>Keep offering it</AlertDialogCancel>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={() => {
-								if (retiringArea) onAreaStatusChange(retiringArea, false);
-								setRetiringArea(null);
+								if (excludingArea) onAreaStatusChange(excludingArea, false);
+								setExcludingArea(null);
 							}}
 						>
-							Retire area
+							Exclude area
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -296,6 +316,15 @@ function CatalogFilters({
 	const artifact: ArtifactFilter = search.artifact ?? "ALL";
 	return (
 		<div className="grid gap-2 sm:grid-cols-2 lg:flex lg:items-center">
+			{search.review && (
+				<Button
+					variant="secondary"
+					size="sm"
+					onClick={() => onSearchChange({ ...search, review: undefined })}
+				>
+					Show all entries
+				</Button>
+			)}
 			<div className="relative sm:col-span-2 lg:w-64">
 				<Search
 					className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
@@ -321,7 +350,10 @@ function CatalogFilters({
 					})
 				}
 			>
-				<SelectTrigger className="w-full lg:hidden" aria-label="Filter by availability">
+				<SelectTrigger
+					className="w-full lg:hidden"
+					aria-label="Filter by inclusion in new workspaces"
+				>
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
@@ -344,7 +376,7 @@ function CatalogFilters({
 				}
 				variant="outline"
 				size="sm"
-				aria-label="Filter by availability"
+				aria-label="Filter by inclusion in new workspaces"
 				className="hidden lg:flex"
 			>
 				{STATUS_FILTERS.map((filter) => (

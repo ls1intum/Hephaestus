@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 
 const meta = {
@@ -8,6 +8,8 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
+		onReviewChanges: fn(),
+		removedDefaultsToReview: 0,
 		summary: {
 			total: 49,
 			updatesChangingDetection: 0,
@@ -24,18 +26,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** An instance nobody has touched: one sentence, no badges. */
-export const NothingHasBeenChanged: Story = {
+export const EverythingUsesDefaults: Story = {
 	play: async ({ canvasElement }) => {
-		await expect(
-			within(canvasElement).getByText("All 49 practices and areas follow Hephaestus."),
-		).toBeVisible();
+		await expect(within(canvasElement).queryByText(/needs review/)).not.toBeInTheDocument();
 	},
 };
 
-/** Waiting updates are grouped by their consequence. */
 export const UpdatesWaiting: Story = {
 	args: {
+		onReviewChanges: fn(),
 		summary: {
 			total: 49,
 			updatesChangingDetection: 2,
@@ -49,24 +48,40 @@ export const UpdatesWaiting: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("2 would change detection")).toBeVisible();
-		await expect(canvas.getByText("5 wording only")).toBeVisible();
-		await expect(canvas.getByText("1 would change presentation")).toBeVisible();
-		await expect(canvas.getByText("49 practices and areas. 38 follow Hephaestus.")).toBeVisible();
+		await expect(canvas.getByText("2 updates would change review behavior")).toBeVisible();
+		await expect(canvas.getByText("5 updates would change wording or guidance")).toBeVisible();
+		await expect(canvas.getByText("1 update would change area appearance")).toBeVisible();
+		await expect(canvas.getByText("8 catalog changes need review")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Review changes" })).toBeVisible();
 	},
 };
 
-export const CuratedHeavily: Story = {
+export const RemovedDefault: Story = {
 	args: {
+		removedDefaultsToReview: 1,
 		summary: {
-			total: 60,
-			updatesChangingDetection: 1,
+			total: 49,
+			updatesChangingDetection: 0,
 			updatesChangingWordingOnly: 0,
 			updatesChangingPresentation: 0,
-			editedHere: 8,
-			yours: 11,
-			notOffered: 4,
-			noLongerShipped: 2,
+			editedHere: 1,
+			yours: 0,
+			notOffered: 0,
+			noLongerShipped: 1,
 		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("1 catalog change needs review")).toBeVisible();
+		await expect(canvas.getByText("1 entry is no longer in Hephaestus defaults")).toBeVisible();
+	},
+};
+
+export const ReviewingChanges: Story = {
+	args: { ...UpdatesWaiting.args, reviewing: true },
+	play: async ({ canvasElement }) => {
+		await expect(
+			within(canvasElement).queryByRole("button", { name: "Review changes" }),
+		).not.toBeInTheDocument();
 	},
 };

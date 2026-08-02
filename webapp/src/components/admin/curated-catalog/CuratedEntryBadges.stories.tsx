@@ -24,16 +24,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The ordinary case renders nothing at all — a badge on every row would say nothing. */
 export const Ordinary: Story = {
 	play: async ({ canvasElement }) => {
 		await expect(within(canvasElement).queryByText(/./)).toBeNull();
 	},
 };
 
-export const EditedHere: Story = { args: { status: status({ state: "EDITED_HERE" }) } };
+export const Customized: Story = { args: { status: status({ state: "EDITED_HERE" }) } };
 
-export const UpdateChangesDetection: Story = {
+export const UpdateChangesReviewBehavior: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }) },
 };
 
@@ -41,16 +40,15 @@ export const UpdateWordingOnly: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "WORDING" }) },
 };
 
-export const AddedHere: Story = { args: { status: status({ state: "YOURS" }) } };
+export const NoHephaestusDefault: Story = { args: { status: status({ state: "YOURS" }) } };
 
-export const NoLongerShipped: Story = {
+export const RemovedFromDefaults: Story = {
 	args: { status: status({ state: "NO_LONGER_SHIPPED" }) },
 };
 
-/** Retired entries always badge, whatever else is true of them. */
-export const NotOffered: Story = {
+export const Excluded: Story = {
 	args: { status: status({ offered: false, retired: true }), kind: "area" },
 	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText("Not offered")).toBeVisible();
+		await expect(within(canvasElement).getByText("Excluded from new workspaces")).toBeVisible();
 	},
 };

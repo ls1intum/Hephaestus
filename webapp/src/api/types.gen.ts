@@ -2664,7 +2664,7 @@ export type PracticeArea = {
  * The catalog entry a workspace copy came from, and how far it has drifted
  */
 export type CatalogOrigin = {
-    link: 'LOCAL' | 'IN_SYNC' | 'LOCALLY_EDITED' | 'UPDATE_AVAILABLE';
+    link: 'IN_SYNC' | 'LOCALLY_EDITED' | 'UPDATE_AVAILABLE';
     /**
      * Slug of the catalog entry this copy was made from
      */

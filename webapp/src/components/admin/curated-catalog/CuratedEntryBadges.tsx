@@ -9,11 +9,6 @@ export interface CuratedEntryBadgesProps {
 	kind: "practice" | "area";
 }
 
-/**
- * How an entry stands, badged only where that is worth saying. An entry that follows Hephaestus and
- * is offered gets no badge at all: it is the ordinary case, and labelling every row with it would
- * bury the few rows that actually want a decision.
- */
 export function CuratedEntryBadges({ status, kind }: CuratedEntryBadgesProps) {
 	if (isOrdinary(status)) {
 		return null;
@@ -21,7 +16,7 @@ export function CuratedEntryBadges({ status, kind }: CuratedEntryBadgesProps) {
 	const copy = curatedEntryCopy(status, kind);
 	return (
 		<>
-			{!status.offered && <Badge variant="outline">Not offered</Badge>}
+			{!status.offered && <Badge variant="outline">Excluded from new workspaces</Badge>}
 			{status.state !== "FROM_HEPHAESTUS" && (
 				<Badge variant={TONE_VARIANT[copy.tone]}>{copy.label}</Badge>
 			)}
