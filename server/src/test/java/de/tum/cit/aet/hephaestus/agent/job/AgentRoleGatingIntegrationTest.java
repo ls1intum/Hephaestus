@@ -65,11 +65,13 @@ class AgentRoleGatingIntegrationTest extends BaseIntegrationTest {
         // its implementation writes the toggle's audit row through, is @ConditionalOnServerRole and absent.
         assertThat(context.getBeansOfType(SilentModeQuery.class))
             .as("delivery cannot consult a brake whose bean failed to wire")
-            .isNotEmpty();
+            .hasSize(1);
         assertThat(context.getBeansOfType(AuthEventLogger.class))
             .as("the audit logger is server-only; the settings bean must tolerate its absence")
             .isEmpty();
-        assertThat(context.getBean(SilentModeQuery.class).isSilentModeEngaged()).isFalse();
+        assertThat(context.getBean(SilentModeQuery.class).isSilentModeEngaged())
+            .as("a fresh worker-only pod must observe the fail-closed instance default")
+            .isTrue();
     }
 
     @Test
