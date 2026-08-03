@@ -62,7 +62,7 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldBuildScopedClientWithSilentModeFactory() {
+    void shouldReturnGuardedClientWhenPersonalAccessTokenScopeIsActive() {
         when(tokenProvider.isScopeActive(42L)).thenReturn(true);
         when(tokenProvider.getAuthMode(42L)).thenReturn(AuthMode.PERSONAL_ACCESS_TOKEN);
         when(tokenProvider.getPersonalAccessToken(42L)).thenReturn(Optional.of("github-token"));
