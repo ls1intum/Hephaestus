@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedba
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.FeedbackChannelRouter;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.RoutingContext;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -57,11 +59,21 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private InstanceSettingsService instanceSettingsService;
+
     private Practice practice;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        var settings = instanceSettingsService.get();
+        instanceSettingsService.updateSilentMode(
+            false,
+            null,
+            null,
+            EntityTagPrecondition.parse("\"" + settings.getVersion() + "\"")
+        );
         setUpWorkspaceAndRecipient("conv-consent-gate-test");
         practice = new Practice();
         practice.setWorkspace(workspace);

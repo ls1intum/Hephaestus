@@ -40,6 +40,7 @@ final class MentorSseChannel implements MentorChannel {
     private final ObjectMapper objectMapper;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean clientGone = new AtomicBoolean(false);
+    private final AtomicBoolean finishDelivered = new AtomicBoolean(false);
     /**
      * Set once {@link #completeWithDone}/{@link #completeWithError}/{@link #completeWithConflict}
      * runs. Distinguishes "we cleanly finished" from "client went away" — without it, a stray
@@ -178,6 +179,9 @@ final class MentorSseChannel implements MentorChannel {
             try {
                 emitter.send(SseEmitter.event().data(payload));
                 lastSendNanos.set(System.nanoTime());
+                if (chunk instanceof UIMessageChunk.Finish) {
+                    finishDelivered.set(true);
+                }
             } catch (IOException e) {
                 flagDisconnected();
                 throw new ClientDisconnectedException("SSE send failed: " + e.getMessage(), e);
@@ -197,17 +201,19 @@ final class MentorSseChannel implements MentorChannel {
      * tripping Spring's post-complete {@link IllegalStateException}. Idempotent.
      */
     @Override
-    public void completeWithDone() {
+    public DeliveryOutcome completeWithDone() {
         cancelHeartbeat();
         writeLock.lock();
         try {
-            if (!closed.compareAndSet(false, true)) return;
-            try {
-                emitter.send(SseEmitter.event().data("[DONE]"));
-            } catch (IOException | IllegalStateException ignored) {}
-            try {
-                emitter.complete();
-            } catch (RuntimeException ignored) {}
+            if (closed.compareAndSet(false, true)) {
+                try {
+                    emitter.send(SseEmitter.event().data("[DONE]"));
+                } catch (IOException | IllegalStateException ignored) {}
+                try {
+                    emitter.complete();
+                } catch (RuntimeException ignored) {}
+            }
+            return finishDelivered.get() ? DeliveryOutcome.DELIVERED : DeliveryOutcome.NOT_DELIVERED;
         } finally {
             writeLock.unlock();
         }

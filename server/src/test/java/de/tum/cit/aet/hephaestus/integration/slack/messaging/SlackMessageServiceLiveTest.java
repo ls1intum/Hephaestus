@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
@@ -69,7 +70,7 @@ class SlackMessageServiceLiveTest {
         SlackMessageService service = new SlackMessageService(
             credentialProvider,
             new SlackRateLimitTracker(new SimpleMeterRegistry()),
-            () -> false
+            new OutboundEgressGuard(() -> false)
         );
 
         // The real send: block-kit payload through the app's SlackMessageService to the live channel.

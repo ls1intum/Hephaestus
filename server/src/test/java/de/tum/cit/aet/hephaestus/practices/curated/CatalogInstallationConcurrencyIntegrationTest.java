@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
@@ -61,7 +62,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
             transactionOperations.executeWithoutResult(ignored -> {
                 catalogService.writePractice(
                     PRACTICE,
-                    CuratedVersionPrecondition.parse('"' + current.etag() + '"'),
+                    EntityTagPrecondition.parse('"' + current.etag() + '"'),
                     updated
                 );
                 writeReady.countDown();

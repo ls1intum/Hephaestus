@@ -237,6 +237,19 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int markConversationDelivered(@Param("id") UUID id, @Param("at") Instant at);
 
     /**
+     * Flip a PREPARED conversational unit to SUPPRESSED when its actual transport attempt was blocked by
+     * instance Silent Mode. The state predicate prevents overwriting a unit another transaction already delivered.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = 'INSTANCE_SILENCED' " +
+            "WHERE id = :id AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markConversationSuppressedBySilentMode(@Param("id") UUID id);
+
+    /**
      * Newest PREPARED conversational units for a developer (as RECIPIENT) in a workspace - the mentor's queue.
      * Body is intentionally NULL on these rows (composed at delivery). Ordered newest-first, bounded by the caller's
      * {@code Pageable}.

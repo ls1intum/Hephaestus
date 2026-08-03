@@ -318,7 +318,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         );
         UIMessageChunk.Finish finish = new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, finishMeta);
 
-        persistence.finalise(cookie, state, finish);
+        persistence.finalise(cookie, state, finish, MentorChannel.DeliveryOutcome.NOT_DELIVERED);
 
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.completed);
@@ -365,7 +365,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             new UIMessageChunk.MessageMetadata.Usage(100, 50, 50, null, 200),
             /* costUsd */ null
         );
-        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, finishMeta));
+        persistence.finalise(
+            cookie,
+            state,
+            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, finishMeta),
+            MentorChannel.DeliveryOutcome.NOT_DELIVERED
+        );
 
         JsonNode meta = chatMessageRepository.findById(assistantId).orElseThrow().getMetadata();
         assertThat(meta.path("usage").path("input").asLong()).isEqualTo(100);
@@ -394,7 +399,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
         TranslatorState state = new TranslatorState(assistantId);
         state.observeSessionJsonl(expectedBytes);
-        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+        persistence.finalise(
+            cookie,
+            state,
+            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
+            MentorChannel.DeliveryOutcome.NOT_DELIVERED
+        );
 
         assertThat(chatThreadRepository.findSessionJsonl(threadId))
             .as("byte-identical: any re-encoding kills prompt-cache prefix matching")
@@ -429,7 +439,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
         TranslatorState state = new TranslatorState(assistantId);
         state.observeSessionJsonl(bigBytes);
-        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+        persistence.finalise(
+            cookie,
+            state,
+            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
+            MentorChannel.DeliveryOutcome.NOT_DELIVERED
+        );
 
         byte[] readBack = chatThreadRepository.findSessionJsonl(threadId).orElseThrow();
         assertThat(readBack).as("1MB TOAST round-trip preserves every byte").isEqualTo(bigBytes);
@@ -454,7 +469,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         persistence.finalise(
             cookie,
             new TranslatorState(assistantId),
-            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null)
+            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
+            MentorChannel.DeliveryOutcome.NOT_DELIVERED
         );
 
         assertThat(chatThreadRepository.findSessionJsonl(threadId)).contains(priorBytes);
@@ -547,7 +563,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         usage.put("input", 0).put("output", 0).put("cacheRead", 500_000).put("cacheWrite", 0);
         state.observeUsage(usage);
 
-        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+        persistence.finalise(
+            cookie,
+            state,
+            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
+            MentorChannel.DeliveryOutcome.NOT_DELIVERED
+        );
 
         var event = usageEventRepository
             .findAll()

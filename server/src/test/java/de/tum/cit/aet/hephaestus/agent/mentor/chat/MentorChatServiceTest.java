@@ -288,7 +288,9 @@ class MentorChatServiceTest extends BaseUnitTest {
             "finish"
         );
         assertThat(types).doesNotContain("error");
-        verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class));
+        var deliveryOutcome = ArgumentCaptor.forClass(MentorChannel.DeliveryOutcome.class);
+        verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class), deliveryOutcome.capture());
+        assertThat(deliveryOutcome.getValue()).isEqualTo(MentorChannel.DeliveryOutcome.DELIVERED);
         verify(persistence, never()).interrupt(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
@@ -460,7 +462,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         } catch (InteractiveSandboxException e) {
             throw new AssertionError(e);
         }
-        verify(persistence, never()).finalise(any(), any(), any());
+        verify(persistence, never()).finalise(any(), any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
     }
@@ -588,7 +590,12 @@ class MentorChatServiceTest extends BaseUnitTest {
         runTurnSync();
 
         verify(interactiveSandboxService, times(2)).attach(any());
-        verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class));
+        verify(persistence).finalise(
+            any(),
+            any(),
+            any(UIMessageChunk.Finish.class),
+            any(MentorChannel.DeliveryOutcome.class)
+        );
         verify(persistence, never()).interrupt(any(), any(), any());
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
@@ -641,7 +648,12 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(chatThreadRepository).clearSessionJsonl(THREAD_ID);
         verify(interactiveSandboxService, times(2)).attach(any());
         assertThat(staleSessionSandbox.closed).isTrue();
-        verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class));
+        verify(persistence).finalise(
+            any(),
+            any(),
+            any(UIMessageChunk.Finish.class),
+            any(MentorChannel.DeliveryOutcome.class)
+        );
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
@@ -656,7 +668,12 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         assertThat(sandbox.methodsSent()).contains("abort");
         assertThat(emitter.recordedTypes()).doesNotContain("error");
-        verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
+        verify(persistence, atLeastOnce()).finalise(
+            any(),
+            any(),
+            any(UIMessageChunk.Finish.class),
+            any(MentorChannel.DeliveryOutcome.class)
+        );
         verify(persistence, never()).interrupt(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
         // A disconnect on the event-handler thread is swallowed inside handleEvent; the runner keeps
@@ -675,7 +692,12 @@ class MentorChatServiceTest extends BaseUnitTest {
         runTurnSync();
 
         assertThat(sandbox.methodsSent()).contains("abort");
-        verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
+        verify(persistence, atLeastOnce()).finalise(
+            any(),
+            any(),
+            any(UIMessageChunk.Finish.class),
+            any(MentorChannel.DeliveryOutcome.class)
+        );
         verify(persistence, never()).interrupt(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
@@ -708,7 +730,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Poisoned sandboxes are explicitly closed so the next turn rebuilds fresh.
         assertThat(sandbox.closed.get()).isTrue();
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
-        verify(persistence, never()).finalise(any(), any(), any());
+        verify(persistence, never()).finalise(any(), any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
         // Poisoned is a distinct outcome from a generic error — the labels stay separate.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);

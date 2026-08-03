@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
@@ -175,6 +177,8 @@ class PullRequestCommentPoster {
                 handle.externalId()
             );
             return handle.externalId();
+        } catch (OutboundEgressSuppressedException e) {
+            throw new JobDeliverySuppressedException(e.getMessage(), e);
         } catch (FeedbackDeliveryException e) {
             throw new JobDeliveryException(e.getMessage(), e);
         }
@@ -196,11 +200,16 @@ class PullRequestCommentPoster {
         }
         FeedbackChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
-        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
-            target,
-            externalRef,
-            new FeedbackContent(formattedBody, summaryMarkerFor(job))
-        );
+        FeedbackChannel.UpdateOutcome outcome;
+        try {
+            outcome = channel.updateSummary(
+                target,
+                externalRef,
+                new FeedbackContent(formattedBody, summaryMarkerFor(job))
+            );
+        } catch (OutboundEgressSuppressedException e) {
+            throw new JobDeliverySuppressedException(e.getMessage(), e);
+        }
         return switch (outcome.kind()) {
             case EDITED -> {
                 log.info(
@@ -283,6 +292,8 @@ class PullRequestCommentPoster {
                 handle.externalId()
             );
             return handle.externalId();
+        } catch (OutboundEgressSuppressedException e) {
+            throw new JobDeliverySuppressedException(e.getMessage(), e);
         } catch (FeedbackDeliveryException e) {
             throw new JobDeliveryException(e.getMessage(), e);
         }

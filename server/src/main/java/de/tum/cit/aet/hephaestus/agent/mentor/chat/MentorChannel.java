@@ -29,6 +29,12 @@ import org.springframework.modulith.NamedInterface;
  */
 @NamedInterface(name = "mentor-chat", propagate = true)
 public interface MentorChannel extends AutoCloseable {
+    enum DeliveryOutcome {
+        DELIVERED,
+        INSTANCE_SILENCED,
+        NOT_DELIVERED,
+    }
+
     /**
      * Register the "the far side went away" hook, fired <em>exactly once</em> on the first transition
      * to disconnected (SSE: client closed the stream; Slack: a stream write fails because the user
@@ -59,8 +65,8 @@ public interface MentorChannel extends AutoCloseable {
      */
     void send(UIMessageChunk chunk);
 
-    /** Natural-finish terminal: flush any buffered content and finalize the turn. Idempotent. */
-    void completeWithDone();
+    /** Natural terminal: flush, close, and report what reached the transport. Idempotent. */
+    DeliveryOutcome completeWithDone();
 
     /** Error terminal: surface {@code errorText} to the user, then finalize. Idempotent. */
     void completeWithError(String errorText);

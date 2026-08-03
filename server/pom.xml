@@ -1010,9 +1010,10 @@
                     <!-- Tag filtering: run integration tests, exclude live tests -->
                     <groups>${failsafe.includedGroups}</groups>
                     <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
-                    <!-- Include *IntegrationTest.java pattern (project convention) -->
+                    <!-- Failsafe-discovered integration test patterns -->
                     <includes>
                         <include>**/*IntegrationTest.java</include>
+                        <include>**/*LiquibaseTest.java</include>
                     </includes>
                 </configuration>
                 <executions>

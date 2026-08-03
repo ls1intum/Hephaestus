@@ -45,6 +45,23 @@ All under `/admin`, all gated by `hasAuthority('app_admin')`:
 | `GET`/`PUT /admin/llm/settings` (`adminGetLlmSettings`, `adminUpdateLlmSettings`) | The instance LLM settings singleton: egress host allowlist and `allowWorkspaceConnections`, the switch that lets workspaces register their own provider connections. |
 | `GET /admin/llm/usage` (`adminGetLlmUsageReport`) | Cross-workspace monthly LLM usage and budget report, split by purse (shared models vs each workspace's own provider). |
 | `PUT /admin/workspaces/{workspaceSlug}/llm/budget` (`adminUpdateWorkspaceLlmBudget`) | Set **or clear** a workspace's monthly cap on **shared-model** spend — clearing is `PUT` with `monthlyBudgetUsd: null`, not `DELETE` (there is no `DELETE` mapping; it returns 405). The workspace's cap on its own provider is a different endpoint under `/workspaces/**`, set by the workspace's own admin. |
+| `GET /admin/settings` / `PATCH /admin/settings/silent-mode` | Read or change the instance-wide outbound delivery brake. Releasing requires `If-Match` with the ETag returned by `GET`, so a stale browser cannot release a newer incident response. |
+
+## Instance Silent Mode
+
+Silent Mode is an emergency and disaster-recovery brake, not a workspace rollout stage. It is
+**engaged by default** on new installs, when the singleton settings row is missing, and on upgrades
+whose seeded row was never explicitly changed. Detection, observation persistence, inbound webhook
+processing, synchronization, and admin access continue, but delivery writes to GitHub, GitLab, and
+Slack are refused at the provider gateway.
+
+Suppression is prospective: a suppressed review is recorded as `SUPPRESSED(INSTANCE_SILENCED)` for
+audit and preview, but is never queued for replay. Releasing the brake therefore sends nothing by
+itself; only a new source event can deliver. A re-review that would have edited an existing comment
+records the attempted replacement without superseding the live delivered ledger unit.
+
+OAuth/token lifecycle operations, webhook registration, and operator alerts remain available while
+Silent Mode is engaged.
 
 ## Impersonation time-box
 

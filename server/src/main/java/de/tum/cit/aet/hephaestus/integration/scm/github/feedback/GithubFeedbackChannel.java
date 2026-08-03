@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 
 import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
@@ -29,6 +32,7 @@ import org.springframework.stereotype.Component;
  * the feedback ledger records it ({@code FeedbackPlacement.external_ref}) for edit-in-place on subsequent runs.
  */
 @Component
+@OutboundEgressGateway
 public class GithubFeedbackChannel implements FeedbackChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubFeedbackChannel.class);
@@ -41,10 +45,16 @@ public class GithubFeedbackChannel implements FeedbackChannel {
 
     private final GitHubGraphQlClientProvider gitHubProvider;
     private final GithubPrNodeIdResolver prNodeIdResolver;
+    private final OutboundEgressGuard egressGuard;
 
-    public GithubFeedbackChannel(GitHubGraphQlClientProvider gitHubProvider, GithubPrNodeIdResolver prNodeIdResolver) {
+    public GithubFeedbackChannel(
+        GitHubGraphQlClientProvider gitHubProvider,
+        GithubPrNodeIdResolver prNodeIdResolver,
+        OutboundEgressGuard egressGuard
+    ) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
+        this.egressGuard = egressGuard;
     }
 
     @Override
@@ -139,6 +149,7 @@ public class GithubFeedbackChannel implements FeedbackChannel {
 
         ClientGraphQlResponse response;
         try {
+            egressGuard.requireDeliveryAllowed("github.update-summary");
             response = gitHubProvider
                 .forScope(scopeId)
                 .documentName("UpdateIssueComment")
@@ -146,6 +157,8 @@ public class GithubFeedbackChannel implements FeedbackChannel {
                 .variable("body", content.body())
                 .execute()
                 .block(GRAPHQL_TIMEOUT);
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (RuntimeException e) {
             return UpdateOutcome.transientFailure("updateIssueComment transport error: " + e.getMessage());
         }
@@ -309,6 +322,7 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     record IssueCoordinates(String owner, String name, int number) {}
 
     private String createComment(long scopeId, String subjectId, String body) {
+        egressGuard.requireDeliveryAllowed("github.post-summary");
         ClientGraphQlResponse response = gitHubProvider
             .forScope(scopeId)
             .documentName("AddPullRequestComment")

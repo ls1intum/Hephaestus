@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
@@ -75,7 +76,7 @@ final class CuratedCatalogModel {
             .toList();
     }
 
-    static void requireCatalog(EffectiveCatalog catalog, @Nullable CuratedVersionPrecondition precondition) {
+    static void requireCatalog(EffectiveCatalog catalog, @Nullable EntityTagPrecondition precondition) {
         if (precondition == null) {
             throw new CuratedPreconditionRequiredException();
         }
@@ -120,7 +121,7 @@ final class CuratedCatalogModel {
         java.util.Optional<CatalogEntry<D>> entry,
         String type,
         String slug,
-        @Nullable CuratedVersionPrecondition precondition
+        @Nullable EntityTagPrecondition precondition
     ) {
         CatalogEntry<D> found = entry.orElseThrow(() -> new EntityNotFoundException(type, slug));
         if (precondition == null) {

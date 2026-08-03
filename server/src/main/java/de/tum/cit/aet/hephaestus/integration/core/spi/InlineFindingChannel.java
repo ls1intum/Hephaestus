@@ -77,10 +77,29 @@ public interface InlineFindingChannel {
      * skips outright (e.g. a blank body the GitHub impl drops without posting) yields no signal and no count, so
      * it is simply absent from both sides rather than violating the equality.
      */
-    record InlineResult(int posted, int failed, List<DeliveredSignal> signals) {
+    record InlineResult(
+        int posted,
+        int failed,
+        List<DeliveredSignal> signals,
+        boolean suppressed,
+        List<String> suppressedRecurrenceKeys
+    ) {
+        public InlineResult(int posted, int failed, List<DeliveredSignal> signals) {
+            this(posted, failed, signals, false, List.of());
+        }
+
         /** Count-only result with no per-finding signals (rate-limit short-circuit / empty input). */
         public static InlineResult counts(int posted, int failed) {
             return new InlineResult(posted, failed, List.of());
+        }
+
+        public static InlineResult suppressed(
+            int posted,
+            int failed,
+            List<DeliveredSignal> signals,
+            List<String> suppressedRecurrenceKeys
+        ) {
+            return new InlineResult(posted, failed, List.copyOf(signals), true, List.copyOf(suppressedRecurrenceKeys));
         }
     }
 }

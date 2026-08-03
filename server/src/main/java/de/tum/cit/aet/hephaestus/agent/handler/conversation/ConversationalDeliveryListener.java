@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.util.List;
@@ -27,15 +28,18 @@ public class ConversationalDeliveryListener {
     private final ObservationRepository observationRepository;
     private final FeedbackChannelRouter router;
     private final ConversationalFeedbackPreparer preparer;
+    private final OutboundEgressGuard egressGuard;
 
     public ConversationalDeliveryListener(
         ObservationRepository observationRepository,
         FeedbackChannelRouter router,
-        ConversationalFeedbackPreparer preparer
+        ConversationalFeedbackPreparer preparer,
+        OutboundEgressGuard egressGuard
     ) {
         this.observationRepository = observationRepository;
         this.router = router;
         this.preparer = preparer;
+        this.egressGuard = egressGuard;
     }
 
     @Async
@@ -43,6 +47,10 @@ public class ConversationalDeliveryListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPracticeDetectionDelivered(PracticeDetectionDeliveredEvent event) {
         try {
+            if (!egressGuard.deliveryAllowed("prepare-conversational-feedback")) {
+                log.debug("Conversational preparation suppressed: jobId={}", event.agentJobId());
+                return;
+            }
             List<Observation> observations = observationRepository.findByAgentJobId(event.agentJobId());
             if (observations.isEmpty()) {
                 return;

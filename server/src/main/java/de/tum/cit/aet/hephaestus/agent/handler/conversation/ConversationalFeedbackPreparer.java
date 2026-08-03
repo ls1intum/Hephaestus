@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -48,15 +49,18 @@ public class ConversationalFeedbackPreparer {
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final OutboundEgressGuard egressGuard;
 
     public ConversationalFeedbackPreparer(
         FeedbackRepository feedbackRepository,
         FeedbackObservationRepository feedbackObservationRepository,
-        ApplicationEventPublisher eventPublisher
+        ApplicationEventPublisher eventPublisher,
+        OutboundEgressGuard egressGuard
     ) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.eventPublisher = eventPublisher;
+        this.egressGuard = egressGuard;
     }
 
     /**
@@ -68,6 +72,9 @@ public class ConversationalFeedbackPreparer {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int prepare(UUID agentJobId, Long workspaceId, List<Observation> admitted) {
         if (admitted.isEmpty()) {
+            return 0;
+        }
+        if (!egressGuard.deliveryAllowed("prepare-conversational-feedback")) {
             return 0;
         }
         List<Observation> ordered = admitted

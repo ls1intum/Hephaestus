@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { Gauge } from "lucide-react";
 import { expect, within } from "storybook/test";
 import type { InstanceSettings } from "@/api/types.gen";
+import { PageHeader } from "@/components/core/PageHeader";
 import { SilentModeBanner } from "./SilentModeBanner";
 
 const engaged: InstanceSettings = {
+	etag: '"0"',
 	silentModeEngaged: true,
 	silentModeReason: "Investigating incident #42 — bad feedback going out",
 	silentModeChangedAt: new Date(Date.now() - 45 * 60_000),
@@ -29,20 +32,35 @@ export const Engaged: Story = {
 	},
 };
 
-/** Engaged with no breadcrumbs — every metadata field is nullable. */
 export const WithoutMetadata: Story = {
 	args: {
-		settings: { silentModeEngaged: true },
+		settings: { etag: '"0"', silentModeEngaged: true },
 	},
 };
 
-/** Past a day the title stops reporting and starts asking — a forgotten brake is the likelier incident. */
-export const StillEngagedAfterADay: Story = {
+export const AbovePageContentOnReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
 	args: {
-		settings: { ...engaged, silentModeChangedAt: new Date(Date.now() - 30 * 3_600_000) },
+		settings: {
+			...engaged,
+			silentModeChangedBy: "an-instance-administrator-with-a-long-identity@example.invalid",
+			silentModeReason:
+				"https://status.example.invalid/incidents/delivery-suppression-investigation-without-convenient-breakpoints",
+		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/is that still intentional/i)).toBeInTheDocument();
-	},
+	render: (args) => (
+		<>
+			<div className="mb-6">
+				<SilentModeBanner {...args} />
+			</div>
+			<PageHeader
+				icon={<Gauge />}
+				title="Instance overview"
+				description="What is running, and what changed recently on this instance."
+			/>
+		</>
+	),
 };

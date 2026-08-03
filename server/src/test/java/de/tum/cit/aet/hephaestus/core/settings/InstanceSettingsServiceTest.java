@@ -3,10 +3,12 @@ package de.tum.cit.aet.hephaestus.core.settings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
@@ -17,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 
-/** Mock repository: the DB round-trip is covered by {@link InstanceSettingsAdminControllerIntegrationTest}. */
 class InstanceSettingsServiceTest extends BaseUnitTest {
 
     @Mock
@@ -39,9 +40,9 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void toggleIsRecordedOnTheAuditTrail() {
-        givenRow(new InstanceSettings());
+        givenEngagedRow(new InstanceSettings());
 
-        service.updateSilentMode(true, "incident #42", "felix");
+        service.updateSilentMode(true, "incident #42", "felix", null);
 
         verify(authEventWriter).write(
             argThat(
@@ -54,24 +55,18 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void isSilentModeEngaged_absentRow_isReleased() {
-        when(repository.findById(InstanceSettings.SINGLETON_ID)).thenReturn(Optional.empty());
+    void shouldReturnRepositoryDecisionWhenSilentModeStateIsRead() {
+        when(repository.readSilentModeEngaged()).thenReturn(true);
+        assertThat(service.isSilentModeEngaged()).isTrue();
+        when(repository.readSilentModeEngaged()).thenReturn(false);
         assertThat(service.isSilentModeEngaged()).isFalse();
     }
 
     @Test
-    void isSilentModeEngaged_reflectsTheRow() {
-        InstanceSettings row = new InstanceSettings();
-        row.setSilentModeEngaged(true);
-        when(repository.findById(InstanceSettings.SINGLETON_ID)).thenReturn(Optional.of(row));
-        assertThat(service.isSilentModeEngaged()).isTrue();
-    }
-
-    @Test
     void engage_recordsTrimmedReasonAndActor() {
-        givenRow(new InstanceSettings());
+        givenEngagedRow(new InstanceSettings());
 
-        InstanceSettings updated = service.updateSilentMode(true, "  incident #42  ", "felix");
+        InstanceSettings updated = service.updateSilentMode(true, "  incident #42  ", "felix", null);
 
         assertThat(updated.isSilentModeEngaged()).isTrue();
         assertThat(updated.getSilentModeReason()).isEqualTo("incident #42");
@@ -81,8 +76,8 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void engage_blankReasonBecomesNull() {
-        givenRow(new InstanceSettings());
-        assertThat(service.updateSilentMode(true, "   ", "felix").getSilentModeReason()).isNull();
+        givenEngagedRow(new InstanceSettings());
+        assertThat(service.updateSilentMode(true, "   ", "felix", null).getSilentModeReason()).isNull();
     }
 
     @Test
@@ -90,17 +85,34 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
         InstanceSettings engaged = new InstanceSettings();
         engaged.setSilentModeEngaged(true);
         engaged.setSilentModeReason("incident #42");
-        givenRow(engaged);
+        givenReleasedRow(engaged);
 
-        InstanceSettings released = service.updateSilentMode(false, "ignored on release", "felix");
+        InstanceSettings released = service.updateSilentMode(
+            false,
+            "ignored on release",
+            "felix",
+            EntityTagPrecondition.parse("\"0\"")
+        );
 
         assertThat(released.isSilentModeEngaged()).isFalse();
         assertThat(released.getSilentModeReason()).isNull();
     }
 
-    private void givenRow(InstanceSettings row) {
+    private void givenEngagedRow(InstanceSettings row) {
         row.setId(InstanceSettings.SINGLETON_ID);
         when(repository.findById(InstanceSettings.SINGLETON_ID)).thenReturn(Optional.of(row));
-        when(repository.save(any(InstanceSettings.class))).thenAnswer(call -> call.getArgument(0));
+        when(repository.engageSilentMode(nullable(String.class), any(), nullable(String.class))).thenAnswer(call -> {
+            row.setSilentModeEngaged(true);
+            row.setSilentModeReason(call.getArgument(0));
+            row.setSilentModeChangedAt(call.getArgument(1));
+            row.setSilentModeChangedBy(call.getArgument(2));
+            return 1;
+        });
+    }
+
+    private void givenReleasedRow(InstanceSettings row) {
+        row.setId(InstanceSettings.SINGLETON_ID);
+        when(repository.findById(InstanceSettings.SINGLETON_ID)).thenReturn(Optional.of(row));
+        when(repository.saveAndFlush(any(InstanceSettings.class))).thenAnswer(call -> call.getArgument(0));
     }
 }

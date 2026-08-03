@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.GITLAB_GRAPHQL_PATH;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.CircuitBreakerOpenException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -14,42 +15,7 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
-/**
- * Provides authenticated {@link HttpGraphQlClient} instances for GitLab GraphQL API.
- *
- * <p>This provider creates per-request authenticated clients by cloning the base client
- * and injecting scope-specific authentication tokens and server URLs. Unlike GitHub's
- * single-endpoint model, GitLab URLs vary per workspace (self-hosted support).
- *
- * <p><b>Circuit Breaker Protection:</b>
- * All clients returned by this provider are protected by a circuit breaker that prevents
- * cascading failures when the GitLab API is unavailable.
- *
- * <p><b>Key differences from {@link de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider}:</b>
- * <ul>
- *   <li>Per-workspace URL (not hardcoded) — supports self-hosted GitLab instances</li>
- *   <li>PAT-only authentication (no App token minting)</li>
- *   <li>Header-based rate limit tracking (not GraphQL response field)</li>
- * </ul>
- *
- * <p>Usage:
- * <pre>{@code
- * @Service
- * public class MergeRequestService {
- *     private final GitLabGraphQlClientProvider clientProvider;
- *
- *     public MergeRequest fetchMR(Long scopeId, String projectPath, String iid) {
- *         return clientProvider.forScope(scopeId)
- *             .documentName("GetMergeRequest")
- *             .variable("fullPath", projectPath)
- *             .variable("iid", iid)
- *             .retrieve("project.mergeRequest")
- *             .toEntity(MergeRequest.class)
- *             .block();
- *     }
- * }
- * }</pre>
- */
+/** Creates authenticated GitLab GraphQL clients from the guarded base client. */
 @Component
 @Slf4j
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -65,17 +31,20 @@ public class GitLabGraphQlClientProvider {
     private final GitLabTokenService tokenService;
     private final CircuitBreaker circuitBreaker;
     private final GitLabRateLimitTracker rateLimitTracker;
+    private final SilentModeGraphQlClientFactory clientFactory;
 
     public GitLabGraphQlClientProvider(
         @Qualifier("gitLabGraphQlClient") HttpGraphQlClient gitLabGraphQlClient,
         GitLabTokenService tokenService,
         @Qualifier("gitlabGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
-        GitLabRateLimitTracker rateLimitTracker
+        GitLabRateLimitTracker rateLimitTracker,
+        SilentModeGraphQlClientFactory clientFactory
     ) {
         this.baseClient = gitLabGraphQlClient;
         this.tokenService = tokenService;
         this.circuitBreaker = circuitBreaker;
         this.rateLimitTracker = rateLimitTracker;
+        this.clientFactory = clientFactory;
     }
 
     /**
@@ -133,12 +102,13 @@ public class GitLabGraphQlClientProvider {
         String token = tokenService.getAccessToken(scopeId);
         String serverUrl = tokenService.resolveServerUrl(scopeId);
 
-        return baseClient
-            .mutate()
-            .url(serverUrl + GITLAB_GRAPHQL_PATH)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .webClient(builder -> builder.defaultRequest(spec -> spec.attribute(SCOPE_ID_ATTRIBUTE, scopeId)))
-            .build();
+        return clientFactory.withBearerTokenAndAttribute(
+            baseClient,
+            serverUrl + GITLAB_GRAPHQL_PATH,
+            token,
+            SCOPE_ID_ATTRIBUTE,
+            scopeId
+        );
     }
 
     /**
@@ -151,11 +121,7 @@ public class GitLabGraphQlClientProvider {
      * @return authenticated HttpGraphQlClient
      */
     public HttpGraphQlClient withToken(String token, String serverUrl) {
-        return baseClient
-            .mutate()
-            .url(serverUrl + GITLAB_GRAPHQL_PATH)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .build();
+        return clientFactory.withBearerToken(baseClient, serverUrl + GITLAB_GRAPHQL_PATH, token);
     }
 
     // Rate Limit Tracking (Per-Scope)

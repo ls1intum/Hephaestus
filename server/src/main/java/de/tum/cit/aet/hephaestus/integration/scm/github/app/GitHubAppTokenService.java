@@ -7,6 +7,8 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.tum.cit.aet.hephaestus.integration.core.egress.EgressExempt;
+import de.tum.cit.aet.hephaestus.integration.core.egress.EgressExemption;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationSuspendedException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.GitHubProperties;
@@ -50,6 +52,7 @@ import reactor.netty.http.client.HttpClient;
  * @see <a href="https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app">GitHub Docs - Installation Access Tokens</a>
  */
 @Service
+@EgressExempt(EgressExemption.OAUTH_CONTROL_PLANE)
 public class GitHubAppTokenService {
 
     private final long appId;

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.settings;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
@@ -12,6 +13,7 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -44,47 +46,38 @@ public class InstanceSettingsService implements SilentModeQuery {
 
     @Transactional(readOnly = true)
     public InstanceSettings get() {
-        return repository.findById(InstanceSettings.SINGLETON_ID).orElseGet(InstanceSettings::new);
+        return repository.findById(InstanceSettings.SINGLETON_ID).orElseGet(InstanceSettings::failSafeDefault);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean isSilentModeEngaged() {
-        return repository
-            .findById(InstanceSettings.SINGLETON_ID)
-            .map(InstanceSettings::isSilentModeEngaged)
-            .orElse(false);
+        return repository.readSilentModeEngaged();
     }
 
-    /** Logged at WARN in both directions so the incident timeline is reconstructable from logs alone. */
     @Transactional
-    public InstanceSettings updateSilentMode(boolean engaged, @Nullable String reason, @Nullable String actor) {
-        InstanceSettings settings = repository
-            .findById(InstanceSettings.SINGLETON_ID)
-            .orElseGet(() -> {
-                InstanceSettings row = new InstanceSettings();
-                row.setId(InstanceSettings.SINGLETON_ID);
-                return row;
-            });
-        String trimmedReason = reason == null || reason.isBlank() ? null : reason.trim();
-        settings.setSilentModeEngaged(engaged);
-        settings.setSilentModeReason(engaged ? trimmedReason : null);
-        settings.setSilentModeChangedAt(Instant.now());
-        settings.setSilentModeChangedBy(actor);
+    public InstanceSettings updateSilentMode(
+        boolean engaged,
+        @Nullable String reason,
+        @Nullable String actor,
+        @Nullable EntityTagPrecondition precondition
+    ) {
+        repository.insertFailSafeSingletonIfMissing();
+        String effectiveReason = engaged && reason != null && !reason.isBlank() ? reason.trim() : null;
+        Instant changedAt = Instant.now();
+        InstanceSettings saved = engaged
+            ? engage(effectiveReason, actor, changedAt)
+            : release(actor, changedAt, precondition);
         log.warn(
             "Instance silent mode {}: actor={}, reason={}",
             engaged ? "ENGAGED — all outbound delivery suppressed" : "RELEASED — outbound delivery resumed",
             actor,
-            trimmedReason
+            effectiveReason
         );
-        InstanceSettings saved = repository.save(settings);
-        // auth_event, not config_audit_event: the latter's workspace_id is NOT NULL and this is instance-level.
-        // The writer commits in its own transaction, so the trail survives a rollback of this one — an
-        // over-recorded toggle beats a silently unaudited one for a control this consequential.
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("engaged", engaged);
-        if (trimmedReason != null) {
-            details.put("reason", trimmedReason);
+        if (effectiveReason != null) {
+            details.put("reason", effectiveReason);
         }
         authEventLogger.ifPresent(logger ->
             logger
@@ -94,5 +87,41 @@ public class InstanceSettingsService implements SilentModeQuery {
                 .record()
         );
         return saved;
+    }
+
+    private InstanceSettings engage(@Nullable String reason, @Nullable String actor, Instant changedAt) {
+        if (repository.engageSilentMode(reason, changedAt, actor) != 1) {
+            throw new IllegalStateException("Failed to engage instance Silent Mode");
+        }
+        return currentSettings();
+    }
+
+    private InstanceSettings release(
+        @Nullable String actor,
+        Instant changedAt,
+        @Nullable EntityTagPrecondition precondition
+    ) {
+        InstanceSettings settings = currentSettings();
+        if (precondition == null) {
+            throw new InstanceSettingsPreconditionRequiredException();
+        }
+        if (!precondition.matches(Long.toString(settings.getVersion()))) {
+            throw new StaleInstanceSettingsException();
+        }
+        settings.setSilentModeEngaged(false);
+        settings.setSilentModeReason(null);
+        settings.setSilentModeChangedAt(changedAt);
+        settings.setSilentModeChangedBy(actor);
+        try {
+            return repository.saveAndFlush(settings);
+        } catch (ObjectOptimisticLockingFailureException exception) {
+            throw new StaleInstanceSettingsException();
+        }
+    }
+
+    private InstanceSettings currentSettings() {
+        return repository
+            .findById(InstanceSettings.SINGLETON_ID)
+            .orElseThrow(() -> new IllegalStateException("Failed to initialize instance_settings singleton"));
     }
 }

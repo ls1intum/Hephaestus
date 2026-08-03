@@ -15,6 +15,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.settings.InstanceSettings;
+import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -24,6 +27,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -97,6 +104,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ApplicationEvents applicationEvents;
 
+    @Autowired
+    private FeedbackRepository feedbackRepository;
+
+    @Autowired
+    private InstanceSettingsService instanceSettingsService;
+
     @MockitoBean
     private PullRequestCommentPoster commentPoster;
 
@@ -111,6 +124,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        releaseSilentMode();
 
         workspace = WorkspaceTestFixtures.activeWorkspace("pipeline-test");
         workspace.getFeatures().setPracticesEnabled(true);
@@ -220,6 +234,34 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         agentJob = agentJobRepository.save(agentJob);
     }
 
+    private void releaseSilentMode() {
+        var current = instanceSettingsService.get();
+        instanceSettingsService.updateSilentMode(false, null, "pipeline-test", version(current));
+    }
+
+    private void engageSilentMode() {
+        var current = instanceSettingsService.get();
+        instanceSettingsService.updateSilentMode(true, "pipeline safety test", "pipeline-test", version(current));
+    }
+
+    private static EntityTagPrecondition version(InstanceSettings settings) {
+        return EntityTagPrecondition.parse("\"" + settings.getVersion() + "\"");
+    }
+
+    private AgentJob newJobWithOutput(String rawOutput) {
+        AgentJob next = new AgentJob();
+        next.setWorkspace(workspace);
+        next.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        next.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        next.setStatus(AgentJobStatus.COMPLETED);
+        next.setConfigSnapshot(agentJob.getConfigSnapshot());
+        next.setMetadata(agentJob.getMetadata().deepCopy());
+        ObjectNode output = OBJECT_MAPPER.createObjectNode();
+        output.put("rawOutput", rawOutput);
+        next.setOutput(output);
+        return agentJobRepository.save(next);
+    }
+
     private String validAgentOutput() {
         String findings = """
             {
@@ -252,6 +294,38 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     @Nested
     class HappyPath {
+
+        @Test
+        void shouldPersistWithoutExternalWritesOrReplayWhenSilentModeIsEngaged() {
+            setJobOutput(validAgentOutput());
+            engageSilentMode();
+
+            handler.deliver(agentJob);
+
+            assertThat(observationRepository.findAll()).hasSize(2);
+            assertThat(feedbackRepository.findAll())
+                .singleElement()
+                .extracting(Feedback::getDeliveryState, Feedback::getSuppressionReason)
+                .containsExactly(FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            verify(commentPoster, never()).postFormattedBody(any(), any());
+            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
+
+            releaseSilentMode();
+            assertThat(feedbackRepository.findAll()).noneMatch(
+                feedback -> feedback.getDeliveryState() == FeedbackDeliveryState.PREPARED
+            );
+
+            AgentJob newEvent = newJobWithOutput(validAgentOutput());
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-after-release");
+            handler.deliver(newEvent);
+
+            verify(commentPoster).postFormattedBody(eq(newEvent), any(String.class));
+            verify(diffNotePoster).reconcileInlineNotes(eq(newEvent), any());
+            assertThat(observationRepository.findAll()).hasSize(4);
+            assertThat(feedbackRepository.findAll())
+                .extracting(Feedback::getDeliveryState)
+                .containsExactlyInAnyOrder(FeedbackDeliveryState.SUPPRESSED, FeedbackDeliveryState.DELIVERED);
+        }
 
         @Test
         void fullPipelineFromParseToDelivery() {

@@ -17,28 +17,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Streams one mentor turn into a Slack thread natively — the peer of {@code MentorSseChannel} for Slack.
- * Maps the {@link UIMessageChunk} stream onto Slack's streaming API ({@code chat.startStream} /
- * {@code chat.appendStream} / {@code chat.stopStream}).
- *
- * <p><strong>Cadence, not size.</strong> {@link #send} only buffers the incoming {@code TextDelta}s; a fixed
- * ~{@value #FLUSH_INTERVAL_MS} ms flush loop drains the buffer to Slack. That gives a fast first paint (the
- * stream opens on the first tick that has content) and a smooth, steady reveal for replies of ANY length —
- * unlike a size/newline gate, which leaves short single-paragraph replies buffered until the very end. The
- * cadence keeps us well inside {@code chat.appendStream}'s rate-limit tier, and Slack animates the text reveal
- * between appends, so per-token writes are neither needed nor desirable.
- *
- * <p><strong>Boundaries.</strong> A drain cuts at the last whitespace so a word is never split mid-stream; a
- * single unbroken token is held until it breaks (or until it grows past {@value #MAX_APPEND_CHARS}, which also
- * keeps every append under Slack's 12k {@code markdown_text} cap).
- *
- * <p><strong>Resilience.</strong> A transient Slack failure (rate limit / 5xx / transport) is re-buffered and
- * retried on the next tick — it does NOT abort the turn. Only an unambiguous "the target is gone" error
- * ({@link #GONE_ERRORS}) flips the gone flag, fires {@code onDisconnect} (so the orchestrator aborts the Pi
- * generation), and stops the loop. Persistent transient failure gives up after {@value #MAX_CONSECUTIVE_FAILURES}
- * ticks so a Slack outage never wedges a turn.
- */
+/** Streams mentor output to Slack with bounded buffering and retry. */
 public class SlackStreamingMentorChannel implements MentorChannel {
 
     private static final Logger log = LoggerFactory.getLogger(SlackStreamingMentorChannel.class);
@@ -59,8 +38,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
      */
     private static final int MAX_CONSECUTIVE_RATE_LIMITS = 20;
 
-    /** Slack error codes that mean the target is genuinely gone — everything else is treated as transient/retryable. */
-    private static final Set<String> GONE_ERRORS = Set.of(
+    private static final Set<String> TERMINAL_ERRORS = Set.of(
         "message_not_found",
         "channel_not_found",
         "thread_not_found",
@@ -68,7 +46,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         "message_deleted",
         "is_archived",
         "stream_not_found",
-        "cant_stream"
+        "cant_stream",
+        "silent_mode_engaged"
     );
 
     private final SlackMessageService slack;
@@ -86,8 +65,10 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final StringBuilder pending = new StringBuilder();
     private final ReentrantLock lock = new ReentrantLock();
     private final AtomicBoolean done = new AtomicBoolean(false);
-    private final AtomicBoolean clientGone = new AtomicBoolean(false);
+    private final AtomicBoolean terminated = new AtomicBoolean(false);
     private final AtomicBoolean flushing = new AtomicBoolean(false);
+    private final AtomicBoolean contentDelivered = new AtomicBoolean(false);
+    private final AtomicBoolean silentModeSuppressed = new AtomicBoolean(false);
 
     private volatile Runnable disconnectHook;
     /** The streaming message ts: {@code null} until the first successful open, set exactly once ({@link #openOrAppend}). */
@@ -108,14 +89,14 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     @Override
     public void onDisconnect(Runnable hook) {
         this.disconnectHook = hook;
-        if (clientGone.get()) {
+        if (terminated.get()) {
             hook.run();
         }
     }
 
     @Override
     public boolean isClientGone() {
-        return clientGone.get();
+        return terminated.get();
     }
 
     @Override
@@ -127,7 +108,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
 
     @Override
     public void send(UIMessageChunk chunk) {
-        if (done.get() || clientGone.get()) {
+        if (done.get() || terminated.get()) {
             return;
         }
         if (chunk instanceof UIMessageChunk.TextDelta delta) {
@@ -145,8 +126,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     }
 
     @Override
-    public void completeWithDone() {
+    public DeliveryOutcome completeWithDone() {
         finish(null);
+        return deliveryOutcome();
     }
 
     @Override
@@ -169,6 +151,13 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         finish(null);
     }
 
+    private DeliveryOutcome deliveryOutcome() {
+        if (contentDelivered.get()) {
+            return DeliveryOutcome.DELIVERED;
+        }
+        return silentModeSuppressed.get() ? DeliveryOutcome.INSTANCE_SILENCED : DeliveryOutcome.NOT_DELIVERED;
+    }
+
     private void append(String text) {
         if (text == null || text.isEmpty()) {
             return;
@@ -183,7 +172,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
 
     /** Start the periodic flush loop once (idempotent); driven off {@link #startKeepAlive}/{@link #send}. */
     private void ensureFlushing() {
-        if (done.get() || clientGone.get() || !flushing.compareAndSet(false, true)) {
+        if (done.get() || terminated.get() || !flushing.compareAndSet(false, true)) {
             return;
         }
         flushTask = scheduler.scheduleWithFixedDelay(
@@ -196,7 +185,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
 
     /** One flush tick: drain a whitespace-aligned prefix and write it to Slack. Runs single-threaded. */
     private void tick() {
-        if (done.get() || clientGone.get()) {
+        if (done.get() || terminated.get()) {
             return;
         }
         String toSend = drain(false);
@@ -253,8 +242,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             consecutiveFailures = 0;
             consecutiveRateLimits = 0;
         } catch (SlackSendException e) {
-            if (isGone(e)) {
-                markGone();
+            if (isTerminal(e)) {
+                terminate();
                 return;
             }
             // Put the text back at the front so no delta is lost, whatever the failure kind.
@@ -275,7 +264,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                         consecutiveRateLimits,
                         channel
                     );
-                    markGone();
+                    terminate();
                 }
                 return;
             }
@@ -287,7 +276,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                     channel,
                     e.slackError()
                 );
-                markGone();
+                terminate();
             } else {
                 log.debug(
                     "Slack stream append retry {} (channel={}): {}",
@@ -314,6 +303,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             } else {
                 slack.appendStream(workspaceId, channel, ts, text);
             }
+            contentDelivered.set(true);
         } finally {
             streamLock.unlock();
         }
@@ -353,7 +343,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             lock.unlock();
         }
 
-        if (clientGone.get()) {
+        if (terminated.get()) {
             return; // target is gone; nothing to finalize
         }
         // A turn that finishes before the first flush tick (or leaves a tail) writes here. No further tick will
@@ -365,7 +355,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
         try {
             String ts = streamTs.get();
-            if (ts != null && !clientGone.get()) {
+            if (ts != null && !terminated.get()) {
                 slack.stopStream(workspaceId, channel, ts, List.of());
             }
         } catch (Exception e) {
@@ -382,8 +372,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                 openOrAppend(text);
                 return;
             } catch (SlackSendException e) {
-                if (isGone(e)) {
-                    markGone();
+                if (isTerminal(e)) {
+                    terminate();
                     return;
                 }
                 attemptsLeft--;
@@ -428,16 +418,12 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
     }
 
-    /**
-     * Mark the recipient gone and fire the disconnect hook once. Runs on the flush thread, so it only cancels the
-     * task (no {@code awaitTermination} — a task cannot wait for itself); {@link #finish} performs the full drain.
-     */
-    private void markGone() {
+    private void terminate() {
         ScheduledFuture<?> task = flushTask;
         if (task != null) {
             task.cancel(false);
         }
-        if (clientGone.compareAndSet(false, true)) {
+        if (terminated.compareAndSet(false, true)) {
             Runnable hook = disconnectHook;
             if (hook != null) {
                 hook.run();
@@ -445,9 +431,12 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
     }
 
-    private static boolean isGone(SlackSendException e) {
+    private boolean isTerminal(SlackSendException e) {
         String code = e.slackError();
-        return code != null && GONE_ERRORS.contains(code);
+        if ("silent_mode_engaged".equals(code)) {
+            silentModeSuppressed.set(true);
+        }
+        return code != null && TERMINAL_ERRORS.contains(code);
     }
 
     private static String safeError(String text) {

@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
@@ -26,6 +29,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track {@link GitLabGraphQlClientProvider}.
  */
 @Component
+@OutboundEgressGateway
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitlabApprovalChannel implements ApprovalChannel {
 
@@ -36,17 +40,20 @@ public class GitlabApprovalChannel implements ApprovalChannel {
     private final GitLabTokenService tokenService;
     private final GitlabFeedbackChannel feedbackChannel;
     private final WebClient webClient;
+    private final OutboundEgressGuard egressGuard;
 
     public GitlabApprovalChannel(
         GitLabGraphQlClientProvider gitLabProvider,
         GitLabTokenService tokenService,
         GitlabFeedbackChannel feedbackChannel,
-        WebClient.Builder webClientBuilder
+        WebClient.Builder webClientBuilder,
+        OutboundEgressGuard egressGuard
     ) {
         this.gitLabProvider = gitLabProvider;
         this.tokenService = tokenService;
         this.feedbackChannel = feedbackChannel;
         this.webClient = webClientBuilder.build();
+        this.egressGuard = egressGuard;
     }
 
     @Override
@@ -63,6 +70,7 @@ public class GitlabApprovalChannel implements ApprovalChannel {
 
         MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(target.subjectExternalId());
         try {
+            egressGuard.requireDeliveryAllowed("gitlab.approve");
             webClient
                 .post()
                 .uri(approvalUri(tokenService.resolveServerUrl(scopeId), mr))
@@ -70,6 +78,8 @@ public class GitlabApprovalChannel implements ApprovalChannel {
                 .retrieve()
                 .toBodilessEntity()
                 .block(REQUEST_TIMEOUT);
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (WebClientResponseException e) {
             // GitLab answers 401, not 403, when the token's user may not approve this MR — usually its author.
             throw new FeedbackDeliveryException(

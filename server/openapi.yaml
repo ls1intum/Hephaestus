@@ -1401,8 +1401,15 @@ paths:
       tags:
       - Instance Settings
   /admin/settings/silent-mode:
-    put:
+    patch:
       operationId: adminUpdateSilentMode
+      parameters:
+      - description: Current settings ETag; required when releasing Silent Mode
+        in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -1415,7 +1422,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InstanceSettings"
-          description: OK
+          description: Silent Mode updated
+        "412":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The supplied ETag is stale
+        "428":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: If-Match is required when releasing Silent Mode
       summary: Engage or release the instance-wide silent mode
       tags:
       - Instance Settings
@@ -8384,6 +8403,8 @@ components:
     InstanceSettings:
       type: object
       properties:
+        etag:
+          type: string
         silentModeChangedAt:
           type: string
           format: date-time
@@ -8394,6 +8415,7 @@ components:
         silentModeReason:
           type: string
       required:
+      - etag
       - silentModeEngaged
     IntegrationCatalogEntry:
       type: object

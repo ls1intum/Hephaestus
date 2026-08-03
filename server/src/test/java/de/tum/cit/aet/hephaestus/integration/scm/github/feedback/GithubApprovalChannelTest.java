@@ -4,12 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -34,11 +40,14 @@ class GithubApprovalChannelTest extends BaseUnitTest {
     @Mock
     private GithubPrNodeIdResolver prNodeIdResolver;
 
+    @Mock
+    private OutboundEgressGuard egressGuard;
+
     private GithubApprovalChannel channel;
 
     @BeforeEach
     void setUp() {
-        channel = new GithubApprovalChannel(gitHubProvider, prNodeIdResolver);
+        channel = new GithubApprovalChannel(gitHubProvider, prNodeIdResolver, egressGuard);
     }
 
     @Test
@@ -69,6 +78,22 @@ class GithubApprovalChannelTest extends BaseUnitTest {
         verify(client).documentName("ApprovePullRequest");
         verify(spec).variable(eq("pullRequestId"), eq("PR_node123"));
         verify(spec).variable(eq("body"), eq("looks good"));
+    }
+
+    @Test
+    void shouldBlockApprovalMutationWhenSilentModeIsEngaged() {
+        doThrow(new OutboundEgressSuppressedException("test"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("github.approve");
+
+        assertThatThrownBy(() ->
+            channel.approve(
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
+                "looks good"
+            )
+        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        verifyNoInteractions(prNodeIdResolver);
+        verify(gitHubProvider, never()).forScope(anyLong());
     }
 
     @Test

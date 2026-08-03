@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
@@ -74,6 +76,8 @@ class DiffNotePoster {
         if (findings.isEmpty()) {
             try {
                 channel.clearStaleFindings(target, HEPHAESTUS_MARKER);
+            } catch (OutboundEgressSuppressedException e) {
+                throw new JobDeliverySuppressedException(e.getMessage(), e);
             } catch (RuntimeException e) {
                 log.warn(
                     "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
@@ -94,7 +98,15 @@ class DiffNotePoster {
                 result.failed(),
                 job.getId()
             );
-            return new DiffNoteResult(result.posted(), result.failed(), result.signals());
+            return new DiffNoteResult(
+                result.posted(),
+                result.failed(),
+                result.signals(),
+                result.suppressed(),
+                result.suppressedRecurrenceKeys()
+            );
+        } catch (OutboundEgressSuppressedException e) {
+            throw new JobDeliverySuppressedException(e.getMessage(), e);
         } catch (FeedbackDeliveryException e) {
             throw new JobDeliveryException(e.getMessage(), e);
         }
@@ -124,5 +136,15 @@ class DiffNotePoster {
         return findings;
     }
 
-    record DiffNoteResult(int posted, int failed, List<InlineFindingChannel.DeliveredSignal> signals) {}
+    record DiffNoteResult(
+        int posted,
+        int failed,
+        List<InlineFindingChannel.DeliveredSignal> signals,
+        boolean suppressed,
+        List<String> suppressedRecurrenceKeys
+    ) {
+        DiffNoteResult(int posted, int failed, List<InlineFindingChannel.DeliveredSignal> signals) {
+            this(posted, failed, signals, false, List.of());
+        }
+    }
 }

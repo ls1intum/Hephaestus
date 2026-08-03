@@ -3641,6 +3641,7 @@ export type IntegrationCatalogEntry = {
 };
 
 export type InstanceSettings = {
+    etag: string;
     silentModeChangedAt?: Date;
     silentModeChangedBy?: string;
     silentModeEngaged: boolean;
@@ -5806,14 +5807,33 @@ export type AdminGetInstanceSettingsResponse = AdminGetInstanceSettingsResponses
 
 export type AdminUpdateSilentModeData = {
     body: UpdateSilentModeRequest;
+    headers?: {
+        /**
+         * Current settings ETag; required when releasing Silent Mode
+         */
+        'If-Match'?: string;
+    };
     path?: never;
     query?: never;
     url: '/admin/settings/silent-mode';
 };
 
+export type AdminUpdateSilentModeErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required when releasing Silent Mode
+     */
+    428: ProblemDetail;
+};
+
+export type AdminUpdateSilentModeError = AdminUpdateSilentModeErrors[keyof AdminUpdateSilentModeErrors];
+
 export type AdminUpdateSilentModeResponses = {
     /**
-     * OK
+     * Silent Mode updated
      */
     200: InstanceSettings;
 };

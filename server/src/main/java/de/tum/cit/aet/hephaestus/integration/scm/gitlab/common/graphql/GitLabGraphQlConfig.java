@@ -8,6 +8,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
@@ -114,7 +115,10 @@ public class GitLabGraphQlConfig {
 
     @Bean
     @Qualifier("gitLabGraphQlClient")
-    public HttpGraphQlClient gitLabGraphQlClient(@Qualifier("gitLabGraphQlWebClient") WebClient webClient) {
+    public HttpGraphQlClient gitLabGraphQlClient(
+        @Qualifier("gitLabGraphQlWebClient") WebClient webClient,
+        SilentModeGraphQlClientFactory clientFactory
+    ) {
         // Operations are loaded from graphql/gitlab/operations/ by name.
         // Shared fragments from graphql/gitlab/fragments/GitLabUserFields.graphql are
         // selectively appended by FragmentMergingDocumentSource: only fragments that are
@@ -128,7 +132,7 @@ public class GitLabGraphQlConfig {
             List.of(".graphql", ".gql"),
             List.of(fragmentFile)
         );
-        return HttpGraphQlClient.builder(webClient).documentSource(documentSource).build();
+        return clientFactory.create(webClient, documentSource);
     }
 
     /**

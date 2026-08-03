@@ -100,8 +100,10 @@ export function QueryErrorAlert({ error, title, onRetry, className }: QueryError
 	return (
 		<Alert variant={variant} className={className}>
 			{icon}
-			<AlertTitle>{title}</AlertTitle>
-			<AlertDescription>{describe(detail, guidance)}</AlertDescription>
+			<AlertTitle className="min-w-0 break-words">{title}</AlertTitle>
+			<AlertDescription className="min-w-0 break-words">
+				{describe(detail, guidance)}
+			</AlertDescription>
 			{showRetry && (
 				<AlertAction>
 					<Button type="button" variant="outline" size="sm" onClick={onRetry}>

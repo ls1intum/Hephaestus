@@ -55,11 +55,6 @@ public class MentorTurnPersistence {
     private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
     private final LlmUsageRecorder usageRecorder;
 
-    /**
-     * Explicit template instead of {@code @Transactional} on {@link #finalise} / {@link #interrupt}:
-     * both must run the ledger write after their transaction closes, which a method-level annotation
-     * cannot express without self-proxying.
-     */
     private final TransactionTemplate requiresNewTx;
 
     public MentorTurnPersistence(
@@ -234,9 +229,14 @@ public class MentorTurnPersistence {
     }
 
     /** Uses {@link TransactionTemplate} so the message and ledger write share an explicit new transaction. */
-    public void finalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
+    public void finalise(
+        TurnPersistenceCookie cookie,
+        TranslatorState state,
+        UIMessageChunk.Finish finish,
+        MentorChannel.DeliveryOutcome deliveryOutcome
+    ) {
         try {
-            requiresNewTx.executeWithoutResult(tx -> doFinalise(cookie, state, finish));
+            requiresNewTx.executeWithoutResult(tx -> doFinalise(cookie, state, finish, deliveryOutcome));
         } catch (OptimisticLockingFailureException stale) {
             // A concurrent writer (typically the in-flight reaper) already recorded a terminal state
             // for this row; theirs wins.
@@ -247,7 +247,12 @@ public class MentorTurnPersistence {
         }
     }
 
-    private void doFinalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
+    private void doFinalise(
+        TurnPersistenceCookie cookie,
+        TranslatorState state,
+        UIMessageChunk.Finish finish,
+        MentorChannel.DeliveryOutcome deliveryOutcome
+    ) {
         ChatMessage assistant = chatMessageRepository
             .findById(cookie.assistantMessageId())
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
@@ -289,9 +294,7 @@ public class MentorTurnPersistence {
         // at the REQUIRES_NEW commit boundary, where it would escape uncaught.
         chatMessageRepository.saveAndFlush(assistant);
         billTurn(assistant, state, cookie);
-
-        // MUST follow the flush above: the placement's chat_message_id FK references that row.
-        reconcileConversationalDelivery(assistant, state);
+        reconcileConversationalDelivery(assistant, state, deliveryOutcome);
 
         byte[] sessionBytes = state.observedSessionJsonl();
         if (sessionBytes != null) {
@@ -362,32 +365,34 @@ public class MentorTurnPersistence {
         );
     }
 
-    /**
-     * Reconcile this turn's linked findings against the PREPARED conversational queue. Best-effort: a
-     * failure here must not fail the turn persistence the finalise transaction just did.
-     */
-    private void reconcileConversationalDelivery(ChatMessage assistant, TranslatorState state) {
-        try {
-            List<UUID> linkedFindingIds = state.linkedFindingIds();
-            if (linkedFindingIds.isEmpty()) {
-                return;
-            }
-            ChatThread thread = assistant.getThread();
-            if (thread == null || thread.getWorkspace() == null || thread.getUser() == null) {
-                return;
-            }
-            conversationalDeliveryReconciler.reconcile(
+    /** Reconcile linked findings in the same transaction as the completed assistant message. */
+    private void reconcileConversationalDelivery(
+        ChatMessage assistant,
+        TranslatorState state,
+        MentorChannel.DeliveryOutcome deliveryOutcome
+    ) {
+        List<UUID> linkedFindingIds = state.linkedFindingIds();
+        if (linkedFindingIds.isEmpty()) {
+            return;
+        }
+        ChatThread thread = assistant.getThread();
+        if (thread == null || thread.getWorkspace() == null || thread.getUser() == null) {
+            return;
+        }
+        switch (deliveryOutcome) {
+            case INSTANCE_SILENCED -> conversationalDeliveryReconciler.suppressForSilentMode(
+                thread.getWorkspace().getId(),
+                thread.getUser().getId(),
+                linkedFindingIds
+            );
+            case DELIVERED -> conversationalDeliveryReconciler.reconcile(
                 thread.getWorkspace().getId(),
                 thread.getUser().getId(),
                 assistant.getId(),
                 linkedFindingIds
             );
-        } catch (RuntimeException e) {
-            log.warn(
-                "Conversational delivery reconciliation failed (turn persistence unaffected): assistantMessageId={}, error={}",
-                assistant.getId(),
-                e.toString()
-            );
+            case NOT_DELIVERED -> {
+            }
         }
     }
 

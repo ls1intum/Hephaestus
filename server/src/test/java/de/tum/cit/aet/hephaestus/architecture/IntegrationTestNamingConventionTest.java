@@ -23,12 +23,12 @@ import org.junit.jupiter.api.Test;
  * Durable guard against silently-dead integration tests.
  *
  * <p><b>Why this rule exists.</b> The Maven Failsafe plugin is configured to discover integration
- * tests by the single filename pattern {@code **&#47;*IntegrationTest.java} (see {@code pom.xml}),
- * while Surefire runs only {@code @Tag("unit")}. A concrete {@code BaseIntegrationTest} subclass is
- * {@code @Tag("integration")} (inherited), so if it is named {@code *Test} (or anything not ending
- * in {@code IntegrationTest}) it matches <em>neither</em> runner and never executes in any build —
- * it asserts nothing while looking like coverage. This actually happened to three tests, including
- * two security guards, before this rule was added.
+ * Spring integration tests by {@code **&#47;*IntegrationTest.java} and raw schema tests by
+ * {@code **&#47;*LiquibaseTest.java} (see {@code pom.xml}), while Surefire runs only
+ * {@code @Tag("unit")}. A concrete {@code BaseIntegrationTest} subclass is
+ * {@code @Tag("integration")} (inherited), so it must use the {@code IntegrationTest} suffix or no
+ * runner executes it. This actually happened to three tests, including two security guards, before
+ * this rule was added.
  *
  * <p>The scan resolves {@code extends} transitively. The first version inspected only classes that
  * literally wrote {@code extends BaseIntegrationTest}, leaving the intermediate bases uncovered —

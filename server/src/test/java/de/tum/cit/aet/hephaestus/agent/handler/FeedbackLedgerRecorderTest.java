@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Del
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.WithheldFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -60,7 +61,11 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private OutboundEgressGuard egressGuard;
+
     private FeedbackLedgerRecorder recorder() {
+        when(egressGuard.deliveryAllowed(any())).thenReturn(true);
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any())).thenReturn(List.of());
@@ -71,7 +76,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             feedbackRepository,
             feedbackObservationRepository,
             feedbackPlacementRepository,
-            eventPublisher
+            eventPublisher,
+            egressGuard
         );
     }
 
@@ -179,16 +185,14 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void inlinePlacement_fallsBackToPathLineWhenNoObservationFingerprint_andFailedSignalHasNoRef() {
-        // No findingFingerprint on the note (legacy/unkeyed) → match by path + terminal line. A FAILED disposition
-        // leaves no external_ref, so a dead delivery is not recorded with a vendor handle.
+    void shouldNotCreatePlacementWhenInlineSignalFailed() {
         var finding = problem(0.9f);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
-        var note = new DiffNote("src/Bar.java", 5, 8, "Range note"); // multi-line, no key
+        var note = new DiffNote("src/Bar.java", 5, 8, "Range note");
         var signal = new InlineFindingChannel.DeliveredSignal(
             null,
-            new FindingAnchor.DiffAnchor("src/Bar.java", 8, 5), // newLineNumber=8 is the terminal (end) line
+            new FindingAnchor.DiffAnchor("src/Bar.java", 8, 5),
             InlineFindingChannel.Disposition.FAILED,
             null,
             null
@@ -201,15 +205,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             List.of(signal)
         );
 
-        var placements = ArgumentCaptor.forClass(FeedbackPlacement.class);
-        verify(feedbackPlacementRepository, org.mockito.Mockito.atLeastOnce()).save(placements.capture());
-        FeedbackPlacement inline = placements
-            .getAllValues()
-            .stream()
-            .filter(p -> p.getPlacementType() == PlacementType.INLINE)
-            .findFirst()
-            .orElseThrow();
-        assertThat(inline.getPostedCommentRef()).isNull();
+        verify(feedbackPlacementRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
@@ -473,6 +469,22 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldRecordOneSuppressionWithoutConversationWhenUndeliveredDuringSilentMode() {
+        Observation bad = problem(0.9f);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad));
+        FeedbackLedgerRecorder recorder = recorder();
+        when(egressGuard.deliveryAllowed(any())).thenReturn(false);
+
+        recorder.recordUndelivered(job(), new DeliveryContent("body", List.of(), List.of()));
+
+        var saved = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository).save(saved.capture());
+        assertThat(saved.getValue().getDeliveryState()).isEqualTo(FeedbackDeliveryState.SUPPRESSED);
+        assertThat(saved.getValue().getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.INSTANCE_SILENCED);
+        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(any());
+    }
+
+    @Test
     void recordUndelivered_reSignalsButDoesNotRepersist_onFailedRetry() {
         // A failing retry: the FAILED unit (ordinal 4000) was already written. Re-signalling the conversation is
         // harmless (idempotent listener), but the FAILED row must NOT be persisted twice.
@@ -571,6 +583,101 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         );
 
         verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void shouldReferenceLiveUnitWithoutSupersedingWhenReReviewIsSuppressed() {
+        Observation bad = problem(0.9f);
+        UUID liveFeedbackId = UUID.randomUUID();
+        FeedbackLedgerRecorder rec = recorder();
+        FeedbackPlacement livePlacement = mock(FeedbackPlacement.class);
+        when(livePlacement.getFeedbackId()).thenReturn(liveFeedbackId);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad));
+        when(feedbackPlacementRepository.findLatestDeliveredSummary(any())).thenReturn(Optional.of(livePlacement));
+
+        rec.recordSuppressedUnit(
+            job(),
+            new DeliveryContent("would have updated", List.of(), List.of()),
+            FeedbackSuppressionReason.INSTANCE_SILENCED
+        );
+
+        var saved = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository).save(saved.capture());
+        assertThat(saved.getValue().getReplacesId()).isEqualTo(liveFeedbackId);
+        verify(feedbackRepository, org.mockito.Mockito.never()).updateState(
+            liveFeedbackId,
+            FeedbackDeliveryState.SUPERSEDED.name()
+        );
+    }
+
+    @Test
+    void shouldRecordOnlyLandedPlacementAndFindingWhenInlineDeliveryIsPartiallySuppressed() {
+        Observation landed = problem(0.9f);
+        Observation suppressed = problem(0.8f);
+        when(landed.getRecurrenceKey()).thenReturn("key-1");
+        when(suppressed.getRecurrenceKey()).thenReturn("key-2");
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(landed, suppressed));
+        DeliveryContent delivery = new DeliveryContent(
+            "summary",
+            List.of(
+                new DiffNote("src/Foo.java", 10, null, "landed", "key-1"),
+                new DiffNote("src/Bar.java", 20, null, "suppressed", "key-2")
+            ),
+            List.of()
+        );
+        InlineFindingChannel.DeliveredSignal signal = new InlineFindingChannel.DeliveredSignal(
+            "key-1",
+            new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
+            InlineFindingChannel.Disposition.POSTED,
+            "note-1",
+            "discussion-1"
+        );
+        FeedbackLedgerRecorder recorder = recorder();
+        AgentJob job = job();
+
+        recorder.record(job, delivery, WorkArtifact.PULL_REQUEST, List.of(signal), false, true);
+        recorder.recordSuppressedRemainder(
+            job,
+            delivery,
+            FeedbackSuppressionReason.INSTANCE_SILENCED,
+            List.of("key-2")
+        );
+
+        ArgumentCaptor<FeedbackPlacement> placement = ArgumentCaptor.forClass(FeedbackPlacement.class);
+        verify(feedbackPlacementRepository).save(placement.capture());
+        assertThat(placement.getValue().getAnchorPath()).isEqualTo("src/Foo.java");
+
+        ArgumentCaptor<Feedback> feedback = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository, org.mockito.Mockito.times(2)).save(feedback.capture());
+        assertThat(feedback.getAllValues())
+            .extracting(Feedback::getDeliveryState)
+            .containsExactly(FeedbackDeliveryState.DELIVERED, FeedbackDeliveryState.SUPPRESSED);
+
+        ArgumentCaptor<UUID> evidence = ArgumentCaptor.forClass(UUID.class);
+        verify(feedbackObservationRepository, org.mockito.Mockito.times(2)).insertIfAbsent(
+            any(),
+            evidence.capture(),
+            any(),
+            anyInt()
+        );
+        assertThat(evidence.getAllValues()).containsExactly(landed.getId(), suppressed.getId());
+    }
+
+    @Test
+    void shouldNotPublishConversationAfterReleaseWhenCycleWasSuppressed() {
+        Observation finding = problem(0.9f);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
+
+        recorder().recordWithoutConversation(
+            job(),
+            new DeliveryContent("landed summary", List.of(), List.of()),
+            WorkArtifact.PULL_REQUEST,
+            List.of(),
+            true,
+            false
+        );
+
+        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(any());
     }
 
     @Test

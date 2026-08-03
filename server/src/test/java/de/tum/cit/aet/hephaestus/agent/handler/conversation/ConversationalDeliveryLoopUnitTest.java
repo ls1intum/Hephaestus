@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -67,14 +68,23 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private OutboundEgressGuard egressGuard;
+
     private FeedbackChannelRouter router() {
         return new FeedbackChannelRouter(feedbackRepository);
     }
 
     private ConversationalFeedbackPreparer preparer() {
+        when(egressGuard.deliveryAllowed(any())).thenReturn(true);
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        return new ConversationalFeedbackPreparer(feedbackRepository, feedbackObservationRepository, eventPublisher);
+        return new ConversationalFeedbackPreparer(
+            feedbackRepository,
+            feedbackObservationRepository,
+            eventPublisher,
+            egressGuard
+        );
     }
 
     private ConversationalDeliveryReconciler reconciler() {
@@ -84,6 +94,18 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             feedbackPlacementRepository,
             observationRepository
         );
+    }
+
+    @Test
+    void shouldCreateNoFutureWorkWhenSilentModeIsEngaged() {
+        ConversationalFeedbackPreparer preparer = preparer();
+        when(egressGuard.deliveryAllowed(any())).thenReturn(false);
+
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, "rk-silent")));
+
+        assertThat(prepared).isZero();
+        verify(feedbackRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     private enum ObsKind {
@@ -248,6 +270,23 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(a));
 
         assertThat(flips).isZero();
+        verify(feedbackPlacementRepository, never()).save(any());
+    }
+
+    @Test
+    void silentModeSuppressesOnePreparedUnitWithoutPlacement() {
+        UUID observationId = UUID.randomUUID();
+        UUID feedbackId = UUID.randomUUID();
+        when(
+            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
+        ).thenReturn(List.of(feedbackId));
+        when(feedbackRepository.markConversationSuppressedBySilentMode(feedbackId)).thenReturn(1);
+
+        int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(observationId));
+
+        assertThat(suppressed).isEqualTo(1);
+        verify(feedbackRepository).markConversationSuppressedBySilentMode(feedbackId);
+        verify(feedbackRepository, never()).markConversationDelivered(any(), any());
         verify(feedbackPlacementRepository, never()).save(any());
     }
 

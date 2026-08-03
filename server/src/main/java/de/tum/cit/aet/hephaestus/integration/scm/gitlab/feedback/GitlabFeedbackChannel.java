@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -36,6 +39,7 @@ import org.springframework.stereotype.Component;
  * {@link GitLabGraphQlClientProvider}.
  */
 @Component
+@OutboundEgressGateway
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitlabFeedbackChannel implements FeedbackChannel {
 
@@ -57,10 +61,16 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
 
     private final GitLabGraphQlClientProvider gitLabProvider;
     private final GitlabMrResolver mrResolver;
+    private final OutboundEgressGuard egressGuard;
 
-    public GitlabFeedbackChannel(GitLabGraphQlClientProvider gitLabProvider, GitlabMrResolver mrResolver) {
+    public GitlabFeedbackChannel(
+        GitLabGraphQlClientProvider gitLabProvider,
+        GitlabMrResolver mrResolver,
+        OutboundEgressGuard egressGuard
+    ) {
         this.gitLabProvider = gitLabProvider;
         this.mrResolver = mrResolver;
+        this.egressGuard = egressGuard;
     }
 
     @Override
@@ -100,6 +110,7 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
 
         ClientGraphQlResponse response;
         try {
+            egressGuard.requireDeliveryAllowed("gitlab.post-summary");
             response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("CreateMergeRequestNote")
@@ -107,6 +118,8 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
                 .variable("body", body)
                 .execute()
                 .block(GRAPHQL_TIMEOUT);
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (RuntimeException e) {
             // A transport/timeout error must surface as the channel's typed exception (consistent with
             // updateSummary) so PullRequestCommentPoster's catch(FeedbackDeliveryException) wraps it uniformly.
@@ -168,6 +181,7 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
 
         ClientGraphQlResponse response;
         try {
+            egressGuard.requireDeliveryAllowed("gitlab.update-summary");
             response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("UpdateNote")
@@ -175,6 +189,8 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
                 .variable("body", body)
                 .execute()
                 .block(GRAPHQL_TIMEOUT);
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (RuntimeException e) {
             return UpdateOutcome.transientFailure("updateNote transport error: " + e.getMessage());
         }

@@ -5,8 +5,10 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Dif
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -32,6 +34,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -101,22 +104,26 @@ public class FeedbackLedgerRecorder {
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final OutboundEgressGuard egressGuard;
 
     FeedbackLedgerRecorder(
         ObservationRepository observationRepository,
         FeedbackRepository feedbackRepository,
         FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
-        ApplicationEventPublisher eventPublisher
+        ApplicationEventPublisher eventPublisher,
+        OutboundEgressGuard egressGuard
     ) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
         this.eventPublisher = eventPublisher;
+        this.egressGuard = egressGuard;
     }
 
     /** Records a delivery whose summary landed. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(
         AgentJob job,
         DeliveryContent delivery,
@@ -135,10 +142,33 @@ public class FeedbackLedgerRecorder {
         boolean summaryDelivered,
         boolean inlineDelivered
     ) {
-        // Signal the conversational-delivery loop for EVERY cycle that reaches the ledger - before any early
-        // return below - so comms-only cycles (zero IN_CONTEXT posts) and transient no-ops are not skipped. The
-        // listener re-reads the observations and no-ops if nothing is admitted, so an unconditional signal is safe.
-        publishConversationDeliveryTrigger(job);
+        record(job, delivery, artifact, inlineSignals, summaryDelivered, inlineDelivered, true);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordWithoutConversation(
+        AgentJob job,
+        DeliveryContent delivery,
+        WorkArtifact artifact,
+        List<DeliveredSignal> inlineSignals,
+        boolean summaryDelivered,
+        boolean inlineDelivered
+    ) {
+        record(job, delivery, artifact, inlineSignals, summaryDelivered, inlineDelivered, false);
+    }
+
+    private void record(
+        AgentJob job,
+        DeliveryContent delivery,
+        WorkArtifact artifact,
+        List<DeliveredSignal> inlineSignals,
+        boolean summaryDelivered,
+        boolean inlineDelivered,
+        boolean conversationalDeliveryEligible
+    ) {
+        if (conversationalDeliveryEligible && deliveryAllowed()) {
+            publishConversationDeliveryTrigger(job);
+        }
         if (delivery == null) {
             return;
         }
@@ -224,10 +254,12 @@ public class FeedbackLedgerRecorder {
         // Bind every DELIVERED finding: BAD (the problems surfaced) lead as PRIMARY, GOOD
         // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.
         // Severity is null for a GOOD strength (ADR 0022) — sort it after any problem (least severe).
+        Set<String> deliveredInlineKeys = deliveredKeys(inlineSignals);
         List<Observation> assessed = findings
             .stream()
             .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
             .filter(f -> !excludedIds.contains(f.getId()))
+            .filter(f -> summaryDelivered || deliveredInlineKeys.contains(f.getRecurrenceKey()))
             // Stable order matching the composer’s prioritisation: severity, then confidence DESC, then id — so the
             // persisted PRIMARY ordinal of equal-severity problems is reproducible across re-runs rather
             // than flapping with the repository's findByAgentJobId iteration order.
@@ -254,13 +286,13 @@ public class FeedbackLedgerRecorder {
             );
         }
 
-        // INLINE placements (PR only) — the ANCHOR is always recoverable; the durable vendor handle
-        // (external_ref) comes from the per-note DeliveredSignal the channel emitted this run. A note with no
-        // matching signal (append-only GitHub, or a channel that emitted none) keeps the anchor-only fallback:
-        // a null external_ref.
-        if (artifact.hasInlineLane()) {
+        int inlinePlacementCount = 0;
+        if (artifact.hasInlineLane() && inlineDelivered) {
             for (DiffNote note : delivery.diffNotes()) {
                 DeliveredSignal signal = matchSignal(note, inlineSignals);
+                if (signal == null || signal.disposition() == Disposition.FAILED) {
+                    continue;
+                }
                 feedbackPlacementRepository.save(
                     FeedbackPlacement.builder()
                         .feedback(feedback)
@@ -270,10 +302,11 @@ public class FeedbackLedgerRecorder {
                         .anchorStartLine(note.startLine())
                         .anchorEndLine(note.endLine())
                         .anchorSide(PlacementAnchorSide.NEW)
-                        .postedCommentRef(signal != null ? signal.externalRef() : null)
+                        .postedCommentRef(signal.externalRef())
                         .createdAt(now)
                         .build()
                 );
+                inlinePlacementCount++;
             }
         }
 
@@ -286,9 +319,18 @@ public class FeedbackLedgerRecorder {
             job.getId(),
             feedback.getId(),
             assessed.size(),
-            artifact.hasInlineLane() ? delivery.diffNotes().size() : 0,
+            inlinePlacementCount,
             feedbackThreadKey
         );
+    }
+
+    private static Set<String> deliveredKeys(List<DeliveredSignal> signals) {
+        return signals
+            .stream()
+            .filter(signal -> signal.disposition() != Disposition.FAILED)
+            .map(DeliveredSignal::recurrenceKey)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
     }
 
     /**
@@ -372,7 +414,47 @@ public class FeedbackLedgerRecorder {
         if (findings.isEmpty()) {
             return;
         }
+        saveSuppressedUnit(job, delivery, reason, findings, findings);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSuppressedRemainder(
+        AgentJob job,
+        DeliveryContent delivery,
+        FeedbackSuppressionReason reason,
+        List<String> suppressedRecurrenceKeys
+    ) {
+        if (delivery == null || job.getWorkspace() == null) {
+            return;
+        }
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), GATE_SUPPRESSED_UNIT_ORDINAL)) {
+            return;
+        }
+        List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
+        if (findings.isEmpty()) {
+            return;
+        }
+        Set<String> suppressedKeys = Set.copyOf(suppressedRecurrenceKeys);
+        List<Observation> suppressedFindings = findings
+            .stream()
+            .filter(f -> suppressedKeys.contains(f.getRecurrenceKey()))
+            .toList();
+        saveSuppressedUnit(job, delivery, reason, findings, suppressedFindings);
+    }
+
+    private void saveSuppressedUnit(
+        AgentJob job,
+        DeliveryContent delivery,
+        FeedbackSuppressionReason reason,
+        List<Observation> findings,
+        List<Observation> evidence
+    ) {
         Observation any = findings.get(0);
+        String feedbackThreadKey = feedbackThreadKeyFor(any);
+        UUID replacesId = feedbackPlacementRepository
+            .findLatestDeliveredSummary(feedbackThreadKey)
+            .map(FeedbackPlacement::getFeedbackId)
+            .orElse(null);
         Instant now = Instant.now();
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
@@ -388,12 +470,13 @@ public class FeedbackLedgerRecorder {
                 .suppressionReason(reason)
                 .body(delivery.mrNote())
                 .source(FeedbackSource.AGENT)
-                .threadKey(feedbackThreadKeyFor(any))
+                .threadKey(feedbackThreadKey)
+                .replacesId(replacesId)
                 .createdAt(now)
                 .build()
         );
         int ordinal = 0;
-        List<Observation> assessed = findings
+        List<Observation> assessed = evidence
             .stream()
             .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
             .sorted(
@@ -501,6 +584,10 @@ public class FeedbackLedgerRecorder {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
             return; // a DELIVERED unit already exists (a prior run landed) — never contradict it or re-signal
         }
+        if (!deliveryAllowed()) {
+            recordSuppressedUnit(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            return;
+        }
         // Failed direct delivery → let the CONVERSATION channel cover the un-delivered loci. Idempotent listener,
         // so a retry that re-signals is harmless.
         publishConversationDeliveryTrigger(job);
@@ -598,6 +685,10 @@ public class FeedbackLedgerRecorder {
             any.getAboutUserId(),
             FeedbackChannel.IN_CONTEXT
         );
+    }
+
+    private boolean deliveryAllowed() {
+        return egressGuard.deliveryAllowed("prepare-conversational-feedback");
     }
 
     /**

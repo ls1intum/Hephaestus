@@ -379,11 +379,10 @@ public class MentorChatService implements MentorTurnRunner {
                     proxyCredentialRegistry.unbindTurn(sandboxSessionId, proxyMeter);
                 }
             }
-            // Natural-finish path: Pi emitted `agent_end` → handleEvent sent the `finish` chunk
-            // already. Close the wire with AI-SDK's `[DONE]` sentinel.
-            channel.completeWithDone();
-            // If an Error chunk reached the wire mid-turn, the DB row is `interrupted`. Avoid
-            // recording SUCCESS in that case — metrics must agree with persistence.
+            // Error chunks interrupt rather than finalise, so they still need a transport terminal here.
+            if (errorChunkSeen.get()) {
+                channel.completeWithDone();
+            }
             outcome = errorChunkSeen.get() ? MentorChatMetrics.Outcome.ERROR : MentorChatMetrics.Outcome.SUCCESS;
         } catch (TimeoutException timeout) {
             // Turn outlasted the prompt deadline (165s) + 30s grace; the future never resolved.
@@ -599,7 +598,9 @@ public class MentorChatService implements MentorTurnRunner {
                         log.debug("Cost augmentation failed — sending raw Finish: {}", costEx.toString());
                     }
                     channel.send(toSend);
-                    persistence.finalise(cookie, state, toSend);
+                    // Slack discovers suppression only when its final buffer flushes; persist that observed outcome.
+                    MentorChannel.DeliveryOutcome deliveryOutcome = channel.completeWithDone();
+                    persistence.finalise(cookie, state, toSend, deliveryOutcome);
                     Double costUsd = toSend.messageMetadata() != null ? toSend.messageMetadata().costUsd() : null;
                     if (costUsd != null) metrics.recordCostUsd(costUsd);
                     turnComplete.complete(null);

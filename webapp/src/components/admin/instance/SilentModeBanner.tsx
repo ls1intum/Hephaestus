@@ -3,31 +3,24 @@ import { VolumeX } from "lucide-react";
 import type { InstanceSettings } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { asDate } from "@/lib/dates";
 
-const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
-
-interface SilentModeBannerProps {
+export interface SilentModeBannerProps {
 	settings: InstanceSettings;
 }
 
-/** The parent decides visibility; this renders the engaged state only. */
 export function SilentModeBanner({ settings }: SilentModeBannerProps) {
 	const engagedAt = asDate(settings.silentModeChangedAt);
-	// A brake left on is the likelier incident than a brake released early, so an old one asks to be re-decided.
-	const stale = engagedAt != null && Date.now() - engagedAt.getTime() > STALE_AFTER_MS;
 
 	return (
 		<Alert variant="destructive">
 			<VolumeX aria-hidden />
-			<AlertTitle>
-				{stale
-					? "Silent mode is still engaged — is that still intentional?"
-					: "Silent mode is engaged — nothing is being delivered"}
+			<AlertTitle className="min-w-0 break-words">
+				Silent mode is engaged — workspace delivery is blocked
 			</AlertTitle>
-			<AlertDescription>
-				Hephaestus is not posting practice feedback or Slack messages anywhere on this instance.
+			<AlertDescription className="min-w-0 break-words">
+				Practice feedback and workspace Slack messages are suppressed across this instance.
 				{settings.silentModeChangedBy || engagedAt ? (
 					<>
 						{" Engaged"}
@@ -43,9 +36,9 @@ export function SilentModeBanner({ settings }: SilentModeBannerProps) {
 				) : null}
 			</AlertDescription>
 			<AlertAction>
-				<Button variant="outline" size="sm" render={<Link to="/admin/settings" />}>
+				<Link to="/admin/settings" className={buttonVariants({ variant: "outline", size: "sm" })}>
 					Manage
-				</Button>
+				</Link>
 			</AlertAction>
 		</Alert>
 	);

@@ -65,6 +65,22 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 Untouched instances start with Silent Mode engaged
+
+**Affected**: deployments where the instance Silent Mode setting has never been explicitly changed.
+
+The upgrade engages the instance-wide outbound brake before any new GitHub, GitLab, or Slack delivery
+can leave the application. Detection, persistence, synchronization, webhooks, OAuth, and administration
+continue normally; suppressed feedback is recorded and is never replayed.
+
+On production, verify each workspace's practice delivery settings and provider targets, then open
+**Instance admin → Settings** and release Silent Mode. Leave it engaged on staging clones and during
+disaster-recovery drills. Instances whose operator had already changed the setting keep that explicit
+choice.
+
+**API clients:** The Silent Mode update operation is now
+`PATCH /admin/settings/silent-mode`. Replace calls to the removed `PUT` operation before upgrading.
+
 #### 🔴 Practice-feedback delivery field renamed
 
 **Affected**: API clients that read or write user settings, or consume account-export JSON.

@@ -3,12 +3,17 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
@@ -41,11 +46,14 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     @Mock
     private GitlabMrResolver mrResolver;
 
+    @Mock
+    private OutboundEgressGuard egressGuard;
+
     private GitlabFeedbackChannel channel;
 
     @BeforeEach
     void setUp() {
-        channel = new GitlabFeedbackChannel(gitLabProvider, mrResolver);
+        channel = new GitlabFeedbackChannel(gitLabProvider, mrResolver, egressGuard);
     }
 
     @Test
@@ -69,6 +77,33 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
         assertThat(handle).isNotNull();
         assertThat(handle.externalId()).isEqualTo("gid://gitlab/Note/789");
+    }
+
+    @Test
+    void shouldBlockPostMutationWhenSilentModeIsEngaged() {
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
+        doThrow(new OutboundEgressSuppressedException("test"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("gitlab.post-summary");
+
+        assertThatThrownBy(() ->
+            channel.postSummary(gitlabTarget(), new FeedbackContent("body", "marker"))
+        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        verify(gitLabProvider, never()).forScope(anyLong());
+    }
+
+    @Test
+    void shouldBlockUpdateMutationWhenSilentModeIsEngaged() {
+        doThrow(new OutboundEgressSuppressedException("test"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("gitlab.update-summary");
+
+        assertThatThrownBy(() ->
+            channel.updateSummary(gitlabTarget(), "gid://gitlab/Note/789", new FeedbackContent("body", "marker"))
+        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        verify(gitLabProvider, never()).forScope(anyLong());
     }
 
     @Test

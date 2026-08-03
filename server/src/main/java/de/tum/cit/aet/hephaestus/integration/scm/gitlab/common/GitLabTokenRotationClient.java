@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.EgressExempt;
+import de.tum.cit.aet.hephaestus.integration.core.egress.EgressExemption;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Map;
@@ -26,6 +28,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * @see <a href="https://docs.gitlab.com/ee/api/personal_access_tokens.html#rotate-a-personal-access-token">GitLab PAT Rotation</a>
  */
 @Service
+@EgressExempt(EgressExemption.OAUTH_CONTROL_PLANE)
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabTokenRotationClient {
 

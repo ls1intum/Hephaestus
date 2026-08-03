@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -13,6 +14,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
@@ -44,11 +47,14 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     @Mock
     private GithubPrNodeIdResolver prNodeIdResolver;
 
+    @Mock
+    private OutboundEgressGuard egressGuard;
+
     private GithubFeedbackChannel channel;
 
     @BeforeEach
     void setUp() {
-        channel = new GithubFeedbackChannel(gitHubProvider, prNodeIdResolver);
+        channel = new GithubFeedbackChannel(gitHubProvider, prNodeIdResolver, egressGuard);
     }
 
     @Test
@@ -75,6 +81,37 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
         assertThat(handle).isNotNull();
         assertThat(handle.externalId()).isEqualTo("IC_comment456");
+    }
+
+    @Test
+    void shouldBlockPostMutationWhenSilentModeIsEngaged() {
+        doThrow(new OutboundEgressSuppressedException("test"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("github.post-summary");
+
+        assertThatThrownBy(() ->
+            channel.postSummary(
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
+                new FeedbackContent("body", "marker")
+            )
+        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        verify(gitHubProvider, never()).forScope(anyLong());
+    }
+
+    @Test
+    void shouldBlockUpdateMutationWhenSilentModeIsEngaged() {
+        doThrow(new OutboundEgressSuppressedException("test"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("github.update-summary");
+
+        assertThatThrownBy(() ->
+            channel.updateSummary(
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
+                "IC_comment456",
+                new FeedbackContent("body", "marker")
+            )
+        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        verify(gitHubProvider, never()).forScope(anyLong());
     }
 
     @Test

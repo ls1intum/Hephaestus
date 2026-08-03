@@ -6,13 +6,16 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
@@ -337,5 +340,35 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
 
         channel.completeWithDone(); // terminal must not fire the hook again
         assertThat(disconnects.get()).isEqualTo(1);
+    }
+
+    @Test
+    void noWriteBlockedBySilentModeIsSuppressed() {
+        SlackMessageService slack = mock(SlackMessageService.class);
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenThrow(
+            new SlackSendException(WS, CH, "silent_mode_engaged")
+        );
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.send(delta("suppressed response"));
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.INSTANCE_SILENCED);
+    }
+
+    @Test
+    void successfulContentWinsWhenSilentModeEngagesMidStream() {
+        SlackMessageService slack = mock(SlackMessageService.class);
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenReturn("ts");
+        doThrow(new SlackSendException(WS, CH, "silent_mode_engaged"))
+            .when(slack)
+            .appendStream(anyLong(), anyString(), anyString(), anyString());
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.send(delta("first "));
+        verify(slack, timeout(4000)).startStream(WS, CH, THREAD, "first ");
+        channel.send(delta("second "));
+        waitUntil(channel::isClientGone, 4000);
+
+        assertThat(channel.isClientGone()).isTrue();
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.DELIVERED);
     }
 }

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -87,6 +88,9 @@ class FeedbackDeliveryService {
 
         try {
             doDeliverEligible(job, delivery, summaryComposer, decision.artifact());
+        } catch (JobDeliverySuppressedException e) {
+            log.info("Delivery suppressed at egress: jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
         } catch (JobDeliveryException e) {
             if (job.getDeliveryCommentId() == null) {
                 recordUndelivered(job, delivery);
@@ -94,6 +98,21 @@ class FeedbackDeliveryService {
             throw e;
         } catch (Exception e) {
             log.warn("Feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
+        }
+    }
+
+    private void recordPartialSummaryDelivery(AgentJob job, DeliveryContent delivery) {
+        try {
+            feedbackLedgerRecorder.recordWithoutConversation(
+                job,
+                delivery,
+                WorkArtifact.PULL_REQUEST,
+                List.of(),
+                true,
+                false
+            );
+        } catch (RuntimeException e) {
+            log.warn("Partial delivery ledger record failed: jobId={}, error={}", job.getId(), e.getMessage());
         }
     }
 
@@ -110,13 +129,29 @@ class FeedbackDeliveryService {
             : null;
 
         SummaryOutcome summaryOutcome = postSummaryNote(job, delivery, trend);
-        DiffNotePoster.DiffNoteResult inlineResult = postDiffNotes(job, delivery);
+        DiffNotePoster.DiffNoteResult inlineResult;
+        try {
+            inlineResult = postDiffNotes(job, delivery);
+        } catch (JobDeliverySuppressedException e) {
+            log.info("Inline delivery suppressed at egress: jobId={}", job.getId());
+            if (summaryOutcome == SummaryOutcome.DELIVERED) {
+                recordPartialSummaryDelivery(job, delivery);
+                recordSuppressedRemainder(job, delivery, List.of());
+            } else {
+                recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            }
+            return;
+        }
         List<InlineFindingChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
 
-        if (summaryOutcome == SummaryOutcome.DELIVERED) {
+        if (summaryOutcome == SummaryOutcome.DELIVERED && !inlineResult.suppressed()) {
             reEditSummaryWithSignals(job, summaryComposer, inlineSignals, trend);
         }
         boolean inlineDelivered = inlineResult.posted() > 0;
+        if (inlineResult.suppressed() && summaryOutcome != SummaryOutcome.DELIVERED && !inlineDelivered) {
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            return;
+        }
         if (summaryOutcome == SummaryOutcome.SKIPPED_EMPTY && !inlineDelivered) {
             recordGateSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
@@ -126,20 +161,51 @@ class FeedbackDeliveryService {
         }
 
         try {
-            feedbackLedgerRecorder.record(
-                job,
-                delivery,
-                WorkArtifact.PULL_REQUEST,
-                inlineSignals,
-                summaryOutcome == SummaryOutcome.DELIVERED,
-                inlineDelivered
-            );
+            if (inlineResult.suppressed()) {
+                feedbackLedgerRecorder.recordWithoutConversation(
+                    job,
+                    delivery,
+                    WorkArtifact.PULL_REQUEST,
+                    inlineSignals,
+                    summaryOutcome == SummaryOutcome.DELIVERED,
+                    inlineDelivered
+                );
+            } else {
+                feedbackLedgerRecorder.record(
+                    job,
+                    delivery,
+                    WorkArtifact.PULL_REQUEST,
+                    inlineSignals,
+                    summaryOutcome == SummaryOutcome.DELIVERED,
+                    inlineDelivered
+                );
+            }
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
                 job.getId(),
                 e.getMessage()
             );
+        }
+        if (inlineResult.suppressed()) {
+            recordSuppressedRemainder(job, delivery, inlineResult.suppressedRecurrenceKeys());
+        }
+    }
+
+    private void recordSuppressedRemainder(
+        AgentJob job,
+        DeliveryContent delivery,
+        List<String> suppressedRecurrenceKeys
+    ) {
+        try {
+            feedbackLedgerRecorder.recordSuppressedRemainder(
+                job,
+                delivery,
+                FeedbackSuppressionReason.INSTANCE_SILENCED,
+                suppressedRecurrenceKeys
+            );
+        } catch (RuntimeException e) {
+            log.warn("Suppressed delivery ledger record failed: jobId={}, error={}", job.getId(), e.getMessage());
         }
     }
 
