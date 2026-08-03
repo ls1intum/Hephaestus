@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
@@ -235,6 +236,10 @@ public class IssueReviewHandler implements JobTypeHandler {
             } else {
                 log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
             }
+        } catch (JobDeliverySuppressedException e) {
+            log.info("Issue delivery suppressed at egress: jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            return;
         } catch (JobDeliveryException e) {
             recordUndelivered(job, delivery);
             throw e;

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
@@ -29,7 +30,6 @@ import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.ETag;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -466,10 +466,10 @@ public class CuratedCatalogAdminController {
     }
 
     private static String etag(String tag) {
-        return new ETag(tag, false).formattedTag();
+        return EntityTagPrecondition.format(tag);
     }
 
-    private static @Nullable CuratedVersionPrecondition precondition(@Nullable String ifMatch) {
-        return ifMatch == null ? null : CuratedVersionPrecondition.parse(ifMatch);
+    private static @Nullable EntityTagPrecondition precondition(@Nullable String ifMatch) {
+        return ifMatch == null ? null : EntityTagPrecondition.parse(ifMatch);
     }
 }

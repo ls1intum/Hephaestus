@@ -6,7 +6,7 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		settings: { silentModeEngaged: false },
+		settings: { etag: '"0"', silentModeEngaged: false },
 	},
 } satisfies Meta<typeof SilentModeStatusCard>;
 
@@ -18,6 +18,7 @@ export const Delivering: Story = {};
 export const Engaged: Story = {
 	args: {
 		settings: {
+			etag: '"0"',
 			silentModeEngaged: true,
 			silentModeChangedAt: new Date(Date.now() - 2 * 3_600_000),
 			silentModeChangedBy: "felixtjdietrich",

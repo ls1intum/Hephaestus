@@ -3,7 +3,7 @@ import { ArrowRight, Volume2, VolumeX } from "lucide-react";
 import type { InstanceSettings } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
 	Card,
 	CardAction,
@@ -14,14 +14,12 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface SilentModeStatusCardProps {
+export interface SilentModeStatusCardProps {
 	settings?: InstanceSettings;
 	isLoading?: boolean;
-	/** Unknown delivery state must not read as "delivering". */
 	isError?: boolean;
 }
 
-/** Read-only status tile; the control itself lives on the instance settings page. */
 export function SilentModeStatusCard({
 	settings,
 	isLoading = false,
@@ -41,10 +39,10 @@ export function SilentModeStatusCard({
 				</CardTitle>
 				<CardDescription>Outbound feedback and messages, instance-wide</CardDescription>
 				<CardAction>
-					<Button variant="ghost" size="sm" render={<Link to="/admin/settings" />}>
+					<Link to="/admin/settings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
 						Manage
 						<ArrowRight aria-hidden />
-					</Button>
+					</Link>
 				</CardAction>
 			</CardHeader>
 			<CardContent>
@@ -61,7 +59,7 @@ export function SilentModeStatusCard({
 					<div className="space-y-1">
 						<Badge variant="destructive">Silent mode engaged</Badge>
 						<p className="text-sm text-muted-foreground">
-							Nothing is being delivered
+							Workspace delivery is blocked
 							{settings?.silentModeChangedBy ? ` — engaged by ${settings.silentModeChangedBy}` : ""}
 							{settings?.silentModeChangedAt ? (
 								<>

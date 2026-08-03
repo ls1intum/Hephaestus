@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
@@ -54,7 +55,7 @@ public class CuratedCatalogService {
     @Transactional
     public CatalogEntry<PracticeDefinition> writePractice(
         String slug,
-        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable EntityTagPrecondition precondition,
         PracticeDefinition definition
     ) {
         lockCatalog();
@@ -105,10 +106,7 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public CatalogEntry<PracticeDefinition> resetPractice(
-        String slug,
-        @Nullable CuratedVersionPrecondition precondition
-    ) {
+    public CatalogEntry<PracticeDefinition> resetPractice(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
             catalog().practice(slug),
@@ -133,10 +131,7 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public CatalogEntry<PracticeDefinition> keepPractice(
-        String slug,
-        @Nullable CuratedVersionPrecondition precondition
-    ) {
+    public CatalogEntry<PracticeDefinition> keepPractice(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
             catalog().practice(slug),
@@ -159,7 +154,7 @@ public class CuratedCatalogService {
     @Transactional
     public CatalogEntry<PracticeDefinition> setPracticeStatus(
         String slug,
-        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable EntityTagPrecondition precondition,
         CuratedStatus status
     ) {
         lockCatalog();
@@ -187,7 +182,7 @@ public class CuratedCatalogService {
     @Transactional
     public CatalogEntry<AreaDefinition> writeArea(
         String slug,
-        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable EntityTagPrecondition precondition,
         AreaDefinition definition
     ) {
         lockCatalog();
@@ -235,7 +230,7 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public CatalogEntry<AreaDefinition> resetArea(String slug, @Nullable CuratedVersionPrecondition precondition) {
+    public CatalogEntry<AreaDefinition> resetArea(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
             catalog().area(slug),
@@ -260,7 +255,7 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public CatalogEntry<AreaDefinition> keepArea(String slug, @Nullable CuratedVersionPrecondition precondition) {
+    public CatalogEntry<AreaDefinition> keepArea(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
             catalog().area(slug),
@@ -283,7 +278,7 @@ public class CuratedCatalogService {
     @Transactional
     public EffectiveCatalog setAreaStatus(
         String slug,
-        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable EntityTagPrecondition precondition,
         CuratedStatus status
     ) {
         lockCatalog();
@@ -309,7 +304,7 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public EffectiveCatalog reorderAreas(@Nullable CuratedVersionPrecondition precondition, List<String> orderedSlugs) {
+    public EffectiveCatalog reorderAreas(@Nullable EntityTagPrecondition precondition, List<String> orderedSlugs) {
         lockCatalog();
         EffectiveCatalog before = catalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
@@ -332,7 +327,7 @@ public class CuratedCatalogService {
 
     @Transactional
     public EffectiveCatalog reorderPractices(
-        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable EntityTagPrecondition precondition,
         @Nullable String areaSlug,
         List<String> orderedSlugs
     ) {
@@ -355,7 +350,7 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public EffectiveCatalog resetOrder(@Nullable CuratedVersionPrecondition precondition) {
+    public EffectiveCatalog resetOrder(@Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         EffectiveCatalog before = catalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
@@ -393,7 +388,7 @@ public class CuratedCatalogService {
     @Transactional
     public EffectiveCatalog placePractice(
         String slug,
-        @Nullable CuratedVersionPrecondition precondition,
+        @Nullable EntityTagPrecondition precondition,
         @Nullable String areaSlug,
         int position
     ) {

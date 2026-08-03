@@ -4,10 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
@@ -38,6 +42,9 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     @Mock
     private GitlabFeedbackChannel feedbackChannel;
 
+    @Mock
+    private OutboundEgressGuard egressGuard;
+
     private MockWebServer gitlab;
     private GitlabApprovalChannel channel;
 
@@ -45,7 +52,13 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     void setUp() throws IOException {
         gitlab = new MockWebServer();
         gitlab.start();
-        channel = new GitlabApprovalChannel(gitLabProvider, tokenService, feedbackChannel, WebClient.builder());
+        channel = new GitlabApprovalChannel(
+            gitLabProvider,
+            tokenService,
+            feedbackChannel,
+            WebClient.builder(),
+            egressGuard
+        );
     }
 
     @AfterEach
@@ -134,6 +147,19 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
         assertThatThrownBy(() -> channel.approve(gitlabTarget(), null))
             .isInstanceOf(FeedbackDeliveryException.class)
             .hasMessageContaining("rate limit critical");
+    }
+
+    @Test
+    void silentModeBlocksBeforeTokenOrHttpCalls() {
+        doThrow(new OutboundEgressSuppressedException("test"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("gitlab.approve");
+
+        assertThatThrownBy(() -> channel.approve(gitlabTarget(), null)).isInstanceOf(
+            OutboundEgressSuppressedException.class
+        );
+        verifyNoInteractions(tokenService, feedbackChannel);
+        assertThat(gitlab.getRequestCount()).isZero();
     }
 
     private static FeedbackTarget gitlabTarget() {

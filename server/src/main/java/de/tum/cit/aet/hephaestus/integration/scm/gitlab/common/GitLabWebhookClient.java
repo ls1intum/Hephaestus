@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.EgressExempt;
+import de.tum.cit.aet.hephaestus.integration.core.egress.EgressExemption;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import java.time.Duration;
 import java.util.List;
@@ -30,6 +32,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * @see <a href="https://docs.gitlab.com/ee/api/group_level_webhooks.html">GitLab Group Webhooks API</a>
  */
 @Service
+@EgressExempt(EgressExemption.WEBHOOK_REGISTRATION)
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabWebhookClient {
 

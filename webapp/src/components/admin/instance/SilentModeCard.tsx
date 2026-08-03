@@ -2,6 +2,7 @@ import { Volume2, VolumeX } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import type { InstanceSettings } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -38,30 +39,27 @@ import { Textarea } from "@/components/ui/textarea";
 
 const RELEASE_CONFIRM_WORD = "release";
 
-interface SilentModeCardProps {
+export interface SilentModeCardProps {
 	settings: InstanceSettings;
 	isPending: boolean;
+	releaseDisabled?: boolean;
 	onEngage: (reason: string | undefined) => void;
 	onRelease: () => void;
 }
 
-/**
- * Deliberately asymmetric friction: cheap to silence, expensive to un-silence, because releasing
- * re-opens delivery to every workspace at once.
- */
-export function SilentModeCard({ settings, isPending, onEngage, onRelease }: SilentModeCardProps) {
+export function SilentModeCard({
+	settings,
+	isPending,
+	releaseDisabled = false,
+	onEngage,
+	onRelease,
+}: SilentModeCardProps) {
 	const engaged = settings.silentModeEngaged;
 	const [engageOpen, setEngageOpen] = useState(false);
 	const [releaseOpen, setReleaseOpen] = useState(false);
 	const [reason, setReason] = useState("");
 	const [confirmWord, setConfirmWord] = useState("");
 	const [mismatch, setMismatch] = useState(false);
-
-	// Each dialog stays open until the toggle it asked for actually lands, so its pending state is
-	// reachable and a failed request leaves the operator in the dialog rather than back on the card.
-	// Dismissal stays available throughout: a request that never settles must not trap the operator.
-	if (engageOpen && engaged) setEngageOpen(false);
-	if (releaseOpen && !engaged) setReleaseOpen(false);
 
 	const openEngage = () => {
 		setReason("");
@@ -75,6 +73,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 
 	const confirmRelease = (event: FormEvent) => {
 		event.preventDefault();
+		if (releaseDisabled) return;
 		if (confirmWord.trim() !== RELEASE_CONFIRM_WORD) {
 			setMismatch(true);
 			return;
@@ -125,7 +124,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 			</CardContent>
 			<CardFooter>
 				{engaged ? (
-					<Button variant="outline" onClick={openRelease} disabled={isPending}>
+					<Button variant="outline" onClick={openRelease} disabled={isPending || releaseDisabled}>
 						{isPending ? <Spinner aria-hidden /> : <Volume2 aria-hidden />}
 						Release silent mode…
 					</Button>
@@ -192,6 +191,14 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 							check that it is fixed first: the next completed review posts for real.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
+					{releaseDisabled ? (
+						<Alert variant="destructive">
+							<AlertDescription>
+								The current settings could not be verified. Keep silent mode on and retry after
+								reloading.
+							</AlertDescription>
+						</Alert>
+					) : null}
 					<form onSubmit={confirmRelease} className="grid gap-4">
 						<Field data-invalid={mismatch}>
 							<FieldLabel htmlFor="silent-mode-release-confirm">
@@ -201,7 +208,7 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 							<Input
 								id="silent-mode-release-confirm"
 								value={confirmWord}
-								disabled={isPending}
+								disabled={isPending || releaseDisabled}
 								onChange={(event) => {
 									setConfirmWord(event.target.value);
 									setMismatch(false);
@@ -220,7 +227,11 @@ export function SilentModeCard({ settings, isPending, onEngage, onRelease }: Sil
 						</Field>
 						<AlertDialogFooter>
 							<AlertDialogCancel>Keep silent mode on</AlertDialogCancel>
-							<AlertDialogAction type="submit" variant="destructive" disabled={isPending}>
+							<AlertDialogAction
+								type="submit"
+								variant="destructive"
+								disabled={isPending || releaseDisabled}
+							>
 								{isPending && <Spinner aria-hidden />}
 								Release silent mode
 							</AlertDialogAction>

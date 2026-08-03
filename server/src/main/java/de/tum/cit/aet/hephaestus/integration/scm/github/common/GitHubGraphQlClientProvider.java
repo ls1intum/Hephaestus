@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.CircuitBreakerOpenException;
@@ -15,47 +16,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
-/**
- * Provides authenticated HttpGraphQlClient instances for GitHub GraphQL API.
- * <p>
- * This provider creates per-request authenticated clients by cloning the base
- * client
- * and injecting scope-specific authentication tokens. Unlike the REST API
- * client
- * ({@link GitHubClientProvider}), GraphQL clients are lightweight and don't
- * need caching.
- * <p>
- * <b>Circuit Breaker Protection:</b>
- * All clients returned by this provider are protected by a circuit breaker
- * that prevents cascading failures when GitHub API is unavailable. When the
- * circuit is open, calls fail fast with {@link CircuitBreakerOpenException}.
- * <p>
- * Usage:
- *
- * <pre>{@code
- * @Service
- * public class PullRequestGraphQlService {
- *   private final GitHubGraphQlClientProvider clientProvider;
- *
- *   public Mono<PullRequest> fetchPR(Long scopeId, String owner, String repo, int number) {
- *     return clientProvider.forScope(scopeId)
- *         .document(GetPullRequestRequest.builder()
- *             .owner(owner)
- *             .name(repo)
- *             .number(number)
- *             .build()
- *             .toString())
- *         .retrieve("repository.pullRequest")
- *         .toEntity(PullRequest.class);
- *   }
- * }
- * }</pre>
- *
- * @see GitHubClientProvider for the REST API equivalent
- */
+/** Creates authenticated GitHub GraphQL clients from the guarded base client. */
 @Component
 @Slf4j
 public class GitHubGraphQlClientProvider {
@@ -66,6 +29,7 @@ public class GitHubGraphQlClientProvider {
     private final CircuitBreaker circuitBreaker;
     private final RateLimitTracker rateLimitTracker;
     private final GitHubRestRateLimitSeeder rateLimitSeeder;
+    private final SilentModeGraphQlClientFactory clientFactory;
 
     public GitHubGraphQlClientProvider(
         HttpGraphQlClient gitHubGraphQlClient,
@@ -73,7 +37,8 @@ public class GitHubGraphQlClientProvider {
         GitHubAppTokenService appTokens,
         @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
         RateLimitTracker rateLimitTracker,
-        GitHubRestRateLimitSeeder rateLimitSeeder
+        GitHubRestRateLimitSeeder rateLimitSeeder,
+        SilentModeGraphQlClientFactory clientFactory
     ) {
         this.baseClient = gitHubGraphQlClient;
         this.tokenProvider = tokenProvider;
@@ -81,6 +46,7 @@ public class GitHubGraphQlClientProvider {
         this.circuitBreaker = circuitBreaker;
         this.rateLimitTracker = rateLimitTracker;
         this.rateLimitSeeder = rateLimitSeeder;
+        this.clientFactory = clientFactory;
     }
 
     /**
@@ -144,7 +110,7 @@ public class GitHubGraphQlClientProvider {
         // Fire-and-forget and self-throttled, so it costs the sync neither latency nor quota (GitHub
         // documents that endpoint as not counting against the limit) — see GitHubRestRateLimitSeeder.
         rateLimitSeeder.seedIfUnobserved(scopeId, token);
-        return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
+        return clientFactory.withBearerToken(baseClient, token);
     }
 
     /**
@@ -158,7 +124,7 @@ public class GitHubGraphQlClientProvider {
      * @return authenticated HttpGraphQlClient
      */
     public HttpGraphQlClient withToken(String token) {
-        return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
+        return clientFactory.withBearerToken(baseClient, token);
     }
 
     // Rate Limit Tracking (Per-Scope)

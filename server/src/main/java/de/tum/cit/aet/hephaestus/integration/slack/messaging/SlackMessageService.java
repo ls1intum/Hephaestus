@@ -22,7 +22,9 @@ import com.slack.api.model.User;
 import com.slack.api.model.assistant.SuggestedPrompt;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.view.View;
-import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -48,6 +50,7 @@ import org.springframework.stereotype.Service;
  * the Slack error code so callers can choose the HTTP mapping.
  */
 @Service
+@OutboundEgressGateway
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackMessageService {
 
@@ -78,32 +81,34 @@ public class SlackMessageService {
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
     private final SlackRateLimitTracker rateLimitTracker;
-    private final SilentModeQuery silentModeQuery;
+    private final OutboundEgressGuard egressGuard;
     private final ConcurrentMap<Long, String> botUserIdCache = new ConcurrentHashMap<>();
 
     public SlackMessageService(
         SlackCredentialProvider credentialProvider,
         SlackRateLimitTracker rateLimitTracker,
-        SilentModeQuery silentModeQuery
+        OutboundEgressGuard egressGuard
     ) {
         this.slack = Slack.getInstance();
         this.credentialProvider = credentialProvider;
         this.rateLimitTracker = rateLimitTracker;
-        this.silentModeQuery = silentModeQuery;
+        this.egressGuard = egressGuard;
     }
 
-    /**
-     * Whether the instance-wide brake is engaged. Callers choose the response: a content send throws so
-     * the caller learns nothing was delivered, while a decoration or membership call returns quietly —
-     * those ride inbound events whose handlers do not catch, and throwing would only NAK the consumer
-     * into redelivery and the poison alarm during the incident the brake was engaged for.
-     */
     private boolean silenced(long workspaceId) {
-        if (silentModeQuery.isSilentModeEngaged()) {
+        boolean silenced = !egressGuard.deliveryAllowed("slack.write");
+        if (silenced) {
             log.debug("Slack call skipped or refused: instance silent mode engaged, workspaceId={}", workspaceId);
-            return true;
         }
-        return false;
+        return silenced;
+    }
+
+    private void requireNotSilenced(long workspaceId, String target) {
+        try {
+            egressGuard.requireDeliveryAllowed("slack.write");
+        } catch (OutboundEgressSuppressedException e) {
+            throw new SlackSendException(workspaceId, target, "silent_mode_engaged", e);
+        }
     }
 
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {
@@ -131,7 +136,7 @@ public class SlackMessageService {
             request.threadTs(threadTs);
         }
         try {
-            ChatPostMessageResponse response = callHonoringRateLimit(workspaceId, () ->
+            ChatPostMessageResponse response = callOutboundHonoringRateLimit(workspaceId, channelId, () ->
                 slack.methods(token).chatPostMessage(request.build())
             );
             if (!response.isOk()) {
@@ -180,7 +185,7 @@ public class SlackMessageService {
             .text(fallback)
             .build();
         try {
-            ChatPostEphemeralResponse response = callHonoringRateLimit(workspaceId, () ->
+            ChatPostEphemeralResponse response = callOutboundHonoringRateLimit(workspaceId, channelId, () ->
                 slack.methods(token).chatPostEphemeral(request)
             );
             if (!response.isOk()) {
@@ -257,6 +262,7 @@ public class SlackMessageService {
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );
         try {
+            requireNotSilenced(workspaceId, channel);
             ChatStartStreamResponse r = slack
                 .methods(token)
                 .chatStartStream(req -> req.channel(channel).threadTs(threadTs).markdownText(markdownText));
@@ -273,10 +279,14 @@ public class SlackMessageService {
 
     /** Append a Markdown delta to an in-progress stream. Throws with the Slack error so callers can detect a gone recipient. */
     public void appendStream(long workspaceId, String channel, String ts, String markdownText) {
+        if (silenced(workspaceId)) {
+            throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
+        }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );
         try {
+            requireNotSilenced(workspaceId, channel);
             ChatAppendStreamResponse r = slack
                 .methods(token)
                 .chatAppendStream(req -> req.channel(channel).ts(ts).markdownText(markdownText));
@@ -292,10 +302,14 @@ public class SlackMessageService {
 
     /** Finalize a stream, optionally attaching terminal blocks (finding chips / actions). */
     public void stopStream(long workspaceId, String channel, String ts, List<LayoutBlock> blocks) {
+        if (silenced(workspaceId)) {
+            throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
+        }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );
         try {
+            requireNotSilenced(workspaceId, channel);
             ChatStopStreamResponse r = slack
                 .methods(token)
                 .chatStopStream(req -> req.channel(channel).ts(ts).blocks(blocks));
@@ -322,7 +336,7 @@ public class SlackMessageService {
             new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection")
         );
         try {
-            ViewsPublishResponse r = callHonoringRateLimit(workspaceId, () ->
+            ViewsPublishResponse r = callOutboundHonoringRateLimit(workspaceId, slackUserId, () ->
                 slack.methods(token).viewsPublish(req -> req.userId(slackUserId).view(view))
             );
             if (!r.isOk()) {
@@ -335,6 +349,11 @@ public class SlackMessageService {
                 );
                 throw new SlackSendException(workspaceId, slackUserId, error);
             }
+        } catch (SlackSendException e) {
+            if ("silent_mode_engaged".equals(e.slackError())) {
+                return;
+            }
+            throw e;
         } catch (SlackApiException | IOException e) {
             log.warn(
                 "Slack views.publish transport failure: workspaceId={}, userId={}, error={}",
@@ -359,6 +378,7 @@ public class SlackMessageService {
             return;
         }
         try {
+            requireNotSilenced(workspaceId, channel);
             slack
                 .methods(token.get())
                 .assistantThreadsSetStatus(req -> req.channelId(channel).threadTs(threadTs).status(status));
@@ -380,6 +400,7 @@ public class SlackMessageService {
             return;
         }
         try {
+            requireNotSilenced(workspaceId, channel);
             slack
                 .methods(token.get())
                 .assistantThreadsSetSuggestedPrompts(req -> req.channelId(channel).title(title).prompts(prompts));
@@ -632,7 +653,7 @@ public class SlackMessageService {
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );
         try {
-            ConversationsJoinResponse response = callHonoringRateLimit(workspaceId, () ->
+            ConversationsJoinResponse response = callOutboundHonoringRateLimit(workspaceId, channelId, () ->
                 slack.methods(token).conversationsJoin(req -> req.channel(channelId))
             );
             if (!response.isOk()) {
@@ -642,6 +663,11 @@ public class SlackMessageService {
                     response.getError() == null ? "unknown" : response.getError()
                 );
             }
+        } catch (SlackSendException e) {
+            if ("silent_mode_engaged".equals(e.slackError())) {
+                return;
+            }
+            throw e;
         } catch (SlackApiException e) {
             throw streamFailure(workspaceId, channelId, e);
         } catch (IOException e) {
@@ -734,6 +760,14 @@ public class SlackMessageService {
      */
     private <T> T callHonoringRateLimit(long workspaceId, SlackCall<T> call) throws SlackApiException, IOException {
         return callHonoringRateLimit(workspaceId, call, RATE_LIMIT_MAX_WAIT_MS, RATE_LIMIT_TOTAL_BUDGET_MS);
+    }
+
+    private <T> T callOutboundHonoringRateLimit(long workspaceId, String target, SlackCall<T> call)
+        throws SlackApiException, IOException {
+        return callHonoringRateLimit(workspaceId, () -> {
+            requireNotSilenced(workspaceId, target);
+            return call.call();
+        });
     }
 
     /**

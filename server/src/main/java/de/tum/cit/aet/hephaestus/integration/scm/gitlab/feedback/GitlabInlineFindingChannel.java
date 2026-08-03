@@ -3,6 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.GRAPHQL_TIMEOUT;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
@@ -19,6 +22,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -53,6 +57,7 @@ import org.springframework.stereotype.Component;
  * {@link GitLabGraphQlClientProvider}.
  */
 @Component
+@OutboundEgressGateway
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
@@ -78,10 +83,16 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
     private final GitLabGraphQlClientProvider gitLabProvider;
     private final GitlabMrResolver mrResolver;
+    private final OutboundEgressGuard egressGuard;
 
-    public GitlabInlineFindingChannel(GitLabGraphQlClientProvider gitLabProvider, GitlabMrResolver mrResolver) {
+    public GitlabInlineFindingChannel(
+        GitLabGraphQlClientProvider gitLabProvider,
+        GitlabMrResolver mrResolver,
+        OutboundEgressGuard egressGuard
+    ) {
         this.gitLabProvider = gitLabProvider;
         this.mrResolver = mrResolver;
+        this.egressGuard = egressGuard;
     }
 
     @Override
@@ -142,7 +153,6 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
         int posted = 0;
         int failed = 0;
-        int remaining = findings.size();
         boolean rateLimited = false;
         Set<String> seenKeys = new HashSet<>();
         // Keys we've already posted/edited a thread for THIS run. Guards the case where two findings in one
@@ -152,8 +162,9 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         Set<String> processedKeys = new HashSet<>();
         List<DeliveredSignal> signals = new ArrayList<>(findings.size());
 
-        for (InlineFinding finding : findings) {
-            remaining--;
+        for (int index = 0; index < findings.size(); index++) {
+            InlineFinding finding = findings.get(index);
+            int remaining = findings.size() - index - 1;
             if (!(finding.anchor() instanceof FindingAnchor.DiffAnchor diff)) {
                 log.warn("Skipping non-diff anchor on GitLab inline finding: anchor={}", finding.anchor());
                 failed++;
@@ -206,6 +217,13 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 signals.add(
                     new DeliveredSignal(key, diff, outcome.disposition(), outcome.noteId(), outcome.discussionId())
                 );
+            } catch (OutboundEgressSuppressedException e) {
+                return InlineResult.suppressed(
+                    posted,
+                    failed,
+                    signals,
+                    recurrenceKeys(findings.subList(index, findings.size()))
+                );
             } catch (RateLimitHit e) {
                 log.warn("GitLab rate limit hit during diff note posting — stopping: workspaceId={}", scopeId);
                 failed += remaining + 1;
@@ -215,15 +233,12 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             }
         }
 
-        // Delete only the prior bot threads that this run did NOT re-emit and that no developer touched — the
-        // findings that genuinely went away. Edited/preserved threads are excluded by key; human-replied ones
-        // are never destroyed.
-        //
-        // NEVER reap on a mid-batch rate limit: a 429 abandons the loop before the un-processed findings could
-        // register their keys in seenKeys, so destroyVanishedThreads would see still-current findings as
-        // "vanished" and delete their live threads. Skip the destroy entirely this run; the next reconcile
-        // (with a full seenKeys) reaps anything genuinely gone.
-        int deletedGone = rateLimited ? 0 : destroyVanishedThreads(scopeId, priorByKey, seenKeys);
+        int deletedGone;
+        try {
+            deletedGone = rateLimited ? 0 : destroyVanishedThreads(scopeId, priorByKey, seenKeys);
+        } catch (OutboundEgressSuppressedException e) {
+            return InlineResult.suppressed(posted, failed, signals, List.of());
+        }
 
         log.info(
             "Reconciled GitLab inline findings: posted/edited={}, failed={}, deleted-gone={}, workspaceId={}",
@@ -235,10 +250,15 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         return new InlineResult(posted, failed, List.copyOf(signals));
     }
 
+    private static List<String> recurrenceKeys(List<InlineFinding> findings) {
+        return findings.stream().map(InlineFinding::recurrenceKey).filter(Objects::nonNull).toList();
+    }
+
     /** Posts a brand-new diff-note thread; falls back to an MR comment when the line is outside the diff hunk. */
     private Outcome createThread(long scopeId, MrInfo mrInfo, FindingAnchor.DiffAnchor diff, String body) {
         try {
             Map<String, Object> position = buildPosition(diff, mrInfo);
+            egressGuard.requireDeliveryAllowed("gitlab.post-inline-finding");
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("CreateDiffNote")
@@ -276,6 +296,8 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             }
 
             return new Outcome(Disposition.POSTED, noteIdOf(response), discussionIdOf(response));
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (Exception e) {
             if (isRateLimitError(e)) {
                 throw new RateLimitHit();
@@ -291,9 +313,9 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         }
     }
 
-    /** Edits a matched prior bot note's body in place ({@code UpdateNote}), keeping its thread and anchor. */
     private Outcome editInPlace(long scopeId, PriorThread prior, String body, FindingAnchor.DiffAnchor diff) {
         try {
+            egressGuard.requireDeliveryAllowed("gitlab.update-inline-finding");
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("UpdateNote")
@@ -318,6 +340,8 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 return Outcome.failed();
             }
             return new Outcome(Disposition.POSTED, prior.noteId(), prior.discussionId());
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (Exception e) {
             if (isRateLimitError(e)) {
                 throw new RateLimitHit();
@@ -348,6 +372,8 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             for (Map<String, Object> discussion : fetchAllDiscussions(scopeId, projectPath, mrIid)) {
                 indexDiscussion(discussion, marker, byKey);
             }
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (Exception e) {
             log.debug("Failed to read MR discussions for correlation reconcile: workspaceId={}", scopeId, e);
         }
@@ -569,6 +595,8 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                     mrIid
                 );
             }
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (Exception e) {
             log.debug("Failed to reconcile existing MR discussions for dedup: workspaceId={}", scopeId, e);
         }
@@ -585,9 +613,9 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         return nodes instanceof List ? (List<Map<String, Object>>) nodes : List.of();
     }
 
-    /** Destroys a single note; returns true on success. Best-effort — failures are logged, never thrown. */
     private boolean destroyNote(long scopeId, String noteId) {
         try {
+            egressGuard.requireDeliveryAllowed("gitlab.delete-inline-finding");
             ClientGraphQlResponse deleteResponse = gitLabProvider
                 .forScope(scopeId)
                 .documentName("DestroyNote")
@@ -603,6 +631,8 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             }
             log.debug("Failed to delete old diff note: noteId={}, errors={}", noteId, errors);
             return false;
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (Exception e) {
             log.debug("Failed to delete old diff note: noteId={}", noteId, e);
             return false;
@@ -623,6 +653,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     ) {
         try {
             String fallbackBody = String.format("**`%s:%d`**%n%n%s", diff.filePath(), diff.newLineNumber(), markedBody);
+            egressGuard.requireDeliveryAllowed("gitlab.post-inline-fallback");
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("CreateMergeRequestNote")
@@ -646,6 +677,8 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 return null;
             }
             return response.field("createNote.note.id").getValue();
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (Exception e) {
             log.warn(
                 "Fallback MR comment failed: workspaceId={}, file={}",

@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 
 import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
@@ -19,16 +21,23 @@ import org.springframework.stereotype.Component;
  * to {@code event: APPROVE}).
  */
 @Component
+@OutboundEgressGateway
 public class GithubApprovalChannel implements ApprovalChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubApprovalChannel.class);
 
     private final GitHubGraphQlClientProvider gitHubProvider;
     private final GithubPrNodeIdResolver prNodeIdResolver;
+    private final OutboundEgressGuard egressGuard;
 
-    public GithubApprovalChannel(GitHubGraphQlClientProvider gitHubProvider, GithubPrNodeIdResolver prNodeIdResolver) {
+    public GithubApprovalChannel(
+        GitHubGraphQlClientProvider gitHubProvider,
+        GithubPrNodeIdResolver prNodeIdResolver,
+        OutboundEgressGuard egressGuard
+    ) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
+        this.egressGuard = egressGuard;
     }
 
     @Override
@@ -46,6 +55,7 @@ public class GithubApprovalChannel implements ApprovalChannel {
         PrCoordinates pr = GithubFeedbackChannel.parseSubjectExternalId(target.subjectExternalId());
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
 
+        egressGuard.requireDeliveryAllowed("github.approve");
         ClientGraphQlResponse response = gitHubProvider
             .forScope(scopeId)
             .documentName("ApprovePullRequest")

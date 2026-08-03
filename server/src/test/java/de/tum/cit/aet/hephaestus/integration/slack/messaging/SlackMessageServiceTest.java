@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.view.View;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -41,7 +43,7 @@ class SlackMessageServiceTest extends BaseUnitTest {
         service = new SlackMessageService(
             credentialProvider,
             new SlackRateLimitTracker(new SimpleMeterRegistry()),
-            () -> silentModeEngaged
+            new OutboundEgressGuard(() -> silentModeEngaged)
         );
     }
 
@@ -69,7 +71,9 @@ class SlackMessageServiceTest extends BaseUnitTest {
                 "sendEphemeralForWorkspace",
                 (ThrowingSend) s -> s.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "f")
             ),
-            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi"))
+            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
+            Arguments.of("appendStream", (ThrowingSend) s -> s.appendStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
+            Arguments.of("stopStream", (ThrowingSend) s -> s.stopStream(7L, "C1ABCDEFGH", "171234.5678", List.of()))
         );
     }
 
@@ -107,6 +111,18 @@ class SlackMessageServiceTest extends BaseUnitTest {
                 assertThat(sse.channelId()).isEqualTo("C1ABCDEFGH");
                 assertThat(sse.slackError()).isEqualTo("no_active_slack_connection");
             });
+    }
+
+    @Test
+    void stateChangeDuringCredentialResolutionPreventsStreamWrite() {
+        when(credentialProvider.resolve(any(IntegrationRef.class))).thenAnswer(invocation -> {
+            silentModeEngaged = true;
+            return Optional.of(new BearerToken("token", null));
+        });
+
+        assertThatThrownBy(() -> service.appendStream(7L, "C1ABCDEFGH", "171234.5678", "delta"))
+            .isInstanceOf(SlackSendException.class)
+            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
     }
 
     private static SlackApiException apiException(int code, String retryAfterHeader) {

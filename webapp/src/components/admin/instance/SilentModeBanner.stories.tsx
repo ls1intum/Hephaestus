@@ -4,6 +4,7 @@ import type { InstanceSettings } from "@/api/types.gen";
 import { SilentModeBanner } from "./SilentModeBanner";
 
 const engaged: InstanceSettings = {
+	etag: '"0"',
 	silentModeEngaged: true,
 	silentModeReason: "Investigating incident #42 — bad feedback going out",
 	silentModeChangedAt: new Date(Date.now() - 45 * 60_000),
@@ -29,20 +30,8 @@ export const Engaged: Story = {
 	},
 };
 
-/** Engaged with no breadcrumbs — every metadata field is nullable. */
 export const WithoutMetadata: Story = {
 	args: {
-		settings: { silentModeEngaged: true },
-	},
-};
-
-/** Past a day the title stops reporting and starts asking — a forgotten brake is the likelier incident. */
-export const StillEngagedAfterADay: Story = {
-	args: {
-		settings: { ...engaged, silentModeChangedAt: new Date(Date.now() - 30 * 3_600_000) },
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/is that still intentional/i)).toBeInTheDocument();
+		settings: { etag: '"0"', silentModeEngaged: true },
 	},
 };

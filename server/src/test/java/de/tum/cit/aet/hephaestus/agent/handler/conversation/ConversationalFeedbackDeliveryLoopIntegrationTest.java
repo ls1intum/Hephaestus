@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -94,6 +96,9 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     @Autowired
     private ChatMessageRepository chatMessageRepository;
 
+    @Autowired
+    private InstanceSettingsService instanceSettingsService;
+
     private Workspace workspace;
     private Practice practice;
     private User recipient;
@@ -101,6 +106,13 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        var settings = instanceSettingsService.get();
+        instanceSettingsService.updateSilentMode(
+            false,
+            null,
+            null,
+            EntityTagPrecondition.parse("\"" + settings.getVersion() + "\"")
+        );
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("conv-delivery-test"));
         practice = new Practice();
         practice.setWorkspace(workspace);

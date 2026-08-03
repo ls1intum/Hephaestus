@@ -5,12 +5,16 @@ import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValid
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
@@ -58,12 +62,15 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     @Mock
     private GitlabMrResolver mrResolver;
 
+    @Mock
+    private OutboundEgressGuard egressGuard;
+
     private GitlabInlineFindingChannel channel;
     private HttpGraphQlClient client;
 
     @BeforeEach
     void setUp() {
-        channel = new GitlabInlineFindingChannel(gitLabProvider, mrResolver);
+        channel = new GitlabInlineFindingChannel(gitLabProvider, mrResolver, egressGuard);
         client = mock(HttpGraphQlClient.class);
     }
 
@@ -122,6 +129,81 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
             });
         // The correlation key must be embedded in the posted body so the next run can match it.
         assertThat(bodyCaptor.getValue()).contains("hephaestus-diff-note-ck=ck-new").contains(MARKER);
+    }
+
+    @Test
+    void reportsWritesCompletedBeforeMidBatchSuppression() {
+        stubResolvedMr();
+        stubDiscussionsReturning(List.of());
+        stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
+        doNothing()
+            .doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("gitlab.post-inline-finding");
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(
+                new InlineFinding(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-1"),
+                new InlineFinding(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-2")
+            )
+        );
+
+        assertThat(result.suppressed()).isTrue();
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.signals()).extracting(DeliveredSignal::recurrenceKey).containsExactly("ck-1");
+        assertThat(result.suppressedRecurrenceKeys()).containsExactly("ck-2");
+    }
+
+    @Test
+    void failedFindingIsNotRelabeledWhenLaterFindingIsSuppressed() {
+        stubResolvedMr();
+        stubDiscussionsReturning(List.of());
+        HttpGraphQlClient.RequestSpec diffSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("CreateDiffNote")).thenReturn(diffSpec);
+        when(diffSpec.variable(any(), any())).thenReturn(diffSpec);
+        ClientGraphQlResponse failedResponse = mock(ClientGraphQlResponse.class);
+        stubField(failedResponse, "createDiffNote.errors", List.of("validation failed"));
+        when(diffSpec.execute()).thenReturn(Mono.just(failedResponse));
+        doNothing()
+            .doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("gitlab.post-inline-finding");
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(
+                new InlineFinding(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-failed"),
+                new InlineFinding(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-suppressed")
+            )
+        );
+
+        assertThat(result.signals())
+            .singleElement()
+            .satisfies(signal -> {
+                assertThat(signal.recurrenceKey()).isEqualTo("ck-failed");
+                assertThat(signal.disposition()).isEqualTo(Disposition.FAILED);
+            });
+        assertThat(result.suppressedRecurrenceKeys()).containsExactly("ck-suppressed");
+    }
+
+    @Test
+    void silentModeBlocksInitialInlineMutation() {
+        stubResolvedMr();
+        stubDiscussionsReturning(List.of());
+        doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("gitlab.post-inline-finding");
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
+        );
+
+        assertThat(result.suppressed()).isTrue();
+        assertThat(result.posted()).isZero();
+        assertThat(result.suppressedRecurrenceKeys()).containsExactly("ck-1");
+        verify(client, never()).documentName("CreateDiffNote");
     }
 
     /** A prior bot thread with the SAME key and no human reply → UpdateNote in place; no new thread created. */

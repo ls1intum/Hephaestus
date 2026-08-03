@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 
 import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
@@ -17,9 +20,11 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +60,7 @@ import org.springframework.stereotype.Component;
  * to re-resolve PR metadata.
  */
 @Component
+@OutboundEgressGateway
 public class GithubInlineFindingChannel implements InlineFindingChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubInlineFindingChannel.class);
@@ -78,13 +84,16 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
 
     private final GitHubGraphQlClientProvider gitHubProvider;
     private final GithubPrNodeIdResolver prNodeIdResolver;
+    private final OutboundEgressGuard egressGuard;
 
     public GithubInlineFindingChannel(
         GitHubGraphQlClientProvider gitHubProvider,
-        GithubPrNodeIdResolver prNodeIdResolver
+        GithubPrNodeIdResolver prNodeIdResolver,
+        OutboundEgressGuard egressGuard
     ) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
+        this.egressGuard = egressGuard;
     }
 
     @Override
@@ -186,8 +195,12 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             postedKeys.add(finding.recurrenceKey());
         }
         seenKeys.addAll(postedKeys);
+        int postedBeforeSuppression = preservedSignals.size();
+        List<DeliveredSignal> signalsBeforeSuppression = new ArrayList<>(preservedSignals);
+        signalsBeforeSuppression.addAll(unsupportedSignals);
 
         try {
+            egressGuard.requireDeliveryAllowed("github.post-inline-findings");
             ClientGraphQlResponse response = gitHubProvider
                 .forScope(scopeId)
                 .documentName("AddPullRequestReviewWithThreads")
@@ -218,6 +231,8 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
 
             String reviewId = response.field("addPullRequestReview.pullRequestReview.id").getValue();
             List<DeliveredSignal> postedSignals = buildPostedSignals(response, reviewId, postedAnchors, postedKeys);
+            postedBeforeSuppression += postedSignals.size();
+            signalsBeforeSuppression.addAll(0, postedSignals);
 
             // Retire prior bot threads whose finding vanished this run (still-seen = posted ∪ preserved).
             int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), seenKeys);
@@ -234,6 +249,24 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             all.addAll(preservedSignals);
             all.addAll(unsupportedSignals);
             return new InlineResult(threads.size() + preservedSignals.size(), unsupportedAnchorCount, List.copyOf(all));
+        } catch (OutboundEgressSuppressedException e) {
+            Set<String> completedKeys = signalsBeforeSuppression
+                .stream()
+                .map(DeliveredSignal::recurrenceKey)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+            List<String> suppressedKeys = toPost
+                .stream()
+                .map(InlineFinding::recurrenceKey)
+                .filter(Objects::nonNull)
+                .filter(key -> !completedKeys.contains(key))
+                .toList();
+            return InlineResult.suppressed(
+                postedBeforeSuppression,
+                unsupportedAnchorCount,
+                signalsBeforeSuppression,
+                suppressedKeys
+            );
         } catch (FeedbackDeliveryException e) {
             throw e;
         } catch (Exception e) {
@@ -424,9 +457,9 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         return minimized;
     }
 
-    /** Minimizes a single review comment as {@code OUTDATED}; returns true on success. Best-effort. */
     private boolean minimizeComment(long scopeId, String commentId) {
         try {
+            egressGuard.requireDeliveryAllowed("github.minimize-inline-finding");
             ClientGraphQlResponse response = gitHubProvider
                 .forScope(scopeId)
                 .documentName("MinimizeComment")
@@ -447,6 +480,8 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
                 return false;
             }
             return true;
+        } catch (OutboundEgressSuppressedException e) {
+            throw e;
         } catch (Exception e) {
             log.debug("Failed to minimize stale review comment: commentId={}", commentId, e);
             return false;

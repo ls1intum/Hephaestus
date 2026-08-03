@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,6 +26,10 @@ public class InstanceSettings {
     @Id
     private Long id;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
     @Column(name = "silent_mode_engaged", nullable = false)
     private boolean silentModeEngaged;
 
@@ -38,4 +43,11 @@ public class InstanceSettings {
     /** Login of the admin who last flipped the brake (snapshot, not an FK — survives account deletion). */
     @Column(name = "silent_mode_changed_by", length = 255)
     private String silentModeChangedBy;
+
+    static InstanceSettings failSafeDefault() {
+        InstanceSettings settings = new InstanceSettings();
+        settings.setId(SINGLETON_ID);
+        settings.setSilentModeEngaged(true);
+        return settings;
+    }
 }

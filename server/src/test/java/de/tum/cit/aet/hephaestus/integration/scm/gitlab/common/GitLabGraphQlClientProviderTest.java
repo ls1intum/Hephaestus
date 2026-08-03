@@ -2,14 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.CircuitBreakerOpenException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -23,9 +22,6 @@ import org.mockito.Mock;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
 
-/**
- * Unit tests for {@link GitLabGraphQlClientProvider}.
- */
 @Tag("unit")
 class GitLabGraphQlClientProviderTest extends BaseUnitTest {
 
@@ -41,38 +37,51 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
     @Mock
     private GitLabRateLimitTracker rateLimitTracker;
 
+    @Mock
+    private SilentModeGraphQlClientFactory clientFactory;
+
     private GitLabGraphQlClientProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new GitLabGraphQlClientProvider(baseClient, tokenService, circuitBreaker, rateLimitTracker);
+        provider = new GitLabGraphQlClientProvider(
+            baseClient,
+            tokenService,
+            circuitBreaker,
+            rateLimitTracker,
+            clientFactory
+        );
     }
 
     @Nested
     class ForScope {
 
         @Test
-        @SuppressWarnings("unchecked")
         void shouldBuildClientWithCorrectUrlAndAuth() {
             when(tokenService.getAccessToken(1L)).thenReturn("glpat-test-token");
             when(tokenService.resolveServerUrl(1L)).thenReturn("https://gitlab.example.com");
 
-            HttpGraphQlClient.Builder<?> mutateBuilder = mock(HttpGraphQlClient.Builder.class);
             HttpGraphQlClient builtClient = mock(HttpGraphQlClient.class);
-
-            // Use doReturn to avoid wildcard capture issues with self-referential generics
-            doReturn(mutateBuilder).when(baseClient).mutate();
-            doReturn(mutateBuilder).when(mutateBuilder).url("https://gitlab.example.com/api/graphql");
-            doReturn(mutateBuilder).when(mutateBuilder).header("Authorization", "Bearer glpat-test-token");
-            doReturn(mutateBuilder).when(mutateBuilder).webClient(any());
-            doReturn(builtClient).when(mutateBuilder).build();
+            when(
+                clientFactory.withBearerTokenAndAttribute(
+                    baseClient,
+                    "https://gitlab.example.com/api/graphql",
+                    "glpat-test-token",
+                    GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE,
+                    1L
+                )
+            ).thenReturn(builtClient);
 
             HttpGraphQlClient result = provider.forScope(1L);
 
             assertThat(result).isSameAs(builtClient);
-            verify(mutateBuilder).url("https://gitlab.example.com/api/graphql");
-            verify(mutateBuilder).header("Authorization", "Bearer glpat-test-token");
-            verify(mutateBuilder).webClient(any());
+            verify(clientFactory).withBearerTokenAndAttribute(
+                baseClient,
+                "https://gitlab.example.com/api/graphql",
+                "glpat-test-token",
+                GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE,
+                1L
+            );
         }
 
         @Test
@@ -87,19 +96,16 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
     class WithToken {
 
         @Test
-        @SuppressWarnings("unchecked")
         void shouldBuildClientWithProvidedTokenAndUrl() {
-            HttpGraphQlClient.Builder<?> mutateBuilder = mock(HttpGraphQlClient.Builder.class);
             HttpGraphQlClient builtClient = mock(HttpGraphQlClient.class);
-
-            doReturn(mutateBuilder).when(baseClient).mutate();
-            doReturn(mutateBuilder).when(mutateBuilder).url("https://gitlab.com/api/graphql");
-            doReturn(mutateBuilder).when(mutateBuilder).header("Authorization", "Bearer glpat-direct");
-            doReturn(builtClient).when(mutateBuilder).build();
+            when(
+                clientFactory.withBearerToken(baseClient, "https://gitlab.com/api/graphql", "glpat-direct")
+            ).thenReturn(builtClient);
 
             HttpGraphQlClient result = provider.withToken("glpat-direct", "https://gitlab.com");
 
             assertThat(result).isSameAs(builtClient);
+            verify(clientFactory).withBearerToken(baseClient, "https://gitlab.com/api/graphql", "glpat-direct");
         }
     }
 
@@ -122,7 +128,6 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         void acquirePermissionThrowsWhenOpen() {
             CallNotPermittedException exception = mock(CallNotPermittedException.class);
 
-            // Resilience4j acquirePermission is void — use doThrow for void methods
             doThrow(exception).when(circuitBreaker).acquirePermission();
 
             assertThatThrownBy(() -> provider.acquirePermission()).isInstanceOf(CircuitBreakerOpenException.class);

@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
@@ -18,6 +21,7 @@ import org.springframework.stereotype.Component;
  * Best-effort by contract: every remote call is wrapped and exceptions are swallowed.
  */
 @Component
+@OutboundEgressGateway
 @ConditionalOnBean(GitLabGraphQlClientProvider.class)
 public class GitLabCommentReactionSink implements ScmCommentReactionSink {
 
@@ -25,9 +29,14 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
     private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(10);
 
     private final GitLabGraphQlClientProvider gitLabGraphQlProvider;
+    private final OutboundEgressGuard egressGuard;
 
-    public GitLabCommentReactionSink(GitLabGraphQlClientProvider gitLabGraphQlProvider) {
+    public GitLabCommentReactionSink(
+        GitLabGraphQlClientProvider gitLabGraphQlProvider,
+        OutboundEgressGuard egressGuard
+    ) {
         this.gitLabGraphQlProvider = gitLabGraphQlProvider;
+        this.egressGuard = egressGuard;
     }
 
     @Override
@@ -39,6 +48,7 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
     public void react(long scopeId, long commentNativeId, String reactionName) {
         try {
             String awardableId = "gid://gitlab/Note/" + commentNativeId;
+            egressGuard.requireDeliveryAllowed("gitlab.react-to-comment");
             var response = gitLabGraphQlProvider
                 .forScope(scopeId)
                 .documentName("AwardEmojiAdd")
@@ -57,6 +67,8 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
                     response != null ? response.getErrors() : "null"
                 );
             }
+        } catch (OutboundEgressSuppressedException e) {
+            log.debug("Suppressed {} reaction while instance Silent Mode is engaged", reactionName);
         } catch (Exception e) {
             log.debug(
                 "Failed to add {} reaction (non-fatal): noteId={}, scopeId={}, error={}",

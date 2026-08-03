@@ -3,12 +3,16 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
@@ -43,13 +47,16 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     private GithubPrNodeIdResolver prNodeIdResolver;
 
     @Mock
+    private OutboundEgressGuard egressGuard;
+
+    @Mock
     private HttpGraphQlClient client;
 
     private GithubInlineFindingChannel channel;
 
     @BeforeEach
     void setUp() {
-        channel = new GithubInlineFindingChannel(gitHubProvider, prNodeIdResolver);
+        channel = new GithubInlineFindingChannel(gitHubProvider, prNodeIdResolver, egressGuard);
     }
 
     @Test
@@ -91,6 +98,27 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         DeliveredSignal bar = signalForKey(result, "ck-bar");
         assertThat(bar.externalRef()).isEqualTo("RC_bar");
         assertThat(bar.threadExternalRef()).isEqualTo("REVIEW_1");
+    }
+
+    @Test
+    void silentModeBlocksInitialBatchMutation() {
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+        stubReviewThreads(List.of());
+        doThrow(new OutboundEgressSuppressedException("github.post-inline-findings"))
+            .when(egressGuard)
+            .requireDeliveryAllowed("github.post-inline-findings");
+
+        InlineResult result = channel.postInlineFindings(
+            githubTarget(),
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-1"))
+        );
+
+        assertThat(result.suppressed()).isTrue();
+        assertThat(result.posted()).isZero();
+        assertThat(result.suppressedRecurrenceKeys()).containsExactly("ck-1");
+        verify(client, never()).documentName("AddPullRequestReviewWithThreads");
     }
 
     @Test
@@ -257,6 +285,31 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
 
         verify(minimizeSpec).variable("subjectId", "RC_a");
         verify(minimizeSpec, never()).variable("subjectId", "RC_b");
+    }
+
+    @Test
+    void reportsBatchWritesWhenStaleThreadCleanupIsSuppressed() {
+        FeedbackTarget target = githubTarget();
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+        stubReviewThreads(List.of(thread("THREAD_old", "RC_old", "old\n" + ckTag("ck-old"), false, false)));
+        stubAddReview("REVIEW_1", List.of(commentWithCk("RC_new", "src/New.java", 12, "ck-new")));
+        stubMinimize();
+        doNothing()
+            .doThrow(new OutboundEgressSuppressedException("github.minimize-inline-finding"))
+            .when(egressGuard)
+            .requireDeliveryAllowed(any());
+
+        InlineResult result = channel.postInlineFindings(
+            target,
+            List.of(new InlineFinding(new DiffAnchor("src/New.java", 12, null), "fix", "marker", "ck-new"))
+        );
+
+        assertThat(result.suppressed()).isTrue();
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.signals()).extracting(DeliveredSignal::recurrenceKey).containsExactly("ck-new");
+        assertThat(result.suppressedRecurrenceKeys()).isEmpty();
     }
 
     @Test

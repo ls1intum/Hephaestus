@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
@@ -20,9 +21,6 @@ import org.mockito.Mockito;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 
-/**
- * Unit tests for {@link GitHubGraphQlClientProvider} rate limit delegation and circuit breaker.
- */
 class GitHubGraphQlClientProviderTest extends BaseUnitTest {
 
     @Mock
@@ -43,6 +41,9 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
     @Mock
     private GitHubRestRateLimitSeeder rateLimitSeeder;
 
+    @Mock
+    private SilentModeGraphQlClientFactory clientFactory;
+
     private GitHubGraphQlClientProvider provider;
 
     @BeforeEach
@@ -53,7 +54,8 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
             appTokens,
             circuitBreaker,
             rateLimitTracker,
-            rateLimitSeeder
+            rateLimitSeeder,
+            clientFactory
         );
     }
 

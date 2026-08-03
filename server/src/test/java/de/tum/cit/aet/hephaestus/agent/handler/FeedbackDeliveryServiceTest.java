@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
@@ -254,7 +255,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of()),
                 eq(false),
-                eq(false)
+                eq(false),
+                eq(true)
             );
         }
 
@@ -288,6 +290,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
+                eq(true),
                 eq(true)
             );
         }
@@ -369,8 +372,102 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(delivery),
                 eq(FeedbackSuppressionReason.INSTANCE_SILENCED)
             );
-            // The brake short-circuits before the policy touches the artifact or the recipient.
             verifyNoInteractions(pullRequestRepository);
+        }
+
+        @Test
+        void egressRaceIsTerminalSuppressionNotFailedDelivery() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenThrow(
+                new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
+            );
+
+            service.deliverFeedback(job, delivery);
+
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                job,
+                delivery,
+                FeedbackSuppressionReason.INSTANCE_SILENCED
+            );
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
+        }
+
+        @Test
+        void egressRaceAfterSummaryRecordsWhatAlreadyLanded() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            var delivery = new DeliveryContent(
+                "summary",
+                List.of(new DiffNote("src/Foo.java", 10, null, "inline", "key")),
+                List.of()
+            );
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_landed");
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
+                new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
+            );
+
+            service.deliverFeedback(job, delivery);
+
+            verify(feedbackLedgerRecorder).record(
+                job,
+                delivery,
+                WorkArtifact.PULL_REQUEST,
+                List.of(),
+                true,
+                false,
+                false
+            );
+            verify(feedbackLedgerRecorder).recordSuppressedRemainder(
+                job,
+                delivery,
+                FeedbackSuppressionReason.INSTANCE_SILENCED,
+                List.of()
+            );
+        }
+
+        @Test
+        void midBatchSuppressionRecordsLandedInlineWritesAndTheSuppressedRemainder() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            var delivery = new DeliveryContent(
+                "summary",
+                List.of(
+                    new DiffNote("src/Foo.java", 10, null, "inline", "key-1"),
+                    new DiffNote("src/Bar.java", 20, null, "suppressed", "key-2")
+                ),
+                List.of()
+            );
+            InlineFindingChannel.DeliveredSignal signal = new InlineFindingChannel.DeliveredSignal(
+                "key-1",
+                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFindingChannel.Disposition.POSTED,
+                "note-1",
+                "discussion-1"
+            );
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_landed");
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal), true, List.of("key-2"))
+            );
+
+            service.deliverFeedback(job, delivery);
+
+            verify(feedbackLedgerRecorder).record(
+                job,
+                delivery,
+                WorkArtifact.PULL_REQUEST,
+                List.of(signal),
+                true,
+                true,
+                false
+            );
+            verify(feedbackLedgerRecorder).recordSuppressedRemainder(
+                job,
+                delivery,
+                FeedbackSuppressionReason.INSTANCE_SILENCED,
+                List.of("key-2")
+            );
         }
 
         @Test
@@ -617,6 +714,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
+                eq(true),
                 eq(true)
             );
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
@@ -707,6 +805,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of(firstSignal, secondSignal)),
                 eq(false),
+                eq(true),
                 eq(true)
             );
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());

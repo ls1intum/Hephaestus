@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHActor;
@@ -177,7 +178,10 @@ public class GitHubGraphQlConfig {
     }
 
     @Bean
-    public HttpGraphQlClient gitHubGraphQlClient(WebClient gitHubGraphQlWebClient) {
+    public HttpGraphQlClient gitHubGraphQlClient(
+        WebClient gitHubGraphQlWebClient,
+        SilentModeGraphQlClientFactory clientFactory
+    ) {
         // Operations are loaded from graphql/github/operations/ by name.
         // Shared fragments (GitHubGraphQlFragments) are
         // selectively appended by FragmentMergingDocumentSource: only fragments that are
@@ -196,7 +200,7 @@ public class GitHubGraphQlConfig {
             List.of(".graphql", ".gql"),
             fragmentFiles
         );
-        return HttpGraphQlClient.builder(gitHubGraphQlWebClient).documentSource(documentSource).build();
+        return clientFactory.create(gitHubGraphQlWebClient, documentSource);
     }
 
     /**
