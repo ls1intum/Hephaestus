@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { Gauge } from "lucide-react";
 import { expect, within } from "storybook/test";
 import type { InstanceSettings } from "@/api/types.gen";
+import { PageHeader } from "@/components/core/PageHeader";
 import { SilentModeBanner } from "./SilentModeBanner";
 
 const engaged: InstanceSettings = {
@@ -34,4 +36,31 @@ export const WithoutMetadata: Story = {
 	args: {
 		settings: { etag: '"0"', silentModeEngaged: true },
 	},
+};
+
+export const AbovePageContentOnReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	args: {
+		settings: {
+			...engaged,
+			silentModeChangedBy: "an-instance-administrator-with-a-long-identity@example.invalid",
+			silentModeReason:
+				"https://status.example.invalid/incidents/delivery-suppression-investigation-without-convenient-breakpoints",
+		},
+	},
+	render: (args) => (
+		<>
+			<div className="mb-6">
+				<SilentModeBanner {...args} />
+			</div>
+			<PageHeader
+				icon={<Gauge />}
+				title="Instance overview"
+				description="What is running, and what changed recently on this instance."
+			/>
+		</>
+	),
 };

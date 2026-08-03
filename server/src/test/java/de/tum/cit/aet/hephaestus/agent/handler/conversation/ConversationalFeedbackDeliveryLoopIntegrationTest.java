@@ -5,6 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnPersistence;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -48,7 +53,7 @@ import tools.jackson.databind.ObjectMapper;
  * Real-Postgres, stub-Pi (no live Slack) proof of the conversational delivery loop: two jobs prepare body-null
  * CONVERSATION units; three simulated {@code link_finding} events flip exactly one to DELIVERED (one-per-turn) and
  * bind a CONVERSATION_TURN placement; a re-run is a no-op; a clock-advanced sweep expires the remaining PREPARED
- * units to CONVERSATION_EXPIRED. Deterministic.
+ * units to CONVERSATION_EXPIRED. It also pins the prospective Silent Mode suppression transition. Deterministic.
  */
 class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationTest {
 
@@ -62,6 +67,9 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
 
     @Autowired
     private ConversationalDeliveryReconciler reconciler;
+
+    @Autowired
+    private MentorTurnPersistence mentorTurnPersistence;
 
     @Autowired
     private ConversationFeedbackTtlSweeper sweeper;
@@ -198,6 +206,46 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         assertThat(conversationUnits()).allSatisfy(f -> assertThat(f.getBody()).isNull());
     }
 
+    @Test
+    void silentTransportOutcomeConsumesPreparedUnitProspectively() {
+        AgentJob job = newJob();
+        Observation observation = saveObservation(job, "occ-silent");
+        prepareFor(job);
+        ChatMessage assistant = persistAssistantMessage(ChatMessage.Status.in_flight);
+        TranslatorState state = new TranslatorState(assistant.getId());
+        state.recordDataFinding(observation.getId());
+        MentorTurnPersistence.TurnPersistenceCookie cookie = new MentorTurnPersistence.TurnPersistenceCookie(
+            assistant.getThread().getId(),
+            UUID.randomUUID(),
+            assistant.getId(),
+            Instant.now(),
+            "test-model",
+            org.mockito.Mockito.mock(LlmPriceSnapshot.class)
+        );
+
+        mentorTurnPersistence.finalise(
+            cookie,
+            state,
+            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
+            MentorChannel.DeliveryOutcome.INSTANCE_SILENCED
+        );
+
+        assertThat(
+            reconciler.suppressForSilentMode(workspace.getId(), recipient.getId(), List.of(observation.getId()))
+        ).isZero();
+        assertThat(chatMessageRepository.findById(assistant.getId()).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.completed
+        );
+        assertThat(conversationUnits())
+            .singleElement()
+            .satisfies(feedback -> {
+                assertThat(feedback.getDeliveryState()).isEqualTo(FeedbackDeliveryState.SUPPRESSED);
+                assertThat(feedback.getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.INSTANCE_SILENCED);
+            });
+        assertThat(preparedCount()).isZero();
+        assertThat(feedbackPlacementRepository.findAll()).isEmpty();
+    }
+
     private void prepareFor(AgentJob job) {
         List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
@@ -259,6 +307,10 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     }
 
     private UUID persistAssistantMessage() {
+        return persistAssistantMessage(ChatMessage.Status.completed).getId();
+    }
+
+    private ChatMessage persistAssistantMessage(ChatMessage.Status status) {
         ChatThread thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setUser(recipient);
@@ -269,10 +321,9 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         message.setId(UUID.randomUUID());
         message.setThread(thread);
         message.setRole(ChatMessage.Role.ASSISTANT);
-        message.setStatus(ChatMessage.Status.completed);
+        message.setStatus(status);
         message.setParts(OM.createArrayNode());
         message.setMetadata(OM.createObjectNode());
-        chatMessageRepository.save(message);
-        return message.getId();
+        return chatMessageRepository.save(message);
     }
 }

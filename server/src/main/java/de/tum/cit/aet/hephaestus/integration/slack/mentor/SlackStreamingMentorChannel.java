@@ -67,6 +67,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final AtomicBoolean done = new AtomicBoolean(false);
     private final AtomicBoolean terminated = new AtomicBoolean(false);
     private final AtomicBoolean flushing = new AtomicBoolean(false);
+    private final AtomicBoolean contentDelivered = new AtomicBoolean(false);
+    private final AtomicBoolean silentModeSuppressed = new AtomicBoolean(false);
 
     private volatile Runnable disconnectHook;
     /** The streaming message ts: {@code null} until the first successful open, set exactly once ({@link #openOrAppend}). */
@@ -124,8 +126,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     }
 
     @Override
-    public void completeWithDone() {
+    public DeliveryOutcome completeWithDone() {
         finish(null);
+        return deliveryOutcome();
     }
 
     @Override
@@ -146,6 +149,13 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     public void close() {
         // The turn always drives a completeWith* before close(); this just guarantees the stream is stopped.
         finish(null);
+    }
+
+    private DeliveryOutcome deliveryOutcome() {
+        if (contentDelivered.get()) {
+            return DeliveryOutcome.DELIVERED;
+        }
+        return silentModeSuppressed.get() ? DeliveryOutcome.INSTANCE_SILENCED : DeliveryOutcome.NOT_DELIVERED;
     }
 
     private void append(String text) {
@@ -293,6 +303,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             } else {
                 slack.appendStream(workspaceId, channel, ts, text);
             }
+            contentDelivered.set(true);
         } finally {
             streamLock.unlock();
         }
@@ -420,8 +431,11 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
     }
 
-    private static boolean isTerminal(SlackSendException e) {
+    private boolean isTerminal(SlackSendException e) {
         String code = e.slackError();
+        if ("silent_mode_engaged".equals(code)) {
+            silentModeSuppressed.set(true);
+        }
         return code != null && TERMINAL_ERRORS.contains(code);
     }
 

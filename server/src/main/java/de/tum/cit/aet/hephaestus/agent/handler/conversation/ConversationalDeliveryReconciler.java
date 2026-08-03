@@ -23,10 +23,8 @@ import org.springframework.stereotype.Component;
  * flips it to DELIVERED via a guarded compare-and-set, and - on a winning flip - writes exactly one
  * {@code CONVERSATION_TURN} placement bound to the assistant {@code chat_message} that delivered it.
  *
- * <p><b>Invoked INSIDE {@code MentorTurnPersistence.finalise}, AFTER the assistant chat_message
- * {@code saveAndFlush}.</b> The placement's {@code chat_message_id} FK is {@code ON DELETE SET NULL}; writing the
- * placement before the message is flushed would reference a row that does not yet exist. Because it shares the
- * finalise transaction, the flushed (but not-yet-committed) message is visible to the FK check.
+ * <p>Invoked inside the assistant finalisation transaction after the message is flushed, once the transport outcome
+ * is known. The message state and feedback transition therefore commit or roll back together.
  *
  * <p><b>One flip per turn.</b> A single turn may emit several {@code link_finding} events; at most ONE PREPARED unit
  * is delivered per turn - the method returns after the first winning CAS. A rowcount of 0 (a concurrent turn already
@@ -56,9 +54,8 @@ public class ConversationalDeliveryReconciler {
     }
 
     /**
-     * Reconcile the mentor's linked findings for one turn against the PREPARED conversational queue. Joins the
-     * caller's ({@code finalise}) transaction - NOT {@code @Transactional} itself - so the CONVERSATION_TURN
-     * placement's FK sees the assistant message already flushed by {@code finalise}.
+     * Reconcile the mentor's linked findings for one turn against the PREPARED conversational queue. The caller
+     * owns the transaction and has already flushed the assistant message referenced by the placement.
      *
      * @param workspaceId   the chat thread's workspace
      * @param recipientUserId the developer the mentor is talking to (the feedback recipient)
@@ -110,6 +107,37 @@ public class ConversationalDeliveryReconciler {
                     "Conversational feedback delivered: feedbackId={}, chatMessageId={}, recipient={}",
                     feedbackId,
                     chatMessageId,
+                    recipientUserId
+                );
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Suppress the single conversational unit this turn would have delivered when the transport was blocked by
+     * instance Silent Mode. Unlike a generic transport failure, this is prospective-only: the unit must not remain
+     * queued for a later turn after the brake is released.
+     */
+    public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedFindingIds) {
+        if (linkedFindingIds == null || linkedFindingIds.isEmpty()) {
+            return 0;
+        }
+        for (UUID observationId : new LinkedHashSet<>(linkedFindingIds)) {
+            List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
+                workspaceId,
+                recipientUserId,
+                observationId
+            );
+            if (feedbackIds.isEmpty()) {
+                continue;
+            }
+            UUID feedbackId = feedbackIds.get(0);
+            if (feedbackRepository.markConversationSuppressedBySilentMode(feedbackId) == 1) {
+                log.info(
+                    "Conversational feedback suppressed by instance Silent Mode: feedbackId={}, recipient={}",
+                    feedbackId,
                     recipientUserId
                 );
                 return 1;

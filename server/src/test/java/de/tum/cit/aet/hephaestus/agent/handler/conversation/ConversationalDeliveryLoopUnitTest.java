@@ -274,6 +274,23 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     @Test
+    void silentModeSuppressesOnePreparedUnitWithoutPlacement() {
+        UUID observationId = UUID.randomUUID();
+        UUID feedbackId = UUID.randomUUID();
+        when(
+            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
+        ).thenReturn(List.of(feedbackId));
+        when(feedbackRepository.markConversationSuppressedBySilentMode(feedbackId)).thenReturn(1);
+
+        int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(observationId));
+
+        assertThat(suppressed).isEqualTo(1);
+        verify(feedbackRepository).markConversationSuppressedBySilentMode(feedbackId);
+        verify(feedbackRepository, never()).markConversationDelivered(any(), any());
+        verify(feedbackPlacementRepository, never()).save(any());
+    }
+
+    @Test
     void reconcilerSkipsFlip_whenLocusWasSinceDeliveredInContext() {
         // A PREPARED unit seeded by a FAILED direct delivery: if a later re-review has since delivered the SAME
         // recurrence_key in-context, the flip must be skipped (no double-delivery) — the stale unit ages out.

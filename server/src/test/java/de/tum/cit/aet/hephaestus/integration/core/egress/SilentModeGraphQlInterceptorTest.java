@@ -92,6 +92,20 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
         verify(egressGuard, never()).requireDeliveryAllowed(org.mockito.ArgumentMatchers.anyString());
     }
 
+    @Test
+    void shouldAllowSelectedQueryFromMultiOperationDocument() {
+        ClientGraphQlRequest request = request(
+            "query ReadThing { thing { id } } mutation UpdateThing { updateThing { id } }"
+        );
+        when(request.getOperationName()).thenReturn("ReadThing");
+        SilentModeGraphQlInterceptor interceptor = new SilentModeGraphQlInterceptor(egressGuard);
+        when(chain.next(request)).thenReturn(httpExchange(interceptor, Mono.just(mock(ClientResponse.class))));
+
+        interceptor.intercept(request, chain).block();
+
+        verify(egressGuard, never()).requireDeliveryAllowed(org.mockito.ArgumentMatchers.anyString());
+    }
+
     private static ClientGraphQlRequest request(String document) {
         ClientGraphQlRequest request = mock(ClientGraphQlRequest.class);
         when(request.getDocument()).thenReturn(document);

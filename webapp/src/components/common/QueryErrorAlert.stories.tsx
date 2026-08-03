@@ -138,6 +138,21 @@ export const NetworkFailure: Story = {
 	},
 };
 
+export const ReflowWithLongDetail: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	args: {
+		title: "Couldn't load the instance delivery state",
+		error: {
+			status: 503,
+			detail:
+				"https://status.example.invalid/incidents/instance-delivery-state-could-not-be-verified-without-convenient-breakpoints",
+		},
+	},
+};
+
 /**
  * The server said nothing useful. The guidance stands on its own rather than being padded with a
  * generic "An unexpected error occurred" it would only repeat.

@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import graphql.language.OperationDefinition;
 import graphql.parser.Parser;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.graphql.client.ClientGraphQlRequest;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -18,7 +19,9 @@ public class SilentModeGraphQlInterceptor implements GraphQlClientInterceptor {
     private static final Object MUTATION_OPERATION = new Object();
 
     private final OutboundEgressGuard egressGuard;
-    private final Cache<String, Boolean> mutationDocuments = Caffeine.newBuilder().maximumSize(256).build();
+    private final Cache<String, List<OperationDefinition>> operationsByDocument = Caffeine.newBuilder()
+        .maximumSize(256)
+        .build();
 
     public SilentModeGraphQlInterceptor(OutboundEgressGuard egressGuard) {
         this.egressGuard = egressGuard;
@@ -26,7 +29,7 @@ public class SilentModeGraphQlInterceptor implements GraphQlClientInterceptor {
 
     @Override
     public Mono<ClientGraphQlResponse> intercept(ClientGraphQlRequest request, Chain chain) {
-        if (!mutationDocuments.get(request.getDocument(), SilentModeGraphQlInterceptor::isMutation)) {
+        if (!isMutation(request.getDocument(), request.getOperationName())) {
             return chain.next(request);
         }
 
@@ -44,9 +47,18 @@ public class SilentModeGraphQlInterceptor implements GraphQlClientInterceptor {
             });
     }
 
-    private static boolean isMutation(String document) {
-        return Parser.parse(document)
-            .getDefinitionsOfType(OperationDefinition.class)
+    private boolean isMutation(String document, String operationName) {
+        List<OperationDefinition> operations = operationsByDocument.get(document, source ->
+            Parser.parse(source).getDefinitionsOfType(OperationDefinition.class)
+        );
+        if (operationName != null) {
+            for (OperationDefinition operation : operations) {
+                if (operationName.equals(operation.getName())) {
+                    return operation.getOperation() == OperationDefinition.Operation.MUTATION;
+                }
+            }
+        }
+        return operations
             .stream()
             .anyMatch(operation -> operation.getOperation() == OperationDefinition.Operation.MUTATION);
     }

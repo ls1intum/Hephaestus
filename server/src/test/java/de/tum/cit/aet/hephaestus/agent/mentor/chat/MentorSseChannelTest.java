@@ -57,6 +57,14 @@ class MentorSseChannelTest extends BaseUnitTest {
     }
 
     @Test
+    void deliveryOutcomeRequiresSuccessfulFinishChunk() {
+        channel.send(new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+        emitter.failOnNextSend();
+
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.DELIVERED);
+    }
+
+    @Test
     @DisplayName("send while clientGone is a no-op")
     void send_afterDisconnect_isNoop() {
         // Trigger the lifecycle disconnect via onCompletion → clientGone flips.

@@ -46,7 +46,7 @@ function AdminSettingsPage() {
 	});
 
 	return (
-		<PageLayout className="py-6">
+		<PageLayout>
 			<PageHeader
 				icon={<Settings2 />}
 				title="Instance settings"

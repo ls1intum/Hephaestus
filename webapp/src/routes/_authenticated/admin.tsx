@@ -40,7 +40,7 @@ function AdminLayout() {
 	) : null;
 	return (
 		<>
-			{topStrip ? <div className="mx-auto w-full max-w-6xl pt-6">{topStrip}</div> : null}
+			{topStrip ? <div className="mx-auto mb-6 w-full max-w-6xl">{topStrip}</div> : null}
 			<Outlet />
 		</>
 	);

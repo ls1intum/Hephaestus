@@ -16,8 +16,10 @@ export function SilentModeBanner({ settings }: SilentModeBannerProps) {
 	return (
 		<Alert variant="destructive">
 			<VolumeX aria-hidden />
-			<AlertTitle>Silent mode is engaged — workspace delivery is blocked</AlertTitle>
-			<AlertDescription>
+			<AlertTitle className="min-w-0 break-words">
+				Silent mode is engaged — workspace delivery is blocked
+			</AlertTitle>
+			<AlertDescription className="min-w-0 break-words">
 				Practice feedback and workspace Slack messages are suppressed across this instance.
 				{settings.silentModeChangedBy || engagedAt ? (
 					<>

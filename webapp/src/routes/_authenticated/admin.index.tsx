@@ -29,7 +29,7 @@ function AdminOverviewPage() {
 	const memberships = workspaces.reduce((sum, ws) => sum + ws.memberCount, 0);
 
 	return (
-		<PageLayout className="py-6">
+		<PageLayout>
 			<PageHeader
 				icon={<Gauge />}
 				title="Instance overview"
