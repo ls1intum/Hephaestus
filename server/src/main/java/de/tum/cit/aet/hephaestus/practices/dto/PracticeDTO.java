@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceValidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +23,8 @@ public record PracticeDTO(
     @Nullable
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
+    @NonNull PracticeEvidenceDeclaration evidence,
+    @NonNull PracticeEvidenceValidation evidenceValidation,
     @NonNull @Schema(description = "Artifact this practice evaluates") WorkArtifact artifactType,
     @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
     @NonNull @Schema(description = "Position within its area (lowest first); ties broken by name") Integer displayOrder,
@@ -39,6 +43,8 @@ public record PracticeDTO(
             TriggerEventsConverter.toList(practice.getTriggerEvents()),
             practice.getCriteria(),
             practice.getPrecomputeScript(),
+            practice.getEvidence(),
+            PracticeEvidenceValidation.authorDeclared(practice.getEvidence()),
             practice.getArtifactType(),
             practice.getArea() != null ? practice.getArea().getSlug() : null,
             practice.getDisplayOrder(),

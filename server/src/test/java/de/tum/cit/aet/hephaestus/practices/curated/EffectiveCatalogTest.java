@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogFixtures
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -21,6 +22,7 @@ class EffectiveCatalogTest extends BaseUnitTest {
             List.of("PullRequestCreated"),
             "Criteria",
             null,
+            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
             "Reason",
             null,
             "quality"

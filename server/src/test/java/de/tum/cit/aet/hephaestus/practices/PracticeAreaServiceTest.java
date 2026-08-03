@@ -323,6 +323,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria("criteria");
+        practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         return practice;
     }
 

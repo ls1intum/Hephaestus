@@ -19,7 +19,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { FindingEvidence } from "./FindingEvidence";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
-import { FeedbackStateBadge, FindingAssessmentBadge } from "./ReviewBadges";
+import { ClaimStatusBadge, FeedbackStateBadge, FindingAssessmentBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
@@ -84,6 +84,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 				<div className="space-y-2">
 					<div className="flex flex-wrap items-center gap-2">
 						<FindingAssessmentBadge finding={finding} />
+						<ClaimStatusBadge status={finding.claimStatus} />
 					</div>
 					<h2 className="break-words text-2xl font-semibold tracking-tight">{finding.title}</h2>
 					<ReviewPracticeLabel

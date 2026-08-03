@@ -73,6 +73,20 @@ export const LongContent: Story = {
 		await expectNoPageOverflow();
 	},
 };
+export const OutdatedResult: Story = {
+	args: {
+		state: {
+			status: "ready",
+			findings: [{ ...reviewFindings[0], claimStatus: "STALE" }],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const result = within(canvasElement).getByRole("link", {
+			name: /The controller delegates review queries/,
+		});
+		await expect(within(result).getByText("Outdated result")).toBeVisible();
+	},
+};
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	parameters: { chromatic: { viewports: [1440] } },

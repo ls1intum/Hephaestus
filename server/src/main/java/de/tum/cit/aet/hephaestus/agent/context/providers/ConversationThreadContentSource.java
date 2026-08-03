@@ -4,10 +4,17 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -31,7 +38,19 @@ import tools.jackson.databind.node.ObjectNode;
  * does not name a thread is a preparation failure.
  */
 @Component
-public class ConversationThreadContentSource implements ContentSource {
+public class ConversationThreadContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("slack.conversation.thread");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(ConversationThreadContentSource.class);
 
@@ -83,6 +102,33 @@ public class ConversationThreadContentSource implements ContentSource {
             threadTs,
             payload.path("messageCount").asInt(),
             job.getId()
+        );
+    }
+
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        if (!selectedKinds.contains(KIND)) return captured;
+        JsonNode metadata = ((ContextRequest.ConversationReviewRequest) request).job().getMetadata();
+        JsonNode payload;
+        try {
+            payload = objectMapper.readTree(captured.files().get(OUTPUT_KEY));
+        } catch (Exception e) {
+            throw new IllegalStateException("Serialized conversation thread could not be read", e);
+        }
+        int messageCount = payload.path("messageCount").asInt();
+        Instant effectiveTime = projection.sourceEffectiveAt(metadata.path("slack_last_ts").asString(null));
+        Map<SourceKind, Instant> effectiveAt = effectiveTime == null ? Map.of() : Map.of(KIND, effectiveTime);
+        return new EvidenceContribution(
+            captured.files(),
+            Map.of(
+                KIND,
+                payload.path("truncated").asBoolean() ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE
+            ),
+            Map.of(),
+            Map.of(),
+            effectiveAt,
+            Map.of(KIND, messageCount == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
         );
     }
 }

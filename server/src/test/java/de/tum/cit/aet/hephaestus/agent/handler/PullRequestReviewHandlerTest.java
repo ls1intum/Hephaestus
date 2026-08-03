@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -11,6 +12,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionDeliveryService.DeliveryResult;
@@ -20,15 +23,18 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -163,6 +169,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setName(name);
         p.setCriteria(criteria);
         p.setActive(true);
+        p.setArtifactType(WorkArtifact.PULL_REQUEST);
+        p.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         return p;
     }
 
@@ -176,10 +184,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     /** Stub the workspace context build + practice catalog to return minimal valid data. */
     private void stubDefaults() {
         lenient()
-            .when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class)))
-            .thenReturn(
-                new LinkedHashMap<>(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8)))
-            );
+            .when(
+                workspaceContextBuilder.prepare(
+                    any(ContextRequest.PracticeReviewRequest.class),
+                    any(EvidencePlan.class)
+                )
+            )
+            .thenReturn(prepared(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8))));
+        lenient()
+            .when(workspaceContextBuilder.readyPractices(any(), any(), anyString()))
+            .thenAnswer(invocation -> invocation.getArgument(1));
         lenient()
             .when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
@@ -188,6 +202,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 )
             )
             .thenReturn(samplePractices());
+    }
+
+    private PreparedEvidence prepared(Map<String, byte[]> files) {
+        return new PreparedEvidence(files, org.mockito.Mockito.mock(ArtifactSourceManifest.class));
     }
 
     @Nested
@@ -241,7 +259,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             handler.prepareInputFiles(job);
 
             ArgumentCaptor<ContextRequest> captor = ArgumentCaptor.forClass(ContextRequest.class);
-            verify(workspaceContextBuilder).build(captor.capture());
+            verify(workspaceContextBuilder).prepare(captor.capture(), any(EvidencePlan.class));
             assertThat(captor.getValue()).isInstanceOf(ContextRequest.PracticeReviewRequest.class);
             assertThat(((ContextRequest.PracticeReviewRequest) captor.getValue()).job()).isSameAs(job);
         }
@@ -249,8 +267,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void mergesProviderFiles() {
             byte[] metadataBytes = "{\"pr_number\":42}".getBytes(StandardCharsets.UTF_8);
-            when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class))).thenReturn(
-                new LinkedHashMap<>(Map.of("inputs/context/metadata.json", metadataBytes))
+            when(
+                workspaceContextBuilder.prepare(
+                    any(ContextRequest.PracticeReviewRequest.class),
+                    any(EvidencePlan.class)
+                )
+            ).thenReturn(prepared(Map.of("inputs/context/metadata.json", metadataBytes)));
+            when(workspaceContextBuilder.readyPractices(any(), any(), anyString())).thenAnswer(invocation ->
+                invocation.getArgument(1)
             );
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
@@ -301,7 +325,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void rejectsMalformedSlug() {
-            when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
@@ -316,7 +339,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void throwsWhenNoActivePractices() {
-            when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
@@ -327,6 +349,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("No active PULL_REQUEST practices");
+            verifyNoInteractions(workspaceContextBuilder);
         }
 
         @Test
@@ -344,7 +367,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             providerFiles.put("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
             providerFiles.put("inputs/context/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
             providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
-            when(workspaceContextBuilder.build(any())).thenReturn(providerFiles);
+            when(workspaceContextBuilder.prepare(any(), any())).thenReturn(prepared(providerFiles));
+            when(workspaceContextBuilder.readyPractices(any(), any(), anyString())).thenAnswer(invocation ->
+                invocation.getArgument(1)
+            );
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -150,6 +151,11 @@ public class Practice {
     @Column(name = "precompute_script", columnDefinition = "TEXT")
     @ToString.Exclude
     private String precomputeScript;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evidence_declaration", columnDefinition = "jsonb", nullable = false)
+    @ToString.Exclude
+    private PracticeEvidenceDeclaration evidence;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;

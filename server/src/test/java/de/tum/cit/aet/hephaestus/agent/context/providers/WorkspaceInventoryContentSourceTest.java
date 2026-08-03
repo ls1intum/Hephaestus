@@ -1,14 +1,16 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -256,6 +258,18 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
+    void reportsEmptyWhenOnlyTheExcludedFocalArtifactExists() {
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(
+            List.of(issue(1, "Focal issue", Issue.State.OPEN, "alice"))
+        );
+
+        var captured = provider.capture(issueRequest(1), provider.sourceKinds());
+
+        assertThat(captured.files()).containsKey(OUTPUT);
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
+    }
+
+    @Test
     void writesNothingWhenRepositoryIdMissing() {
         var job = new AgentJob();
         job.setMetadata(objectMapper.createObjectNode());
@@ -265,12 +279,14 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void neverThrowsOnRepositoryFailure() {
+    void reportsRepositoryFailure() {
         when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenThrow(
             new RuntimeException("db down")
         );
         Map<String, byte[]> files = new LinkedHashMap<>();
-        assertThatCode(() -> provider.contribute(issueRequest(1), files)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> provider.contribute(issueRequest(1), files))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasMessageContaining("Workspace-inventory collection failed");
         assertThat(files).doesNotContainKey(OUTPUT);
     }
 
@@ -360,10 +376,12 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void conversationFlow_neverThrowsOnRepositoryFailure() {
+    void conversationFlow_reportsRepositoryFailure() {
         when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenThrow(new RuntimeException("db down"));
         Map<String, byte[]> files = new LinkedHashMap<>();
-        assertThatCode(() -> provider.contribute(conversationRequest(), files)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> provider.contribute(conversationRequest(), files))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasMessageContaining("Workspace-inventory collection failed");
         assertThat(files).doesNotContainKey(OUTPUT);
     }
 }

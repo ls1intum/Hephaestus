@@ -41,6 +41,8 @@ public class PracticeService {
     private final ConfigAuditPort configAudit;
     private final PracticeRevisionService practiceRevisionService;
     private final WorkspaceRepository workspaceRepository;
+    private final PracticeDefinitionValidator definitionValidator;
+    private final PracticeEvidenceDefaults evidenceDefaults;
 
     @Transactional(readOnly = true)
     public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {
@@ -190,7 +192,7 @@ public class PracticeService {
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
-        validateDefinition(definition);
+        definitionValidator.validate(definition);
 
         try {
             practice = practiceRepository.save(practice);
@@ -223,15 +225,6 @@ public class PracticeService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
     }
 
-    private static void validateDefinition(PracticeDefinition definition) {
-        PracticeDefinitionValidator.validate(
-            definition.artifactType(),
-            definition.triggerEvents(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike()
-        );
-    }
-
     @Transactional
     public Practice updatePractice(WorkspaceContext ctx, String slug, UpdatePracticeRequestDTO request) {
         lockWorkspace(ctx);
@@ -243,9 +236,11 @@ public class PracticeService {
         PracticeDefinition beforeDefinition = PracticeDefinition.from(practice);
 
         Set<ClearablePracticeField> fieldsToClear = request.clear() == null ? Set.of() : request.clear();
+        WorkArtifact artifactType =
+            request.artifactType() == null ? beforeDefinition.artifactType() : request.artifactType();
         PracticeDefinition afterDefinition = new PracticeDefinition(
             request.name() == null ? beforeDefinition.name() : request.name(),
-            request.artifactType() == null ? beforeDefinition.artifactType() : request.artifactType(),
+            artifactType,
             request.triggerEvents() == null ? beforeDefinition.triggerEvents() : request.triggerEvents(),
             request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
             patch(
@@ -253,6 +248,11 @@ public class PracticeService {
                 request.precomputeScript(),
                 fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
             ),
+            request.evidence() != null
+                ? request.evidence()
+                : artifactType == beforeDefinition.artifactType()
+                    ? beforeDefinition.evidence()
+                    : evidenceDefaults.forArtifact(artifactType),
             patch(
                 beforeDefinition.whyItMatters(),
                 request.whyItMatters(),
@@ -274,7 +274,7 @@ public class PracticeService {
             practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
         }
         applyDefinition(practice, afterDefinition);
-        validateDefinition(afterDefinition);
+        definitionValidator.validate(afterDefinition);
         practice = practiceRepository.save(practice);
         revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
         configAudit.record(
@@ -336,13 +336,15 @@ public class PracticeService {
         return practiceRevisionService.currentRevisionNumber(practice);
     }
 
-    private static PracticeDefinition definition(CreatePracticeRequestDTO request) {
+    private PracticeDefinition definition(CreatePracticeRequestDTO request) {
+        WorkArtifact artifactType = request.artifactType() == null ? WorkArtifact.PULL_REQUEST : request.artifactType();
         return new PracticeDefinition(
             request.name(),
-            request.artifactType() == null ? WorkArtifact.PULL_REQUEST : request.artifactType(),
+            artifactType,
             request.triggerEvents(),
             request.criteria(),
             request.precomputeScript(),
+            request.evidence() == null ? evidenceDefaults.forArtifact(artifactType) : request.evidence(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
             request.areaSlug()
@@ -355,6 +357,7 @@ public class PracticeService {
         practice.setTriggerEvents(definition.triggerEventsJson());
         practice.setCriteria(definition.criteria());
         practice.setPrecomputeScript(definition.precomputeScript());
+        practice.setEvidence(definition.evidence());
         practice.setWhyItMatters(definition.whyItMatters());
         practice.setWhatGoodLooksLike(definition.whatGoodLooksLike());
     }

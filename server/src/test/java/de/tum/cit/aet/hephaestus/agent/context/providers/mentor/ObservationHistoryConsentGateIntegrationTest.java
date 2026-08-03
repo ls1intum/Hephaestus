@@ -6,8 +6,10 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -62,6 +64,8 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         }
         setUpWorkspaceAndRecipient("obs-consent-gate-test");
         practice = new Practice();
+        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        practice.setEvidence(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");

@@ -497,13 +497,13 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     class RepositoryAvailability {
 
         @Test
-        void throwsWhenCheckoutMissing() {
+        void throwsWhenRepositoryMissing() {
             lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(false);
 
             assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Repository checkout is not available locally for bind-mount");
+                .hasMessageContaining("Repository is not available locally for evidence capture");
         }
 
         @Test

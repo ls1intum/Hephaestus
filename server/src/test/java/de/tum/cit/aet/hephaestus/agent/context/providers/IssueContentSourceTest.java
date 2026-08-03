@@ -297,8 +297,11 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(md).contains("# Issue #123 — Tighten the practice catalogue");
             assertThat(md).contains("**State:** CLOSED (COMPLETED)");
             assertThat(md).contains("**Sub-issues:** 3/4 completed");
-            assertThat(md).contains("## Discussion (1 comments)");
-            assertThat(md).contains("**bob** wrote:");
+            assertThat(md).doesNotContain("## Discussion").doesNotContain("**bob** wrote:");
+
+            JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
+            assertThat(comments).hasSize(1);
+            assertThat(comments.get(0).path("author").asString()).isEqualTo("bob");
         }
 
         @Test
@@ -314,8 +317,10 @@ class IssueContentSourceTest extends BaseUnitTest {
             provider.contribute(request(sampleMetadata()), files);
 
             String md = new String(files.get(SUMMARY_KEY), StandardCharsets.UTF_8);
-            assertThat(md).contains("**unknown** wrote:");
-            assertThat(md).doesNotContain("**null** wrote:");
+            assertThat(md).doesNotContain("**unknown** wrote:").doesNotContain("**null** wrote:");
+
+            JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
+            assertThat(comments.get(0).path("author").isNull()).isTrue();
         }
 
         @Test
@@ -336,8 +341,8 @@ class IssueContentSourceTest extends BaseUnitTest {
             provider.contribute(request(sampleMetadata()), files);
 
             String md = new String(files.get(SUMMARY_KEY), StandardCharsets.UTF_8);
-            assertThat(md).contains("## Discussion (" + IssueContentSource.MAX_COMMENTS + " comments)");
-            assertThat(md).doesNotContain("## Discussion (" + overflow + " comments)");
+            assertThat(md).doesNotContain("## Discussion");
+            assertThat(objectMapper.readTree(files.get(COMMENTS_KEY))).hasSize(IssueContentSource.MAX_COMMENTS);
         }
     }
 

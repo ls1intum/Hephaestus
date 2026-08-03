@@ -41,6 +41,15 @@ export function FindingAssessmentBadge({ finding }: { finding: FindingAssessment
 	);
 }
 
+export function ClaimStatusBadge({ status }: { status: ReviewFinding["claimStatus"] }) {
+	if (status === "CURRENT") return null;
+	return (
+		<Badge variant={status === "STALE" ? "warning" : "outline"}>
+			{status === "STALE" ? "Outdated result" : "Current status unknown"}
+		</Badge>
+	);
+}
+
 export function FindingFeedbackSummary({
 	disposition,
 }: {

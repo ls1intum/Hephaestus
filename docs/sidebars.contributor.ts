@@ -16,6 +16,7 @@ const sidebars: SidebarsConfig = {
         'e2e-testing',
         'coding-guidelines',
         'api-error-handling',
+        'artifact-source-contract',
         'workspace-context',
         'dockerless-postgres',
       ],

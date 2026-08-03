@@ -35,17 +35,17 @@ export const FOCUS_ARTIFACT_OPTIONS = [
 	{
 		value: "PULL_REQUEST",
 		label: WORK_ARTIFACT_LABELS.PULL_REQUEST,
-		hint: "Evaluates the diff, commits, and review thread",
+		hint: "Reviews work submitted in a pull or merge request",
 	},
 	{
 		value: "ISSUE",
 		label: WORK_ARTIFACT_LABELS.ISSUE,
-		hint: "Evaluates the issue title, body, labels, and comments",
+		hint: "Reviews work described or discussed in an issue",
 	},
 	{
 		value: "CONVERSATION_THREAD",
 		label: WORK_ARTIFACT_LABELS.CONVERSATION_THREAD,
-		hint: "Evaluates recent messages when the scheduled conversation review runs",
+		hint: "Reviews messages in a conversation thread",
 	},
 ] as const;
 

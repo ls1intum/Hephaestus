@@ -2,7 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
@@ -52,7 +55,19 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 @Order(200)
-public class LinkedWorkItemContentSource implements ContentSource {
+public class LinkedWorkItemContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("scm.linked-work-items");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     @Override
     public String originId() {
@@ -188,6 +203,7 @@ public class LinkedWorkItemContentSource implements ContentSource {
 
             ObjectNode root = objectMapper.createObjectNode();
             root.set("workItems", items);
+            root.put("truncated", refs.numbers.size() > MAX_ITEMS);
             ArrayNode from = objectMapper.createArrayNode();
             for (String source : refs.resolvedFrom) {
                 from.add(source);
@@ -197,7 +213,7 @@ public class LinkedWorkItemContentSource implements ContentSource {
             files.put(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
             log.info("Linked work items: wrote {} item(s), resolvedFrom={}", items.size(), refs.resolvedFrom);
         } catch (Exception e) {
-            log.warn("LinkedWorkItemContentSource failed, continuing without linkage: {}", e.getMessage());
+            throw new EvidenceCollectionException("Linked-work-item collection failed", e);
         }
     }
 

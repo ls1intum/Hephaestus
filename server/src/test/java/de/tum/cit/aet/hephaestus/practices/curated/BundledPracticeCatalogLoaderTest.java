@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -9,7 +11,13 @@ import tools.jackson.databind.json.JsonMapper;
 
 class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
 
-    private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(JsonMapper.builder().build());
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
+    private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
+        objectMapper,
+        new PracticeDefinitionValidator(
+            new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC())
+        )
+    );
 
     @Test
     void shouldLoadComposedDefinitionsAndScripts() {

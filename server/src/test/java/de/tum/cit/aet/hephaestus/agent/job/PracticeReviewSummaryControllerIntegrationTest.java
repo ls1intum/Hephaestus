@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -179,6 +180,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
 
     private Practice persistPractice(Workspace targetWorkspace) {
         Practice result = new Practice();
+        result.setEvidence(PracticeTestEvidence.pullRequest());
         result.setWorkspace(targetWorkspace);
         result.setSlug("review-quality");
         result.setName("Review quality");

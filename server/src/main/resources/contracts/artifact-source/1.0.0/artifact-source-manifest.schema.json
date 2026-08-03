@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "catalogDigest",
+    "profileId",
+    "capturedAt",
+    "sources",
+    "viewTransformations"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "1.0.0"
+    },
+    "catalogDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "profileId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/capture"
+      }
+    },
+    "viewTransformations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transformation"
+      }
+    }
+  },
+  "$defs": {
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "state",
+        "artifacts"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "state": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "availability",
+                "content",
+                "completeness",
+                "facts"
+              ],
+              "properties": {
+                "availability": {
+                  "const": "AVAILABLE"
+                },
+                "content": {
+                  "enum": [
+                    "EMPTY",
+                    "NON_EMPTY"
+                  ]
+                },
+                "completeness": {
+                  "enum": [
+                    "COMPLETE",
+                    "PARTIAL",
+                    "UNKNOWN"
+                  ]
+                },
+                "facts": {
+                  "$ref": "#/$defs/facts"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "availability",
+                "reasonCode"
+              ],
+              "properties": {
+                "availability": {
+                  "enum": [
+                    "NOT_COLLECTED",
+                    "UNAVAILABLE",
+                    "REDACTED"
+                  ]
+                },
+                "reasonCode": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "availability",
+                "errorCode"
+              ],
+              "properties": {
+                "availability": {
+                  "const": "COLLECTION_ERROR"
+                },
+                "errorCode": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]*$"
+                }
+              }
+            }
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "properties": {
+                  "availability": {
+                    "not": {
+                      "const": "AVAILABLE"
+                    }
+                  }
+                },
+                "required": [
+                  "availability"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifacts": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "properties": {
+                  "availability": {
+                    "const": "AVAILABLE"
+                  },
+                  "content": {
+                    "const": "NON_EMPTY"
+                  }
+                },
+                "required": [
+                  "availability",
+                  "content"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifacts": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capturedAt",
+        "queryScope",
+        "completenessBasis",
+        "representationFidelity"
+      ],
+      "properties": {
+        "capturedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sourceEffectiveAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "observedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "immutableIdentity": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "queryScope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "completenessBasis": {
+          "enum": [
+            "CURSOR_EXHAUSTED",
+            "KNOWN_TOTAL",
+            "LIMIT_EXCEEDED",
+            "BOUNDED_SCOPE",
+            "IMMUTABLE_OBJECT",
+            "UNKNOWN"
+          ]
+        },
+        "representationFidelity": {
+          "enum": [
+            "EXACT",
+            "LOSSLESS_DERIVATION",
+            "LOSSY_DERIVATION"
+          ]
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "mediaType",
+        "sha256",
+        "bytes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "planId",
+        "removedSources"
+      ],
+      "properties": {
+        "kind": {
+          "const": "ABLATION"
+        },
+        "planId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "removedSources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

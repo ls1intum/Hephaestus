@@ -7607,6 +7607,10 @@ components:
           description: Practice evaluation criteria
           maxLength: 50000
           minLength: 0
+        evidence:
+          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
+          description: Versioned sources and quality required before this practice
+            may be judged; omit to use the server baseline for the selected artifact
         name:
           type: string
           description: Human-readable name
@@ -7980,6 +7984,10 @@ components:
           type: string
           maxLength: 50000
           minLength: 0
+        evidence:
+          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
+          description: Evidence declaration; omit to use the server baseline for the
+            selected artifact
         name:
           type: string
           maxLength: 128
@@ -8984,6 +8992,14 @@ components:
           enum:
           - GOOD
           - BAD
+        claimStatus:
+          type: string
+          description: Validity of an evaluation claim against the practice revision
+            currently in force
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
         confidence:
           type: number
           format: float
@@ -9035,6 +9051,7 @@ components:
       required:
       - artifactId
       - artifactType
+      - claimStatus
       - confidence
       - id
       - observedAt
@@ -9063,6 +9080,14 @@ components:
           enum:
           - GOOD
           - BAD
+        claimStatus:
+          type: string
+          description: Validity of an evaluation claim against the practice revision
+            currently in force
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
         confidence:
           type: number
           format: float
@@ -9102,6 +9127,7 @@ components:
       required:
       - artifactId
       - artifactType
+      - claimStatus
       - confidence
       - id
       - observedAt
@@ -9504,6 +9530,10 @@ components:
           type: integer
           format: int32
           description: Position within its area (lowest first); ties broken by name
+        evidence:
+          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
+        evidenceValidation:
+          $ref: "#/components/schemas/PracticeEvidenceValidation"
         id:
           type: integer
           format: int64
@@ -9539,6 +9569,8 @@ components:
       - createdAt
       - criteria
       - displayOrder
+      - evidence
+      - evidenceValidation
       - id
       - name
       - slug
@@ -9591,6 +9623,102 @@ components:
       - id
       - name
       - slug
+    PracticeEvidenceBlindSpot:
+      type: object
+      description: Author-declared limitation that remains when required evidence
+        is available
+      properties:
+        code:
+          type: string
+          pattern: "[A-Z][A-Z0-9_]{2,63}"
+        summary:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - code
+      - summary
+    PracticeEvidenceDeclaration:
+      type: object
+      description: "Author-declared, versioned evidence boundary for a practice definition"
+      properties:
+        blindSpots:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceBlindSpot"
+        onUnsatisfied:
+          type: string
+          enum:
+          - DECLINE_SEMANTIC_JUDGMENT
+        optional:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceRequirement"
+        profile:
+          type: string
+        required:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceRequirement"
+          maxItems: 2147483647
+          minItems: 1
+        sourceContractVersion:
+          type: string
+      required:
+      - blindSpots
+      - onUnsatisfied
+      - optional
+      - profile
+      - required
+      - sourceContractVersion
+    PracticeEvidenceRequirement:
+      type: object
+      description: Source and minimum capture quality required by a practice
+      properties:
+        completeness:
+          type: string
+          enum:
+          - COMPLETE
+          - ANY
+        freshness:
+          type: string
+          enum:
+          - CURRENT
+          - ANY
+        sourceKind:
+          type: string
+      required:
+      - completeness
+      - freshness
+      - sourceKind
+    PracticeEvidenceValidation:
+      type: object
+      description: Independent validation status and provenance for an evidence declaration
+      properties:
+        declarationDigest:
+          type: string
+        sourceContractVersion:
+          type: string
+        status:
+          type: string
+          description: Independent status; evidence authors cannot promote their own
+            declaration
+          enum:
+          - AUTHOR_DECLARED
+          - INDEPENDENTLY_VALIDATED
+          - STALE
+          - SUPERSEDED
+        validatedAt:
+          type: string
+          format: date-time
+        validationReference:
+          type: string
+        validator:
+          type: string
+      required:
+      - declarationDigest
+      - sourceContractVersion
+      - status
     PracticeReviewSettings:
       type: object
       description: "A workspace's practice-review policy: effective values plus raw\
@@ -10470,6 +10598,14 @@ components:
           enum:
           - GOOD
           - BAD
+        claimStatus:
+          type: string
+          description: Validity of an evaluation claim against the practice revision
+            currently in force
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
         confidence:
           type: number
           format: float
@@ -10513,6 +10649,7 @@ components:
         title:
           type: string
       required:
+      - claimStatus
       - confidence
       - findingId
       - observedAt
@@ -10758,6 +10895,14 @@ components:
           enum:
           - GOOD
           - BAD
+        claimStatus:
+          type: string
+          description: Validity of an evaluation claim against the practice revision
+            currently in force
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
         confidence:
           type: number
           format: float
@@ -10803,6 +10948,7 @@ components:
       required:
       - agentJobId
       - artifact
+      - claimStatus
       - confidence
       - feedbackDisposition
       - id
@@ -10846,6 +10992,14 @@ components:
           enum:
           - GOOD
           - BAD
+        claimStatus:
+          type: string
+          description: Validity of an evaluation claim against the practice revision
+            currently in force
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
         confidence:
           type: number
           format: float
@@ -10900,6 +11054,7 @@ components:
       required:
       - agentJobId
       - artifact
+      - claimStatus
       - confidence
       - feedback
       - id
@@ -11848,6 +12003,10 @@ components:
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*
+        evidence:
+          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
+          description: "Replacement evidence declaration; omit to preserve it, or\
+            \ to use the server baseline when artifactType changes"
         name:
           type: string
           description: Human-readable name

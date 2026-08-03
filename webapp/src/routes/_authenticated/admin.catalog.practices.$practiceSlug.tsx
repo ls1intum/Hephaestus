@@ -208,7 +208,12 @@ function LoadedEditCuratedPracticePage({
 				updatePractice.mutate({
 					path: { slug: practiceSlug },
 					headers: { "If-Match": `"${basePractice.status.etag}"` },
-					body: definition,
+					body: {
+						...definition,
+						...(definition.artifactType === basePractice.definition.artifactType
+							? { evidence: basePractice.definition.evidence }
+							: {}),
+					},
 				});
 			}}
 		/>

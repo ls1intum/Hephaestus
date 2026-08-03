@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -43,6 +45,14 @@ public record CreatePracticeRequestDTO(
     @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
+
+    @Valid
+    @Schema(
+        description = "Versioned sources and quality required before this practice may be judged; " +
+            "omit to use the server baseline for the selected artifact"
+    )
+    @Nullable
+    PracticeEvidenceDeclaration evidence,
 
     @Schema(
         description = "Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.",

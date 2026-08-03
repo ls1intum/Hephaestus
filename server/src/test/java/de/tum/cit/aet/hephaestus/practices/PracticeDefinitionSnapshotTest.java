@@ -3,6 +3,9 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -19,6 +22,22 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("ReviewSubmitted", "PullRequestCreated")));
         practice.setCriteria("abc");
         practice.setPrecomputeScript("console.log('x')");
+        practice.setEvidence(
+            new PracticeEvidenceDeclaration(
+                new SourceContractVersion("1.0.0"),
+                new EvidenceProfileId("pull-request-review"),
+                List.of(
+                    new PracticeEvidenceRequirement(
+                        new SourceKind("scm.pull-request.diff"),
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
+                    )
+                ),
+                List.of(),
+                PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+                List.of()
+            )
+        );
         practice.setWhyItMatters("Keeps feedback useful.");
         practice.setWhatGoodLooksLike("Each comment addresses one concern.");
 

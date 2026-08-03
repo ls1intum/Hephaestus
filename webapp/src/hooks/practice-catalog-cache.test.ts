@@ -126,5 +126,14 @@ describe("practice catalog cache updates", () => {
 		expect(
 			selectPracticePatch({ ...updated, whyItMatters: undefined }, { clear: ["WHY_IT_MATTERS"] }),
 		).toEqual({ whyItMatters: undefined });
+		expect(selectPracticePatch(updated, { evidence: updated.evidence })).toEqual({
+			evidence: updated.evidence,
+			evidenceValidation: updated.evidenceValidation,
+		});
+		expect(selectPracticePatch(updated, { artifactType: "PULL_REQUEST" })).toEqual({
+			artifactType: "PULL_REQUEST",
+			evidence: updated.evidence,
+			evidenceValidation: updated.evidenceValidation,
+		});
 	});
 });

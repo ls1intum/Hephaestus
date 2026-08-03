@@ -2,7 +2,7 @@
 id: dsms
 sidebar_position: 3
 title: Data-Protection Documentation
-description: Art. 30 / Art. 35 / Art. 28 records for the TUM-operated Hephaestus deployment.
+description: Art. 30 / Art. 35 / Art. 28 records and source-governance controls for the TUM-operated deployment.
 ---
 
 # Hephaestus — Data-Protection Documentation
@@ -16,14 +16,19 @@ A different operator forking Hephaestus must amend, before opening their deploym
 | File | Purpose |
 |---|---|
 | [`record-of-processing.md`](./record-of-processing.md) | Art. 30 record. TOMs (Art. 32) folded in under Art. 30(1)(g). Fenced blocks paste-ready into the TUM DSMS form. |
-| [`dpia-prescreen.md`](./dpia-prescreen.md) | Art. 35 pre-screen. Documents the DPIA-light posture and the conditions that would require a full DPIA. |
+| [`dpia-prescreen.md`](./dpia-prescreen.md) | Art. 35 pre-screen. Records the pending controller/DPO determination, safeguards, and change freeze. |
 | [`processor-checklist.md`](./processor-checklist.md) | Art. 28 checklist. Per-processor AVV status; LRZ-as-separate-controller analysis. |
+| [`artifact-source-governance.md`](./artifact-source-governance.md) | Approval, minimization, processor-egress, retention, and erasure gate for every AI-readable source. |
 
 The live imprint and privacy pages are at https://hephaestus.aet.cit.tum.de/imprint and https://hephaestus.aet.cit.tum.de/privacy. Markdown source: [`webapp/public/legal/profiles/tumaet/`](https://github.com/ls1intum/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
 
 ## Maintenance
 
-Re-review annually and on any material change to the processing surface (new processor, new data category, new retention window, new identity provider, activation of an integration that is currently disabled). The triggers that require an amendment before go-live are listed in `processor-checklist.md` and `dpia-prescreen.md` §5–§6.
+Re-review annually and on any material change to the processing surface (new processor, source, source
+combination, purpose, audience, data category, retention window, identity provider, or activation of an integration
+that is currently disabled). The DPIA pre-screen requires a recorded controller/DPO determination before material
+source expansion. The amendment triggers are listed in `processor-checklist.md`,
+`dpia-prescreen.md` §5–§6, and `artifact-source-governance.md`.
 
 ## Contacts
 

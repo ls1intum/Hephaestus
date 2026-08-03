@@ -1,13 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -302,11 +304,11 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
             List.of(review(PullRequestReview.State.UNKNOWN, "reviewer-x", Instant.parse("2025-05-01T12:00:00Z")))
         );
 
-        Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(request(metadataWithPr()), files);
+        var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());
 
-        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        JsonNode out = objectMapper.readTree(captured.files().get(FILE_KEY));
         assertThat(out.get("reviewDecisions")).isEmpty();
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
@@ -362,11 +364,13 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_neverThrows_onRepositoryFailure() {
+    void contribute_reportsCollectionError_onRepositoryFailure() {
         when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenThrow(new RuntimeException("db down"));
 
         Map<String, byte[]> files = new HashMap<>();
-        assertThatCode(() -> provider.contribute(request(metadataWithPr()), files)).doesNotThrowAnyException();
+        assertThatExceptionOfType(EvidenceCollectionException.class).isThrownBy(() ->
+            provider.contribute(request(metadataWithPr()), files)
+        );
         assertThat(files).doesNotContainKey(FILE_KEY);
     }
 

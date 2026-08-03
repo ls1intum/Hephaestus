@@ -4,6 +4,7 @@ import type {
 	CatalogEntryStatus,
 	CuratedAreaRequest,
 	CuratedPracticeRequest,
+	PracticeEvidenceDeclaration,
 } from "@/api/types.gen";
 import {
 	FOCUS_ARTIFACT_OPTIONS,
@@ -51,10 +52,35 @@ const PRACTICE_FIELDS = {
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Precompute script",
+	evidence: "Evidence contract",
 } satisfies Record<keyof CuratedPracticeRequest, string>;
 
 function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
+}
+
+function displayEvidence(evidence: PracticeEvidenceDeclaration): string {
+	const requirement = ({
+		sourceKind,
+		completeness,
+		freshness,
+	}: PracticeEvidenceDeclaration["required"][number]) =>
+		`${sourceKind} (${completeness.toLowerCase()}, ${freshness.toLowerCase()})`;
+	const lines = [
+		`Contract ${evidence.sourceContractVersion} · ${evidence.profile}`,
+		"Required:",
+		...evidence.required.map(requirement),
+	];
+	if (evidence.optional.length > 0) {
+		lines.push("Optional:", ...evidence.optional.map(requirement));
+	}
+	if (evidence.blindSpots.length > 0) {
+		lines.push(
+			"Declared blind spots:",
+			...evidence.blindSpots.map(({ code, summary }) => `${code}: ${summary}`),
+		);
+	}
+	return lines.join("\n");
 }
 
 function displayValue(
@@ -68,6 +94,9 @@ function displayValue(
 	}
 	if (field === "triggerEvents" && Array.isArray(value) && value.length === 0) {
 		return "No automatic trigger";
+	}
+	if (field === "evidence" && typeof value === "object") {
+		return displayEvidence(value as PracticeEvidenceDeclaration);
 	}
 	const words = (token: string) =>
 		token

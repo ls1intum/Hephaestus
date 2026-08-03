@@ -38,6 +38,7 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria("Give specific feedback");
+        practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         when(practiceRepository.findByIdForUpdate(42L)).thenReturn(Optional.of(practice));
         when(revisionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -85,6 +86,31 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         String before = service.append(practice).getDetectionFingerprint();
 
         practice.setCriteria("Changed detector criteria");
+
+        assertThat(service.append(practice).getDetectionFingerprint()).isNotEqualTo(before);
+    }
+
+    @Test
+    void editingTheEvidenceDeclarationChangesTheFingerprint() {
+        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
+        String before = service.append(practice).getDetectionFingerprint();
+
+        practice.setEvidence(
+            new PracticeEvidenceDeclaration(
+                practice.getEvidence().sourceContractVersion(),
+                practice.getEvidence().profile(),
+                List.of(
+                    new PracticeEvidenceRequirement(
+                        new de.tum.cit.aet.hephaestus.evidence.SourceKind("scm.pull-request.diff"),
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
+                    )
+                ),
+                List.of(),
+                PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+                List.of()
+            )
+        );
 
         assertThat(service.append(practice).getDetectionFingerprint()).isNotEqualTo(before);
     }

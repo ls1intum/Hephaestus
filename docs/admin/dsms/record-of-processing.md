@@ -1,6 +1,6 @@
 # Hephaestus — Record of Processing Activities (Art. 30 GDPR)
 
-_Last updated: 2026-07-31._
+*Last updated: 2026-08-03.*
 
 This file is the Art. 30 record for the TUM-operated Hephaestus deployment at https://hephaestus.aet.cit.tum.de. Each section maps to a single Art. 30 element. Fenced code blocks are paste-ready into the corresponding TUM DSMS form field at https://dsms.datenschutz.tum.de/; everything outside the fences is contextual.
 
@@ -12,7 +12,7 @@ This file is the Art. 30 record for the TUM-operated Hephaestus deployment at ht
 - Relevant for Subject Rights Request (SRR): tick.
 - Responsible department: TUM School of Computation, Information and Technology.
 - Associated TUM Org identifier: `TUS1322`.
-- DPIA pre-screen: see [`dpia-prescreen.md`](./dpia-prescreen.md) — outcome: no full DPIA required at the current scope; documented mitigations remain in place.
+- DPIA pre-screen: see [`dpia-prescreen.md`](./dpia-prescreen.md) — controller/DPO determination pending; material source expansion is frozen until the outcome is recorded.
 
 ## Controller and contact (Art. 30(1)(a))
 
@@ -35,7 +35,7 @@ Hephaestus is a self-hosted web platform operated by AET on TUM infrastructure a
 
 A workspace administrator connects one or more Git repositories from github.com or gitlab.lrz.de. Hephaestus then synchronises the pull/merge requests, issues, code reviews, review comments, and commit metadata authored in those repositories. The platform processes activity authored in the connected repositories, whether or not the author has signed in to Hephaestus.
 
-The synchronised activity is analysed against a set of practices configured by the workspace administrator to produce findings on each contributor's activity. Some of these judgements require reading and understanding natural-language text, such as the meaning of a code comment or the substance of a review reply. For those, the analysis uses an external LLM provider chosen by the administrator for the workspace. Automated practice review forwards the relevant pull/merge-request diff or issue content and surrounding discussion to the provider and can post the AI-generated findings as comments on the reviewed artefact. The conversational mentor is an in-app chat where contributors can ask follow-up questions; their messages and the surrounding context are forwarded to the same provider.
+The synchronised activity is analysed against a set of practices configured by the workspace administrator to produce findings on each contributor's activity. Some of these judgements require reading and understanding natural-language text, such as the meaning of a code comment or the substance of a review reply. For those, the analysis uses an external LLM provider chosen by the administrator for the workspace. Automated practice review forwards the relevant pull/merge-request diff or issue content and surrounding discussion to the provider and can post the AI-generated findings as comments on the reviewed artefact. Where explicitly connected and permitted, selected Outline documents may supply project context. The conversational mentor is an in-app chat where contributors can ask follow-up questions; their messages and the approved bounded context from repository activity, prior feedback, selected Outline documents, or participant-permitted monitored Slack channels are forwarded to the same provider. Sources are purpose- and audience-bound; an enabled integration is not by itself authorization to include all of its content in every request.
 
 Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their findings and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements based on workspace activity (all off by default), plus Slack integration for App Home privacy controls, mentor DMs, optional digests, and explicitly activated monitored channels.
 
@@ -57,7 +57,7 @@ Tick in DSMS:
 Tick in DSMS: Name(s), Contact details: email, Image data, Indicators of Behaviour, IP address, Social network data, User IDs and Passwords. Do **not** tick "Examination and academic performance" — practice findings are advisory, not graded.
 
 ```text
-Repository-activity artefacts authored by the contributor in the connected Git repositories (pull/merge requests, issues, code reviews, review comments, commit metadata), AI guidance-assistant conversations, and Slack integration data when enabled (Slack IDs, Slack identity links, App Home privacy choices, Hephaestus DM mentor messages, and new messages in administrator-activated monitored Slack channels).
+Repository-activity artefacts authored by the contributor in the connected Git repositories (pull/merge requests, issues, code reviews, review comments, commit metadata and the bounded repository tree required for an enabled review), AI guidance-assistant conversations, selected Outline project documents, and Slack integration data when enabled (Slack IDs, Slack identity links, App Home privacy choices, Hephaestus DM mentor messages, and new messages in administrator-activated monitored Slack channels).
 ```
 
 Hephaestus does not intentionally solicit or classify special-category data (Art. 9(1) GDPR) or criminal-offence data (Art. 10 GDPR). Because repository and chat fields contain free text, incidental content may include and therefore cause processing of them. The privacy statement instructs users not to enter third-party personal or sensitive data.
@@ -109,6 +109,7 @@ Mixed retention by category:
 - Settings-change audit log (`config_audit_event`: who changed which workspace or AI setting, when, and the before/after values; records the acting account and, where a change was made while impersonating, the impersonator): retained 365 days, then deleted automatically. The table is append-only by database trigger, so a row is never rewritten. On account erasure the actor references are detached and the row is retained for the remainder of its window, as for the authentication-event log. Credentials are never stored in it — a rotation records only that a secret changed.
 - LLM usage ledger (`llm_usage_event`: per-run token counts and cost, attributed to a workspace and to the run that incurred them): retained indefinitely as accounting data, deliberately outliving the row that produced it so that a month's spend total cannot change retrospectively. It holds no message content and no free text; where its source pointer refers to a mentor conversation turn, the pointer survives deletion of that turn while the conversation content itself is removed on the paths described above.
 - Practice-review job records (`agent_job`: the queued job, the sandbox's captured stdout, and the findings it produced — these can quote the contributor's code and discussion): the diagnostic payload (`container_logs`, `output`) is stripped to NULL 14 days after the job reaches a terminal state (`AGENT_PAYLOAD_RETENTION`, default `P14D`) and the row itself is deleted after 90 days (`AGENT_ROW_RETENTION`, default `P90D`). Both are operator-tunable.
+- Ordinary artifact-source manifests and their content-addressed cache references: job replay directories expire after 30 days by default (`hephaestus.fabric.gc-retention-days`), after which mark-and-sweep removes blobs not referenced by another live manifest. A digest is an integrity identifier, not authorization. Extended evaluation retention is disabled until it has a separate approved purpose, tenant-safe authorization, and the retention/erasure coverage required by the [artifact-source governance decision](./artifact-source-governance.md).
 - Webhook and integration-sync event transport buffer (NATS JetStream): the `slack` and `outline` streams carry real message and document content and expire after at most 72 hours; the GitHub and GitLab streams carry delivered webhook payloads (pull-request, issue and review-comment bodies) and expire after 180 days. PostgreSQL is the system of record and all consent/erasure controls apply there; erasure cannot reach inside the broker, so these horizons, not an erasure request, are what remove the buffered copy.
 - Container stdout (startup and error output; no per-request records): rotated by size by the container runtime, per the per-service caps described there. There is no time-based expiry; a line survives until the rotation window displaces it.
 ```
@@ -135,12 +136,17 @@ Hephaestus provides a self-service data export (Art. 20): a signed-in contributo
 
 ```text
 - The Hephaestus account, federated identity links, and (where PostHog analytics is activated; off by default in the TUM-operated deployment) the corresponding analytics identity: removed by the in-app account-deletion control. Deletion immediately revokes all sessions and marks the account for deletion with a 48-hour cancellation window; after the window a scheduled sweeper hard-deletes the account-bound rows (identity links, feature flags, the session/revocation list, export artefacts), tombstones the account's contact PII, and severs the link to the git-provider activity mirror.
-- Contributor profile and dependent records (account preferences, workspace memberships, AI conversations, practice-finding feedback, recognition signals): removed by AET operators against the production database — by row deletion where supported by foreign-key constraints, otherwise by anonymisation that severs the link to federated identity (the records cease to be personal data within the meaning of Art. 4(1) GDPR).
+- Contributor profile and dependent records: account preferences and workspace memberships are covered by the
+  account/operator paths. Automated person-level traversal does not cover every SCM-only identity, AI conversation,
+  observation, feedback record, evaluation label, and retained evidence copy. Operators must locate and remove or
+  irreversibly de-identify those records when fulfilling a request. Extended evidence retention remains disabled
+  until complete traversal is implemented and tested.
 - Mirrored third-party content, on disconnection of the corresponding integration or on workspace purge (both triggers erase the same rows, by hard deletion, not by a deleted-flag):
     - GitHub / gitlab.lrz.de: the mirrored repository and everything cascading from it — issues, pull/merge requests, reviews, review threads and comments, discussions, labels, milestones, collaborators — plus the workspace's repository monitors, any local git clone, the org-level mirror (teams, team memberships, organisation memberships), the activity-event log, and the SCM-derived practice observations and feedback (whose evidence quotes mirrored content verbatim). Repository rows are instance-global and shared: a repository another workspace still monitors is retained for that workspace, and only the disconnecting workspace's access path is removed. The org-level mirror is removed only when no other workspace is bound to the same organisation.
     - Slack: messages, threads, monitored-channel records, participant-consent records, mentor threads, and the conversation-derived observations and feedback.
     - Outline: documents, collections, and the document event log.
 - Retained after disconnection / purge, for all four integrations: the operational sync history (`sync_job`, `connection_activity`, `connection_audit`) — job kind, type, status and timestamps only, capped per connection, carrying no third-party content — so that the disconnection itself remains auditable. Connection credentials are cleared atomically as part of the same transition. Cross-tenant identity rows (accounts, organisations, identity providers) are not touched by a disconnection; they are covered by the account-deletion and erasure-request paths above.
+- Artifact-source manifests, repository snapshots, CAS references, derived assessments, exports, and governed evaluation cases must be traversed by source, workspace, and person erasure. Expiry/erasure may leave only a non-content typed tombstone and makes replay unavailable; audit reproducibility never overrides erasure.
 - Source-side content on GitHub or gitlab.lrz.de: not modified by deletion in Hephaestus.
 - Container stdout (startup and error output): rotated by size by the container runtime (per-service caps under "Where stored") and not selectively prunable — an erasure request cannot reach inside the rotation window, which displaces the lines on its own.
 - Off-host backups: not configured at the time of submission. Any VM-level snapshots taken by AET infrastructure operations are governed by their separate retention policy at the infrastructure layer.
@@ -221,6 +227,10 @@ DSMS multi-select: tick `Data received from third parties` and `Directly from th
 
 ```text
 - From GitHub and gitlab.lrz.de: identity at sign-in (GitHub OAuth, gitlab.lrz.de OIDC, federated directly by the application server); repository activity via the GitHub App installation or workspace-configured access token; webhook events delivered to the platform's /webhooks endpoint.
+- From a connected Slack workspace: linked identity and App Home choices, mentor direct messages, and new messages
+  from explicitly activated monitored channels after the visible announcement.
+- From a connected Outline workspace: documents and author attribution from collections explicitly selected by
+  the workspace administrator; optional linked identity when a contributor connects Outline.
 - Directly from the data subject: account preferences, AI-assistant messages, and rights requests submitted through the contact process.
 - From the HTTP connection: nothing. No layer writes a per-request record. The source IP address and user agent are collected as such only for authentication events, and are retained under the auth-event log's own 12-month window described above.
 ```

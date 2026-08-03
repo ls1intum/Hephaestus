@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
         {type: 'doc', id: 'dsms/record-of-processing', label: 'Record of Processing (Art. 30)'},
         {type: 'doc', id: 'dsms/dpia-prescreen', label: 'DPIA Pre-Screen (Art. 35)'},
         {type: 'doc', id: 'dsms/processor-checklist', label: 'Processor Checklist (Art. 28)'},
+        {type: 'doc', id: 'dsms/artifact-source-governance', label: 'Artifact-Source Governance'},
       ],
     },
   ],

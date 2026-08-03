@@ -2,13 +2,16 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
@@ -247,10 +250,10 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         ObjectNode metadata = sampleMetadata();
         metadata.put("source_branch", "feature/no-refs");
 
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(request(metadata), files);
+        var captured = provider.capture(request(metadata), provider.sourceKinds());
 
-        assertThat(files).doesNotContainKey("inputs/context/linked_work_items.json");
+        assertThat(captured.files()).doesNotContainKey("inputs/context/linked_work_items.json");
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
@@ -288,14 +291,16 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void doesNotThrowWhenRepositoryQueryFails() {
+    void reportsCollectionErrorWhenRepositoryQueryFails() {
         PullRequest pr = new PullRequest();
         pr.setBody("Closes #42");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42)).thenThrow(new RuntimeException("DB down"));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
-        assertThatCode(() -> provider.contribute(request(sampleMetadata()), files)).doesNotThrowAnyException();
+        assertThatExceptionOfType(EvidenceCollectionException.class).isThrownBy(() ->
+            provider.contribute(request(sampleMetadata()), files)
+        );
         assertThat(files).isEmpty();
     }
 

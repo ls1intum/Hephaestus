@@ -1,0 +1,402 @@
+{
+  "version": "1.0.0",
+  "sources": [
+    {
+      "kind": "scm.pull-request.core",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "SYNCHRONIZED_MIRROR",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "MAX_AGE",
+        "maxAgeSeconds": 300
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": false
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-pull-request-core"
+    },
+    {
+      "kind": "scm.pull-request.diff",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "DETERMINISTIC_DERIVATION",
+      "captureTime": "PINNED_IMMUTABLE_IDENTITY",
+      "freshness": {
+        "mode": "PINNED_IDENTITY"
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": false,
+        "supportsEmpty": true
+      },
+      "privacyClass": "INTERNAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-pull-request-diff"
+    },
+    {
+      "kind": "scm.pull-request.comments",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "SYNCHRONIZED_MIRROR",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "MAX_AGE",
+        "maxAgeSeconds": 300
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-pull-request-comments"
+    },
+    {
+      "kind": "scm.contributor-history",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "LOSSY_DERIVATION",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "NOT_APPLICABLE"
+      },
+      "completeness": {
+        "supportsComplete": false,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-contributor-history"
+    },
+    {
+      "kind": "scm.repository.tree",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "UPSTREAM_SNAPSHOT",
+      "captureTime": "PINNED_IMMUTABLE_IDENTITY",
+      "freshness": {
+        "mode": "PINNED_IDENTITY"
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "INTERNAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-repository-tree"
+    },
+    {
+      "kind": "scm.issue.core",
+      "artifactTypes": [
+        "ISSUE"
+      ],
+      "authority": "SYNCHRONIZED_MIRROR",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "MAX_AGE",
+        "maxAgeSeconds": 300
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": false
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-issue-core"
+    },
+    {
+      "kind": "scm.issue.comments",
+      "artifactTypes": [
+        "ISSUE"
+      ],
+      "authority": "SYNCHRONIZED_MIRROR",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "MAX_AGE",
+        "maxAgeSeconds": 300
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-issue-comments"
+    },
+    {
+      "kind": "slack.conversation.thread",
+      "artifactTypes": [
+        "CONVERSATION_THREAD"
+      ],
+      "authority": "SYNCHRONIZED_MIRROR",
+      "captureTime": "EVENT_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "EVENT_TIME"
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-slack-conversation-thread"
+    },
+    {
+      "kind": "scm.linked-work-items",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "LOSSY_DERIVATION",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "NOT_APPLICABLE"
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-linked-work-items"
+    },
+    {
+      "kind": "scm.review-threads",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "SYNCHRONIZED_MIRROR",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "NOT_APPLICABLE"
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-review-threads"
+    },
+    {
+      "kind": "scm.general-review-comments",
+      "artifactTypes": [
+        "PULL_REQUEST"
+      ],
+      "authority": "SYNCHRONIZED_MIRROR",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "NOT_APPLICABLE"
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-scm-general-review-comments"
+    },
+    {
+      "kind": "workspace.project-inventory",
+      "artifactTypes": [
+        "PULL_REQUEST",
+        "ISSUE",
+        "CONVERSATION_THREAD"
+      ],
+      "authority": "LOSSY_DERIVATION",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "NOT_APPLICABLE"
+      },
+      "completeness": {
+        "supportsComplete": true,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-workspace-project-inventory"
+    },
+    {
+      "kind": "outline.documents",
+      "artifactTypes": [
+        "PULL_REQUEST",
+        "ISSUE"
+      ],
+      "authority": "LOSSY_DERIVATION",
+      "captureTime": "COLLECTION_TIME_SNAPSHOT",
+      "freshness": {
+        "mode": "NOT_APPLICABLE"
+      },
+      "completeness": {
+        "supportsComplete": false,
+        "supportsPartial": true,
+        "supportsEmpty": true
+      },
+      "privacyClass": "PERSONAL",
+      "supportedMissingness": [
+        "NOT_COLLECTED",
+        "UNAVAILABLE",
+        "REDACTED",
+        "COLLECTION_ERROR"
+      ],
+      "purpose": "practice-detection",
+      "retentionPolicy": "agent-evidence-retention",
+      "erasurePolicy": "workspace-and-person-erasure",
+      "useDecisionId": "use-outline-documents"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "pull-request-review",
+      "version": "1.0.0",
+      "artifactType": "PULL_REQUEST",
+      "allowedSources": [
+        "scm.pull-request.core",
+        "scm.pull-request.diff",
+        "scm.pull-request.comments",
+        "scm.contributor-history",
+        "scm.repository.tree",
+        "scm.linked-work-items",
+        "scm.review-threads",
+        "scm.general-review-comments",
+        "workspace.project-inventory",
+        "outline.documents"
+      ]
+    },
+    {
+      "id": "issue-review",
+      "version": "1.0.0",
+      "artifactType": "ISSUE",
+      "allowedSources": [
+        "scm.issue.core",
+        "scm.issue.comments",
+        "workspace.project-inventory",
+        "outline.documents"
+      ]
+    },
+    {
+      "id": "conversation-review",
+      "version": "1.0.0",
+      "artifactType": "CONVERSATION_THREAD",
+      "allowedSources": [
+        "slack.conversation.thread",
+        "workspace.project-inventory"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
+import { mockPullRequestEvidence } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { CuratedPracticeForm } from "./CuratedPracticeForm";
@@ -98,6 +99,7 @@ export const HephaestusUpdateAvailable: Story = {
 				artifactType: "PULL_REQUEST",
 				triggerEvents: ["PullRequestCreated"],
 				criteria: "The updated default criteria",
+				evidence: mockPullRequestEvidence,
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},
 		},

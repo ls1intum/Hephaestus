@@ -9,7 +9,9 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -115,7 +117,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "criteria",
                     "Initial private criteria",
                     "precomputeScript",
-                    "return { hints: [] };"
+                    "return { hints: [] };",
+                    "evidence",
+                    PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST)
                 )
             )
             .exchange()

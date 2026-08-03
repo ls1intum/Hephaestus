@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.conversation;
 
+import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -35,4 +37,8 @@ public interface ConversationThreadProjection {
      * @param threadTs    the thread root {@code ts} (aggregate key)
      */
     ObjectNode buildThreadPayload(long workspaceId, String channelId, String threadTs);
+
+    default @Nullable Instant sourceEffectiveAt(String sourceEventId) {
+        return null;
+    }
 }

@@ -84,7 +84,7 @@ The `.env` file in `server/` is read by **both** Docker Compose (for container p
 
 Ports flow through the system like this:
 
-```
+```text
 .env (POSTGRES_PORT=15432)
   ├─► Docker Compose  →  '15432:5432' host mapping
   └─► Spring Boot     →  jdbc:postgresql://localhost:15432/hephaestus
@@ -278,7 +278,6 @@ App-level admin is the `APP_ADMIN` role on the `account` table (authority `app_a
 - **401 after login:** ensure `GITHUB_OAUTH_CLIENT_ID/SECRET` are set and the callback URL on the GitHub app matches your `SERVER_PORT`.
 - **Logins don't survive a server restart locally:** set `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` (base64 32-byte; `openssl rand -base64 32`) in `server/.env` — otherwise an ephemeral per-boot key is used.
 - **Reset everything:** run `pnpm dev:reset` (Postgres is a bind-mounted folder, so `docker compose down -v` does **not** clear it — `dev:reset` removes `server/postgres-data` and recreates the stack); on next login the account + identity link are recreated.
-
 
 ### Webhook receiver
 

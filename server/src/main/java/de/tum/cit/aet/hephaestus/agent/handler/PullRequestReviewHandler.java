@@ -7,6 +7,8 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
@@ -23,6 +25,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -76,37 +79,18 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 
-    /**
-     * Materialized context files a finding may legitimately cite that survive the post-agent
-     * {@code filterByDiffScope} pass. metadata.json carries the PR fields; diff.patch / diff_summary.md
-     * ARE the change under review (so a finding anchored there is in-scope by definition — the
-     * code-judging practices quote a {@code [L<n>]} span in diff.patch); comments.json is the review
-     * thread the reviewer-side practices read. These resolve as internal paths in DeliveryComposer, so
-     * such findings render as non-inlinable summary items rather than diff-anchored inline notes.
-     */
+    /** Context artifacts permitted as non-inline finding locations. */
     private static final Set<String> ALLOWED_INTERNAL_CONTEXT_PATHS = Set.of(
         ContentSource.OUTPUT_PREFIX + "metadata.json",
         ContentSource.OUTPUT_PREFIX + "diff.patch",
         ContentSource.OUTPUT_PREFIX + "diff_summary.md",
         ContentSource.OUTPUT_PREFIX + "comments.json",
-        // Raw SQL-only integration objects (the agent cannot get these from the mounted worktree): a finding
-        // grounded in one of these must survive the diff-scope filter. Only objects absent from the worktree
-        // belong here — anything derivable from the checkout is content the agent reads directly.
         ContentSource.OUTPUT_PREFIX + "linked_work_items.json",
         ContentSource.OUTPUT_PREFIX + "review_threads.json",
-        // General (conversation-tab) MR review discussion — position-less notes GitLab routes to
-        // IssueComment, surfaced by GeneralReviewCommentContentSource. The reviewer-craft practices
-        // ground in this alongside comments.json; a finding citing it must survive the diff-scope filter.
         ContentSource.OUTPUT_PREFIX + "general_comments.json"
     );
 
-    /**
-     * Process/metadata-level PR practices whose evidence is the PR metadata, the commit subjects, or the
-     * review thread — NOT a diff line. {@code filterByDiffScope} is a guard for CODE-defect findings whose
-     * location must sit inside the diff; applied to these process practices it would wrongly drop a valid
-     * finding the moment the agent attaches a stray (non-diff) location to it (e.g. a commit-subject
-     * finding citing a commit ref). These slugs therefore bypass the diff-scope filter.
-     */
+    /** Practices whose evidence need not be anchored to a changed line. */
     private static final Set<String> METADATA_LEVEL_PRACTICES = Set.of(
         "scope-one-reviewable-change",
         "describe-what-and-why",
@@ -219,11 +203,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return new JobSubmission(metadata, idempotencyKey);
     }
 
-    /**
-     * Prepare context files for the agent. Workspace context is materialised by
-     * {@link WorkspaceContextBuilder}; task envelope by {@link TaskEnvelopeWriter}; practice
-     * catalog stays here (per-job, not provider-shaped).
-     */
     @Override
     public Map<String, byte[]> prepareInputFiles(AgentJob job) {
         long startNanos = System.nanoTime();
@@ -234,18 +213,20 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
 
-        // LinkedHashMap: deterministic iteration order for snapshot fixtures.
-        Map<String, byte[]> files = new LinkedHashMap<>(
-            workspaceContextBuilder.build(new ContextRequest.PracticeReviewRequest(job))
+        List<Practice> practices = practiceCatalogInjector.resolve(job, WorkArtifact.PULL_REQUEST);
+        PreparedEvidence prepared = workspaceContextBuilder.prepare(
+            new ContextRequest.PracticeReviewRequest(job),
+            EvidencePlan.compile(practices)
         );
+        practices = workspaceContextBuilder.readyPractices(prepared.manifest(), practices, job.getId().toString());
+        if (practices.isEmpty()) {
+            throw new JobPreparationException("No practice has sufficient evidence: jobId=" + job.getId());
+        }
+        Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
 
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
-        practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST);
-
-        // Pre-create blobs/scm/ so the repo can mount under it (the directory mount needs its parent
-        // to exist before docker cp extracts into it).
-        files.put(SandboxLayout.SCM_SOURCE_KEEP, new byte[0]);
+        practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST, practices);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -268,26 +249,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             requireText(metadata, "repository_full_name")
         );
         return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
-    }
-
-    /**
-     * Mount the real locally-cloned git repository into the container read-only.
-     * The agent gets full access to git history, blame, diffs, and the complete codebase.
-     */
-    @Override
-    public Map<String, String> volumeMounts(AgentJob job) {
-        JsonNode metadata = job.getMetadata();
-        long repositoryId = requireLong(metadata, "repository_id");
-
-        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
-            throw new JobPreparationException(
-                "Repository not cloned: repoId=" + repositoryId + ", jobId=" + job.getId()
-            );
-        }
-
-        log.info("Mounting real repo: repoId={}, path={}", repositoryId, repoPath);
-        return Map.of(repoPath.toAbsolutePath().toString(), SandboxLayout.REPO_MOUNT);
     }
 
     private String buildPrompt(AgentJob job) {

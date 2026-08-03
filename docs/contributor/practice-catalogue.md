@@ -91,6 +91,12 @@ A practice must:
 5. use language useful to the developer doing the work; and
 6. cite research, a standard, or an explicitly identified practitioner norm.
 
+Evidence requirements use the versioned
+[artifact-source contract](./artifact-source-contract). They declare logical required/optional sources, minimum
+completeness/freshness, conservative refusal, and known blind spots. They must not infer availability
+from a missing file or require desired content to be non-empty. An author declaration is not independent
+observability validation.
+
 Architecture-wide qualities cannot be inferred from one change. A practice may review an observable
 act, such as recording a decision, without turning it into a claim about the whole system.
 
@@ -110,10 +116,13 @@ standard as an experiment or a convention as a proven outcome.
 1. State the user problem and supported reviewed work.
 2. Cite and classify the evidence.
 3. Draft applicability, signals, exclusions, evidence requirements, and severity.
-4. Update `server/src/main/resources/practices/default-catalog.json`; its Git history is the bundled
+4. Validate every source against the applicable evidence profile and confirm its governance decision permits the product
+   purpose, audience, processor egress, and retention. A new source follows the
+   [artifact-source governance gate](../admin/dsms/artifact-source-governance).
+5. Update `server/src/main/resources/practices/default-catalog.json`; its Git history is the bundled
    version history.
-5. Add or update focused detection tests when review behavior changes.
-6. Review the admin presentation and a representative delivered message.
+6. Add or update focused detection tests, including required-source refusal and valid-empty evidence.
+7. Review the admin presentation and a representative delivered message.
 
 Create workspace-specific practices through the admin UI or API so validation, ordering, revisions,
 and audit behavior remain intact.

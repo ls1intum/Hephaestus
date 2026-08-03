@@ -2,13 +2,17 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -40,7 +44,19 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 @Order(210)
-public class GeneralReviewCommentContentSource implements ContentSource {
+public class GeneralReviewCommentContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("scm.general-review-comments");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(GeneralReviewCommentContentSource.class);
 
@@ -144,10 +160,7 @@ public class GeneralReviewCommentContentSource implements ContentSource {
             files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));
             log.info("GeneralReviewComments: prId={} emitted={} skippedSelf={}", pullRequestId, emitted, skippedSelf);
         } catch (Exception e) {
-            log.warn(
-                "GeneralReviewCommentContentSource failed, continuing without general discussion: {}",
-                e.getMessage()
-            );
+            throw new EvidenceCollectionException("General-review-comment collection failed", e);
         }
     }
 

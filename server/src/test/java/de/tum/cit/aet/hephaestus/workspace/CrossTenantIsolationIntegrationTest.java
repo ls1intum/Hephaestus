@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -153,6 +154,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private TenantData seed(Workspace ws) {
         String practiceSlug = "practice-" + ws.getWorkspaceSlug();
         Practice practice = new Practice();
+        practice.setEvidence(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(ws);
         practice.setSlug(practiceSlug);
         practice.setName("Practice of " + ws.getWorkspaceSlug());

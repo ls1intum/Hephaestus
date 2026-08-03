@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeDetectionFingerprint;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -28,6 +29,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -95,6 +97,11 @@ public class PracticeRevision {
     @ToString.Exclude
     private String precomputeScript;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evidence_declaration", columnDefinition = "jsonb")
+    @ToString.Exclude
+    private @Nullable PracticeEvidenceDeclaration evidence;
+
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     @ToString.Exclude
     private String whyItMatters;
@@ -136,6 +143,7 @@ public class PracticeRevision {
         this.triggerEvents = Objects.requireNonNull(practice.getTriggerEvents(), "practice.triggerEvents").deepCopy();
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
         this.precomputeScript = practice.getPrecomputeScript();
+        this.evidence = Objects.requireNonNull(practice.getEvidence(), "practice.evidence");
         this.whyItMatters = practice.getWhyItMatters();
         this.whatGoodLooksLike = practice.getWhatGoodLooksLike();
         PracticeArea area = practice.getArea();
@@ -153,11 +161,15 @@ public class PracticeRevision {
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
+            evidence,
             areaSlug
         );
     }
 
     public String computeDetectionFingerprint() {
+        if (evidence == null) {
+            throw new IllegalStateException("Practice revision has no artifact-source contract");
+        }
         return PracticeDetectionFingerprint.of(
             slug,
             name,
@@ -165,6 +177,7 @@ public class PracticeRevision {
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
+            evidence,
             areaSlug
         );
     }

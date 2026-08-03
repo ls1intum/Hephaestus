@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.dto.ValidTriggerEvents;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -35,6 +37,11 @@ public record CuratedPracticeRequestDTO(
     @Nullable
     String precomputeScript,
 
+    @Valid
+    @Schema(description = "Evidence declaration; omit to use the server baseline for the selected artifact")
+    @Nullable
+    PracticeEvidenceDeclaration evidence,
+
     @Size(max = 2000, message = "Why it matters must be at most 2000 characters") @Nullable String whyItMatters,
 
     @Size(max = 2000, message = "What good looks like must be at most 2000 characters")
@@ -50,19 +57,21 @@ public record CuratedPracticeRequestDTO(
             definition.triggerEvents(),
             definition.criteria(),
             definition.precomputeScript(),
+            definition.evidence(),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
             definition.areaSlug()
         );
     }
 
-    public PracticeDefinition definition() {
+    public PracticeDefinition definition(PracticeEvidenceDeclaration resolvedEvidence) {
         return new PracticeDefinition(
             name,
             artifactType,
             triggerEvents,
             criteria,
             precomputeScript,
+            resolvedEvidence,
             whyItMatters,
             whatGoodLooksLike,
             areaSlug

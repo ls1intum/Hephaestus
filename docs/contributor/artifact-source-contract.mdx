@@ -1,0 +1,226 @@
+---
+id: artifact-source-contract
+sidebar_position: 6
+title: Artifact-source contract
+description: Versioned evidence sources, missingness, practice requirements, and conservative refusal rules.
+---
+
+# Artifact-source contract
+
+Hephaestus may make a practice judgment only from evidence with explicit semantics. Contract `1.0.0` defines the
+logical source catalog, capture states, evidence profiles, and practice requirements. A capture manifest proves
+what was supplied to one run; it does not prove that a practice is empirically observable. Independent
+observability validation has separate provenance and status.
+
+> If any required evidence clause is unsatisfied, record insufficient evidence and make no semantic claim.
+> Missing evidence is never `NOT_APPLICABLE`, a strength, or evidence that desired behaviour is absent.
+
+## Contract boundary
+
+The contract separates three identities:
+
+1. **Source catalog:** logical source kinds and their authority, timing, freshness, completeness, privacy, and
+   missingness semantics.
+2. **Evidence profile:** the source allow-list for one artifact type and runtime purpose.
+3. **Capture manifest:** the state, provenance facts, and materialized artifacts for one invocation.
+
+Paths are materializations, not source identities. Prompts, practice files, task envelopes, runner code, model
+settings, and executables are invocation inputs and require separate evaluation provenance.
+
+Runtime components must reference the exact contract version and catalog digest they implement. The
+`schemaVersion: 1` context index is not an artifact-source manifest and must not acquire `1.0.0` semantics.
+Inputs outside the catalog cannot satisfy a practice requirement.
+
+## Source vocabulary
+
+### Authority and time
+
+| Authority | Meaning |
+| --- | --- |
+| `UPSTREAM_SNAPSHOT` | Content captured from an upstream object. |
+| `SYNCHRONIZED_MIRROR` | A local projection whose currentness depends on upstream synchronization. |
+| `DETERMINISTIC_DERIVATION` | A deterministic transform of declared dependencies. |
+| `LOSSY_DERIVATION` | A sample, excerpt, aggregation, heuristic, or other information-losing transform. |
+
+Capture time is separately `EVENT_TIME_SNAPSHOT`, `COLLECTION_TIME_SNAPSHOT`, or
+`PINNED_IMMUTABLE_IDENTITY`. An available capture records representation fidelity as `EXACT`,
+`LOSSLESS_DERIVATION`, or `LOSSY_DERIVATION`.
+
+A database row is not automatically authoritative for the current state of GitHub, GitLab, Slack, or Outline.
+Currentness depends on a source watermark, event time, or immutable identity defined by the source contract.
+
+### Privacy classes
+
+Privacy class describes risk; it does not authorize collection, disclosure, or model egress.
+
+| Class | Scope | Minimum treatment |
+| --- | --- | --- |
+| `PUBLIC` | Content verified as intentionally public within the approved scope | Integrity and purpose controls |
+| `INTERNAL` | Non-public project or workspace content without person-level assessment | Workspace authorization and purpose-bound retention |
+| `PERSONAL` | User-linked project content, authorship, reviews, comments, or activity | Personal-data access, export, and erasure coverage |
+| `SENSITIVE_PERSONAL` | Private conversations or derived person-level assessments | Restricted audience and stricter disclosure and retention controls |
+
+Each catalog source references a source-use decision. That registration is only one runtime gate. Audience,
+processor, region, transfer, and model-egress controls remain separate enforcement obligations. A source allowed
+in an internal mirror is not thereby allowed in an external model request or learner-facing quotation.
+
+## Detector catalog (`1.0.0`)
+
+The machine-readable [catalog](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/catalog.json)
+and its adjacent JSON Schema are normative; prose does not maintain a second field-by-field catalog. Authoring
+tools resolve source kinds through one of the catalog's exact artifact profiles and reject unknown kinds.
+
+The constraints with direct authoring consequences are:
+
+- Contributor history, linked work items, review threads, general review comments, project inventory, and
+  Outline documents expose no `CURRENT` claim. A practice can require them only with freshness `ANY`.
+- Contributor history and Outline documents cannot satisfy `COMPLETE`.
+- Pull-request and issue core records cannot be logically empty. Other `1.0.0` sources may be validly empty.
+- An available pull-request diff is pinned and complete; it may be empty but is never partial.
+
+`ENGINEERING_BASELINE` with `PENDING_CONTROLLER_REVIEW` records an operational registration, not approval. It
+contains no reviewer or decision timestamp and cannot cover an expanded source, purpose, audience, processor,
+retention policy, or collection scope. `CONTROLLER_DECISION` records the releasable subset of a traceable decision;
+only an unexpired `APPROVED` product decision passes that gate. The controller's complete record remains separate.
+
+Changing a source's meaning, selection scope, limit, mapping, freshness policy, dependency, or normalization
+requires a new contract version. Repository history is not part of `scm.repository.tree` and requires its own
+source and governance decision.
+
+## Capture state
+
+Missingness is orthogonal so the manifest does not collapse unavailable, stale, and partial evidence into one
+state.
+
+### Availability
+
+- `AVAILABLE`: capture facts and logical content state are present.
+- `NOT_COLLECTED`: the source was outside the plan, disabled, or not attempted.
+- `UNAVAILABLE`: the source could not be retrieved for a non-error reason.
+- `REDACTED`: the entire source was withheld for privacy or security.
+- `COLLECTION_ERROR`: an attempted collection failed.
+
+A non-available source contains no artifacts or source identifiers. Safe, typed reason codes may be
+role-filtered; free-form exception text must not enter the manifest.
+
+### Available-source dimensions
+
+Only `AVAILABLE` has:
+
+- logical content: `EMPTY` or `NON_EMPTY`;
+- completeness: `COMPLETE`, `PARTIAL`, or `UNKNOWN`;
+- capture and optional source times or immutable identity;
+- query scope, completeness basis, fidelity, and artifacts.
+
+Logical content is independent of serialized bytes: a JSON file containing `[]` represents an `EMPTY` source.
+Field-level redaction remains an available, usually partial source; whole-source redaction uses `REDACTED`.
+
+Freshness is an assessment, not a mutable capture fact. The runtime evaluates the recorded temporal anchor under
+the pinned freshness policy at `assessedAt`, producing `CURRENT`, `STALE`, or `UNKNOWN`. It must not substitute
+query time for a missing upstream watermark. `NOT_APPLICABLE` means that the contract offers no currentness claim,
+so authoring validation rejects a `CURRENT` requirement. `ANY` accepts the absence of such a claim; it does not
+assert that the data is current.
+
+Deliberate ablation is an evaluation transformation, not natural missingness. Production rejects ablation;
+evaluation records a named plan and removes the declared dependency closure.
+
+## Practice evidence declarations
+
+A declaration pins one contract version and profile, then lists required and optional sources. Required sources
+must satisfy their completeness and freshness clauses. The contract deliberately has no arbitrary expression
+language and cannot require `NON_EMPTY`: complete empty evidence is valid evidence.
+
+```json
+{
+  "sourceContractVersion": "1.0.0",
+  "profile": "pull-request-review",
+  "required": [
+    {
+      "sourceKind": "scm.pull-request.diff",
+      "completeness": "COMPLETE",
+      "freshness": "CURRENT"
+    }
+  ],
+  "optional": [],
+  "onUnsatisfied": "DECLINE_SEMANTIC_JUDGMENT",
+  "blindSpots": [
+    {
+      "code": "RUNTIME_BEHAVIOUR_NOT_OBSERVED",
+      "summary": "Runtime behaviour and production configuration are not observed."
+    }
+  ]
+}
+```
+
+Validation rejects unknown versions or kinds, sources outside the profile, impossible requirements, incompatible
+artifact types, conflicting required and optional entries, undeclared precompute dependencies, and active use of
+an unobservable practice/source combination.
+
+Author classifications (`MECHANICAL`, `SEMANTIC`, `CONDITIONALLY_OBSERVABLE`, or `UNOBSERVABLE`) are declarations,
+not empirical validation. Independent validation records their own scope, method, provenance, lifecycle, and
+outcome.
+
+## Conservative examples
+
+### Required evidence is insufficient
+
+`scope-one-reviewable-change` requires current, complete `scm.pull-request.core` and
+`scm.pull-request.diff`. If the diff is unavailable or the pull-request watermark is stale or unknown, the
+runtime records insufficient evidence and makes no claim that the change is focused, sprawling, or
+`NOT_APPLICABLE`.
+
+### Empty evidence is valid
+
+A complete pull-request comment query may materialize as `[]`. Its state is
+`AVAILABLE + EMPTY + COMPLETE`, not `UNAVAILABLE`. A capped, stale, redacted, or failed query cannot support the
+same semantic claim.
+
+## Runtime behavior
+
+The runtime resolves exact practice revisions before capture and collects the union of their governed source
+requirements. Readiness is evaluated per practice. Optional-source failure does not refuse an otherwise eligible
+practice; required-source failure does. If no practice is eligible, no model request is made.
+
+The internal readiness report records each admission or refusal. Model-visible input exposes only the evidence
+needed for the review; governance metadata and protected reason codes remain internal.
+
+## Change and staleness
+
+Historical records keep their original contract and practice revision. Currentness is derived:
+
+- changing a source meaning, scope, limit, mapping, freshness policy, or dependency stales claims that depend on it;
+- changing a practice evidence declaration stales that practice's claims;
+- adding an unrelated source does not stale a practice that cannot use it;
+- governance withdrawal disables future collection or delivery without rewriting historical semantics; and
+- erasure or expiry may make a claim unreplayable without making the historical result false.
+
+Semantic currentness, independent-validation status, governance eligibility, and replayability remain separate.
+Observation and review APIs expose `CURRENT`, `STALE`, or `UNVERIFIABLE` by comparing the evaluated practice
+revision with the current revision. Rows without a revision pin are `UNVERIFIABLE`.
+
+## Adding or changing a source
+
+Complete the [artifact-source governance decision](../admin/dsms/artifact-source-governance) before enabling a new
+or expanded source use. Accuracy or product benefit alone does not authorize collection.
+
+Tests must cover the runtime source inventory, every supported capture state, valid empty evidence, impossible
+requirements, atomic capture, dependency closure, tenant isolation, retention and erasure, and safe telemetry.
+
+## Standards and references
+
+- [GDPR Article 5](https://eur-lex.europa.eu/eli/reg/2016/679/art_5/oj) — purpose limitation, minimization,
+  accuracy, and storage limitation.
+- [GDPR Article 25](https://eur-lex.europa.eu/eli/reg/2016/679/art_25/oj) — data protection by design and default.
+- [HL7 DataAbsentReason](https://terminology.hl7.org/6.5.0/CodeSystem-data-absent-reason.html) — distinct reasons
+  for absent data.
+- [OpenTelemetry log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/) — event time and
+  observation time.
+- [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/json-schema-core) — closed, versioned contracts.
+- [W3C PROV-DM](https://www.w3.org/TR/prov-dm/) and [SLSA provenance](https://slsa.dev/spec/v1.2/provenance) —
+  provenance and immutable subject identity.
+- [El-Yaniv and Wiener, “On the Foundations of Noise-free Selective Classification”](https://www.jmlr.org/papers/v11/el-yaniv10a.html)
+  — selective prediction with abstention.
+- [Gebru et al., “Datasheets for Datasets”](https://doi.org/10.1145/3458723) — source composition, uses, and
+  limitations.
+- [NIST AI RMF 1.0](https://doi.org/10.6028/NIST.AI.100-1) and
+  [NIST Generative AI Profile](https://doi.org/10.6028/NIST.AI.600-1) — AI risk management and data governance.

@@ -531,6 +531,19 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldRecordTheResolvedCommitIdentity() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String headSha = sourceGit.log().call().iterator().next().getName();
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                var snapshot = manager.readTreeSnapshot(1L, headSha.substring(0, 8), 50L * 1024 * 1024);
+
+                assertThat(snapshot.commitSha()).isEqualTo(headSha);
+            }
+        }
+
+        @Test
         void shouldReadFromSpecificCommit() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {

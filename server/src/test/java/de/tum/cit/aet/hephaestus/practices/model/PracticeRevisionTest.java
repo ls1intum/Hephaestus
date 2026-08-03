@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ class PracticeRevisionTest extends BaseUnitTest {
         practice.setTriggerEvents(triggers);
         practice.setCriteria("Detect clear feedback");
         practice.setPrecomputeScript("export default {}");
+        practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         practice.setWhyItMatters("Prevents rework");
         practice.setWhatGoodLooksLike("A concrete suggestion");
         practice.setArea(area);
@@ -40,6 +42,7 @@ class PracticeRevisionTest extends BaseUnitTest {
         assertThat(TriggerEventsConverter.toList(revision.getTriggerEvents())).containsExactly("PullRequestCreated");
         assertThat(revision.getCriteria()).isEqualTo("Detect clear feedback");
         assertThat(revision.getPrecomputeScript()).isEqualTo("export default {}");
+        assertThat(revision.getEvidence()).isEqualTo(practice.getEvidence());
         assertThat(revision.getWhyItMatters()).isEqualTo("Prevents rework");
         assertThat(revision.getWhatGoodLooksLike()).isEqualTo("A concrete suggestion");
         assertThat(revision)

@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurge
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -764,6 +765,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         private UUID seedDerivedConversation(Workspace workspace, long threadId) {
             User owner = persistUser("conv-" + workspace.getId() + "-subject");
             Practice practice = new Practice();
+            practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+            practice.setEvidence(PracticeTestEvidence.conversationThread());
             practice.setWorkspace(workspace);
             practice.setSlug("conv-practice-" + workspace.getId());
             practice.setName("Conversation Practice");

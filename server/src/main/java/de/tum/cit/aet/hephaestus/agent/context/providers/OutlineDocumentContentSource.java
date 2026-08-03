@@ -5,9 +5,12 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.IssueReviewRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.PracticeReviewRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -50,7 +53,19 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
-public class OutlineDocumentContentSource implements ContentSource {
+public class OutlineDocumentContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("outline.documents");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(OutlineDocumentContentSource.class);
 
@@ -145,7 +160,7 @@ public class OutlineDocumentContentSource implements ContentSource {
                 contributeReview(issueReview.job(), "issue_id", files, false);
             }
         } catch (RuntimeException e) {
-            log.warn("OutlineDocumentContentSource failed, continuing without documentation: {}", e.getMessage());
+            throw new EvidenceCollectionException("Outline-document collection failed", e);
         }
     }
 

@@ -16,6 +16,7 @@ public final class PracticeDetectionFingerprint {
         List<String> triggerEvents,
         String criteria,
         @Nullable String precomputeScript,
+        PracticeEvidenceDeclaration evidence,
         @Nullable String areaSlug
     ) {
         CanonicalDigest digest = new CanonicalDigest()
@@ -24,6 +25,11 @@ public final class PracticeDetectionFingerprint {
             .add(artifactType.name())
             .addInt(triggerEvents.size());
         triggerEvents.stream().sorted().forEach(digest::add);
-        return digest.add(criteria).addNullable(precomputeScript).addNullable(areaSlug).hex();
+        return digest
+            .add(criteria)
+            .addNullable(precomputeScript)
+            .add(PracticeEvidenceDigest.digest(evidence))
+            .addNullable(areaSlug)
+            .hex();
     }
 }

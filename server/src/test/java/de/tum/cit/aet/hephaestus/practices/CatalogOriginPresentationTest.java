@@ -22,8 +22,12 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         CuratedCatalogService service = mock(CuratedCatalogService.class);
         when(service.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
         CatalogOriginPresenter presenter = new CatalogOriginPresenter(service);
+        Practice first = mock(Practice.class);
+        Practice second = mock(Practice.class);
+        when(first.getEvidence()).thenReturn(PracticeTestEvidence.pullRequest());
+        when(second.getEvidence()).thenReturn(PracticeTestEvidence.pullRequest());
 
-        presenter.presentPractices(List.of(mock(Practice.class), mock(Practice.class)));
+        presenter.presentPractices(List.of(first, second));
 
         verify(service).catalog();
     }

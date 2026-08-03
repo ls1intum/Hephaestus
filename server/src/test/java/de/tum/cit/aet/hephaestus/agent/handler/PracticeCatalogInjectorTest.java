@@ -26,13 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 
-/**
- * Locks the lifecycle phase-correctness gate in {@link PracticeCatalogInjector#inject}: a job carrying a
- * {@code trigger_event} materialises ONLY the practices whose {@code triggerEvents} include that event, so
- * an authoring practice is not re-litigated on a fixup push and a retrospective practice runs only at
- * close. The two safety behaviours — no-trigger keeps the full set, and a mis-seeded no-match falls THROUGH
- * to the full set rather than failing the job — are the load-bearing cases and are pinned here.
- */
 @ExtendWith(MockitoExtension.class)
 class PracticeCatalogInjectorTest extends BaseUnitTest {
 
@@ -116,8 +109,8 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a trigger event that matches nothing falls THROUGH to the full set rather than failing the job")
-    void noMatchFallsThroughToFullSet() {
+    @DisplayName("a trigger event that matches nothing fails closed")
+    void noMatchFailsClosed() {
         when(
             practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(
@@ -125,10 +118,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job("SomeEventNobodyDeclares"), WorkArtifact.PULL_REQUEST);
-
-        assertThat(files).containsKey(md("authoring"));
-        assertThat(files).containsKey(md("retrospective"));
+        assertThatThrownBy(() -> injector.inject(files, job("SomeEventNobodyDeclares"), WorkArtifact.PULL_REQUEST))
+            .isInstanceOf(JobPreparationException.class)
+            .hasMessageContaining("No active PULL_REQUEST practices");
+        assertThat(files).isEmpty();
     }
 
     @Test

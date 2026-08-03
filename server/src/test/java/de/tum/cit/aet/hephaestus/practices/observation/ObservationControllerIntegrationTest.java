@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -82,6 +83,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private Practice persistPractice(String slug, String name) {
         Practice practice = new Practice();
+        practice.setEvidence(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);
@@ -469,6 +471,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             ensureWorkspaceMembership(otherWorkspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             Practice otherPractice = new Practice();
+            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
@@ -1027,6 +1030,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             ensureWorkspaceMembership(otherWorkspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             Practice otherPractice = new Practice();
+            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("ws2-practice");
             otherPractice.setName("WS2 Practice");

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation.dto;
 
+import de.tum.cit.aet.hephaestus.practices.EvaluationClaimStatus;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -27,6 +28,7 @@ public record ObservationListDTO(
     @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
+    @NonNull EvaluationClaimStatus claimStatus,
     @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     /**
@@ -45,6 +47,7 @@ public record ObservationListDTO(
             observation.getAssessment(),
             observation.getSeverity(),
             observation.getConfidence(),
+            EvaluationClaimStatus.of(observation.getPracticeRevision(), practice),
             observation.getObservedAt()
         );
     }

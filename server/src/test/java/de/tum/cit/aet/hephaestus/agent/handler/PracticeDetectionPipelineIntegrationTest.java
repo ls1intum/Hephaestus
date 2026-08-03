@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -219,6 +220,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     private Practice createPractice(String slug, String name) {
         Practice p = new Practice();
+        p.setEvidence(PracticeTestEvidence.pullRequest());
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);

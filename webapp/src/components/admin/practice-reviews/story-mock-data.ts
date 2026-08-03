@@ -56,6 +56,7 @@ export const reviewFindings = [
 		artifact: reviewArtifact,
 		area: { slug: "code-quality", name: "Code quality" },
 		assessment: "GOOD",
+		claimStatus: "CURRENT",
 		confidence: 0.94,
 		feedbackDisposition: { delivered: 1, failed: 0, prepared: 1, superseded: 0, suppressed: 0 },
 		observedAt: new Date("2026-07-28T13:40:00Z"),
@@ -71,6 +72,7 @@ export const reviewFindings = [
 		artifact: reviewArtifact,
 		area: { slug: "architecture", name: "Architecture" },
 		assessment: "BAD",
+		claimStatus: "CURRENT",
 		confidence: 0.87,
 		feedbackDisposition: { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 1 },
 		observedAt: new Date("2026-07-28T12:08:00Z"),
@@ -99,6 +101,7 @@ export const reviewFeedbackDetail: ReviewFeedbackDetail = {
 			findingId: improvementFinding.id,
 			area: improvementFinding.area,
 			assessment: "BAD",
+			claimStatus: "CURRENT",
 			confidence: improvementFinding.confidence,
 			observedAt: improvementFinding.observedAt,
 			ordinal: 0,
@@ -122,6 +125,7 @@ export const reviewFindingDetail: ReviewFindingDetail = {
 	artifact: reviewArtifact,
 	area: improvementFinding.area,
 	assessment: "BAD",
+	claimStatus: "CURRENT",
 	confidence: improvementFinding.confidence,
 	evidence: {
 		locations: [

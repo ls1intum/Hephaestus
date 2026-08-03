@@ -26,24 +26,20 @@ public final class SandboxLayout {
     public static final String INPUTS_PREFIX = "inputs/";
 
     /**
-     * Workspace-relative prefix for per-connector source materialisations (ADR 0020): the SCM checkout
-     * mounts at {@code inputs/sources/scm/repo}, a future Slack/Outline export at
-     * {@code inputs/sources/slack/...} — each connector owns one namespace, none is privileged.
+     * Workspace-relative prefix for connector-owned source materialisations. The SCM checkout mounts at
+     * {@code inputs/sources/scm/repo}; other connectors use a peer namespace.
      */
     public static final String SOURCES_PREFIX = INPUTS_PREFIX + "sources/";
 
     /**
-     * Generic primitive: the workspace-relative mount prefix for a connector's source ({@code inputs/sources/<id>/}).
-     * The SCM-specific repo paths below are the one concrete instance; a future connector composes its own from this.
+     * Workspace-relative mount prefix for a connector's source ({@code inputs/sources/<id>/}).
      */
     public static String sourceMount(String originId) {
         return SOURCES_PREFIX + originId + "/";
     }
 
-    /** Workspace-relative {@code .keep} that pre-creates {@code inputs/sources/scm/} so the repo can mount under it. */
     public static final String SCM_SOURCE_KEEP = sourceMount("scm") + ".keep";
 
-    /** Bind-mount point for the read-only git checkout — the SCM connector's source materialisation. */
     public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + sourceMount("scm") + "repo";
 
     /** Workspace-relative prefix the agent cites for repo files ({@code inputs/sources/scm/repo/<path>}). */
@@ -59,10 +55,7 @@ public final class SandboxLayout {
     public static final String CONTEXT_PREFIX = INPUTS_PREFIX + "context/";
 
     /**
-     * Workspace-relative path of the integration-agnostic context manifest (the "telescope"): a small
-     * index of every projected context file with its connector + provenance, so the agent — and a future
-     * connector — sees one uniform entry point regardless of which integration produced the bytes. Sits
-     * directly under {@code inputs/}, above the per-connector context it indexes.
+     * Workspace-relative path of the manifest indexing projected context files and their provenance.
      */
     public static final String MANIFEST_PATH = INPUTS_PREFIX + "manifest.json";
 

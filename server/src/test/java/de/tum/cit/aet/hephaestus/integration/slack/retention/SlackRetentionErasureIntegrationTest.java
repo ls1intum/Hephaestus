@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -291,6 +292,8 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     private Practice savePractice(Workspace ws) {
         Practice p = new Practice();
+        p.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        p.setEvidence(PracticeTestEvidence.conversationThread());
         p.setWorkspace(ws);
         p.setSlug("retain-practice-" + ws.getId());
         p.setName("Retention Practice");

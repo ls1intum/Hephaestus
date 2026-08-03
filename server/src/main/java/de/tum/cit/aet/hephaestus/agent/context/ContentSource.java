@@ -4,54 +4,30 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import java.util.Map;
 
 /**
- * SPI for an integration's content into the agent workspace. A ContentSource is an
- * <strong>EXTRACT+LOAD connector and nothing else</strong> — it materialises the integration's RAW NATIVE
- * OBJECTS under {@link #OUTPUT_PREFIX} and stops there.
- *
- * <p><strong>The admission test is PROVENANCE, not usefulness.</strong> A byte qualifies as integration
- * content iff it (a) lives in SQL / the integration's API object graph (for SCM: the PR/issue object, its
- * comments, the computed two-ref diff, review-decision + thread rows, resolved linked-issue rows, developer
- * history) AND (b) is absent from the read-only worktree the sandbox already mounts at
- * {@code inputs/sources/scm/repo}. If a grep / JGit walk over that mount, or a parse of {@code diff.patch},
- * reproduces it, it is NOT integration content — it is downstream Transform.
- *
- * <p><strong>A provider MUST NOT</strong> compute a practice-shaped feature, emit an observation/note sentence,
- * carry a tuned threshold, or name a practice anywhere (field, file, javadoc). Such derivation is
- * practice-dependent TRANSFORM and belongs downstream — in the per-practice precompute script or the agent
- * (which has the mounted worktree). The single permitted in-connector transform is a practice-AGNOSTIC,
- * lossless structural reshape reused identically by every practice (e.g. {@code diff_summary.md} as a
- * lossless re-chunking of {@code diff.patch}); a feature file scanned from the worktree is Transform and
- * fails the rule. {@link #originId()} is the enforcement seam: a provider stamped {@code "scm"} that emits
- * a practice observation is, by definition, code in the wrong layer.
- *
- * <p>Provider order at {@link WorkspaceContextBuilder} is governed by Spring's {@code @Order}; a
- * {@link #required()} provider whose {@link #contribute} throws aborts the build, optional providers degrade
- * quietly. Implementations must reside under {@code agent.context.providers.*} — enforced by
- * {@code AgentRuntimeBoundaryTest}.
+ * Projects integration-owned source data into read-only workspace inputs. Providers may reshape source
+ * data only when the transformation is lossless and practice-agnostic; practice-specific features belong
+ * downstream. Data derivable from an already materialised repository tree is not a separate integration source.
  */
 public interface ContentSource {
-    /** Workspace-relative prefix every provider must write under (see {@link SandboxLayout#CONTEXT_PREFIX}). */
     String OUTPUT_PREFIX = SandboxLayout.CONTEXT_PREFIX;
 
-    /** @return {@code true} iff this provider can produce content for the given request variant. */
     boolean supports(ContextRequest request);
 
-    /** @return {@code true} (default) for fatal-on-failure providers; {@code false} for best-effort. */
     default boolean required() {
         return true;
     }
 
-    /**
-     * The integration this provider projects from (ADR 0020) — recorded per file in the context manifest
-     * so the agent sees uniform provenance regardless of which connector produced the bytes.
-     * Abstract on purpose: a silent default would mislabel a non-SCM provider's files as {@code "scm"},
-     * corrupting the one thing the manifest exists to provide.
-     */
+    /** Stable provenance identifier recorded for every emitted artifact. */
     String originId();
 
     /**
-     * Materialise this provider's files into {@code files}. Keys must begin with
-     * {@link #OUTPUT_PREFIX}. The builder validates this after each call.
+     * Whether {@code path} belongs to this provider's declared read-only namespace. Bulk sources may
+     * override the default for a connector-owned {@code inputs/sources/...} prefix.
      */
+    default boolean ownsPath(String path) {
+        return path.startsWith(OUTPUT_PREFIX);
+    }
+
+    /** Materialise workspace-relative paths and bytes into {@code files}. */
     void contribute(ContextRequest request, Map<String, byte[]> files);
 }

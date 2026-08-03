@@ -80,42 +80,35 @@ class PracticeCatalogInjector {
      *     slug violates the workspace ABI pattern.
      */
     void inject(Map<String, byte[]> files, AgentJob job, WorkArtifact focus) {
+        inject(files, job, focus, resolve(job, focus));
+    }
+
+    /** Resolve eligibility before collection so excluded practices cannot widen the evidence plan. */
+    List<Practice> resolve(AgentJob job, WorkArtifact focus) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
         Long workspaceId = job.getWorkspace().getId();
-        // Slug order, not SQL order: the catalog is concatenated into all-criteria.md, so an unordered result
-        // set would hand the model a differently-ordered rubric per run — and make inputs_digest disagree
-        // across runs over identical work.
+        // Stable ordering keeps catalog bytes and input digests reproducible.
         List<Practice> practices = practiceRepository
             .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
             .stream()
             .sorted(Comparator.comparing(Practice::getSlug))
             .toList();
-        // Lifecycle phase-correctness: when the job carries the trigger event that spawned it, materialise
-        // ONLY the practices whose triggerEvents include that event — so an authoring practice is not
-        // re-litigated on a fixup push (PullRequestSynchronized), a reviewer practice runs only after a
-        // review exists, and a retrospective practice runs only at merge/close. A job with no trigger_event
-        // (the gate-bypass dev path / bot command) keeps the full focus set.
+        // A triggered job evaluates only practices eligible for that lifecycle event.
         String triggerEvent = triggerEventOf(job);
         if (triggerEvent != null) {
-            List<Practice> matched = practices
+            practices = practices
                 .stream()
                 .filter(p -> containsTriggerEvent(p.getTriggerEvents(), triggerEvent))
                 .toList();
-            if (!matched.isEmpty()) {
-                practices = matched;
-            }
-            // If nothing matched (mis-seeded triggerEvents), fall through to the full set rather than fail
-            // the job — the gate already confirmed at least one practice matched before submission.
         }
         if (practices.isEmpty()) {
             throw new JobPreparationException(
                 "No active " + focus + " practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
             );
         }
-        // Defense in depth: slugs are interpolated into filesystem paths below; reject any value that
-        // doesn't match the ABI pattern before it can escape "inputs/practices/" / "work/precompute/".
+        // Slugs become workspace paths; enforce the ABI before interpolation.
         for (Practice p : practices) {
             String slug = p.getSlug();
             if (slug == null || !SandboxLayout.PRACTICE_SLUG.matcher(slug).matches()) {
@@ -124,11 +117,17 @@ class PracticeCatalogInjector {
                 );
             }
         }
+        return practices;
+    }
+
+    void inject(Map<String, byte[]> files, AgentJob job, WorkArtifact focus, List<Practice> practices) {
+        if (job.getWorkspace() == null) {
+            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
+        }
+        Long workspaceId = job.getWorkspace().getId();
 
         ArrayNode index = objectMapper.createArrayNode();
         for (Practice p : practices) {
-            // area groups practices for the runner's per-area evaluation; falls back to the slug so an
-            // ungrouped practice still forms its own one-practice group.
             String areaSlug = p.getArea() != null ? p.getArea().getSlug() : p.getSlug();
             ObjectNode entry = index.addObject();
             entry.put("slug", p.getSlug());

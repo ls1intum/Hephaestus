@@ -87,6 +87,7 @@ class CatalogOriginTest extends BaseUnitTest {
             List.of("PullRequestCreated"),
             "Seed criteria",
             null,
+            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
             "Reason",
             null,
             "quality"
@@ -106,6 +107,7 @@ class CatalogOriginTest extends BaseUnitTest {
             List.of("PullRequestCreated"),
             criteria,
             null,
+            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
             "Reason",
             null,
             null
@@ -128,6 +130,7 @@ class CatalogOriginTest extends BaseUnitTest {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria(criteria);
+        practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         practice.setWhyItMatters("Reason");
         if (copiedFromFingerprint != null) {
             practice.setSourceCuratedSlug(SLUG);

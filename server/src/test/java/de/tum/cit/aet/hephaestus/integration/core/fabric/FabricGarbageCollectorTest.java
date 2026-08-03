@@ -45,6 +45,19 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
         return dir;
     }
 
+    private Path writeArtifactSourceJob(String jobId, String... shas) throws Exception {
+        var manifest = mapper.createObjectNode();
+        var source = manifest.putArray("sources").addObject();
+        var artifacts = source.putArray("artifacts");
+        for (String sha : shas) {
+            artifacts.addObject().put("sha256", sha);
+        }
+        Path dir = layout.jobDir(jobId);
+        Files.createDirectories(dir);
+        Files.write(dir.resolve("artifact-source-manifest.json"), mapper.writeValueAsBytes(manifest));
+        return dir;
+    }
+
     @Test
     void pruneExpiredJobs_removesDirsOlderThanCutoffOnly() throws Exception {
         Path recent = writeJob("recent", "aa");
@@ -62,6 +75,14 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
     void referencedShas_collectsEveryShaFromSurvivingManifests() throws Exception {
         writeJob("a", "1111", "2222");
         writeJob("b", "3333");
+
+        assertThat(gc.referencedShas()).containsExactlyInAnyOrder("1111", "2222", "3333");
+    }
+
+    @Test
+    void referencedShas_collectsEveryShaFromArtifactSourceManifests() throws Exception {
+        writeArtifactSourceJob("a", "1111", "2222");
+        writeArtifactSourceJob("b", "3333");
 
         assertThat(gc.referencedShas()).containsExactlyInAnyOrder("1111", "2222", "3333");
     }
@@ -118,6 +139,22 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
 
         assertThat(cas.exists(keep)).as("blob referenced by a surviving job manifest is kept").isTrue();
         assertThat(cas.exists(expired)).as("blob referenced only by a pruned (expired) job is swept").isFalse();
+        assertThat(cas.exists(orphan)).as("blob referenced by no manifest is swept").isFalse();
+    }
+
+    @Test
+    void collect_endToEnd_keepsBlobsReferencedByBothManifestFormats() throws Exception {
+        String legacy = cas.put("legacy".getBytes(StandardCharsets.UTF_8));
+        String artifactSource = cas.put("artifact-source".getBytes(StandardCharsets.UTF_8));
+        String orphan = cas.put("orphan".getBytes(StandardCharsets.UTF_8));
+
+        writeJob("legacy", legacy);
+        writeArtifactSourceJob("artifact-source", artifactSource);
+
+        gc.collect();
+
+        assertThat(cas.exists(legacy)).as("blob referenced by a legacy manifest is kept").isTrue();
+        assertThat(cas.exists(artifactSource)).as("blob referenced by an artifact-source manifest is kept").isTrue();
         assertThat(cas.exists(orphan)).as("blob referenced by no manifest is swept").isFalse();
     }
 }

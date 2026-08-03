@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-evidence-declaration.schema.json",
+  "title": "Practice evidence declaration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sourceContractVersion",
+    "profile",
+    "required",
+    "optional",
+    "onUnsatisfied",
+    "blindSpots"
+  ],
+  "properties": {
+    "sourceContractVersion": {
+      "const": "1.0.0"
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "required": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/requirement"
+      }
+    },
+    "optional": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/requirement"
+      }
+    },
+    "onUnsatisfied": {
+      "const": "DECLINE_SEMANTIC_JUDGMENT"
+    },
+    "blindSpots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/blindSpot"
+      }
+    }
+  },
+  "$defs": {
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceKind", "completeness", "freshness"],
+      "properties": {
+        "sourceKind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
+        },
+        "completeness": {
+          "enum": ["COMPLETE", "ANY"]
+        },
+        "freshness": {
+          "enum": ["CURRENT", "ANY"]
+        }
+      }
+    },
+    "blindSpot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "summary"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    }
+  }
+}

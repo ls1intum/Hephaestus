@@ -2,7 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -12,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -63,7 +69,19 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 @Order(200)
-public class ReviewThreadContentSource implements ContentSource {
+public class ReviewThreadContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("scm.review-threads");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     @Override
     public String originId() {
@@ -196,6 +214,7 @@ public class ReviewThreadContentSource implements ContentSource {
                 }
             }
             root.set("reviewDecisions", decisionArray);
+            root.put("truncated", emittedThreads >= MAX_THREADS || decisionArray.size() >= MAX_DECISIONS);
 
             // --- Merge state (observable fact, no judgement) ---
             root.put("mergeState", mergeState(pullRequest));
@@ -210,8 +229,30 @@ public class ReviewThreadContentSource implements ContentSource {
                 root.get("mergeState").asString()
             );
         } catch (Exception e) {
-            // Best-effort: cross-context enrichment must never fail the job.
-            log.warn("ReviewThreadContentSource failed, continuing without review-thread state: {}", e.getMessage());
+            throw new EvidenceCollectionException("Review-thread collection failed", e);
+        }
+    }
+
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        byte[] reviewState = captured.files().get(OUTPUT_PREFIX + FILE_NAME);
+        if (!selectedKinds.contains(KIND) || reviewState == null) {
+            return captured;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(reviewState);
+            boolean empty = root.path("threads").isEmpty() && root.path("reviewDecisions").isEmpty();
+            return new EvidenceContribution(
+                captured.files(),
+                captured.completeness(),
+                captured.immutableIdentities(),
+                captured.observedAt(),
+                captured.sourceEffectiveAt(),
+                Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
+            );
+        } catch (Exception exception) {
+            throw new IllegalStateException("Serialized review threads could not be read", exception);
         }
     }
 

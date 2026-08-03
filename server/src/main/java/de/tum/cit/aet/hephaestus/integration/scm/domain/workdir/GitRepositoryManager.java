@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -22,6 +23,7 @@ import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -56,7 +58,7 @@ import org.springframework.stereotype.Service;
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
 
-    /** Connector namespace for SCM checkouts in the fabric {@code sources/} tree (one among future slack/, outline/). */
+    /** Connector namespace for SCM checkouts in the fabric {@code sources/} tree. */
     private static final String SCM_CONNECTOR = "scm";
 
     private final GitRepositoryProperties properties;
@@ -93,7 +95,7 @@ public class GitRepositoryManager {
     /**
      * Get the local path for a repository clone — the SCM connector's bulk artifact in the Context
      * Fabric (ADR 0020). Path format: {@code {fabric.root}/sources/scm/{repositoryId}}. A clone is a
-     * rebuildable cache, so the move from the legacy {@code {root}/{repositoryId}} layout needs no
+     * rebuildable cache, so the move from the flat {@code {root}/{repositoryId}} layout needs no
      * data migration: a stale-or-absent clone is simply re-fetched at this path on first use.
      */
     public Path getRepositoryPath(Long repositoryId) {
@@ -106,7 +108,7 @@ public class GitRepositoryManager {
      */
     public boolean isRepositoryCloned(Long repositoryId) {
         Path repoPath = getRepositoryPath(repositoryId);
-        // Full clone: .git/HEAD; bare clone (legacy): HEAD at root
+        // Working-tree clones store HEAD under .git; bare clones store it at the root.
         return Files.exists(repoPath.resolve(".git").resolve("HEAD")) || Files.exists(repoPath.resolve("HEAD"));
     }
 
@@ -760,14 +762,26 @@ public class GitRepositoryManager {
      * @throws GitOperationException if the commit cannot be resolved or an I/O error occurs
      */
     public Map<String, byte[]> readFilesAtCommit(Long repositoryId, String commitSha, long maxTotalBytes) {
+        return readTreeSnapshot(repositoryId, commitSha, maxTotalBytes).files();
+    }
+
+    /** Reads a bounded commit tree without dereferencing symlinks or submodules across the source boundary. */
+    public GitTreeSnapshot readTreeSnapshot(Long repositoryId, String commitSha, long maxTotalBytes) {
         if (!properties.enabled()) {
-            return Map.of();
+            return new GitTreeSnapshot(commitSha, null, Map.of(), 0, 0, false, Set.of("COLLECTION_DISABLED"));
+        }
+        if (maxTotalBytes <= 0) {
+            throw new IllegalArgumentException("maxTotalBytes must be positive");
         }
 
         return lockManager.withReadLock(repositoryId, () -> {
             Path repoPath = getRepositoryPath(repositoryId);
-            Map<String, byte[]> result = new HashMap<>();
+            Map<String, byte[]> result = new LinkedHashMap<>();
+            Set<String> limitations = new java.util.TreeSet<>();
             long totalBytes = 0;
+            int visitedFiles = 0;
+            String resolvedCommitSha;
+            String treeSha;
 
             try (Git git = Git.open(repoPath.toFile())) {
                 Repository repo = git.getRepository();
@@ -779,22 +793,45 @@ public class GitRepositoryManager {
 
                 try (RevWalk revWalk = new RevWalk(repo); ObjectReader reader = repo.newObjectReader()) {
                     RevCommit commit = revWalk.parseCommit(commitId);
+                    resolvedCommitSha = commit.getId().getName();
+                    treeSha = commit.getTree().getId().getName();
 
                     try (TreeWalk treeWalk = new TreeWalk(reader)) {
                         treeWalk.addTree(commit.getTree());
                         treeWalk.setRecursive(true);
 
                         while (treeWalk.next()) {
+                            visitedFiles++;
+                            String sourcePath = treeWalk.getPathString();
+                            FileMode mode = treeWalk.getFileMode(0);
+                            if (FileMode.SYMLINK.equals(mode)) {
+                                limitations.add("SYMLINK_EXCLUDED");
+                                continue;
+                            }
+                            if (FileMode.GITLINK.equals(mode)) {
+                                limitations.add("SUBMODULE_EXCLUDED");
+                                continue;
+                            }
+                            if (!FileMode.REGULAR_FILE.equals(mode) && !FileMode.EXECUTABLE_FILE.equals(mode)) {
+                                limitations.add("UNSUPPORTED_GIT_MODE_EXCLUDED");
+                                continue;
+                            }
+                            if (unsafeWorkspacePath(sourcePath)) {
+                                limitations.add("UNSAFE_PATH_EXCLUDED");
+                                continue;
+                            }
                             ObjectId blobId = treeWalk.getObjectId(0);
                             long size = reader.getObjectSize(blobId, Constants.OBJ_BLOB);
 
                             // Skip individual files larger than 10 MB
                             if (size > 10L * 1024 * 1024) {
+                                limitations.add("OVERSIZED_FILE_EXCLUDED");
                                 log.debug("Skipping oversized file: path={}, size={}", treeWalk.getPathString(), size);
                                 continue;
                             }
 
                             if (totalBytes + size > maxTotalBytes) {
+                                limitations.add("TOTAL_SIZE_LIMIT_REACHED");
                                 log.warn(
                                     "File collection exceeded size limit ({} bytes), stopping: repoId={}, commit={}",
                                     maxTotalBytes,
@@ -805,7 +842,7 @@ public class GitRepositoryManager {
                             }
 
                             byte[] content = reader.open(blobId).getBytes();
-                            result.put(treeWalk.getPathString(), content);
+                            result.put(sourcePath, content);
                             totalBytes += content.length;
                         }
                     }
@@ -817,8 +854,43 @@ public class GitRepositoryManager {
                 );
             }
 
-            return result;
+            return new GitTreeSnapshot(
+                resolvedCommitSha,
+                treeSha,
+                result,
+                totalBytes,
+                visitedFiles,
+                limitations.isEmpty(),
+                limitations
+            );
         });
+    }
+
+    private static boolean unsafeWorkspacePath(String path) {
+        if (path == null || path.isBlank() || path.startsWith("/") || path.contains("\\") || path.indexOf('\0') >= 0) {
+            return true;
+        }
+        for (String segment : path.split("/")) {
+            if (segment.equals(".") || segment.equals("..")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public record GitTreeSnapshot(
+        String commitSha,
+        @Nullable String treeSha,
+        Map<String, byte[]> files,
+        long totalBytes,
+        int visitedFiles,
+        boolean complete,
+        Set<String> limitations
+    ) {
+        public GitTreeSnapshot {
+            files = Collections.unmodifiableMap(new LinkedHashMap<>(files));
+            limitations = Set.copyOf(limitations);
+        }
     }
 
     /**

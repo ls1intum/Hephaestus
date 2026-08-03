@@ -257,6 +257,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
+        JSONB evidence_declaration
     }
 
     Discussion {
@@ -806,6 +807,7 @@ erDiagram
         BIGINT current_revision_id FK,UK
         VARCHAR(64) source_curated_slug
         VARCHAR(64) source_curated_fingerprint
+        JSONB evidence_declaration "NOT NULL"
     }
 
     PracticeArea {
@@ -849,6 +851,7 @@ erDiagram
         VARCHAR(64) area_icon
         VARCHAR(32) area_color
         VARCHAR(64) detection_fingerprint
+        JSONB evidence_declaration
     }
 
     Project {

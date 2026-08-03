@@ -312,7 +312,7 @@ matrix:
     ]
 ```
 
-2. **Add case statement** in "Determine if check should run":
+1. **Add case statement** in "Determine if check should run":
 
 ```yaml
 "new-service-quality")
@@ -320,7 +320,7 @@ matrix:
   ;;
 ```
 
-3. **Add quality check step** with the appropriate linting/type checking commands.
+1. **Add quality check step** with the appropriate linting/type checking commands.
 
 ### Step 3: Tests (`ci-tests.yml`)
 
@@ -335,7 +335,7 @@ matrix:
     ]
 ```
 
-2. **Add case statement** in "Determine if test should run":
+1. **Add case statement** in "Determine if test should run":
 
 ```yaml
 "new-service-unit"|"new-service-integration")
@@ -343,9 +343,9 @@ matrix:
   ;;
 ```
 
-3. **Add test execution step** with the test commands.
+1. **Add test execution step** with the test commands.
 
-4. **Add test result upload** for JUnit reporting.
+2. **Add test result upload** for JUnit reporting.
 
 ### Step 4: Docker Build (`ci-docker-build.yml`)
 

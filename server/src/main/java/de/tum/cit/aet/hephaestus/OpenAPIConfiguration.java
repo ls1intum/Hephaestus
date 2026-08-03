@@ -96,7 +96,19 @@ public class OpenAPIConfiguration {
         "PageableObject",
         "SortObject",
         "ProblemDetail",
-        "PageMetadata"
+        "PageMetadata",
+        "PracticeEvidenceDeclaration",
+        "PracticeEvidenceRequirement",
+        "PracticeEvidenceRefusal",
+        "PracticeEvidenceBlindSpot",
+        "PracticeEvidenceValidation",
+        "PracticeEvidenceValidationStatus",
+        "EvidenceCompletenessRequirement",
+        "EvidenceFreshnessRequirement",
+        "EvaluationClaimStatus",
+        "SourceContractVersion",
+        "EvidenceProfileId",
+        "SourceKind"
     );
     /**
      * Domain objects to include by specific suffix (like AchievementProgress records)

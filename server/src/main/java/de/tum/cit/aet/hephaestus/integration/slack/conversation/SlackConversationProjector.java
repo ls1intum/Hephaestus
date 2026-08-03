@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadMessageRow;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
@@ -119,7 +121,17 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         ArrayNode messages = root.putArray("messages");
         appendThreadMessages(workspaceId, new ThreadKey(channelId, null, threadTs, 0), messages);
         root.put("messageCount", messages.size());
+        // A full page is conservatively partial because the query does not fetch a total count.
+        root.put("truncated", messages.size() >= MAX_MESSAGES_PER_THREAD);
         return root;
+    }
+
+    @Override
+    public Instant sourceEffectiveAt(String sourceEventId) {
+        Long epochMicros = SlackTs.toEpochMicros(sourceEventId);
+        return epochMicros == null
+            ? null
+            : Instant.ofEpochSecond(epochMicros / 1_000_000L, (epochMicros % 1_000_000L) * 1_000L);
     }
 
     /**

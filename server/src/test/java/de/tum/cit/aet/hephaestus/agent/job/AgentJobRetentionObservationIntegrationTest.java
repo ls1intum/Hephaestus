@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -47,6 +48,7 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
             owner
         );
         Practice practice = new Practice();
+        practice.setEvidence(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("review-quality");
         practice.setName("Review quality");

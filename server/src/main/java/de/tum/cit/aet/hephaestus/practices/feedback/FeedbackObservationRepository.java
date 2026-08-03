@@ -142,10 +142,13 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                p.slug AS practiceSlug, p.name AS practiceName, o.title AS title,
                pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
                o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
-               o.confidence AS confidence, o.observedAt AS observedAt
+               o.confidence AS confidence, evaluatedRevision.id AS practiceRevisionId,
+               currentRevision.id AS currentPracticeRevisionId, o.observedAt AS observedAt
         FROM FeedbackObservation fo
         JOIN fo.observation o
         JOIN o.practice p
+        LEFT JOIN o.practiceRevision evaluatedRevision
+        LEFT JOIN p.currentRevision currentRevision
         LEFT JOIN p.area pa
         WHERE fo.feedback.id = :feedbackId
           AND fo.feedback.workspaceId = :workspaceId
@@ -189,6 +192,8 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         Assessment getAssessment();
         Severity getSeverity();
         Float getConfidence();
+        Long getPracticeRevisionId();
+        Long getCurrentPracticeRevisionId();
         Instant getObservedAt();
     }
 

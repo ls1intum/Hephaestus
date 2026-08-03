@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
+import de.tum.cit.aet.hephaestus.practices.EvaluationClaimStatus;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -29,6 +30,7 @@ public record ReviewFindingDetailDTO(
     Object evidence,
     String reasoning,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
+    @NonNull EvaluationClaimStatus claimStatus,
     @NonNull Instant observedAt,
     @NonNull @Schema(description = "Linked feedback, newest first") List<ReviewBoundFeedbackDTO> feedback
 ) {
@@ -57,6 +59,7 @@ public record ReviewFindingDetailDTO(
             observation.getEvidence(),
             observation.getReasoning(),
             observation.getRecurrenceKey(),
+            EvaluationClaimStatus.of(revision, practice),
             observation.getObservedAt(),
             feedback
         );

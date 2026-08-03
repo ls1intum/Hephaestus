@@ -144,14 +144,16 @@ public class FabricGarbageCollector {
         }
         try (Stream<Path> manifests = Files.walk(jobsRoot)) {
             manifests
-                .filter(p -> p.getFileName().toString().equals("manifest.json"))
+                .filter(FabricGarbageCollector::isManifest)
                 .forEach(manifest -> {
                     try {
                         JsonNode root = objectMapper.readTree(Files.readAllBytes(manifest));
                         for (JsonNode entry : root.path("entries")) {
-                            String sha = entry.path("sha256").asString("");
-                            if (!sha.isBlank()) {
-                                shas.add(sha);
+                            addSha(shas, entry.path("sha256"));
+                        }
+                        for (JsonNode source : root.path("sources")) {
+                            for (JsonNode artifact : source.path("artifacts")) {
+                                addSha(shas, artifact.path("sha256"));
                             }
                         }
                     } catch (IOException | RuntimeException e) {
@@ -162,6 +164,18 @@ public class FabricGarbageCollector {
             log.warn("Fabric GC could not walk jobs root {}: {}", jobsRoot, e.getMessage());
         }
         return shas;
+    }
+
+    private static boolean isManifest(Path path) {
+        String name = path.getFileName().toString();
+        return name.equals("manifest.json") || name.equals("artifact-source-manifest.json");
+    }
+
+    private static void addSha(Set<String> shas, JsonNode value) {
+        String sha = value.asString("");
+        if (!sha.isBlank()) {
+            shas.add(sha);
+        }
     }
 
     private static void deleteRecursively(Path dir) throws IOException {

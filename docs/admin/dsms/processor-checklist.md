@@ -1,6 +1,6 @@
 # Hephaestus — Art. 28 Processor Checklist
 
-_Last updated: 2026-05-07._
+*Last updated: 2026-08-03.*
 
 Records every entity that might qualify as a processor (Art. 28 GDPR) for the TUM-operated Hephaestus deployment and the status of the corresponding Auftragsverarbeitungsvertrag (AVV). Internal AET-operated components and the LRZ public-body counterpart are listed for completeness so the record is self-contained.
 
@@ -48,3 +48,6 @@ Amend this file, the Art. 30 record, and the privacy statement before deploying 
 - Activating the bundled PostHog client. PostHog is an Art. 28 U.S. processor and requires a DPA, a privacy / recipients entry, an Art. 6(1)(a) consent flow, and a DPIA re-assessment.
 - Any external storage (S3, CDN) or any third-party font, script, image, or embed served from the application: requires an AVV and a privacy-statement entry.
 - Any widening of the practice-review sandbox network posture beyond the per-job LLM proxy — triggers a re-audit under §5 of `dpia-prescreen.md`.
+- Sending a new artifact-source privacy class to an existing processor, changing its region or provider retention,
+  or using product evidence for operator/research evaluation. An existing DPA does not by itself authorize a new
+  purpose or data category; complete the [artifact-source governance gate](./artifact-source-governance.md).

@@ -5,10 +5,8 @@ title: Pi Agent Workspace ABI
 description: Reserved paths, task envelope, and exit codes for the Pi sandbox workspace.
 ---
 
-The container workspace (`/workspace/`) is shared across all Pi-based agent variants — the
-one-shot practice runner today, the long-lived mentor runner soon. Reserving the directory
-names below is a no-cost commitment that prevents a second rename when the mentor runtime
-lands (#1071) and beyond.
+This ABI covers the one-shot practice runner's container workspace at `/workspace/`. The interactive mentor uses
+a separate workspace contract.
 
 ## Layout
 
@@ -17,14 +15,12 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 `inputs/` (read-only; the path-guard whitelists exactly this subtree), `work/` (agent +
 precompute scratch; never collected), and `out/` (the only directory collected back into SQL).
 
-```
+```text
 /workspace/
 ├── inputs/                          # READ-ONLY. The path-guard whitelists exactly this subtree.
-│   ├── manifest.json                #   Telescope: the integration-agnostic index (path/connector/
-│   │                                #   sha256 per file). Sits above the per-connector context it indexes.
-│   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020). One namespace
-│   │   └── scm/repo/                #   per connector — the SCM git working tree (READ-ONLY mount) lives
-│   │                                #   here; a future export would be sources/slack/…, sources/outline/…
+│   ├── manifest.json                #   Versioned source, capture-state, and artifact index.
+│   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020).
+│   │   └── scm/repo/                #   Pinned, read-only SCM tree without Git metadata or history.
 │   ├── context/                     #   System-written, AI-readable. Populated by the ContentSource SPI.
 │   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
 │   │                                #   contributor_history.json, linked_work_items.json, …
@@ -43,26 +39,25 @@ precompute scratch; never collected), and `out/` (the only directory collected b
 └── .run-pi.mjs                      # Runner script entry point.
 ```
 
-The long-lived **mentor interactive sandbox** (#1071) is a *separate* runtime with its own
-layout (`context/target/`, `context/user/`, `scratch/`) driven by
-`DockerInteractiveSandboxAdapter`, not by this ABI. It is documented there, not here.
+The mentor interactive sandbox has its own `context/target/`, `context/user/`, and `scratch/` layout and is not
+covered by this ABI.
 
 ## Path conventions
 
-* **`inputs/`** — the entire read-only region. The sandbox path-guard whitelists exactly this
+- **`inputs/`** — the entire read-only region. The sandbox path-guard whitelists exactly this
   subtree; an agent write attempt anywhere under `inputs/` is rejected.
-* **`inputs/context/`** — written by `ContentSource` implementations under
-  `agent.context.providers.*`. Path prefix is enforced by `WorkspaceContextBuilder`.
-* **`inputs/manifest.json`** — the telescope index, written by `ContextManifestBuilder` *above*
-  `inputs/context/` (it indexes the context files but is not itself one of them).
-* **`inputs/sources/scm/repo/`** — the read-only SCM checkout, bind-mounted from the host
-  Context Fabric (`{fabric.root}/sources/scm/{repositoryId}`).
-* **`work/`** — agent + precompute scratch. The Pi agent may write here; the server never
+- **`inputs/context/`** — system-written, AI-readable source materializations.
+- **`inputs/manifest.json`** — the source and artifact index. It indexes context files but is not itself a source
+  artifact.
+- **`inputs/sources/scm/repo/`** — a read-only repository tree materialised at the manifest's
+  immutable commit identity. It intentionally excludes `.git`, history, submodules, and symlink
+  targets; `inputs/manifest.json` records whether the resulting source is complete or partial.
+- **`work/`** — agent + precompute scratch. The Pi agent may write here; the server never
   collects it.
-* **`out/`** — the *only* directory the sandbox collects after the run.
-* **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
+- **`out/`** — the *only* directory the sandbox collects after the run.
+- **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
   `schemaVersion` and `task.kind`, exiting `42` on mismatch (envelope/image drift signal).
-* **`.pi*`** / `inputs/practices/` / `work/precompute*` / `work/analysis/` / `out/`
+- **`.pi*`** / `inputs/practices/` / `work/precompute*` / `work/analysis/` / `out/`
   — internal control surfaces. AI-readable as configured by the orchestrator, but
   *not* part of the public agent ABI; subject to change without a `schemaVersion` bump.
 

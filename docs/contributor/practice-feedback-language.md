@@ -36,6 +36,6 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 Use provider-specific names such as **pull request** or **merge request** when the provider is known;
 otherwise write **pull or merge request**.
 
-Use **used in new reviews** for workspace participation. Do not use _shipped_, _offered_, _retired_,
-_ours_, _yours_, or _here_ in catalog UI copy; those terms expose implementation or depend on who is
+Use **used in new reviews** for workspace participation. Do not use *shipped*, *offered*, *retired*,
+*ours*, *yours*, or *here* in catalog UI copy; those terms expose implementation or depend on who is
 reading.

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -33,6 +34,13 @@ public record UpdatePracticeRequestDTO(
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     @Nullable
     String precomputeScript,
+
+    @Valid
+    @Schema(
+        description = "Replacement evidence declaration; omit to preserve it, or to use the server baseline when artifactType changes"
+    )
+    @Nullable
+    PracticeEvidenceDeclaration evidence,
 
     @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact artifactType,
 

@@ -132,6 +132,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             List.of("PullRequestCreated"),
             "Seed criteria",
             null,
+            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
             "Reason",
             null,
             "packaging"

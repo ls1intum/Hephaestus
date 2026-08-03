@@ -1,104 +1,522 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.CompletenessBasis;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessment;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceViewTransformation;
+import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
+import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.RepresentationFidelity;
+import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
+import de.tum.cit.aet.hephaestus.evidence.SourceAuthority;
+import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceFreshness;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
+import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
-import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Builds the integration-agnostic context manifest — the "telescope" of ADR 0020. After the providers
- * materialise {@code inputs/context/*}, this records one uniform index entry per projected file
- * ({@code path}, producing {@code connector}, size, and a content-addressed {@code sha256}) so the agent
- * — and any future connector — sees a single entry point regardless of which integration produced the
- * bytes. Every byte is also written to the {@link ContentAddressedStore}, which deduplicates identical
- * context across jobs and records a content-addressed provenance hash per entry. The same manifest is
- * persisted under {@code jobs/{jobId}/} for replay.
- *
- * <p>Best-effort: a manifest failure is logged, never thrown — context building must not break on it.
- */
 @Component
 public class ContextManifestBuilder {
 
-    private static final Logger log = LoggerFactory.getLogger(ContextManifestBuilder.class);
-    private static final int SCHEMA_VERSION = 1;
+    static final String INTERNAL_MANIFEST_FILE = "artifact-source-manifest.json";
+    static final String READINESS_REPORT_FILE = "practice-readiness-report.json";
+
+    public record CaptureMetadata(
+        Map<SourceKind, SourceCompleteness> reportedCompleteness,
+        Map<SourceKind, SourceContentState> reportedContentStates,
+        Map<SourceKind, String> immutableIdentities,
+        Map<SourceKind, Instant> observedAt,
+        Map<SourceKind, Instant> sourceEffectiveAt,
+        Map<SourceKind, SourceCaptureState> stateOverrides,
+        Set<SourceKind> attemptedKinds
+    ) {
+        public CaptureMetadata(
+            Map<SourceKind, SourceCompleteness> reportedCompleteness,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt,
+            Map<SourceKind, SourceCaptureState> stateOverrides,
+            Set<SourceKind> attemptedKinds
+        ) {
+            this(
+                reportedCompleteness,
+                Map.of(),
+                immutableIdentities,
+                observedAt,
+                sourceEffectiveAt,
+                stateOverrides,
+                attemptedKinds
+            );
+        }
+    }
 
     private final ContentAddressedStore cas;
     private final FabricLayout layout;
     private final JsonMapper objectMapper;
+    private final ArtifactSourceCatalogRegistry catalogs;
+    private final Clock clock;
 
-    public ContextManifestBuilder(ContentAddressedStore cas, FabricLayout layout, JsonMapper objectMapper) {
+    public ContextManifestBuilder(
+        ContentAddressedStore cas,
+        FabricLayout layout,
+        JsonMapper objectMapper,
+        ArtifactSourceCatalogRegistry catalogs,
+        Clock clock
+    ) {
         this.cas = cas;
         this.layout = layout;
         this.objectMapper = objectMapper;
+        this.catalogs = catalogs;
+        this.clock = clock;
+    }
+
+    void validateEvidenceSources(List<ContentSource> providers) {
+        Set<SourceKind> seen = new HashSet<>();
+        for (ContentSource provider : providers) {
+            if (!(provider instanceof EvidenceSource evidenceSource)) continue;
+            for (SourceKind kind : evidenceSource.sourceKinds()) {
+                catalogs.requireSource(catalogs.current().version(), kind);
+                if (!seen.add(kind)) {
+                    throw new IllegalStateException("Multiple evidence providers declare source kind " + kind);
+                }
+            }
+        }
     }
 
     /**
-     * Add {@code inputs/manifest.json} to {@code files} indexing every context file under {@code inputs/context/}, storing
-     * each blob in the CAS, and persisting the manifest to {@code jobs/{jobId}/}. {@code keyConnector} maps
-     * each workspace key to the connector id of the provider that wrote it.
+     * Finalize source capture before model execution. Failure is fatal: a semantic result without a
+     * trustworthy source manifest is not auditable and must never be produced.
      */
-    public void augment(
+    public ArtifactSourceManifest augment(
         Map<String, byte[]> files,
-        Map<String, String> keyConnector,
+        Map<String, SourceKind> pathKinds,
         String jobId,
-        @Nullable Long workspaceId
+        EvidencePlan plan,
+        CaptureMetadata metadata
     ) {
+        Instant capturedAt = clock.instant();
+        var profile = catalogs.requireProfile(plan.contractVersion(), plan.profileId());
+        if (!profile.allowedSources().containsAll(plan.selectedSources())) {
+            Set<SourceKind> disallowed = new HashSet<>(plan.selectedSources());
+            disallowed.removeAll(profile.allowedSources());
+            throw new IllegalArgumentException("Evidence plan contains sources outside profile: " + disallowed);
+        }
+        List<SourceCapture> captures = profile
+            .allowedSources()
+            .stream()
+            .sorted()
+            .map(kind ->
+                capture(
+                    kind,
+                    files,
+                    pathKinds,
+                    plan,
+                    capturedAt,
+                    metadata.reportedCompleteness(),
+                    metadata.reportedContentStates(),
+                    metadata.immutableIdentities(),
+                    metadata.observedAt(),
+                    metadata.sourceEffectiveAt(),
+                    metadata.stateOverrides(),
+                    metadata.attemptedKinds()
+                )
+            )
+            .toList();
+        ArtifactSourceManifest manifest = new ArtifactSourceManifest(
+            plan.contractVersion(),
+            catalogs.catalogDigest(),
+            plan.profileId(),
+            capturedAt,
+            captures,
+            List.<EvidenceViewTransformation>of()
+        );
         try {
-            ObjectNode manifest = objectMapper.createObjectNode();
-            manifest.put("schemaVersion", SCHEMA_VERSION);
-            manifest.put("jobId", jobId);
-            if (workspaceId != null) {
-                manifest.put("workspaceId", workspaceId);
-            }
-            ArrayNode entries = manifest.putArray("entries");
-            // Deterministic order so the manifest bytes are stable for identical context (CAS dedup).
-            for (String key : new TreeSet<>(files.keySet())) {
-                if (key.equals(SandboxLayout.MANIFEST_PATH) || !key.startsWith(ContentSource.OUTPUT_PREFIX)) {
-                    continue;
-                }
-                byte[] bytes = files.get(key);
-                // Skip a null blob: an NPE here would discard the ENTIRE manifest via the best-effort catch.
-                if (bytes == null) {
-                    continue;
-                }
-                ObjectNode entry = entries.addObject();
-                // Full workspace-relative key, not a bare filename — criteria and orchestrator prompt cite
-                // the full path, so the manifest must speak the same path vocabulary.
-                entry.put("path", key);
-                // "unknown" is the fail-loud marker, never a default connector attribution. Plain get + null
-                // check (not getOrDefault) also coalesces a present-but-null mapping.
-                String connector = keyConnector.get(key);
-                entry.put("connector", connector != null ? connector : "unknown");
-                entry.put("bytes", bytes.length);
-                entry.put("sha256", cas.put(bytes));
-            }
-            byte[] manifestBytes = objectMapper.writeValueAsBytes(manifest);
-            files.put(SandboxLayout.MANIFEST_PATH, manifestBytes);
-            persistJobManifest(jobId, manifestBytes);
+            byte[] internalBytes = objectMapper.writeValueAsBytes(manifest);
+            persistInternalManifest(jobId, internalBytes);
+            files.put(SandboxLayout.MANIFEST_PATH, modelVisibleIndex(manifest));
+            return manifest;
         } catch (RuntimeException e) {
-            // Log the full throwable — this path is swallowed, so the stack trace is the only diagnostic.
-            log.warn("Context manifest generation failed (best-effort), continuing without it", e);
+            throw new IllegalStateException("Artifact-source manifest generation failed", e);
         }
     }
 
-    private void persistJobManifest(String jobId, byte[] manifestBytes) {
+    public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices) {
+        return assessPractices(manifest, practices).readyPractices();
+    }
+
+    public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices, String jobId) {
+        PracticeReadinessResult result = assessPractices(manifest, practices);
+        if (result.decisions().isEmpty()) {
+            throw new IllegalArgumentException("Cannot persist an empty practice readiness report");
+        }
+        Instant decidedAt = result.decisions().getFirst().decidedAt();
+        persistInternalJson(
+            jobId,
+            READINESS_REPORT_FILE,
+            objectMapper.writeValueAsBytes(
+                new PracticeReadinessReport(
+                    manifest.contractVersion(),
+                    manifest.catalogDigest(),
+                    manifest.profileId(),
+                    manifest.capturedAt(),
+                    decidedAt,
+                    result.decisions()
+                )
+            )
+        );
+        return result.readyPractices();
+    }
+
+    public PracticeReadinessResult assessPractices(ArtifactSourceManifest manifest, List<Practice> practices) {
+        if (
+            !catalogs.current().version().equals(manifest.contractVersion()) ||
+            !catalogs.catalogDigest().equals(manifest.catalogDigest())
+        ) {
+            throw new IllegalArgumentException("Manifest does not reference the runtime's exact source contract");
+        }
+        Map<SourceKind, SourceCapture> captures = new HashMap<>();
+        manifest.sources().forEach(capture -> captures.put(capture.kind(), capture));
+        Instant assessedAt = clock.instant();
+        List<Practice> ready = new ArrayList<>();
+        List<PracticeReadinessDecision> decisions = new ArrayList<>();
+        for (Practice practice : practices) {
+            var declaration = practice.getEvidence();
+            if (declaration == null) {
+                throw new IllegalArgumentException("Practice has no evidence declaration: " + practice.getSlug());
+            }
+            if (
+                !declaration.sourceContractVersion().equals(manifest.contractVersion()) ||
+                !declaration.profile().equals(manifest.profileId())
+            ) {
+                throw new IllegalArgumentException(
+                    "Practice evidence contract does not match manifest: " + practice.getSlug()
+                );
+            }
+            List<EvidenceAssessment> assessments = new ArrayList<>();
+            for (var requirement : declaration.required()) {
+                SourceCapture capture = captures.get(requirement.sourceKind());
+                boolean available = capture != null && capture.state() instanceof SourceCaptureState.Available;
+                SourceCompleteness completeness = available
+                    ? ((SourceCaptureState.Available) capture.state()).completeness()
+                    : SourceCompleteness.UNKNOWN;
+                SourceFreshness freshness = available
+                    ? assessFreshness(
+                          catalogs.requireSource(manifest.contractVersion(), requirement.sourceKind()),
+                          (SourceCaptureState.Available) capture.state(),
+                          assessedAt
+                      )
+                    : SourceFreshness.UNKNOWN;
+                List<String> reasons = new ArrayList<>();
+                if (!available) reasons.add("SOURCE_NOT_AVAILABLE");
+                if (
+                    requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
+                    completeness != SourceCompleteness.COMPLETE
+                ) reasons.add("COMPLETENESS_UNSATISFIED");
+                if (
+                    requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
+                    freshness != SourceFreshness.CURRENT
+                ) reasons.add("FRESHNESS_UNSATISFIED");
+                assessments.add(
+                    new EvidenceAssessment(
+                        requirement.sourceKind(),
+                        manifest.contractVersion(),
+                        assessedAt,
+                        assessedAt,
+                        freshness,
+                        reasons.isEmpty(),
+                        reasons
+                    )
+                );
+            }
+            PracticeReadinessDecision decision = new PracticeReadinessDecision(
+                practice.getSlug(),
+                assessedAt,
+                assessments.stream().allMatch(EvidenceAssessment::acceptable),
+                assessments
+            );
+            decisions.add(decision);
+            if (decision.ready()) ready.add(practice);
+        }
+        return new PracticeReadinessResult(ready, decisions);
+    }
+
+    private SourceFreshness assessFreshness(
+        ArtifactSourceContract contract,
+        SourceCaptureState.Available capture,
+        Instant temporalAnchor
+    ) {
+        var policy = contract.freshnessPolicy();
+        if (policy.mode() == FreshnessMode.NOT_APPLICABLE) return SourceFreshness.UNKNOWN;
+        if (policy.mode() == FreshnessMode.PINNED_IDENTITY) {
+            return capture.facts().immutableIdentity() != null ? SourceFreshness.CURRENT : SourceFreshness.UNKNOWN;
+        }
+        if (policy.mode() == FreshnessMode.MAX_AGE) {
+            Instant observed = capture.facts().observedAt();
+            if (observed == null || observed.isAfter(temporalAnchor)) return SourceFreshness.UNKNOWN;
+            return observed.plusSeconds(policy.maxAgeSeconds()).isBefore(temporalAnchor)
+                ? SourceFreshness.STALE
+                : SourceFreshness.CURRENT;
+        }
+        Instant eventTime = capture.facts().sourceEffectiveAt();
+        if (eventTime == null) return SourceFreshness.UNKNOWN;
+        return eventTime.isAfter(temporalAnchor) ? SourceFreshness.UNKNOWN : SourceFreshness.CURRENT;
+    }
+
+    private SourceCapture capture(
+        SourceKind kind,
+        Map<String, byte[]> files,
+        Map<String, SourceKind> pathKinds,
+        EvidencePlan plan,
+        Instant capturedAt,
+        Map<SourceKind, SourceCompleteness> reportedCompleteness,
+        Map<SourceKind, SourceContentState> reportedContentStates,
+        Map<SourceKind, String> immutableIdentities,
+        Map<SourceKind, Instant> observedAt,
+        Map<SourceKind, Instant> sourceEffectiveAt,
+        Map<SourceKind, SourceCaptureState> stateOverrides,
+        Set<SourceKind> attemptedKinds
+    ) {
+        ArtifactSourceContract contract = catalogs.requireSource(plan.contractVersion(), kind);
+        if (!plan.selectedSources().contains(kind)) {
+            return missingCapture(contract, new SourceCaptureState.NotCollected("MINIMIZED"));
+        }
+        SourceCaptureState override = stateOverrides.get(kind);
+        if (override != null) {
+            return missingCapture(contract, override);
+        }
+        if (!attemptedKinds.contains(kind)) {
+            return missingCapture(contract, new SourceCaptureState.Unavailable("NO_PROVIDER"));
+        }
+        List<SourceArtifact> artifacts = pathKinds
+            .entrySet()
+            .stream()
+            .filter(entry -> entry.getValue().equals(kind))
+            .sorted(Map.Entry.comparingByKey())
+            .map(entry -> artifact(entry.getKey(), files.get(entry.getKey())))
+            .toList();
+        if (artifacts.isEmpty() && !contract.completenessPolicy().supportsEmpty()) {
+            return missingCapture(contract, new SourceCaptureState.Unavailable("EMPTY_NOT_VALID"));
+        }
+        SourceCompleteness completeness = reportedCompleteness.getOrDefault(
+            kind,
+            inferredCompleteness(contract, artifacts, files)
+        );
+        if (
+            (completeness == SourceCompleteness.COMPLETE && !contract.completenessPolicy().supportsComplete()) ||
+            (completeness == SourceCompleteness.PARTIAL && !contract.completenessPolicy().supportsPartial())
+        ) {
+            throw new IllegalStateException(
+                kind + " reported completeness forbidden by its source contract: " + completeness
+            );
+        }
+        SourceContentState content = reportedContentStates.getOrDefault(
+            kind,
+            artifacts.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
+        );
+        if (content == SourceContentState.EMPTY && !contract.completenessPolicy().supportsEmpty()) {
+            throw new IllegalStateException(kind + " reported EMPTY although its source contract forbids it");
+        }
+        SourceCaptureFacts facts = new SourceCaptureFacts(
+            capturedAt,
+            sourceEffectiveAt.get(kind),
+            observedAt.get(kind),
+            immutableIdentities.get(kind),
+            "job-scoped " + plan.profileId().value() + " capture",
+            completenessBasis(completeness, contract),
+            fidelity(contract.authority())
+        );
+        return new SourceCapture(kind, new SourceCaptureState.Available(content, completeness, facts), artifacts);
+    }
+
+    private static SourceCapture missingCapture(ArtifactSourceContract contract, SourceCaptureState state) {
+        MissingnessKind missingness = missingness(state);
+        if (!contract.supportedMissingness().contains(missingness)) {
+            throw new IllegalArgumentException(contract.kind() + " does not support missingness state " + missingness);
+        }
+        return new SourceCapture(contract.kind(), state, List.of());
+    }
+
+    private SourceCompleteness inferredCompleteness(
+        ArtifactSourceContract contract,
+        List<SourceArtifact> artifacts,
+        Map<String, byte[]> files
+    ) {
+        if (artifacts.isEmpty()) {
+            return contract.completenessPolicy().supportsEmpty()
+                ? SourceCompleteness.COMPLETE
+                : SourceCompleteness.UNKNOWN;
+        }
+        List<Boolean> truncationMarkers = artifacts
+            .stream()
+            .map(artifact -> truncationMarker(files.get(artifact.path())))
+            .flatMap(Optional::stream)
+            .toList();
+        if (truncationMarkers.stream().anyMatch(Boolean.TRUE::equals)) {
+            return SourceCompleteness.PARTIAL;
+        }
+        if (!truncationMarkers.isEmpty() && contract.completenessPolicy().supportsComplete()) {
+            return SourceCompleteness.COMPLETE;
+        }
+        return contract.completenessPolicy().supportsPartial()
+            ? SourceCompleteness.PARTIAL
+            : SourceCompleteness.UNKNOWN;
+    }
+
+    private Optional<Boolean> truncationMarker(byte[] bytes) {
+        if (bytes == null || bytes.length == 0 || bytes[0] != '{') {
+            return Optional.empty();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(bytes);
+            return node.has("truncated") && node.path("truncated").isBoolean()
+                ? Optional.of(node.path("truncated").asBoolean())
+                : Optional.empty();
+        } catch (RuntimeException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private SourceArtifact artifact(String path, byte[] bytes) {
+        if (bytes == null) {
+            throw new IllegalStateException("Evidence artifact has null bytes: " + path);
+        }
+        return new SourceArtifact(path, mediaType(path), cas.put(bytes), bytes.length);
+    }
+
+    private byte[] modelVisibleIndex(ArtifactSourceManifest manifest) {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("contractVersion", manifest.contractVersion().value());
+        root.put("profile", manifest.profileId().value());
+        ArrayNode sources = root.putArray("sources");
+        for (SourceCapture capture : manifest.sources()) {
+            ObjectNode node = sources.addObject();
+            node.put("kind", capture.kind().value());
+            node.put("availability", availability(capture.state()));
+            if (capture.state() instanceof SourceCaptureState.Available available) {
+                node.put("content", available.content().name());
+                node.put("completeness", available.completeness().name());
+                ArrayNode paths = node.putArray("paths");
+                capture.artifacts().stream().map(SourceArtifact::path).sorted().forEach(paths::add);
+            }
+        }
+        return objectMapper.writeValueAsBytes(root);
+    }
+
+    private static String availability(SourceCaptureState state) {
+        if (state instanceof SourceCaptureState.Available) return "AVAILABLE";
+        if (state instanceof SourceCaptureState.NotCollected) return "NOT_COLLECTED";
+        if (state instanceof SourceCaptureState.Unavailable) return "UNAVAILABLE";
+        if (state instanceof SourceCaptureState.Redacted) return "REDACTED";
+        return "COLLECTION_ERROR";
+    }
+
+    private static MissingnessKind missingness(SourceCaptureState state) {
+        if (state instanceof SourceCaptureState.NotCollected) return MissingnessKind.NOT_COLLECTED;
+        if (state instanceof SourceCaptureState.Unavailable) return MissingnessKind.UNAVAILABLE;
+        if (state instanceof SourceCaptureState.Redacted) return MissingnessKind.REDACTED;
+        if (state instanceof SourceCaptureState.CollectionError) return MissingnessKind.COLLECTION_ERROR;
+        throw new IllegalArgumentException("AVAILABLE is not a missingness override");
+    }
+
+    private void persistInternalManifest(String jobId, byte[] bytes) {
         try {
             Path dir = layout.jobDir(jobId);
             Files.createDirectories(dir);
-            Files.write(dir.resolve("manifest.json"), manifestBytes);
-        } catch (IOException | RuntimeException e) {
-            log.debug("Could not persist job manifest for {}: {}", jobId, e.getMessage());
+            writeAtomically(dir, INTERNAL_MANIFEST_FILE, bytes);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not persist artifact-source manifest for job " + jobId, e);
         }
+    }
+
+    private void persistInternalJson(String jobId, String fileName, byte[] bytes) {
+        try {
+            Path dir = layout.jobDir(jobId);
+            Files.createDirectories(dir);
+            writeAtomically(dir, fileName, bytes);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not persist " + fileName + " for job " + jobId, e);
+        }
+    }
+
+    private static void writeAtomically(Path dir, String fileName, byte[] bytes) throws IOException {
+        Path temporary = Files.createTempFile(dir, fileName, ".tmp");
+        try {
+            Files.write(temporary, bytes);
+            try {
+                Files.move(
+                    temporary,
+                    dir.resolve(fileName),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING
+                );
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, dir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static CompletenessBasis completenessBasis(
+        SourceCompleteness completeness,
+        ArtifactSourceContract contract
+    ) {
+        if (completeness == SourceCompleteness.UNKNOWN) {
+            return CompletenessBasis.UNKNOWN;
+        }
+        if (completeness == SourceCompleteness.PARTIAL) {
+            return CompletenessBasis.BOUNDED_SCOPE;
+        }
+        return switch (contract.captureTime()) {
+            case PINNED_IMMUTABLE_IDENTITY -> CompletenessBasis.IMMUTABLE_OBJECT;
+            default -> CompletenessBasis.BOUNDED_SCOPE;
+        };
+    }
+
+    private static RepresentationFidelity fidelity(SourceAuthority authority) {
+        return switch (authority) {
+            case UPSTREAM_SNAPSHOT, SYNCHRONIZED_MIRROR -> RepresentationFidelity.EXACT;
+            case DETERMINISTIC_DERIVATION -> RepresentationFidelity.LOSSLESS_DERIVATION;
+            case LOSSY_DERIVATION -> RepresentationFidelity.LOSSY_DERIVATION;
+        };
+    }
+
+    private static String mediaType(String path) {
+        if (path.endsWith(".json")) return "application/json";
+        if (path.endsWith(".md")) return "text/markdown";
+        if (path.endsWith(".patch")) return "text/x-diff";
+        return "application/octet-stream";
     }
 }

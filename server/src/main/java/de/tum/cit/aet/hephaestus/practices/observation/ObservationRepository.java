@@ -671,6 +671,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    o.severity AS "severity",
                    o.confidence AS "confidence",
                    o.recurrence_key AS "recurrenceKey",
+                   o.practice_revision_id AS "practiceRevisionId",
+                   p.current_revision_id AS "currentPracticeRevisionId",
                    o.observed_at AS "observedAt"
             FROM observation o
             JOIN practice p ON p.id = o.practice_id
@@ -730,6 +732,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Severity getSeverity();
         Float getConfidence();
         String getRecurrenceKey();
+        Long getPracticeRevisionId();
+        Long getCurrentPracticeRevisionId();
         Instant getObservedAt();
     }
 

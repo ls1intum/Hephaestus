@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -139,6 +140,8 @@ public final class SlackConversationTestSupport {
     /** Saves a minimal {@link Practice} owned by the given workspace, slugged so repeated calls do not collide. */
     public static Practice newPractice(PracticeRepository practiceRepository, Workspace workspace, String slugPrefix) {
         Practice practice = new Practice();
+        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        practice.setEvidence(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug(slugPrefix + "-" + UUID.randomUUID());
         practice.setName("Test Practice");

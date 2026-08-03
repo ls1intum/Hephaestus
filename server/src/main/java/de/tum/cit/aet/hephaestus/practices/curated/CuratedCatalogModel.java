@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -105,16 +104,10 @@ final class CuratedCatalogModel {
         throw new IllegalArgumentException("orderedSlugs must contain every entry in the list");
     }
 
-    static void validatePractice(EffectiveCatalog catalog, PracticeDefinition definition) {
+    static void validatePracticeArea(EffectiveCatalog catalog, PracticeDefinition definition) {
         if (definition.areaSlug() != null && catalog.area(definition.areaSlug()).isEmpty()) {
             throw new EntityNotFoundException(CATALOG_AREA, definition.areaSlug());
         }
-        PracticeDefinitionValidator.validate(
-            definition.artifactType(),
-            definition.triggerEvents(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike()
-        );
     }
 
     static <D extends CatalogDefinition> CatalogEntry<D> requireEntry(

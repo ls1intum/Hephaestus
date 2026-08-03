@@ -6,8 +6,13 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
@@ -20,14 +25,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -50,7 +58,28 @@ import tools.jackson.databind.node.ObjectNode;
  * aborts the build (prevents hollow positives from the agent).
  */
 @Component
-public class PullRequestContentSource implements ContentSource {
+@Order(100)
+public class PullRequestContentSource implements EvidenceSource {
+
+    private static final SourceKind CORE = new SourceKind("scm.pull-request.core");
+    private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
+    private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
+    private static final SourceKind CONTRIBUTOR_HISTORY = new SourceKind("scm.contributor-history");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(CORE, DIFF, COMMENTS, CONTRIBUTOR_HISTORY);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        if (path.endsWith("comments.json")) return COMMENTS;
+        if (path.endsWith("contributor_history.json")) return CONTRIBUTOR_HISTORY;
+        if (
+            path.endsWith("diff.patch") || path.endsWith("diff_stat.txt") || path.endsWith("diff_summary.md")
+        ) return DIFF;
+        return CORE;
+    }
 
     @Override
     public String originId() {
@@ -116,6 +145,11 @@ public class PullRequestContentSource implements ContentSource {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
+        contributeSelected(request, sourceKinds(), files);
+    }
+
+    @Override
+    public void contributeSelected(ContextRequest request, Set<SourceKind> selectedKinds, Map<String, byte[]> files) {
         // Narrowed via supports(); cast is safe and documents the variant precondition.
         if (!(request instanceof ContextRequest.PracticeReviewRequest practiceReview)) {
             throw new IllegalStateException(
@@ -131,8 +165,6 @@ public class PullRequestContentSource implements ContentSource {
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
 
-        ensureRepositoryAvailable(repositoryId);
-
         PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
         // Refresh the clone ONCE, up-front, before anything reads refs from it. The commit log
@@ -140,13 +172,84 @@ public class PullRequestContentSource implements ContentSource {
         // clone; doing the fetch here guarantees they see the same, freshest ref state. Otherwise a
         // fresh-push / stale-clone run would skip the commit log (head not yet local) while the diff,
         // computed after a later fetch, succeeds — an inconsistent context.
-        String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
-        boolean headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
+        boolean needsGit = selectedKinds.contains(CORE) || selectedKinds.contains(DIFF);
+        boolean headVerified = false;
+        if (needsGit) {
+            ensureRepositoryAvailable(repositoryId);
+            String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
+            headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
+        }
+        if (selectedKinds.contains(CORE)) {
+            storeMetadata(files, pullRequest, metadata);
+        }
+        if (selectedKinds.contains(COMMENTS)) {
+            storeComments(files, pullRequestId);
+        }
+        if (selectedKinds.contains(CONTRIBUTOR_HISTORY)) {
+            storeDeveloperHistory(files, pullRequest, job);
+        }
+        if (selectedKinds.contains(DIFF)) {
+            computeAndStoreDiff(files, repositoryId, metadata, headVerified);
+            computeAndStoreDiffSummary(files);
+        }
+    }
 
-        storeMetadataAndComments(files, pullRequest, pullRequestId, metadata);
-        storeDeveloperHistory(files, pullRequest, job);
-        computeAndStoreDiff(files, repositoryId, metadata, headVerified);
-        computeAndStoreDiffSummary(files);
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        JsonNode metadata = ((ContextRequest.PracticeReviewRequest) request).job().getMetadata();
+        long pullRequestId = requireLong(metadata, "pull_request_id");
+        PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
+        Map<SourceKind, SourceCompleteness> completeness = new HashMap<>();
+        if (selectedKinds.contains(CORE)) {
+            completeness.put(CORE, pullRequest == null ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE);
+        }
+        if (selectedKinds.contains(DIFF)) completeness.put(DIFF, SourceCompleteness.COMPLETE);
+        if (selectedKinds.contains(CONTRIBUTOR_HISTORY)) {
+            completeness.put(CONTRIBUTOR_HISTORY, SourceCompleteness.PARTIAL);
+        }
+        if (selectedKinds.contains(COMMENTS)) {
+            byte[] comments = captured.files().get(OUTPUT_PREFIX + "comments.json");
+            try {
+                int count = comments == null ? 0 : objectMapper.readTree(comments).size();
+                completeness.put(
+                    COMMENTS,
+                    count < MAX_COMMENTS ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL
+                );
+            } catch (JacksonException e) {
+                throw new IllegalStateException("Serialized review comments could not be read", e);
+            }
+        }
+        String headSha = metadata == null ? null : metadata.path("commit_sha").asString();
+        Map<SourceKind, String> identities =
+            selectedKinds.contains(DIFF) && headSha != null && !headSha.isBlank() ? Map.of(DIFF, headSha) : Map.of();
+        Map<SourceKind, java.time.Instant> observedAt = new HashMap<>();
+        if (pullRequest != null && pullRequest.getLastSyncAt() != null) {
+            if (selectedKinds.contains(CORE)) observedAt.put(CORE, pullRequest.getLastSyncAt());
+            if (selectedKinds.contains(COMMENTS)) observedAt.put(COMMENTS, pullRequest.getLastSyncAt());
+        }
+        Map<SourceKind, SourceContentState> contentStates = new HashMap<>();
+        if (selectedKinds.contains(COMMENTS)) {
+            byte[] comments = captured.files().get(OUTPUT_PREFIX + "comments.json");
+            try {
+                contentStates.put(
+                    COMMENTS,
+                    comments == null || objectMapper.readTree(comments).isEmpty()
+                        ? SourceContentState.EMPTY
+                        : SourceContentState.NON_EMPTY
+                );
+            } catch (JacksonException e) {
+                throw new IllegalStateException("Serialized review comments could not be read", e);
+            }
+        }
+        return new EvidenceContribution(
+            captured.files(),
+            completeness,
+            identities,
+            observedAt,
+            Map.of(),
+            contentStates
+        );
     }
 
     // Repository availability
@@ -154,12 +257,12 @@ public class PullRequestContentSource implements ContentSource {
     private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
             throw new JobPreparationException(
-                "Git local checkout is disabled but required for bind-mount: repoId=" + repositoryId
+                "Git local storage is disabled but required for repository evidence: repoId=" + repositoryId
             );
         }
         if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             throw new JobPreparationException(
-                "Repository checkout is not available locally for bind-mount: repoId=" + repositoryId
+                "Repository is not available locally for evidence capture: repoId=" + repositoryId
             );
         }
     }
@@ -250,12 +353,7 @@ public class PullRequestContentSource implements ContentSource {
 
     // Metadata + comments
 
-    private void storeMetadataAndComments(
-        Map<String, byte[]> files,
-        @Nullable PullRequest pullRequest,
-        long pullRequestId,
-        JsonNode metadata
-    ) {
+    private void storeMetadata(Map<String, byte[]> files, @Nullable PullRequest pullRequest, JsonNode metadata) {
         ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequest, metadata);
         addCommitLog(pullRequestMetadata, metadata);
         try {
@@ -266,7 +364,9 @@ public class PullRequestContentSource implements ContentSource {
         } catch (JacksonException e) {
             throw new JobPreparationException("Failed to serialize pull request metadata", e);
         }
+    }
 
+    private void storeComments(Map<String, byte[]> files, long pullRequestId) {
         JsonNode comments = buildReviewComments(pullRequestId);
         try {
             files.put(

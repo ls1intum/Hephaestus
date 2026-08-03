@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -184,6 +185,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);
+        p.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practiceRepository.save(p);
     }

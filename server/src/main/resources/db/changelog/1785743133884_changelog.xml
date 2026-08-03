@@ -1,0 +1,260 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.evidence_declaration already present">
+            <not><columnExists tableName="practice" columnName="evidence_declaration"/></not>
+        </preConditions>
+        <comment>Pin every workspace practice to an explicit artifact-source contract.</comment>
+        <addColumn tableName="practice">
+            <column name="evidence_declaration" type="jsonb"/>
+        </addColumn>
+        <sql>
+            UPDATE practice
+            SET evidence_declaration = CASE applies_to
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+            END
+        </sql>
+        <addNotNullConstraint tableName="practice" columnName="evidence_declaration" columnDataType="jsonb"/>
+        <rollback><dropColumn tableName="practice" columnName="evidence_declaration"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision.evidence_declaration already present">
+            <not><columnExists tableName="practice_revision" columnName="evidence_declaration"/></not>
+        </preConditions>
+        <comment>
+            Add evidence declarations for new revisions. Historical revisions remain null so they cannot
+            silently acquire artifact-source semantics that did not exist when they were evaluated.
+        </comment>
+        <addColumn tableName="practice_revision">
+            <column name="evidence_declaration" type="jsonb"/>
+        </addColumn>
+        <rollback><dropColumn tableName="practice_revision" columnName="evidence_declaration"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="curated_practice_override.evidence_declaration already present">
+            <not><columnExists tableName="curated_practice_override" columnName="evidence_declaration"/></not>
+        </preConditions>
+        <comment>Keep evidence declarations with complete instance-curated practice overrides.</comment>
+        <addColumn tableName="curated_practice_override">
+            <column name="evidence_declaration" type="jsonb"/>
+        </addColumn>
+        <sql>
+            UPDATE curated_practice_override
+            SET evidence_declaration = CASE applies_to
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+            END
+            WHERE applies_to IS NOT NULL
+        </sql>
+        <rollback><dropColumn tableName="curated_practice_override" columnName="evidence_declaration"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-4">
+        <preConditions onFail="HALT">
+            <columnExists tableName="practice" columnName="evidence_declaration"/>
+            <columnExists tableName="practice_revision" columnName="evidence_declaration"/>
+        </preConditions>
+        <comment>Create a new immutable practice revision for the source contract and enforce evidence projection.</comment>
+        <sql splitStatements="false"><![CDATA[
+            INSERT INTO practice_revision (
+                practice_id, revision_number, criteria, created_at,
+                slug, name, applies_to, trigger_events, precompute_script,
+                why_it_matters, what_good_looks_like,
+                area_slug, area_name, area_description, area_icon, area_color,
+                evidence_declaration
+            )
+            SELECT practice.id,
+                   COALESCE(max_revision.revision_number, 0) + 1,
+                   practice.criteria,
+                   CURRENT_TIMESTAMP,
+                   practice.slug,
+                   practice.name,
+                   practice.applies_to,
+                   practice.trigger_events,
+                   practice.precompute_script,
+                   practice.why_it_matters,
+                   practice.what_good_looks_like,
+                   area.slug,
+                   area.name,
+                   area.description,
+                   area.icon,
+                   area.color,
+                   practice.evidence_declaration
+            FROM practice
+            LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+            LEFT JOIN (
+                SELECT practice_id, max(revision_number) AS revision_number
+                FROM practice_revision
+                GROUP BY practice_id
+            ) max_revision ON max_revision.practice_id = practice.id;
+
+            UPDATE practice
+            SET current_revision_id = current_revision.id
+            FROM practice_revision current_revision
+            WHERE current_revision.practice_id = practice.id
+              AND current_revision.revision_number = (
+                  SELECT max(candidate.revision_number)
+                  FROM practice_revision candidate
+                  WHERE candidate.practice_id = practice.id
+              );
+
+            CREATE OR REPLACE FUNCTION enforce_practice_revision_immutability()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $immutable_revision$
+            BEGIN
+                IF NEW.practice_id = OLD.practice_id
+                   AND NEW.revision_number = OLD.revision_number
+                   AND NEW.created_at = OLD.created_at
+                   AND NEW.slug IS NOT DISTINCT FROM OLD.slug
+                   AND NEW.name IS NOT DISTINCT FROM OLD.name
+                   AND NEW.applies_to IS NOT DISTINCT FROM OLD.applies_to
+                   AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
+                   AND NEW.criteria = OLD.criteria
+                   AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
+                   AND NEW.evidence_declaration IS NOT DISTINCT FROM OLD.evidence_declaration
+                   AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
+                   AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
+                   AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
+                   AND NEW.area_name IS NOT DISTINCT FROM OLD.area_name
+                   AND NEW.area_description IS NOT DISTINCT FROM OLD.area_description
+                   AND NEW.area_icon IS NOT DISTINCT FROM OLD.area_icon
+                   AND NEW.area_color IS NOT DISTINCT FROM OLD.area_color
+                   AND (
+                       NEW.detection_fingerprint IS NOT DISTINCT FROM OLD.detection_fingerprint
+                       OR OLD.detection_fingerprint IS NULL
+                   )
+                THEN
+                    RETURN NEW;
+                END IF;
+                RAISE EXCEPTION 'practice revisions are immutable' USING ERRCODE = '55000';
+            END;
+            $immutable_revision$;
+
+            CREATE OR REPLACE FUNCTION enforce_practice_current_revision_projection()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $current_projection$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM practice practice
+                    JOIN practice_revision revision
+                      ON revision.id = practice.current_revision_id
+                     AND revision.practice_id = practice.id
+                    LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+                    WHERE practice.id = NEW.id
+                      AND revision.slug = practice.slug
+                      AND revision.name = practice.name
+                      AND revision.applies_to = practice.applies_to
+                      AND revision.trigger_events = practice.trigger_events
+                      AND revision.criteria = practice.criteria
+                      AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
+                      AND revision.evidence_declaration = practice.evidence_declaration
+                      AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
+                      AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                      AND revision.area_slug IS NOT DISTINCT FROM area.slug
+                ) THEN
+                    RAISE EXCEPTION 'practice current revision does not match its current projection'
+                        USING ERRCODE = '23514';
+                END IF;
+                RETURN NULL;
+            END;
+            $current_projection$;
+
+            DROP TRIGGER practice_requires_current_revision_projection ON practice;
+            CREATE CONSTRAINT TRIGGER practice_requires_current_revision_projection
+                AFTER INSERT OR UPDATE OF current_revision_id, slug, name, applies_to, trigger_events,
+                    criteria, precompute_script, evidence_declaration, why_it_matters, what_good_looks_like,
+                    practice_area_id
+                ON practice
+                DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION enforce_practice_current_revision_projection();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TRIGGER practice_requires_current_revision_projection ON practice;
+
+                CREATE OR REPLACE FUNCTION enforce_practice_revision_immutability()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $immutable_revision$
+                BEGIN
+                    IF NEW.practice_id = OLD.practice_id
+                       AND NEW.revision_number = OLD.revision_number
+                       AND NEW.created_at = OLD.created_at
+                       AND NEW.slug IS NOT DISTINCT FROM OLD.slug
+                       AND NEW.name IS NOT DISTINCT FROM OLD.name
+                       AND NEW.applies_to IS NOT DISTINCT FROM OLD.applies_to
+                       AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
+                       AND NEW.criteria = OLD.criteria
+                       AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
+                       AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
+                       AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
+                       AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
+                       AND NEW.area_name IS NOT DISTINCT FROM OLD.area_name
+                       AND NEW.area_description IS NOT DISTINCT FROM OLD.area_description
+                       AND NEW.area_icon IS NOT DISTINCT FROM OLD.area_icon
+                       AND NEW.area_color IS NOT DISTINCT FROM OLD.area_color
+                       AND (
+                           NEW.detection_fingerprint IS NOT DISTINCT FROM OLD.detection_fingerprint
+                           OR OLD.detection_fingerprint IS NULL
+                       )
+                    THEN
+                        RETURN NEW;
+                    END IF;
+                    RAISE EXCEPTION 'practice revisions are immutable' USING ERRCODE = '55000';
+                END;
+                $immutable_revision$;
+
+                CREATE OR REPLACE FUNCTION enforce_practice_current_revision_projection()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $current_projection$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM practice practice
+                        JOIN practice_revision revision
+                          ON revision.id = practice.current_revision_id
+                         AND revision.practice_id = practice.id
+                        LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+                        WHERE practice.id = NEW.id
+                          AND revision.slug = practice.slug
+                          AND revision.name = practice.name
+                          AND revision.applies_to = practice.applies_to
+                          AND revision.trigger_events = practice.trigger_events
+                          AND revision.criteria = practice.criteria
+                          AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
+                          AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
+                          AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                          AND revision.area_slug IS NOT DISTINCT FROM area.slug
+                    ) THEN
+                        RAISE EXCEPTION 'practice current revision does not match its current projection'
+                            USING ERRCODE = '23514';
+                    END IF;
+                    RETURN NULL;
+                END;
+                $current_projection$;
+
+                CREATE CONSTRAINT TRIGGER practice_requires_current_revision_projection
+                    AFTER INSERT OR UPDATE OF current_revision_id, slug, name, applies_to, trigger_events,
+                        criteria, precompute_script, why_it_matters, what_good_looks_like, practice_area_id
+                    ON practice
+                    DEFERRABLE INITIALLY DEFERRED
+                    FOR EACH ROW EXECUTE FUNCTION enforce_practice_current_revision_projection();
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

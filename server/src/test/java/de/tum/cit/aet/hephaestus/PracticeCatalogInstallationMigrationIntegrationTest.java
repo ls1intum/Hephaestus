@@ -65,6 +65,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         assertMarkerRepair();
         assertEmptyCatalogBootstrap();
         assertWorkspaceRevisionBackfill();
+        assertEvidenceRevisionBackfill();
         assertPointerOwnership();
         assertControlledProvenanceUpdate();
         assertAggregateDeletion();
@@ -128,7 +129,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 WHERE practice.id = 136301
                 """
             )
-        ).isEqualTo("2");
+        ).isEqualTo("3");
         assertThat(
             scalar(
                 """
@@ -213,13 +214,21 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .hasMessageContaining("practice current revision does not match its current projection");
         assertThatThrownBy(() ->
             execute(
+                "UPDATE practice SET evidence_declaration = " +
+                    "jsonb_set(evidence_declaration, '{profile}', '\"issue-review\"') WHERE id = 136301"
+            )
+        )
+            .isInstanceOf(SQLException.class)
+            .hasMessageContaining("practice current revision does not match its current projection");
+        assertThatThrownBy(() ->
+            execute(
                 """
                 INSERT INTO practice (
                     workspace_id, slug, name, applies_to, display_order, trigger_events,
-                    criteria, is_active, created_at
+                    criteria, evidence_declaration, is_active, created_at
                 ) VALUES (
                     136103, 'missing-current-revision', 'Missing revision', 'PULL_REQUEST', 3,
-                    '[]'::jsonb, 'criteria', true, now()
+                    '[]'::jsonb, 'criteria', '{}'::jsonb, true, now()
                 )
                 """
             )
@@ -231,6 +240,15 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     private static void assertRevisionImmutability() throws SQLException {
         assertThatThrownBy(() ->
             execute("UPDATE practice_revision SET criteria = 'mutated' WHERE practice_id = 136301")
+        )
+            .isInstanceOf(SQLException.class)
+            .hasMessageContaining("practice revisions are immutable");
+
+        assertThatThrownBy(() ->
+            execute(
+                "UPDATE practice_revision SET evidence_declaration = '{}'::jsonb " +
+                    "WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)"
+            )
         )
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("practice revisions are immutable");
@@ -247,7 +265,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 "SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301" +
                     " AND detection_fingerprint = repeat('a', 64)"
             )
-        ).isEqualTo("1");
+        ).isEqualTo("2");
 
         assertThatThrownBy(() ->
             execute(
@@ -270,7 +288,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     slug, name, applies_to, trigger_events, precompute_script,
                     why_it_matters, what_good_looks_like,
                     area_slug, area_name, area_description, area_icon, area_color,
-                    detection_fingerprint
+                    detection_fingerprint, evidence_declaration
                 )
                 SELECT practice.id,
                        (SELECT max(revision_number) + 1 FROM practice_revision WHERE practice_id = practice.id),
@@ -288,7 +306,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                        area.description,
                        area.icon,
                        area.color,
-                       repeat('a', 64)
+                       repeat('a', 64),
+                       practice.evidence_declaration
                 FROM practice
                 LEFT JOIN practice_area area ON area.id = practice.practice_area_id
                 WHERE practice.id = 136301
@@ -318,7 +337,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)
                 """
             )
-        ).isEqualTo("3");
+        ).isEqualTo("4");
     }
 
     private static void assertRollbackAndReapply() throws Exception {
@@ -358,7 +377,32 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 WHERE practice.id = 136301
                 """
             )
+        ).isEqualTo("3");
+    }
+
+    private static void assertEvidenceRevisionBackfill() throws SQLException {
+        assertThat(
+            scalar(
+                """
+                SELECT count(*)::text
+                FROM practice practice
+                JOIN practice_revision revision ON revision.id = practice.current_revision_id
+                WHERE practice.id IN (136301, 136302)
+                  AND revision.evidence_declaration = practice.evidence_declaration
+                  AND revision.evidence_declaration IS NOT NULL
+                """
+            )
         ).isEqualTo("2");
+        assertThat(
+            scalar(
+                """
+                SELECT count(*)::text
+                FROM practice_revision
+                WHERE practice_id IN (136301, 136302)
+                  AND evidence_declaration IS NULL
+                """
+            )
+        ).isEqualTo("3");
     }
 
     private static void seedExistingWorkspaces() throws SQLException {

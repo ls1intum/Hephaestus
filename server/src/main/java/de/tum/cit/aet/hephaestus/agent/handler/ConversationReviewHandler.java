@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -14,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,6 +94,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
             metadata.put("slack_channel_name", r.slackChannelName());
         }
         metadata.put("slack_thread_ts", r.slackThreadTs());
+        metadata.put("slack_last_ts", r.lastTs());
         metadata.put("about_user_id", r.aboutUserId());
 
         // Trailing segment is the disposable freshness (lastTs): AgentJobService.extractCooldownKeyPrefix
@@ -117,11 +121,18 @@ public class ConversationReviewHandler implements JobTypeHandler {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
-        Map<String, byte[]> files = new LinkedHashMap<>(
-            workspaceContextBuilder.build(new ContextRequest.ConversationReviewRequest(job))
+        List<Practice> practices = practiceCatalogInjector.resolve(job, WorkArtifact.CONVERSATION_THREAD);
+        PreparedEvidence prepared = workspaceContextBuilder.prepare(
+            new ContextRequest.ConversationReviewRequest(job),
+            EvidencePlan.compile(practices)
         );
+        practices = workspaceContextBuilder.readyPractices(prepared.manifest(), practices, job.getId().toString());
+        if (practices.isEmpty()) {
+            throw new JobPreparationException("No practice has sufficient evidence: jobId=" + job.getId());
+        }
+        Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
-        practiceCatalogInjector.inject(files, job, WorkArtifact.CONVERSATION_THREAD);
+        practiceCatalogInjector.inject(files, job, WorkArtifact.CONVERSATION_THREAD, practices);
         log.info("Conversation context preparation complete: {} files, jobId={}", files.size(), job.getId());
         return files;
     }

@@ -737,8 +737,16 @@ export const updateAreaResponseTransformer = async (data: any): Promise<UpdateAr
     return data;
 };
 
+const practiceEvidenceValidationSchemaResponseTransformer = (data: any) => {
+    if (data.validatedAt) {
+        data.validatedAt = new Date(data.validatedAt);
+    }
+    return data;
+};
+
 const practiceSchemaResponseTransformer = (data: any) => {
     data.createdAt = new Date(data.createdAt);
+    data.evidenceValidation = practiceEvidenceValidationSchemaResponseTransformer(data.evidenceValidation);
     data.updatedAt = new Date(data.updatedAt);
     return data;
 };

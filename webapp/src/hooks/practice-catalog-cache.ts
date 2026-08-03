@@ -80,6 +80,12 @@ export function selectPracticePatch(
 	return {
 		...("artifactType" in request ? { artifactType: practice.artifactType } : {}),
 		...("criteria" in request ? { criteria: practice.criteria } : {}),
+		...("evidence" in request || "artifactType" in request
+			? {
+					evidence: practice.evidence,
+					evidenceValidation: practice.evidenceValidation,
+				}
+			: {}),
 		...("name" in request ? { name: practice.name } : {}),
 		...("precomputeScript" in request || clear.has("PRECOMPUTE_SCRIPT")
 			? { precomputeScript: practice.precomputeScript }

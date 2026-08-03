@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -97,6 +98,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-test"));
 
         practice = new Practice();
+        practice.setEvidence(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
@@ -286,6 +288,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             // Create workspace B with its own practice and finding
             Workspace workspaceB = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("ws-b"));
             Practice practiceB = new Practice();
+            practiceB.setEvidence(PracticeTestEvidence.pullRequest());
             practiceB.setWorkspace(workspaceB);
             practiceB.setSlug("practice-b");
             practiceB.setName("Practice B");
@@ -358,6 +361,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         void cascadesFromPracticeSelectively() {
             // Create a second practice with its own finding
             Practice otherPractice = new Practice();
+            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(workspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
@@ -514,6 +518,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         void groupsByPracticeSlug() {
             Practice secondPractice = new Practice();
+            secondPractice.setEvidence(PracticeTestEvidence.pullRequest());
             secondPractice.setWorkspace(workspace);
             secondPractice.setSlug("error-handling");
             secondPractice.setName("Error Handling");
@@ -539,6 +544,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         void workspaceIsolation() {
             Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-ws"));
             Practice otherPractice = new Practice();
+            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("test-practice"); // Same slug, different workspace
             otherPractice.setName("Test Practice");
@@ -1066,6 +1072,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
             Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-other"));
             Practice otherPractice = new Practice();
+            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");

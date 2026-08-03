@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaDTO;
@@ -57,6 +59,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class CuratedCatalogAdminController {
 
     private final CuratedCatalogService service;
+    private final PracticeEvidenceDefaults evidenceDefaults;
 
     @GetMapping
     @Operation(
@@ -96,7 +99,7 @@ public class CuratedCatalogAdminController {
     public ResponseEntity<CuratedPracticeDTO> createPractice(
         @Valid @RequestBody CreateCuratedPracticeRequestDTO request
     ) {
-        var entry = service.createPractice(request.slug(), request.definition().definition());
+        var entry = service.createPractice(request.slug(), definition(request.definition()));
         return created(entry.slug(), entry.etag(), CuratedPracticeDTO.from(entry));
     }
 
@@ -126,7 +129,7 @@ public class CuratedCatalogAdminController {
         ) @Nullable String ifMatch,
         @Valid @RequestBody CuratedPracticeRequestDTO request
     ) {
-        return ok(service.writePractice(slug, precondition(ifMatch), request.definition()), CuratedPracticeDTO::from);
+        return ok(service.writePractice(slug, precondition(ifMatch), definition(request)), CuratedPracticeDTO::from);
     }
 
     @PatchMapping("/practices/{slug}/status")
@@ -436,6 +439,12 @@ public class CuratedCatalogAdminController {
         ) @Nullable String ifMatch
     ) {
         return catalogResponse(service.resetOrder(precondition(ifMatch)));
+    }
+
+    private PracticeDefinition definition(CuratedPracticeRequestDTO request) {
+        var evidence =
+            request.evidence() == null ? evidenceDefaults.forArtifact(request.artifactType()) : request.evidence();
+        return request.definition(evidence);
     }
 
     private static ResponseEntity<CuratedCatalogDTO> catalogResponse(EffectiveCatalog catalog) {

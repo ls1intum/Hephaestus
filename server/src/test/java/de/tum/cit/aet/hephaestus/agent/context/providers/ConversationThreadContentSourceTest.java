@@ -6,10 +6,14 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,5 +70,20 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
         assertThat(files).containsKey("inputs/context/conversation_thread.json");
         String written = new String(files.get("inputs/context/conversation_thread.json"));
         assertThat(written).contains("\"channel\":\"C0ABC\"").contains("\"messageCount\":3");
+    }
+
+    @Test
+    void reportsAnEmptyFullyEnumeratedThreadAsCompleteEmptyEvidence() {
+        AgentJob job = conversationJob();
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("messageCount", 0);
+        payload.put("truncated", false);
+        when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
+        SourceKind kind = new SourceKind("slack.conversation.thread");
+
+        var contribution = source.capture(new ContextRequest.ConversationReviewRequest(job), Set.of(kind));
+
+        assertThat(contribution.contentStates()).containsEntry(kind, SourceContentState.EMPTY);
+        assertThat(contribution.completeness()).containsEntry(kind, SourceCompleteness.COMPLETE);
     }
 }

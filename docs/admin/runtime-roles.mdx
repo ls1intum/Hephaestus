@@ -14,13 +14,13 @@ All three default-on means a vanilla `mvn spring-boot:run` is a working monolith
 
 On startup the JVM logs which roles wired:
 
-```
+```text
 INFO  RuntimeRoleStartupLogger : Runtime roles enabled: [server, worker, webhook]
 ```
 
 If you accidentally disable all three, the WARN spells out the recovery:
 
-```
+```text
 WARN  RuntimeRoleStartupLogger : All runtime roles disabled — this JVM will
       accept no work. Set at least one of hephaestus.runtime.server.enabled=true,
       hephaestus.runtime.worker.enabled=true, or hephaestus.runtime.webhook.enabled=true.
@@ -50,7 +50,7 @@ Each role ships with a Spring profile YAML that flips the other two flags off an
 
 - `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandbox has) is served with the worker/sandbox capability, and no `ports:`/Traefik mapping exposes it externally.
 - `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
-- No `application-server.yml` — the monolith default _is_ the server profile.
+- No `application-server.yml` — the monolith default *is* the server profile.
 
 To deploy a worker pod set `SPRING_PROFILES_ACTIVE=prod,worker` and point `HEPHAESTUS_HUB_URL` at the app pod's WSS endpoint. See `docker/compose.app.yaml` for a working compose template.
 

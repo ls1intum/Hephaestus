@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -114,6 +115,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     private Practice persistPractice(Workspace ws, String slug, String name) {
         Practice practice = new Practice();
+        practice.setEvidence(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(ws);
         practice.setSlug(slug);
         practice.setName(name);
@@ -329,6 +331,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .isEqualTo(2)
                 .jsonPath("$.content[?(@.title == 'Alice problem')].subject.login")
                 .isEqualTo("alice")
+                .jsonPath("$.content[?(@.title == 'Alice problem')].claimStatus")
+                .isEqualTo("UNVERIFIABLE")
                 .jsonPath("$.content[?(@.title == 'Bob problem')].subject.login")
                 .isEqualTo("bob");
         }

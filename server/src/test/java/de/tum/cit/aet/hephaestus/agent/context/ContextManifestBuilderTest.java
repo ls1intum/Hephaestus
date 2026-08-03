@@ -1,14 +1,38 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
+import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
+import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRefusal;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,6 +40,15 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 class ContextManifestBuilderTest extends BaseUnitTest {
+
+    private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
+    private static final SourceKind CORE = new SourceKind("scm.pull-request.core");
+    private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
+    private static final SourceKind CONVERSATION = new SourceKind("slack.conversation.thread");
+    private static final SourceKind LINKED_ITEMS = new SourceKind("scm.linked-work-items");
+    private static final SourceKind CONTRIBUTOR_HISTORY = new SourceKind("scm.contributor-history");
+    private static final SourceKind REPOSITORY_TREE = new SourceKind("scm.repository.tree");
+    private static final Instant NOW = Instant.parse("2026-08-03T10:00:00Z");
 
     @TempDir
     Path root;
@@ -29,87 +62,459 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     void setUp() {
         layout = new FabricLayout(root.toString());
         cas = new ContentAddressedStore(layout);
-        builder = new ContextManifestBuilder(cas, layout, mapper);
+        builder = builderAt(NOW);
     }
 
     @Test
-    void augment_indexesEachFileWithConnectorAndContentHash_andStoresBlobsInCas() {
+    void shouldKeepDigestsInternalAndExposeOnlySafeModelIndex() {
         Map<String, byte[]> files = new LinkedHashMap<>();
         byte[] diff = "diff --git a b".getBytes(StandardCharsets.UTF_8);
-        byte[] linked = "{\"workItems\":[]}".getBytes(StandardCharsets.UTF_8);
         files.put("inputs/context/diff.patch", diff);
-        files.put("inputs/context/linked_work_items.json", linked);
-        Map<String, String> keyConnector = Map.of(
-            "inputs/context/diff.patch",
-            "scm",
-            "inputs/context/linked_work_items.json",
-            "scm"
+        EvidencePlan plan = plan(Set.of(DIFF));
+
+        builder.augment(
+            files,
+            Map.of("inputs/context/diff.patch", DIFF),
+            "job-42",
+            plan,
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(DIFF, SourceCompleteness.COMPLETE),
+                Map.of(DIFF, "abc123"),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(DIFF)
+            )
         );
 
-        builder.augment(files, keyConnector, "job-42", 7L);
+        JsonNode visible = mapper.readTree(files.get("inputs/manifest.json"));
+        assertThat(visible.path("contractVersion").asString()).isEqualTo("1.0.0");
+        assertThat(visible.toString()).doesNotContain("sha256").doesNotContain("job-42").doesNotContain("workspaceId");
+        JsonNode diffSource = findSource(visible, DIFF.value());
+        assertThat(diffSource.path("availability").asString()).isEqualTo("AVAILABLE");
+        assertThat(diffSource.path("paths").get(0).asString()).isEqualTo("inputs/context/diff.patch");
 
-        // The manifest sits at inputs/manifest.json (above the per-connector context) and indexes the two files.
-        assertThat(files).containsKey("inputs/manifest.json");
-        JsonNode manifest = mapper.readTree(files.get("inputs/manifest.json"));
-        assertThat(manifest.path("jobId").asString()).isEqualTo("job-42");
-        assertThat(manifest.path("workspaceId").asLong()).isEqualTo(7L);
-        JsonNode entries = manifest.path("entries");
-        assertThat(entries).hasSize(2);
-        // Entry order is deterministic (sorted by key): diff.patch before linked_work_items.json.
-        assertThat(entries.get(0).path("path").asString()).isEqualTo("inputs/context/diff.patch");
-        assertThat(entries.get(0).path("connector").asString()).isEqualTo("scm");
-        assertThat(entries.get(0).path("bytes").asInt()).isEqualTo(diff.length);
+        Path internalPath = layout.jobDir("job-42").resolve("artifact-source-manifest.json");
+        assertThat(internalPath).exists();
+        JsonNode internal = mapper.readTree(internalPath.toFile());
+        String sha = findSource(internal, DIFF.value()).path("artifacts").get(0).path("sha256").asString();
+        assertThat(cas.get(sha)).contains(diff);
+    }
 
-        // Every entry's sha is a real, retrievable CAS blob (provenance the agent cannot fabricate).
-        for (JsonNode entry : entries) {
-            String sha = entry.path("sha256").asString();
-            assertThat(cas.exists(sha)).isTrue();
+    @Test
+    void shouldRepresentMinimizedSourcesAsNotCollected() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+
+        builder.augment(files, Map.of(), "job-7", plan(Set.of(COMMENTS)), metadata(COMMENTS, NOW));
+
+        JsonNode visible = mapper.readTree(files.get("inputs/manifest.json"));
+        JsonNode diff = findSource(visible, DIFF.value());
+        assertThat(diff.path("availability").asString()).isEqualTo("NOT_COLLECTED");
+        assertThat(diff.has("paths")).isFalse();
+        JsonNode comments = findSource(visible, COMMENTS.value());
+        assertThat(comments.path("content").asString()).isEqualTo("EMPTY");
+        assertThat(comments.path("completeness").asString()).isEqualTo("COMPLETE");
+    }
+
+    @Test
+    void shouldRepresentAWhollyWithheldSourceAsRedactedWithoutLeakingArtifacts() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+
+        builder.augment(
+            files,
+            Map.of(),
+            "job-redacted",
+            plan(Set.of(COMMENTS)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(COMMENTS, new SourceCaptureState.Redacted("PRIVACY_POLICY")),
+                Set.of(COMMENTS)
+            )
+        );
+
+        JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), COMMENTS.value());
+        assertThat(source.path("availability").asString()).isEqualTo("REDACTED");
+        assertThat(source.has("paths")).isFalse();
+    }
+
+    @Test
+    void shouldDeclineWhenRequiredEvidenceIsStale() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        var manifest = builder.augment(
+            files,
+            Map.of(),
+            "job-stale",
+            plan(Set.of(COMMENTS)),
+            metadata(COMMENTS, java.time.Instant.EPOCH)
+        );
+
+        assertThat(builder.readyPractices(manifest, List.of(practiceRequiringComments()))).isEmpty();
+    }
+
+    @Test
+    void shouldReassessFreshnessAtReplayTime() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(),
+            "job-replay",
+            plan(Set.of(COMMENTS)),
+            metadata(COMMENTS, NOW)
+        );
+
+        ContextManifestBuilder replayBuilder = builderAt(NOW.plusSeconds(301));
+
+        assertThat(replayBuilder.readyPractices(manifest, List.of(practiceRequiringComments()))).isEmpty();
+    }
+
+    @Test
+    void shouldPersistEvidenceRefusalsAsTypedDecisions() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(),
+            "job-refused",
+            plan(Set.of(COMMENTS)),
+            metadata(COMMENTS, Instant.EPOCH)
+        );
+
+        assertThat(builder.readyPractices(manifest, List.of(practiceRequiringComments()), "job-refused")).isEmpty();
+        JsonNode report = mapper.readTree(
+            layout.jobDir("job-refused").resolve("practice-readiness-report.json").toFile()
+        );
+        JsonNode decision = report.path("decisions").get(0);
+        assertThat(decision.path("ready").asBoolean()).isFalse();
+        assertThat(decision.path("assessments").get(0).path("reasonCodes").get(0).asString()).isEqualTo(
+            "FRESHNESS_UNSATISFIED"
+        );
+    }
+
+    @Test
+    void shouldAcceptCompleteCurrentEmptyEvidence() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        var manifest = builder.augment(files, Map.of(), "job-empty", plan(Set.of(COMMENTS)), metadata(COMMENTS, NOW));
+        Practice practice = practiceRequiringComments();
+
+        assertThat(builder.readyPractices(manifest, List.of(practice))).containsExactly(practice);
+    }
+
+    @Test
+    void shouldRejectEmptyContentWhenTheSourceContractForbidsIt() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        builder.augment(files, Map.of(), "job-invalid-empty", plan(Set.of(CORE)), metadata(CORE, NOW));
+
+        JsonNode core = findSource(mapper.readTree(files.get("inputs/manifest.json")), CORE.value());
+        assertThat(core.path("availability").asString()).isEqualTo("UNAVAILABLE");
+    }
+
+    @Test
+    void shouldRejectAReplayAgainstDifferentContractBytes() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(),
+            "job-old-contract",
+            plan(Set.of(COMMENTS)),
+            metadata(COMMENTS, NOW)
+        );
+        ArtifactSourceManifest changedContract = new ArtifactSourceManifest(
+            manifest.contractVersion(),
+            "0".repeat(64),
+            manifest.profileId(),
+            manifest.capturedAt(),
+            manifest.sources(),
+            manifest.viewTransformations()
+        );
+
+        assertThatThrownBy(() -> builder.readyPractices(changedContract, List.of(practiceRequiringComments())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("exact source contract");
+    }
+
+    @Test
+    void shouldAssessEventTimeWithoutRequiringAnObservedAtWatermark() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        Instant eventTime = NOW.minusSeconds(1);
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(),
+            "job-event-time",
+            conversationPlan(),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(CONVERSATION, SourceCompleteness.COMPLETE),
+                Map.of(),
+                Map.of(),
+                Map.of(CONVERSATION, eventTime),
+                Map.of(),
+                Set.of(CONVERSATION)
+            )
+        );
+        Practice practice = practiceRequiring(CONVERSATION, "conversation");
+
+        assertThat(builder.readyPractices(manifest, List.of(practice))).containsExactly(practice);
+    }
+
+    @Test
+    void shouldNotTreatAFutureMirrorWatermarkAsCurrent() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(),
+            "job-future-watermark",
+            plan(Set.of(COMMENTS)),
+            metadata(COMMENTS, NOW.plusSeconds(60))
+        );
+
+        assertThat(builder.readyPractices(manifest, List.of(practiceRequiringComments()))).isEmpty();
+    }
+
+    @Test
+    void shouldNotInferCompleteFromSourceCapabilityAlone() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        files.put("inputs/context/linked_work_items.json", "{\"workItems\":[{}]}".getBytes(StandardCharsets.UTF_8));
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of("inputs/context/linked_work_items.json", LINKED_ITEMS),
+            "job-unreported-completeness",
+            plan(Set.of(LINKED_ITEMS)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(LINKED_ITEMS)
+            )
+        );
+
+        JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), LINKED_ITEMS.value());
+        assertThat(source.path("completeness").asString()).isEqualTo("PARTIAL");
+    }
+
+    @Test
+    void shouldRejectSourcesOutsideTheSelectedProfile() {
+        assertThatThrownBy(() ->
+            builder.augment(
+                new LinkedHashMap<>(),
+                Map.of(),
+                "job-invalid-plan",
+                plan(Set.of(CONVERSATION)),
+                metadata(CONVERSATION, NOW)
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("outside profile");
+    }
+
+    @Test
+    void shouldRejectGeneratedMissingnessForbiddenByTheSourceContract() {
+        var realCatalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC());
+        ArtifactSourceContract diff = realCatalogs.requireSource(plan(Set.of(DIFF)).contractVersion(), DIFF);
+        ArtifactSourceContract restrictedDiff = new ArtifactSourceContract(
+            diff.kind(),
+            diff.artifactTypes(),
+            diff.authority(),
+            diff.captureTime(),
+            diff.freshnessPolicy(),
+            diff.completenessPolicy(),
+            diff.privacyClass(),
+            Set.of(MissingnessKind.UNAVAILABLE),
+            diff.purpose(),
+            diff.retentionPolicy(),
+            diff.erasurePolicy(),
+            diff.useDecisionId()
+        );
+        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
+        when(catalogs.requireProfile(any(), any())).thenAnswer(invocation ->
+            realCatalogs.requireProfile(invocation.getArgument(0), invocation.getArgument(1))
+        );
+        when(catalogs.requireSource(any(), any())).thenAnswer(invocation -> {
+            SourceKind kind = invocation.getArgument(1);
+            return kind.equals(DIFF) ? restrictedDiff : realCatalogs.requireSource(invocation.getArgument(0), kind);
+        });
+        ContextManifestBuilder restrictedBuilder = new ContextManifestBuilder(
+            cas,
+            layout,
+            mapper,
+            catalogs,
+            Clock.systemUTC()
+        );
+
+        assertThatThrownBy(() ->
+            restrictedBuilder.augment(
+                new LinkedHashMap<>(),
+                Map.of(),
+                "job-unsupported-missingness",
+                plan(Set.of(COMMENTS)),
+                metadata(COMMENTS, NOW)
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("does not support missingness state NOT_COLLECTED");
+    }
+
+    @Test
+    void shouldRejectPracticeEvidenceFromAnotherProfile() {
+        ArtifactSourceManifest manifest = builder.augment(
+            new LinkedHashMap<>(),
+            Map.of(),
+            "job-profile-mismatch",
+            plan(Set.of(COMMENTS)),
+            metadata(COMMENTS, NOW)
+        );
+
+        assertThatThrownBy(() ->
+            builder.readyPractices(manifest, List.of(practiceRequiring(CONVERSATION, "conversation")))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("does not match manifest");
+    }
+
+    @Test
+    void shouldRejectCompletenessForbiddenByTheSourceContract() {
+        assertThatThrownBy(() ->
+            builder.augment(
+                new LinkedHashMap<>(),
+                Map.of(),
+                "job-invalid-completeness",
+                plan(Set.of(CONTRIBUTOR_HISTORY)),
+                metadata(CONTRIBUTOR_HISTORY, NOW)
+            )
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("completeness forbidden");
+    }
+
+    @Test
+    void shouldTreatAnEmptyRepositoryTreeAsValidCompleteEvidence() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        builder.augment(
+            files,
+            Map.of(),
+            "job-empty-tree",
+            plan(Set.of(REPOSITORY_TREE)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(REPOSITORY_TREE, SourceCompleteness.COMPLETE),
+                Map.of(REPOSITORY_TREE, "commit:tree"),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(REPOSITORY_TREE)
+            )
+        );
+
+        JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), REPOSITORY_TREE.value());
+        assertThat(source.path("availability").asString()).isEqualTo("AVAILABLE");
+        assertThat(source.path("content").asString()).isEqualTo("EMPTY");
+        assertThat(source.path("completeness").asString()).isEqualTo("COMPLETE");
+    }
+
+    @Test
+    void shouldRejectUndocumentedRuntimeSourceKinds() {
+        EvidenceSource undocumented = new EvidenceSource() {
+            private final SourceKind kind = new SourceKind("scm.undocumented");
+
+            @Override
+            public Set<SourceKind> sourceKinds() {
+                return Set.of(kind);
+            }
+
+            @Override
+            public SourceKind sourceKindFor(String path) {
+                return kind;
+            }
+
+            @Override
+            public String originId() {
+                return "test";
+            }
+
+            @Override
+            public boolean supports(ContextRequest request) {
+                return true;
+            }
+
+            @Override
+            public void contribute(ContextRequest request, Map<String, byte[]> files) {}
+        };
+
+        assertThatThrownBy(() -> builder.validateEvidenceSources(List.of(undocumented)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Unknown source kind");
+    }
+
+    private static EvidencePlan plan(Set<SourceKind> sources) {
+        return new EvidencePlan(
+            new SourceContractVersion("1.0.0"),
+            new EvidenceProfileId("pull-request-review"),
+            sources
+        );
+    }
+
+    private ContextManifestBuilder builderAt(Instant instant) {
+        return new ContextManifestBuilder(
+            cas,
+            layout,
+            mapper,
+            new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
+            Clock.fixed(instant, java.time.ZoneOffset.UTC)
+        );
+    }
+
+    private static EvidencePlan conversationPlan() {
+        return new EvidencePlan(
+            new SourceContractVersion("1.0.0"),
+            new EvidenceProfileId("conversation-review"),
+            Set.of(CONVERSATION)
+        );
+    }
+
+    private static ContextManifestBuilder.CaptureMetadata metadata(SourceKind kind, Instant observedAt) {
+        return new ContextManifestBuilder.CaptureMetadata(
+            Map.of(kind, SourceCompleteness.COMPLETE),
+            Map.of(),
+            Map.of(kind, observedAt),
+            Map.of(),
+            Map.of(),
+            Set.of(kind)
+        );
+    }
+
+    private static Practice practiceRequiringComments() {
+        return practiceRequiring(COMMENTS, "review-comments");
+    }
+
+    private static Practice practiceRequiring(SourceKind sourceKind, String slug) {
+        Practice practice = new Practice();
+        practice.setSlug(slug);
+        practice.setEvidence(
+            new PracticeEvidenceDeclaration(
+                new SourceContractVersion("1.0.0"),
+                sourceKind.equals(CONVERSATION)
+                    ? new EvidenceProfileId("conversation-review")
+                    : new EvidenceProfileId("pull-request-review"),
+                List.of(
+                    new PracticeEvidenceRequirement(
+                        sourceKind,
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
+                    )
+                ),
+                List.of(),
+                PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+                List.of()
+            )
+        );
+        return practice;
+    }
+
+    private static JsonNode findSource(JsonNode root, String kind) {
+        for (JsonNode source : root.path("sources")) {
+            if (kind.equals(source.path("kind").asString())) return source;
         }
-        // The diff blob's recorded sha addresses exactly the diff bytes.
-        String diffSha = entries.get(0).path("sha256").asString();
-        assertThat(cas.get(diffSha)).contains(diff);
-    }
-
-    @Test
-    void augment_persistsJobManifestForReplay() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        files.put("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
-
-        builder.augment(files, Map.of("inputs/context/metadata.json", "scm"), "job-99", 1L);
-
-        Path jobManifest = layout.jobDir("job-99").resolve("manifest.json");
-        assertThat(jobManifest).exists();
-    }
-
-    @Test
-    void augment_indexesOnlyContextFiles_andNeverItself() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        files.put("inputs/context/diff.patch", "d".getBytes(StandardCharsets.UTF_8));
-        // A non-context file (e.g. an internal catalog file) must be ignored by the manifest.
-        files.put("inputs/practices/index.json", "[]".getBytes(StandardCharsets.UTF_8));
-        // A pre-seeded manifest must not index itself, and must be overwritten exactly once.
-        files.put("inputs/manifest.json", "stale".getBytes(StandardCharsets.UTF_8));
-
-        builder.augment(files, Map.of("inputs/context/diff.patch", "scm"), "job-1", 1L);
-
-        JsonNode manifest = mapper.readTree(files.get("inputs/manifest.json"));
-        assertThat(manifest.path("entries")).hasSize(1);
-        assertThat(manifest.path("entries").get(0).path("path").asString()).isEqualTo("inputs/context/diff.patch");
-        assertThat(files).containsKey("inputs/practices/index.json"); // untouched, still present
-    }
-
-    @Test
-    void augment_neverDefaultsAnUnmappedKeyToAConnectorName() {
-        // Provenance integrity: a context file whose connector is (impossibly) absent from keyConnector must
-        // NOT be silently attributed to "scm" — that is exactly the mislabel the telescope exists to prevent.
-        // It is recorded as the fail-loud "unknown" marker instead. (originId() is abstract, so in practice
-        // every provider-written key is mapped; this guards the regression where the default named a connector.)
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        files.put("inputs/context/core_context.json", "{}".getBytes(StandardCharsets.UTF_8));
-
-        builder.augment(files, Map.of(), "job-7", 1L);
-
-        JsonNode manifest = mapper.readTree(files.get("inputs/manifest.json"));
-        assertThat(manifest.path("entries").get(0).path("connector").asString()).isEqualTo("unknown");
+        throw new AssertionError("Missing source " + kind);
     }
 }

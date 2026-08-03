@@ -1,13 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -84,10 +86,10 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_noComments_writesNothing() {
-        Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(request(metadataWithPr()), files);
+        var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());
 
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        assertThat(captured.files()).doesNotContainKey(FILE_KEY);
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
@@ -157,13 +159,15 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_neverThrows_onRepositoryFailure() {
+    void contribute_reportsRepositoryFailure() {
         when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenThrow(
             new RuntimeException("db down")
         );
 
         Map<String, byte[]> files = new HashMap<>();
-        assertThatCode(() -> provider.contribute(request(metadataWithPr()), files)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> provider.contribute(request(metadataWithPr()), files))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasMessageContaining("General-review-comment collection failed");
         assertThat(files).doesNotContainKey(FILE_KEY);
     }
 

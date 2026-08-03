@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.io.IOException;
@@ -25,15 +26,18 @@ public class BundledPracticeCatalogLoader {
 
     private final BundledPracticeCatalog catalog;
 
-    BundledPracticeCatalogLoader(JsonMapper objectMapper) {
-        this.catalog = parse(objectMapper);
+    BundledPracticeCatalogLoader(JsonMapper objectMapper, PracticeDefinitionValidator definitionValidator) {
+        this.catalog = parse(objectMapper, definitionValidator);
     }
 
     BundledPracticeCatalog catalog() {
         return catalog;
     }
 
-    private static BundledPracticeCatalog parse(JsonMapper objectMapper) {
+    private static BundledPracticeCatalog parse(
+        JsonMapper objectMapper,
+        PracticeDefinitionValidator definitionValidator
+    ) {
         JsonNode root = readCatalog(objectMapper);
         List<BundledEntry<AreaDefinition>> areas = new ArrayList<>();
         List<BundledEntry<PracticeDefinition>> practices = new ArrayList<>();
@@ -73,7 +77,11 @@ public class BundledPracticeCatalogLoader {
                     throw new IllegalStateException("duplicate bundled practice slug: " + slug);
                 }
                 practices.add(
-                    new BundledEntry<>(slug, definition(root, areaSlug, practiceNode, slug), practicePosition++)
+                    new BundledEntry<>(
+                        slug,
+                        definition(objectMapper, definitionValidator, root, areaSlug, practiceNode, slug),
+                        practicePosition++
+                    )
                 );
             }
         }
@@ -83,7 +91,14 @@ public class BundledPracticeCatalogLoader {
         return new BundledPracticeCatalog(List.copyOf(areas), List.copyOf(practices));
     }
 
-    private static PracticeDefinition definition(JsonNode catalog, String areaSlug, JsonNode node, String slug) {
+    private static PracticeDefinition definition(
+        JsonMapper objectMapper,
+        PracticeDefinitionValidator definitionValidator,
+        JsonNode catalog,
+        String areaSlug,
+        JsonNode node,
+        String slug
+    ) {
         WorkArtifact artifactType = WorkArtifact.valueOf(requiredText(node, "artifactType"));
         JsonNode triggersNode = node.path("triggerEvents");
         if (!triggersNode.isArray()) {
@@ -104,17 +119,37 @@ public class BundledPracticeCatalogLoader {
         String criteria = composeCriteria(catalog, preambleKey, requiredText(node, "criteria"));
         String whyItMatters = text(node, "whyItMatters");
         String whatGoodLooksLike = text(node, "whatGoodLooksLike");
-        PracticeDefinitionValidator.validate(artifactType, triggerEvents, whyItMatters, whatGoodLooksLike);
-        return new PracticeDefinition(
+        PracticeDefinition definition = new PracticeDefinition(
             requiredText(node, "name"),
             artifactType,
             triggerEvents,
             criteria,
             loadPrecomputeScript(slug),
+            evidence(objectMapper, catalog, node, slug),
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
         );
+        definitionValidator.validate(definition);
+        return definition;
+    }
+
+    private static PracticeEvidenceDeclaration evidence(
+        JsonMapper objectMapper,
+        JsonNode catalog,
+        JsonNode node,
+        String slug
+    ) {
+        String evidenceId = requiredText(node, "evidence");
+        JsonNode evidence = catalog.path("evidenceDeclarations").get(evidenceId);
+        if (evidence == null || !evidence.isObject()) {
+            throw new IllegalStateException("unknown bundled practice evidence declaration: " + evidenceId);
+        }
+        try {
+            return objectMapper.treeToValue(evidence, PracticeEvidenceDeclaration.class);
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("invalid bundled practice evidence: " + slug, exception);
+        }
     }
 
     private static @Nullable String loadPrecomputeScript(String slug) {

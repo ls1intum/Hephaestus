@@ -2,12 +2,23 @@ package de.tum.cit.aet.hephaestus.agent.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,8 +29,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.Ordered;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class WorkspaceContextBuilderTest extends BaseUnitTest {
 
@@ -65,7 +78,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             @Override
             public void contribute(ContextRequest request, Map<String, byte[]> files) {
                 if (throwError) {
-                    throw new IllegalStateException("provider boom");
+                    throw new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure"));
                 }
                 files.put(OUTPUT_PREFIX + pathSuffix, payload);
             }
@@ -166,6 +179,145 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         @Test
+        void unexpectedProviderBugPropagates() {
+            var bad = new ContentSource() {
+                @Override
+                public String originId() {
+                    return "test";
+                }
+
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    throw new IllegalStateException("programmer bug");
+                }
+            };
+
+            assertThatThrownBy(() -> builderOf(bad).build(reviewRequest()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("programmer bug");
+        }
+
+        @Test
+        void requiredEvidenceFailureIsPersistedForConservativeRefusal(@TempDir Path root) {
+            SourceKind comments = new SourceKind("scm.pull-request.comments");
+            EvidenceSource bad = new EvidenceSource() {
+                @Override
+                public String originId() {
+                    return "test";
+                }
+
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public boolean required() {
+                    return true;
+                }
+
+                @Override
+                public Set<SourceKind> sourceKinds() {
+                    return Set.of(comments);
+                }
+
+                @Override
+                public SourceKind sourceKindFor(String path) {
+                    return comments;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    throw new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure"));
+                }
+            };
+            JsonMapper mapper = JsonMapper.builder().build();
+            FabricLayout layout = new FabricLayout(root.toString());
+            ContextManifestBuilder manifestBuilder = new ContextManifestBuilder(
+                new ContentAddressedStore(layout),
+                layout,
+                mapper,
+                new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
+                Clock.systemUTC()
+            );
+            var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
+            EvidencePlan plan = new EvidencePlan(
+                new SourceContractVersion("1.0.0"),
+                new EvidenceProfileId("pull-request-review"),
+                Set.of(comments)
+            );
+            ContextRequest.PracticeReviewRequest request = reviewRequest();
+
+            PreparedEvidence prepared = builder.prepare(request, plan);
+
+            var capture = prepared
+                .manifest()
+                .sources()
+                .stream()
+                .filter(source -> source.kind().equals(comments))
+                .findFirst()
+                .orElseThrow();
+            assertThat(capture.state()).isEqualTo(new SourceCaptureState.CollectionError("PROVIDER_FAILURE"));
+            assertThat(
+                layout.jobDir(String.valueOf(request.job().getId())).resolve("artifact-source-manifest.json")
+            ).exists();
+        }
+
+        @Test
+        void rejectsCaptureFactsForAnotherSource() {
+            SourceKind comments = new SourceKind("scm.pull-request.comments");
+            SourceKind core = new SourceKind("scm.pull-request.core");
+            EvidenceSource provider = new EvidenceSource() {
+                @Override
+                public Set<SourceKind> sourceKinds() {
+                    return Set.of(comments);
+                }
+
+                @Override
+                public SourceKind sourceKindFor(String path) {
+                    return comments;
+                }
+
+                @Override
+                public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+                    return new EvidenceContribution(Map.of(), Map.of(core, SourceCompleteness.COMPLETE));
+                }
+
+                @Override
+                public String originId() {
+                    return "test";
+                }
+
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {}
+            };
+            var builder = new WorkspaceContextBuilder(
+                List.of(provider),
+                new SimpleMeterRegistry(),
+                mock(ContextManifestBuilder.class)
+            );
+            EvidencePlan plan = new EvidencePlan(
+                new SourceContractVersion("1.0.0"),
+                new EvidenceProfileId("pull-request-review"),
+                Set.of(comments)
+            );
+
+            assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("undeclared or unselected sources");
+        }
+
+        @Test
         @DisplayName("re-raises JobPreparationException without re-wrapping")
         void jpePassThrough() {
             var bad = new ContentSource() {
@@ -202,6 +354,33 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             assertThatThrownBy(() -> builderOf(first, second).build(reviewRequest()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate workspace key");
+        }
+
+        @Test
+        void isolatesPreviouslyCollectedBytesFromLaterProviders() {
+            byte[] shared = "FIRST".getBytes(StandardCharsets.UTF_8);
+            ContentSource first = stubProvider(true, "first.txt", shared, false);
+            ContentSource mutating = new ContentSource() {
+                @Override
+                public String originId() {
+                    return "test";
+                }
+
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    shared[0] = 'X';
+                    files.put(OUTPUT_PREFIX + "second.txt", new byte[0]);
+                }
+            };
+
+            Map<String, byte[]> files = builderOf(first, mutating).build(reviewRequest());
+
+            assertThat(files.get("inputs/context/first.txt")).asString(StandardCharsets.UTF_8).isEqualTo("FIRST");
         }
 
         private final class ProviderA implements ContentSource {

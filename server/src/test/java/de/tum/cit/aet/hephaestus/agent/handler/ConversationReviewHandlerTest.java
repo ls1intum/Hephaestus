@@ -3,15 +3,22 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -86,6 +93,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("slack_channel_id").asString()).isEqualTo("C0ABC");
             assertThat(metadata.get("slack_channel_name").asString()).isEqualTo("engineering");
             assertThat(metadata.get("slack_thread_ts").asString()).isEqualTo("1700000000.100000");
+            assertThat(metadata.get("slack_last_ts").asString()).isEqualTo("1700000900.500000");
             assertThat(metadata.get("about_user_id").asLong()).isEqualTo(42L);
         }
 
@@ -141,9 +149,17 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             AgentJob job = conversationJob();
             // WorkspaceContextBuilder is mocked (its provider wiring has its own tests); stub a representative
             // context file. The practice-catalog injection is a mocked no-op; neither path writes an SCM source.
-            when(workspaceContextBuilder.build(any())).thenReturn(
-                Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes())
+            Practice practice = new Practice();
+            practice.setSlug("conversation-practice");
+            practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.CONVERSATION_THREAD));
+            when(practiceCatalogInjector.resolve(job, WorkArtifact.CONVERSATION_THREAD)).thenReturn(List.of(practice));
+            when(workspaceContextBuilder.prepare(any(), any())).thenReturn(
+                new PreparedEvidence(
+                    Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes()),
+                    org.mockito.Mockito.mock(ArtifactSourceManifest.class)
+                )
             );
+            when(workspaceContextBuilder.readyPractices(any(), any(), anyString())).thenReturn(List.of(practice));
 
             Map<String, byte[]> files = handler.prepareInputFiles(job);
 

@@ -5,6 +5,8 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -20,6 +22,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -114,11 +117,18 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
-        Map<String, byte[]> files = new LinkedHashMap<>(
-            workspaceContextBuilder.build(new ContextRequest.IssueReviewRequest(job))
+        List<Practice> practices = practiceCatalogInjector.resolve(job, WorkArtifact.ISSUE);
+        PreparedEvidence prepared = workspaceContextBuilder.prepare(
+            new ContextRequest.IssueReviewRequest(job),
+            EvidencePlan.compile(practices)
         );
+        practices = workspaceContextBuilder.readyPractices(prepared.manifest(), practices, job.getId().toString());
+        if (practices.isEmpty()) {
+            throw new JobPreparationException("No practice has sufficient evidence: jobId=" + job.getId());
+        }
+        Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
-        practiceCatalogInjector.inject(files, job, WorkArtifact.ISSUE);
+        practiceCatalogInjector.inject(files, job, WorkArtifact.ISSUE, practices);
         log.info(
             "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
             files.size(),

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
+import de.tum.cit.aet.hephaestus.practices.EvaluationClaimStatus;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -27,6 +28,7 @@ public record ReviewFindingDTO(
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "Detector confidence", minimum = "0", maximum = "1") Float confidence,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
+    @NonNull EvaluationClaimStatus claimStatus,
     @NonNull Instant observedAt,
     @NonNull
     @Schema(description = "Counts of linked messages by delivery state")
@@ -52,6 +54,7 @@ public record ReviewFindingDTO(
             row.getSeverity(),
             row.getConfidence(),
             row.getRecurrenceKey(),
+            EvaluationClaimStatus.of(row.getPracticeRevisionId(), row.getCurrentPracticeRevisionId()),
             row.getObservedAt(),
             disposition == null ? ReviewFeedbackDispositionDTO.empty() : ReviewFeedbackDispositionDTO.from(disposition)
         );

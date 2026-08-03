@@ -947,6 +947,10 @@ export type UpdatePracticeRequest = {
      */
     criteria?: string;
     /**
+     * Replacement evidence declaration; omit to preserve it, or to use the server baseline when artifactType changes
+     */
+    evidence?: PracticeEvidenceDeclaration;
+    /**
      * Human-readable name
      */
     name?: string;
@@ -966,6 +970,35 @@ export type UpdatePracticeRequest = {
      * Developer-facing rationale (learner layer); plain language, never the detection rubric
      */
     whyItMatters?: string;
+};
+
+/**
+ * Source and minimum capture quality required by a practice
+ */
+export type PracticeEvidenceRequirement = {
+    completeness: 'COMPLETE' | 'ANY';
+    freshness: 'CURRENT' | 'ANY';
+    sourceKind: string;
+};
+
+/**
+ * Author-declared limitation that remains when required evidence is available
+ */
+export type PracticeEvidenceBlindSpot = {
+    code: string;
+    summary: string;
+};
+
+/**
+ * Author-declared, versioned evidence boundary for a practice definition
+ */
+export type PracticeEvidenceDeclaration = {
+    blindSpots: Array<PracticeEvidenceBlindSpot>;
+    onUnsatisfied: 'DECLINE_SEMANTIC_JUDGMENT';
+    optional: Array<PracticeEvidenceRequirement>;
+    profile: string;
+    required: Array<PracticeEvidenceRequirement>;
+    sourceContractVersion: string;
 };
 
 /**
@@ -1750,6 +1783,10 @@ export type ReviewFindingDetail = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
+     * Validity of an evaluation claim against the practice revision currently in force
+     */
+    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    /**
      * Detector confidence
      */
     confidence: number;
@@ -1849,6 +1886,10 @@ export type ReviewFinding = {
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
     assessment?: 'GOOD' | 'BAD';
+    /**
+     * Validity of an evaluation claim against the practice revision currently in force
+     */
+    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * Detector confidence
      */
@@ -1966,6 +2007,10 @@ export type ReviewBoundFinding = {
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
     assessment?: 'GOOD' | 'BAD';
+    /**
+     * Validity of an evaluation claim against the practice revision currently in force
+     */
+    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * Detector confidence
      */
@@ -2619,6 +2664,21 @@ export type PracticeReviewSettings = {
 };
 
 /**
+ * Independent validation status and provenance for an evidence declaration
+ */
+export type PracticeEvidenceValidation = {
+    declarationDigest: string;
+    sourceContractVersion: string;
+    /**
+     * Independent status; evidence authors cannot promote their own declaration
+     */
+    status: 'AUTHOR_DECLARED' | 'INDEPENDENTLY_VALIDATED' | 'STALE' | 'SUPERSEDED';
+    validatedAt?: Date;
+    validationReference?: string;
+    validator?: string;
+};
+
+/**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
@@ -2709,6 +2769,8 @@ export type Practice = {
      * Position within its area (lowest first); ties broken by name
      */
     displayOrder: number;
+    evidence: PracticeEvidenceDeclaration;
+    evidenceValidation: PracticeEvidenceValidation;
     /**
      * Practice ID
      */
@@ -2832,6 +2894,10 @@ export type ObservationList = {
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
     assessment?: 'GOOD' | 'BAD';
+    /**
+     * Validity of an evaluation claim against the practice revision currently in force
+     */
+    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -3234,6 +3300,10 @@ export type ObservationDetail = {
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
     assessment?: 'GOOD' | 'BAD';
+    /**
+     * Validity of an evaluation claim against the practice revision currently in force
+     */
+    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -3929,6 +3999,10 @@ export type CuratedPracticeRequest = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     criteria: string;
+    /**
+     * Evidence declaration; omit to use the server baseline for the selected artifact
+     */
+    evidence?: PracticeEvidenceDeclaration;
     name: string;
     precomputeScript?: string;
     triggerEvents: Array<string>;
@@ -4146,6 +4220,10 @@ export type CreatePracticeRequest = {
      * Practice evaluation criteria
      */
     criteria: string;
+    /**
+     * Versioned sources and quality required before this practice may be judged; omit to use the server baseline for the selected artifact
+     */
+    evidence?: PracticeEvidenceDeclaration;
     /**
      * Human-readable name
      */
