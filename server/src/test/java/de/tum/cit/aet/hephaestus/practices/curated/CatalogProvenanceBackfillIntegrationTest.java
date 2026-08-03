@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionOperations;
+import tools.jackson.databind.ObjectMapper;
 
 @Tag("integration")
 class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -30,6 +31,9 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Autowired
     private TransactionOperations transactionOperations;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private Workspace matching;
     private Workspace edited;
@@ -97,8 +101,8 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 """
                 INSERT INTO practice (
                     workspace_id, practice_area_id, slug, name, applies_to, display_order, trigger_events,
-                    criteria, why_it_matters, is_active, created_at
-                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, 'Reviewers need context', true, now())
+                    criteria, evidence_declaration, why_it_matters, is_active, created_at
+                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', true, now())
                 RETURNING id
                 """,
                 Long.class,
@@ -108,14 +112,15 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 shipped.name(),
                 shipped.artifactType().name(),
                 triggerEventsJson(shipped),
-                criteria
+                criteria,
+                evidenceJson(shipped)
             );
             Long revisionId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
-                    why_it_matters, area_slug, created_at
-                ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, 'Reviewers need context', ?, now())
+                    evidence_declaration, why_it_matters, area_slug, created_at
+                ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, now())
                 RETURNING id
                 """,
                 Long.class,
@@ -125,6 +130,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 shipped.artifactType().name(),
                 triggerEventsJson(shipped),
                 criteria,
+                evidenceJson(shipped),
                 shipped.areaSlug()
             );
             jdbcTemplate.update("UPDATE practice SET current_revision_id = ? WHERE id = ?", revisionId, practiceId);
@@ -141,6 +147,10 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
 
     private static String triggerEventsJson(PracticeDefinition definition) {
         return definition.triggerEventsJson().toString();
+    }
+
+    private String evidenceJson(PracticeDefinition definition) {
+        return objectMapper.valueToTree(definition.evidence()).toString();
     }
 
     private long stampedPractices(Workspace workspace) {
