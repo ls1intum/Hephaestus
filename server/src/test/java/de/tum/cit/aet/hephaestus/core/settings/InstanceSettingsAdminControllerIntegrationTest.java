@@ -39,7 +39,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     private InstanceSettingsRepository instanceSettingsRepository;
 
     @BeforeEach
-    void startReleased() {
+    void shouldStartReleasedWhenExplicitSettingExists() {
         releaseDirectly();
     }
 
@@ -98,7 +98,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
 
     @Test
     @WithAdminUser
-    void staleReleaseIsRejected() {
+    void shouldRejectReleaseWhenEntityTagIsStale() {
         InstanceSettingsDTO initial = getSettings();
         InstanceSettingsDTO engaged = patchSilentMode(Map.of("engaged", true), null);
 
@@ -119,7 +119,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
 
     @Test
     @WithAdminUser
-    void releaseWithoutIfMatchIsRejected() {
+    void shouldRejectReleaseWhenIfMatchIsMissing() {
         webTestClient
             .patch()
             .uri("/admin/settings/silent-mode")
@@ -132,7 +132,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     @Test
-    void concurrentMissingRowInitializationIsConflictSafe() throws Exception {
+    void shouldInitializeOneRowWhenMissingRowIsReadConcurrently() throws Exception {
         instanceSettingsRepository.deleteAll();
         instanceSettingsRepository.flush();
         assertThat(instanceSettingsService.get().isSilentModeEngaged()).isTrue();
@@ -155,7 +155,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     @Test
-    void emergencyEngageWinsAConcurrentRelease() throws Exception {
+    void shouldKeepEmergencyEngagedWhenReleaseIsConcurrent() throws Exception {
         InstanceSettings current = instanceSettingsService.get();
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);

@@ -9,14 +9,14 @@ import org.junit.jupiter.api.Test;
 class OutboundEgressGuardTest extends BaseUnitTest {
 
     @Test
-    void allowsDeliveryOnlyWhenTheStoredStateIsExplicitlyReleased() {
+    void shouldAllowDeliveryWhenStoredStateIsExplicitlyReleased() {
         OutboundEgressGuard guard = new OutboundEgressGuard(() -> false);
 
         assertThatCode(() -> guard.requireDeliveryAllowed("test")).doesNotThrowAnyException();
     }
 
     @Test
-    void blocksDeliveryWhenSilentModeIsEngaged() {
+    void shouldBlockDeliveryWhenSilentModeIsEngaged() {
         OutboundEgressGuard guard = new OutboundEgressGuard(() -> true);
 
         assertThatThrownBy(() -> guard.requireDeliveryAllowed("test")).isInstanceOf(
@@ -25,7 +25,7 @@ class OutboundEgressGuardTest extends BaseUnitTest {
     }
 
     @Test
-    void failsClosedWhenTheStateCannotBeRead() {
+    void shouldFailClosedWhenStateCannotBeRead() {
         OutboundEgressGuard guard = new OutboundEgressGuard(() -> {
             throw new IllegalStateException("database unavailable");
         });

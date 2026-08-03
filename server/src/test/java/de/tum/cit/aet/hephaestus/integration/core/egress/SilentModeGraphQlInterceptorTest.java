@@ -31,7 +31,7 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
     private GraphQlClientInterceptor.Chain chain;
 
     @Test
-    void mutationIsCheckedAtExecution() {
+    void shouldCheckMutationWhenExecuted() {
         ClientGraphQlRequest request = request("mutation UpdateThing { updateThing { id } }");
         when(request.getOperationName()).thenReturn("UpdateThing");
         SilentModeGraphQlInterceptor interceptor = new SilentModeGraphQlInterceptor(egressGuard);
@@ -43,7 +43,7 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
     }
 
     @Test
-    void suppressedMutationNeverReachesTransport() {
+    void shouldNotReachTransportWhenMutationIsSuppressed() {
         ClientGraphQlRequest request = request("mutation UpdateThing { updateThing { id } }");
         when(request.getOperationName()).thenReturn("UpdateThing");
         doThrow(new OutboundEgressSuppressedException("test"))
@@ -60,7 +60,7 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
     }
 
     @Test
-    void engagingSilentModeStopsAQueuedRetry() {
+    void shouldStopQueuedRetryWhenSilentModeEngages() {
         ClientGraphQlRequest request = request("mutation UpdateThing { updateThing { id } }");
         when(request.getOperationName()).thenReturn("UpdateThing");
         doNothing()
@@ -82,7 +82,7 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
     }
 
     @Test
-    void queryBypassesTheDeliveryBrake() {
+    void shouldAllowQueryWhenDeliveryBrakeIsEngaged() {
         ClientGraphQlRequest request = request("query ReadThing { thing { id } }");
         SilentModeGraphQlInterceptor interceptor = new SilentModeGraphQlInterceptor(egressGuard);
         when(chain.next(request)).thenReturn(httpExchange(interceptor, Mono.just(mock(ClientResponse.class))));

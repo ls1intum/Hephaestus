@@ -150,7 +150,7 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksBeforeTokenOrHttpCalls() {
+    void shouldBlockBeforeTokenOrHttpCallsWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
             .when(egressGuard)
             .requireDeliveryAllowed("gitlab.approve");

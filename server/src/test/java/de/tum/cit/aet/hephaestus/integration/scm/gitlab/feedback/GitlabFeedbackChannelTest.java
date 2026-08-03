@@ -80,7 +80,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksMutationExecution() {
+    void shouldBlockPostMutationWhenSilentModeIsEngaged() {
         when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
             new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
         );
@@ -95,7 +95,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksUpdateMutationExecution() {
+    void shouldBlockUpdateMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
             .when(egressGuard)
             .requireDeliveryAllowed("gitlab.update-summary");

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
@@ -13,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimi
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -57,6 +59,20 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
             rateLimitSeeder,
             clientFactory
         );
+    }
+
+    @Test
+    void shouldBuildScopedClientWithSilentModeFactory() {
+        when(tokenProvider.isScopeActive(42L)).thenReturn(true);
+        when(tokenProvider.getAuthMode(42L)).thenReturn(AuthMode.PERSONAL_ACCESS_TOKEN);
+        when(tokenProvider.getPersonalAccessToken(42L)).thenReturn(Optional.of("github-token"));
+        HttpGraphQlClient guardedClient = Mockito.mock(HttpGraphQlClient.class);
+        when(clientFactory.withBearerToken(baseClient, "github-token")).thenReturn(guardedClient);
+
+        HttpGraphQlClient result = provider.forScope(42L);
+
+        assertThat(result).isSameAs(guardedClient);
+        verify(clientFactory).withBearerToken(baseClient, "github-token");
     }
 
     @Nested

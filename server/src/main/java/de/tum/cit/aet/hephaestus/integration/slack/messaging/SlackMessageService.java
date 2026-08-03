@@ -95,22 +95,6 @@ public class SlackMessageService {
         this.egressGuard = egressGuard;
     }
 
-    private boolean silenced(long workspaceId) {
-        boolean silenced = !egressGuard.deliveryAllowed("slack.write");
-        if (silenced) {
-            log.debug("Slack call skipped or refused: instance silent mode engaged, workspaceId={}", workspaceId);
-        }
-        return silenced;
-    }
-
-    private void requireNotSilenced(long workspaceId, String target) {
-        try {
-            egressGuard.requireDeliveryAllowed("slack.write");
-        } catch (OutboundEgressSuppressedException e) {
-            throw new SlackSendException(workspaceId, target, "silent_mode_engaged", e);
-        }
-    }
-
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {
         sendForWorkspace(workspaceId, channelId, null, blocks, fallback);
     }
@@ -122,7 +106,7 @@ public class SlackMessageService {
         List<LayoutBlock> blocks,
         String fallback
     ) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channelId, "silent_mode_engaged");
         }
         String token = resolveToken(workspaceId).orElseThrow(() ->
@@ -172,7 +156,7 @@ public class SlackMessageService {
         List<LayoutBlock> blocks,
         String fallback
     ) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channelId, "silent_mode_engaged");
         }
         String token = resolveToken(workspaceId).orElseThrow(() ->
@@ -255,14 +239,14 @@ public class SlackMessageService {
      * to. {@code markdownText} is standard Markdown (Slack renders it, incl. tables) — not Slack mrkdwn.
      */
     public String startStream(long workspaceId, String channel, String threadTs, String markdownText) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
         }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );
         try {
-            requireNotSilenced(workspaceId, channel);
+            egressGuard.requireDeliveryAllowed("slack.write");
             ChatStartStreamResponse r = slack
                 .methods(token)
                 .chatStartStream(req -> req.channel(channel).threadTs(threadTs).markdownText(markdownText));
@@ -270,6 +254,8 @@ public class SlackMessageService {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
             return r.getTs();
+        } catch (OutboundEgressSuppressedException e) {
+            throw new SlackSendException(workspaceId, channel, "silent_mode_engaged", e);
         } catch (SlackApiException e) {
             throw streamFailure(workspaceId, channel, e);
         } catch (IOException e) {
@@ -279,20 +265,22 @@ public class SlackMessageService {
 
     /** Append a Markdown delta to an in-progress stream. Throws with the Slack error so callers can detect a gone recipient. */
     public void appendStream(long workspaceId, String channel, String ts, String markdownText) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
         }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );
         try {
-            requireNotSilenced(workspaceId, channel);
+            egressGuard.requireDeliveryAllowed("slack.write");
             ChatAppendStreamResponse r = slack
                 .methods(token)
                 .chatAppendStream(req -> req.channel(channel).ts(ts).markdownText(markdownText));
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
+        } catch (OutboundEgressSuppressedException e) {
+            throw new SlackSendException(workspaceId, channel, "silent_mode_engaged", e);
         } catch (SlackApiException e) {
             throw streamFailure(workspaceId, channel, e);
         } catch (IOException e) {
@@ -302,20 +290,22 @@ public class SlackMessageService {
 
     /** Finalize a stream, optionally attaching terminal blocks (finding chips / actions). */
     public void stopStream(long workspaceId, String channel, String ts, List<LayoutBlock> blocks) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
         }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );
         try {
-            requireNotSilenced(workspaceId, channel);
+            egressGuard.requireDeliveryAllowed("slack.write");
             ChatStopStreamResponse r = slack
                 .methods(token)
                 .chatStopStream(req -> req.channel(channel).ts(ts).blocks(blocks));
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
+        } catch (OutboundEgressSuppressedException e) {
+            throw new SlackSendException(workspaceId, channel, "silent_mode_engaged", e);
         } catch (SlackApiException e) {
             throw streamFailure(workspaceId, channel, e);
         } catch (IOException e) {
@@ -329,7 +319,7 @@ public class SlackMessageService {
      * best-effort).
      */
     public void publishHomeView(long workspaceId, String slackUserId, View view) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             return;
         }
         String token = resolveToken(workspaceId).orElseThrow(() ->
@@ -370,7 +360,7 @@ public class SlackMessageService {
      * failure (e.g. a plain DM thread) is swallowed.
      */
     public void setStatus(long workspaceId, String channel, String threadTs, String status) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             return;
         }
         Optional<String> token = resolveToken(workspaceId);
@@ -378,7 +368,7 @@ public class SlackMessageService {
             return;
         }
         try {
-            requireNotSilenced(workspaceId, channel);
+            egressGuard.requireDeliveryAllowed("slack.write");
             slack
                 .methods(token.get())
                 .assistantThreadsSetStatus(req -> req.channelId(channel).threadTs(threadTs).status(status));
@@ -392,7 +382,7 @@ public class SlackMessageService {
      * a failure is swallowed.
      */
     public void setSuggestedPrompts(long workspaceId, String channel, String title, List<SuggestedPrompt> prompts) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             return;
         }
         Optional<String> token = resolveToken(workspaceId);
@@ -400,7 +390,7 @@ public class SlackMessageService {
             return;
         }
         try {
-            requireNotSilenced(workspaceId, channel);
+            egressGuard.requireDeliveryAllowed("slack.write");
             slack
                 .methods(token.get())
                 .assistantThreadsSetSuggestedPrompts(req -> req.channelId(channel).title(title).prompts(prompts));
@@ -646,7 +636,7 @@ public class SlackMessageService {
     public record HistoryPage(List<com.slack.api.model.Message> messages, @Nullable String nextCursor) {}
 
     public void joinPublicChannel(long workspaceId, String channelId) {
-        if (silenced(workspaceId)) {
+        if (!egressGuard.deliveryAllowed("slack.write")) {
             return;
         }
         String token = resolveToken(workspaceId).orElseThrow(() ->
@@ -765,8 +755,12 @@ public class SlackMessageService {
     private <T> T callOutboundHonoringRateLimit(long workspaceId, String target, SlackCall<T> call)
         throws SlackApiException, IOException {
         return callHonoringRateLimit(workspaceId, () -> {
-            requireNotSilenced(workspaceId, target);
-            return call.call();
+            try {
+                egressGuard.requireDeliveryAllowed("slack.write");
+                return call.call();
+            } catch (OutboundEgressSuppressedException e) {
+                throw new SlackSendException(workspaceId, target, "silent_mode_engaged", e);
+            }
         });
     }
 

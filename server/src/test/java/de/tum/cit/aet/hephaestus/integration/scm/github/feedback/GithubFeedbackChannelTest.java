@@ -84,7 +84,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksMutationExecution() {
+    void shouldBlockPostMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
             .when(egressGuard)
             .requireDeliveryAllowed("github.post-summary");
@@ -99,7 +99,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksUpdateMutationExecution() {
+    void shouldBlockUpdateMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
             .when(egressGuard)
             .requireDeliveryAllowed("github.update-summary");

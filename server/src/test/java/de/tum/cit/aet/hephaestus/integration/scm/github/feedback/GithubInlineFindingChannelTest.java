@@ -101,7 +101,7 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksInitialBatchMutation() {
+    void shouldBlockInitialBatchMutationWhenSilentModeIsEngaged() {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(gitHubProvider.forScope(1L)).thenReturn(client);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
@@ -288,7 +288,7 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void reportsBatchWritesWhenStaleThreadCleanupIsSuppressed() {
+    void shouldReportCompletedBatchWritesWhenStaleCleanupIsSuppressed() {
         FeedbackTarget target = githubTarget();
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(gitHubProvider.forScope(1L)).thenReturn(client);

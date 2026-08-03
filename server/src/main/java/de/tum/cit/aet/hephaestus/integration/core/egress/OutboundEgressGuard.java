@@ -1,15 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.core.egress;
 
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /** Final, fail-closed check immediately before an external delivery-write attempt. */
 @Component
+@Slf4j
 public class OutboundEgressGuard {
-
-    private static final Logger log = LoggerFactory.getLogger(OutboundEgressGuard.class);
 
     private final SilentModeQuery silentModeQuery;
 

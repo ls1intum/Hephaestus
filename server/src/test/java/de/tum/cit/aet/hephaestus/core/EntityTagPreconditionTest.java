@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class EntityTagPreconditionTest extends BaseUnitTest {
 
     @Test
-    void usesStrongComparisonAcrossTagLists() {
+    void shouldUseStrongComparisonWhenHeaderContainsTagList() {
         EntityTagPrecondition precondition = EntityTagPrecondition.parse("W/\"7\", \"8\"");
 
         assertThat(precondition.matches("7")).isFalse();
@@ -17,17 +17,17 @@ class EntityTagPreconditionTest extends BaseUnitTest {
     }
 
     @Test
-    void wildcardMatchesAnyCurrentTag() {
+    void shouldMatchCurrentTagWhenHeaderContainsWildcard() {
         assertThat(EntityTagPrecondition.parse("*").matches("42")).isTrue();
     }
 
     @Test
-    void rejectsMissingTags() {
+    void shouldRejectWhenHeaderIsMissing() {
         assertThatIllegalArgumentException().isThrownBy(() -> EntityTagPrecondition.parse(""));
     }
 
     @Test
-    void formatsStrongTag() {
+    void shouldFormatStrongTagWhenRevisionIsProvided() {
         assertThat(EntityTagPrecondition.format("42")).isEqualTo("\"42\"");
     }
 }

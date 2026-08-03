@@ -67,3 +67,11 @@ export const Engaged: Story = {
 export const Pending: Story = {
 	args: { settings: engaged, isPending: true },
 };
+
+export const ReleaseUnavailable: Story = {
+	args: { settings: engaged, releaseDisabled: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /release silent mode/i })).toBeDisabled();
+	},
+};

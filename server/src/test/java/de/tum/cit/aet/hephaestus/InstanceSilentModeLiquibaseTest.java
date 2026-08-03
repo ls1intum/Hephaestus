@@ -25,7 +25,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
 @Tag("integration")
-class InstanceSilentModeMigrationIntegrationTest {
+class InstanceSilentModeLiquibaseTest {
 
     private static final String CHANGELOG = "1785739495153_changelog.xml";
     private static final String MASTER = "db/master.xml";
@@ -39,7 +39,7 @@ class InstanceSilentModeMigrationIntegrationTest {
         .withPassword("test");
 
     @Test
-    void upgradeIsFailSafeWithoutOverwritingOperatorChoices() throws Exception {
+    void shouldFailSafeWithoutOverwritingOperatorChoicesWhenUpgrading() throws Exception {
         updateUntilBeforeFollowup();
 
         updateFollowup();

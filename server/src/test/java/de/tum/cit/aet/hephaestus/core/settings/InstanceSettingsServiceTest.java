@@ -55,7 +55,7 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void isSilentModeEngaged_returnsRepositoryDecision() {
+    void shouldReturnRepositoryDecisionWhenSilentModeStateIsRead() {
         when(repository.readSilentModeEngaged()).thenReturn(true);
         assertThat(service.isSilentModeEngaged()).isTrue();
         when(repository.readSilentModeEngaged()).thenReturn(false);

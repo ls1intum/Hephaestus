@@ -47,6 +47,7 @@ public class GithubApprovalChannel implements ApprovalChannel {
 
     @Override
     public void approve(FeedbackChannel.FeedbackTarget target, String message) {
+        egressGuard.requireDeliveryAllowed("github.approve");
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             throw new FeedbackDeliveryException("GitHub rate limit critical — skipping approval for scope " + scopeId);
@@ -55,7 +56,6 @@ public class GithubApprovalChannel implements ApprovalChannel {
         PrCoordinates pr = GithubFeedbackChannel.parseSubjectExternalId(target.subjectExternalId());
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
 
-        egressGuard.requireDeliveryAllowed("github.approve");
         ClientGraphQlResponse response = gitHubProvider
             .forScope(scopeId)
             .documentName("ApprovePullRequest")

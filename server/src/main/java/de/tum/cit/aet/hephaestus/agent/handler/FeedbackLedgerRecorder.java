@@ -146,7 +146,18 @@ public class FeedbackLedgerRecorder {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(
+    public void recordWithoutConversation(
+        AgentJob job,
+        DeliveryContent delivery,
+        WorkArtifact artifact,
+        List<DeliveredSignal> inlineSignals,
+        boolean summaryDelivered,
+        boolean inlineDelivered
+    ) {
+        record(job, delivery, artifact, inlineSignals, summaryDelivered, inlineDelivered, false);
+    }
+
+    private void record(
         AgentJob job,
         DeliveryContent delivery,
         WorkArtifact artifact,

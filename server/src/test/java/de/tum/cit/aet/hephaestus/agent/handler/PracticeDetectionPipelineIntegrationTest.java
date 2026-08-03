@@ -296,7 +296,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     class HappyPath {
 
         @Test
-        void silentModePersistsObservationsWithoutExternalWritesOrReplay() {
+        void shouldPersistWithoutExternalWritesOrReplayWhenSilentModeIsEngaged() {
             setJobOutput(validAgentOutput());
             engageSilentMode();
 

@@ -9,6 +9,7 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * Singleton instance-wide settings row (id = {@link #SINGLETON_ID}). Deliberately not
@@ -28,9 +29,11 @@ public class InstanceSettings {
 
     @Version
     @Column(name = "version", nullable = false)
+    @ColumnDefault("0")
     private long version;
 
     @Column(name = "silent_mode_engaged", nullable = false)
+    @ColumnDefault("true")
     private boolean silentModeEngaged;
 
     /** Why the brake was engaged; cleared on release. */

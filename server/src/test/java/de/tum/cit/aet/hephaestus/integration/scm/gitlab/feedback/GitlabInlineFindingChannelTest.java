@@ -132,7 +132,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void reportsWritesCompletedBeforeMidBatchSuppression() {
+    void shouldReportCompletedWritesWhenBatchIsSuppressedMidway() {
         stubResolvedMr();
         stubDiscussionsReturning(List.of());
         stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
@@ -156,7 +156,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void failedFindingIsNotRelabeledWhenLaterFindingIsSuppressed() {
+    void shouldKeepFailedDispositionWhenLaterFindingIsSuppressed() {
         stubResolvedMr();
         stubDiscussionsReturning(List.of());
         HttpGraphQlClient.RequestSpec diffSpec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -188,7 +188,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksInitialInlineMutation() {
+    void shouldBlockInitialInlineMutationWhenSilentModeIsEngaged() {
         stubResolvedMr();
         stubDiscussionsReturning(List.of());
         doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))

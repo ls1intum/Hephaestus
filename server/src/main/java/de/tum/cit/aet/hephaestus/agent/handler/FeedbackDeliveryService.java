@@ -90,12 +90,7 @@ class FeedbackDeliveryService {
             doDeliverEligible(job, delivery, summaryComposer, decision.artifact());
         } catch (JobDeliverySuppressedException e) {
             log.info("Delivery suppressed at egress: jobId={}", job.getId());
-            if (job.getDeliveryCommentId() == null) {
-                recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
-            } else {
-                recordPartialSummaryDelivery(job, delivery);
-                recordSuppressedRemainder(job, delivery, List.of());
-            }
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
         } catch (JobDeliveryException e) {
             if (job.getDeliveryCommentId() == null) {
                 recordUndelivered(job, delivery);
@@ -108,7 +103,14 @@ class FeedbackDeliveryService {
 
     private void recordPartialSummaryDelivery(AgentJob job, DeliveryContent delivery) {
         try {
-            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.PULL_REQUEST, List.of(), true, false, false);
+            feedbackLedgerRecorder.recordWithoutConversation(
+                job,
+                delivery,
+                WorkArtifact.PULL_REQUEST,
+                List.of(),
+                true,
+                false
+            );
         } catch (RuntimeException e) {
             log.warn("Partial delivery ledger record failed: jobId={}, error={}", job.getId(), e.getMessage());
         }
@@ -127,7 +129,19 @@ class FeedbackDeliveryService {
             : null;
 
         SummaryOutcome summaryOutcome = postSummaryNote(job, delivery, trend);
-        DiffNotePoster.DiffNoteResult inlineResult = postDiffNotes(job, delivery);
+        DiffNotePoster.DiffNoteResult inlineResult;
+        try {
+            inlineResult = postDiffNotes(job, delivery);
+        } catch (JobDeliverySuppressedException e) {
+            log.info("Inline delivery suppressed at egress: jobId={}", job.getId());
+            if (summaryOutcome == SummaryOutcome.DELIVERED) {
+                recordPartialSummaryDelivery(job, delivery);
+                recordSuppressedRemainder(job, delivery, List.of());
+            } else {
+                recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            }
+            return;
+        }
         List<InlineFindingChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
 
         if (summaryOutcome == SummaryOutcome.DELIVERED && !inlineResult.suppressed()) {
@@ -147,15 +161,25 @@ class FeedbackDeliveryService {
         }
 
         try {
-            feedbackLedgerRecorder.record(
-                job,
-                delivery,
-                WorkArtifact.PULL_REQUEST,
-                inlineSignals,
-                summaryOutcome == SummaryOutcome.DELIVERED,
-                inlineDelivered,
-                !inlineResult.suppressed()
-            );
+            if (inlineResult.suppressed()) {
+                feedbackLedgerRecorder.recordWithoutConversation(
+                    job,
+                    delivery,
+                    WorkArtifact.PULL_REQUEST,
+                    inlineSignals,
+                    summaryOutcome == SummaryOutcome.DELIVERED,
+                    inlineDelivered
+                );
+            } else {
+                feedbackLedgerRecorder.record(
+                    job,
+                    delivery,
+                    WorkArtifact.PULL_REQUEST,
+                    inlineSignals,
+                    summaryOutcome == SummaryOutcome.DELIVERED,
+                    inlineDelivered
+                );
+            }
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",

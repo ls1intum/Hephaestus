@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.springframework.graphql.client.GraphQlClientInterceptor;
@@ -27,7 +28,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
 
     @Test
-    void everyScmWriterIsADeclaredGateway() {
+    void shouldDeclareEveryScmWriterAsGateway() {
         ArchRule rule = classes()
             .that()
             .areAssignableTo(FeedbackChannel.class)
@@ -47,7 +48,7 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    void everyGatewayConsultsTheSharedGuard() {
+    void shouldRequireEveryGatewayToConsultSharedGuard() {
         ArchRule rule = classes()
             .that()
             .areAnnotatedWith(OutboundEgressGateway.class)
@@ -61,7 +62,7 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    void onlyTheDeclaredSpiAndSlackClientSurfacesCanBeGateways() {
+    void shouldRestrictGatewaysToDeclaredClientSurfaces() {
         ArchRule rule = classes()
             .that()
             .areAnnotatedWith(OutboundEgressGateway.class)
@@ -74,14 +75,14 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
             .orShould()
             .beAssignableTo(ScmCommentReactionSink.class)
             .orShould()
-            .haveSimpleName("SlackMessageService")
+            .haveFullyQualifiedName(SlackMessageService.class.getName())
             .because("gateway status is limited to the reviewed SPI and Slack client surfaces");
 
         rule.check(classes);
     }
 
     @Test
-    void exemptionsStayInReviewedControlPlanePackages() {
+    void shouldRestrictExemptionsToReviewedControlPlanePackages() {
         ArchRule rule = classes()
             .that()
             .areAnnotatedWith(EgressExempt.class)
@@ -97,7 +98,7 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    void slackSdkWritesStayInsideTheDeclaredGateway() {
+    void shouldKeepSlackSdkWritesInsideDeclaredGateway() {
         ArchRule rule = noClasses()
             .that()
             .areNotAnnotatedWith(OutboundEgressGateway.class)
@@ -116,7 +117,7 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    void scmRestWritesStayInsideDeclaredGatewaysOrExemptions() {
+    void shouldKeepScmRestWritesInsideGatewaysOrExemptions() {
         for (String method : new String[] { "post", "put", "patch", "delete" }) {
             noClasses()
                 .that()
@@ -171,7 +172,7 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    void graphQlClientsAreOnlyBuiltByTheFailClosedFactory() {
+    void shouldBuildGraphQlClientsOnlyWithFailClosedFactory() {
         noClasses()
             .that()
             .doNotHaveFullyQualifiedName(SilentModeGraphQlClientFactory.class.getName())

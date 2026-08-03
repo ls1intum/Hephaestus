@@ -7,8 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import java.time.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
@@ -23,9 +22,9 @@ import org.springframework.stereotype.Component;
 @Component
 @OutboundEgressGateway
 @ConditionalOnBean(GitLabGraphQlClientProvider.class)
+@Slf4j
 public class GitLabCommentReactionSink implements ScmCommentReactionSink {
 
-    private static final Logger log = LoggerFactory.getLogger(GitLabCommentReactionSink.class);
     private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(10);
 
     private final GitLabGraphQlClientProvider gitLabGraphQlProvider;
@@ -68,7 +67,12 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
                 );
             }
         } catch (OutboundEgressSuppressedException e) {
-            log.debug("Suppressed {} reaction while instance Silent Mode is engaged", reactionName);
+            log.debug(
+                "Suppressed GitLab comment reaction while instance Silent Mode is engaged: reactionName={}, noteId={}, scopeId={}",
+                reactionName,
+                commentNativeId,
+                scopeId
+            );
         } catch (Exception e) {
             log.debug(
                 "Failed to add {} reaction (non-fatal): noteId={}, scopeId={}, error={}",

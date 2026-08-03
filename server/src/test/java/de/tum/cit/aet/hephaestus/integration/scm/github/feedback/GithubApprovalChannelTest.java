@@ -11,6 +11,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
@@ -80,7 +81,7 @@ class GithubApprovalChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeBlocksMutationExecution() {
+    void shouldBlockApprovalMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
             .when(egressGuard)
             .requireDeliveryAllowed("github.approve");
@@ -91,6 +92,7 @@ class GithubApprovalChannelTest extends BaseUnitTest {
                 "looks good"
             )
         ).isInstanceOf(OutboundEgressSuppressedException.class);
+        verifyNoInteractions(prNodeIdResolver);
         verify(gitHubProvider, never()).forScope(anyLong());
     }
 

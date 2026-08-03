@@ -185,7 +185,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void failedInlineSignalDoesNotCreateAPlacement() {
+    void shouldNotCreatePlacementWhenInlineSignalFailed() {
         var finding = problem(0.9f);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
@@ -469,7 +469,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void recordUndeliveredDuringSilentModeBecomesOneSuppressedOutcomeWithoutConversation() {
+    void shouldRecordOneSuppressionWithoutConversationWhenUndeliveredDuringSilentMode() {
         Observation bad = problem(0.9f);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad));
         FeedbackLedgerRecorder recorder = recorder();
@@ -586,7 +586,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void suppressedReReviewReferencesTheLiveUnitWithoutSupersedingIt() {
+    void shouldReferenceLiveUnitWithoutSupersedingWhenReReviewIsSuppressed() {
         Observation bad = problem(0.9f);
         UUID liveFeedbackId = UUID.randomUUID();
         FeedbackLedgerRecorder rec = recorder();
@@ -611,7 +611,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void partialInlineSuppressionRecordsOnlyTheLandedPlacementAndSuppressedFinding() {
+    void shouldRecordOnlyLandedPlacementAndFindingWhenInlineDeliveryIsPartiallySuppressed() {
         Observation landed = problem(0.9f);
         Observation suppressed = problem(0.8f);
         when(landed.getRecurrenceKey()).thenReturn("key-1");
@@ -664,17 +664,16 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void suppressedCycleCannotPublishAConversationAfterRelease() {
+    void shouldNotPublishConversationAfterReleaseWhenCycleWasSuppressed() {
         Observation finding = problem(0.9f);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
-        recorder().record(
+        recorder().recordWithoutConversation(
             job(),
             new DeliveryContent("landed summary", List.of(), List.of()),
             WorkArtifact.PULL_REQUEST,
             List.of(),
             true,
-            false,
             false
         );
 

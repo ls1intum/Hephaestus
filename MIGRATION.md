@@ -78,6 +78,9 @@ On production, verify each workspace's practice delivery settings and provider t
 disaster-recovery drills. Instances whose operator had already changed the setting keep that explicit
 choice.
 
+**API clients:** The Silent Mode update operation is now
+`PATCH /admin/settings/silent-mode`. Replace calls to the removed `PUT` operation before upgrading.
+
 #### 🔴 Practice-feedback delivery field renamed
 
 **Affected**: API clients that read or write user settings, or consume account-export JSON.

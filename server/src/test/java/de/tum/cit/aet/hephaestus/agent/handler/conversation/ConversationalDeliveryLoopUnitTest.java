@@ -97,7 +97,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     @Test
-    void preparerCreatesNoFutureWorkWhileSilentModeIsEngaged() {
+    void shouldCreateNoFutureWorkWhenSilentModeIsEngaged() {
         ConversationalFeedbackPreparer preparer = preparer();
         when(egressGuard.deliveryAllowed(any())).thenReturn(false);
 
@@ -105,7 +105,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     private enum ObsKind {

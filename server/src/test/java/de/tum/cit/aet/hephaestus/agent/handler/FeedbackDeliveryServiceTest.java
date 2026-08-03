@@ -255,8 +255,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of()),
                 eq(false),
-                eq(false),
-                eq(true)
+                eq(false)
             );
         }
 
@@ -290,7 +289,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
-                eq(true),
                 eq(true)
             );
         }
@@ -376,7 +374,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void egressRaceIsTerminalSuppressionNotFailedDelivery() {
+        void shouldRecordSuppressionInsteadOfFailureWhenSummaryEgressCloses() {
             AgentJob job = createJob();
             stubOpenPr();
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
@@ -395,7 +393,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void egressRaceAfterSummaryRecordsWhatAlreadyLanded() {
+        void shouldRecordLandedSummaryWhenInlineEgressCloses() {
             AgentJob job = createJob();
             stubOpenPr();
             var delivery = new DeliveryContent(
@@ -410,13 +408,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             service.deliverFeedback(job, delivery);
 
-            verify(feedbackLedgerRecorder).record(
+            verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
                 delivery,
                 WorkArtifact.PULL_REQUEST,
                 List.of(),
                 true,
-                false,
                 false
             );
             verify(feedbackLedgerRecorder).recordSuppressedRemainder(
@@ -428,7 +425,42 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void midBatchSuppressionRecordsLandedInlineWritesAndTheSuppressedRemainder() {
+        void shouldKeepPriorSummaryLiveWhenInlineDeliveryIsSuppressedAfterTransientEdit() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            var delivery = new DeliveryContent(
+                "updated summary",
+                List.of(new DiffNote("src/Foo.java", 10, null, "inline", "key")),
+                List.of()
+            );
+            when(feedbackLedgerRecorder.priorLiveSummaryRef(job)).thenReturn(Optional.of("IC_prior"));
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
+                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
+            );
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
+                new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
+            );
+
+            service.deliverFeedback(job, delivery);
+
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                job,
+                delivery,
+                FeedbackSuppressionReason.INSTANCE_SILENCED
+            );
+            verify(feedbackLedgerRecorder, never()).recordWithoutConversation(
+                any(),
+                any(),
+                any(),
+                any(),
+                anyBoolean(),
+                anyBoolean()
+            );
+            verify(feedbackLedgerRecorder, never()).recordSuppressedRemainder(any(), any(), any(), any());
+        }
+
+        @Test
+        void shouldRecordLandedWritesAndRemainderWhenInlineBatchIsSuppressed() {
             AgentJob job = createJob();
             stubOpenPr();
             var delivery = new DeliveryContent(
@@ -453,14 +485,13 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             service.deliverFeedback(job, delivery);
 
-            verify(feedbackLedgerRecorder).record(
+            verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
                 delivery,
                 WorkArtifact.PULL_REQUEST,
                 List.of(signal),
                 true,
-                true,
-                false
+                true
             );
             verify(feedbackLedgerRecorder).recordSuppressedRemainder(
                 job,
@@ -714,7 +745,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
-                eq(true),
                 eq(true)
             );
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
@@ -805,7 +835,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(WorkArtifact.PULL_REQUEST),
                 eq(List.of(firstSignal, secondSignal)),
                 eq(false),
-                eq(true),
                 eq(true)
             );
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());

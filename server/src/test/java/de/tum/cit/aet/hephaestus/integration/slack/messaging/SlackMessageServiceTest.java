@@ -114,7 +114,7 @@ class SlackMessageServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void stateChangeDuringCredentialResolutionPreventsStreamWrite() {
+    void shouldRejectStreamWriteWhenSilentModeEngagesDuringCredentialResolution() {
         when(credentialProvider.resolve(any(IntegrationRef.class))).thenAnswer(invocation -> {
             silentModeEngaged = true;
             return Optional.of(new BearerToken("token", null));
