@@ -63,6 +63,7 @@ function words(token: string): string {
 	return token
 		.replace(/_/g, " ")
 		.replace(/([a-z])([A-Z])/g, "$1 $2")
+		.toLowerCase()
 		.replace(/^./, (letter) => letter.toUpperCase());
 }
 
