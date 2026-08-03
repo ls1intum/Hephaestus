@@ -9,9 +9,9 @@ import org.junit.jupiter.api.Test;
 class EvaluationClaimStatusTest {
 
     @Test
-    void shouldDeriveCurrentnessFromPinnedAndCurrentRevision() {
-        assertThat(EvaluationClaimStatus.of(7L, 7L)).isEqualTo(EvaluationClaimStatus.CURRENT);
-        assertThat(EvaluationClaimStatus.of(7L, 8L)).isEqualTo(EvaluationClaimStatus.STALE);
-        assertThat(EvaluationClaimStatus.of(null, 8L)).isEqualTo(EvaluationClaimStatus.UNVERIFIABLE);
+    void shouldDeriveCurrentnessFromDetectionSemantics() {
+        assertThat(EvaluationClaimStatus.of("v2:one", "v2:one")).isEqualTo(EvaluationClaimStatus.CURRENT);
+        assertThat(EvaluationClaimStatus.of("v1:one", "v2:one")).isEqualTo(EvaluationClaimStatus.STALE);
+        assertThat(EvaluationClaimStatus.of(null, "v2:one")).isEqualTo(EvaluationClaimStatus.UNVERIFIABLE);
     }
 }

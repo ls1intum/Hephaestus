@@ -7,6 +7,7 @@
   "required": [
     "sourceContractVersion",
     "profile",
+    "observability",
     "required",
     "optional",
     "onUnsatisfied",
@@ -20,6 +21,9 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
     },
+    "observability": {
+      "enum": ["MECHANICAL", "SEMANTIC", "CONDITIONALLY_OBSERVABLE", "UNOBSERVABLE"]
+    },
     "required": {
       "type": "array",
       "minItems": 1,
@@ -30,7 +34,7 @@
     "optional": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/requirement"
+        "$ref": "#/$defs/optionalRequirement"
       }
     },
     "onUnsatisfied": {
@@ -58,6 +62,27 @@
         },
         "freshness": {
           "enum": ["CURRENT", "ANY"]
+        }
+      }
+    },
+    "optionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceKind",
+        "completeness",
+        "freshness"
+      ],
+      "properties": {
+        "sourceKind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
+        },
+        "completeness": {
+          "const": "ANY"
+        },
+        "freshness": {
+          "const": "ANY"
         }
       }
     },

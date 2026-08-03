@@ -40,7 +40,7 @@ public record ReviewBoundFindingDTO(
             row.getAssessment(),
             row.getSeverity(),
             row.getConfidence(),
-            EvaluationClaimStatus.of(row.getPracticeRevisionId(), row.getCurrentPracticeRevisionId()),
+            EvaluationClaimStatus.of(row.getPracticeRevisionFingerprint(), row.getCurrentPracticeRevisionFingerprint()),
             row.getObservedAt()
         );
     }

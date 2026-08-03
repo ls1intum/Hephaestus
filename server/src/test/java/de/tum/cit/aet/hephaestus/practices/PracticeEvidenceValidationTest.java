@@ -44,6 +44,7 @@ class PracticeEvidenceValidationTest extends BaseUnitTest {
         return new PracticeEvidenceDeclaration(
             new SourceContractVersion("1.0.0"),
             new EvidenceProfileId("pull-request-review"),
+            PracticeObservability.SEMANTIC,
             List.of(
                 new PracticeEvidenceRequirement(
                     new SourceKind("scm.pull-request.diff"),

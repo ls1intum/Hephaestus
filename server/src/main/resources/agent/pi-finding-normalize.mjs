@@ -1,11 +1,4 @@
-// Pure normalization helpers for practice-detection findings.
-//
-// Kept in a side-effect-free module (separate from pi-runner.mjs, whose top-level env guards,
-// envelope reads, and main() make it un-importable) so the report_finding tool boundary can be
-// unit-tested in isolation. These functions MUST stay in lock-step with the Java consumer
-// PracticeDetectionResultParser: the slug is lower-cased with underscores mapped to hyphens, and
-// presence/assessment/severity are upper-cased BEFORE validation, so the JS boundary accepts
-// exactly what the parser accepts (no silent recall loss).
+// Keep finding normalization aligned with PracticeDetectionResultParser.
 
 export function normalizeDiffNote(note) {
     if (!note || typeof note !== "object") throw new Error("diff note must be an object");
@@ -22,23 +15,32 @@ export function normalizeDiffNote(note) {
 }
 
 export function normalizeEvidence(evidence) {
-    const locations = Array.isArray(evidence?.locations)
-        ? evidence.locations.map((location) => {
-              const path = String(location?.path ?? "").trim();
-              const startLine = Number(location?.startLine);
-              const endLine = location?.endLine == null ? startLine : Number(location.endLine);
-              if (!path) throw new Error("evidence location path is required");
-              if (!Number.isInteger(startLine) || startLine <= 0)
-                  throw new Error("evidence startLine must be a positive integer");
-              if (!Number.isInteger(endLine) || endLine < startLine)
-                  throw new Error("evidence endLine must be >= startLine");
-              return { path, startLine, endLine };
-          })
-        : [];
-    const snippets = Array.isArray(evidence?.snippets)
-        ? evidence.snippets.map((snippet) => String(snippet ?? "")).filter((snippet) => snippet.trim().length > 0)
-        : [];
-    return { locations, snippets };
+    if (!Array.isArray(evidence?.citations) || evidence.citations.length === 0)
+        throw new Error("evidence citations are required");
+    const citations = evidence.citations.map((citation) => {
+        const sourceKind = String(citation?.sourceKind ?? "").trim();
+        const artifactPath = String(citation?.artifactPath ?? "").trim();
+        const path = String(citation?.path ?? "").trim();
+        const side = citation?.side == null ? null : String(citation.side).trim().toUpperCase();
+        const startLine = Number(citation?.startLine);
+        const endLine = citation?.endLine == null ? startLine : Number(citation.endLine);
+        const quote = String(citation?.quote ?? "").trim();
+        if (!sourceKind) throw new Error("evidence citation sourceKind is required");
+        if (!artifactPath) throw new Error("evidence citation artifactPath is required");
+        if (!path) throw new Error("evidence citation path is required");
+        if (sourceKind === "scm.pull-request.diff" && !["OLD", "NEW"].includes(side))
+            throw new Error("diff evidence citation side must be OLD or NEW");
+        if (!Number.isInteger(startLine) || startLine <= 0)
+            throw new Error("evidence citation startLine must be a positive integer");
+        if (!Number.isInteger(endLine) || endLine < startLine)
+            throw new Error("evidence citation endLine must be >= startLine");
+        if (!quote) throw new Error("evidence citation quote is required");
+        return { sourceKind, artifactPath, path, ...(side == null ? {} : { side }), startLine, endLine, quote };
+    });
+    const sourceKinds = [...new Set(citations.map((citation) => citation.sourceKind))].sort();
+    const locations = citations.map(({ path, startLine, endLine }) => ({ path, startLine, endLine }));
+    const snippets = citations.map((citation) => citation.quote);
+    return { citations, sourceKinds, locations, snippets };
 }
 
 export function normalizeFinding(finding) {
@@ -92,4 +94,57 @@ export function dedupeKeyForFinding(finding) {
     // Dedupe key: practice + title + locations.
     const locs = finding.evidence.locations.map((l) => `${l.path}:${l.startLine}-${l.endLine}`).join(",");
     return `${finding.practiceSlug}|${finding.title}|${locs}`;
+}
+
+export function validateEvidenceSources(finding, allowedSources, availableSources, artifactSources = new Map()) {
+    for (const citation of finding.evidence.citations) {
+        const sourceKind = citation.sourceKind;
+        if (!allowedSources.has(sourceKind)) {
+            throw new Error(`practice '${finding.practiceSlug}' does not declare evidence source '${sourceKind}'`);
+        }
+        if (!availableSources.has(sourceKind)) {
+            throw new Error(`evidence source '${sourceKind}' was not available to this invocation`);
+        }
+        if (artifactSources.get(citation.artifactPath) !== sourceKind) {
+            throw new Error(`artifact '${citation.artifactPath}' does not belong to evidence source '${sourceKind}'`);
+        }
+    }
+}
+
+export function citationMatchesArtifact(citation, content) {
+    if (citation.sourceKind !== "scm.pull-request.diff") return content.includes(citation.quote);
+    let oldPath = null;
+    let newPath = null;
+    const citedLines = new Map();
+    for (const storedLine of content.split("\n")) {
+        const annotated = storedLine.match(/^\[L(\d+)] (.*)$/);
+        const line = annotated ? annotated[2] : storedLine;
+        if (line.startsWith("--- ")) {
+            oldPath = diffPath(line.slice(4));
+            continue;
+        }
+        if (line.startsWith("+++ ")) {
+            newPath = diffPath(line.slice(4));
+            continue;
+        }
+        if (annotated) {
+            const lineNumber = Number(annotated[1]);
+            const side = line.startsWith("-") ? "OLD" : "NEW";
+            const path = side === "OLD" ? oldPath : newPath;
+            if (side === citation.side && path === citation.path) citedLines.set(lineNumber, line);
+        }
+    }
+    const quoteLines = citation.quote.split("\n");
+    if (quoteLines.length !== citation.endLine - citation.startLine + 1) return false;
+    return quoteLines.every((quoteLine, index) => {
+        const diffLine = citedLines.get(citation.startLine + index);
+        return diffLine === quoteLine || diffLine?.slice(1) === quoteLine;
+    });
+}
+
+function diffPath(rawPath) {
+    let value = rawPath.trim();
+    if (value === "/dev/null") return null;
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1).replaceAll('\\"', '"');
+    return value.startsWith("a/") || value.startsWith("b/") ? value.slice(2) : value;
 }

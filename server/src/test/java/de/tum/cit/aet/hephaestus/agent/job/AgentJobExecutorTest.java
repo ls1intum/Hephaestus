@@ -614,7 +614,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // observation can always be tied to what produced it even when the sandbox then fails.
             ArgumentCaptor<String> inputsDigest = ArgumentCaptor.forClass(String.class);
             InOrder order = inOrder(jobRepository, sandboxManager);
-            order.verify(jobRepository).updateProvenanceDigests(eq(jobId), eq("prompt-digest"), inputsDigest.capture());
+            order
+                .verify(jobRepository)
+                .updateProvenanceDigests(eq(jobId), eq("prompt-digest"), inputsDigest.capture(), any());
             order.verify(sandboxManager).execute(any());
             assertThat(inputsDigest.getValue()).matches("[0-9a-f]{64}");
         }
@@ -638,7 +640,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.prepareInputFiles(any())).thenReturn(Map.of("task.json", "{}".getBytes()));
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
-            when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(0); // job row is gone
+            when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(0); // job row is gone
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
@@ -2044,7 +2046,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(0);
-            when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
+            when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(1);
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.prepareInputFiles(any())).thenReturn(Map.of());
@@ -2090,7 +2092,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private JobTypeHandler setupFullExecution(SandboxResult sandboxResult) {
         // Every execution stamps its provenance digests before the sandbox starts, and fails loud if the write
         // matches no row — so the standard path must report the row it updated.
-        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputFiles(any())).thenReturn(Map.of("code.py", "print('hi')".getBytes()));
@@ -2138,7 +2140,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     private void setupFullExecutionWithException(Exception exception) {
-        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputFiles(any())).thenReturn(Map.of());

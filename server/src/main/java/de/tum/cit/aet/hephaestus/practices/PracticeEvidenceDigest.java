@@ -8,6 +8,7 @@ public final class PracticeEvidenceDigest {
         CanonicalDigest digest = new CanonicalDigest()
             .add(declaration.sourceContractVersion().value())
             .add(declaration.profile().value())
+            .add(declaration.observability().name())
             .add(declaration.onUnsatisfied().name())
             .addInt(declaration.required().size());
         declaration.required().forEach(requirement -> add(digest, requirement));
@@ -19,6 +20,13 @@ public final class PracticeEvidenceDigest {
     }
 
     private static void add(CanonicalDigest digest, PracticeEvidenceRequirement requirement) {
+        digest
+            .add(requirement.sourceKind().value())
+            .add(requirement.completeness().name())
+            .add(requirement.freshness().name());
+    }
+
+    private static void add(CanonicalDigest digest, OptionalPracticeEvidenceRequirement requirement) {
         digest
             .add(requirement.sourceKind().value())
             .add(requirement.completeness().name())

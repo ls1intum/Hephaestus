@@ -99,6 +99,7 @@ public class OpenAPIConfiguration {
         "PageMetadata",
         "PracticeEvidenceDeclaration",
         "PracticeEvidenceRequirement",
+        "OptionalPracticeEvidenceRequirement",
         "PracticeEvidenceRefusal",
         "PracticeEvidenceBlindSpot",
         "PracticeEvidenceValidation",

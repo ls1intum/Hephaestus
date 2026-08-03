@@ -1,12 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -29,7 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class JobTypeHandlerConfiguration {
 
     private final JsonMapper objectMapper;
-    private final GitRepositoryManager gitRepositoryManager;
+    private final ContentAddressedStore contentAddressedStore;
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
@@ -37,14 +36,14 @@ public class JobTypeHandlerConfiguration {
 
     JobTypeHandlerConfiguration(
         JsonMapper objectMapper,
-        GitRepositoryManager gitRepositoryManager,
+        ContentAddressedStore contentAddressedStore,
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter,
         ReactionSuppressionFilter reactionSuppressionFilter
     ) {
         this.objectMapper = objectMapper;
-        this.gitRepositoryManager = gitRepositoryManager;
+        this.contentAddressedStore = contentAddressedStore;
         this.reviewProperties = reviewProperties;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
@@ -103,7 +102,6 @@ public class JobTypeHandlerConfiguration {
     @Bean
     JobTypeHandler pullRequestReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
-        GitDiffOperations gitDiffOperations,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
@@ -111,11 +109,10 @@ public class JobTypeHandlerConfiguration {
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
-            gitRepositoryManager,
+            contentAddressedStore,
             practiceCatalogInjector,
             workspaceContextBuilder,
             taskEnvelopeWriter,
-            gitDiffOperations,
             resultParser,
             deliveryService,
             feedbackService,

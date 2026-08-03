@@ -23,7 +23,7 @@ precompute scratch; never collected), and `out/` (the only directory collected b
 │   │   └── scm/repo/                #   Pinned, read-only SCM tree without Git metadata or history.
 │   ├── context/                     #   System-written, AI-readable. Populated by the ContentSource SPI.
 │   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
-│   │                                #   contributor_history.json, linked_work_items.json, …
+│   │                                #   linked_work_items.json, review_threads.json, …
 │   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
 │   ├── precompute/                  #   Per-practice precompute scripts injected by the server.

@@ -7,6 +7,8 @@ import org.jspecify.annotations.Nullable;
 /** Fingerprints review-rule inputs, excluding why-it-matters and what-good-looks-like guidance. */
 public final class PracticeDetectionFingerprint {
 
+    private static final String SCHEME = "v2:";
+
     private PracticeDetectionFingerprint() {}
 
     public static String of(
@@ -25,11 +27,14 @@ public final class PracticeDetectionFingerprint {
             .add(artifactType.name())
             .addInt(triggerEvents.size());
         triggerEvents.stream().sorted().forEach(digest::add);
-        return digest
-            .add(criteria)
-            .addNullable(precomputeScript)
-            .add(PracticeEvidenceDigest.digest(evidence))
-            .addNullable(areaSlug)
-            .hex();
+        return (
+            SCHEME +
+            digest
+                .add(criteria)
+                .addNullable(precomputeScript)
+                .add(PracticeEvidenceDigest.digest(evidence))
+                .addNullable(areaSlug)
+                .hex()
+        );
     }
 }

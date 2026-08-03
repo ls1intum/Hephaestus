@@ -213,6 +213,10 @@ public class AgentJob {
     @Column(name = "inputs_digest", length = 64)
     private String inputsDigest;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evidence_snapshot", columnDefinition = "jsonb")
+    private JsonNode evidenceSnapshot;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

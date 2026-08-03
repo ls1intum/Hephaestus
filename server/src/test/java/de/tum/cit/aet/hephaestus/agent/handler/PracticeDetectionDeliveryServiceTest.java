@@ -17,11 +17,12 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
@@ -32,6 +33,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -53,9 +55,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
-    private PracticeRepository practiceRepository;
-
-    @Mock
     private de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository practiceRevisionRepository;
 
     @Mock
@@ -70,6 +69,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private ContentAddressedStore cas;
+
     @Captor
     private ArgumentCaptor<PracticeDetectionCompletedEvent> eventCaptor;
 
@@ -83,13 +85,13 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new PracticeDetectionDeliveryService(
-            practiceRepository,
             practiceRevisionRepository,
             observationRepository,
             pullRequestRepository,
             issueRepository,
             eventPublisher,
-            objectMapper
+            objectMapper,
+            cas
         );
 
         Workspace workspace = new Workspace();
@@ -98,6 +100,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         testPractice = new Practice();
         ReflectionTestUtils.setField(testPractice, "id", 10L);
         testPractice.setSlug("pr-description-quality");
+        testPractice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        testPractice.setWorkspace(workspace);
 
         testJob = new AgentJob();
         ReflectionTestUtils.setField(testJob, "id", UUID.randomUUID());
@@ -108,6 +112,36 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         metadata.put("repository_full_name", "owner/repo");
         metadata.put("pr_number", 42);
         testJob.setMetadata(metadata);
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        var source = snapshot
+            .putObject("manifest")
+            .putArray("sources")
+            .addObject()
+            .put("kind", "scm.pull-request.diff")
+            .put("availability", "AVAILABLE");
+        source
+            .putArray("artifacts")
+            .addObject()
+            .put("path", "inputs/context/diff.patch")
+            .put("sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        snapshot.putArray("practices").addObject().put("slug", "pr-description-quality").put("revisionId", 11L);
+        testJob.setEvidenceSnapshot(snapshot);
+
+        PracticeRevision revision = org.mockito.Mockito.mock(PracticeRevision.class);
+        lenient().when(revision.getId()).thenReturn(11L);
+        lenient().when(revision.getSlug()).thenReturn("pr-description-quality");
+        lenient().when(revision.getPractice()).thenReturn(testPractice);
+        lenient().when(revision.getEvidence()).thenReturn(testPractice.getEvidence());
+        lenient().when(practiceRevisionRepository.findById(11L)).thenReturn(Optional.of(revision));
+        lenient()
+            .when(cas.get("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+            .thenReturn(
+                Optional.of(
+                    "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n".getBytes(
+                        StandardCharsets.UTF_8
+                    )
+                )
+            );
 
         testAuthor = new User();
         ReflectionTestUtils.setField(testAuthor, "id", 789L);
@@ -120,8 +154,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         repository.setNameWithOwner("owner/repo");
         testPr.setRepository(repository);
 
-        // Default stubs (lenient because not all tests exercise all code paths)
-        lenient().when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(List.of(testPractice));
         lenient().when(pullRequestRepository.findByIdWithAuthorAndRepository(456L)).thenReturn(Optional.of(testPr));
         lenient()
             .when(
@@ -148,17 +180,26 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             .thenReturn(1);
     }
 
-    /**
-     * Build a finding whose valence follows the former-GOOD practice convention used across these
-     * fixtures (pr-description-quality, error-handling): PRESENT→GOOD strength, ABSENT→BAD gap,
-     * NOT_APPLICABLE→null. The assessment slot sits right after presence on {@link ValidatedFinding}.
-     */
     private ValidatedFinding validFinding(String slug, Presence presence) {
         Assessment assessment = switch (presence) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
             case NOT_APPLICABLE -> null;
         };
+        ObjectNode evidence = objectMapper.createObjectNode();
+        evidence
+            .putArray("citations")
+            .addObject()
+            .put("sourceKind", "scm.pull-request.diff")
+            .put("artifactPath", "inputs/context/diff.patch")
+            .put("path", "src/Auth.java")
+            .put("side", "NEW")
+            .put("startLine", 10)
+            .put("endLine", 10)
+            .put("quote", "+ insecure();");
+        evidence.putArray("sourceKinds").add("scm.pull-request.diff");
+        evidence.putArray("locations");
+        evidence.putArray("snippets");
         return new ValidatedFinding(
             slug,
             "Test finding",
@@ -166,95 +207,140 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assessment,
             Severity.INFO,
             0.9f,
-            null,
+            evidence,
             null,
             null,
             List.of()
         );
     }
 
+    private void admit(Practice practice, long revisionId) {
+        practice.setWorkspace(testPractice.getWorkspace());
+        ((ObjectNode) testJob.getEvidenceSnapshot()).withArray("practices")
+            .addObject()
+            .put("slug", practice.getSlug())
+            .put("revisionId", revisionId);
+        PracticeRevision revision = org.mockito.Mockito.mock(PracticeRevision.class);
+        lenient().when(revision.getId()).thenReturn(revisionId);
+        lenient().when(revision.getSlug()).thenReturn(practice.getSlug());
+        lenient().when(revision.getPractice()).thenReturn(practice);
+        lenient().when(revision.getEvidence()).thenReturn(practice.getEvidence());
+        lenient().when(practiceRevisionRepository.findById(revisionId)).thenReturn(Optional.of(revision));
+    }
+
     @Nested
-    class RevisionPinning {
+    class EvidenceBoundary {
 
-        /** The practice_revision_id the service passed to insertIfAbsent for the single persisted finding. */
-        private Long persistedRevisionId() {
-            ArgumentCaptor<Long> revisionId = ArgumentCaptor.forClass(Long.class);
-            verify(observationRepository).insertIfAbsent(
-                any(),
-                anyString(),
-                any(),
-                anyLong(),
-                revisionId.capture(),
-                anyString(),
-                anyLong(),
-                anyLong(),
-                any(),
-                anyString(),
-                any(),
-                any(),
-                anyFloat(),
-                any(),
-                any(),
-                anyString(),
-                any()
+        @Test
+        void rejectsMissingSourceAttribution() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) finding.evidence()).remove("citations");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("no source-bound evidence citation");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void rejectsSourcesOutsideThePracticeDeclaration() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) ((ObjectNode) finding.evidence()).withArray("citations").get(0)).put(
+                "sourceKind",
+                "scm.repository.tree"
             );
-            return revisionId.getValue();
-        }
 
-        private PracticeRevision revision(long id) {
-            var revision = org.mockito.Mockito.mock(PracticeRevision.class);
-            lenient().when(revision.getId()).thenReturn(id);
-            return revision;
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("misattributed evidence source");
+            verifyNoInteractions(observationRepository);
         }
 
         @Test
-        void pinsTheRevisionThatExistedWhenTheJobStarted_notTheLatest() {
-            // An admin edit while the sandbox runs appends a revision the detector never saw. The observation
-            // must pin the criteria as of startedAt — the moment before the catalog injector read them.
-            testJob.setStartedAt(Instant.parse("2026-07-16T10:00:00Z"));
-            Optional<PracticeRevision> asOfStart = Optional.of(revision(41L));
-            Optional<PracticeRevision> midRunEdit = Optional.of(revision(42L));
-            when(
-                practiceRevisionRepository.findFirstByPracticeIdAndCreatedAtLessThanEqualOrderByRevisionNumberDesc(
-                    10L,
-                    testJob.getStartedAt()
+        void rejectsAQuoteThatIsNotInTheCitedArtifact() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) ((ObjectNode) finding.evidence()).withArray("citations").get(0)).put(
+                "quote",
+                "fabricated quote"
+            );
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("does not match the cited diff location");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void rejectsARealQuoteAtTheWrongDiffLine() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) finding.evidence().withArray("citations").get(0)).put("startLine", 11);
+            ((ObjectNode) finding.evidence().withArray("citations").get(0)).put("endLine", 11);
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("does not match the cited diff location");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void rejectsARealQuoteInTheWrongDiffFile() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) finding.evidence().withArray("citations").get(0)).put("path", "src/Other.java");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("does not match the cited diff location");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void rejectsARealQuoteWithAnInvalidDiffRange() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) finding.evidence().withArray("citations").get(0)).put("endLine", 11);
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("does not match the cited diff location");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void acceptsRemovedLineEvidenceOnTheOldSide() {
+            when(cas.get("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).thenReturn(
+                Optional.of(
+                    (
+                        "diff --git a/src/Auth.java b/src/Auth.java\n" +
+                        "--- a/src/Auth.java\n" +
+                        "+++ b/src/Auth.java\n" +
+                        "@@ -8 +8 @@\n" +
+                        "[L8] - requireAdmin();\n" +
+                        "[L8] + allowAll();\n"
+                    ).getBytes(StandardCharsets.UTF_8)
                 )
-            ).thenReturn(asOfStart);
-            lenient()
-                .when(practiceRevisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(10L))
-                .thenReturn(midRunEdit);
+            );
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ObjectNode citation = (ObjectNode) finding.evidence().withArray("citations").get(0);
+            citation.put("side", "OLD");
+            citation.put("startLine", 8);
+            citation.put("endLine", 8);
+            citation.put("quote", "- requireAdmin();");
 
-            service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)));
-
-            assertThat(persistedRevisionId()).isEqualTo(41L);
+            assertThat(service.deliver(testJob, List.of(finding)).inserted()).isEqualTo(1);
         }
 
         @Test
-        void fallsBackToTheLatestRevision_whenNoneExistedAtJobStart() {
-            // A practice created mid-run has no as-of revision; pinning the latest beats pinning nothing.
-            testJob.setStartedAt(Instant.parse("2026-07-16T10:00:00Z"));
-            when(
-                practiceRevisionRepository.findFirstByPracticeIdAndCreatedAtLessThanEqualOrderByRevisionNumberDesc(
-                    any(),
-                    any()
-                )
-            ).thenReturn(Optional.empty());
-            Optional<PracticeRevision> latest = Optional.of(revision(7L));
-            when(practiceRevisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(10L)).thenReturn(latest);
+        void rejectsACitationToAnUnavailableSource() {
+            ((ObjectNode) testJob.getEvidenceSnapshot().path("manifest").path("sources").get(0)).put(
+                "availability",
+                "UNAVAILABLE"
+            );
 
-            service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)));
-
-            assertThat(persistedRevisionId()).isEqualTo(7L);
-        }
-
-        @Test
-        void fallsBackToTheLatestRevision_whenTheJobHasNoStartedAt() {
-            Optional<PracticeRevision> latest = Optional.of(revision(7L));
-            when(practiceRevisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(10L)).thenReturn(latest);
-
-            service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)));
-
-            assertThat(persistedRevisionId()).isEqualTo(7L);
+            assertThatThrownBy(() ->
+                service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)))
+            )
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("misattributed evidence source");
+            verifyNoInteractions(observationRepository);
         }
     }
 
@@ -268,7 +354,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isEqualTo(1);
-            assertThat(result.discardedUnknownSlug()).isZero();
             assertThat(result.discardedDuplicate()).isZero();
 
             ArgumentCaptor<String> fingerprintCaptor = ArgumentCaptor.forClass(String.class);
@@ -277,7 +362,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId()),
                 eq(testJob.getId()),
                 eq(10L),
-                isNull(), // practiceRevisionId — no revision in the mocked repo
+                eq(11L),
                 eq("PULL_REQUEST"),
                 eq(456L),
                 eq(789L), // aboutUserId
@@ -286,7 +371,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("GOOD"), // assessment (former-GOOD practice, PRESENT → a strength)
                 isNull(), // severity — coerced to null for a non-BAD finding (ADR 0022 invariant)
                 eq(0.9f),
-                isNull(),
+                anyString(),
                 isNull(),
                 fingerprintCaptor.capture(), // findingFingerprint == persisted recurrence_key
                 any()
@@ -316,41 +401,10 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void unknownSlug() {
             var findings = List.of(validFinding("unknown-practice", Presence.PRESENT));
 
-            var result = service.deliver(testJob, findings);
-
-            assertThat(result.inserted()).isZero();
-            assertThat(result.discardedUnknownSlug()).isEqualTo(1);
-            verify(observationRepository, never()).insertIfAbsent(
-                any(),
-                anyString(),
-                any(),
-                anyLong(),
-                any(), // practiceRevisionId
-                anyString(),
-                anyLong(),
-                anyLong(),
-                any(),
-                anyString(),
-                anyString(),
-                anyString(),
-                anyFloat(),
-                any(),
-                any(),
-                anyString(),
-                any()
-            );
-        }
-
-        @Test
-        @DisplayName("returns 0 inserted when workspace has no practices")
-        void emptyPracticeCatalog() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(List.of());
-            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
-
-            var result = service.deliver(testJob, findings);
-
-            assertThat(result.inserted()).isZero();
-            assertThat(result.discardedUnknownSlug()).isEqualTo(1);
+            assertThatThrownBy(() -> service.deliver(testJob, findings))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("not admitted");
+            verifyNoInteractions(observationRepository);
         }
     }
 
@@ -449,9 +503,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
-                List.of(testPractice, otherPractice)
-            );
+            otherPractice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            admit(otherPractice, 22L);
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 5; i++) {
@@ -618,14 +671,12 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
-                List.of(testPractice, otherPractice)
-            );
+            otherPractice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            admit(otherPractice, 22L);
 
             var findings = List.of(
                 validFinding("pr-description-quality", Presence.PRESENT),
-                validFinding("error-handling", Presence.ABSENT),
-                validFinding("unknown-slug", Presence.PRESENT)
+                validFinding("error-handling", Presence.ABSENT)
             );
 
             service.deliver(testJob, findings);
@@ -633,7 +684,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             PracticeDetectionCompletedEvent event = eventCaptor.getValue();
             assertThat(event.findingsInserted()).isEqualTo(2);
-            assertThat(event.findingsDiscarded()).isEqualTo(1); // unknown slug
+            assertThat(event.findingsDiscarded()).isZero();
             assertThat(event.hasNegative()).isTrue(); // error-handling finding is NEGATIVE
             assertThat(event.developerId()).isEqualTo(789L);
             assertThat(event.artifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
@@ -674,7 +725,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("pr-description-quality:0:ISSUE:999:" + testJob.getId()),
                 eq(testJob.getId()),
                 anyLong(),
-                isNull(), // practiceRevisionId — no revision in the mocked repo
+                eq(11L),
                 eq("ISSUE"),
                 eq(999L),
                 eq(789L), // aboutUserId

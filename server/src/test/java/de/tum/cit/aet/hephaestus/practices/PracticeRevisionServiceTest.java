@@ -66,7 +66,7 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         PracticeRevision appended = service.append(practice);
 
         assertThat(appended.getCriteria()).isEqualTo("Give specific feedback");
-        assertThat(appended.getDetectionFingerprint()).hasSize(64);
+        assertThat(appended.getDetectionFingerprint()).hasSize(67).startsWith("v2:");
         assertThat(practice.getCurrentRevision()).isSameAs(appended);
     }
 
@@ -99,6 +99,7 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
             new PracticeEvidenceDeclaration(
                 practice.getEvidence().sourceContractVersion(),
                 practice.getEvidence().profile(),
+                PracticeObservability.SEMANTIC,
                 List.of(
                     new PracticeEvidenceRequirement(
                         new de.tum.cit.aet.hephaestus.evidence.SourceKind("scm.pull-request.diff"),

@@ -69,6 +69,7 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("Starts a review when")).toBeVisible();
 		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
+		await expect(canvas.getByText("Observability: Semantic")).toBeVisible();
 		await expect(canvas.getByText(/scm\.pull-request\.core \(complete, current\)/)).toBeVisible();
 		await expect(canvas.getByText(/RUNTIME_BEHAVIOR_NOT_OBSERVED/)).toBeVisible();
 		await expect(canvas.queryByText("PullRequestCreated")).not.toBeInTheDocument();

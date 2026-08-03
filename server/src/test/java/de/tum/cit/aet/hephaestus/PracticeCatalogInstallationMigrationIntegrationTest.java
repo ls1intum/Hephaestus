@@ -59,10 +59,21 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
 
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(BEFORE_CATALOG_TAG);
+        }
+        updateThrough("1785743133884-4");
+        execute(
+            "UPDATE practice_revision SET detection_fingerprint = repeat('a', 64) " +
+                "WHERE practice_id = 136301 AND revision_number = " +
+                "(SELECT max(revision_number) FROM practice_revision WHERE practice_id = 136301)",
+            "UPDATE practice SET source_curated_slug = 'second-practice', " +
+                "source_curated_fingerprint = repeat('c', 64) WHERE id = 136302"
+        );
+        try (Liquibase liquibase = liquibase()) {
             liquibase.update(contexts());
         }
 
         assertMarkerRepair();
+        assertHistoricalFingerprintsVersioned();
         assertEmptyCatalogBootstrap();
         assertWorkspaceRevisionBackfill();
         assertEvidenceRevisionBackfill();
@@ -73,6 +84,18 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         assertRevisionImmutability();
         appendValidCurrentRevision();
         assertRollbackAndReapply();
+    }
+
+    private static void assertHistoricalFingerprintsVersioned() throws SQLException {
+        assertThat(
+            scalar(
+                "SELECT detection_fingerprint FROM practice_revision " +
+                    "WHERE practice_id = 136301 ORDER BY revision_number DESC LIMIT 1"
+            )
+        ).isEqualTo("v1:" + "a".repeat(64));
+        assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302")).isEqualTo(
+            "v1:" + "c".repeat(64)
+        );
     }
 
     private static void assertMarkerRepair() throws SQLException {
@@ -169,7 +192,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         execute(
             """
             UPDATE practice_revision
-            SET detection_fingerprint = repeat('b', 64)
+            SET detection_fingerprint = ('v2:' || repeat('b', 64))
             WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
             """
         );
@@ -179,7 +202,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
-                  AND detection_fingerprint = repeat('b', 64)
+                  AND detection_fingerprint = ('v2:' || repeat('b', 64))
                 """
             )
         ).isEqualTo("1");
@@ -187,7 +210,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             execute(
                 """
                 UPDATE practice_revision
-                SET detection_fingerprint = repeat('d', 64)
+                SET detection_fingerprint = ('v2:' || repeat('d', 64))
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
                 """
             )
@@ -196,7 +219,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         execute(
             """
             UPDATE practice
-            SET source_curated_slug = 'second-practice', source_curated_fingerprint = repeat('b', 64)
+            SET source_curated_slug = 'second-practice', source_curated_fingerprint = ('v2:' || repeat('b', 64))
             WHERE id = 136302
             """
         );
@@ -256,20 +279,20 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         execute(
             """
             UPDATE practice_revision
-            SET detection_fingerprint = repeat('a', 64)
+            SET detection_fingerprint = ('v2:' || repeat('a', 64))
             WHERE practice_id = 136301 AND slug IS NOT NULL AND detection_fingerprint IS NULL
             """
         );
         assertThat(
             scalar(
                 "SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301" +
-                    " AND detection_fingerprint = repeat('a', 64)"
+                    " AND detection_fingerprint = ('v2:' || repeat('a', 64))"
             )
-        ).isEqualTo("2");
+        ).isEqualTo("1");
 
         assertThatThrownBy(() ->
             execute(
-                "UPDATE practice_revision SET detection_fingerprint = repeat('b', 64)" +
+                "UPDATE practice_revision SET detection_fingerprint = ('v2:' || repeat('b', 64))" +
                     " WHERE practice_id = 136301 AND slug IS NOT NULL"
             )
         )
@@ -306,7 +329,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                        area.description,
                        area.icon,
                        area.color,
-                       repeat('a', 64),
+                       ('v2:' || repeat('a', 64)),
                        practice.evidence_declaration
                 FROM practice
                 LEFT JOIN practice_area area ON area.id = practice.practice_area_id
@@ -454,6 +477,17 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             List<Integer> indexes = indexesOf(pending, changelogName);
             assertThat(indexes).as("%s must be the next pending changelog", changelogName).isNotEmpty().startsWith(0);
             liquibase.update(indexes.size(), contexts(), new LabelExpression());
+        }
+    }
+
+    private static void updateThrough(String changeSetId) throws Exception {
+        try (Liquibase liquibase = liquibase()) {
+            List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
+            int index = java.util.stream.IntStream.range(0, pending.size())
+                .filter(candidate -> pending.get(candidate).getId().equals(changeSetId))
+                .findFirst()
+                .orElseThrow();
+            liquibase.update(index + 1, contexts(), new LabelExpression());
         }
     }
 

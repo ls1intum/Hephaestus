@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeCatalogInstallationRepository
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
@@ -30,11 +31,13 @@ public class CatalogProvenanceBackfill {
     private final PracticeRepository practiceRepository;
     private final PracticeAreaRepository practiceAreaRepository;
     private final PracticeRevisionRepository revisionRepository;
+    private final PracticeRevisionService revisionService;
     private final BundledPracticeCatalogLoader bundledCatalogLoader;
     private final TransactionOperations transactionOperations;
     private final Clock clock;
 
     public Stamped run() {
+        alignVersionedEvidence();
         fingerprintMigratedRevisions();
         List<Long> pending = installationRepository.findWorkspaceIdsAwaitingProvenanceLink();
         if (pending.isEmpty()) {
@@ -58,6 +61,25 @@ public class CatalogProvenanceBackfill {
             total.areas()
         );
         return total;
+    }
+
+    private void alignVersionedEvidence() {
+        BundledPracticeCatalog catalog = bundledCatalogLoader.catalog();
+        for (Practice practice : practiceRepository.findSourceAlignedV1Practices()) {
+            catalog
+                .practices()
+                .stream()
+                .filter(entry -> entry.slug().equals(practice.getSourceCuratedSlug()))
+                .findFirst()
+                .ifPresent(entry ->
+                    transactionOperations.executeWithoutResult(ignored -> {
+                        Practice managed = practiceRepository.findById(practice.getId()).orElseThrow();
+                        managed.setEvidence(entry.definition().evidence());
+                        managed.setSourceCuratedFingerprint(entry.definition().provenanceFingerprint(entry.slug()));
+                        revisionService.append(managed);
+                    })
+                );
+        }
     }
 
     private void fingerprintMigratedRevisions() {

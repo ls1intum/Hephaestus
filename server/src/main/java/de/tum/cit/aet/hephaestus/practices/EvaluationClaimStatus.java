@@ -12,17 +12,17 @@ public enum EvaluationClaimStatus {
     UNVERIFIABLE;
 
     public static EvaluationClaimStatus of(@Nullable PracticeRevision evaluated, Practice practice) {
-        return of(evaluated == null ? null : evaluated.getId(), revisionId(practice.getCurrentRevision()));
+        return of(fingerprint(evaluated), fingerprint(practice.getCurrentRevision()));
     }
 
-    public static EvaluationClaimStatus of(@Nullable Long evaluatedRevisionId, @Nullable Long currentRevisionId) {
-        if (evaluatedRevisionId == null || currentRevisionId == null) {
+    public static EvaluationClaimStatus of(@Nullable String evaluatedFingerprint, @Nullable String currentFingerprint) {
+        if (evaluatedFingerprint == null || currentFingerprint == null) {
             return UNVERIFIABLE;
         }
-        return evaluatedRevisionId.equals(currentRevisionId) ? CURRENT : STALE;
+        return evaluatedFingerprint.equals(currentFingerprint) ? CURRENT : STALE;
     }
 
-    private static @Nullable Long revisionId(@Nullable PracticeRevision revision) {
-        return revision == null ? null : revision.getId();
+    private static @Nullable String fingerprint(@Nullable PracticeRevision revision) {
+        return revision == null ? null : revision.getDetectionFingerprint();
     }
 }

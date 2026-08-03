@@ -29,6 +29,7 @@
     },
     "sources": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "$ref": "#/$defs/capture"
       }
@@ -51,7 +52,8 @@
       ],
       "properties": {
         "kind": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
         },
         "state": {
           "oneOf": [
@@ -138,6 +140,7 @@
           "if": {
             "properties": {
               "state": {
+                "type": "object",
                 "properties": {
                   "availability": {
                     "not": {
@@ -157,6 +160,7 @@
           "then": {
             "properties": {
               "artifacts": {
+                "type": "array",
                 "maxItems": 0
               }
             }
@@ -166,6 +170,7 @@
           "if": {
             "properties": {
               "state": {
+                "type": "object",
                 "properties": {
                   "availability": {
                     "const": "AVAILABLE"
@@ -187,6 +192,7 @@
           "then": {
             "properties": {
               "artifacts": {
+                "type": "array",
                 "minItems": 1
               }
             }
@@ -264,7 +270,8 @@
       "properties": {
         "path": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"
         },
         "mediaType": {
           "type": "string",
@@ -301,7 +308,8 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
           }
         }
       }

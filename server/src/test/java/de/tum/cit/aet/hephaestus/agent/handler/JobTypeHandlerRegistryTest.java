@@ -7,11 +7,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -24,16 +23,13 @@ import tools.jackson.databind.json.JsonMapper;
 class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
     @Mock
-    private GitRepositoryManager gitRepositoryManager;
+    private ContentAddressedStore cas;
 
     @Mock
     private PracticeRepository practiceRepository;
 
     @Mock
     private WorkspaceContextBuilder workspaceContextBuilder;
-
-    @Mock
-    private GitDiffOperations gitDiffOperations;
 
     @Mock
     private PracticeDetectionDeliveryService deliveryService;
@@ -51,11 +47,10 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
         return new PullRequestReviewHandler(
             objectMapper,
-            gitRepositoryManager,
+            cas,
             new PracticeCatalogInjector(objectMapper, practiceRepository),
             workspaceContextBuilder,
             envelopeWriter,
-            gitDiffOperations,
             parser,
             deliveryService,
             feedbackService,

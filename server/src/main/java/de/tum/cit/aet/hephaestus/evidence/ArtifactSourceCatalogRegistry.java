@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
+import java.time.Instant;
+import java.util.Optional;
+
 public interface ArtifactSourceCatalogRegistry {
     ArtifactSourceCatalog current();
 
@@ -11,4 +14,6 @@ public interface ArtifactSourceCatalogRegistry {
     EvidenceProfile requireProfile(SourceContractVersion version, EvidenceProfileId id);
 
     SourceUseDecision requireUseDecision(SourceContractVersion version, String decisionId);
+
+    Optional<Instant> earliestUseDecisionExpiry();
 }

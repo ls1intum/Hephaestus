@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
@@ -21,52 +20,14 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Cross-context, best-effort provider that de-blinds a PR review by materialising the
- * <em>review-decision and thread-resolution state</em> into {@code
- * inputs/context/review_threads.json}.
- *
- * <p>Some review signals live in the review decision + merge state, never in the diff and never in the
- * inline comments:
- *
- * <ul>
- *   <li>An author can merge past unresolved {@code CHANGES_REQUESTED} reviews via auto-merge. When
- *       {@code comments.json} is empty (no inline notes), the review practices read it as "no reviewer
- *       input" and abstain — yet the gate WAS jammed. The signal is the review <em>decision</em>, not an
- *       inline comment.
- *   <li>A rubber-stamp approval ("Looks good"). The substance of the review lives in the review-decision
- *       row + the (un)resolved thread, not in a diff-anchored inline comment.
- * </ul>
- *
- * <p>Both facts ARE already persisted: {@link PullRequestReview#getState()} carries the decision
- * (APPROVED / CHANGES_REQUESTED / …) and {@link PullRequestReviewThread#getState()} carries
- * UNRESOLVED / RESOLVED plus {@code resolvedBy} and {@code outdated}. This provider reads them by
- * pull-request id and emits a compact, judgement-free fact sheet (telescope, not cage):
- *
- * <pre>
- * {
- *   "threads":[{"path":..,"line":..,"state":"UNRESOLVED|RESOLVED","resolvedBy":..,"author":..,"outdated":..}],
- *   "unresolvedCount": N,
- *   "reviewDecisions":[{"state":"CHANGES_REQUESTED","author":..,"submittedAt":..,"dismissed":..}],
- *   "mergeState": "MERGED|CLOSED|OPEN"
- * }
- * </pre>
- *
- * <p>No comment bodies are materialised here — {@code comments.json} already carries inline notes;
- * this provider adds only the DECISION + RESOLUTION layer the diff and the inline thread cannot
- * express.
- *
- * <p>Best-effort ({@link #required()} == {@code false}): a missing PR id, absent rows, or any
- * failure degrades to writing nothing and NEVER aborts the job. When there is no review decision
- * AND no thread at all, the file is omitted (the review practices keep their existing empty-context
- * behaviour).
- */
+/** Captures bounded review decisions, thread-resolution state, and merge state without comment bodies. */
 @Component
 @Order(200)
 public class ReviewThreadContentSource implements EvidenceSource {
@@ -90,13 +51,10 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewThreadContentSource.class);
 
-    /** Output filename under {@link ContentSource#OUTPUT_PREFIX}. */
     static final String FILE_NAME = "review_threads.json";
 
-    /** Cap on threads materialised — keeps the artefact a few KB even on a noisy PR. */
     static final int MAX_THREADS = 40;
 
-    /** Cap on review-decision rows materialised. */
     static final int MAX_DECISIONS = 30;
 
     private final ObjectMapper objectMapper;
@@ -121,7 +79,6 @@ public class ReviewThreadContentSource implements EvidenceSource {
         return request instanceof ContextRequest.PracticeReviewRequest;
     }
 
-    /** Cross-context enrichment: never abort the job if decision/thread state cannot be resolved. */
     @Override
     public boolean required() {
         return false;
@@ -144,14 +101,28 @@ public class ReviewThreadContentSource implements EvidenceSource {
                 return;
             }
 
-            List<PullRequestReviewThread> threads = threadRepository.findAllByPullRequestIdWithResolvedBy(
-                pullRequestId
+            List<Long> threadIds = new java.util.ArrayList<>(
+                threadRepository.findRecentIdsByPullRequestId(pullRequestId, PageRequest.of(0, MAX_THREADS + 1))
             );
-            List<PullRequestReview> reviews = reviewRepository.findAllByPullRequestIdWithAuthor(pullRequestId);
+            boolean threadsTruncated = threadIds.size() > MAX_THREADS;
+            if (threadsTruncated) threadIds.remove(threadIds.size() - 1);
+            List<PullRequestReviewThread> threads = threadIds.isEmpty()
+                ? List.of()
+                : threadRepository.findAllByIdWithResolvedBy(threadIds);
+            List<PullRequestReview> reviews = new java.util.ArrayList<>(
+                reviewRepository.findRecentByPullRequestIdWithAuthor(
+                    pullRequestId,
+                    Set.of(PullRequestReview.State.PENDING, PullRequestReview.State.UNKNOWN),
+                    PageRequest.of(0, MAX_DECISIONS + 1)
+                )
+            );
+            if (reviews.size() > MAX_DECISIONS + 1) {
+                reviews = new java.util.ArrayList<>(reviews.subList(0, MAX_DECISIONS + 1));
+            }
+            boolean decisionsTruncated = reviews.size() > MAX_DECISIONS;
+            if (decisionsTruncated) reviews.remove(reviews.size() - 1);
 
-            if ((threads == null || threads.isEmpty()) && (reviews == null || reviews.isEmpty())) {
-                // No decision state and no thread state at all — emit nothing so the review practices
-                // keep their existing empty-context abstention semantics.
+            if (threads.isEmpty() && reviews.isEmpty()) {
                 return;
             }
 
@@ -159,64 +130,42 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
             ObjectNode root = objectMapper.createObjectNode();
 
-            // --- Threads ---
             ArrayNode threadArray = objectMapper.createArrayNode();
             int unresolved = 0;
             int emittedThreads = 0;
-            if (threads != null) {
-                for (PullRequestReviewThread t : threads) {
-                    if (t == null) {
-                        continue;
-                    }
-                    // A thread opened by Hephaestus's OWN posted note is the tool's own output, not a
-                    // reviewer thread — emitting it (and counting it in unresolvedCount) would feed the
-                    // agent the tool's self-reference as if it were reviewer input. Drop it entirely.
-                    if (isHephaestusThread(t)) {
-                        continue;
-                    }
-                    boolean isUnresolved = t.getState() == PullRequestReviewThread.State.UNRESOLVED;
-                    if (isUnresolved) {
-                        unresolved++;
-                    }
-                    if (emittedThreads >= MAX_THREADS) {
-                        continue;
-                    }
-                    threadArray.add(toThread(t));
-                    emittedThreads++;
+            for (PullRequestReviewThread t : threads) {
+                if (t == null) {
+                    continue;
                 }
+                if (isHephaestusThread(t)) {
+                    continue;
+                }
+                boolean isUnresolved = t.getState() == PullRequestReviewThread.State.UNRESOLVED;
+                if (isUnresolved) {
+                    unresolved++;
+                }
+                threadArray.add(toThread(t));
+                emittedThreads++;
             }
             root.set("threads", threadArray);
             root.put("unresolvedCount", unresolved);
 
-            // --- Review decisions (raw rows; supersession is computed by the agent, not here) ---
             ArrayNode decisionArray = objectMapper.createArrayNode();
-            if (reviews != null) {
-                int emitted = 0;
-                for (PullRequestReview review : reviews) {
-                    if (review == null || review.getState() == null) {
-                        continue;
-                    }
-                    // A PENDING review is an unsubmitted draft ("only visible to the author" per GitHub) with no
-                    // submittedAt — never a real reviewer decision. UNKNOWN is the unmapped fallback. Emitting
-                    // either would fabricate a "CHANGES_REQUESTED was outstanding" style signal the supersession
-                    // lesson keys on, so only genuinely-submitted decisions reach the agent.
-                    if (
-                        review.getState() == PullRequestReview.State.PENDING ||
-                        review.getState() == PullRequestReview.State.UNKNOWN
-                    ) {
-                        continue;
-                    }
-                    if (emitted >= MAX_DECISIONS) {
-                        break;
-                    }
-                    decisionArray.add(toDecision(review));
-                    emitted++;
+            for (PullRequestReview review : reviews) {
+                if (review == null || review.getState() == null) {
+                    continue;
                 }
+                if (
+                    review.getState() == PullRequestReview.State.PENDING ||
+                    review.getState() == PullRequestReview.State.UNKNOWN
+                ) {
+                    continue;
+                }
+                decisionArray.add(toDecision(review));
             }
             root.set("reviewDecisions", decisionArray);
-            root.put("truncated", emittedThreads >= MAX_THREADS || decisionArray.size() >= MAX_DECISIONS);
+            root.put("truncated", threadsTruncated || decisionsTruncated);
 
-            // --- Merge state (observable fact, no judgement) ---
             root.put("mergeState", mergeState(pullRequest));
 
             files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));

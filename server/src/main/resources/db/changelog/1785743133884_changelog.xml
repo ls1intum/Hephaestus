@@ -16,9 +16,9 @@
         <sql>
             UPDATE practice
             SET evidence_declaration = CASE applies_to
-                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
-                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
-                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","observability":"SEMANTIC","required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","observability":"SEMANTIC","required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","observability":"SEMANTIC","required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
             END
         </sql>
         <addNotNullConstraint tableName="practice" columnName="evidence_declaration" columnDataType="jsonb"/>
@@ -50,9 +50,9 @@
         <sql>
             UPDATE curated_practice_override
             SET evidence_declaration = CASE applies_to
-                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
-                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
-                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","observability":"SEMANTIC","required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","observability":"SEMANTIC","required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","observability":"SEMANTIC","required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
             END
             WHERE applies_to IS NOT NULL
         </sql>
@@ -254,6 +254,69 @@
                     DEFERRABLE INITIALLY DEFERRED
                     FOR EACH ROW EXECUTE FUNCTION enforce_practice_current_revision_projection();
             ]]></sql>
+        </rollback>
+    </changeSet>
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-5">
+        <preConditions onFail="HALT">
+            <columnExists tableName="practice_revision" columnName="detection_fingerprint"/>
+        </preConditions>
+        <comment>Version review-rule fingerprints before evidence becomes part of their meaning.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+            ALTER TABLE practice_revision DROP CONSTRAINT ck_practice_revision_fingerprint;
+            ALTER TABLE practice_revision ALTER COLUMN detection_fingerprint TYPE VARCHAR(96);
+            UPDATE practice_revision
+            SET detection_fingerprint = 'v1:' || detection_fingerprint
+            WHERE detection_fingerprint ~ '^[0-9a-f]{64}$';
+            ALTER TABLE practice_revision
+                ADD CONSTRAINT ck_practice_revision_fingerprint
+                CHECK (detection_fingerprint IS NULL OR detection_fingerprint ~ '^v[1-9][0-9]*:[0-9a-f]{64}$');
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+
+            ALTER TABLE practice DROP CONSTRAINT ck_practice_curated_fingerprint;
+            ALTER TABLE practice ALTER COLUMN source_curated_fingerprint TYPE VARCHAR(96);
+            UPDATE practice
+            SET source_curated_fingerprint = 'v1:' || source_curated_fingerprint
+            WHERE source_curated_fingerprint ~ '^[0-9a-f]{64}$';
+            ALTER TABLE practice
+                ADD CONSTRAINT ck_practice_curated_fingerprint
+                CHECK (source_curated_fingerprint IS NULL OR source_curated_fingerprint ~ '^v[1-9][0-9]*:[0-9a-f]{64}$');
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE practice DROP CONSTRAINT ck_practice_curated_fingerprint;
+                UPDATE practice
+                SET source_curated_fingerprint = substring(source_curated_fingerprint FROM position(':' IN source_curated_fingerprint) + 1)
+                WHERE source_curated_fingerprint ~ '^v[1-9][0-9]*:[0-9a-f]{64}$';
+                ALTER TABLE practice ALTER COLUMN source_curated_fingerprint TYPE VARCHAR(64);
+                ALTER TABLE practice
+                    ADD CONSTRAINT ck_practice_curated_fingerprint
+                    CHECK (source_curated_fingerprint IS NULL OR source_curated_fingerprint ~ '^[0-9a-f]{64}$');
+
+                ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+                ALTER TABLE practice_revision DROP CONSTRAINT ck_practice_revision_fingerprint;
+                UPDATE practice_revision
+                SET detection_fingerprint = substring(detection_fingerprint FROM position(':' IN detection_fingerprint) + 1)
+                WHERE detection_fingerprint ~ '^v[1-9][0-9]*:[0-9a-f]{64}$';
+                ALTER TABLE practice_revision ALTER COLUMN detection_fingerprint TYPE VARCHAR(64);
+                ALTER TABLE practice_revision
+                    ADD CONSTRAINT ck_practice_revision_fingerprint
+                    CHECK (detection_fingerprint IS NULL OR detection_fingerprint ~ '^[0-9a-f]{64}$');
+                ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-6">
+        <preConditions onFail="HALT">
+            <not><columnExists tableName="agent_job" columnName="evidence_snapshot"/></not>
+        </preConditions>
+        <comment>Pin the admitted practice revisions and source availability consumed by each job.</comment>
+        <addColumn tableName="agent_job">
+            <column name="evidence_snapshot" type="JSONB"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="evidence_snapshot"/>
         </rollback>
     </changeSet>
 

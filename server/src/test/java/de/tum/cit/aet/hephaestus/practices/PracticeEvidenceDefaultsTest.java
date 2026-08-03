@@ -22,7 +22,7 @@ class PracticeEvidenceDefaultsTest {
     void shouldCreateTheArtifactBaseline(
         WorkArtifact artifact,
         String profile,
-        String required,
+        List<String> required,
         List<String> optional
     ) {
         JsonMapper mapper = JsonMapper.builder().build();
@@ -34,7 +34,7 @@ class PracticeEvidenceDefaultsTest {
         assertThat(declaration.profile()).isEqualTo(new EvidenceProfileId(profile));
         assertThat(declaration.required())
             .extracting(item -> item.sourceKind().value())
-            .containsExactly(required);
+            .containsExactlyElementsOf(required);
         assertThat(declaration.optional())
             .extracting(item -> item.sourceKind().value())
             .containsExactlyElementsOf(optional);
@@ -47,14 +47,14 @@ class PracticeEvidenceDefaultsTest {
             Arguments.of(
                 WorkArtifact.PULL_REQUEST,
                 "pull-request-review",
-                "scm.pull-request.core",
+                List.of("scm.pull-request.core", "scm.pull-request.diff"),
                 List.of("scm.pull-request.comments")
             ),
-            Arguments.of(WorkArtifact.ISSUE, "issue-review", "scm.issue.core", List.of("scm.issue.comments")),
+            Arguments.of(WorkArtifact.ISSUE, "issue-review", List.of("scm.issue.core"), List.of("scm.issue.comments")),
             Arguments.of(
                 WorkArtifact.CONVERSATION_THREAD,
                 "conversation-review",
-                "slack.conversation.thread",
+                List.of("slack.conversation.thread"),
                 List.of()
             )
         );

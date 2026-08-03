@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
@@ -38,9 +39,9 @@ import org.springframework.stereotype.Component;
 public class GitDiffOperations {
 
     private static final Logger log = LoggerFactory.getLogger(GitDiffOperations.class);
+    static final int MAX_DIFF_BYTES = 20 * 1024 * 1024;
 
-    /** Regex matching unified diff hunk headers: {@code @@ -a,b +c,d @@}. Group 1 captures {@code c}. */
-    private static final Pattern HUNK_HEADER = Pattern.compile("^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@");
+    private static final Pattern HUNK_HEADER = Pattern.compile("^@@ -(\\d+)(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@");
 
     @FunctionalInterface
     private interface RepoOp<T> {
@@ -152,16 +153,48 @@ public class GitDiffOperations {
             if (range == null) return null;
 
             try (
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                LimitedOutputStream out = new LimitedOutputStream(MAX_DIFF_BYTES);
                 ObjectReader reader = repo.newObjectReader();
                 RevWalk walk = new RevWalk(repo);
                 DiffFormatter formatter = newDiffFormatter(repo, out)
             ) {
                 formatter.format(treeIterator(reader, walk, range[0]), treeIterator(reader, walk, range[1]));
                 formatter.flush();
-                return out.toString(StandardCharsets.UTF_8);
+                return out.content();
             }
         });
+    }
+
+    private static final class LimitedOutputStream extends OutputStream {
+
+        private final int limit;
+        private final ByteArrayOutputStream delegate = new ByteArrayOutputStream();
+
+        private LimitedOutputStream(int limit) {
+            this.limit = limit;
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            ensureCapacity(1);
+            delegate.write(value);
+        }
+
+        @Override
+        public void write(byte[] bytes, int offset, int length) throws IOException {
+            ensureCapacity(length);
+            delegate.write(bytes, offset, length);
+        }
+
+        private void ensureCapacity(int additionalBytes) throws IOException {
+            if (delegate.size() + additionalBytes > limit) {
+                throw new IOException("Diff exceeds " + limit + " bytes");
+            }
+        }
+
+        private String content() {
+            return delegate.toString(StandardCharsets.UTF_8);
+        }
     }
 
     /**
@@ -261,7 +294,7 @@ public class GitDiffOperations {
         }
     }
 
-    private static DiffFormatter newDiffFormatter(Repository repo, @Nullable ByteArrayOutputStream out) {
+    private static DiffFormatter newDiffFormatter(Repository repo, @Nullable OutputStream out) {
         DiffFormatter formatter = new DiffFormatter(
             out != null ? out : org.eclipse.jgit.util.io.DisabledOutputStream.INSTANCE
         );
@@ -299,13 +332,12 @@ public class GitDiffOperations {
     }
 
     /**
-     * Annotate a unified diff with {@code [L<n>]} source-file line-number prefixes. Added (+) and
-     * context lines get a prefix derived from the hunk header; deleted (-) lines and diff metadata
-     * are left unmodified.
+     * Annotate unified-diff content with {@code [L<n>]} line numbers from the applicable side.
      */
     public static String annotateDiffWithLineNumbers(String diff) {
         String[] lines = diff.split("\n", -1);
         StringBuilder out = new StringBuilder(diff.length() + lines.length * 6);
+        Integer oldLineNum = null;
         Integer newLineNum = null;
 
         for (String line : lines) {
@@ -313,6 +345,7 @@ public class GitDiffOperations {
             // file in a multi-file diff inherit the FIRST file's trailing line number until that file's first
             // hunk header is reached, mis-stamping every [L<n>] marker. Emit the header verbatim.
             if (line.startsWith("diff --git")) {
+                oldLineNum = null;
                 newLineNum = null;
                 out.append(line).append('\n');
                 continue;
@@ -320,7 +353,8 @@ public class GitDiffOperations {
 
             Matcher m = HUNK_HEADER.matcher(line);
             if (m.find()) {
-                newLineNum = Integer.parseInt(m.group(1));
+                oldLineNum = Integer.parseInt(m.group(1));
+                newLineNum = Integer.parseInt(m.group(2));
                 out.append(line).append('\n');
                 continue;
             }
@@ -350,9 +384,11 @@ public class GitDiffOperations {
                 out.append("[L").append(newLineNum).append("] ").append(line).append('\n');
                 newLineNum++;
             } else if (line.startsWith("-")) {
-                out.append(line).append('\n');
+                out.append("[L").append(oldLineNum).append("] ").append(line).append('\n');
+                oldLineNum++;
             } else {
                 out.append("[L").append(newLineNum).append("] ").append(line).append('\n');
+                oldLineNum++;
                 newLineNum++;
             }
         }

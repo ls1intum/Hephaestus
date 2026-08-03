@@ -16,26 +16,9 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Anti-drift guard for cross-practice slug references inside the catalogue's {@code criteria} prose.
- *
- * <p>Several practices route a sibling concern to another practice by NAME ("(that is X)", "(deferred to
- * X)", "X owns it"). If the criteria name a slug that is not a real practice — a phantom (e.g.
- * {@code keeps-secrets-out}) or a truncation of a real slug (e.g. {@code validates-inputs-and-edge-cases}
- * for {@code validates-inputs-and-edge-cases-at-the-boundary}) — the LLM dutifully routes the finding to a
- * slug that does not exist and the concern silently vanishes. Criteria prose is not type-checked, so this
- * test is the contract: every slug-shaped reference in the criteria must resolve to a real practice slug
- * (the synthetic {@code hardcoded-secrets} sentinel excepted), and no truncation of a real slug may appear.
- */
+/** Guards cross-practice slug references embedded in catalogue criteria. */
 class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
 
-    /**
-     * The one slug-shaped token the criteria are permitted to name that is NOT a catalogue practice: the
-     * synthetic finding-fingerprint sentinel used by the secret-detector discipline.
-     */
-    private static final Set<String> SYNTHETIC_SLUGS = Set.of("hardcoded-secrets");
-
-    /** A practice slug is a lowercase, hyphen-joined token of three or more segments. */
     private static final Pattern SLUG_SHAPED = Pattern.compile("\\b[a-z]+(?:-[a-z]+){2,}\\b");
 
     @Test
@@ -50,7 +33,7 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
             Matcher m = SLUG_SHAPED.matcher(criteria);
             while (m.find()) {
                 String token = m.group();
-                if (realSlugs.contains(token) || SYNTHETIC_SLUGS.contains(token)) {
+                if (realSlugs.contains(token)) {
                     continue;
                 }
                 // Only flag tokens that look like a real slug reference: a segment-prefix truncation of an

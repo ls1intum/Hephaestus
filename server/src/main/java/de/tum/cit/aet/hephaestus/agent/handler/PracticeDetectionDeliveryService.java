@@ -3,11 +3,13 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -16,14 +18,15 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,30 +48,30 @@ public class PracticeDetectionDeliveryService {
 
     private static final Logger log = LoggerFactory.getLogger(PracticeDetectionDeliveryService.class);
 
-    private final PracticeRepository practiceRepository;
     private final PracticeRevisionRepository practiceRevisionRepository;
     private final ObservationRepository observationRepository;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final ContentAddressedStore cas;
 
     public PracticeDetectionDeliveryService(
-        PracticeRepository practiceRepository,
         PracticeRevisionRepository practiceRevisionRepository,
         ObservationRepository observationRepository,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
         ApplicationEventPublisher eventPublisher,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        ContentAddressedStore cas
     ) {
-        this.practiceRepository = practiceRepository;
         this.practiceRevisionRepository = practiceRevisionRepository;
         this.observationRepository = observationRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
+        this.cas = cas;
     }
 
     /** Resolved delivery target: who the finding is about + the typed (work artifact, id) reference. */
@@ -90,19 +93,19 @@ public class PracticeDetectionDeliveryService {
             throw new JobDeliveryException("Missing job metadata: jobId=" + job.getId());
         }
 
-        Map<String, Practice> practicesBySlug = practiceRepository
-            .findByWorkspaceIdAndActiveTrue(workspaceId)
-            .stream()
-            .collect(Collectors.toMap(Practice::getSlug, p -> p, (a, b) -> a));
-
-        if (practicesBySlug.isEmpty()) {
-            log.error(
-                "Workspace has no active practices — all findings discarded: workspaceId={}, jobId={}",
-                workspaceId,
-                job.getId()
-            );
-            // With no active practices every slug is unknown, so the discards fold into discardedUnknownSlug.
-            return new DeliveryResult(0, validFindings.size(), 0, false, Map.of());
+        EvidenceBoundary evidenceBoundary = evidenceBoundary(job);
+        Map<String, PracticeRevision> revisionsBySlug = admittedRevisions(job, workspaceId);
+        for (ValidatedFinding finding : validFindings) {
+            PracticeRevision revision = revisionsBySlug.get(finding.practiceSlug());
+            if (revision == null) {
+                throw new JobDeliveryException(
+                    "Finding references a practice not admitted to the job: slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+            enforceEvidenceBoundary(finding, revision.getEvidence(), evidenceBoundary, job);
         }
 
         Target target = resolveTarget(job, metadata);
@@ -111,32 +114,18 @@ public class PracticeDetectionDeliveryService {
         Long artifactId = target.id();
 
         int inserted = 0;
-        int discardedUnknownSlug = 0;
         int discardedDuplicate = 0;
         boolean hasNegative = false;
         Instant observedAt = Instant.now();
 
-        // Keyed by finding IDENTITY, not value-equality — two findings can be value-equal yet must each carry
-        // their own keys. Only known-slug findings are entered; unknown-slug ones never get keys.
+        // Keyed by finding identity because equal findings still represent distinct occurrences.
         Map<ValidatedFinding, ObservationKeys> observationKeys = new IdentityHashMap<>();
-
-        // Criteria-revision per practice, memoized. Null if a practice has no revision yet (pre-versioning).
-        Instant criteriaAsOf = job.getStartedAt();
-        Map<Long, Long> revisionByPractice = new HashMap<>();
 
         for (int i = 0; i < validFindings.size(); i++) {
             ValidatedFinding finding = validFindings.get(i);
 
-            Practice practice = practicesBySlug.get(finding.practiceSlug());
-            if (practice == null) {
-                discardedUnknownSlug++;
-                log.info(
-                    "Discarded finding for unknown practice slug: slug={}, jobId={}",
-                    finding.practiceSlug(),
-                    job.getId()
-                );
-                continue;
-            }
+            PracticeRevision revision = revisionsBySlug.get(finding.practiceSlug());
+            Practice practice = revision.getPractice();
 
             // The index disambiguates multiple findings for the same practice on one artifact.
             String occurrenceKey =
@@ -163,9 +152,7 @@ public class PracticeDetectionDeliveryService {
             );
             observationKeys.put(finding, new ObservationKeys(occurrenceKey, recurrenceKey));
 
-            Long practiceRevisionId = revisionByPractice.computeIfAbsent(practice.getId(), pid ->
-                resolvePinnedRevisionId(pid, criteriaAsOf)
-            );
+            Long practiceRevisionId = revision.getId();
 
             // Self-enforce the ADR-0022 invariant that Observation.@PrePersist applies but the native
             // insertIfAbsent path bypasses: severity is an impact band for a BAD observation only, so it
@@ -205,11 +192,9 @@ public class PracticeDetectionDeliveryService {
             }
         }
 
-        int totalDiscarded = discardedUnknownSlug + discardedDuplicate;
         log.info(
-            "Practice detection delivery: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
+            "Practice detection delivery: inserted={}, duplicate={}, jobId={}",
             inserted,
-            discardedUnknownSlug,
             discardedDuplicate,
             job.getId()
         );
@@ -222,37 +207,281 @@ public class PracticeDetectionDeliveryService {
                 artifactId,
                 aboutUserId, // the event's developerId field == aboutUserId (author-side subject today)
                 inserted,
-                totalDiscarded,
+                discardedDuplicate,
                 hasNegative
             )
         );
 
-        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, observationKeys);
+        return new DeliveryResult(inserted, discardedDuplicate, hasNegative, observationKeys);
     }
 
-    /**
-     * The criteria revision the detector was actually given: the latest that existed when the job's inputs were
-     * prepared. {@code startedAt} is stamped at claim, immediately before the catalog injector reads the
-     * criteria into the sandbox, so a revision an admin appends mid-run is a rubric this run never saw. Falls
-     * back to the latest revision when the as-of lookup finds none (a practice created mid-run) or the job
-     * carries no {@code startedAt}; null when the practice has no revision at all (pre-versioning rows).
-     */
-    private Long resolvePinnedRevisionId(Long practiceId, @Nullable Instant asOf) {
-        if (asOf != null) {
-            Optional<PracticeRevision> pinned =
-                practiceRevisionRepository.findFirstByPracticeIdAndCreatedAtLessThanEqualOrderByRevisionNumberDesc(
-                    practiceId,
-                    asOf
+    private void enforceEvidenceBoundary(
+        ValidatedFinding finding,
+        @Nullable PracticeEvidenceDeclaration declaration,
+        EvidenceBoundary boundary,
+        AgentJob job
+    ) {
+        if (declaration == null) {
+            throw new JobDeliveryException(
+                "Practice has no evidence declaration: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
+            );
+        }
+        JsonNode evidence = finding.evidence();
+        JsonNode citations = evidence == null ? null : evidence.get("citations");
+        if (citations == null || !citations.isArray() || citations.isEmpty()) {
+            throw new JobDeliveryException(
+                "Finding has no source-bound evidence citation: slug=" +
+                    finding.practiceSlug() +
+                    ", jobId=" +
+                    job.getId()
+            );
+        }
+        Set<SourceKind> declared = new HashSet<>();
+        declaration.required().forEach(requirement -> declared.add(requirement.sourceKind()));
+        declaration.optional().forEach(requirement -> declared.add(requirement.sourceKind()));
+        for (JsonNode citation : citations) {
+            JsonNode sourceKind = citation.path("sourceKind");
+            JsonNode artifactPath = citation.path("artifactPath");
+            JsonNode path = citation.path("path");
+            JsonNode side = citation.path("side");
+            JsonNode startLine = citation.path("startLine");
+            JsonNode endLine = citation.path("endLine");
+            JsonNode quote = citation.path("quote");
+            if (
+                !citation.isObject() ||
+                !sourceKind.isTextual() ||
+                !artifactPath.isTextual() ||
+                !path.isTextual() ||
+                ("scm.pull-request.diff".equals(sourceKind.asText()) &&
+                    (!side.isTextual() || !("OLD".equals(side.asText()) || "NEW".equals(side.asText())))) ||
+                !startLine.isIntegralNumber() ||
+                startLine.asInt() < 1 ||
+                (!endLine.isMissingNode() && (!endLine.isIntegralNumber() || endLine.asInt() < startLine.asInt())) ||
+                !quote.isTextual()
+            ) {
+                throw new JobDeliveryException(
+                    "Finding has an invalid evidence citation: slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
                 );
-            if (pinned.isPresent()) {
-                return pinned.get().getId();
+            }
+            SourceKind kind;
+            try {
+                kind = new SourceKind(sourceKind.asText());
+            } catch (IllegalArgumentException e) {
+                throw new JobDeliveryException(
+                    "Finding has invalid evidence-source attribution: slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId(),
+                    e
+                );
+            }
+            SourceArtifactRef artifact = boundary.artifacts().get(artifactPath.asText());
+            if (
+                !declared.contains(kind) ||
+                !boundary.availableSources().contains(kind) ||
+                artifact == null ||
+                !artifact.kind().equals(kind)
+            ) {
+                throw new JobDeliveryException(
+                    "Finding cited unavailable, undeclared, or misattributed evidence source " +
+                        kind +
+                        ": slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+            String exactQuote = quote.asText();
+            if (exactQuote.isBlank()) {
+                throw new JobDeliveryException(
+                    "Finding has an empty evidence quote: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
+                );
+            }
+            byte[] content = cas
+                .get(artifact.sha256())
+                .orElseThrow(() ->
+                    new JobDeliveryException(
+                        "Cited evidence artifact is no longer available: path=" +
+                            artifactPath.asText() +
+                            ", jobId=" +
+                            job.getId()
+                    )
+                );
+            String artifactContent = new String(content, StandardCharsets.UTF_8);
+            if (!"scm.pull-request.diff".equals(kind.value()) && !artifactContent.contains(exactQuote)) {
+                throw new JobDeliveryException(
+                    "Evidence quote does not occur in the cited artifact: path=" +
+                        artifactPath.asText() +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+            if (
+                "scm.pull-request.diff".equals(kind.value()) &&
+                !diffContainsCitation(
+                    artifactContent,
+                    path.asText(),
+                    side.asText(),
+                    startLine.asInt(),
+                    endLine.isMissingNode() ? startLine.asInt() : endLine.asInt(),
+                    exactQuote
+                )
+            ) {
+                throw new JobDeliveryException(
+                    "Evidence quote does not match the cited diff location: path=" +
+                        path.asText() +
+                        ", line=" +
+                        startLine.asInt() +
+                        ", jobId=" +
+                        job.getId()
+                );
             }
         }
-        return practiceRevisionRepository
-            .findFirstByPracticeIdOrderByRevisionNumberDesc(practiceId)
-            .map(PracticeRevision::getId)
-            .orElse(null);
     }
+
+    private static boolean diffContainsCitation(
+        String diff,
+        String citedPath,
+        String citedSide,
+        int citedStartLine,
+        int citedEndLine,
+        String quote
+    ) {
+        String oldPath = null;
+        String newPath = null;
+        Map<Integer, String> citedLines = new HashMap<>();
+        for (String storedLine : diff.split("\n", -1)) {
+            String line = storedLine;
+            Integer annotatedLine = null;
+            if (storedLine.startsWith("[L")) {
+                int end = storedLine.indexOf("] ");
+                if (end > 2) {
+                    try {
+                        annotatedLine = Integer.parseInt(storedLine.substring(2, end));
+                        line = storedLine.substring(end + 2);
+                    } catch (NumberFormatException ignored) {
+                        return false;
+                    }
+                }
+            }
+            if (line.startsWith("--- ")) {
+                oldPath = parseDiffPath(line.substring(4));
+                continue;
+            }
+            if (line.startsWith("+++ ")) {
+                newPath = parseDiffPath(line.substring(4));
+                continue;
+            }
+            if (annotatedLine != null) {
+                String lineSide = line.startsWith("-") ? "OLD" : "NEW";
+                String linePath = "OLD".equals(lineSide) ? oldPath : newPath;
+                if (citedSide.equals(lineSide) && citedPath.equals(linePath)) {
+                    citedLines.put(annotatedLine, line);
+                }
+            }
+        }
+        List<String> quoteLines = quote.lines().toList();
+        if (quoteLines.size() != citedEndLine - citedStartLine + 1) {
+            return false;
+        }
+        for (int i = 0; i < quoteLines.size(); i++) {
+            String diffLine = citedLines.get(citedStartLine + i);
+            String quoteLine = quoteLines.get(i);
+            if (diffLine == null || !(diffLine.equals(quoteLine) || diffLine.substring(1).equals(quoteLine))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String parseDiffPath(String value) {
+        String path = value.trim();
+        if ("/dev/null".equals(path)) {
+            return null;
+        }
+        if (path.length() >= 2 && path.startsWith("\"") && path.endsWith("\"")) {
+            path = path.substring(1, path.length() - 1).replace("\\\"", "\"");
+        }
+        return path.startsWith("a/") || path.startsWith("b/") ? path.substring(2) : path;
+    }
+
+    private EvidenceBoundary evidenceBoundary(AgentJob job) {
+        JsonNode manifest = requireEvidenceSnapshot(job).path("manifest");
+        JsonNode sources = manifest.path("sources");
+        if (!sources.isArray()) {
+            throw new JobDeliveryException("Job evidence snapshot has no source manifest: jobId=" + job.getId());
+        }
+        Set<SourceKind> available = new HashSet<>();
+        Map<String, SourceArtifactRef> artifacts = new HashMap<>();
+        for (JsonNode source : sources) {
+            if ("AVAILABLE".equals(source.path("availability").asString())) {
+                SourceKind kind = new SourceKind(source.path("kind").asString());
+                available.add(kind);
+                JsonNode sourceArtifacts = source.path("artifacts");
+                if (!sourceArtifacts.isArray()) {
+                    throw new JobDeliveryException("Available source has no artifact inventory: jobId=" + job.getId());
+                }
+                for (JsonNode artifact : sourceArtifacts) {
+                    String path = artifact.path("path").asString();
+                    String sha256 = artifact.path("sha256").asString();
+                    if (path.isBlank() || !sha256.matches("[0-9a-f]{64}")) {
+                        throw new JobDeliveryException(
+                            "Available source has an invalid artifact: jobId=" + job.getId()
+                        );
+                    }
+                    if (artifacts.put(path, new SourceArtifactRef(kind, sha256)) != null) {
+                        throw new JobDeliveryException("Evidence artifact belongs to multiple sources: path=" + path);
+                    }
+                }
+            }
+        }
+        return new EvidenceBoundary(Set.copyOf(available), Map.copyOf(artifacts));
+    }
+
+    private Map<String, PracticeRevision> admittedRevisions(AgentJob job, Long workspaceId) {
+        JsonNode practices = requireEvidenceSnapshot(job).path("practices");
+        if (!practices.isArray() || practices.isEmpty()) {
+            throw new JobDeliveryException("Job evidence snapshot has no admitted practices: jobId=" + job.getId());
+        }
+        Map<String, PracticeRevision> admitted = new HashMap<>();
+        for (JsonNode entry : practices) {
+            String slug = entry.path("slug").asString();
+            JsonNode revisionId = entry.path("revisionId");
+            if (slug.isBlank() || !revisionId.isIntegralNumber()) {
+                throw new JobDeliveryException("Job evidence snapshot has an invalid practice: jobId=" + job.getId());
+            }
+            PracticeRevision revision = practiceRevisionRepository
+                .findById(revisionId.asLong())
+                .orElseThrow(() ->
+                    new JobDeliveryException("Admitted practice revision no longer exists: jobId=" + job.getId())
+                );
+            Practice practice = revision.getPractice();
+            if (!slug.equals(revision.getSlug()) || !workspaceId.equals(practice.getWorkspace().getId())) {
+                throw new JobDeliveryException(
+                    "Admitted practice revision does not match the job: jobId=" + job.getId()
+                );
+            }
+            if (admitted.put(slug, revision) != null) {
+                throw new JobDeliveryException("Duplicate admitted practice slug: " + slug + ", jobId=" + job.getId());
+            }
+        }
+        return admitted;
+    }
+
+    private static JsonNode requireEvidenceSnapshot(AgentJob job) {
+        JsonNode snapshot = job.getEvidenceSnapshot();
+        if (snapshot == null || !snapshot.isObject()) {
+            throw new JobDeliveryException("Job has no evidence snapshot: jobId=" + job.getId());
+        }
+        return snapshot;
+    }
+
+    private record SourceArtifactRef(SourceKind kind, String sha256) {}
+
+    private record EvidenceBoundary(Set<SourceKind> availableSources, Map<String, SourceArtifactRef> artifacts) {}
 
     /**
      * Route the delivery target on the job's artifact. Issue and conversation jobs stamp
@@ -347,7 +576,6 @@ public class PracticeDetectionDeliveryService {
      */
     public record DeliveryResult(
         int inserted,
-        int discardedUnknownSlug,
         int discardedDuplicate,
         boolean hasNegative,
         Map<ValidatedFinding, ObservationKeys> observationKeys

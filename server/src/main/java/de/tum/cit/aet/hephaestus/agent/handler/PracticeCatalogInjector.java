@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -8,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,13 +65,33 @@ class PracticeCatalogInjector {
      * a model-emitted {@code (PRESENT, GOOD)} to {@code NOT_APPLICABLE} before it ships to the student as a
      * false strength (see {@code ValidatedFinding#coerceCoherence}).
      */
-    Set<String> defectDetectorSlugs(Long workspaceId, WorkArtifact focus) {
-        return practiceRepository
-            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
-            .stream()
-            .filter(Practice::isDefectDetector)
-            .map(Practice::getSlug)
-            .collect(Collectors.toSet());
+    Set<String> defectDetectorSlugs(AgentJob job) {
+        JsonNode snapshot = job.getEvidenceSnapshot();
+        JsonNode practices = snapshot == null ? null : snapshot.path("practices");
+        if (practices == null || !practices.isArray()) {
+            throw new JobDeliveryException("Job has no admitted practice snapshot: jobId=" + job.getId());
+        }
+        Set<String> slugs = new HashSet<>();
+        for (JsonNode practice : practices) {
+            if (practice.path("defectDetector").asBoolean(false)) {
+                slugs.add(practice.path("slug").asString());
+            }
+        }
+        return Set.copyOf(slugs);
+    }
+
+    boolean isAdmitted(AgentJob job, String slug) {
+        JsonNode snapshot = job.getEvidenceSnapshot();
+        JsonNode practices = snapshot == null ? null : snapshot.path("practices");
+        if (practices == null || !practices.isArray()) {
+            throw new JobDeliveryException("Job has no admitted practice snapshot: jobId=" + job.getId());
+        }
+        for (JsonNode practice : practices) {
+            if (slug.equals(practice.path("slug").asString()) && practice.path("revisionId").isIntegralNumber()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -89,13 +111,11 @@ class PracticeCatalogInjector {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
         Long workspaceId = job.getWorkspace().getId();
-        // Stable ordering keeps catalog bytes and input digests reproducible.
         List<Practice> practices = practiceRepository
             .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
             .stream()
             .sorted(Comparator.comparing(Practice::getSlug))
             .toList();
-        // A triggered job evaluates only practices eligible for that lifecycle event.
         String triggerEvent = triggerEventOf(job);
         if (triggerEvent != null) {
             practices = practices
@@ -108,7 +128,6 @@ class PracticeCatalogInjector {
                 "No active " + focus + " practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
             );
         }
-        // Slugs become workspace paths; enforce the ABI before interpolation.
         for (Practice p : practices) {
             String slug = p.getSlug();
             if (slug == null || !SandboxLayout.PRACTICE_SLUG.matcher(slug).matches()) {
@@ -133,6 +152,27 @@ class PracticeCatalogInjector {
             entry.put("slug", p.getSlug());
             entry.put("name", p.getName());
             entry.put("area", areaSlug);
+            if (p.getCurrentRevision() == null || p.getCurrentRevision().getId() == null) {
+                throw new JobPreparationException("Practice has no current revision: " + p.getSlug());
+            }
+            entry.put("revisionId", p.getCurrentRevision().getId());
+            entry.put("defectDetector", p.isDefectDetector());
+            ArrayNode allowedSources = entry.putArray("allowedSources");
+            java.util.stream.Stream.concat(
+                p
+                    .getEvidence()
+                    .required()
+                    .stream()
+                    .map(requirement -> requirement.sourceKind().value()),
+                p
+                    .getEvidence()
+                    .optional()
+                    .stream()
+                    .map(requirement -> requirement.sourceKind().value())
+            )
+                .distinct()
+                .sorted()
+                .forEach(allowedSources::add);
         }
         try {
             files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));

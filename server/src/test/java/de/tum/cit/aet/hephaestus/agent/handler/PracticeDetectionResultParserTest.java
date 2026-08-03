@@ -737,7 +737,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void extractsJsonFromPhaseMarkers() {
             String mixed = """
                 [PHASE0] Context loaded: 1 files changed
-                [PHASE1] RELEVANT: hardcoded-secrets
+                [PHASE1] RELEVANT: avoids-insecure-defaults-and-over-broad-permissions
                 [PHASE4] Output ready
                 {"findings": [%s]}
                 """.formatted(validFindingNode().toString());
@@ -1078,7 +1078,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 "avoids-unsafe-panics-and-chosen-crashes",
                 "validates-and-escapes-untrusted-input",
                 "avoids-insecure-defaults-and-over-broad-permissions",
-                "hardcoded-secrets",
                 "keeps-the-test-suite-honest"
             );
         }

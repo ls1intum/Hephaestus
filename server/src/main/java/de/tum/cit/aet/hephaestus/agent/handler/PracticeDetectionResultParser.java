@@ -97,9 +97,6 @@ public class PracticeDetectionResultParser {
         // Security / data integrity.
         "validates-and-escapes-untrusted-input",
         "avoids-insecure-defaults-and-over-broad-permissions",
-        // A hard-coded credential / secret is a security defect a reviewer must be able to block on; the
-        // synthetic secret finding is injected at CRITICAL/MAJOR and must keep that band through coercion.
-        "hardcoded-secrets",
         // A dishonest test (always-green, asserting nothing, disabled) actively HIDES correctness defects —
         // worse than a missing test, because it manufactures false safety — so it keeps blocking weight.
         "keeps-the-test-suite-honest"
@@ -680,6 +677,9 @@ public class PracticeDetectionResultParser {
                     : null;
             if (advisoryOnly && a == Assessment.BAD && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
                 s = Severity.MINOR;
+            }
+            if ("avoids-insecure-defaults-and-over-broad-permissions".equals(practiceSlug) && s == Severity.CRITICAL) {
+                s = Severity.MAJOR;
             }
             if (p == presence && a == assessment && s == severity) {
                 return this;

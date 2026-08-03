@@ -28,8 +28,8 @@ class GitDiffOperationsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("does not annotate deleted lines (no source-file position)")
-    void doesNotAnnotateDeletions() {
+    @DisplayName("annotates deleted lines with old-side positions")
+    void annotatesDeletions() {
         String diff =
             "diff --git a/Bar.swift b/Bar.swift\n" +
             "--- a/Bar.swift\n" +
@@ -43,7 +43,7 @@ class GitDiffOperationsTest extends BaseUnitTest {
         assertThat(annotated).contains("[L5]  context");
         assertThat(annotated).contains("[L6] +added line");
         assertThat(annotated).contains("[L7]  more context");
-        assertThat(annotated).containsPattern("(?m)^-deleted line$");
+        assertThat(annotated).contains("[L6] -deleted line");
     }
 
     @Test

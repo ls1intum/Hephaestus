@@ -14,8 +14,8 @@ public record SourceUseDecision(
     SourceUseOutcome outcome,
     String audience,
     @Nullable String modelProcessor,
-    String retentionPolicy,
-    String erasurePolicy,
+    RetentionPolicy retentionPolicy,
+    ErasurePolicy erasurePolicy,
     Instant recordedAt,
     @Nullable String reviewer,
     @Nullable Instant decidedAt,
@@ -32,29 +32,26 @@ public record SourceUseDecision(
         if (modelProcessor != null && modelProcessor.isBlank()) {
             throw new IllegalArgumentException("modelProcessor must be null or non-blank");
         }
-        retentionPolicy = requireText(retentionPolicy, "retentionPolicy");
-        erasurePolicy = requireText(erasurePolicy, "erasurePolicy");
+        Objects.requireNonNull(retentionPolicy, "retentionPolicy");
+        Objects.requireNonNull(erasurePolicy, "erasurePolicy");
         Objects.requireNonNull(recordedAt, "recordedAt");
         if (reviewer != null && reviewer.isBlank()) {
             throw new IllegalArgumentException("reviewer must be null or non-blank");
         }
         if (basis == SourceUseBasis.ENGINEERING_BASELINE) {
-            if (outcome != SourceUseOutcome.PENDING_CONTROLLER_REVIEW) {
-                throw new IllegalArgumentException("Engineering baseline must remain pending controller review: " + id);
-            }
-            if (reviewer != null || decidedAt != null || expiresAt != null) {
-                throw new IllegalArgumentException("Engineering baseline must not contain approval metadata: " + id);
+            if (outcome != SourceUseOutcome.ENGINEERING_APPROVED) {
+                throw new IllegalArgumentException("Engineering baseline must be engineering-approved: " + id);
             }
         } else {
-            if (outcome == SourceUseOutcome.PENDING_CONTROLLER_REVIEW) {
+            if (outcome == SourceUseOutcome.ENGINEERING_APPROVED) {
                 throw new IllegalArgumentException("Controller decision must have a decided outcome: " + id);
             }
-            if (reviewer == null || decidedAt == null || expiresAt == null) {
-                throw new IllegalArgumentException("Controller decision requires review metadata: " + id);
-            }
-            if (!expiresAt.isAfter(decidedAt)) {
-                throw new IllegalArgumentException("expiresAt must be after decidedAt: " + id);
-            }
+        }
+        if (reviewer == null || decidedAt == null || expiresAt == null) {
+            throw new IllegalArgumentException("Source-use decision requires review metadata: " + id);
+        }
+        if (!expiresAt.isAfter(decidedAt)) {
+            throw new IllegalArgumentException("expiresAt must be after decidedAt: " + id);
         }
     }
 
@@ -68,7 +65,11 @@ public record SourceUseDecision(
             return false;
         }
         if (basis == SourceUseBasis.ENGINEERING_BASELINE) {
-            return outcome == SourceUseOutcome.PENDING_CONTROLLER_REVIEW;
+            return (
+                outcome == SourceUseOutcome.ENGINEERING_APPROVED &&
+                !instant.isBefore(Objects.requireNonNull(decidedAt)) &&
+                instant.isBefore(Objects.requireNonNull(expiresAt))
+            );
         }
         return (
             outcome == SourceUseOutcome.APPROVED &&

@@ -20,44 +20,43 @@ public class PracticeEvidenceDefaults {
         return switch (artifact) {
             case PULL_REQUEST -> declaration(
                 "pull-request-review",
-                requirement(
-                    "scm.pull-request.core",
-                    EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceFreshnessRequirement.CURRENT
-                ),
                 List.of(
                     requirement(
-                        "scm.pull-request.comments",
-                        EvidenceCompletenessRequirement.ANY,
-                        EvidenceFreshnessRequirement.ANY
+                        "scm.pull-request.core",
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
+                    ),
+                    requirement(
+                        "scm.pull-request.diff",
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
                     )
                 ),
+                List.of(optionalRequirement("scm.pull-request.comments")),
                 "RUNTIME_BEHAVIOR_NOT_OBSERVED",
                 "Repository evidence does not establish behavior in a deployed runtime."
             );
             case ISSUE -> declaration(
                 "issue-review",
-                requirement(
-                    "scm.issue.core",
-                    EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceFreshnessRequirement.CURRENT
-                ),
                 List.of(
                     requirement(
-                        "scm.issue.comments",
-                        EvidenceCompletenessRequirement.ANY,
-                        EvidenceFreshnessRequirement.ANY
+                        "scm.issue.core",
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
                     )
                 ),
+                List.of(optionalRequirement("scm.issue.comments")),
                 "IMPLEMENTATION_NOT_OBSERVED",
                 "Issue evidence does not establish whether the described work was implemented correctly."
             );
             case CONVERSATION_THREAD -> declaration(
                 "conversation-review",
-                requirement(
-                    "slack.conversation.thread",
-                    EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceFreshnessRequirement.CURRENT
+                List.of(
+                    requirement(
+                        "slack.conversation.thread",
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
+                    )
                 ),
                 List.of(),
                 "PRIVATE_CONTEXT_NOT_OBSERVED",
@@ -68,15 +67,16 @@ public class PracticeEvidenceDefaults {
 
     private PracticeEvidenceDeclaration declaration(
         String profile,
-        PracticeEvidenceRequirement required,
-        List<PracticeEvidenceRequirement> optional,
+        List<PracticeEvidenceRequirement> required,
+        List<OptionalPracticeEvidenceRequirement> optional,
         String blindSpotCode,
         String blindSpotSummary
     ) {
         return new PracticeEvidenceDeclaration(
             catalogs.current().version(),
             new EvidenceProfileId(profile),
-            List.of(required),
+            PracticeObservability.SEMANTIC,
+            required,
             optional,
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
             List.of(new PracticeEvidenceBlindSpot(blindSpotCode, blindSpotSummary))
@@ -89,5 +89,13 @@ public class PracticeEvidenceDefaults {
         EvidenceFreshnessRequirement freshness
     ) {
         return new PracticeEvidenceRequirement(new SourceKind(sourceKind), completeness, freshness);
+    }
+
+    private static OptionalPracticeEvidenceRequirement optionalRequirement(String sourceKind) {
+        return new OptionalPracticeEvidenceRequirement(
+            new SourceKind(sourceKind),
+            EvidenceCompletenessRequirement.ANY,
+            EvidenceFreshnessRequirement.ANY
+        );
     }
 }

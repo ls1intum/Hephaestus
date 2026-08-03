@@ -365,63 +365,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("workspaceId") Long workspaceId
     );
 
-    // Aggregation for agent context (Issue #895)
-
-    /**
-     * Returns aggregated counts per (practice, presence, assessment) for a developer within a workspace.
-     *
-     * <p>Each row is one (practice slug, presence, assessment) combination with the total count and the
-     * most recent detection timestamp. Callers group results by slug to build a per-practice
-     * history summary. The {@code idx_observation_subject} index on {@code (about_user_id)} narrows the
-     * initial scan by about-user.
-     *
-     * <p>Re-review deduped to each target's latest run (same grain as the sibling histogram queries), so a
-     * twice-reviewed target contributes only its current state rather than inflating the good/bad counts that
-     * drive the contributor-history ranking. Hidden-repository and latest-run policy matches
-     * {@link #findSummaryByDeveloperAndWorkspace}.
-     *
-     * @param aboutUserId the about-user whose history to aggregate
-     * @param workspaceId   the workspace scope (via practice → workspace relationship)
-     * @return aggregated summary rows ordered by slug then presence, empty if no findings exist
-     */
-    @Query(
-        value = """
-        SELECT p.slug AS practiceSlug,
-               f.presence AS presence,
-               f.assessment AS assessment,
-               COUNT(f.id) AS count,
-               MAX(f.observed_at) AS lastObservedAt
-        FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND NOT EXISTS (
-              SELECT 1
-              FROM issue target_artifact
-              JOIN workspace_team_repository_settings wtrs
-                ON wtrs.workspace_id = p.workspace_id
-               AND wtrs.repository_id = target_artifact.repository_id
-               AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
-                AND target_artifact.id = f.artifact_id
-          )
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              JOIN practice p2 ON p2.id = f2.practice_id
-              WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
-          )
-        GROUP BY p.slug, f.presence, f.assessment
-        ORDER BY p.slug, f.presence
-        """,
-        nativeQuery = true
-    )
-    List<DeveloperPracticeSummary> findDeveloperPracticeSummary(
-        @Param("aboutUserId") Long aboutUserId,
-        @Param("workspaceId") Long workspaceId
-    );
-
     /**
      * Recent findings the mentor can refer to by title in conversation.
      *
@@ -672,10 +615,13 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    o.confidence AS "confidence",
                    o.recurrence_key AS "recurrenceKey",
                    o.practice_revision_id AS "practiceRevisionId",
-                   p.current_revision_id AS "currentPracticeRevisionId",
+                   evaluated_revision.detection_fingerprint AS "practiceRevisionFingerprint",
+                   current_revision.detection_fingerprint AS "currentPracticeRevisionFingerprint",
                    o.observed_at AS "observedAt"
             FROM observation o
             JOIN practice p ON p.id = o.practice_id
+            LEFT JOIN practice_revision evaluated_revision ON evaluated_revision.id = o.practice_revision_id
+            LEFT JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
             LEFT JOIN practice_area pa ON pa.id = p.practice_area_id
             WHERE p.workspace_id = :workspaceId
             """ +
@@ -733,7 +679,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Float getConfidence();
         String getRecurrenceKey();
         Long getPracticeRevisionId();
-        Long getCurrentPracticeRevisionId();
+        String getPracticeRevisionFingerprint();
+        String getCurrentPracticeRevisionFingerprint();
         Instant getObservedAt();
     }
 

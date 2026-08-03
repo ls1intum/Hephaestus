@@ -1,7 +1,5 @@
 # Hephaestus — DPIA Pre-Screen (Art. 35 GDPR)
 
-*Last updated: 2026-08-03.*
-
 > **Status: controller/DPO determination pending.** Several WP29 risk criteria are present. Advisory output and
 > the absence of grading, employment, or access decisions reduce impact but do not negate evaluation, systematic
 > monitoring, dataset combination, or the student/employee power imbalance. This engineering screen is not the
@@ -83,7 +81,7 @@ Until that decision is recorded, the TUM-operated deployment must not enable a n
 cross-source purpose, broader processor egress, extended evidence retention, or a materially broader monitored
 population. This is not an instruction to weaken existing safeguards or erase operational audit evidence.
 
-`ENGINEERING_BASELINE` / `PENDING_CONTROLLER_REVIEW` in the machine source-use registry is not a legal decision
+`ENGINEERING_BASELINE` / `ENGINEERING_APPROVED` in the machine source-use registry is not a legal decision
 and does not permit expansion.
 
 Regardless of the pending determination, a DPIA must be opened or amended before any of the following takes effect:

@@ -92,7 +92,7 @@ public class Practice {
     private String sourceCuratedSlug;
 
     /** Catalog comparison fingerprint captured when the workspace copy is created. */
-    @Column(name = "source_curated_fingerprint", length = 64)
+    @Column(name = "source_curated_fingerprint", length = 96)
     private String sourceCuratedFingerprint;
 
     @OneToOne(fetch = FetchType.LAZY)

@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.evidence.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
@@ -11,6 +13,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUseBasis;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseOutcome;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
 import org.junit.jupiter.api.Tag;
@@ -23,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "484b89a8237376ede7252c5af182e55a7b4161beb4c5e36a0e47e7911b0b3060";
+        "3ee0ecd611114c0543208598fe20af834c32f2f08827eed5afcafff323e09600";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -33,7 +36,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
         assertThat(registry.current().version()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(registry.catalogDigest()).isEqualTo(VERSION_1_CATALOG_SHA256);
-        assertThat(registry.current().sources()).hasSize(13);
+        assertThat(registry.current().sources()).hasSize(12);
         assertThat(registry.current().profiles())
             .extracting(profile -> profile.id().value())
             .containsExactlyInAnyOrder("pull-request-review", "issue-review", "conversation-review");
@@ -76,7 +79,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     }
 
     @Test
-    void shouldKeepExistingUseOperationalWhileControllerReviewIsPending() throws IOException {
+    void shouldRequireTraceableCurrentEngineeringApproval() throws IOException {
         var catalog = ClasspathArtifactSourceCatalogRegistry.parse(
             read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE)
         );
@@ -86,13 +89,15 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(
             catalog,
             decisions,
-            Instant.parse("2030-08-03T00:00:00Z")
+            Instant.parse("2026-08-03T12:00:00Z")
         );
         assertThat(decisions.values()).allSatisfy(decision -> {
             assertThat(decision.basis()).isEqualTo(SourceUseBasis.ENGINEERING_BASELINE);
-            assertThat(decision.outcome()).isEqualTo(SourceUseOutcome.PENDING_CONTROLLER_REVIEW);
-            assertThat(decision.reviewer()).isNull();
-            assertThat(decision.permitsProductUseAt(Instant.parse("2030-08-03T00:00:00Z"))).isTrue();
+            assertThat(decision.outcome()).isEqualTo(SourceUseOutcome.ENGINEERING_APPROVED);
+            assertThat(decision.reviewer()).isNotBlank();
+            assertThat(decision.decidedAt()).isNotNull();
+            assertThat(decision.expiresAt()).isNotNull();
+            assertThat(decision.permitsProductUseAt(Instant.parse("2026-08-03T12:00:00Z"))).isTrue();
         });
     }
 
@@ -112,7 +117,6 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 "scm.pull-request.core",
                 "scm.pull-request.diff",
                 "scm.pull-request.comments",
-                "scm.contributor-history",
                 "scm.repository.tree",
                 "scm.issue.core",
                 "scm.issue.comments",
@@ -126,13 +130,25 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     }
 
     @Test
-    void shouldRejectApprovalMetadataOnEngineeringBaseline() throws IOException {
+    void shouldRejectEngineeringBaselineWithoutApprovalMetadata() throws IOException {
         JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
-        ((tools.jackson.databind.node.ObjectNode) root.path("decisions").get(0)).put("reviewer", "test-reviewer");
+        ((tools.jackson.databind.node.ObjectNode) root.path("decisions").get(0)).remove("reviewer");
 
         assertThatIllegalArgumentException()
             .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root))
-            .withMessageContaining("must not contain approval metadata");
+            .withMessageContaining("requires review metadata");
+    }
+
+    @Test
+    void shouldRecheckApprovalExpiryWhenASourceIsRequested() {
+        Clock clock = mock(Clock.class);
+        when(clock.instant()).thenReturn(Instant.parse("2026-08-03T12:00:00Z"));
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, clock);
+        when(clock.instant()).thenReturn(Instant.parse("2027-08-03T00:00:00Z"));
+
+        assertThatIllegalStateException().isThrownBy(() ->
+            registry.requireSource(new SourceContractVersion("1.0.0"), new SourceKind("scm.pull-request.diff"))
+        );
     }
 
     @Test

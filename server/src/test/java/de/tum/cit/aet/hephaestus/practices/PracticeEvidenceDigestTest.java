@@ -30,10 +30,27 @@ class PracticeEvidenceDigestTest extends BaseUnitTest {
         assertThat(core).isNotEqualTo(diff);
     }
 
+    @Test
+    void shouldChangeWhenObservabilityChanges() {
+        var required = List.of(requirement("scm.pull-request.diff"));
+
+        assertThat(PracticeEvidenceDigest.digest(declaration(required, PracticeObservability.SEMANTIC))).isNotEqualTo(
+            PracticeEvidenceDigest.digest(declaration(required, PracticeObservability.UNOBSERVABLE))
+        );
+    }
+
     private static PracticeEvidenceDeclaration declaration(List<PracticeEvidenceRequirement> required) {
+        return declaration(required, PracticeObservability.SEMANTIC);
+    }
+
+    private static PracticeEvidenceDeclaration declaration(
+        List<PracticeEvidenceRequirement> required,
+        PracticeObservability observability
+    ) {
         return new PracticeEvidenceDeclaration(
             new SourceContractVersion("1.0.0"),
             new EvidenceProfileId("pull-request-review"),
+            observability,
             required,
             List.of(),
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,

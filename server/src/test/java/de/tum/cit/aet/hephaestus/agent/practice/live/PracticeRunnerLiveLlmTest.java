@@ -213,7 +213,7 @@ class PracticeRunnerLiveLlmTest {
             String tag = "finding[" + i + "]";
             assertThat(finding.path("practiceSlug").asString())
                 .as(tag + ".practiceSlug")
-                .isEqualTo("hardcoded-secrets");
+                .isEqualTo("avoids-insecure-defaults-and-over-broad-permissions");
             assertThat(finding.path("presence").asString())
                 .as(tag + ".presence")
                 .isIn("PRESENT", "ABSENT", "NOT_APPLICABLE");
@@ -237,7 +237,7 @@ class PracticeRunnerLiveLlmTest {
         boolean foundViolation = false;
         for (JsonNode finding : findings) {
             if (
-                "hardcoded-secrets".equals(finding.path("practiceSlug").asString()) &&
+                "avoids-insecure-defaults-and-over-broad-permissions".equals(finding.path("practiceSlug").asString()) &&
                 "PRESENT".equals(finding.path("presence").asString()) &&
                 "BAD".equals(finding.path("assessment").asString())
             ) {
@@ -247,7 +247,7 @@ class PracticeRunnerLiveLlmTest {
         }
         assertThat(foundViolation)
             .as(
-                "at least one (PRESENT, BAD) hardcoded-secrets finding for the planted apiKey/dbPassword. " +
+                "at least one (PRESENT, BAD) avoids-insecure-defaults-and-over-broad-permissions finding for the planted apiKey/dbPassword. " +
                     "Findings payload: " +
                     rawOutput
             )
@@ -312,7 +312,10 @@ class PracticeRunnerLiveLlmTest {
         Files.createDirectories(practicesDir);
         copyFixture("practices/index.json", practicesDir.resolve("index.json"));
         copyFixture("practices/all-criteria.md", practicesDir.resolve("all-criteria.md"));
-        copyFixture("practices/hardcoded-secrets.md", practicesDir.resolve("hardcoded-secrets.md"));
+        copyFixture(
+            "practices/avoids-insecure-defaults-and-over-broad-permissions.md",
+            practicesDir.resolve("avoids-insecure-defaults-and-over-broad-permissions.md")
+        );
 
         // Context fixture — diff, metadata, comments, diff_summary. Mirrors what
         // PullRequestContentSource materialises in production.
@@ -340,7 +343,7 @@ class PracticeRunnerLiveLlmTest {
             new Task.PracticeReview(
                 "Review merge request #1 in test/fixture. Read inputs/context/diff_summary.md, " +
                     "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. " +
-                    "Apply the hardcoded-secrets practice to inputs/context/diff.patch. Persist each " +
+                    "Apply the avoids-insecure-defaults-and-over-broad-permissions practice to inputs/context/diff.patch. Persist each " +
                     "justified finding via report_finding (one tool call per finding). Follow " +
                     SandboxLayout.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",

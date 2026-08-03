@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -25,6 +27,9 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Autowired
     private CuratedCatalogService catalogService;
+
+    @Autowired
+    private PracticeEvidenceDefaults evidenceDefaults;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -80,11 +85,59 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         assertThat(workspacesAwaiting()).isZero();
     }
 
+    @Test
+    void upgradesAnUneditedV1SourceCopyToTheExactBundledEvidence() {
+        PracticeDefinition shipped = shipped();
+        String v1Fingerprint = "v1:" + "a".repeat(64);
+        seedLegacyWorkspace(
+            matching,
+            shipped.criteria(),
+            false,
+            evidenceDefaults.forArtifact(shipped.artifactType()),
+            v1Fingerprint
+        );
+
+        backfill.run();
+
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT evidence_declaration = ?::jsonb FROM practice WHERE workspace_id = ?",
+                Boolean.class,
+                evidenceJson(shipped),
+                matching.getId()
+            )
+        ).isTrue();
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT source_curated_fingerprint FROM practice WHERE workspace_id = ?",
+                String.class,
+                matching.getId()
+            )
+        ).isEqualTo(shipped.provenanceFingerprint(SHIPPED_SLUG));
+        assertThat(
+            count(
+                "SELECT count(*) FROM practice_revision r JOIN practice p ON p.id = r.practice_id WHERE p.workspace_id = ?",
+                matching.getId()
+            )
+        ).isEqualTo(3);
+    }
+
     private PracticeDefinition shipped() {
         return catalogService.catalog().practice(SHIPPED_SLUG).orElseThrow().effective();
     }
 
     private void seedLegacyWorkspace(Workspace workspace, String criteria, boolean provenancePending) {
+        PracticeDefinition shipped = shipped();
+        seedLegacyWorkspace(workspace, criteria, provenancePending, shipped.evidence(), null);
+    }
+
+    private void seedLegacyWorkspace(
+        Workspace workspace,
+        String criteria,
+        boolean provenancePending,
+        PracticeEvidenceDeclaration evidence,
+        String fingerprint
+    ) {
         PracticeDefinition shipped = shipped();
         transactionOperations.executeWithoutResult(ignored -> {
             Long areaId = jdbcTemplate.queryForObject(
@@ -101,8 +154,9 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 """
                 INSERT INTO practice (
                     workspace_id, practice_area_id, slug, name, applies_to, display_order, trigger_events,
-                    criteria, evidence_declaration, why_it_matters, is_active, created_at
-                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', true, now())
+                    criteria, evidence_declaration, why_it_matters, source_curated_slug,
+                    source_curated_fingerprint, is_active, created_at
+                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, true, now())
                 RETURNING id
                 """,
                 Long.class,
@@ -113,14 +167,16 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 shipped.artifactType().name(),
                 triggerEventsJson(shipped),
                 criteria,
-                evidenceJson(shipped)
+                evidenceJson(evidence),
+                fingerprint == null ? null : SHIPPED_SLUG,
+                fingerprint
             );
             Long revisionId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
-                    evidence_declaration, why_it_matters, area_slug, created_at
-                ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, now())
+                    evidence_declaration, why_it_matters, area_slug, detection_fingerprint, created_at
+                ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, now())
                 RETURNING id
                 """,
                 Long.class,
@@ -130,9 +186,30 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 shipped.artifactType().name(),
                 triggerEventsJson(shipped),
                 criteria,
-                evidenceJson(shipped),
-                shipped.areaSlug()
+                evidenceJson(evidence),
+                shipped.areaSlug(),
+                fingerprint
             );
+            if (fingerprint != null) {
+                revisionId = jdbcTemplate.queryForObject(
+                    """
+                    INSERT INTO practice_revision (
+                        practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
+                        evidence_declaration, why_it_matters, area_slug, detection_fingerprint, created_at
+                    ) VALUES (?, 2, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, NULL, now())
+                    RETURNING id
+                    """,
+                    Long.class,
+                    practiceId,
+                    SHIPPED_SLUG,
+                    shipped.name(),
+                    shipped.artifactType().name(),
+                    triggerEventsJson(shipped),
+                    criteria,
+                    evidenceJson(evidence),
+                    shipped.areaSlug()
+                );
+            }
             jdbcTemplate.update("UPDATE practice SET current_revision_id = ? WHERE id = ?", revisionId, practiceId);
             jdbcTemplate.update(
                 """
@@ -150,7 +227,11 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     private String evidenceJson(PracticeDefinition definition) {
-        return objectMapper.valueToTree(definition.evidence()).toString();
+        return evidenceJson(definition.evidence());
+    }
+
+    private String evidenceJson(PracticeEvidenceDeclaration evidence) {
+        return objectMapper.valueToTree(evidence).toString();
     }
 
     private long stampedPractices(Workspace workspace) {

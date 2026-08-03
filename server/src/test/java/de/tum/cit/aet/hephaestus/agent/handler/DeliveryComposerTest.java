@@ -111,15 +111,13 @@ class DeliveryComposerTest extends BaseUnitTest {
     private List<ValidatedFinding> mixedFindings() {
         List<ValidatedFinding> findings = new ArrayList<>();
 
-        // 3 positives
         findings.add(positiveFinding("error-state-handling"));
         findings.add(positiveFinding("view-decomposition"));
         findings.add(positiveFinding("meaningful-naming"));
 
-        // CRITICAL: hardcoded-secrets
         findings.add(
             negativeFinding(
-                "hardcoded-secrets",
+                "avoids-insecure-defaults-and-over-broad-permissions",
                 "Hardcoded API key exposed in source",
                 Severity.CRITICAL,
                 List.of(new LocationSpec("Config/APIKeys.swift", 5)),
@@ -288,7 +286,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // 7 negatives: all inlinable (have file locations)
         findings.add(
             negativeFinding(
-                "hardcoded-secrets",
+                "avoids-insecure-defaults-and-over-broad-permissions",
                 "Hardcoded secret",
                 Severity.CRITICAL,
                 List.of(new LocationSpec("Config/Keys.swift", 1)),
@@ -596,7 +594,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         findings.add(positiveFinding("scope-one-reviewable-change"));
         findings.add(
             negativeFinding(
-                "hardcoded-secrets",
+                "avoids-insecure-defaults-and-over-broad-permissions",
                 "Hardcoded API key",
                 Severity.CRITICAL,
                 List.of(new LocationSpec("Config/Keys.swift", 5)),
@@ -1238,7 +1236,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         var findings = List.of(
             positiveFinding("engaging-with-inline-review-comments"),
             negativeFinding(
-                "hardcoded-secrets",
+                "avoids-insecure-defaults-and-over-broad-permissions",
                 "Hardcoded secret",
                 Severity.CRITICAL,
                 List.of(new LocationSpec("Keys.swift", 1)),
@@ -1277,7 +1275,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         var findings = List.of(
             strength,
             negativeFinding(
-                "hardcoded-secrets",
+                "avoids-insecure-defaults-and-over-broad-permissions",
                 "Hardcoded secret",
                 Severity.CRITICAL,
                 List.of(new LocationSpec("Keys.swift", 1)),

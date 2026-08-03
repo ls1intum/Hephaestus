@@ -982,6 +982,15 @@ export type PracticeEvidenceRequirement = {
 };
 
 /**
+ * Optional source that may be used at any available quality
+ */
+export type OptionalPracticeEvidenceRequirement = {
+    completeness: 'ANY';
+    freshness: 'ANY';
+    sourceKind: string;
+};
+
+/**
  * Author-declared limitation that remains when required evidence is available
  */
 export type PracticeEvidenceBlindSpot = {
@@ -994,8 +1003,9 @@ export type PracticeEvidenceBlindSpot = {
  */
 export type PracticeEvidenceDeclaration = {
     blindSpots: Array<PracticeEvidenceBlindSpot>;
+    observability: 'MECHANICAL' | 'SEMANTIC' | 'CONDITIONALLY_OBSERVABLE' | 'UNOBSERVABLE';
     onUnsatisfied: 'DECLINE_SEMANTIC_JUDGMENT';
-    optional: Array<PracticeEvidenceRequirement>;
+    optional: Array<OptionalPracticeEvidenceRequirement>;
     profile: string;
     required: Array<PracticeEvidenceRequirement>;
     sourceContractVersion: string;

@@ -54,7 +54,7 @@ public record ReviewFindingDTO(
             row.getSeverity(),
             row.getConfidence(),
             row.getRecurrenceKey(),
-            EvaluationClaimStatus.of(row.getPracticeRevisionId(), row.getCurrentPracticeRevisionId()),
+            EvaluationClaimStatus.of(row.getPracticeRevisionFingerprint(), row.getCurrentPracticeRevisionFingerprint()),
             row.getObservedAt(),
             disposition == null ? ReviewFeedbackDispositionDTO.empty() : ReviewFeedbackDispositionDTO.from(disposition)
         );

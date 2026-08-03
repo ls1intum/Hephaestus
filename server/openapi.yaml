@@ -9135,6 +9135,24 @@ components:
       - practiceSlug
       - presence
       - title
+    OptionalPracticeEvidenceRequirement:
+      type: object
+      description: Optional source that may be used at any available quality
+      properties:
+        completeness:
+          type: string
+          enum:
+          - ANY
+        freshness:
+          type: string
+          enum:
+          - ANY
+        sourceKind:
+          type: string
+      required:
+      - completeness
+      - freshness
+      - sourceKind
     OutlineCollection:
       type: object
       description: A mirrored Outline collection with its sync state and live document
@@ -9646,6 +9664,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PracticeEvidenceBlindSpot"
+        observability:
+          type: string
+          enum:
+          - MECHANICAL
+          - SEMANTIC
+          - CONDITIONALLY_OBSERVABLE
+          - UNOBSERVABLE
         onUnsatisfied:
           type: string
           enum:
@@ -9653,7 +9678,7 @@ components:
         optional:
           type: array
           items:
-            $ref: "#/components/schemas/PracticeEvidenceRequirement"
+            $ref: "#/components/schemas/OptionalPracticeEvidenceRequirement"
         profile:
           type: string
         required:
@@ -9666,6 +9691,7 @@ components:
           type: string
       required:
       - blindSpots
+      - observability
       - onUnsatisfied
       - optional
       - profile

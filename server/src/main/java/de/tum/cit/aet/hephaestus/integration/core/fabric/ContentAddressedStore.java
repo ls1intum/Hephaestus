@@ -105,7 +105,11 @@ public class ContentAddressedStore {
         // between the check and the read. Reading directly and treating a missing file as empty closes
         // that TOCTOU gap and makes the documented "no longer present" branch actually hold.
         try {
-            return Optional.of(Files.readAllBytes(blob));
+            byte[] content = Files.readAllBytes(blob);
+            if (!sha.equals(sha256(content))) {
+                throw new IllegalStateException("CAS blob digest mismatch: " + sha);
+            }
+            return Optional.of(content);
         } catch (NoSuchFileException e) {
             return Optional.empty();
         } catch (IOException e) {

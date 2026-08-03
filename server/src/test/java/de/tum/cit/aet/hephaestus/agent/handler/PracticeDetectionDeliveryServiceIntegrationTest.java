@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -34,6 +35,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,6 +96,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     @Autowired
     private ApplicationEvents applicationEvents;
 
+    @Autowired
+    private ContentAddressedStore cas;
+
     private Workspace workspace;
     private AgentJob agentJob;
     private User developer;
@@ -105,8 +110,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("delivery-test"));
 
-        createPractice("pr-description-quality", "PR Description Quality");
-        createPractice("error-handling", "Error Handling");
+        Practice description = createPractice("pr-description-quality", "PR Description Quality");
+        Practice errors = createPractice("error-handling", "Error Handling");
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
@@ -176,6 +181,32 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         metadata.put("repository_full_name", repo.getNameWithOwner());
         metadata.put("pr_number", 42);
         agentJob.setMetadata(metadata);
+        ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
+        var source = snapshot
+            .putObject("manifest")
+            .putArray("sources")
+            .addObject()
+            .put("kind", "scm.pull-request.diff")
+            .put("availability", "AVAILABLE");
+        source
+            .putArray("artifacts")
+            .addObject()
+            .put("path", "inputs/context/diff.patch")
+            .put(
+                "sha256",
+                cas.put(
+                    "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n".getBytes(
+                        StandardCharsets.UTF_8
+                    )
+                )
+            );
+        var admitted = snapshot.putArray("practices");
+        admitted
+            .addObject()
+            .put("slug", description.getSlug())
+            .put("revisionId", description.getCurrentRevision().getId());
+        admitted.addObject().put("slug", errors.getSlug()).put("revisionId", errors.getCurrentRevision().getId());
+        agentJob.setEvidenceSnapshot(snapshot);
         agentJob = agentJobRepository.save(agentJob);
     }
 
@@ -187,7 +218,10 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         p.setCriteria("Test " + slug);
         p.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        return practiceRepository.save(p);
+        p = practiceRepository.saveAndFlush(p);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(p, 1));
+        p.setCurrentRevision(revision);
+        return practiceRepository.saveAndFlush(p);
     }
 
     /**
@@ -207,11 +241,29 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assessment,
             Severity.INFO,
             0.9f,
-            null,
+            evidence(),
             null,
             null,
             List.of()
         );
+    }
+
+    private static ObjectNode evidence() {
+        ObjectNode evidence = OBJECT_MAPPER.createObjectNode();
+        evidence
+            .putArray("citations")
+            .addObject()
+            .put("sourceKind", "scm.pull-request.diff")
+            .put("artifactPath", "inputs/context/diff.patch")
+            .put("path", "src/Auth.java")
+            .put("side", "NEW")
+            .put("startLine", 10)
+            .put("endLine", 10)
+            .put("quote", "+ insecure();");
+        evidence.putArray("sourceKinds").add("scm.pull-request.diff");
+        evidence.putArray("locations");
+        evidence.putArray("snippets");
+        return evidence;
     }
 
     @Nested
@@ -227,7 +279,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             var result = deliveryService.deliver(agentJob, findings);
 
             assertThat(result.inserted()).isEqualTo(2);
-            assertThat(result.discardedUnknownSlug()).isZero();
             assertThat(result.hasNegative()).isTrue();
 
             List<Observation> persisted = observationRepository.findAll();
@@ -286,17 +337,16 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     class PracticeResolution {
 
         @Test
-        void unknownSlugsSkipped() {
+        void unknownSlugsFailDelivery() {
             var findings = List.of(
                 finding("pr-description-quality", Presence.PRESENT),
                 finding("nonexistent-practice", Presence.PRESENT)
             );
 
-            var result = deliveryService.deliver(agentJob, findings);
-
-            assertThat(result.inserted()).isEqualTo(1);
-            assertThat(result.discardedUnknownSlug()).isEqualTo(1);
-            assertThat(observationRepository.findAll()).hasSize(1);
+            assertThatThrownBy(() -> deliveryService.deliver(agentJob, findings))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("not admitted");
+            assertThat(observationRepository.findAll()).isEmpty();
         }
     }
 
@@ -306,11 +356,10 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("persisted finding pins the practice's current definition revision")
         void findingPinsCurrentRevision() {
-            // Seeded straight through the repository, so no revision exists yet; append one as createPractice would.
             Practice practice = practiceRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
                 .orElseThrow();
-            PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+            PracticeRevision revision = practice.getCurrentRevision();
 
             var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
 
@@ -342,7 +391,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                         Assessment.BAD,
                         Severity.MINOR,
                         0.8f,
-                        null,
+                        evidence(),
                         null,
                         null,
                         List.of()

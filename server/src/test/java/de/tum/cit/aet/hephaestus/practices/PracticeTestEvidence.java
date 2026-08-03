@@ -20,32 +20,36 @@ public final class PracticeTestEvidence {
 
     public static PracticeEvidenceDeclaration forArtifact(WorkArtifact artifactType) {
         String profile;
-        String kind;
+        List<String> kinds;
         switch (artifactType) {
             case PULL_REQUEST -> {
                 profile = "pull-request-review";
-                kind = "scm.pull-request.core";
+                kinds = List.of("scm.pull-request.core", "scm.pull-request.diff");
             }
             case ISSUE -> {
                 profile = "issue-review";
-                kind = "scm.issue.core";
+                kinds = List.of("scm.issue.core");
             }
             case CONVERSATION_THREAD -> {
                 profile = "conversation-review";
-                kind = "slack.conversation.thread";
+                kinds = List.of("slack.conversation.thread");
             }
             default -> throw new IllegalArgumentException("Unsupported artifact type: " + artifactType);
         }
         return new PracticeEvidenceDeclaration(
             new SourceContractVersion("1.0.0"),
             new EvidenceProfileId(profile),
-            List.of(
-                new PracticeEvidenceRequirement(
-                    new SourceKind(kind),
-                    EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceFreshnessRequirement.CURRENT
+            PracticeObservability.SEMANTIC,
+            kinds
+                .stream()
+                .map(kind ->
+                    new PracticeEvidenceRequirement(
+                        new SourceKind(kind),
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT
+                    )
                 )
-            ),
+                .toList(),
             List.of(),
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
             List.of()

@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -152,6 +154,9 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             Practice practice = new Practice();
             practice.setSlug("conversation-practice");
             practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.CONVERSATION_THREAD));
+            var revision = new PracticeRevision();
+            ReflectionTestUtils.setField(revision, "id", 12L);
+            practice.setCurrentRevision(revision);
             when(practiceCatalogInjector.resolve(job, WorkArtifact.CONVERSATION_THREAD)).thenReturn(List.of(practice));
             when(workspaceContextBuilder.prepare(any(), any())).thenReturn(
                 new PreparedEvidence(
@@ -159,7 +164,10 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
                     org.mockito.Mockito.mock(ArtifactSourceManifest.class)
                 )
             );
-            when(workspaceContextBuilder.readyPractices(any(), any(), anyString())).thenReturn(List.of(practice));
+            when(workspaceContextBuilder.readyPractices(any(), any(), anyString(), any())).thenReturn(
+                List.of(practice)
+            );
+            when(workspaceContextBuilder.restrictTo(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
 
             Map<String, byte[]> files = handler.prepareInputFiles(job);
 

@@ -84,7 +84,7 @@ public final class PracticeDefinitionValidator {
         }
 
         Set<SourceKind> required = validateRequirements(profile, declaration, declaration.required());
-        Set<SourceKind> optional = validateRequirements(profile, declaration, declaration.optional());
+        Set<SourceKind> optional = validateOptionalRequirements(profile, declaration);
         if (required.stream().anyMatch(optional::contains)) {
             throw new IllegalArgumentException("An evidence source cannot be both required and optional");
         }
@@ -101,6 +101,23 @@ public final class PracticeDefinitionValidator {
                 throw new IllegalArgumentException("Blind-spot summaries must contain 1 to 500 characters");
             }
         }
+    }
+
+    private Set<SourceKind> validateOptionalRequirements(
+        EvidenceProfile profile,
+        PracticeEvidenceDeclaration declaration
+    ) {
+        Set<SourceKind> kinds = new HashSet<>();
+        for (OptionalPracticeEvidenceRequirement requirement : declaration.optional()) {
+            if (!kinds.add(requirement.sourceKind())) {
+                throw new IllegalArgumentException("Evidence requirements must not contain duplicate source kinds");
+            }
+            sourceCatalogs.requireSource(declaration.sourceContractVersion(), requirement.sourceKind());
+            if (!profile.allows(requirement.sourceKind())) {
+                throw new IllegalArgumentException("Evidence source is not allowed by the selected profile");
+            }
+        }
+        return kinds;
     }
 
     private Set<SourceKind> validateRequirements(

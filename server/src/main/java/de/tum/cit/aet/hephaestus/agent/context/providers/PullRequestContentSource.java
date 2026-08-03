@@ -18,12 +18,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.observation.DeveloperHistoryProvider;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -48,14 +50,13 @@ import tools.jackson.databind.node.ObjectNode;
  * <ul>
  *   <li>{@code metadata.json} — PR metadata, enriched from DB, plus commit log</li>
  *   <li>{@code comments.json} — review comments (most recent 500)</li>
- *   <li>{@code contributor_history.json} — optional, prior findings for the author</li>
  *   <li>{@code diff.patch} — annotated unified diff via {@link GitDiffOperations}</li>
  *   <li>{@code diff_stat.txt} — {@code git diff --stat} output</li>
  *   <li>{@code diff_summary.md} — per-file diff chunks for single-pass AI consumption</li>
  * </ul>
  *
- * <p>The diff is {@link ContentSource#required required} for this provider — an empty diff
- * aborts the build (prevents hollow positives from the agent).
+ * <p>The diff source is required. A resolved range with no changes is captured as valid empty evidence;
+ * failure to resolve the range is a collection error.
  */
 @Component
 @Order(100)
@@ -64,17 +65,15 @@ public class PullRequestContentSource implements EvidenceSource {
     private static final SourceKind CORE = new SourceKind("scm.pull-request.core");
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
     private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
-    private static final SourceKind CONTRIBUTOR_HISTORY = new SourceKind("scm.contributor-history");
 
     @Override
     public Set<SourceKind> sourceKinds() {
-        return Set.of(CORE, DIFF, COMMENTS, CONTRIBUTOR_HISTORY);
+        return Set.of(CORE, DIFF, COMMENTS);
     }
 
     @Override
     public SourceKind sourceKindFor(String path) {
         if (path.endsWith("comments.json")) return COMMENTS;
-        if (path.endsWith("contributor_history.json")) return CONTRIBUTOR_HISTORY;
         if (
             path.endsWith("diff.patch") || path.endsWith("diff_stat.txt") || path.endsWith("diff_summary.md")
         ) return DIFF;
@@ -98,20 +97,9 @@ public class PullRequestContentSource implements EvidenceSource {
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
-    private final DeveloperHistoryProvider developerHistoryProvider;
     private final GitDiffOperations gitDiffOperations;
     private final ConnectionService connectionService;
 
-    /**
-     * SCM token sources keyed by integration kind. Collected via constructor injection so
-     * adding a new SCM (Bitbucket etc.) is a matter of registering a new {@link ScmTokenSource}
-     * bean — this class never has to learn the new kind.
-     *
-     * <p>Pre-fetch only fires when a token source is available for the workspace's active SCM
-     * kind (resolved via {@link ConnectionService#findActiveProviderKind}); stale repos under
-     * workspaces with no active SCM connection still get diffed against the cached clone, just
-     * without a network refresh.
-     */
     private final Map<IntegrationKind, ScmTokenSource> tokenSources;
 
     public PullRequestContentSource(
@@ -119,7 +107,6 @@ public class PullRequestContentSource implements EvidenceSource {
         GitRepositoryManager gitRepositoryManager,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
-        DeveloperHistoryProvider developerHistoryProvider,
         GitDiffOperations gitDiffOperations,
         ConnectionService connectionService,
         List<ScmTokenSource> tokenSourceList
@@ -128,7 +115,6 @@ public class PullRequestContentSource implements EvidenceSource {
         this.gitRepositoryManager = gitRepositoryManager;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewCommentRepository = reviewCommentRepository;
-        this.developerHistoryProvider = developerHistoryProvider;
         this.gitDiffOperations = gitDiffOperations;
         this.connectionService = connectionService;
         Map<IntegrationKind, ScmTokenSource> map = new EnumMap<>(IntegrationKind.class);
@@ -145,12 +131,33 @@ public class PullRequestContentSource implements EvidenceSource {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
+        prepareCapture(request, sourceKinds());
         contributeSelected(request, sourceKinds(), files);
     }
 
     @Override
+    public void prepareCapture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        if (!(request instanceof ContextRequest.PracticeReviewRequest practiceReview)) return;
+        if (!(selectedKinds.contains(CORE) || selectedKinds.contains(DIFF))) return;
+        JsonNode metadata = practiceReview.job().getMetadata();
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) return;
+        long repositoryId = requireLong(metadata, "repository_id");
+        if (!gitRepositoryManager.isEnabled() || !gitRepositoryManager.isRepositoryCloned(repositoryId)) return;
+        String headSha = metadata.path("commit_sha").asString(null);
+        fetchAndVerifyHead(repositoryId, practiceReview.job(), headSha);
+    }
+
+    @Override
     public void contributeSelected(ContextRequest request, Set<SourceKind> selectedKinds, Map<String, byte[]> files) {
-        // Narrowed via supports(); cast is safe and documents the variant precondition.
+        files.putAll(captureSelected(request, selectedKinds).files());
+    }
+
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        return captureSelected(request, selectedKinds);
+    }
+
+    private EvidenceContribution captureSelected(ContextRequest request, Set<SourceKind> selectedKinds) {
         if (!(request instanceof ContextRequest.PracticeReviewRequest practiceReview)) {
             throw new IllegalStateException(
                 "PullRequestContentSource.contribute called with unsupported variant: " +
@@ -164,95 +171,51 @@ public class PullRequestContentSource implements EvidenceSource {
         }
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
+        Map<String, byte[]> files = new HashMap<>();
+        Map<SourceKind, SourceCompleteness> completeness = new HashMap<>();
+        Map<SourceKind, String> identities = new HashMap<>();
+        Map<SourceKind, java.time.Instant> observedAt = new HashMap<>();
+        Map<SourceKind, SourceContentState> contentStates = new HashMap<>();
 
-        PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
-
-        // Refresh the clone ONCE, up-front, before anything reads refs from it. The commit log
-        // (addCommitLog) and the diff (computeAndStoreDiff) both resolve a range against the local
-        // clone; doing the fetch here guarantees they see the same, freshest ref state. Otherwise a
-        // fresh-push / stale-clone run would skip the commit log (head not yet local) while the diff,
-        // computed after a later fetch, succeeds — an inconsistent context.
         boolean needsGit = selectedKinds.contains(CORE) || selectedKinds.contains(DIFF);
         boolean headVerified = false;
         if (needsGit) {
             ensureRepositoryAvailable(repositoryId);
             String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
-            headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
+            headVerified =
+                headSha != null && !headSha.isBlank() && gitRepositoryManager.commitExists(repositoryId, headSha);
         }
         if (selectedKinds.contains(CORE)) {
+            PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
             storeMetadata(files, pullRequest, metadata);
+            completeness.put(CORE, pullRequest == null ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE);
+            if (pullRequest != null && pullRequest.getLastSyncAt() != null) {
+                observedAt.put(CORE, pullRequest.getLastSyncAt());
+            }
         }
         if (selectedKinds.contains(COMMENTS)) {
-            storeComments(files, pullRequestId);
-        }
-        if (selectedKinds.contains(CONTRIBUTOR_HISTORY)) {
-            storeDeveloperHistory(files, pullRequest, job);
+            CommentCapture comments = loadComments(pullRequestId);
+            storeComments(files, comments.comments());
+            completeness.put(COMMENTS, comments.complete() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
+            contentStates.put(
+                COMMENTS,
+                comments.comments().isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
+            );
         }
         if (selectedKinds.contains(DIFF)) {
             computeAndStoreDiff(files, repositoryId, metadata, headVerified);
             computeAndStoreDiffSummary(files);
+            completeness.put(DIFF, SourceCompleteness.COMPLETE);
+            String headSha = metadata.path("commit_sha").asString();
+            if (!headSha.isBlank()) identities.put(DIFF, headSha);
+            byte[] diff = files.get(OUTPUT_PREFIX + "diff.patch");
+            contentStates.put(
+                DIFF,
+                diff == null || diff.length == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
+            );
         }
+        return new EvidenceContribution(files, completeness, identities, observedAt, Map.of(), contentStates);
     }
-
-    @Override
-    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
-        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
-        JsonNode metadata = ((ContextRequest.PracticeReviewRequest) request).job().getMetadata();
-        long pullRequestId = requireLong(metadata, "pull_request_id");
-        PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
-        Map<SourceKind, SourceCompleteness> completeness = new HashMap<>();
-        if (selectedKinds.contains(CORE)) {
-            completeness.put(CORE, pullRequest == null ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE);
-        }
-        if (selectedKinds.contains(DIFF)) completeness.put(DIFF, SourceCompleteness.COMPLETE);
-        if (selectedKinds.contains(CONTRIBUTOR_HISTORY)) {
-            completeness.put(CONTRIBUTOR_HISTORY, SourceCompleteness.PARTIAL);
-        }
-        if (selectedKinds.contains(COMMENTS)) {
-            byte[] comments = captured.files().get(OUTPUT_PREFIX + "comments.json");
-            try {
-                int count = comments == null ? 0 : objectMapper.readTree(comments).size();
-                completeness.put(
-                    COMMENTS,
-                    count < MAX_COMMENTS ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL
-                );
-            } catch (JacksonException e) {
-                throw new IllegalStateException("Serialized review comments could not be read", e);
-            }
-        }
-        String headSha = metadata == null ? null : metadata.path("commit_sha").asString();
-        Map<SourceKind, String> identities =
-            selectedKinds.contains(DIFF) && headSha != null && !headSha.isBlank() ? Map.of(DIFF, headSha) : Map.of();
-        Map<SourceKind, java.time.Instant> observedAt = new HashMap<>();
-        if (pullRequest != null && pullRequest.getLastSyncAt() != null) {
-            if (selectedKinds.contains(CORE)) observedAt.put(CORE, pullRequest.getLastSyncAt());
-            if (selectedKinds.contains(COMMENTS)) observedAt.put(COMMENTS, pullRequest.getLastSyncAt());
-        }
-        Map<SourceKind, SourceContentState> contentStates = new HashMap<>();
-        if (selectedKinds.contains(COMMENTS)) {
-            byte[] comments = captured.files().get(OUTPUT_PREFIX + "comments.json");
-            try {
-                contentStates.put(
-                    COMMENTS,
-                    comments == null || objectMapper.readTree(comments).isEmpty()
-                        ? SourceContentState.EMPTY
-                        : SourceContentState.NON_EMPTY
-                );
-            } catch (JacksonException e) {
-                throw new IllegalStateException("Serialized review comments could not be read", e);
-            }
-        }
-        return new EvidenceContribution(
-            captured.files(),
-            completeness,
-            identities,
-            observedAt,
-            Map.of(),
-            contentStates
-        );
-    }
-
-    // Repository availability
 
     private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
@@ -274,12 +237,6 @@ public class PullRequestContentSource implements EvidenceSource {
         }
 
         var workspace = job.getWorkspace();
-        // The pre-diff fetch is gated on the workspace's active SCM kind: we resolve that
-        // kind from the connection (never hardcode a vendor) and look up its token source.
-        // The fetch only actually fires when that source exposes a deterministic clone URL
-        // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
-        // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
-        // empty serverUrl; its fetches go through GithubDataSyncService instead).
         var kind =
             workspace == null
                 ? Optional.<IntegrationKind>empty()
@@ -319,9 +276,6 @@ public class PullRequestContentSource implements EvidenceSource {
                 }
             }
         } catch (Exception e) {
-            // Log the full exception (class + stack), not just the message: an auth/credential failure here
-            // is usually systemic (it will hit every job in the workspace) and the class is what makes it
-            // diagnosable. Include kind/serverUrl for triage — never the token.
             log.warn(
                 "Pre-diff fetch failed: repoId={}, kind={}, serverUrl={}",
                 repositoryId,
@@ -351,8 +305,6 @@ public class PullRequestContentSource implements EvidenceSource {
         return false;
     }
 
-    // Metadata + comments
-
     private void storeMetadata(Map<String, byte[]> files, @Nullable PullRequest pullRequest, JsonNode metadata) {
         ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequest, metadata);
         addCommitLog(pullRequestMetadata, metadata);
@@ -366,12 +318,12 @@ public class PullRequestContentSource implements EvidenceSource {
         }
     }
 
-    private void storeComments(Map<String, byte[]> files, long pullRequestId) {
-        JsonNode comments = buildReviewComments(pullRequestId);
+    private void storeComments(Map<String, byte[]> files, List<PullRequestReviewComment> comments) {
+        JsonNode serialized = buildReviewComments(comments);
         try {
             files.put(
                 OUTPUT_PREFIX + "comments.json",
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(comments)
+                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(serialized)
             );
         } catch (JacksonException e) {
             throw new JobPreparationException("Failed to serialize review comments", e);
@@ -409,18 +361,28 @@ public class PullRequestContentSource implements EvidenceSource {
         return result;
     }
 
-    private JsonNode buildReviewComments(long pullRequestId) {
-        var comments = reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(pullRequestId);
-        log.debug("Fetched {} review comments for pull request: pullRequestId={}", comments.size(), pullRequestId);
-        if (comments.size() > MAX_COMMENTS) {
-            log.warn(
-                "Truncating review comments from {} to {}: pullRequestId={}",
-                comments.size(),
-                MAX_COMMENTS,
-                pullRequestId
-            );
-            comments = comments.subList(comments.size() - MAX_COMMENTS, comments.size());
+    private CommentCapture loadComments(long pullRequestId) {
+        var comments = new ArrayList<>(
+            reviewCommentRepository.findRecentByPullRequestIdWithAuthor(
+                pullRequestId,
+                PageRequest.of(0, MAX_COMMENTS + 1)
+            )
+        );
+        if (comments.size() > MAX_COMMENTS + 1) {
+            comments = new ArrayList<>(comments.subList(0, MAX_COMMENTS + 1));
         }
+        boolean complete = comments.size() <= MAX_COMMENTS;
+        if (!complete) comments.remove(comments.size() - 1);
+        comments.sort(
+            Comparator.comparing(
+                PullRequestReviewComment::getCreatedAt,
+                Comparator.nullsLast(Comparator.naturalOrder())
+            )
+        );
+        return new CommentCapture(comments, complete);
+    }
+
+    private JsonNode buildReviewComments(List<PullRequestReviewComment> comments) {
         var commentsArray = objectMapper.createArrayNode();
         for (var comment : comments) {
             var commentNode = objectMapper.createObjectNode();
@@ -441,6 +403,8 @@ public class PullRequestContentSource implements EvidenceSource {
         }
         return commentsArray;
     }
+
+    private record CommentCapture(List<PullRequestReviewComment> comments, boolean complete) {}
 
     private void addCommitLog(ObjectNode metadata, JsonNode jobMetadata) {
         String sourceBranch = jobMetadata.has("source_branch") ? jobMetadata.get("source_branch").asString() : null;
@@ -477,39 +441,6 @@ public class PullRequestContentSource implements EvidenceSource {
         if (!commits.isEmpty()) {
             metadata.set("commits", commits);
             log.debug("Injected {} commit messages into metadata", commits.size());
-        }
-    }
-
-    // Developer history
-
-    private void storeDeveloperHistory(Map<String, byte[]> files, @Nullable PullRequest pullRequest, AgentJob job) {
-        if (pullRequest == null || pullRequest.getAuthor() == null || job.getWorkspace() == null) {
-            if (pullRequest != null && pullRequest.getAuthor() == null) {
-                log.debug("Skipping developer history: PR has no author, pullRequestId={}", pullRequest.getId());
-            }
-            return;
-        }
-        Long developerId = pullRequest.getAuthor().getId();
-        Long workspaceId = job.getWorkspace().getId();
-
-        try {
-            Optional<byte[]> historyJson = developerHistoryProvider.buildHistoryJson(developerId, workspaceId);
-            historyJson.ifPresent(json -> {
-                files.put(OUTPUT_PREFIX + "contributor_history.json", json);
-                log.info(
-                    "Injected developer history: {} bytes, developerId={}, workspaceId={}",
-                    json.length,
-                    developerId,
-                    workspaceId
-                );
-            });
-        } catch (Exception e) {
-            log.warn(
-                "Failed to build developer history, continuing without it: developerId={}, workspaceId={}",
-                developerId,
-                workspaceId,
-                e
-            );
         }
     }
 
@@ -573,14 +504,9 @@ public class PullRequestContentSource implements EvidenceSource {
                     headSha
                 );
             } else {
-                throw new JobPreparationException(
-                    "Empty diff: no changed files between target and head. headSha=" +
-                        headSha +
-                        ", targetBranch=" +
-                        targetBranch +
-                        ", sourceBranch=" +
-                        sourceBranch
-                );
+                files.put(OUTPUT_PREFIX + "diff.patch", new byte[0]);
+                files.put(OUTPUT_PREFIX + "diff_stat.txt", new byte[0]);
+                log.info("Pre-computed empty diff: range={}..{}, headSha={}", range[0], range[1], headSha);
             }
         } catch (JobPreparationException e) {
             throw e;
@@ -592,7 +518,7 @@ public class PullRequestContentSource implements EvidenceSource {
     /** Pure transformation: build the per-file diff summary from {@code diff.patch}. */
     void computeAndStoreDiffSummary(Map<String, byte[]> files) {
         byte[] diffBytes = files.get(OUTPUT_PREFIX + "diff.patch");
-        if (diffBytes == null || diffBytes.length == 0) {
+        if (diffBytes == null) {
             return;
         }
 

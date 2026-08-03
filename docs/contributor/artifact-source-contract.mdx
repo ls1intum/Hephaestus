@@ -8,7 +8,7 @@ description: Versioned evidence sources, missingness, practice requirements, and
 # Artifact-source contract
 
 Hephaestus may make a practice judgment only from evidence with explicit semantics. Contract `1.0.0` defines the
-logical source catalog, capture states, evidence profiles, and practice requirements. A capture manifest proves
+logical source catalog, capture states, evidence profiles, and practice requirements. A capture manifest records
 what was supplied to one run; it does not prove that a practice is empirically observable. Independent
 observability validation has separate provenance and status.
 
@@ -72,16 +72,18 @@ tools resolve source kinds through one of the catalog's exact artifact profiles 
 
 The constraints with direct authoring consequences are:
 
-- Contributor history, linked work items, review threads, general review comments, project inventory, and
-  Outline documents expose no `CURRENT` claim. A practice can require them only with freshness `ANY`.
-- Contributor history and Outline documents cannot satisfy `COMPLETE`.
+- Pull-request and issue comments, linked work items, review threads, general review comments, project inventory,
+  and Outline documents expose no `CURRENT` claim. Their mirrors do not carry source-specific synchronization
+  watermarks, so a practice can require them only with freshness `ANY`.
+- Outline documents cannot satisfy `COMPLETE`.
 - Pull-request and issue core records cannot be logically empty. Other `1.0.0` sources may be validly empty.
 - An available pull-request diff is pinned and complete; it may be empty but is never partial.
 
-`ENGINEERING_BASELINE` with `PENDING_CONTROLLER_REVIEW` records an operational registration, not approval. It
-contains no reviewer or decision timestamp and cannot cover an expanded source, purpose, audience, processor,
+`ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized product
+scope. It is not controller or DPO approval and cannot cover an expanded source, purpose, audience, processor,
 retention policy, or collection scope. `CONTROLLER_DECISION` records the releasable subset of a traceable decision;
-only an unexpired `APPROVED` product decision passes that gate. The controller's complete record remains separate.
+only an unexpired `APPROVED` decision passes when that basis is used. The controller's complete record remains
+separate.
 
 Changing a source's meaning, selection scope, limit, mapping, freshness policy, dependency, or normalization
 requires a new contract version. Repository history is not part of `scm.repository.tree` and requires its own
@@ -115,25 +117,31 @@ Only `AVAILABLE` has:
 Logical content is independent of serialized bytes: a JSON file containing `[]` represents an `EMPTY` source.
 Field-level redaction remains an available, usually partial source; whole-source redaction uses `REDACTED`.
 
-Freshness is an assessment, not a mutable capture fact. The runtime evaluates the recorded temporal anchor under
-the pinned freshness policy at `assessedAt`, producing `CURRENT`, `STALE`, or `UNKNOWN`. It must not substitute
-query time for a missing upstream watermark. `NOT_APPLICABLE` means that the contract offers no currentness claim,
+Freshness is an assessment, not a mutable capture fact. The runtime evaluates the recorded watermark against the
+job's submission time under the pinned freshness policy, recording the later assessment time separately. A delayed
+queue therefore does not invalidate evidence that covered the requested snapshot. A manual request still refuses a
+mirror whose watermark was already too old when submitted. The runtime must not substitute query time for a missing
+upstream watermark. `NOT_APPLICABLE` means that the contract offers no currentness claim,
 so authoring validation rejects a `CURRENT` requirement. `ANY` accepts the absence of such a claim; it does not
 assert that the data is current.
 
-Deliberate ablation is an evaluation transformation, not natural missingness. Production rejects ablation;
-evaluation records a named plan and removes the declared dependency closure.
+Deliberate ablation is an evaluation transformation, not natural missingness. Production rejects every transformed
+view. The manifest can record evaluation transformations, but this contract version does not apply or authorize
+them; an evaluation runtime must define and validate its own dependency-aware view before enabling ablation.
 
 ## Practice evidence declarations
 
 A declaration pins one contract version and profile, then lists required and optional sources. Required sources
 must satisfy their completeness and freshness clauses. The contract deliberately has no arbitrary expression
-language and cannot require `NON_EMPTY`: complete empty evidence is valid evidence.
+language and cannot require `NON_EMPTY`: complete empty evidence is valid evidence. Optional sources do not
+control readiness and therefore must use `ANY` completeness and freshness; make a source required when its
+quality is necessary for a semantic claim.
 
 ```json
 {
   "sourceContractVersion": "1.0.0",
   "profile": "pull-request-review",
+  "observability": "SEMANTIC",
   "required": [
     {
       "sourceKind": "scm.pull-request.diff",
@@ -145,7 +153,7 @@ language and cannot require `NON_EMPTY`: complete empty evidence is valid eviden
   "onUnsatisfied": "DECLINE_SEMANTIC_JUDGMENT",
   "blindSpots": [
     {
-      "code": "RUNTIME_BEHAVIOUR_NOT_OBSERVED",
+      "code": "RUNTIME_BEHAVIOR_NOT_OBSERVED",
       "summary": "Runtime behaviour and production configuration are not observed."
     }
   ]
@@ -153,8 +161,8 @@ language and cannot require `NON_EMPTY`: complete empty evidence is valid eviden
 ```
 
 Validation rejects unknown versions or kinds, sources outside the profile, impossible requirements, incompatible
-artifact types, conflicting required and optional entries, undeclared precompute dependencies, and active use of
-an unobservable practice/source combination.
+artifact types, and conflicting required and optional entries. Product readiness refuses an `UNOBSERVABLE`
+practice.
 
 Author classifications (`MECHANICAL`, `SEMANTIC`, `CONDITIONALLY_OBSERVABLE`, or `UNOBSERVABLE`) are declarations,
 not empirical validation. Independent validation records their own scope, method, provenance, lifecycle, and
@@ -172,7 +180,7 @@ runtime records insufficient evidence and makes no claim that the change is focu
 ### Empty evidence is valid
 
 A complete pull-request comment query may materialize as `[]`. Its state is
-`AVAILABLE + EMPTY + COMPLETE`, not `UNAVAILABLE`. A capped, stale, redacted, or failed query cannot support the
+`AVAILABLE + EMPTY + COMPLETE`, not `UNAVAILABLE`. A capped/partial, redacted, or failed query cannot support the
 same semantic claim.
 
 ## Runtime behavior
@@ -181,6 +189,14 @@ The runtime resolves exact practice revisions before capture and collects the un
 requirements. Readiness is evaluated per practice. Optional-source failure does not refuse an otherwise eligible
 practice; required-source failure does. If no practice is eligible, no model request is made.
 
+One invocation may contain the governed union needed by several practices. The model can technically read that
+union; this runtime uses an attribution boundary rather than process isolation. The practice index lists each
+practice's admissible logical source kinds. Every finding must cite an exact quote and artifact path. The sandbox
+and server independently verify that the source is declared and available, the path belongs to that source in the
+pinned manifest, and the quote occurs in the digest-addressed artifact. Delivery fails atomically on any mismatch.
+This proves traceable grounding, not model causality; evaluations requiring non-interference must still run
+practices in isolated evidence views.
+
 The internal readiness report records each admission or refusal. Model-visible input exposes only the evidence
 needed for the review; governance metadata and protected reason codes remain internal.
 
@@ -188,15 +204,19 @@ needed for the review; governance metadata and protected reason codes remain int
 
 Historical records keep their original contract and practice revision. Currentness is derived:
 
-- changing a source meaning, scope, limit, mapping, freshness policy, or dependency stales claims that depend on it;
+- source and profile resources are immutable within a published contract version; any semantic change creates a new
+  version;
+- moving a practice to that version changes its evidence declaration and stales that practice's earlier claims;
 - changing a practice evidence declaration stales that practice's claims;
-- adding an unrelated source does not stale a practice that cannot use it;
+- adding a source cannot silently alter an existing declaration because its exact version and source list remain
+  pinned;
 - governance withdrawal disables future collection or delivery without rewriting historical semantics; and
 - erasure or expiry may make a claim unreplayable without making the historical result false.
 
 Semantic currentness, independent-validation status, governance eligibility, and replayability remain separate.
 Observation and review APIs expose `CURRENT`, `STALE`, or `UNVERIFIABLE` by comparing the evaluated practice
-revision with the current revision. Rows without a revision pin are `UNVERIFIABLE`.
+revision's detection fingerprint with the current revision's fingerprint. Presentation-only edits retain semantic
+currentness; rows without comparable versioned fingerprints are `UNVERIFIABLE`.
 
 ## Adding or changing a source
 
@@ -204,7 +224,7 @@ Complete the [artifact-source governance decision](../admin/dsms/artifact-source
 or expanded source use. Accuracy or product benefit alone does not authorize collection.
 
 Tests must cover the runtime source inventory, every supported capture state, valid empty evidence, impossible
-requirements, atomic capture, dependency closure, tenant isolation, retention and erasure, and safe telemetry.
+requirements, atomic capture, tenant isolation, retention and erasure, and safe telemetry.
 
 ## Standards and references
 

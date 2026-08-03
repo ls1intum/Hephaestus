@@ -31,7 +31,6 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         "diff.patch",
         "diff_summary.md",
         "diff_stat.txt",
-        "contributor_history.json",
         "issue_summary.md",
         // The two raw SQL-only graph projections (the agent cannot get these from the mounted worktree):
         "linked_work_items.json", // LinkedWorkItemContentSource.OUTPUT_FILE — resolved linked-issue rows

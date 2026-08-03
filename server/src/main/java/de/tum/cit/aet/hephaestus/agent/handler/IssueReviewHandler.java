@@ -122,10 +122,16 @@ public class IssueReviewHandler implements JobTypeHandler {
             new ContextRequest.IssueReviewRequest(job),
             EvidencePlan.compile(practices)
         );
-        practices = workspaceContextBuilder.readyPractices(prepared.manifest(), practices, job.getId().toString());
+        practices = workspaceContextBuilder.readyPractices(
+            prepared.manifest(),
+            practices,
+            job.getId().toString(),
+            job.getCreatedAt()
+        );
         if (practices.isEmpty()) {
             throw new JobPreparationException("No practice has sufficient evidence: jobId=" + job.getId());
         }
+        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, WorkArtifact.ISSUE, practices);
@@ -177,18 +183,14 @@ public class IssueReviewHandler implements JobTypeHandler {
                 "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
             );
         }
-        Set<String> defectDetectorSlugs =
-            job.getWorkspace() == null
-                ? Set.of()
-                : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.ISSUE);
+        Set<String> defectDetectorSlugs = practiceCatalogInjector.defectDetectorSlugs(job);
         List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings = new ArrayList<>(
             PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs)
         );
         PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
         log.info(
-            "Issue delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
+            "Issue delivery complete: inserted={}, duplicate={}, jobId={}",
             result.inserted(),
-            result.discardedUnknownSlug(),
             result.discardedDuplicate(),
             job.getId()
         );

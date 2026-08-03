@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -30,28 +32,8 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Cross-context, best-effort provider that de-blinds a PR review by materialising the linked
- * work-item(s) — issue body + acceptance criteria — into {@code inputs/context/linked_work_items.json}.
- *
- * <p>The acceptance criteria that a change must satisfy live in the linked issue body, which the diff
- * alone never carries. This provider parses work-item references from three signals and resolves each to
- * the issue row so the agent can ground a "did this satisfy the acceptance criteria?" finding.
- *
- * <p>Reference signals (telescope, not cage — hints + provenance, never full bodies):
- * <ul>
- *   <li><b>body</b>: closing keywords ({@code close|closes|fix|fixes|resolve|resolves|...}) {@code + #N},
- *       plus bare {@code #N} mentions.</li>
- *   <li><b>branch</b>: an issue id embedded in the source-branch slug, e.g. {@code 18-foo} or
- *       {@code feat/18-foo}.</li>
- *   <li><b>commits</b>: closing keywords / bare {@code #N} in the ahead-commit subjects.</li>
- * </ul>
- *
- * <p>Output is intentionally compact (capped at {@link #MAX_ITEMS} items, body excerpted to
- * {@link #EXCERPT_CHARS} chars) to bound the context size fed to the agent per turn. Each item
- * carries a real {@code htmlUrl} so a finding grounded in it is clickably provenanced.
- *
- * <p>Best-effort ({@link #required()} == {@code false}): a missing repo, branch, or issue — or any
- * failure — degrades to writing nothing and never aborts the job.
+ * Captures issue references from a pull request, its branch, and its first 50 pinned commit subjects.
+ * The contribution is partial when an input is unavailable, capped, or cannot be resolved.
  */
 @Component
 @Order(200)
@@ -76,16 +58,12 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
 
     private static final Logger log = LoggerFactory.getLogger(LinkedWorkItemContentSource.class);
 
-    /** Output filename under {@link ContentSource#OUTPUT_PREFIX}. */
     static final String OUTPUT_FILE = OUTPUT_PREFIX + "linked_work_items.json";
 
-    /** Maximum work-items materialised; keeps the file small (a few KB). */
     static final int MAX_ITEMS = 8;
 
-    /** Issue body is excerpted to this many characters — acceptance criteria live up front. */
     static final int EXCERPT_CHARS = 600;
 
-    /** Maximum commit subjects scanned for references (bounds work; ahead-list is already small). */
     private static final int MAX_COMMITS_SCANNED = 50;
 
     /**
@@ -146,24 +124,33 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
+        files.putAll(capture(request, Set.of(KIND)).files());
+    }
+
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        if (!selectedKinds.contains(KIND)) {
+            return new EvidenceContribution(Map.of(), Map.of());
+        }
         if (!(request instanceof ContextRequest.PracticeReviewRequest pr)) {
-            return;
+            return new EvidenceContribution(Map.of(), Map.of());
         }
         try {
             AgentJob job = pr.job();
             JsonNode m = job.getMetadata();
             if (m == null || m.isNull() || m.isMissingNode()) {
-                return;
+                throw new EvidenceCollectionException("Linked-work-item job metadata is missing", null);
             }
 
             Long repositoryId = MetaJson.optLong(m, "repository_id");
             Long pullRequestId = MetaJson.optLong(m, "pull_request_id");
             if (repositoryId == null) {
-                return;
+                throw new EvidenceCollectionException("Linked-work-item repository id is missing", null);
             }
 
             PullRequest pullRequest =
                 pullRequestId == null ? null : pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
+            boolean complete = pullRequest != null;
 
             String body = pullRequest != null ? pullRequest.getBody() : null;
             String sourceBranch = firstNonBlank(
@@ -175,44 +162,46 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
 
             collectFromText(body, refs, "body");
             collectFromBranch(sourceBranch, refs);
-            collectFromCommits(m, repositoryId, sourceBranch, refs);
-
-            if (refs.isEmpty()) {
-                return;
-            }
+            complete &= collectFromCommits(m, repositoryId, sourceBranch, refs);
 
             ArrayNode items = objectMapper.createArrayNode();
-            int emitted = 0;
+            int examined = 0;
             for (Map.Entry<Integer, Boolean> entry : refs.numbers.entrySet()) {
-                if (emitted >= MAX_ITEMS) {
-                    break;
-                }
+                if (examined++ >= MAX_ITEMS) break;
                 int number = entry.getKey();
                 Optional<Issue> resolved = issueRepository.findByRepositoryIdAndNumber(repositoryId, number);
                 if (resolved.isEmpty()) {
+                    complete = false;
                     continue;
                 }
                 items.add(toItem(resolved.get(), entry.getValue()));
-                emitted++;
             }
-
-            if (items.isEmpty()) {
-                // References existed but none resolved to a known issue row — write nothing.
-                return;
-            }
+            boolean truncated = refs.numbers.size() > MAX_ITEMS;
+            complete &= !truncated;
 
             ObjectNode root = objectMapper.createObjectNode();
             root.set("workItems", items);
-            root.put("truncated", refs.numbers.size() > MAX_ITEMS);
+            root.put("truncated", truncated);
             ArrayNode from = objectMapper.createArrayNode();
             for (String source : refs.resolvedFrom) {
                 from.add(source);
             }
             root.set("resolvedFrom", from);
 
-            files.put(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
+            Map<String, byte[]> files = Map.of(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
             log.info("Linked work items: wrote {} item(s), resolvedFrom={}", items.size(), refs.resolvedFrom);
+            return new EvidenceContribution(
+                files,
+                Map.of(KIND, complete ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(KIND, items.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
+            );
         } catch (Exception e) {
+            if (e instanceof EvidenceCollectionException evidenceCollectionException) {
+                throw evidenceCollectionException;
+            }
             throw new EvidenceCollectionException("Linked-work-item collection failed", e);
         }
     }
@@ -315,44 +304,40 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         }
     }
 
-    private void collectFromCommits(JsonNode metadata, long repositoryId, String sourceBranch, Refs refs) {
+    private boolean collectFromCommits(JsonNode metadata, long repositoryId, String sourceBranch, Refs refs) {
         if (!gitRepositoryManager.isEnabled() || !gitRepositoryManager.isRepositoryCloned(repositoryId)) {
-            return;
+            return false;
         }
-        // sourceBranch is the already-resolved head ref (metadata first, PR-row headRefName fallback) so the
-        // commit-subject scan and the branch scan agree on the branch name. target_branch / commit_sha stay
-        // metadata-only — they have no DB fallback here.
         String targetBranch = MetaJson.optString(metadata, "target_branch");
         String headSha = MetaJson.optString(metadata, "commit_sha");
         if (sourceBranch == null || sourceBranch.isBlank() || targetBranch == null || headSha == null) {
-            return;
+            return false;
         }
 
         try {
             var repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
             String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
-                return;
+                return false;
             }
             List<GitRepositoryManager.CommitInfo> ahead = gitRepositoryManager.walkCommits(
                 repositoryId,
                 range[0],
-                range[1]
+                range[1],
+                MAX_COMMITS_SCANNED + 1
             );
-            int scanned = 0;
-            for (GitRepositoryManager.CommitInfo commit : ahead) {
-                if (scanned >= MAX_COMMITS_SCANNED) {
-                    break;
-                }
-                scanned++;
+            boolean complete = ahead.size() <= MAX_COMMITS_SCANNED;
+            for (GitRepositoryManager.CommitInfo commit : ahead.stream().limit(MAX_COMMITS_SCANNED).toList()) {
                 String subject = commit.message();
                 if (subject == null || subject.isBlank()) {
                     continue;
                 }
                 collectFromText(subject, refs, "commits");
             }
+            return complete;
         } catch (Exception e) {
             log.debug("Commit-subject scan for linked work items skipped: {}", e.getMessage());
+            return false;
         }
     }
 

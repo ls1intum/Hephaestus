@@ -43,11 +43,7 @@ class ReactionSuppressionFilter {
         ReactionAction.NOT_APPLICABLE
     );
 
-    // Credential-leak practices whose still-BAD findings a reaction may never silence: a single DISPUTED /
-    // NOT_APPLICABLE must not permanently mute a secret that is STILL present this run. Membership here ==
-    // never-silenceable — a slug rename or a second secret practice must be added here (caught in one place)
-    // rather than silently becoming reaction-silenceable.
-    private static final Set<String> UNSUPPRESSABLE_SECRET_SLUGS = Set.of("hardcoded-secrets");
+    private static final String SECRET_SCANNER = "secret-diff-scanner";
 
     private final ObservationRepository observationRepository;
     private final ReactionRepository reactionRepository;
@@ -127,9 +123,10 @@ class ReactionSuppressionFilter {
                 continue;
             }
             ReactionAction action = actionByKey.get(key);
-            // A live credential-leak BAD alarm is never silenceable by a reaction (see UNSUPPRESSABLE_SECRET_SLUGS).
             boolean unsuppressableSecret =
-                UNSUPPRESSABLE_SECRET_SLUGS.contains(vf.practiceSlug()) && vf.assessment() == Assessment.BAD;
+                vf.assessment() == Assessment.BAD &&
+                vf.evidence() != null &&
+                SECRET_SCANNER.equals(vf.evidence().path("detector").asString());
             if (!unsuppressableSecret && action != null && SUPPRESS_ACTIONS.contains(action)) {
                 Observation pf = persistedByOccurrence.get(vf.occurrenceKey());
                 if (pf != null) {

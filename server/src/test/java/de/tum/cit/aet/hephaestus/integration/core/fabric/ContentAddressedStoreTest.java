@@ -45,6 +45,16 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
+    void getRejectsCorruptedBlob() throws Exception {
+        String sha = cas.put("original".getBytes(StandardCharsets.UTF_8));
+        java.nio.file.Files.writeString(cas.pathFor(sha), "corrupted");
+
+        assertThatThrownBy(() -> cas.get(sha))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("digest mismatch");
+    }
+
+    @Test
     void put_isIdempotent_doesNotRewrite() throws Exception {
         String sha = cas.put("immutable".getBytes(StandardCharsets.UTF_8));
         Path blob = cas.pathFor(sha);

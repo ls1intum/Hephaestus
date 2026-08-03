@@ -15,20 +15,25 @@ import org.jspecify.annotations.NonNull;
 public record PracticeEvidenceDeclaration(
     @NonNull @NotNull SourceContractVersion sourceContractVersion,
     @NonNull @NotNull EvidenceProfileId profile,
+    @NonNull @NotNull PracticeObservability observability,
     @NonNull
     @NotNull
     @Size(min = 1, message = "At least one required evidence source is required")
     @Valid
     List<PracticeEvidenceRequirement> required,
-    @NonNull @NotNull @Valid List<PracticeEvidenceRequirement> optional,
+    @NonNull @NotNull @Valid List<OptionalPracticeEvidenceRequirement> optional,
     @NonNull @NotNull PracticeEvidenceRefusal onUnsatisfied,
     @NonNull @NotNull @Valid List<PracticeEvidenceBlindSpot> blindSpots
 ) {
     public PracticeEvidenceDeclaration {
         Objects.requireNonNull(sourceContractVersion, "sourceContractVersion");
         Objects.requireNonNull(profile, "profile");
+        Objects.requireNonNull(observability, "observability");
         required = sortedRequirements(required, "required");
-        optional = sortedRequirements(optional, "optional");
+        optional = Objects.requireNonNull(optional, "optional")
+            .stream()
+            .sorted(Comparator.comparing(requirement -> requirement.sourceKind().value()))
+            .toList();
         Objects.requireNonNull(onUnsatisfied, "onUnsatisfied");
         blindSpots = Objects.requireNonNull(blindSpots, "blindSpots")
             .stream()

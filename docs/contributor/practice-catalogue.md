@@ -97,6 +97,9 @@ completeness/freshness, conservative refusal, and known blind spots. They must n
 from a missing file or require desired content to be non-empty. An author declaration is not independent
 observability validation.
 
+The detection fingerprint uses an explicit scheme prefix. Evidence-aware definitions use `v2`; stored `v1`
+fingerprints retain their original pre-contract meaning and never compare equal by accident.
+
 Architecture-wide qualities cannot be inferred from one change. A practice may review an observable
 act, such as recording a decision, without turning it into a claim about the whole system.
 

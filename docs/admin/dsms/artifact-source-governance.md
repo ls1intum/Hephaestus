@@ -40,7 +40,7 @@ defines the governance decision that permits collection, retention, processing, 
 | Processor and transfer | Controller or delegated privacy/procurement reviewer | DPA/AVV, role, region, subprocessors, transfer basis, retention and training terms |
 | Security and access | Security reviewer | Trust boundary, tenant isolation, injection and secret controls, audience policy, safe logging |
 | Retention and erasure | Data owner and integration maintainer | Expiry trigger, deletion owner, derived-data graph, export and erasure tests |
-| Runtime contract | Agent/runtime maintainer | Schema, authority, timing, completeness, missingness, dependency closure, contract tests |
+| Runtime contract | Agent/runtime maintainer | Schema, authority, timing, completeness, missingness, and contract tests |
 
 A material change reopens the affected reviews. One operator may disable a source immediately; re-enablement follows
 the normal decision path.
@@ -49,12 +49,21 @@ The runtime registry is
 [`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
 It is an engineering gate and contains only a releasable decision summary:
 
-- `ENGINEERING_BASELINE` with `PENDING_CONTROLLER_REVIEW` is not approval. It has no reviewer, decision time, or
-  expiry and cannot cover scope expansion.
+- `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized
+  product scope. It is not controller or DPO approval and cannot cover scope expansion.
 - `CONTROLLER_DECISION` requires a reviewer, decision time, expiry, and decided outcome. Only an unexpired
-  `APPROVED` product decision passes the source-use gate.
+  `APPROVED` decision passes when that basis is used.
 
 Neither the registry nor CI can establish a legal basis, certify a DPIA, or replace the controller's record.
+
+`AGENT_EVIDENCE_RETENTION` resolves to the configured `hephaestus.agent.payload-retention` and
+`hephaestus.agent.row-retention` windows enforced by `AgentJobRetentionService`; CAS garbage collection removes
+blobs after their job manifests stop retaining them. `WORKSPACE_AND_PERSON_ERASURE` is a governance obligation,
+not proof that every copy supports immediate selective deletion. Workspace purge removes agent SQL rows, while job
+replay directories and CAS blobs currently expire through the configured retention sweep. A production controller
+decision must explicitly accept that bounded residual window or require reference-aware immediate deletion first.
+Person and channel requests use the source-specific paths in the processor checklist; any uncovered derived copy
+blocks approval. The runtime and schemas use closed policy identifiers so a source cannot omit this decision.
 
 ## Decision record
 
@@ -143,6 +152,18 @@ Before enabling a source or increasing retention, tests must prove:
 Do not enable extended evaluation retention until its purpose, authorization, tenant isolation, retention, and
 source/workspace/person erasure paths are implemented and tested.
 
+## Approval renewal
+
+The shipped decisions expire on the date recorded in
+`contracts/artifact-source/1.0.0/source-use-decisions.json`. The application fails closed after expiry. Instance
+operators should alert when `artifact_source_governance_expiry_seconds` falls below 30 days and assign the alert
+to the instance privacy/governance owner.
+
+Before the deadline, that owner must review the source scopes, processors, retention, erasure coverage, and DPIA
+record; update `reviewer`, `decidedAt`, and `expiresAt`; run `pnpm run check:contracts`; and deploy the renewed
+release. Do not extend the date without the review. If renewal is denied or incomplete, remove the affected source
+from its profiles and practice declarations before expiry so review jobs decline cleanly instead of collecting it.
+
 ## Change checklist
 
 - [ ] Define a stable logical kind, authority, scope, timing, freshness, fidelity, caps, and missingness.
@@ -153,7 +174,7 @@ source/workspace/person erasure paths are implemented and tested.
 - [ ] Define operator, learner, and evaluation audiences and propagation rules.
 - [ ] Define product, evaluation, log, cache, broker, and backup retention separately.
 - [ ] Implement disconnect, purge, person erasure, expiry, export, and external-delivery handling.
-- [ ] Inventory all files, mounts, caches, tools, and derivations; test ablation dependency closure.
+- [ ] Inventory all files, mounts, caches, tools, and derivations; reject undeclared transformed views.
 - [ ] Test every supported state, including valid empty evidence and applicable truncation or redaction.
 - [ ] Use low-cardinality health metrics without workspace, repository, person, URL, or digest labels.
 - [ ] Document the kill switch and operator remediation.

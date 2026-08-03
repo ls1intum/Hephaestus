@@ -1,7 +1,5 @@
 # Hephaestus — Record of Processing Activities (Art. 30 GDPR)
 
-*Last updated: 2026-08-03.*
-
 This file is the Art. 30 record for the TUM-operated Hephaestus deployment at https://hephaestus.aet.cit.tum.de. Each section maps to a single Art. 30 element. Fenced code blocks are paste-ready into the corresponding TUM DSMS form field at https://dsms.datenschutz.tum.de/; everything outside the fences is contextual.
 
 ## Identifier

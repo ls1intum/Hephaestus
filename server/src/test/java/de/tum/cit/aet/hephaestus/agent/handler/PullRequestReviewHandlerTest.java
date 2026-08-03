@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionDeliveryService.DeliveryResult;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -26,12 +25,13 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -58,16 +59,13 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     @Mock
-    private GitRepositoryManager gitRepositoryManager;
+    private ContentAddressedStore cas;
 
     @Mock
     private PracticeRepository practiceRepository;
 
     @Mock
     private WorkspaceContextBuilder workspaceContextBuilder;
-
-    @Mock
-    private GitDiffOperations gitDiffOperations;
 
     @Mock
     private PracticeDetectionDeliveryService deliveryService;
@@ -87,11 +85,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         taskEnvelopeWriter = new TaskEnvelopeWriter(objectMapper);
         handler = new PullRequestReviewHandler(
             objectMapper,
-            gitRepositoryManager,
+            cas,
             new PracticeCatalogInjector(objectMapper, practiceRepository),
             workspaceContextBuilder,
             taskEnvelopeWriter,
-            gitDiffOperations,
             resultParser,
             deliveryService,
             feedbackService,
@@ -113,6 +110,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 )
             )
         );
+        lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));
+        lenient()
+            .when(workspaceContextBuilder.restrictTo(any(), any()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private PullRequestReviewSubmissionRequest sampleRequest() {
@@ -156,10 +157,35 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         var job = new AgentJob();
         job.setId(UUID.randomUUID());
         job.setMetadata(metadata);
+        job.setEvidenceSnapshot(admittedPracticeSnapshot());
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         job.setWorkspace(workspace);
         return job;
+    }
+
+    private ObjectNode admittedPracticeSnapshot() {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        var practices = snapshot.putArray("practices");
+        practices.addObject().put("slug", "pr-description-quality").put("revisionId", 1).put("defectDetector", false);
+        practices.addObject().put("slug", "error-handling").put("revisionId", 2).put("defectDetector", false);
+        practices
+            .addObject()
+            .put("slug", "avoids-insecure-defaults-and-over-broad-permissions")
+            .put("revisionId", 3)
+            .put("defectDetector", true);
+        var source = snapshot
+            .putObject("manifest")
+            .putArray("sources")
+            .addObject()
+            .put("kind", "scm.pull-request.diff")
+            .put("availability", "AVAILABLE");
+        source
+            .putArray("artifacts")
+            .addObject()
+            .put("path", "inputs/context/diff.patch")
+            .put("sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        return snapshot;
     }
 
     private Practice createPractice(String slug, String name, String criteria) {
@@ -171,6 +197,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setActive(true);
         p.setArtifactType(WorkArtifact.PULL_REQUEST);
         p.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        var revision = new PracticeRevision();
+        ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
+        p.setCurrentRevision(revision);
         return p;
     }
 
@@ -192,8 +221,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             )
             .thenReturn(prepared(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8))));
         lenient()
-            .when(workspaceContextBuilder.readyPractices(any(), any(), anyString()))
+            .when(workspaceContextBuilder.readyPractices(any(), any(), anyString(), any()))
             .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient()
+            .when(workspaceContextBuilder.restrictTo(any(), any()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
         lenient()
             .when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
@@ -273,7 +305,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     any(EvidencePlan.class)
                 )
             ).thenReturn(prepared(Map.of("inputs/context/metadata.json", metadataBytes)));
-            when(workspaceContextBuilder.readyPractices(any(), any(), anyString())).thenAnswer(invocation ->
+            when(workspaceContextBuilder.readyPractices(any(), any(), anyString(), any())).thenAnswer(invocation ->
                 invocation.getArgument(1)
             );
             when(
@@ -368,7 +400,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             providerFiles.put("inputs/context/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
             providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.prepare(any(), any())).thenReturn(prepared(providerFiles));
-            when(workspaceContextBuilder.readyPractices(any(), any(), anyString())).thenAnswer(invocation ->
+            when(workspaceContextBuilder.readyPractices(any(), any(), anyString(), any())).thenAnswer(invocation ->
                 invocation.getArgument(1)
             );
             when(
@@ -407,9 +439,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void filtersFindingBackedByNonWhitelistedInternal() {
-            // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
-            // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
-            var finding = finding("review-noise", Presence.ABSENT, "inputs/context/contributor_history.json");
+            var finding = finding("review-noise", Presence.ABSENT, "inputs/context/private_notes.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
@@ -474,6 +504,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         private AgentJob jobWithOutput(String rawOutputJson) {
             var job = new AgentJob();
             job.setId(UUID.randomUUID());
+            job.setEvidenceSnapshot(admittedPracticeSnapshot());
             ObjectNode output = objectMapper.createObjectNode();
             output.put("rawOutput", rawOutputJson);
             job.setOutput(output);
@@ -496,7 +527,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, false, Map.of()));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, false, Map.of()));
 
             handler.deliver(job);
 
@@ -514,14 +545,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         @SuppressWarnings("unchecked")
-        void hardcodedSecretCriticalSurvivesCoercion() {
-            // M1 guard: hardcoded-secrets is blocking-eligible, so a CRITICAL secret finding must NOT be capped
-            // to MINOR by the advisory ceiling in coerceCoherence. The band the handler hands to deliver() is
-            // what persists + delivers, so assert it there.
+        void hardcodedSecretUsesPracticeSeverityCap() {
             String rawOutput = """
                 {
                   "findings": [{
-                    "practiceSlug": "hardcoded-secrets",
+                    "practiceSlug": "avoids-insecure-defaults-and-over-broad-permissions",
                     "title": "Hard-coded credential",
                     "presence": "PRESENT",
                     "assessment": "BAD",
@@ -537,7 +565,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 List.class
             );
             when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(
-                new DeliveryResult(1, 0, 0, false, Map.of())
+                new DeliveryResult(1, 0, false, Map.of())
             );
 
             handler.deliver(job);
@@ -545,26 +573,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
             var secret = delivered
                 .stream()
-                .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
+                .filter(f -> "avoids-insecure-defaults-and-over-broad-permissions".equals(f.practiceSlug()))
                 .findFirst()
                 .orElseThrow();
-            assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
+            assertThat(secret.severity()).isEqualTo(Severity.MAJOR);
         }
 
-        /**
-         * Wire the delivery-phase diff helpers so {@code computeUnifiedDiff} / {@code computeDiffStatFiles}
-         * return a real two-ref diff instead of {@code null}. Without this every existing Deliver test runs
-         * with an empty diff (the secret pre-pass and stale-diff guard are no-ops). {@code diff} carries the
-         * unified body; {@code nameOnly} the changed-file list.
-         */
-        private void stubDiff(String diff, String nameOnly) {
-            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(true);
-            when(gitRepositoryManager.getRepositoryPath(123L)).thenReturn(java.nio.file.Path.of("/tmp/repo-123"));
-            when(
-                gitDiffOperations.resolveDiffRange(any(), eq("main"), eq("feature/auth-fix"), eq("abc123def456"))
-            ).thenReturn(new String[] { "base", "head" });
-            when(gitDiffOperations.diff(any(), eq("base"), eq("head"))).thenReturn(diff);
-            when(gitDiffOperations.diffNameOnly(any(), eq("base"), eq("head"))).thenReturn(nameOnly);
+        private void stubDiff(String diff) {
+            String annotated =
+                de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations.annotateDiffWithLineNumbers(diff);
+            when(cas.get(anyString())).thenReturn(java.util.Optional.of(annotated.getBytes(StandardCharsets.UTF_8)));
         }
 
         @Test
@@ -589,8 +607,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             output.put("rawOutput", rawOutput);
             job.setOutput(output);
             stubDiff(
-                "diff --git a/Sources/Auth.swift b/Sources/Auth.swift\n+++ b/Sources/Auth.swift\n@@ -1 +1 @@\n+changed\n",
-                "Sources/Auth.swift\n"
+                "diff --git a/Sources/Auth.swift b/Sources/Auth.swift\n+++ b/Sources/Auth.swift\n@@ -1 +1 @@\n+changed\n"
             );
 
             assertThatThrownBy(() -> handler.deliver(job))
@@ -624,8 +641,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             job.setOutput(output);
             // Diff touches a DIFFERENT file, so the finding's location is out of scope.
             stubDiff(
-                "diff --git a/Sources/Other.swift b/Sources/Other.swift\n+++ b/Sources/Other.swift\n@@ -1 +1 @@\n+x\n",
-                "Sources/Other.swift\n"
+                "diff --git a/Sources/Other.swift b/Sources/Other.swift\n+++ b/Sources/Other.swift\n@@ -1 +1 @@\n+x\n"
             );
 
             assertThatThrownBy(() -> handler.deliver(job))
@@ -637,10 +653,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         @SuppressWarnings("unchecked")
         void injectsSecretFindingWhenModelAbstainsButDiffCommitsCredential() {
-            // Deterministic secret pre-pass: the model emitted a single benign strength and never flagged the
-            // committed AWS key on the changed line. The handler must INJECT a synthetic hardcoded-secrets
-            // PRESENT/BAD finding so the credential still reaches deliver()/compose() — the green→red flip the
-            // weak model missed.
             String rawOutput = """
                 {
                   "findings": [{
@@ -657,20 +669,18 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             ObjectNode output = objectMapper.createObjectNode();
             output.put("rawOutput", rawOutput);
             job.setOutput(output);
-            // A committed AWS access key on an added line of a file that is in the diff.
             stubDiff(
                 "diff --git a/Sources/Config.swift b/Sources/Config.swift\n" +
                     "+++ b/Sources/Config.swift\n" +
                     "@@ -1 +1,2 @@\n" +
-                    "+let key = \"AKIA1234567890ABCDEF\"\n",
-                "Sources/Config.swift\n"
+                    "+let key = \"AKIA1234567890ABCDEF\"\n"
             );
 
             ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedFinding>> captor = ArgumentCaptor.forClass(
                 List.class
             );
             when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(
-                new DeliveryResult(1, 0, 0, false, Map.of())
+                new DeliveryResult(1, 0, false, Map.of())
             );
 
             handler.deliver(job);
@@ -678,7 +688,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
             var secret = delivered
                 .stream()
-                .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
+                .filter(f -> "avoids-insecure-defaults-and-over-broad-permissions".equals(f.practiceSlug()))
                 .findFirst()
                 .orElseThrow();
             assertThat(secret.presence()).isEqualTo(Presence.PRESENT);
@@ -720,7 +730,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 for (var f : received) {
                     keys.put(f, new ObservationKeys("occ-" + f.practiceSlug(), "corr-" + f.practiceSlug()));
                 }
-                return new DeliveryResult(received.size(), 0, 0, true, keys);
+                return new DeliveryResult(received.size(), 0, true, keys);
             });
 
             handler.deliver(job);

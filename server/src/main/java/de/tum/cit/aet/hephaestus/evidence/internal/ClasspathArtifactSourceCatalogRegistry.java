@@ -5,12 +5,14 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.CaptureTimeBasis;
 import de.tum.cit.aet.hephaestus.evidence.CompletenessPolicy;
+import de.tum.cit.aet.hephaestus.evidence.ErasurePolicy;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessPolicy;
 import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
 import de.tum.cit.aet.hephaestus.evidence.PrivacyClass;
+import de.tum.cit.aet.hephaestus.evidence.RetentionPolicy;
 import de.tum.cit.aet.hephaestus.evidence.SourceAuthority;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -24,14 +26,18 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -40,6 +46,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSourceCatalogRegistry {
 
+    private static final Logger log = LoggerFactory.getLogger(ClasspathArtifactSourceCatalogRegistry.class);
+
     static final SourceContractVersion CURRENT_VERSION = new SourceContractVersion("1.0.0");
     static final String CATALOG_RESOURCE = "contracts/artifact-source/1.0.0/catalog.json";
     static final String USE_DECISIONS_RESOURCE = "contracts/artifact-source/1.0.0/source-use-decisions.json";
@@ -47,13 +55,31 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     private final ArtifactSourceCatalog catalog;
     private final String catalogDigest;
     private final Map<String, SourceUseDecision> useDecisions;
+    private final Clock clock;
 
     public ClasspathArtifactSourceCatalogRegistry(JsonMapper objectMapper, Clock clock) {
+        this.clock = clock;
         byte[] catalogBytes = readBytes(CATALOG_RESOURCE);
         this.catalog = parse(read(objectMapper, catalogBytes, CATALOG_RESOURCE));
         this.catalogDigest = sha256(catalogBytes);
         this.useDecisions = parseUseDecisions(read(objectMapper, USE_DECISIONS_RESOURCE));
         validateUseDecisions(catalog, useDecisions, clock.instant());
+        useDecisions
+            .values()
+            .stream()
+            .map(SourceUseDecision::expiresAt)
+            .filter(java.util.Objects::nonNull)
+            .min(Instant::compareTo)
+            .ifPresent(expiry -> {
+                long days = ChronoUnit.DAYS.between(clock.instant(), expiry);
+                if (days <= 30) {
+                    log.warn(
+                        "Artifact-source governance approval expires in {} day(s) at {}; renew the versioned source-use decisions before that deadline",
+                        days,
+                        expiry
+                    );
+                }
+            });
     }
 
     @Override
@@ -69,11 +95,16 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     @Override
     public ArtifactSourceContract requireSource(SourceContractVersion version, SourceKind kind) {
         requireSupported(version);
-        return catalog
+        ArtifactSourceContract contract = catalog
             .source(kind)
             .orElseThrow(() ->
                 new IllegalArgumentException("Unknown source kind for contract " + version + ": " + kind)
             );
+        SourceUseDecision decision = requireUseDecision(version, contract.useDecisionId());
+        if (!decision.permitsProductUseAt(clock.instant())) {
+            throw new IllegalStateException("Source-use decision is not currently effective: " + decision.id());
+        }
+        return contract;
     }
 
     @Override
@@ -96,6 +127,16 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             );
         }
         return decision;
+    }
+
+    @Override
+    public Optional<Instant> earliestUseDecisionExpiry() {
+        return useDecisions
+            .values()
+            .stream()
+            .map(SourceUseDecision::expiresAt)
+            .filter(java.util.Objects::nonNull)
+            .min(Instant::compareTo);
     }
 
     private void requireSupported(SourceContractVersion version) {
@@ -129,6 +170,8 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             node,
             Set.of(
                 "kind",
+                "description",
+                "selectionScope",
                 "artifactTypes",
                 "authority",
                 "captureTime",
@@ -162,6 +205,8 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
 
         return new ArtifactSourceContract(
             kind,
+            requiredText(node, "description", kind.toString()),
+            requiredText(node, "selectionScope", kind.toString()),
             textSet(node, "artifactTypes", kind.toString()),
             enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
             enumValue(CaptureTimeBasis.class, requiredText(node, "captureTime", kind.toString()), "capture time"),
@@ -174,8 +219,12 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             enumValue(PrivacyClass.class, requiredText(node, "privacyClass", kind.toString()), "privacy class"),
             enumSet(MissingnessKind.class, node, "supportedMissingness", kind.toString()),
             requiredText(node, "purpose", kind.toString()),
-            requiredText(node, "retentionPolicy", kind.toString()),
-            requiredText(node, "erasurePolicy", kind.toString()),
+            enumValue(
+                RetentionPolicy.class,
+                requiredText(node, "retentionPolicy", kind.toString()),
+                "retention policy"
+            ),
+            enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", kind.toString()), "erasure policy"),
             requiredText(node, "useDecisionId", kind.toString())
         );
     }
@@ -237,8 +286,8 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 enumValue(SourceUseOutcome.class, requiredText(node, "outcome", id), "source-use outcome"),
                 requiredText(node, "audience", id),
                 optionalText(node, "modelProcessor", id),
-                requiredText(node, "retentionPolicy", id),
-                requiredText(node, "erasurePolicy", id),
+                enumValue(RetentionPolicy.class, requiredText(node, "retentionPolicy", id), "retention policy"),
+                enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", id), "erasure policy"),
                 requiredInstant(node, "recordedAt", id),
                 optionalText(node, "reviewer", id),
                 optionalInstant(node, "decidedAt", id),

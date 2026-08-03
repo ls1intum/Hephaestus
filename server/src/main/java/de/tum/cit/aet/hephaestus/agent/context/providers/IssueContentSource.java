@@ -14,7 +14,9 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +24,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -69,10 +72,16 @@ public class IssueContentSource implements EvidenceSource {
 
     private final ObjectMapper objectMapper;
     private final IssueRepository issueRepository;
+    private final IssueCommentRepository issueCommentRepository;
 
-    public IssueContentSource(ObjectMapper objectMapper, IssueRepository issueRepository) {
+    public IssueContentSource(
+        ObjectMapper objectMapper,
+        IssueRepository issueRepository,
+        IssueCommentRepository issueCommentRepository
+    ) {
         this.objectMapper = objectMapper;
         this.issueRepository = issueRepository;
+        this.issueCommentRepository = issueCommentRepository;
     }
 
     @Override
@@ -103,67 +112,39 @@ public class IssueContentSource implements EvidenceSource {
                 new JobPreparationException("Issue not found: issueId=" + issueId + ", jobId=" + job.getId())
             );
 
-        String repoFullName = issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
-
-        ObjectNode meta = objectMapper.createObjectNode();
-        meta.put("issue_number", issue.getNumber());
-        meta.put("title", issue.getTitle());
-        meta.put("body", issue.getBody() != null ? issue.getBody() : "");
-        meta.put("state", issue.getState() != null ? issue.getState().name() : "UNKNOWN");
-        meta.put("state_reason", issue.getStateReason() != null ? issue.getStateReason().name() : null);
-        meta.put("html_url", issue.getHtmlUrl());
-        meta.put("repository_full_name", repoFullName);
-        meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
-        meta.put("is_locked", issue.isLocked());
-        meta.put("comments_count", issue.getCommentsCount());
-        meta.put("sub_issues_total", issue.getSubIssuesTotal());
-        meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
-        meta.put("milestone", issue.getMilestone() != null ? issue.getMilestone().getTitle() : null);
-        meta.put("closed_at", issue.getClosedAt() != null ? issue.getClosedAt().toString() : null);
-        ArrayNode labels = meta.putArray("labels");
-        issue
-            .getLabels()
-            .stream()
-            .map(l -> l.getName())
-            .sorted()
-            .forEach(labels::add);
-        ArrayNode assignees = meta.putArray("assignees");
-        issue
-            .getAssignees()
-            .stream()
-            .map(u -> u.getLogin())
-            .filter(Objects::nonNull)
-            .sorted()
-            .forEach(assignees::add);
         if (selectedKinds.contains(CORE)) {
-            writeJson(files, "metadata.json", meta);
-        }
-
-        int commentCount = 0;
-        if (selectedKinds.contains(COMMENTS)) {
-            List<IssueComment> ordered = issue
-                .getComments()
+            String repoFullName = issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
+            ObjectNode meta = objectMapper.createObjectNode();
+            meta.put("issue_number", issue.getNumber());
+            meta.put("title", issue.getTitle());
+            meta.put("body", issue.getBody() != null ? issue.getBody() : "");
+            meta.put("state", issue.getState() != null ? issue.getState().name() : "UNKNOWN");
+            meta.put("state_reason", issue.getStateReason() != null ? issue.getStateReason().name() : null);
+            meta.put("html_url", issue.getHtmlUrl());
+            meta.put("repository_full_name", repoFullName);
+            meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
+            meta.put("is_locked", issue.isLocked());
+            meta.put("comments_count", issue.getCommentsCount());
+            meta.put("sub_issues_total", issue.getSubIssuesTotal());
+            meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
+            meta.put("milestone", issue.getMilestone() != null ? issue.getMilestone().getTitle() : null);
+            meta.put("closed_at", issue.getClosedAt() != null ? issue.getClosedAt().toString() : null);
+            ArrayNode labels = meta.putArray("labels");
+            issue
+                .getLabels()
                 .stream()
-                .sorted(
-                    Comparator.comparing(IssueComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                )
-                .toList();
-            if (ordered.size() > MAX_COMMENTS) {
-                ordered = ordered.subList(ordered.size() - MAX_COMMENTS, ordered.size());
-            }
-            ArrayNode commentsArr = objectMapper.createArrayNode();
-            for (IssueComment c : ordered) {
-                ObjectNode cn = objectMapper.createObjectNode();
-                cn.put("author", c.getAuthor() != null ? c.getAuthor().getLogin() : null);
-                cn.put("created_at", c.getCreatedAt() != null ? c.getCreatedAt().toString() : null);
-                cn.put("body", c.getBody() != null ? c.getBody() : "");
-                commentsArr.add(cn);
-            }
-            commentCount = ordered.size();
-            writeJson(files, "comments.json", commentsArr);
-        }
-
-        if (selectedKinds.contains(CORE)) {
+                .map(l -> l.getName())
+                .sorted()
+                .forEach(labels::add);
+            ArrayNode assignees = meta.putArray("assignees");
+            issue
+                .getAssignees()
+                .stream()
+                .map(u -> u.getLogin())
+                .filter(Objects::nonNull)
+                .sorted()
+                .forEach(assignees::add);
+            writeJson(files, "metadata.json", meta);
             StringBuilder md = new StringBuilder(512);
             md.append("# Issue #").append(issue.getNumber()).append(" — ").append(issue.getTitle()).append("\n\n");
             md.append("- **State:** ").append(issue.getState());
@@ -201,6 +182,21 @@ public class IssueContentSource implements EvidenceSource {
             files.put(OUTPUT_PREFIX + "issue_summary.md", md.toString().getBytes(StandardCharsets.UTF_8));
         }
 
+        int commentCount = 0;
+        if (selectedKinds.contains(COMMENTS)) {
+            List<IssueComment> ordered = recentComments(issueId);
+            ArrayNode commentsArr = objectMapper.createArrayNode();
+            for (IssueComment c : ordered) {
+                ObjectNode cn = objectMapper.createObjectNode();
+                cn.put("author", c.getAuthor() != null ? c.getAuthor().getLogin() : null);
+                cn.put("created_at", c.getCreatedAt() != null ? c.getCreatedAt().toString() : null);
+                cn.put("body", c.getBody() != null ? c.getBody() : "");
+                commentsArr.add(cn);
+            }
+            commentCount = ordered.size();
+            writeJson(files, "comments.json", commentsArr);
+        }
+
         log.info(
             "Issue context built: issueId={}, number={}, comments={}, jobId={}",
             issueId,
@@ -211,6 +207,7 @@ public class IssueContentSource implements EvidenceSource {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
         EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
         JsonNode metadata = ((ContextRequest.IssueReviewRequest) request).job().getMetadata();
@@ -221,21 +218,17 @@ public class IssueContentSource implements EvidenceSource {
             completeness.put(CORE, issue == null ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE);
         }
         if (selectedKinds.contains(COMMENTS)) {
-            byte[] comments = captured.files().get(OUTPUT_PREFIX + "comments.json");
-            try {
-                int count = comments == null ? 0 : objectMapper.readTree(comments).size();
-                completeness.put(
-                    COMMENTS,
-                    count < MAX_COMMENTS ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL
-                );
-            } catch (Exception e) {
-                throw new IllegalStateException("Serialized issue comments could not be read", e);
-            }
+            int fetched = issueCommentRepository
+                .findRecentByIssueIdWithAuthor(issueId, PageRequest.of(0, MAX_COMMENTS + 1))
+                .size();
+            completeness.put(
+                COMMENTS,
+                fetched <= MAX_COMMENTS ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL
+            );
         }
         Map<SourceKind, java.time.Instant> observedAt = new java.util.HashMap<>();
         if (issue != null && issue.getLastSyncAt() != null) {
             if (selectedKinds.contains(CORE)) observedAt.put(CORE, issue.getLastSyncAt());
-            if (selectedKinds.contains(COMMENTS)) observedAt.put(COMMENTS, issue.getLastSyncAt());
         }
         Map<SourceKind, SourceContentState> contentStates = new java.util.HashMap<>();
         if (selectedKinds.contains(COMMENTS)) {
@@ -252,6 +245,20 @@ public class IssueContentSource implements EvidenceSource {
             }
         }
         return new EvidenceContribution(captured.files(), completeness, Map.of(), observedAt, Map.of(), contentStates);
+    }
+
+    private List<IssueComment> recentComments(long issueId) {
+        List<IssueComment> comments = new ArrayList<>(
+            issueCommentRepository.findRecentByIssueIdWithAuthor(issueId, PageRequest.of(0, MAX_COMMENTS + 1))
+        );
+        if (comments.size() > MAX_COMMENTS + 1) {
+            comments = new ArrayList<>(comments.subList(0, MAX_COMMENTS + 1));
+        }
+        if (comments.size() > MAX_COMMENTS) comments.remove(comments.size() - 1);
+        comments.sort(
+            Comparator.comparing(IssueComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+        );
+        return comments;
     }
 
     private void writeJson(Map<String, byte[]> files, String name, Object node) {

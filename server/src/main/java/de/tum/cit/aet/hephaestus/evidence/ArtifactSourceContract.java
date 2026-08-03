@@ -6,6 +6,8 @@ import java.util.Set;
 /** Contract for one independently missing, fresh, complete, private, and ablatable source kind. */
 public record ArtifactSourceContract(
     SourceKind kind,
+    String description,
+    String selectionScope,
     Set<String> artifactTypes,
     SourceAuthority authority,
     CaptureTimeBasis captureTime,
@@ -14,12 +16,14 @@ public record ArtifactSourceContract(
     PrivacyClass privacyClass,
     Set<MissingnessKind> supportedMissingness,
     String purpose,
-    String retentionPolicy,
-    String erasurePolicy,
+    RetentionPolicy retentionPolicy,
+    ErasurePolicy erasurePolicy,
     String useDecisionId
 ) {
     public ArtifactSourceContract {
         Objects.requireNonNull(kind, "kind");
+        description = requireText(description, "description", kind);
+        selectionScope = requireText(selectionScope, "selectionScope", kind);
         artifactTypes = Set.copyOf(Objects.requireNonNull(artifactTypes, "artifactTypes"));
         if (artifactTypes.isEmpty() || artifactTypes.stream().anyMatch(value -> value == null || value.isBlank())) {
             throw new IllegalArgumentException("artifactTypes must contain non-blank values: " + kind);
@@ -34,8 +38,8 @@ public record ArtifactSourceContract(
             throw new IllegalArgumentException("supportedMissingness must not be empty: " + kind);
         }
         purpose = requireText(purpose, "purpose", kind);
-        retentionPolicy = requireText(retentionPolicy, "retentionPolicy", kind);
-        erasurePolicy = requireText(erasurePolicy, "erasurePolicy", kind);
+        Objects.requireNonNull(retentionPolicy, "retentionPolicy");
+        Objects.requireNonNull(erasurePolicy, "erasurePolicy");
         useDecisionId = requireText(useDecisionId, "useDecisionId", kind);
     }
 

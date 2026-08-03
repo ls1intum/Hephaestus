@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.evidence;
 import java.util.Objects;
 import java.util.Set;
 
-/** Named allow-list used to isolate practices that may share one detector invocation. */
+/** Named allow-list of source kinds available to one artifact-review profile. */
 public record EvidenceProfile(
     EvidenceProfileId id,
     SourceContractVersion version,

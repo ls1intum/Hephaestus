@@ -59,6 +59,13 @@ function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefin
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
 }
 
+function words(token: string): string {
+	return token
+		.replace(/_/g, " ")
+		.replace(/([a-z])([A-Z])/g, "$1 $2")
+		.replace(/^./, (letter) => letter.toUpperCase());
+}
+
 function displayEvidence(evidence: PracticeEvidenceDeclaration): string {
 	const requirement = ({
 		sourceKind,
@@ -68,6 +75,7 @@ function displayEvidence(evidence: PracticeEvidenceDeclaration): string {
 		`${sourceKind} (${completeness.toLowerCase()}, ${freshness.toLowerCase()})`;
 	const lines = [
 		`Contract ${evidence.sourceContractVersion} · ${evidence.profile}`,
+		`Observability: ${words(evidence.observability)}`,
 		"Required:",
 		...evidence.required.map(requirement),
 	];
@@ -98,11 +106,6 @@ function displayValue(
 	if (field === "evidence" && typeof value === "object") {
 		return displayEvidence(value as PracticeEvidenceDeclaration);
 	}
-	const words = (token: string) =>
-		token
-			.replace(/_/g, " ")
-			.replace(/([a-z])([A-Z])/g, "$1 $2")
-			.replace(/^./, (letter) => letter.toUpperCase());
 	if (field === "artifactType") {
 		return (
 			FOCUS_ARTIFACT_OPTIONS.find((option) => option.value === value)?.label ?? words(String(value))

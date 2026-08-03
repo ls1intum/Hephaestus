@@ -294,11 +294,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     /** Written before the sandbox starts, so a failed or cancelled run still records what it consumed. */
     @WorkspaceAgnostic("ID-based provenance stamp; job ID from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE AgentJob j SET j.promptDigest = :promptDigest, j.inputsDigest = :inputsDigest WHERE j.id = :id")
+    @Query(
+        "UPDATE AgentJob j SET j.promptDigest = :promptDigest, j.inputsDigest = :inputsDigest, " +
+            "j.evidenceSnapshot = :evidenceSnapshot WHERE j.id = :id"
+    )
     int updateProvenanceDigests(
         @Param("id") UUID id,
         @Param("promptDigest") String promptDigest,
-        @Param("inputsDigest") String inputsDigest
+        @Param("inputsDigest") String inputsDigest,
+        @Param("evidenceSnapshot") JsonNode evidenceSnapshot
     );
 
     /**

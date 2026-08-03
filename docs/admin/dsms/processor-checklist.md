@@ -1,7 +1,5 @@
 # Hephaestus — Art. 28 Processor Checklist
 
-*Last updated: 2026-08-03.*
-
 Records every entity that might qualify as a processor (Art. 28 GDPR) for the TUM-operated Hephaestus deployment and the status of the corresponding Auftragsverarbeitungsvertrag (AVV). Internal AET-operated components and the LRZ public-body counterpart are listed for completeness so the record is self-contained.
 
 ## Summary

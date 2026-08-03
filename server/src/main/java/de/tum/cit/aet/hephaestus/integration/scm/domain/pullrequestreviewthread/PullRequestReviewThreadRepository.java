@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,4 +41,14 @@ public interface PullRequestReviewThreadRepository extends JpaRepository<PullReq
         """
     )
     List<PullRequestReviewThread> findAllByPullRequestIdWithResolvedBy(@Param("pullRequestId") Long pullRequestId);
+
+    @Query("SELECT t.id FROM PullRequestReviewThread t WHERE t.pullRequest.id = :pullRequestId ORDER BY t.id DESC")
+    List<Long> findRecentIdsByPullRequestId(@Param("pullRequestId") Long pullRequestId, Pageable pageable);
+
+    @Query(
+        "SELECT DISTINCT t FROM PullRequestReviewThread t " +
+            "LEFT JOIN FETCH t.resolvedBy LEFT JOIN FETCH t.comments c LEFT JOIN FETCH c.author " +
+            "WHERE t.id IN :ids ORDER BY t.id"
+    )
+    List<PullRequestReviewThread> findAllByIdWithResolvedBy(@Param("ids") List<Long> ids);
 }

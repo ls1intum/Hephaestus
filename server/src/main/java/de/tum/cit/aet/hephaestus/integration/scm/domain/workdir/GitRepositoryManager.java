@@ -58,6 +58,8 @@ import org.springframework.stereotype.Service;
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
 
+    private static final int MAX_TREE_FILES = 20_000;
+
     /** Connector namespace for SCM checkouts in the fabric {@code sources/} tree. */
     private static final String SCM_CONNECTOR = "scm";
 
@@ -459,6 +461,13 @@ public class GitRepositoryManager {
      * @return list of commit info with file changes
      */
     public List<CommitInfo> walkCommits(Long repositoryId, @Nullable String fromSha, String toSha) {
+        return walkCommits(repositoryId, fromSha, toSha, Integer.MAX_VALUE);
+    }
+
+    public List<CommitInfo> walkCommits(Long repositoryId, @Nullable String fromSha, String toSha, int limit) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
         if (!properties.enabled()) {
             return List.of();
         }
@@ -487,6 +496,7 @@ public class GitRepositoryManager {
                     for (RevCommit revCommit : revWalk) {
                         CommitInfo commitInfo = extractCommitInfo(repo, revCommit);
                         commits.add(commitInfo);
+                        if (commits.size() >= limit) break;
                     }
                 }
             } catch (IOException e) {
@@ -802,6 +812,10 @@ public class GitRepositoryManager {
 
                         while (treeWalk.next()) {
                             visitedFiles++;
+                            if (visitedFiles > MAX_TREE_FILES) {
+                                limitations.add("FILE_COUNT_LIMIT_REACHED");
+                                break;
+                            }
                             String sourcePath = treeWalk.getPathString();
                             FileMode mode = treeWalk.getFileMode(0);
                             if (FileMode.SYMLINK.equals(mode)) {

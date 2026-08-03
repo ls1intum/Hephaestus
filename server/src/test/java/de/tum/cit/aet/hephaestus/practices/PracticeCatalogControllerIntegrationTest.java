@@ -1797,7 +1797,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "ReviewSubmitted"
             );
             assertThat(revisions.get(0).getCriteria()).isEqualTo("Detect if the PR follows best practices");
-            assertThat(revisions.get(0).getDetectionFingerprint()).hasSize(64);
+            assertThat(revisions.get(0).getDetectionFingerprint()).hasSize(67).startsWith("v2:");
             assertThat(revisions.get(0).getCreatedAt()).isNotNull();
         }
 

@@ -8,7 +8,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 
@@ -46,6 +49,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         p.setSlug(slug);
         p.setName(slug);
         p.setCriteria("criteria for " + slug);
+        p.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        var revision = new PracticeRevision();
+        ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
+        p.setCurrentRevision(revision);
         ArrayNode arr = objectMapper.createArrayNode();
         for (String e : triggerEvents) {
             arr.add(e);
@@ -177,6 +184,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         // index.json lists both practices (area falls back to the slug when ungrouped).
         String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
         assertThat(index).contains("authoring").contains("retrospective");
+        assertThat(index).contains("allowedSources").contains("scm.pull-request.diff");
         // Per-slug criteria + the all-criteria bundle are present.
         assertThat(files).containsKey(md("authoring")).containsKey(md("retrospective"));
         String bundle = new String(
@@ -208,16 +216,16 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("defectDetectorSlugs returns only practices whose criteria declare DEFECT-DETECTOR DISCIPLINE")
-    void defectDetectorSlugsFiltersByMarker() {
-        Practice detector = practice("authoring", "PullRequestCreated");
-        detector.setCriteria("Some rule. DEFECT-DETECTOR DISCIPLINE applies here.");
-        Practice ordinary = practice("retrospective", "PullRequestMerged"); // plain criteria, no marker
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(List.of(detector, ordinary));
+    @DisplayName("defectDetectorSlugs uses the exact admitted practice snapshot")
+    void defectDetectorSlugsUsesSnapshot() {
+        AgentJob job = job("PullRequestCreated");
+        var snapshot = objectMapper.createObjectNode();
+        var practices = snapshot.putArray("practices");
+        practices.addObject().put("slug", "authoring").put("defectDetector", true);
+        practices.addObject().put("slug", "retrospective").put("defectDetector", false);
+        job.setEvidenceSnapshot(snapshot);
 
-        Set<String> slugs = injector.defectDetectorSlugs(1L, WorkArtifact.PULL_REQUEST);
+        Set<String> slugs = injector.defectDetectorSlugs(job);
 
         assertThat(slugs).containsExactly("authoring");
     }

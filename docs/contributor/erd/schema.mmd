@@ -92,6 +92,7 @@ erDiagram
         TIMESTAMPTZ execution_started_at
         VARCHAR(32) purpose
         VARCHAR(32) hold_reason
+        JSONB evidence_snapshot
     }
 
     AuthEvent {
@@ -439,6 +440,7 @@ erDiagram
         VARCHAR(500) silent_mode_reason
         TIMESTAMPTZ silent_mode_changed_at
         VARCHAR(255) silent_mode_changed_by
+        BIGINT version "NOT NULL"
     }
 
     Issue {
@@ -805,7 +807,7 @@ erDiagram
         INTEGER display_order "NOT NULL"
         BIGINT current_revision_id FK,UK
         VARCHAR(64) source_curated_slug
-        VARCHAR(64) source_curated_fingerprint
+        VARCHAR(96) source_curated_fingerprint
         JSONB evidence_declaration "NOT NULL"
     }
 
@@ -849,7 +851,7 @@ erDiagram
         TEXT area_description
         VARCHAR(64) area_icon
         VARCHAR(32) area_color
-        VARCHAR(64) detection_fingerprint
+        VARCHAR(96) detection_fingerprint
         JSONB evidence_declaration
     }
 

@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -168,4 +169,22 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         """
     )
     List<IssueComment> findByIssueIdWithAuthorOrderByCreatedAt(@Param("issueId") Long issueId);
+
+    @Query(
+        "SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author " +
+            "WHERE ic.issue.id = :issueId ORDER BY ic.createdAt DESC, ic.id DESC"
+    )
+    List<IssueComment> findRecentByIssueIdWithAuthor(@Param("issueId") Long issueId, Pageable pageable);
+
+    @Query(
+        "SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author " +
+            "WHERE ic.issue.id = :issueId AND ic.body IS NOT NULL AND TRIM(ic.body) <> '' " +
+            "AND ic.body NOT LIKE CONCAT('%', :excludedMarker, '%') " +
+            "ORDER BY ic.createdAt DESC, ic.id DESC"
+    )
+    List<IssueComment> findRecentHumanByIssueIdWithAuthor(
+        @Param("issueId") Long issueId,
+        @Param("excludedMarker") String excludedMarker,
+        Pageable pageable
+    );
 }

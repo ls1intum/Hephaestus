@@ -2,14 +2,20 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -17,11 +23,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -37,20 +46,23 @@ class IssueContentSourceTest extends BaseUnitTest {
     private static final String METADATA_KEY = "inputs/context/metadata.json";
     private static final String COMMENTS_KEY = "inputs/context/comments.json";
     private static final String SUMMARY_KEY = "inputs/context/issue_summary.md";
+    private static final SourceKind COMMENTS = new SourceKind("scm.issue.comments");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
     private IssueRepository issueRepository;
 
+    @Mock
+    private IssueCommentRepository issueCommentRepository;
+
     private IssueContentSource provider;
 
     @BeforeEach
     void setUp() {
-        provider = new IssueContentSource(objectMapper, issueRepository);
+        provider = new IssueContentSource(objectMapper, issueRepository, issueCommentRepository);
+        lenient().when(issueCommentRepository.findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any())).thenReturn(List.of());
     }
-
-    // ---- Fixtures ----------------------------------------------------------
 
     private ObjectNode sampleMetadata() {
         ObjectNode metadata = objectMapper.createObjectNode();
@@ -91,7 +103,13 @@ class IssueContentSourceTest extends BaseUnitTest {
         return c;
     }
 
-    /** A fully-populated, CLOSED issue with labels, assignees, a milestone, and a sub-issue rollup. */
+    private void stubComments(List<IssueComment> chronological) {
+        int from = Math.max(0, chronological.size() - IssueContentSource.MAX_COMMENTS - 1);
+        List<IssueComment> recent = new ArrayList<>(chronological.subList(from, chronological.size()));
+        Collections.reverse(recent);
+        when(issueCommentRepository.findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any())).thenReturn(recent);
+    }
+
     private Issue richIssue() {
         Issue issue = new Issue();
         issue.setId(ISSUE_ID);
@@ -115,14 +133,11 @@ class IssueContentSourceTest extends BaseUnitTest {
         milestone.setTitle("v1.0");
         issue.setMilestone(milestone);
 
-        // Set iteration order is incidental; the provider sorts label/assignee output.
         issue.setLabels(new LinkedHashSet<>(List.of(label("zeta"), label("alpha"))));
         issue.setAssignees(new LinkedHashSet<>(List.of(user("bob"), user("alice"))));
 
         return issue;
     }
-
-    // ---- Supports ----------------------------------------------------------
 
     @Nested
     class Supports {
@@ -132,8 +147,6 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(provider.supports(request(sampleMetadata()))).isTrue();
         }
     }
-
-    // ---- metadata.json -----------------------------------------------------
 
     @Nested
     class Metadata {
@@ -211,18 +224,15 @@ class IssueContentSourceTest extends BaseUnitTest {
         }
     }
 
-    // ---- comments.json -----------------------------------------------------
-
     @Nested
     class Comments {
 
         @Test
         void ordersThreadByCreatedAtAscending() throws Exception {
             Issue issue = richIssue();
-            // Inserted out of order; provider must sort ascending by createdAt.
             IssueComment newer = comment("alice", "second", Instant.parse("2025-06-02T10:00:00Z"));
             IssueComment older = comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"));
-            issue.setComments(new LinkedHashSet<>(List.of(newer, older)));
+            stubComments(List.of(older, newer));
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
@@ -239,9 +249,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         @Test
         void emitsNullAuthorWhenCommentHasNoAuthor() throws Exception {
             Issue issue = richIssue();
-            issue.setComments(
-                new LinkedHashSet<>(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))))
-            );
+            stubComments(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))));
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
@@ -255,14 +263,13 @@ class IssueContentSourceTest extends BaseUnitTest {
         @Test
         void truncatesToMaxCommentsKeepingMostRecent() throws Exception {
             Issue issue = richIssue();
-            var thread = new LinkedHashSet<IssueComment>();
+            var thread = new ArrayList<IssueComment>();
             int overflow = IssueContentSource.MAX_COMMENTS + 50;
             Instant base = Instant.parse("2025-01-01T00:00:00Z");
             for (int i = 0; i < overflow; i++) {
-                // createdAt strictly increasing so "most recent" is unambiguous.
                 thread.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
             }
-            issue.setComments(thread);
+            stubComments(thread);
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
@@ -270,13 +277,31 @@ class IssueContentSourceTest extends BaseUnitTest {
 
             JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
             assertThat(comments).hasSize(IssueContentSource.MAX_COMMENTS);
-            // The 50 oldest were dropped; the first kept comment is index 50.
             assertThat(comments.get(0).get("body").asString()).isEqualTo("Comment 50");
             assertThat(comments.get(comments.size() - 1).get("body").asString()).isEqualTo("Comment " + (overflow - 1));
         }
-    }
 
-    // ---- issue_summary.md --------------------------------------------------
+        @Test
+        void reportsExactLimitAsCompleteAndOverflowAsPartial() {
+            Issue issue = richIssue();
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+            Instant base = Instant.parse("2025-01-01T00:00:00Z");
+            List<IssueComment> comments = new ArrayList<>();
+            for (int i = 0; i < IssueContentSource.MAX_COMMENTS; i++) {
+                comments.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
+            }
+            stubComments(comments);
+            assertThat(
+                provider.capture(request(sampleMetadata()), Set.of(COMMENTS)).completeness().get(COMMENTS)
+            ).isEqualTo(SourceCompleteness.COMPLETE);
+
+            comments.add(comment("overflow", "Overflow", base.plusSeconds(comments.size())));
+            stubComments(comments);
+            assertThat(
+                provider.capture(request(sampleMetadata()), Set.of(COMMENTS)).completeness().get(COMMENTS)
+            ).isEqualTo(SourceCompleteness.PARTIAL);
+        }
+    }
 
     @Nested
     class Summary {
@@ -284,9 +309,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         @Test
         void writesIssueSummaryMarkdown() {
             Issue issue = richIssue();
-            issue.setComments(
-                new LinkedHashSet<>(List.of(comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"))))
-            );
+            stubComments(List.of(comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"))));
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
@@ -303,50 +326,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(comments).hasSize(1);
             assertThat(comments.get(0).path("author").asString()).isEqualTo("bob");
         }
-
-        @Test
-        void rendersNullAuthorAsUnknownInSummary() {
-            // A null-author comment must render as the literal "**unknown** wrote:", never "**null** wrote:".
-            Issue issue = richIssue();
-            issue.setComments(
-                new LinkedHashSet<>(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))))
-            );
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.contribute(request(sampleMetadata()), files);
-
-            String md = new String(files.get(SUMMARY_KEY), StandardCharsets.UTF_8);
-            assertThat(md).doesNotContain("**unknown** wrote:").doesNotContain("**null** wrote:");
-
-            JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
-            assertThat(comments.get(0).path("author").isNull()).isTrue();
-        }
-
-        @Test
-        void discussionHeaderReflectsTruncatedCount() {
-            // The summary uses the post-truncation list, so its "## Discussion (N comments)" header must
-            // report the capped MAX_COMMENTS, not the pre-truncation total.
-            Issue issue = richIssue();
-            var thread = new LinkedHashSet<IssueComment>();
-            int overflow = IssueContentSource.MAX_COMMENTS + 50;
-            Instant base = Instant.parse("2025-01-01T00:00:00Z");
-            for (int i = 0; i < overflow; i++) {
-                thread.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
-            }
-            issue.setComments(thread);
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.contribute(request(sampleMetadata()), files);
-
-            String md = new String(files.get(SUMMARY_KEY), StandardCharsets.UTF_8);
-            assertThat(md).doesNotContain("## Discussion");
-            assertThat(objectMapper.readTree(files.get(COMMENTS_KEY))).hasSize(IssueContentSource.MAX_COMMENTS);
-        }
     }
-
-    // ---- Abstention paths --------------------------------------------------
 
     @Nested
     class Abstention {

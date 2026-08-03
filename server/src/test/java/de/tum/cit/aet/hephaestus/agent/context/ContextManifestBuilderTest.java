@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRefusal;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
+import de.tum.cit.aet.hephaestus.practices.PracticeObservability;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -46,8 +47,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
     private static final SourceKind CONVERSATION = new SourceKind("slack.conversation.thread");
     private static final SourceKind LINKED_ITEMS = new SourceKind("scm.linked-work-items");
-    private static final SourceKind CONTRIBUTOR_HISTORY = new SourceKind("scm.contributor-history");
     private static final SourceKind REPOSITORY_TREE = new SourceKind("scm.repository.tree");
+    private static final SourceKind OUTLINE = new SourceKind("outline.documents");
     private static final Instant NOW = Instant.parse("2026-08-03T10:00:00Z");
 
     @TempDir
@@ -66,7 +67,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepDigestsInternalAndExposeOnlySafeModelIndex() {
+    void shouldExposeCitationDigestsWithoutInternalMetadata() {
         Map<String, byte[]> files = new LinkedHashMap<>();
         byte[] diff = "diff --git a b".getBytes(StandardCharsets.UTF_8);
         files.put("inputs/context/diff.patch", diff);
@@ -89,10 +90,11 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         JsonNode visible = mapper.readTree(files.get("inputs/manifest.json"));
         assertThat(visible.path("contractVersion").asString()).isEqualTo("1.0.0");
-        assertThat(visible.toString()).doesNotContain("sha256").doesNotContain("job-42").doesNotContain("workspaceId");
+        assertThat(visible.toString()).doesNotContain("job-42").doesNotContain("workspaceId");
         JsonNode diffSource = findSource(visible, DIFF.value());
         assertThat(diffSource.path("availability").asString()).isEqualTo("AVAILABLE");
         assertThat(diffSource.path("paths").get(0).asString()).isEqualTo("inputs/context/diff.patch");
+        assertThat(diffSource.path("artifacts").get(0).path("sha256").asString()).matches("[0-9a-f]{64}");
 
         Path internalPath = layout.jobDir("job-42").resolve("artifact-source-manifest.json");
         assertThat(internalPath).exists();
@@ -142,46 +144,27 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldDeclineWhenRequiredEvidenceIsStale() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        var manifest = builder.augment(
-            files,
-            Map.of(),
-            "job-stale",
-            plan(Set.of(COMMENTS)),
-            metadata(COMMENTS, java.time.Instant.EPOCH)
-        );
+        var manifest = coreManifest(builder, "job-stale", Instant.EPOCH);
 
-        assertThat(builder.readyPractices(manifest, List.of(practiceRequiringComments()))).isEmpty();
+        assertThat(builder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")))).isEmpty();
     }
 
     @Test
     void shouldReassessFreshnessAtReplayTime() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        ArtifactSourceManifest manifest = builder.augment(
-            files,
-            Map.of(),
-            "job-replay",
-            plan(Set.of(COMMENTS)),
-            metadata(COMMENTS, NOW)
-        );
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-replay", NOW);
 
         ContextManifestBuilder replayBuilder = builderAt(NOW.plusSeconds(301));
 
-        assertThat(replayBuilder.readyPractices(manifest, List.of(practiceRequiringComments()))).isEmpty();
+        assertThat(replayBuilder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")))).isEmpty();
     }
 
     @Test
     void shouldPersistEvidenceRefusalsAsTypedDecisions() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        ArtifactSourceManifest manifest = builder.augment(
-            files,
-            Map.of(),
-            "job-refused",
-            plan(Set.of(COMMENTS)),
-            metadata(COMMENTS, Instant.EPOCH)
-        );
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-refused", Instant.EPOCH);
 
-        assertThat(builder.readyPractices(manifest, List.of(practiceRequiringComments()), "job-refused")).isEmpty();
+        assertThat(
+            builder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")), "job-refused")
+        ).isEmpty();
         JsonNode report = mapper.readTree(
             layout.jobDir("job-refused").resolve("practice-readiness-report.json").toFile()
         );
@@ -258,17 +241,48 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldNotTreatAFutureMirrorWatermarkAsCurrent() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        ArtifactSourceManifest manifest = builder.augment(
-            files,
-            Map.of(),
-            "job-future-watermark",
-            plan(Set.of(COMMENTS)),
-            metadata(COMMENTS, NOW.plusSeconds(60))
-        );
+    void shouldAcceptMirrorWatermarkThatCoversTheRequestedSnapshot() {
+        ContextManifestBuilder laterBuilder = builderAt(NOW.plusSeconds(60));
+        ArtifactSourceManifest manifest = coreManifest(laterBuilder, "job-future-watermark", NOW.plusSeconds(60));
 
-        assertThat(builder.readyPractices(manifest, List.of(practiceRequiringComments()))).isEmpty();
+        Practice practice = practiceRequiring(CORE, "pr-core");
+        assertThat(
+            laterBuilder.readyPractices(manifest, List.of(practice), "job-future-watermark", NOW)
+        ).containsExactly(practice);
+    }
+
+    @Test
+    void shouldRejectMirrorWatermarkAfterCaptureTime() {
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-invalid-watermark", NOW.plusSeconds(60));
+
+        assertThat(builder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")))).isEmpty();
+    }
+
+    @Test
+    void shouldAssessDelayedWorkAgainstSubmissionTime() {
+        ContextManifestBuilder delayedBuilder = builderAt(NOW.plusSeconds(3_600));
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        files.put("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
+        ArtifactSourceManifest manifest = delayedBuilder.augment(
+            files,
+            Map.of("inputs/context/metadata.json", CORE),
+            "job-delayed",
+            plan(Set.of(CORE)),
+            metadata(CORE, NOW)
+        );
+        Practice practice = practiceRequiring(CORE, "pr-core");
+
+        assertThat(delayedBuilder.readyPractices(manifest, List.of(practice), "job-delayed", NOW)).containsExactly(
+            practice
+        );
+        JsonNode assessment = mapper
+            .readTree(layout.jobDir("job-delayed").resolve("practice-readiness-report.json").toFile())
+            .path("decisions")
+            .get(0)
+            .path("assessments")
+            .get(0);
+        assertThat(assessment.path("assessedAt").asString()).isEqualTo(NOW.plusSeconds(3_600).toString());
+        assertThat(assessment.path("temporalAnchor").asString()).isEqualTo(NOW.toString());
     }
 
     @Test
@@ -315,6 +329,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ArtifactSourceContract diff = realCatalogs.requireSource(plan(Set.of(DIFF)).contractVersion(), DIFF);
         ArtifactSourceContract restrictedDiff = new ArtifactSourceContract(
             diff.kind(),
+            diff.description(),
+            diff.selectionScope(),
             diff.artifactTypes(),
             diff.authority(),
             diff.captureTime(),
@@ -374,21 +390,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectCompletenessForbiddenByTheSourceContract() {
-        assertThatThrownBy(() ->
-            builder.augment(
-                new LinkedHashMap<>(),
-                Map.of(),
-                "job-invalid-completeness",
-                plan(Set.of(CONTRIBUTOR_HISTORY)),
-                metadata(CONTRIBUTOR_HISTORY, NOW)
-            )
-        )
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("completeness forbidden");
-    }
-
-    @Test
     void shouldTreatAnEmptyRepositoryTreeAsValidCompleteEvidence() {
         Map<String, byte[]> files = new LinkedHashMap<>();
         builder.augment(
@@ -410,6 +411,30 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(source.path("availability").asString()).isEqualTo("AVAILABLE");
         assertThat(source.path("content").asString()).isEqualTo("EMPTY");
         assertThat(source.path("completeness").asString()).isEqualTo("COMPLETE");
+    }
+
+    @Test
+    void shouldTreatEmptyOutlineEvidenceAsPartial() throws Exception {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        builder.augment(
+            files,
+            Map.of(),
+            "job-empty-outline",
+            plan(Set.of(OUTLINE)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(OUTLINE)
+            )
+        );
+
+        JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), OUTLINE.value());
+        assertThat(source.path("availability").asString()).isEqualTo("AVAILABLE");
+        assertThat(source.path("content").asString()).isEqualTo("EMPTY");
+        assertThat(source.path("completeness").asString()).isEqualTo("PARTIAL");
     }
 
     @Test
@@ -464,6 +489,13 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
     }
 
+    private ArtifactSourceManifest coreManifest(ContextManifestBuilder target, String jobId, Instant observedAt) {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        String path = "inputs/context/metadata.json";
+        files.put(path, "{}".getBytes(StandardCharsets.UTF_8));
+        return target.augment(files, Map.of(path, CORE), jobId, plan(Set.of(CORE)), metadata(CORE, observedAt));
+    }
+
     private static EvidencePlan conversationPlan() {
         return new EvidencePlan(
             new SourceContractVersion("1.0.0"),
@@ -484,10 +516,18 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     private static Practice practiceRequiringComments() {
-        return practiceRequiring(COMMENTS, "review-comments");
+        return practiceRequiring(COMMENTS, "review-comments", EvidenceFreshnessRequirement.ANY);
     }
 
     private static Practice practiceRequiring(SourceKind sourceKind, String slug) {
+        return practiceRequiring(sourceKind, slug, EvidenceFreshnessRequirement.CURRENT);
+    }
+
+    private static Practice practiceRequiring(
+        SourceKind sourceKind,
+        String slug,
+        EvidenceFreshnessRequirement freshness
+    ) {
         Practice practice = new Practice();
         practice.setSlug(slug);
         practice.setEvidence(
@@ -496,12 +536,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 sourceKind.equals(CONVERSATION)
                     ? new EvidenceProfileId("conversation-review")
                     : new EvidenceProfileId("pull-request-review"),
+                PracticeObservability.SEMANTIC,
                 List.of(
-                    new PracticeEvidenceRequirement(
-                        sourceKind,
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT
-                    )
+                    new PracticeEvidenceRequirement(sourceKind, EvidenceCompletenessRequirement.COMPLETE, freshness)
                 ),
                 List.of(),
                 PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,

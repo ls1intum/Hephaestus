@@ -79,7 +79,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Polls the {@code agent_job} table for {@code QUEUED} work: the queue IS the table, so a QUEUED
@@ -683,13 +685,27 @@ public class AgentJobExecutor {
      */
     private void persistProvenanceDigests(UUID jobId, @Nullable String promptDigest, Map<String, byte[]> inputFiles) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
+        JsonNode evidenceSnapshot = evidenceSnapshot(inputFiles);
         Integer updated = transactionTemplate.execute(status ->
-            jobRepository.updateProvenanceDigests(jobId, promptDigest, inputsDigest)
+            jobRepository.updateProvenanceDigests(jobId, promptDigest, inputsDigest, evidenceSnapshot)
         );
         if (updated == null || updated != 1) {
             throw new IllegalStateException("Provenance digest write matched no job row: jobId=" + jobId);
         }
         log.debug("Provenance digests: jobId={}, prompt={}, inputs={}", jobId, promptDigest, inputsDigest);
+    }
+
+    private JsonNode evidenceSnapshot(Map<String, byte[]> inputFiles) {
+        byte[] manifest = inputFiles.get(SandboxLayout.MANIFEST_PATH);
+        byte[] practices = inputFiles.get(SandboxLayout.PRACTICES_PREFIX + "index.json");
+        if (manifest == null && practices == null) return objectMapper.nullNode();
+        if (manifest == null || practices == null) {
+            throw new IllegalStateException("Practice review inputs have an incomplete evidence snapshot");
+        }
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.set("manifest", objectMapper.readTree(manifest));
+        snapshot.set("practices", objectMapper.readTree(practices));
+        return snapshot;
     }
 
     private static SandboxSpec buildSandboxSpec(

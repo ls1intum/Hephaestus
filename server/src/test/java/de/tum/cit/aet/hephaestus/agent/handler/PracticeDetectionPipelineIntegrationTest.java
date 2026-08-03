@@ -21,12 +21,14 @@ import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -34,6 +36,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
@@ -43,6 +46,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -58,15 +62,7 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Full pipeline integration test: handler.deliver() → result parser → finding persistence
- * → feedback delivery. Exercises real PostgreSQL for finding idempotency (ON CONFLICT DO NOTHING)
- * and event publication.
- *
- * <p><b>Mock boundary:</b> {@link PullRequestCommentPoster} and {@link DiffNotePoster} are mocked
- * because they make external API calls to GitHub/GitLab. All other components (result parser,
- * delivery service, feedback service, finding repository) are real beans against PostgreSQL.
- */
+/** Exercises parsing, persistence, and feedback delivery against PostgreSQL. */
 @RecordApplicationEvents
 class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
@@ -80,6 +76,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
+
+    @Autowired
+    private ContentAddressedStore cas;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -131,8 +133,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         workspace.getFeatures().setPracticesEnabled(true);
         workspace = workspaceRepository.save(workspace);
 
-        createPractice("pr-description-quality", "PR Description Quality");
-        createPractice("error-handling", "Error Handling");
+        Practice description = createPractice("pr-description-quality", "PR Description Quality");
+        Practice errors = createPractice("error-handling", "Error Handling");
 
         IdentityProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -210,6 +212,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         metadata.put("source_branch", "feature/pipeline");
         metadata.put("target_branch", "main");
         agentJob.setMetadata(metadata);
+        agentJob.setEvidenceSnapshot(evidenceSnapshot(description, errors));
         agentJob = agentJobRepository.save(agentJob);
 
         handler = handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW);
@@ -226,12 +229,15 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         p.setName(name);
         p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        return practiceRepository.save(p);
+        p = practiceRepository.saveAndFlush(p);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(p, 1));
+        p.setCurrentRevision(revision);
+        return practiceRepository.saveAndFlush(p);
     }
 
     private void setJobOutput(String rawOutput) {
         ObjectNode output = OBJECT_MAPPER.createObjectNode();
-        output.put("rawOutput", rawOutput);
+        output.put("rawOutput", withEvidence(rawOutput));
         agentJob.setOutput(output);
         agentJob = agentJobRepository.save(agentJob);
     }
@@ -258,10 +264,62 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         next.setStatus(AgentJobStatus.COMPLETED);
         next.setConfigSnapshot(agentJob.getConfigSnapshot());
         next.setMetadata(agentJob.getMetadata().deepCopy());
+        next.setEvidenceSnapshot(agentJob.getEvidenceSnapshot().deepCopy());
         ObjectNode output = OBJECT_MAPPER.createObjectNode();
-        output.put("rawOutput", rawOutput);
+        output.put("rawOutput", withEvidence(rawOutput));
         next.setOutput(output);
         return agentJobRepository.save(next);
+    }
+
+    private ObjectNode evidenceSnapshot(Practice... practices) {
+        ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
+        var sources = snapshot.putObject("manifest").putArray("sources");
+        addArtifact(
+            sources.addObject().put("kind", "scm.pull-request.core").put("availability", "AVAILABLE"),
+            "inputs/context/metadata.json",
+            "{\"body\":\"Test body\"}"
+        );
+        addArtifact(
+            sources.addObject().put("kind", "scm.pull-request.diff").put("availability", "AVAILABLE"),
+            "inputs/context/diff.patch",
+            "diff --git a/src/Main.java b/src/Main.java\n+++ b/src/Main.java\n@@ -10 +10 @@\n[L10] + insecure();\n"
+        );
+        var admitted = snapshot.putArray("practices");
+        for (Practice practice : practices) {
+            admitted
+                .addObject()
+                .put("slug", practice.getSlug())
+                .put("revisionId", practice.getCurrentRevision().getId());
+        }
+        return snapshot;
+    }
+
+    private void addArtifact(ObjectNode source, String path, String content) {
+        source
+            .putArray("artifacts")
+            .addObject()
+            .put("path", path)
+            .put("sha256", cas.put(content.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private String withEvidence(String rawOutput) {
+        try {
+            var root = OBJECT_MAPPER.readTree(rawOutput);
+            for (var finding : root.path("findings")) {
+                if (!finding.has("evidence")) {
+                    var citation = ((ObjectNode) finding).putObject("evidence").putArray("citations").addObject();
+                    citation.put("sourceKind", "scm.pull-request.core");
+                    citation.put("artifactPath", "inputs/context/metadata.json");
+                    citation.put("path", "body");
+                    citation.put("startLine", 1);
+                    citation.put("endLine", 1);
+                    citation.put("quote", "Test body");
+                }
+            }
+            return OBJECT_MAPPER.writeValueAsString(root);
+        } catch (RuntimeException ignored) {
+            return rawOutput;
+        }
     }
 
     private String validAgentOutput() {
@@ -415,7 +473,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        void unknownSlugDiscardedOthersKept() {
+        void unknownSlugRejectsDeliveryAtomically() {
             String output = """
                 {
                   "findings": [
@@ -446,19 +504,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                   ]
                 }""";
             setJobOutput(output);
-            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-456");
 
-            handler.deliver(agentJob);
+            assertThatThrownBy(() -> handler.deliver(agentJob))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("practice not admitted to the job");
 
-            List<Observation> findings = observationRepository.findAll();
-            assertThat(findings).hasSize(2);
-
-            List<PracticeDetectionCompletedEvent> events = applicationEvents
-                .stream(PracticeDetectionCompletedEvent.class)
-                .toList();
-            assertThat(events).hasSize(1);
-            assertThat(events.get(0).findingsInserted()).isEqualTo(2);
-            assertThat(events.get(0).findingsDiscarded()).isEqualTo(1);
+            assertThat(observationRepository.findAll()).isEmpty();
+            verify(commentPoster, never()).postFormattedBody(any(), any());
+            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
         }
 
         @Test

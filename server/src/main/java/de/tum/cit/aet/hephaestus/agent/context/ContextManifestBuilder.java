@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
+import de.tum.cit.aet.hephaestus.practices.PracticeObservability;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -37,8 +38,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -177,7 +180,16 @@ public class ContextManifestBuilder {
     }
 
     public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices, String jobId) {
-        PracticeReadinessResult result = assessPractices(manifest, practices);
+        return readyPractices(manifest, practices, jobId, clock.instant());
+    }
+
+    public List<Practice> readyPractices(
+        ArtifactSourceManifest manifest,
+        List<Practice> practices,
+        String jobId,
+        Instant temporalAnchor
+    ) {
+        PracticeReadinessResult result = assessPractices(manifest, practices, temporalAnchor);
         if (result.decisions().isEmpty()) {
             throw new IllegalArgumentException("Cannot persist an empty practice readiness report");
         }
@@ -199,7 +211,55 @@ public class ContextManifestBuilder {
         return result.readyPractices();
     }
 
+    PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {
+        List<SourceCapture> sources = prepared
+            .manifest()
+            .sources()
+            .stream()
+            .filter(source -> plan.selectedSources().contains(source.kind()))
+            .toList();
+        Set<String> retainedArtifacts = sources
+            .stream()
+            .flatMap(source -> source.artifacts().stream())
+            .map(SourceArtifact::path)
+            .collect(java.util.stream.Collectors.toSet());
+        Set<String> allArtifacts = prepared
+            .manifest()
+            .sources()
+            .stream()
+            .flatMap(source -> source.artifacts().stream())
+            .map(SourceArtifact::path)
+            .collect(java.util.stream.Collectors.toSet());
+        Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
+        allArtifacts
+            .stream()
+            .filter(path -> !retainedArtifacts.contains(path))
+            .forEach(files::remove);
+        ArtifactSourceManifest restricted = new ArtifactSourceManifest(
+            prepared.manifest().contractVersion(),
+            prepared.manifest().catalogDigest(),
+            prepared.manifest().profileId(),
+            prepared.manifest().capturedAt(),
+            sources,
+            prepared.manifest().viewTransformations()
+        );
+        files.put(SandboxLayout.MANIFEST_PATH, modelVisibleIndex(restricted));
+        return new PreparedEvidence(files, restricted);
+    }
+
     public PracticeReadinessResult assessPractices(ArtifactSourceManifest manifest, List<Practice> practices) {
+        return assessPractices(manifest, practices, clock.instant());
+    }
+
+    public PracticeReadinessResult assessPractices(
+        ArtifactSourceManifest manifest,
+        List<Practice> practices,
+        Instant temporalAnchor
+    ) {
+        Objects.requireNonNull(temporalAnchor, "temporalAnchor");
+        if (!manifest.viewTransformations().isEmpty()) {
+            throw new IllegalArgumentException("Ablated evidence views are not valid for product readiness");
+        }
         if (
             !catalogs.current().version().equals(manifest.contractVersion()) ||
             !catalogs.catalogDigest().equals(manifest.catalogDigest())
@@ -235,10 +295,14 @@ public class ContextManifestBuilder {
                     ? assessFreshness(
                           catalogs.requireSource(manifest.contractVersion(), requirement.sourceKind()),
                           (SourceCaptureState.Available) capture.state(),
-                          assessedAt
+                          temporalAnchor,
+                          manifest.capturedAt()
                       )
                     : SourceFreshness.UNKNOWN;
                 List<String> reasons = new ArrayList<>();
+                if (declaration.observability() == PracticeObservability.UNOBSERVABLE) {
+                    reasons.add("PRACTICE_UNOBSERVABLE");
+                }
                 if (!available) reasons.add("SOURCE_NOT_AVAILABLE");
                 if (
                     requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
@@ -253,7 +317,7 @@ public class ContextManifestBuilder {
                         requirement.sourceKind(),
                         manifest.contractVersion(),
                         assessedAt,
-                        assessedAt,
+                        temporalAnchor,
                         freshness,
                         reasons.isEmpty(),
                         reasons
@@ -275,7 +339,8 @@ public class ContextManifestBuilder {
     private SourceFreshness assessFreshness(
         ArtifactSourceContract contract,
         SourceCaptureState.Available capture,
-        Instant temporalAnchor
+        Instant temporalAnchor,
+        Instant capturedAt
     ) {
         var policy = contract.freshnessPolicy();
         if (policy.mode() == FreshnessMode.NOT_APPLICABLE) return SourceFreshness.UNKNOWN;
@@ -284,13 +349,13 @@ public class ContextManifestBuilder {
         }
         if (policy.mode() == FreshnessMode.MAX_AGE) {
             Instant observed = capture.facts().observedAt();
-            if (observed == null || observed.isAfter(temporalAnchor)) return SourceFreshness.UNKNOWN;
+            if (observed == null || observed.isAfter(capturedAt)) return SourceFreshness.UNKNOWN;
             return observed.plusSeconds(policy.maxAgeSeconds()).isBefore(temporalAnchor)
                 ? SourceFreshness.STALE
                 : SourceFreshness.CURRENT;
         }
         Instant eventTime = capture.facts().sourceEffectiveAt();
-        if (eventTime == null) return SourceFreshness.UNKNOWN;
+        if (eventTime == null || eventTime.isAfter(capturedAt)) return SourceFreshness.UNKNOWN;
         return eventTime.isAfter(temporalAnchor) ? SourceFreshness.UNKNOWN : SourceFreshness.CURRENT;
     }
 
@@ -353,7 +418,7 @@ public class ContextManifestBuilder {
             sourceEffectiveAt.get(kind),
             observedAt.get(kind),
             immutableIdentities.get(kind),
-            "job-scoped " + plan.profileId().value() + " capture",
+            contract.selectionScope(),
             completenessBasis(completeness, contract),
             fidelity(contract.authority())
         );
@@ -374,9 +439,10 @@ public class ContextManifestBuilder {
         Map<String, byte[]> files
     ) {
         if (artifacts.isEmpty()) {
-            return contract.completenessPolicy().supportsEmpty()
-                ? SourceCompleteness.COMPLETE
-                : SourceCompleteness.UNKNOWN;
+            if (!contract.completenessPolicy().supportsEmpty()) return SourceCompleteness.UNKNOWN;
+            if (contract.completenessPolicy().supportsComplete()) return SourceCompleteness.COMPLETE;
+            if (contract.completenessPolicy().supportsPartial()) return SourceCompleteness.PARTIAL;
+            return SourceCompleteness.UNKNOWN;
         }
         List<Boolean> truncationMarkers = artifacts
             .stream()
@@ -429,6 +495,16 @@ public class ContextManifestBuilder {
                 node.put("completeness", available.completeness().name());
                 ArrayNode paths = node.putArray("paths");
                 capture.artifacts().stream().map(SourceArtifact::path).sorted().forEach(paths::add);
+                ArrayNode artifacts = node.putArray("artifacts");
+                capture
+                    .artifacts()
+                    .stream()
+                    .sorted(Comparator.comparing(SourceArtifact::path))
+                    .forEach(artifact -> {
+                        ObjectNode artifactNode = artifacts.addObject();
+                        artifactNode.put("path", artifact.path());
+                        artifactNode.put("sha256", artifact.sha256());
+                    });
             }
         }
         return objectMapper.writeValueAsBytes(root);

@@ -146,10 +146,8 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void secretBadFinding_isNotSuppressedDespiteDisputedReaction() {
-        // Security invariant: a still-BAD hardcoded-secrets locus is never silenceable — a single DISPUTED
-        // reaction must not permanently mute a credential leak that is still present this run.
         String secretKey = ObservationFingerprint.compute(
-            "hardcoded-secrets",
+            "avoids-insecure-defaults-and-over-broad-permissions",
             WorkArtifact.PULL_REQUEST.name(),
             TARGET,
             CONTRIBUTOR,
@@ -164,14 +162,30 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             List.of(reaction)
         );
 
-        var d = filter(true).evaluate(
-            TestEntities.agentJob(),
-            List.of(vf("hardcoded-secrets", Presence.ABSENT, secretKey))
-        );
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(secretScannerFinding(secretKey)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
         verify(feedbackLedgerRecorder, never()).recordSuppressed(any(), any(), any(), anyInt());
+    }
+
+    private static ValidatedFinding secretScannerFinding(String recurrenceKey) {
+        var evidence = tools.jackson.databind.node.JsonNodeFactory.instance
+            .objectNode()
+            .put("detector", "secret-diff-scanner");
+        return new ValidatedFinding(
+            "avoids-insecure-defaults-and-over-broad-permissions",
+            "Hardcoded secret on a changed line",
+            Presence.PRESENT,
+            Assessment.BAD,
+            Severity.CRITICAL,
+            1.0f,
+            evidence,
+            "A credential is committed.",
+            "Rotate it.",
+            List.of(),
+            new ObservationKeys("occ-" + recurrenceKey, recurrenceKey)
+        );
     }
 
     @Test

@@ -2,14 +2,20 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
@@ -20,7 +26,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.observation.DeveloperHistoryProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -53,9 +58,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     private PullRequestReviewCommentRepository reviewCommentRepository;
 
     @Mock
-    private DeveloperHistoryProvider developerHistoryProvider;
-
-    @Mock
     private GitDiffOperations gitDiffOperations;
 
     @Mock
@@ -65,6 +67,8 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     private ScmTokenSource scmTokenSource;
 
     private static final Long WORKSPACE_ID = 99L;
+    private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
+    private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
 
     private PullRequestContentSource provider;
 
@@ -76,7 +80,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             gitRepositoryManager,
             pullRequestRepository,
             reviewCommentRepository,
-            developerHistoryProvider,
             gitDiffOperations,
             connectionService,
             List.of(scmTokenSource)
@@ -150,7 +153,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         void writesMetadataJson() throws Exception {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
+            when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any())).thenReturn(List.of());
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
@@ -175,7 +178,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
+            when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any())).thenReturn(List.of());
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
@@ -205,7 +208,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(
+            when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any())).thenReturn(
                 List.of(full, minimal)
             );
 
@@ -227,12 +230,14 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                 c.setPath("file.java");
                 c.setLine(i);
                 c.setBody("Comment " + i);
+                c.setCreatedAt(Instant.EPOCH.plusSeconds(i));
                 comments.add(c);
             }
+            java.util.Collections.reverse(comments);
 
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(comments);
+            when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any())).thenReturn(comments);
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
@@ -241,93 +246,24 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(commentsJson).hasSize(PullRequestContentSource.MAX_COMMENTS);
             assertThat(commentsJson.get(0).get("body").asString()).isEqualTo("Comment 100");
         }
-    }
-
-    @Nested
-    class DeveloperHistory {
 
         @Test
-        void includesDeveloperHistory() {
-            PullRequest pr = new PullRequest();
-            pr.setTitle("Fix bug");
-            User author = new User();
-            author.setId(42L);
-            author.setLogin("alice");
-            pr.setAuthor(author);
+        void reportsExactLimitAsCompleteAndOverflowAsPartial() {
+            List<PullRequestReviewComment> comments = new ArrayList<>();
+            for (int i = 0; i < PullRequestContentSource.MAX_COMMENTS; i++) {
+                PullRequestReviewComment comment = new PullRequestReviewComment();
+                comment.setBody("Comment " + i);
+                comments.add(comment);
+            }
+            when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any())).thenReturn(comments);
+            assertThat(
+                provider.capture(request(sampleMetadata()), java.util.Set.of(COMMENTS)).completeness().get(COMMENTS)
+            ).isEqualTo(SourceCompleteness.COMPLETE);
 
-            stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-
-            byte[] historyJson =
-                "[{\"practice\":\"error-handling\",\"good\":0,\"bad\":3,\"lastSeen\":\"2025-06-01T12:00:00Z\"}]".getBytes(
-                    StandardCharsets.UTF_8
-                );
-            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.contribute(request(sampleMetadata()), files);
-
-            assertThat(files.get("inputs/context/contributor_history.json")).isEqualTo(historyJson);
-        }
-
-        @Test
-        void omitsWhenEmpty() {
-            PullRequest pr = new PullRequest();
-            pr.setTitle("New PR");
-            User author = new User();
-            author.setId(42L);
-            author.setLogin("alice");
-            pr.setAuthor(author);
-
-            stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.contribute(request(sampleMetadata()), files);
-
-            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
-        }
-
-        @Test
-        void continuesWhenHistoryThrows() {
-            PullRequest pr = new PullRequest();
-            pr.setTitle("Broken history");
-            User author = new User();
-            author.setId(42L);
-            author.setLogin("alice");
-            pr.setAuthor(author);
-
-            stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
-                new RuntimeException("DB connection timeout")
-            );
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.contribute(request(sampleMetadata()), files);
-
-            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
-            assertThat(files).containsKey("inputs/context/metadata.json");
-        }
-
-        @Test
-        void skipsWhenNoAuthor() {
-            PullRequest pr = new PullRequest();
-            pr.setTitle("Orphan PR");
-
-            stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.contribute(request(sampleMetadata()), files);
-
-            verifyNoInteractions(developerHistoryProvider);
-            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
+            comments.add(new PullRequestReviewComment());
+            assertThat(
+                provider.capture(request(sampleMetadata()), java.util.Set.of(COMMENTS)).completeness().get(COMMENTS)
+            ).isEqualTo(SourceCompleteness.PARTIAL);
         }
     }
 
@@ -357,22 +293,23 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void computeAndStoreDiffSummary_emptyDiffPatch_writesNothing() {
+        void computeAndStoreDiffSummary_emptyDiffPatch_writesZeroFileSummary() {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.computeAndStoreDiffSummary(files);
             assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
 
             files.put("inputs/context/diff.patch", new byte[0]);
             provider.computeAndStoreDiffSummary(files);
-            assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
+            assertThat(new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8)).contains(
+                "**0 files changed**"
+            );
         }
 
         @Test
-        void emptyDiff_abortsWithJobPreparationException() {
+        void emptyDiff_isCapturedAsAvailableEmptyEvidence() {
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
-                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                 .thenReturn(List.of());
             when(
                 gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
@@ -380,9 +317,11 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456")).thenReturn("");
             when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456")).thenReturn("   ");
 
-            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Empty diff");
+            EvidenceContribution contribution = provider.capture(request(sampleMetadata()), java.util.Set.of(DIFF));
+
+            assertThat(contribution.files().get("inputs/context/diff.patch")).isEmpty();
+            assertThat(contribution.contentStates().get(DIFF)).isEqualTo(SourceContentState.EMPTY);
+            assertThat(contribution.completeness().get(DIFF)).isEqualTo(SourceCompleteness.COMPLETE);
         }
 
         @Test
@@ -390,7 +329,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
-                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                 .thenReturn(List.of());
             when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(true);
             when(
@@ -407,7 +346,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
-                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                 .thenReturn(List.of());
             when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(false);
             when(
@@ -424,7 +363,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
-                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                 .thenReturn(List.of());
             when(
                 gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
@@ -445,7 +384,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         void realDiff_writesAnnotatedPatchAndSummary() throws Exception {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
+            when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any())).thenReturn(List.of());
             when(
                 gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
             ).thenReturn(new String[] { "main", "abc123def456" });
@@ -478,7 +417,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             ).thenReturn(true);
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
-                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                 .thenReturn(List.of());
 
             provider.contribute(request(sampleMetadata()), new LinkedHashMap<>());

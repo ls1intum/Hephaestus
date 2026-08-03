@@ -11,7 +11,12 @@ import {
     defineTool,
 } from "@earendil-works/pi-coding-agent";
 
-import { dedupeKeyForFinding, normalizeFinding } from "./pi-finding-normalize.mjs";
+import {
+    citationMatchesArtifact,
+    dedupeKeyForFinding,
+    normalizeFinding,
+    validateEvidenceSources,
+} from "./pi-finding-normalize.mjs";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
 
 const OUTPUT = "/workspace/out";
@@ -48,6 +53,22 @@ setTimeout(() => {
 
 mkdirSync(OUTPUT, { recursive: true });
 
+const manifest = JSON.parse(readFileSync(`${CWD}/inputs/manifest.json`, "utf8"));
+const availableSources = new Set(
+    manifest.sources.filter((source) => source.availability === "AVAILABLE").map((source) => source.kind),
+);
+const artifactSources = new Map(
+    manifest.sources.flatMap((source) =>
+        (source.artifacts ?? []).map((artifact) => [artifact.path, source.kind]),
+    ),
+);
+const practiceSources = new Map(
+    JSON.parse(readFileSync(`${CWD}/inputs/practices/index.json`, "utf8")).map((practice) => [
+        practice.slug,
+        new Set(practice.allowedSources),
+    ]),
+);
+
 const usageTotals = {
     model: null,
     inputTokens: 0,
@@ -69,24 +90,26 @@ const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "I
 const evidenceSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["locations", "snippets"],
+    required: ["citations"],
     properties: {
-        locations: {
+        citations: {
             type: "array",
+            minItems: 1,
             items: {
                 type: "object",
                 additionalProperties: false,
-                // endLine is optional (a single-line note omits it; normalizers + the Java parser treat it as
-                // optional). Keeping it REQUIRED would reject the whole tool call at the SDK boundary.
-                required: ["path", "startLine"],
+                required: ["sourceKind", "artifactPath", "path", "startLine", "quote"],
                 properties: {
+                    sourceKind: { type: "string", minLength: 1 },
+                    artifactPath: { type: "string", minLength: 1 },
                     path: { type: "string", minLength: 1 },
+                    side: { type: "string", enum: ["OLD", "NEW"] },
                     startLine: { type: "integer", minimum: 1 },
                     endLine: { type: "integer", minimum: 1 },
+                    quote: { type: "string", minLength: 1 },
                 },
             },
         },
-        snippets: { type: "array", items: { type: "string" } },
     },
 };
 const diffNoteSchema = {
@@ -169,7 +192,7 @@ function isValidFindingsPayload(p) {
         typeof p === "object" &&
         Array.isArray(p.findings) &&
         p.findings.length > 0 &&
-        p.findings.some(isValidFinding)
+        p.findings.every(isValidFinding)
     );
 }
 
@@ -198,7 +221,10 @@ function checkResultFile() {
             const validCount = hasFindings ? data.findings.filter(isValidFinding).length : 0;
             console.error(`[pi-runner] result.json validation failed: findings=${count}, valid=${validCount}`);
         }
-        return valid;
+        if (!valid) return false;
+        const normalized = data.findings.map(normalizeAndValidateFinding);
+        writeFileSync(RESULT_PATH, JSON.stringify({ findings: normalized }, null, 2));
+        return true;
     } catch (e) {
         console.error(`[pi-runner] result.json parse error: ${e.message}`);
         return false;
@@ -221,7 +247,7 @@ function appendFindings(findings) {
     let duplicates = 0;
     const seen = new Set(reviewState.findingKeys);
     for (const rawFinding of findings) {
-        const finding = normalizeFinding(rawFinding);
+        const finding = normalizeAndValidateFinding(rawFinding);
         const key = dedupeKeyForFinding(finding);
         if (seen.has(key)) {
             duplicates++;
@@ -235,6 +261,20 @@ function appendFindings(findings) {
     persistReviewState();
     maybeWriteResultFile();
     return { inserted, duplicates };
+}
+
+function normalizeAndValidateFinding(rawFinding) {
+    const finding = normalizeFinding(rawFinding);
+    const allowedSources = practiceSources.get(finding.practiceSlug);
+    if (!allowedSources) throw new Error(`unknown practice '${finding.practiceSlug}'`);
+    validateEvidenceSources(finding, allowedSources, availableSources, artifactSources);
+    for (const citation of finding.evidence.citations) {
+        const content = readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
+        if (!citationMatchesArtifact(citation, content)) {
+            throw new Error(`citation does not match artifact location '${citation.artifactPath}'`);
+        }
+    }
+    return finding;
 }
 
 const reportFindingTool = defineTool({

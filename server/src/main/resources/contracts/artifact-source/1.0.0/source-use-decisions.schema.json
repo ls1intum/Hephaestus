@@ -56,7 +56,7 @@
           },
           "outcome": {
             "enum": [
-              "PENDING_CONTROLLER_REVIEW",
+              "ENGINEERING_APPROVED",
               "APPROVED",
               "DENIED"
             ]
@@ -73,12 +73,10 @@
             "minLength": 1
           },
           "retentionPolicy": {
-            "type": "string",
-            "minLength": 1
+            "const": "AGENT_EVIDENCE_RETENTION"
           },
           "erasurePolicy": {
-            "type": "string",
-            "minLength": 1
+            "const": "WORKSPACE_AND_PERSON_ERASURE"
           },
           "recordedAt": {
             "type": "string",
@@ -110,13 +108,18 @@
               ]
             },
             "then": {
+              "required": [
+                "reviewer",
+                "decidedAt",
+                "expiresAt"
+              ],
               "properties": {
                 "outcome": {
-                  "const": "PENDING_CONTROLLER_REVIEW"
+                  "const": "ENGINEERING_APPROVED"
                 },
-                "reviewer": false,
-                "decidedAt": false,
-                "expiresAt": false
+                "reviewer": true,
+                "decidedAt": true,
+                "expiresAt": true
               }
             }
           },

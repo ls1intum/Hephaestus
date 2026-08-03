@@ -3,6 +3,7 @@ import type { PracticeEvidenceDeclaration } from "@/api/types.gen";
 export const mockPullRequestEvidence = {
 	sourceContractVersion: "1.0.0",
 	profile: "pull-request-review",
+	observability: "SEMANTIC",
 	required: [
 		{ sourceKind: "scm.pull-request.core", completeness: "COMPLETE", freshness: "CURRENT" },
 	],

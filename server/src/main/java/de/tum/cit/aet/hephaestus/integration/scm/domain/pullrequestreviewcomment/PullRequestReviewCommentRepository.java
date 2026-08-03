@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCou
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -72,6 +73,15 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
     )
     List<PullRequestReviewComment> findByPullRequestIdWithAuthorOrderByCreatedAt(
         @Param("pullRequestId") Long pullRequestId
+    );
+
+    @Query(
+        "SELECT prrc FROM PullRequestReviewComment prrc LEFT JOIN FETCH prrc.author " +
+            "WHERE prrc.pullRequest.id = :pullRequestId ORDER BY prrc.createdAt DESC"
+    )
+    List<PullRequestReviewComment> findRecentByPullRequestIdWithAuthor(
+        @Param("pullRequestId") Long pullRequestId,
+        Pageable pageable
     );
 
     @Query(

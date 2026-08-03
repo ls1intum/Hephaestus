@@ -125,7 +125,7 @@ public class PracticeRevision {
     @Column(name = "area_color", length = 32)
     private String areaColor;
 
-    @Column(name = "detection_fingerprint", length = 64)
+    @Column(name = "detection_fingerprint", length = 96)
     private String detectionFingerprint;
 
     @Column(name = "created_at", nullable = false, updatable = false)

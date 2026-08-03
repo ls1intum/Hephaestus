@@ -126,10 +126,16 @@ public class ConversationReviewHandler implements JobTypeHandler {
             new ContextRequest.ConversationReviewRequest(job),
             EvidencePlan.compile(practices)
         );
-        practices = workspaceContextBuilder.readyPractices(prepared.manifest(), practices, job.getId().toString());
+        practices = workspaceContextBuilder.readyPractices(
+            prepared.manifest(),
+            practices,
+            job.getId().toString(),
+            job.getCreatedAt()
+        );
         if (practices.isEmpty()) {
             throw new JobPreparationException("No practice has sufficient evidence: jobId=" + job.getId());
         }
+        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, WorkArtifact.CONVERSATION_THREAD, practices);
@@ -176,21 +182,14 @@ public class ConversationReviewHandler implements JobTypeHandler {
             );
         }
         // Coherence coercion: defect-detector GOOD → NOT_APPLICABLE + severity sentinel.
-        Set<String> defectDetectorSlugs =
-            job.getWorkspace() == null
-                ? Set.of()
-                : practiceCatalogInjector.defectDetectorSlugs(
-                      job.getWorkspace().getId(),
-                      WorkArtifact.CONVERSATION_THREAD
-                  );
+        Set<String> defectDetectorSlugs = practiceCatalogInjector.defectDetectorSlugs(job);
         List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
             PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
 
         PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
         log.info(
-            "Conversation delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
+            "Conversation delivery complete: inserted={}, duplicate={}, jobId={}",
             result.inserted(),
-            result.discardedUnknownSlug(),
             result.discardedDuplicate(),
             job.getId()
         );

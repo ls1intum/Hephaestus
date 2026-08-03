@@ -107,11 +107,17 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             EvidenceCompletenessRequirement.COMPLETE,
             EvidenceFreshnessRequirement.CURRENT
         );
+        OptionalPracticeEvidenceRequirement optionalRequirement = new OptionalPracticeEvidenceRequirement(
+            DIFF,
+            EvidenceCompletenessRequirement.ANY,
+            EvidenceFreshnessRequirement.ANY
+        );
         PracticeEvidenceDeclaration declaration = new PracticeEvidenceDeclaration(
             VERSION,
             PROFILE,
+            PracticeObservability.SEMANTIC,
             List.of(requirement),
-            List.of(requirement),
+            List.of(optionalRequirement),
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
             List.of()
         );
@@ -119,6 +125,19 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         assertThatThrownBy(() -> validator.validate(definition(declaration)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("An evidence source cannot be both required and optional");
+    }
+
+    @Test
+    void rejectsQualityConstraintsOnOptionalEvidence() {
+        assertThatThrownBy(() ->
+            new OptionalPracticeEvidenceRequirement(
+                new SourceKind("scm.pull-request.comments"),
+                EvidenceCompletenessRequirement.COMPLETE,
+                EvidenceFreshnessRequirement.ANY
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Optional evidence must use ANY completeness and freshness");
     }
 
     private static PracticeDefinition definition(PracticeEvidenceDeclaration declaration) {
@@ -139,6 +158,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         return new PracticeEvidenceDeclaration(
             VERSION,
             PROFILE,
+            PracticeObservability.SEMANTIC,
             List.of(requirement),
             List.of(),
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,

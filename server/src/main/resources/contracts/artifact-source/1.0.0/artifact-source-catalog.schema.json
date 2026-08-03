@@ -3,27 +3,42 @@
   "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "sources", "profiles"],
+  "required": [
+    "version",
+    "sources",
+    "profiles"
+  ],
   "properties": {
-    "version": { "const": "1.0.0" },
+    "version": {
+      "const": "1.0.0"
+    },
     "sources": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/source" }
+      "items": {
+        "$ref": "#/$defs/source"
+      }
     },
     "profiles": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/profile" }
+      "items": {
+        "$ref": "#/$defs/profile"
+      }
     }
   },
   "$defs": {
-    "sourceKind": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$" },
+    "sourceKind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "kind",
+        "description",
+        "selectionScope",
         "artifactTypes",
         "authority",
         "captureTime",
@@ -37,32 +52,85 @@
         "useDecisionId"
       ],
       "properties": {
-        "kind": { "$ref": "#/$defs/sourceKind" },
+        "kind": {
+          "$ref": "#/$defs/sourceKind"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selectionScope": {
+          "type": "string",
+          "minLength": 1
+        },
         "artifactTypes": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "enum": ["PULL_REQUEST", "ISSUE", "CONVERSATION_THREAD"] }
+          "items": {
+            "enum": [
+              "PULL_REQUEST",
+              "ISSUE",
+              "CONVERSATION_THREAD"
+            ]
+          }
         },
         "authority": {
-          "enum": ["UPSTREAM_SNAPSHOT", "SYNCHRONIZED_MIRROR", "DETERMINISTIC_DERIVATION", "LOSSY_DERIVATION"]
+          "enum": [
+            "UPSTREAM_SNAPSHOT",
+            "SYNCHRONIZED_MIRROR",
+            "DETERMINISTIC_DERIVATION",
+            "LOSSY_DERIVATION"
+          ]
         },
         "captureTime": {
-          "enum": ["EVENT_TIME_SNAPSHOT", "COLLECTION_TIME_SNAPSHOT", "PINNED_IMMUTABLE_IDENTITY"]
+          "enum": [
+            "EVENT_TIME_SNAPSHOT",
+            "COLLECTION_TIME_SNAPSHOT",
+            "PINNED_IMMUTABLE_IDENTITY"
+          ]
         },
-        "freshness": { "$ref": "#/$defs/freshness" },
-        "completeness": { "$ref": "#/$defs/completeness" },
-        "privacyClass": { "enum": ["PUBLIC", "INTERNAL", "PERSONAL", "SENSITIVE_PERSONAL"] },
+        "freshness": {
+          "$ref": "#/$defs/freshness"
+        },
+        "completeness": {
+          "$ref": "#/$defs/completeness"
+        },
+        "privacyClass": {
+          "enum": [
+            "PUBLIC",
+            "INTERNAL",
+            "PERSONAL",
+            "SENSITIVE_PERSONAL"
+          ]
+        },
         "supportedMissingness": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "enum": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"] }
+          "items": {
+            "enum": [
+              "NOT_COLLECTED",
+              "UNAVAILABLE",
+              "REDACTED",
+              "COLLECTION_ERROR"
+            ]
+          }
         },
-        "purpose": { "type": "string", "minLength": 1 },
-        "retentionPolicy": { "type": "string", "minLength": 1 },
-        "erasurePolicy": { "type": "string", "minLength": 1 },
-        "useDecisionId": { "type": "string", "minLength": 1 }
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retentionPolicy": {
+          "const": "AGENT_EVIDENCE_RETENTION"
+        },
+        "erasurePolicy": {
+          "const": "WORKSPACE_AND_PERSON_ERASURE"
+        },
+        "useDecisionId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "freshness": {
@@ -70,43 +138,89 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["mode", "maxAgeSeconds"],
+          "required": [
+            "mode",
+            "maxAgeSeconds"
+          ],
           "properties": {
-            "mode": { "const": "MAX_AGE" },
-            "maxAgeSeconds": { "type": "integer", "minimum": 1 }
+            "mode": {
+              "const": "MAX_AGE"
+            },
+            "maxAgeSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["mode"],
-          "properties": { "mode": { "enum": ["PINNED_IDENTITY", "EVENT_TIME", "NOT_APPLICABLE"] } }
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "PINNED_IDENTITY",
+                "EVENT_TIME",
+                "NOT_APPLICABLE"
+              ]
+            }
+          }
         }
       ]
     },
     "completeness": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["supportsComplete", "supportsPartial", "supportsEmpty"],
+      "required": [
+        "supportsComplete",
+        "supportsPartial",
+        "supportsEmpty"
+      ],
       "properties": {
-        "supportsComplete": { "type": "boolean" },
-        "supportsPartial": { "type": "boolean" },
-        "supportsEmpty": { "type": "boolean" }
+        "supportsComplete": {
+          "type": "boolean"
+        },
+        "supportsPartial": {
+          "type": "boolean"
+        },
+        "supportsEmpty": {
+          "type": "boolean"
+        }
       }
     },
     "profile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "version", "artifactType", "allowedSources"],
+      "required": [
+        "id",
+        "version",
+        "artifactType",
+        "allowedSources"
+      ],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
-        "version": { "const": "1.0.0" },
-        "artifactType": { "enum": ["PULL_REQUEST", "ISSUE", "CONVERSATION_THREAD"] },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+        },
+        "version": {
+          "const": "1.0.0"
+        },
+        "artifactType": {
+          "enum": [
+            "PULL_REQUEST",
+            "ISSUE",
+            "CONVERSATION_THREAD"
+          ]
+        },
         "allowedSources": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/sourceKind" }
+          "items": {
+            "$ref": "#/$defs/sourceKind"
+          }
         }
       }
     }

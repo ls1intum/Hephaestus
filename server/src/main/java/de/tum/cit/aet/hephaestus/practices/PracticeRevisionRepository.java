@@ -17,6 +17,8 @@ public interface PracticeRevisionRepository
 {
     PracticeRevision save(PracticeRevision revision);
 
+    Optional<PracticeRevision> findById(Long id);
+
     List<PracticeRevision> findAll();
 
     Optional<PracticeRevision> findFirstByPracticeIdOrderByRevisionNumberDesc(Long practiceId);

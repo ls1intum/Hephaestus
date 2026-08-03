@@ -124,6 +124,25 @@ public class WorkspaceContextBuilder {
         return manifestBuilder.readyPractices(manifest, practices, jobId);
     }
 
+    public List<Practice> readyPractices(
+        ArtifactSourceManifest manifest,
+        List<Practice> practices,
+        String jobId,
+        Instant temporalAnchor
+    ) {
+        if (manifestBuilder == null) {
+            throw new IllegalStateException("Evidence readiness requires a manifest builder");
+        }
+        return manifestBuilder.readyPractices(manifest, practices, jobId, temporalAnchor);
+    }
+
+    public PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {
+        if (manifestBuilder == null) {
+            throw new IllegalStateException("Evidence restriction requires a manifest builder");
+        }
+        return manifestBuilder.restrictTo(prepared, plan);
+    }
+
     private Map<String, byte[]> buildWithoutManifest(ContextRequest request) {
         Long repoKey = repoKey(request);
         ReentrantLock lock = repoKey == null ? null : stripeFor(repoKey);
@@ -171,60 +190,37 @@ public class WorkspaceContextBuilder {
                 continue;
             }
             String providerName = provider.getClass().getSimpleName();
-            if (evidencePlan != null && provider instanceof EvidenceSource evidenceSource) {
-                evidenceSource
-                    .sourceKinds()
-                    .stream()
-                    .filter(evidencePlan.selectedSources()::contains)
-                    .forEach(attemptedKinds::add);
-            }
             Map<String, byte[]> contributionFiles;
-            try {
-                if (evidencePlan != null && provider instanceof EvidenceSource evidenceSource) {
-                    EvidenceContribution contribution = evidenceSource.capture(request, evidencePlan.selectedSources());
-                    validateContribution(evidenceSource, evidencePlan, contribution);
-                    contributionFiles = contribution.files();
-                    completeness.putAll(contribution.completeness());
-                    contentStates.putAll(contribution.contentStates());
-                    immutableIdentities.putAll(contribution.immutableIdentities());
-                    observedAt.putAll(contribution.observedAt());
-                    sourceEffectiveAt.putAll(contribution.sourceEffectiveAt());
-                } else {
+            if (evidencePlan != null && provider instanceof EvidenceSource evidenceSource) {
+                contributionFiles = captureIndependently(
+                    request,
+                    evidencePlan,
+                    evidenceSource,
+                    providerName,
+                    completeness,
+                    contentStates,
+                    immutableIdentities,
+                    observedAt,
+                    sourceEffectiveAt,
+                    stateOverrides,
+                    attemptedKinds
+                );
+            } else {
+                try {
                     Map<String, byte[]> localFiles = new LinkedHashMap<>();
                     provider.contribute(request, localFiles);
                     contributionFiles = localFiles;
-                }
-            } catch (JobPreparationException e) {
-                if (evidencePlan == null || !(provider instanceof EvidenceSource evidenceSource)) {
+                } catch (JobPreparationException e) {
                     throw e;
-                }
-                if (provider.required()) {
-                    meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
-                }
-                recordCollectionError(evidenceSource, evidencePlan, stateOverrides);
-                log.warn("Evidence provider failed; recording collection error: {} — {}", providerName, e.getMessage());
-                continue;
-            } catch (RuntimeException e) {
-                if (!(e instanceof EvidenceCollectionException)) {
-                    throw e;
-                }
-                if (provider.required()) {
-                    meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
-                }
-                if (evidencePlan != null && provider instanceof EvidenceSource evidenceSource) {
-                    recordCollectionError(evidenceSource, evidencePlan, stateOverrides);
-                    log.warn(
-                        "Evidence provider failed; recording collection error: {} — {}",
-                        providerName,
-                        e.getMessage()
-                    );
+                } catch (RuntimeException e) {
+                    if (!(e instanceof EvidenceCollectionException)) throw e;
+                    if (provider.required()) {
+                        meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
+                        throw new JobPreparationException("Required content provider failed: " + providerName, e);
+                    }
+                    log.warn("Optional content provider failed, continuing: {} — {}", providerName, e.getMessage());
                     continue;
                 }
-                if (provider.required()) {
-                    throw new JobPreparationException("Required content provider failed: " + providerName, e);
-                }
-                log.warn("Optional content provider failed, continuing: {} — {}", providerName, e.getMessage());
-                continue;
             }
             for (Map.Entry<String, byte[]> entry : contributionFiles.entrySet()) {
                 String key = entry.getKey();
@@ -291,16 +287,53 @@ public class WorkspaceContextBuilder {
         return new BuildResult(files, manifest);
     }
 
-    private static void recordCollectionError(
-        EvidenceSource source,
+    private Map<String, byte[]> captureIndependently(
+        ContextRequest request,
         EvidencePlan plan,
-        Map<SourceKind, SourceCaptureState> stateOverrides
+        EvidenceSource source,
+        String providerName,
+        Map<SourceKind, SourceCompleteness> completeness,
+        Map<SourceKind, SourceContentState> contentStates,
+        Map<SourceKind, String> immutableIdentities,
+        Map<SourceKind, Instant> observedAt,
+        Map<SourceKind, Instant> sourceEffectiveAt,
+        Map<SourceKind, SourceCaptureState> stateOverrides,
+        Set<SourceKind> attemptedKinds
     ) {
-        source
-            .sourceKinds()
-            .stream()
-            .filter(plan.selectedSources()::contains)
-            .forEach(kind -> stateOverrides.put(kind, new SourceCaptureState.CollectionError("PROVIDER_FAILURE")));
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        Set<SourceKind> selectedKinds = new HashSet<>(source.sourceKinds());
+        selectedKinds.retainAll(plan.selectedSources());
+        source.prepareCapture(request, selectedKinds);
+        for (SourceKind kind : source.sourceKinds()) {
+            if (!plan.selectedSources().contains(kind)) continue;
+            attemptedKinds.add(kind);
+            try {
+                EvidenceContribution contribution = source.capture(request, Set.of(kind));
+                validateContribution(source, plan, contribution);
+                contribution
+                    .files()
+                    .forEach((path, bytes) -> {
+                        if (files.put(path, bytes) != null) {
+                            throw new IllegalStateException(providerName + " emitted duplicate file " + path);
+                        }
+                    });
+                completeness.putAll(contribution.completeness());
+                contentStates.putAll(contribution.contentStates());
+                immutableIdentities.putAll(contribution.immutableIdentities());
+                observedAt.putAll(contribution.observedAt());
+                sourceEffectiveAt.putAll(contribution.sourceEffectiveAt());
+            } catch (JobPreparationException | EvidenceCollectionException e) {
+                stateOverrides.put(kind, new SourceCaptureState.CollectionError("PROVIDER_FAILURE"));
+                meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
+                log.warn(
+                    "Evidence source failed; recording collection error: {} {} — {}",
+                    providerName,
+                    kind,
+                    e.getMessage()
+                );
+            }
+        }
+        return files;
     }
 
     private static void validateContribution(
