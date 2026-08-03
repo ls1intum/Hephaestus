@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -51,13 +53,17 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
     private BotCommandProcessor processor;
 
+    private boolean silentModeEngaged;
+
     @BeforeEach
     void setUp() {
+        silentModeEngaged = false;
         processor = new BotCommandProcessor(
             agentJobService,
             pullRequestRepository,
             practiceReviewDetectionGate,
-            List.of()
+            List.of(),
+            () -> silentModeEngaged
         );
     }
 
@@ -184,6 +190,41 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(agentJobService, never()).submit(any(), any(), any());
+        }
+    }
+
+    @Nested
+    class EyesReaction {
+
+        private final ScmCommentReactionSink sink = mock(ScmCommentReactionSink.class);
+
+        private BotCommandProcessor processorWithSink() {
+            when(sink.kind()).thenReturn(IntegrationKind.GITLAB);
+            return new BotCommandProcessor(
+                agentJobService,
+                pullRequestRepository,
+                practiceReviewDetectionGate,
+                List.of(sink),
+                () -> silentModeEngaged
+            );
+        }
+
+        @Test
+        void acknowledgesCommandWhenNotSilenced() {
+            processorWithSink().onBotCommandReceived(eventWithReactionTarget("/hephaestus deploy"));
+            verify(sink).react(9L, 7L, "eyes");
+        }
+
+        @Test
+        void silentModeSuppressesTheAcknowledgementReaction() {
+            silentModeEngaged = true;
+            processorWithSink().onBotCommandReceived(eventWithReactionTarget("/hephaestus deploy"));
+            verify(sink, never()).react(anyLong(), anyLong(), any());
+        }
+
+        private BotCommandReceivedEvent eventWithReactionTarget(String noteBody) {
+            // commentId = 7 (6th arg), scopeId = 9 (7th arg); react() takes (scopeId, commentNativeId, name).
+            return new BotCommandReceivedEvent(IntegrationKind.GITLAB, REPO_ID, MR_NUMBER, noteBody, AUTHOR, 7L, 9L);
         }
     }
 

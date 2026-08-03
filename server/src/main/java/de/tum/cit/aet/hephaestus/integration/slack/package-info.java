@@ -41,6 +41,8 @@
         // SlackChannelConsentService throws the shared EntityNotFoundException (→ 404) for an unknown /
         // cross-workspace channel.
         "core::exception",
+        // SlackMessageService consults the instance-wide silent-mode brake before every outbound send.
+        "core::settings-spi",
         // SlackMentorIdentityResolver resolves a Slack (team, user) to the workspace developer login through the
         // auth SPI ports only (GitProviderRegistry + AccountIdentityQuery + AccountWorkspaceMembershipQuery) —
         // never core.auth domain types.

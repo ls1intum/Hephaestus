@@ -68,7 +68,8 @@ class SlackMessageServiceLiveTest {
         SlackCredentialProvider credentialProvider = new SlackCredentialProvider(connectionService, converter);
         SlackMessageService service = new SlackMessageService(
             credentialProvider,
-            new SlackRateLimitTracker(new SimpleMeterRegistry())
+            new SlackRateLimitTracker(new SimpleMeterRegistry()),
+            () -> false
         );
 
         // The real send: block-kit payload through the app's SlackMessageService to the live channel.

@@ -1,0 +1,86 @@
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, Volume2, VolumeX } from "lucide-react";
+import type { InstanceSettings } from "@/api/types.gen";
+import { RelativeTime } from "@/components/common/RelativeTime";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface SilentModeStatusCardProps {
+	settings?: InstanceSettings;
+	isLoading?: boolean;
+	/** Unknown delivery state must not read as "delivering". */
+	isError?: boolean;
+}
+
+/** Read-only status tile; the control itself lives on the instance settings page. */
+export function SilentModeStatusCard({
+	settings,
+	isLoading = false,
+	isError = false,
+}: SilentModeStatusCardProps) {
+	const engaged = settings?.silentModeEngaged === true;
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle className="flex items-center gap-2">
+					{engaged ? (
+						<VolumeX className="size-4 text-destructive" aria-hidden />
+					) : (
+						<Volume2 className="size-4 text-muted-foreground" aria-hidden />
+					)}
+					Delivery
+				</CardTitle>
+				<CardDescription>Outbound feedback and messages, instance-wide</CardDescription>
+				<CardAction>
+					<Button variant="ghost" size="sm" render={<Link to="/admin/settings" />}>
+						Manage
+						<ArrowRight aria-hidden />
+					</Button>
+				</CardAction>
+			</CardHeader>
+			<CardContent>
+				{isLoading ? (
+					<Skeleton className="h-6 w-40" />
+				) : isError ? (
+					<div className="space-y-1">
+						<Badge variant="outline">Unknown</Badge>
+						<p className="text-sm text-muted-foreground">
+							Couldn&rsquo;t read the delivery state — open instance settings to check.
+						</p>
+					</div>
+				) : engaged ? (
+					<div className="space-y-1">
+						<Badge variant="destructive">Silent mode engaged</Badge>
+						<p className="text-sm text-muted-foreground">
+							Nothing is being delivered
+							{settings?.silentModeChangedBy ? ` — engaged by ${settings.silentModeChangedBy}` : ""}
+							{settings?.silentModeChangedAt ? (
+								<>
+									{" "}
+									<RelativeTime value={settings.silentModeChangedAt} tooltip={false} />
+								</>
+							) : null}
+							.
+						</p>
+					</div>
+				) : (
+					<div className="space-y-1">
+						<Badge variant="success">Delivering</Badge>
+						<p className="text-sm text-muted-foreground">
+							Practice feedback and Slack messages go out normally.
+						</p>
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	);
+}

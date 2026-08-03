@@ -885,6 +885,11 @@ export type UpdateSlackChannelConsentRequest = {
     reason?: string;
 };
 
+export type UpdateSilentModeRequest = {
+    engaged: boolean;
+    reason?: string;
+};
+
 /**
  * Request to update repository contribution visibility settings in a workspace
  */
@@ -1798,7 +1803,7 @@ export type ReviewBoundFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
 };
 
 export type ReviewArtifact = {
@@ -1942,7 +1947,7 @@ export type ReviewFeedbackDetail = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
     /**
      * Cross-run continuity key tying successive deliveries together
      */
@@ -2023,7 +2028,7 @@ export type ReviewFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
 };
 
 /**
@@ -3635,6 +3640,13 @@ export type IntegrationCatalogEntry = {
     kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
 };
 
+export type InstanceSettings = {
+    silentModeChangedAt?: Date;
+    silentModeChangedBy?: string;
+    silentModeEngaged: boolean;
+    silentModeReason?: string;
+};
+
 /**
  * Instance-wide LLM governance settings
  */
@@ -4803,7 +4815,7 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED'>;
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
@@ -4826,7 +4838,7 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED'>;
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
@@ -5775,6 +5787,38 @@ export type AdminUpdateCuratedPracticeStatusResponses = {
 };
 
 export type AdminUpdateCuratedPracticeStatusResponse = AdminUpdateCuratedPracticeStatusResponses[keyof AdminUpdateCuratedPracticeStatusResponses];
+
+export type AdminGetInstanceSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/settings';
+};
+
+export type AdminGetInstanceSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InstanceSettings;
+};
+
+export type AdminGetInstanceSettingsResponse = AdminGetInstanceSettingsResponses[keyof AdminGetInstanceSettingsResponses];
+
+export type AdminUpdateSilentModeData = {
+    body: UpdateSilentModeRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/settings/silent-mode';
+};
+
+export type AdminUpdateSilentModeResponses = {
+    /**
+     * OK
+     */
+    200: InstanceSettings;
+};
+
+export type AdminUpdateSilentModeResponse = AdminUpdateSilentModeResponses[keyof AdminUpdateSilentModeResponses];
 
 export type AdminListUsersData = {
     body?: never;
@@ -8580,7 +8624,7 @@ export type ListPracticeReviewFeedbackData = {
         page?: number;
         size?: number;
         deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED'>;
         channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
         agentJobId?: string;
         artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';

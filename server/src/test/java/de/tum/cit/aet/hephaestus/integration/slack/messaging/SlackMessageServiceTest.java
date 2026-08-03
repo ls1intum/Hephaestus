@@ -1,11 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.slack.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.slack.api.methods.SlackApiException;
+import com.slack.api.model.view.View;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -30,9 +33,66 @@ class SlackMessageServiceTest extends BaseUnitTest {
 
     private SlackMessageService service;
 
+    private boolean silentModeEngaged;
+
     @BeforeEach
     void setUp() {
-        service = new SlackMessageService(credentialProvider, new SlackRateLimitTracker(new SimpleMeterRegistry()));
+        silentModeEngaged = false;
+        service = new SlackMessageService(
+            credentialProvider,
+            new SlackRateLimitTracker(new SimpleMeterRegistry()),
+            () -> silentModeEngaged
+        );
+    }
+
+    /** One guard fronts every content send; parameterizing pins each entry point without triplicating. */
+    @ParameterizedTest(name = "{0} is refused while silent mode is engaged")
+    @MethodSource("outboundSends")
+    void silentModeRefusesEveryOutboundSend(String name, ThrowingSend send) {
+        silentModeEngaged = true;
+
+        assertThatThrownBy(() -> send.run(service))
+            .isInstanceOf(SlackSendException.class)
+            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
+        verifyNoInteractions(credentialProvider);
+    }
+
+    @FunctionalInterface
+    interface ThrowingSend {
+        void run(SlackMessageService service);
+    }
+
+    private static Stream<Arguments> outboundSends() {
+        return Stream.of(
+            Arguments.of("sendForWorkspace", (ThrowingSend) s -> s.sendForWorkspace(7L, "C1ABCDEFGH", List.of(), "f")),
+            Arguments.of(
+                "sendEphemeralForWorkspace",
+                (ThrowingSend) s -> s.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "f")
+            ),
+            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi"))
+        );
+    }
+
+    /** These ride inbound events whose handlers do not catch, so a throw would NAK into the poison alarm. */
+    @ParameterizedTest(name = "{0} is skipped, not refused, while silent mode is engaged")
+    @MethodSource("decorationCalls")
+    void silentModeSkipsDecorationCallsWithoutThrowing(String name, ThrowingSend call) {
+        silentModeEngaged = true;
+
+        assertThatCode(() -> call.run(service)).doesNotThrowAnyException();
+        verifyNoInteractions(credentialProvider);
+    }
+
+    private static Stream<Arguments> decorationCalls() {
+        return Stream.of(
+            Arguments.of("setStatus", (ThrowingSend) s -> s.setStatus(7L, "C1ABCDEFGH", "171234.5678", "Thinking…")),
+            Arguments.of(
+                "setSuggestedPrompts",
+                (ThrowingSend) s -> s.setSuggestedPrompts(7L, "C1ABCDEFGH", "Try", List.of())
+            ),
+            Arguments.of("publishHomeView", (ThrowingSend) s -> s.publishHomeView(7L, "U123", View.builder().build())),
+            Arguments.of("joinPublicChannel", (ThrowingSend) s -> s.joinPublicChannel(7L, "C1ABCDEFGH"))
+        );
     }
 
     @Test

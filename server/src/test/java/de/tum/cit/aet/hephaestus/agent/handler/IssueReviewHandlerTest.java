@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -78,8 +79,11 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
     private IssueReviewHandler handler;
 
+    private boolean silentModeEngaged;
+
     @BeforeEach
     void setUp() {
+        silentModeEngaged = false;
         handler = new IssueReviewHandler(
             objectMapper,
             workspaceContextBuilder,
@@ -95,7 +99,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
                 repositoryToMonitorRepository,
                 workspaceRepository,
                 accountPreferencesQuery,
-                new PracticeReviewProperties(false, true, false, 15, false, false)
+                new PracticeReviewProperties(false, true, false, 15, false, false),
+                () -> silentModeEngaged
             ),
             new PracticeFeedbackCommentFormatter(
                 new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
@@ -223,6 +228,24 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
             verify(issueRepository, never()).findByIdWithAuthorAndRepository(777L);
             verify(accountPreferencesQuery, never()).preferencesForUserId(5L);
+        }
+
+        @Test
+        void instanceSilentMode_isSuppressedAheadOfEveryOtherRule() {
+            silentModeEngaged = true;
+            AgentJob job = issueJob("OPEN");
+            DeliveryContent delivery = note();
+
+            handler.postIssueNote(job, delivery);
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.INSTANCE_SILENCED)
+            );
+            // The brake short-circuits before the policy touches the artifact or the recipient.
+            verify(issueRepository, never()).findByIdWithAuthorAndRepository(anyLong());
         }
 
         @Test

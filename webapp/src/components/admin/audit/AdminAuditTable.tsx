@@ -26,7 +26,13 @@ import {
 import { FilterLink } from "../audit-shared/FilterLink";
 import { refLabel } from "../audit-shared/ref-label";
 import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
-import { type AuditSeverity, eventLabel, eventSeverity, resultLabel } from "./audit-format";
+import {
+	eventLabel,
+	eventSeverity,
+	resultLabel,
+	severityDotClass,
+	severityScreenReaderPrefix,
+} from "./audit-format";
 
 export interface AdminAuditTableProps {
 	events: AuthEventView[];
@@ -42,12 +48,6 @@ export interface AdminAuditTableProps {
 	onFilterActor?: (id: number) => void;
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
-
-const SEVERITY_DOT: Record<AuditSeverity, string> = {
-	error: "bg-destructive",
-	warning: "bg-amber-500",
-	info: "bg-muted-foreground/40",
-};
 
 /** Read-only table of auth audit events, newest first. The actor column attributes an impersonated
  * action to the operator. */
@@ -134,6 +134,7 @@ export function AdminAuditTable({
 					<TableBody>
 						{events.map((e) => {
 							const severity = eventSeverity(e.eventType, e.result);
+							const screenReaderPrefix = severityScreenReaderPrefix(severity);
 							const account = refLabel(e.account, e.accountId);
 							const actor = refLabel(e.actor, e.actingAccountId);
 							return (
@@ -144,13 +145,10 @@ export function AdminAuditTable({
 									<TableCell>
 										<span className="flex items-center gap-2" title={e.eventType}>
 											<span
-												className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
+												className={`size-1.5 shrink-0 rounded-full ${severityDotClass(severity)}`}
 												aria-hidden
 											/>
-											{severity === "warning" && (
-												// The dot's hue is the only other marker of a high-risk event.
-												<span className="sr-only">High-risk event: </span>
-											)}
+											{screenReaderPrefix && <span className="sr-only">{screenReaderPrefix}</span>}
 											<span className="text-sm">{eventLabel(e.eventType)}</span>
 										</span>
 									</TableCell>

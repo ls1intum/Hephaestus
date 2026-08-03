@@ -107,7 +107,7 @@ htmlcov/
 #   install all needed dependencies.
 .installed.cfg
 # Installer logs
-instance/
+/instance/
 # IntelliJ
 #   intended to run in multiple environments; otherwise, check them in:
 #   in version control.

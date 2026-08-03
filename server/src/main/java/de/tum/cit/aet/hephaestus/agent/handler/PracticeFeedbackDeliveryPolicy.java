@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -27,6 +28,7 @@ class PracticeFeedbackDeliveryPolicy {
     private final WorkspaceRepository workspaceRepository;
     private final AccountPreferencesQuery accountPreferencesQuery;
     private final PracticeReviewProperties reviewProperties;
+    private final SilentModeQuery silentModeQuery;
 
     PracticeFeedbackDeliveryPolicy(
         IssueRepository issueRepository,
@@ -34,7 +36,8 @@ class PracticeFeedbackDeliveryPolicy {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceRepository workspaceRepository,
         AccountPreferencesQuery accountPreferencesQuery,
-        PracticeReviewProperties reviewProperties
+        PracticeReviewProperties reviewProperties,
+        SilentModeQuery silentModeQuery
     ) {
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -42,10 +45,14 @@ class PracticeFeedbackDeliveryPolicy {
         this.workspaceRepository = workspaceRepository;
         this.accountPreferencesQuery = accountPreferencesQuery;
         this.reviewProperties = reviewProperties;
+        this.silentModeQuery = silentModeQuery;
     }
 
     @Transactional(readOnly = true)
     Decision<Issue> evaluateIssue(AgentJob job) {
+        if (silentModeQuery.isSilentModeEngaged()) {
+            return Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED);
+        }
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         if (workspace == null) {
@@ -70,6 +77,9 @@ class PracticeFeedbackDeliveryPolicy {
 
     @Transactional(readOnly = true)
     Decision<PullRequest> evaluatePullRequest(AgentJob job) {
+        if (silentModeQuery.isSilentModeEngaged()) {
+            return Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED);
+        }
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         if (workspace == null) {

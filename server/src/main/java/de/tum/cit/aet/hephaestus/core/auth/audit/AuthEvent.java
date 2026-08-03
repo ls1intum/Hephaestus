@@ -127,6 +127,8 @@ public class AuthEvent {
         LOGIN_PROVIDER_CREATED,
         LOGIN_PROVIDER_UPDATED,
         LOGIN_PROVIDER_DELETED,
+        // Instance emergency brake: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
+        SILENT_MODE_CHANGED,
     }
 
     public enum Result {

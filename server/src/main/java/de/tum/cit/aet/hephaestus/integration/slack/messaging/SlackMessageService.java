@@ -22,6 +22,7 @@ import com.slack.api.model.User;
 import com.slack.api.model.assistant.SuggestedPrompt;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.view.View;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -77,12 +78,32 @@ public class SlackMessageService {
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
     private final SlackRateLimitTracker rateLimitTracker;
+    private final SilentModeQuery silentModeQuery;
     private final ConcurrentMap<Long, String> botUserIdCache = new ConcurrentHashMap<>();
 
-    public SlackMessageService(SlackCredentialProvider credentialProvider, SlackRateLimitTracker rateLimitTracker) {
+    public SlackMessageService(
+        SlackCredentialProvider credentialProvider,
+        SlackRateLimitTracker rateLimitTracker,
+        SilentModeQuery silentModeQuery
+    ) {
         this.slack = Slack.getInstance();
         this.credentialProvider = credentialProvider;
         this.rateLimitTracker = rateLimitTracker;
+        this.silentModeQuery = silentModeQuery;
+    }
+
+    /**
+     * Whether the instance-wide brake is engaged. Callers choose the response: a content send throws so
+     * the caller learns nothing was delivered, while a decoration or membership call returns quietly —
+     * those ride inbound events whose handlers do not catch, and throwing would only NAK the consumer
+     * into redelivery and the poison alarm during the incident the brake was engaged for.
+     */
+    private boolean silenced(long workspaceId) {
+        if (silentModeQuery.isSilentModeEngaged()) {
+            log.debug("Slack call skipped or refused: instance silent mode engaged, workspaceId={}", workspaceId);
+            return true;
+        }
+        return false;
     }
 
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {
@@ -96,6 +117,9 @@ public class SlackMessageService {
         List<LayoutBlock> blocks,
         String fallback
     ) {
+        if (silenced(workspaceId)) {
+            throw new SlackSendException(workspaceId, channelId, "silent_mode_engaged");
+        }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );
@@ -143,6 +167,9 @@ public class SlackMessageService {
         List<LayoutBlock> blocks,
         String fallback
     ) {
+        if (silenced(workspaceId)) {
+            throw new SlackSendException(workspaceId, channelId, "silent_mode_engaged");
+        }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );
@@ -223,6 +250,9 @@ public class SlackMessageService {
      * to. {@code markdownText} is standard Markdown (Slack renders it, incl. tables) — not Slack mrkdwn.
      */
     public String startStream(long workspaceId, String channel, String threadTs, String markdownText) {
+        if (silenced(workspaceId)) {
+            throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
+        }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );
@@ -285,6 +315,9 @@ public class SlackMessageService {
      * best-effort).
      */
     public void publishHomeView(long workspaceId, String slackUserId, View view) {
+        if (silenced(workspaceId)) {
+            return;
+        }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection")
         );
@@ -318,6 +351,9 @@ public class SlackMessageService {
      * failure (e.g. a plain DM thread) is swallowed.
      */
     public void setStatus(long workspaceId, String channel, String threadTs, String status) {
+        if (silenced(workspaceId)) {
+            return;
+        }
         Optional<String> token = resolveToken(workspaceId);
         if (token.isEmpty()) {
             return;
@@ -336,6 +372,9 @@ public class SlackMessageService {
      * a failure is swallowed.
      */
     public void setSuggestedPrompts(long workspaceId, String channel, String title, List<SuggestedPrompt> prompts) {
+        if (silenced(workspaceId)) {
+            return;
+        }
         Optional<String> token = resolveToken(workspaceId);
         if (token.isEmpty() || prompts.isEmpty()) {
             return;
@@ -586,6 +625,9 @@ public class SlackMessageService {
     public record HistoryPage(List<com.slack.api.model.Message> messages, @Nullable String nextCursor) {}
 
     public void joinPublicChannel(long workspaceId, String channelId) {
+        if (silenced(workspaceId)) {
+            return;
+        }
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );

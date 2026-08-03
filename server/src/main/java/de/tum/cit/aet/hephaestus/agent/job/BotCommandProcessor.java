@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.T
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -33,9 +34,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * when a non-system MR comment matches a known command pattern. Runs asynchronously
  * to avoid blocking webhook processing.
  *
- * <p>On receiving a recognized command, reacts to the comment with an eyes emoji
- * (via GitLab GraphQL {@code awardEmojiAdd} mutation) to acknowledge receipt,
- * then processes the command.
+ * <p>On a recognized command, acknowledges with an eyes reaction — skipped while instance silent
+ * mode is engaged — then processes it.
  *
  * <p>The command prefix is {@code /hephaestus} (case-insensitive). Supported commands:
  * <ul>
@@ -52,16 +52,19 @@ public class BotCommandProcessor {
     private final PullRequestRepository pullRequestRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
     private final Map<IntegrationKind, ScmCommentReactionSink> reactionSinks;
+    private final SilentModeQuery silentModeQuery;
 
     public BotCommandProcessor(
         AgentJobService agentJobService,
         PullRequestRepository pullRequestRepository,
         PracticeReviewDetectionGate practiceReviewDetectionGate,
-        List<ScmCommentReactionSink> reactionSinkList
+        List<ScmCommentReactionSink> reactionSinkList,
+        SilentModeQuery silentModeQuery
     ) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
+        this.silentModeQuery = silentModeQuery;
         Map<IntegrationKind, ScmCommentReactionSink> map = new EnumMap<>(IntegrationKind.class);
         for (ScmCommentReactionSink sink : reactionSinkList) {
             map.put(sink.kind(), sink);
@@ -73,7 +76,10 @@ public class BotCommandProcessor {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBotCommandReceived(BotCommandReceivedEvent event) {
-        addEyesReaction(event);
+        // The ack is itself an external write: while silenced it would promise a review that won't post.
+        if (!silentModeQuery.isSilentModeEngaged()) {
+            addEyesReaction(event);
+        }
 
         processCommand(event.repositoryId(), event.mrNumber(), event.noteBody(), event.noteAuthor());
     }

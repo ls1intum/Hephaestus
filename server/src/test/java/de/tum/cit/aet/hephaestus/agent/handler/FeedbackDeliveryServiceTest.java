@@ -88,8 +88,11 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     private PracticeReviewProperties reviewProperties;
     private PracticeFeedbackCommentFormatter commentFormatter;
 
+    private boolean silentModeEngaged;
+
     @BeforeEach
     void setUp() {
+        silentModeEngaged = false;
         reviewProperties = reviewProperties(false);
         commentFormatter = new PracticeFeedbackCommentFormatter(
             new ApplicationProperties(null, new ApplicationProperties.Webapp(APP_BASE_URL))
@@ -103,7 +106,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 repositoryToMonitorRepository,
                 workspaceRepository,
                 accountPreferencesQuery,
-                reviewProperties
+                reviewProperties,
+                () -> silentModeEngaged
             ),
             reviewProperties,
             feedbackLedgerRecorder,
@@ -349,6 +353,24 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 eq(delivery),
                 eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
             );
+        }
+
+        @Test
+        void instanceSilentMode_isSuppressedAheadOfEveryOtherRule() {
+            silentModeEngaged = true;
+            AgentJob job = createJob();
+
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
+            service.deliverFeedback(job, delivery);
+
+            verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.INSTANCE_SILENCED)
+            );
+            // The brake short-circuits before the policy touches the artifact or the recipient.
+            verifyNoInteractions(pullRequestRepository);
         }
 
         @Test
@@ -849,7 +871,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 repositoryToMonitorRepository,
                 workspaceRepository,
                 accountPreferencesQuery,
-                props
+                props,
+                () -> silentModeEngaged
             ),
             props,
             feedbackLedgerRecorder,

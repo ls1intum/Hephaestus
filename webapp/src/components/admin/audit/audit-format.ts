@@ -45,6 +45,7 @@ export const EVENT_TYPE_LABELS: Record<AuthEventType, string> = {
 	LOGIN_PROVIDER_CREATED: "Login provider added",
 	LOGIN_PROVIDER_UPDATED: "Login provider updated",
 	LOGIN_PROVIDER_DELETED: "Login provider removed",
+	SILENT_MODE_CHANGED: "Silent mode changed",
 };
 
 export function eventLabel(eventType: string): string {
@@ -80,4 +81,23 @@ function stringify(value: unknown): string {
 	if (value === null || value === undefined) return "—";
 	if (typeof value === "object") return JSON.stringify(value);
 	return String(value);
+}
+
+/** Tailwind class per severity; `warning` is the only tone that earns a colour. */
+const SEVERITY_DOT: Record<AuditSeverity, string> = {
+	error: "bg-destructive",
+	warning: "bg-warning",
+	info: "bg-muted-foreground/40",
+};
+
+/**
+ * The dot's hue is the only marker of a high-risk event, so screen readers get it in words.
+ * Import this rather than re-deriving the colours: a second copy drifts silently.
+ */
+export function severityDotClass(severity: AuditSeverity): string {
+	return SEVERITY_DOT[severity];
+}
+
+export function severityScreenReaderPrefix(severity: AuditSeverity): string | null {
+	return severity === "warning" ? "High-risk event: " : null;
 }

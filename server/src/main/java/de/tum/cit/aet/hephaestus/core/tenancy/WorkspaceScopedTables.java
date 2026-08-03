@@ -67,6 +67,8 @@ public class WorkspaceScopedTables {
         "worker_registry",
         // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
         "login_provider",
+        // Singleton instance-wide operator settings (silent-mode brake); no tenant dimension exists
+        "instance_settings",
         // Instance LLM-config catalog — app_admin-owned, curated, shared across all workspaces
         "llm_connection",
         // Instance-curated models behind a catalog connection; global, not tenant-scoped
