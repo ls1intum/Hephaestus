@@ -60,11 +60,6 @@ public class IssueContentSource implements EvidenceSource {
         return path.endsWith("comments.json") ? COMMENTS : CORE;
     }
 
-    @Override
-    public String originId() {
-        return "scm";
-    }
-
     private static final Logger log = LoggerFactory.getLogger(IssueContentSource.class);
 
     /** Cap the thread included in context; most recent kept on truncation. */

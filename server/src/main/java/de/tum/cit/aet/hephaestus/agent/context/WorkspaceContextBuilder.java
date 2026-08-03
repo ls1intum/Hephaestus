@@ -136,6 +136,18 @@ public class WorkspaceContextBuilder {
         return manifestBuilder.readyPractices(manifest, practices, jobId, temporalAnchor);
     }
 
+    public ContextManifestBuilder.PreparedReadiness prepareReadiness(
+        ArtifactSourceManifest manifest,
+        List<Practice> practices,
+        String jobId,
+        Instant temporalAnchor
+    ) {
+        if (manifestBuilder == null) {
+            throw new IllegalStateException("Evidence readiness requires a manifest builder");
+        }
+        return manifestBuilder.prepareReadiness(manifest, practices, jobId, temporalAnchor);
+    }
+
     public PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {
         if (manifestBuilder == null) {
             throw new IllegalStateException("Evidence restriction requires a manifest builder");
@@ -182,16 +194,17 @@ public class WorkspaceContextBuilder {
             if (!provider.supports(request)) {
                 continue;
             }
-            if (
-                evidencePlan != null &&
-                provider instanceof EvidenceSource evidenceSource &&
-                evidenceSource.sourceKinds().stream().noneMatch(evidencePlan.selectedSources()::contains)
-            ) {
-                continue;
+            if (evidencePlan != null && !(provider instanceof EvidenceSource)) {
+                throw new IllegalStateException(
+                    "Detector context provider must declare source kinds: " + provider.getClass().getSimpleName()
+                );
             }
             String providerName = provider.getClass().getSimpleName();
             Map<String, byte[]> contributionFiles;
             if (evidencePlan != null && provider instanceof EvidenceSource evidenceSource) {
+                if (evidenceSource.sourceKinds().stream().noneMatch(evidencePlan.selectedSources()::contains)) {
+                    continue;
+                }
                 contributionFiles = captureIndependently(
                     request,
                     evidencePlan,
@@ -303,13 +316,21 @@ public class WorkspaceContextBuilder {
         Map<String, byte[]> files = new LinkedHashMap<>();
         Set<SourceKind> selectedKinds = new HashSet<>(source.sourceKinds());
         selectedKinds.retainAll(plan.selectedSources());
+        if (manifestBuilder != null) {
+            for (SourceKind kind : Set.copyOf(selectedKinds)) {
+                if (!manifestBuilder.isSourceUsePermitted(plan.contractVersion(), kind)) {
+                    stateOverrides.put(kind, new SourceCaptureState.NotCollected("GOVERNANCE_NOT_EFFECTIVE"));
+                    selectedKinds.remove(kind);
+                }
+            }
+        }
         source.prepareCapture(request, selectedKinds);
         for (SourceKind kind : source.sourceKinds()) {
-            if (!plan.selectedSources().contains(kind)) continue;
+            if (!selectedKinds.contains(kind)) continue;
             attemptedKinds.add(kind);
             try {
                 EvidenceContribution contribution = source.capture(request, Set.of(kind));
-                validateContribution(source, plan, contribution);
+                validateContribution(source, Set.of(kind), contribution);
                 contribution
                     .files()
                     .forEach((path, bytes) -> {
@@ -338,12 +359,9 @@ public class WorkspaceContextBuilder {
 
     private static void validateContribution(
         EvidenceSource source,
-        EvidencePlan plan,
+        Set<SourceKind> allowedKinds,
         EvidenceContribution contribution
     ) {
-        Set<SourceKind> allowedKinds = new HashSet<>(source.sourceKinds());
-        allowedKinds.retainAll(plan.selectedSources());
-
         Set<SourceKind> reportedKinds = new HashSet<>(contribution.completeness().keySet());
         reportedKinds.addAll(contribution.contentStates().keySet());
         reportedKinds.addAll(contribution.immutableIdentities().keySet());
@@ -355,6 +373,18 @@ public class WorkspaceContextBuilder {
                 source.getClass().getSimpleName() +
                     " reported facts for undeclared or unselected sources: " +
                     reportedKinds
+            );
+        }
+        Set<SourceKind> emittedKinds = contribution
+            .files()
+            .keySet()
+            .stream()
+            .map(source::sourceKindFor)
+            .filter(kind -> !allowedKinds.contains(kind))
+            .collect(java.util.stream.Collectors.toSet());
+        if (!emittedKinds.isEmpty()) {
+            throw new IllegalStateException(
+                source.getClass().getSimpleName() + " emitted files for sources outside this capture: " + emittedKinds
             );
         }
     }

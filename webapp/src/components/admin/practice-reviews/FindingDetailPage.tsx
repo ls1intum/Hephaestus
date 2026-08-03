@@ -19,7 +19,12 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { FindingEvidence } from "./FindingEvidence";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
-import { ClaimStatusBadge, FeedbackStateBadge, FindingAssessmentBadge } from "./ReviewBadges";
+import {
+	ClaimStatusAlert,
+	ClaimStatusBadge,
+	FeedbackStateBadge,
+	FindingAssessmentBadge,
+} from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
@@ -111,6 +116,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 					</div>
 				</div>
 			</header>
+			<ClaimStatusAlert status={finding.claimStatus} />
 
 			<Alert>
 				<InfoIcon />

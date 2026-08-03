@@ -4020,10 +4020,26 @@ export type CuratedPracticeRequest = {
     whyItMatters?: string;
 };
 
+/**
+ * A resolved curated practice definition
+ */
+export type CuratedPracticeDefinition = {
+    areaSlug?: string;
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    criteria: string;
+    evidence: PracticeEvidenceDeclaration;
+    evidenceValidation: PracticeEvidenceValidation;
+    name: string;
+    precomputeScript?: string;
+    triggerEvents: Array<string>;
+    whatGoodLooksLike?: string;
+    whyItMatters?: string;
+};
+
 export type CuratedPractice = {
-    definition: CuratedPracticeRequest;
+    definition: CuratedPracticeDefinition;
     position: number;
-    shipped?: CuratedPracticeRequest;
+    shipped?: CuratedPracticeDefinition;
     slug: string;
     status: CatalogEntryStatus;
 };

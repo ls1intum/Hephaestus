@@ -273,7 +273,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     private ObjectNode evidenceSnapshot(Practice... practices) {
         ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
-        var sources = snapshot.putObject("manifest").putArray("sources");
+        var sources = snapshot.putObject("manifest").put("contractVersion", "1.0.0").putArray("sources");
         addArtifact(
             sources.addObject().put("kind", "scm.pull-request.core").put("availability", "AVAILABLE"),
             "inputs/context/metadata.json",

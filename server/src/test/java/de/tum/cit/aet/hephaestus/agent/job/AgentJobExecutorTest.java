@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -21,12 +22,15 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
@@ -40,6 +44,16 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessment;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceFreshness;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -73,6 +87,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class AgentJobExecutorTest extends BaseUnitTest {
@@ -616,7 +631,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
             InOrder order = inOrder(jobRepository, sandboxManager);
             order
                 .verify(jobRepository)
-                .updateProvenanceDigests(eq(jobId), eq("prompt-digest"), inputsDigest.capture(), any());
+                .updateProvenanceDigests(
+                    eq(jobId),
+                    isNull(),
+                    eq(0),
+                    eq("prompt-digest"),
+                    inputsDigest.capture(),
+                    any()
+                );
             order.verify(sandboxManager).execute(any());
             assertThat(inputsDigest.getValue()).matches("[0-9a-f]{64}");
         }
@@ -635,12 +657,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 )
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-            // Only the prepare chain — the run must abort before the sandbox, so nothing past it is stubbed.
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.prepareInputFiles(any())).thenReturn(Map.of("task.json", "{}".getBytes()));
+            when(handler.prepareInputs(any())).thenReturn(
+                PreparedJobInputs.filesOnly(Map.of("task.json", "{}".getBytes()))
+            );
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
-            when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(0); // job row is gone
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any())).thenReturn(0);
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
@@ -648,6 +671,71 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(sandboxManager, never()).execute(any());
             verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
+        }
+
+        @Test
+        void insufficientEvidencePersistsTypedReadinessWithoutStartingTheSandbox() {
+            stubClaimableJob();
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            Instant now = Instant.parse("2026-08-03T10:00:00Z");
+            SourceContractVersion version = new SourceContractVersion("1.0.0");
+            EvidenceProfileId profile = new EvidenceProfileId("pull-request-review");
+            SourceKind source = new SourceKind("scm.pull-request.diff");
+            ArtifactSourceManifest manifest = new ArtifactSourceManifest(
+                version,
+                "a".repeat(64),
+                profile,
+                now,
+                List.of(new SourceCapture(source, new SourceCaptureState.NotCollected("DISABLED"), List.of())),
+                List.of()
+            );
+            EvidenceAssessment assessment = new EvidenceAssessment(
+                source,
+                version,
+                now,
+                now,
+                SourceFreshness.UNKNOWN,
+                false,
+                List.of("NOT_COLLECTED")
+            );
+            PracticeReadinessReport readiness = new PracticeReadinessReport(
+                version,
+                "a".repeat(64),
+                profile,
+                now,
+                now,
+                List.of(new PracticeReadinessDecision("example", now, false, List.of(assessment)))
+            );
+            PreparedJobInputs inputs = new PreparedJobInputs(
+                Map.of(SandboxLayout.MANIFEST_PATH, "{}".getBytes()),
+                manifest,
+                readiness
+            );
+            when(handler.prepareInputs(any())).thenThrow(
+                new InsufficientEvidenceException("No practice has sufficient evidence", inputs)
+            );
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any())).thenReturn(1);
+            when(jobRepository.transitionToEvidenceRefused(any(), any(), anyInt(), any(), any())).thenReturn(1);
+
+            executor.processJob(jobId);
+
+            ArgumentCaptor<JsonNode> evidence = ArgumentCaptor.forClass(JsonNode.class);
+            verify(jobRepository).updateProvenanceDigests(
+                eq(jobId),
+                isNull(),
+                eq(0),
+                isNull(),
+                any(),
+                evidence.capture()
+            );
+            assertThat(
+                evidence.getValue().path("readiness").path("decisions").get(0).path("ready").asBoolean()
+            ).isFalse();
+            ArgumentCaptor<JsonNode> output = ArgumentCaptor.forClass(JsonNode.class);
+            verify(jobRepository).transitionToEvidenceRefused(eq(jobId), isNull(), eq(0), any(), output.capture());
+            assertThat(output.getValue().path("outcome").asString()).isEqualTo("INSUFFICIENT_EVIDENCE");
+            verify(sandboxManager, never()).execute(any());
         }
 
         @ParameterizedTest
@@ -669,7 +757,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.prepareInputFiles(any())).thenThrow(new IllegalStateException(failureMessage));
+            when(handler.prepareInputs(any())).thenThrow(new IllegalStateException(failureMessage));
 
             executor.processJob(jobId);
 
@@ -2046,10 +2134,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(0);
-            when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(1);
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any())).thenReturn(1);
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.prepareInputFiles(any())).thenReturn(Map.of());
+            when(handler.prepareInputs(any())).thenReturn(PreparedJobInputs.filesOnly(Map.of()));
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
 
             executor.processJob(jobId);
@@ -2092,10 +2180,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private JobTypeHandler setupFullExecution(SandboxResult sandboxResult) {
         // Every execution stamps its provenance digests before the sandbox starts, and fails loud if the write
         // matches no row — so the standard path must report the row it updated.
-        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(1);
+        lenient()
+            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any()))
+            .thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-        when(handler.prepareInputFiles(any())).thenReturn(Map.of("code.py", "print('hi')".getBytes()));
+        when(handler.prepareInputs(any())).thenReturn(
+            PreparedJobInputs.filesOnly(Map.of("code.py", "print('hi')".getBytes()))
+        );
 
         PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",
@@ -2140,10 +2232,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     private void setupFullExecutionWithException(Exception exception) {
-        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any(), any())).thenReturn(1);
+        lenient()
+            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any()))
+            .thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-        when(handler.prepareInputFiles(any())).thenReturn(Map.of());
+        when(handler.prepareInputs(any())).thenReturn(PreparedJobInputs.filesOnly(Map.of()));
 
         PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",

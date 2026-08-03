@@ -31,6 +31,10 @@ Runtime components must reference the exact contract version and catalog digest 
 `schemaVersion: 1` context index is not an artifact-source manifest and must not acquire `1.0.0` semantics.
 Inputs outside the catalog cannot satisfy a practice requirement.
 
+This contract governs practice-detection evidence, not every file used by the separate mentor conversation
+runtime. Mentor inputs remain subject to mentor consent and integration controls and cannot be cited by the
+detector. Reusing one for detection requires registering it as a source kind first.
+
 ## Source vocabulary
 
 ### Authority and time
@@ -66,9 +70,15 @@ in an internal mirror is not thereby allowed in an external model request or lea
 
 ## Detector catalog (`1.0.0`)
 
-The machine-readable [catalog](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/catalog.json)
-and its adjacent JSON Schema are normative; prose does not maintain a second field-by-field catalog. Authoring
-tools resolve source kinds through one of the catalog's exact artifact profiles and reject unknown kinds.
+The machine-readable [catalog](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/catalog.json),
+its adjacent JSON Schemas, and the cross-resource and identity constraints enforced by
+[`check:contracts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/validate-artifact-source-contracts.mjs)
+jointly define conformance. Schema validation alone is insufficient because standard JSON Schema `uniqueItems`
+compares whole values rather than a selected identity property. Every consumer must also reject duplicate source,
+artifact-path, practice, assessment, and reason-code identities; mismatched report/decision times; inconsistent
+readiness outcomes; and catalog/profile/governance references that do not agree. Prose does not maintain a second
+field-by-field catalog. Authoring tools resolve source kinds through one of the catalog's exact artifact profiles
+and reject unknown kinds.
 
 The constraints with direct authoring consequences are:
 
@@ -83,7 +93,9 @@ The constraints with direct authoring consequences are:
 scope. It is not controller or DPO approval and cannot cover an expanded source, purpose, audience, processor,
 retention policy, or collection scope. `CONTROLLER_DECISION` records the releasable subset of a traceable decision;
 only an unexpired `APPROVED` decision passes when that basis is used. The controller's complete record remains
-separate.
+separate. A deployment must additionally list approved kinds in
+`hephaestus.evidence.authorized-source-kinds`; the default-empty allowlist prevents both collection and delayed
+delivery. The checked-in engineering decision cannot authorize an independent operator's processing.
 
 Changing a source's meaning, selection scope, limit, mapping, freshness policy, dependency, or normalization
 requires a new contract version. Repository history is not part of `scm.repository.tree` and requires its own

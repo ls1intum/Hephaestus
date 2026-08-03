@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
  *   <li>{@code cas/} — IMMUTABLE content-addressed blobs (the only hash-keyed region); GC by mark-and-sweep.
  *   <li>{@code sources/{connector}/{externalId}} — MUTABLE name-keyed per-connector materialisations (the SCM
  *       git checkout, a future Slack/Outline export); regenerable, GC by re-materialise-on-miss.
- *   <li>{@code jobs/{jobId}/manifest.json} — the MUTABLE provenance index (name+provenance → digests, the
- *       analogue of Git refs / Bazel ActionCache); recoverable from SQL, GC by retention window.
+ *   <li>{@code jobs/{jobId}/artifact-source-manifest.json} — the MUTABLE provenance index
+ *       (name+provenance → digests); GC by retention window.
  * </ul>
  *
  * <p>The root defaults to the existing {@code hephaestus.git.storage-path} so a deployment that only set
@@ -39,7 +39,7 @@ public class FabricLayout {
         this.root = Path.of(root);
     }
 
-    /** The fabric cache root; everything below is a rebuildable derivative of SQL + the upstream. */
+    /** The fabric root shared by source materialisations, replay manifests, and evidence blobs. */
     public Path root() {
         return root;
     }

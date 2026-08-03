@@ -47,11 +47,6 @@ public class RepositoryTreeContentSource implements EvidenceSource {
     }
 
     @Override
-    public String originId() {
-        return "scm";
-    }
-
-    @Override
     public boolean ownsPath(String path) {
         return path.startsWith(SandboxLayout.REPO_MOUNT_RELATIVE);
     }

@@ -3,13 +3,13 @@ import { useId } from "react";
 import type {
 	CatalogEntryStatus,
 	CuratedAreaRequest,
-	CuratedPracticeRequest,
-	PracticeEvidenceDeclaration,
+	CuratedPracticeDefinition,
 } from "@/api/types.gen";
 import {
 	FOCUS_ARTIFACT_OPTIONS,
 	TRIGGER_EVENTS_BY_FOCUS,
 } from "@/components/admin/practice-catalog/constants";
+import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Spinner } from "@/components/ui/spinner";
@@ -21,13 +21,11 @@ import {
 } from "./curated-entry-state";
 
 type ShippedDefinition = Partial<
-	Record<keyof CuratedPracticeRequest | keyof CuratedAreaRequest, unknown>
+	Record<keyof CuratedPracticeDefinition | keyof CuratedAreaRequest, unknown>
 >;
 
-export interface HephaestusVersionPanelProps {
+interface HephaestusVersionPanelBaseProps {
 	status: CatalogEntryStatus;
-	kind: "practice" | "area";
-	shipped?: ShippedDefinition;
 	areaNames?: Readonly<Record<string, string>>;
 	isResetPending: boolean;
 	isKeepPending?: boolean;
@@ -35,6 +33,12 @@ export interface HephaestusVersionPanelProps {
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
 }
+
+export type HephaestusVersionPanelProps = HephaestusVersionPanelBaseProps &
+	(
+		| { kind: "practice"; shipped?: CuratedPracticeDefinition }
+		| { kind: "area"; shipped?: CuratedAreaRequest }
+	);
 
 const AREA_FIELDS = {
 	name: "Name",
@@ -53,7 +57,7 @@ const PRACTICE_FIELDS = {
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Precompute script",
 	evidence: "Evidence contract",
-} satisfies Record<keyof CuratedPracticeRequest, string>;
+} satisfies Record<Exclude<keyof CuratedPracticeDefinition, "evidenceValidation">, string>;
 
 function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
@@ -67,31 +71,6 @@ function words(token: string): string {
 		.replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function displayEvidence(evidence: PracticeEvidenceDeclaration): string {
-	const requirement = ({
-		sourceKind,
-		completeness,
-		freshness,
-	}: PracticeEvidenceDeclaration["required"][number]) =>
-		`${sourceKind} (${completeness.toLowerCase()}, ${freshness.toLowerCase()})`;
-	const lines = [
-		`Contract ${evidence.sourceContractVersion} · ${evidence.profile}`,
-		`Observability: ${words(evidence.observability)}`,
-		"Required:",
-		...evidence.required.map(requirement),
-	];
-	if (evidence.optional.length > 0) {
-		lines.push("Optional:", ...evidence.optional.map(requirement));
-	}
-	if (evidence.blindSpots.length > 0) {
-		lines.push(
-			"Declared blind spots:",
-			...evidence.blindSpots.map(({ code, summary }) => `${code}: ${summary}`),
-		);
-	}
-	return lines.join("\n");
-}
-
 function displayValue(
 	field: string,
 	value: unknown,
@@ -103,9 +82,6 @@ function displayValue(
 	}
 	if (field === "triggerEvents" && Array.isArray(value) && value.length === 0) {
 		return "No automatic trigger";
-	}
-	if (field === "evidence" && typeof value === "object") {
-		return displayEvidence(value as PracticeEvidenceDeclaration);
 	}
 	if (field === "artifactType") {
 		return (
@@ -131,17 +107,20 @@ function displayValue(
 	return Array.isArray(value) ? value.join("\n") : String(value);
 }
 
-export function HephaestusVersionPanel({
-	status,
-	kind,
-	shipped,
-	areaNames = {},
-	isResetPending,
-	isKeepPending = false,
-	disabled,
-	onUseHephaestusVersion,
-	onKeepCurrentDefinition,
-}: HephaestusVersionPanelProps) {
+export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
+	const {
+		status,
+		kind,
+		shipped,
+		areaNames = {},
+		isResetPending,
+		isKeepPending = false,
+		disabled,
+		onUseHephaestusVersion,
+		onKeepCurrentDefinition,
+	} = props;
+	const shippedDefinition: ShippedDefinition | undefined = shipped;
+	const shippedPractice = props.kind === "practice" ? props.shipped : undefined;
 	const headingId = useId();
 	const copy = curatedEntryCopy(status, kind);
 	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion;
@@ -169,7 +148,7 @@ export function HephaestusVersionPanel({
 					</h2>
 					<p className="mt-1 text-muted-foreground">{copy.detail}</p>
 
-					{shipped && (
+					{shippedDefinition && (
 						<Collapsible className="mt-3 w-full">
 							<CollapsibleTrigger
 								render={
@@ -192,7 +171,19 @@ export function HephaestusVersionPanel({
 													field === "precomputeScript" && "font-mono",
 												)}
 											>
-												{displayValue(field, shipped[field], shipped, areaNames)}
+												{field === "evidence" && shippedPractice ? (
+													<PracticeEvidenceSummary
+														declaration={shippedPractice.evidence}
+														validation={shippedPractice.evidenceValidation}
+													/>
+												) : (
+													displayValue(
+														field,
+														shippedDefinition[field],
+														shippedDefinition,
+														areaNames,
+													)
+												)}
 											</dd>
 										</div>
 									),

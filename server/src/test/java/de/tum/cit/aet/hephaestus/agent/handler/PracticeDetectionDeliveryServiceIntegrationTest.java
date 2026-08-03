@@ -184,6 +184,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
         var source = snapshot
             .putObject("manifest")
+            .put("contractVersion", "1.0.0")
             .putArray("sources")
             .addObject()
             .put("kind", "scm.pull-request.diff")

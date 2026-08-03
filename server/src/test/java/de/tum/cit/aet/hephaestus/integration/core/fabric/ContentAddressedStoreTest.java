@@ -55,15 +55,15 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
-    void put_isIdempotent_doesNotRewrite() throws Exception {
+    void putReusesContentAndRefreshesRetentionAge() throws Exception {
         String sha = cas.put("immutable".getBytes(StandardCharsets.UTF_8));
         Path blob = cas.pathFor(sha);
-        var firstWrite = java.nio.file.Files.getLastModifiedTime(blob);
+        var oldTime = java.nio.file.attribute.FileTime.from(java.time.Instant.EPOCH);
+        java.nio.file.Files.setLastModifiedTime(blob, oldTime);
 
-        // Second put of identical bytes returns the same sha and must NOT rewrite the blob — the
-        // mtime stays put, which would change if build-on-miss were lost.
         assertThat(cas.put("immutable".getBytes(StandardCharsets.UTF_8))).isEqualTo(sha);
-        assertThat(java.nio.file.Files.getLastModifiedTime(blob)).isEqualTo(firstWrite);
+        assertThat(java.nio.file.Files.readString(blob)).isEqualTo("immutable");
+        assertThat(java.nio.file.Files.getLastModifiedTime(blob).toMillis()).isGreaterThan(oldTime.toMillis());
     }
 
     @Test

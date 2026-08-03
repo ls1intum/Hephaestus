@@ -157,11 +157,15 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_noThreadsNoReviews_writesNothing() {
+    void contribute_noThreadsNoReviews_writesCanonicalEmptyState() throws Exception {
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("threads")).isEmpty();
+        assertThat(out.get("reviewDecisions")).isEmpty();
+        assertThat(out.get("mergeState").asString()).isEqualTo("MERGED");
     }
 
     @Test

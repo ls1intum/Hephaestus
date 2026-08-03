@@ -7951,12 +7951,12 @@ components:
       type: object
       properties:
         definition:
-          $ref: "#/components/schemas/CuratedPracticeRequest"
+          $ref: "#/components/schemas/CuratedPracticeDefinition"
         position:
           type: integer
           format: int32
         shipped:
-          $ref: "#/components/schemas/CuratedPracticeRequest"
+          $ref: "#/components/schemas/CuratedPracticeDefinition"
         slug:
           type: string
         status:
@@ -7966,6 +7966,43 @@ components:
       - position
       - slug
       - status
+    CuratedPracticeDefinition:
+      type: object
+      description: A resolved curated practice definition
+      properties:
+        areaSlug:
+          type: string
+        artifactType:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        criteria:
+          type: string
+        evidence:
+          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
+        evidenceValidation:
+          $ref: "#/components/schemas/PracticeEvidenceValidation"
+        name:
+          type: string
+        precomputeScript:
+          type: string
+        triggerEvents:
+          type: array
+          items:
+            type: string
+        whatGoodLooksLike:
+          type: string
+        whyItMatters:
+          type: string
+      required:
+      - artifactType
+      - criteria
+      - evidence
+      - evidenceValidation
+      - name
+      - triggerEvents
     CuratedPracticeRequest:
       type: object
       description: A complete curated practice definition

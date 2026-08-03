@@ -1,11 +1,8 @@
-import type { Practice, PracticeEvidenceValidation } from "@/api/types.gen";
-import { mockPullRequestEvidence } from "@/mocks/fixtures/practice";
-
-const AUTHOR_DECLARED_VALIDATION = {
-	status: "AUTHOR_DECLARED",
-	sourceContractVersion: "1.0.0",
-	declarationDigest: "0".repeat(64),
-} satisfies PracticeEvidenceValidation;
+import type { Practice } from "@/api/types.gen";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPullRequestEvidence,
+} from "@/mocks/fixtures/practice";
 
 export const mockPractices: Practice[] = [
 	{
@@ -21,7 +18,7 @@ export const mockPractices: Practice[] = [
 			"A PR opens with a one-paragraph summary, links the issue, and lists the exact steps a reviewer ran to verify it.",
 		artifactType: "PULL_REQUEST",
 		evidence: mockPullRequestEvidence,
-		evidenceValidation: AUTHOR_DECLARED_VALIDATION,
+		evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
 		active: true,
 		createdAt: new Date("2025-06-01"),
@@ -36,7 +33,7 @@ export const mockPractices: Practice[] = [
 			"## Code Review Thoroughness\n\nEvaluate depth and quality of code reviews. Reviewers should engage with logic and design, not just style.",
 		artifactType: "PULL_REQUEST",
 		evidence: mockPullRequestEvidence,
-		evidenceValidation: AUTHOR_DECLARED_VALIDATION,
+		evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
 		active: true,
 		createdAt: new Date("2025-06-02"),
@@ -51,7 +48,7 @@ export const mockPractices: Practice[] = [
 			"## Test Coverage\n\nChecks that new code includes appropriate test coverage. Critical paths and edge cases should be tested.",
 		artifactType: "PULL_REQUEST",
 		evidence: mockPullRequestEvidence,
-		evidenceValidation: AUTHOR_DECLARED_VALIDATION,
+		evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
 		active: false,
 		createdAt: new Date("2025-06-03"),
@@ -68,7 +65,7 @@ export const mockUnassignedPractice: Practice = {
 		"## Error State Handling\n\nEvaluates whether the code properly handles and surfaces errors to the user instead of silently swallowing them.",
 	artifactType: "PULL_REQUEST",
 	evidence: mockPullRequestEvidence,
-	evidenceValidation: AUTHOR_DECLARED_VALIDATION,
+	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
 	active: true,
 	createdAt: new Date("2025-06-05"),
@@ -89,7 +86,7 @@ export const mockPracticeLongText: Practice = {
 		"## Very Long Criteria\n\nThis is a multi-paragraph criteria block designed to test the line-clamp behavior on the card preview.\n\n### Section 1\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n### Section 2\nUt enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n### Section 3\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
 	artifactType: "PULL_REQUEST",
 	evidence: mockPullRequestEvidence,
-	evidenceValidation: AUTHOR_DECLARED_VALIDATION,
+	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
 	active: true,
 	createdAt: new Date("2025-06-06"),
@@ -126,7 +123,7 @@ export const mockPracticeWithAllTriggers: Practice = {
 	].join("\n"),
 	artifactType: "PULL_REQUEST",
 	evidence: mockPullRequestEvidence,
-	evidenceValidation: AUTHOR_DECLARED_VALIDATION,
+	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
 	active: true,
 	createdAt: new Date("2025-06-04"),

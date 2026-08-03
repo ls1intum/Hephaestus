@@ -260,6 +260,8 @@ services:
       # Feature flag; application.yml reads this exact name (see docker/compose.app.yaml).
       PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
+      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS:-}
+      HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       GIT_STORAGE_PATH: /data/git-repos
       # There is no separate worker container: hephaestus.runtime.worker.enabled defaults to true,

@@ -292,17 +292,37 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     int markExecutionStarted(@Param("id") UUID id, @Param("workerId") String workerId, @Param("now") Instant now);
 
     /** Written before the sandbox starts, so a failed or cancelled run still records what it consumed. */
-    @WorkspaceAgnostic("ID-based provenance stamp; job ID from worker-local execution context")
+    @WorkspaceAgnostic("ID-based provenance stamp; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         "UPDATE AgentJob j SET j.promptDigest = :promptDigest, j.inputsDigest = :inputsDigest, " +
-            "j.evidenceSnapshot = :evidenceSnapshot WHERE j.id = :id"
+            "j.evidenceSnapshot = :evidenceSnapshot WHERE j.id = :id AND j.status = 'RUNNING' " +
+            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) " +
+            "AND j.retryCount = :retryCount"
     )
     int updateProvenanceDigests(
         @Param("id") UUID id,
+        @Param("workerId") String workerId,
+        @Param("retryCount") int retryCount,
         @Param("promptDigest") String promptDigest,
         @Param("inputsDigest") String inputsDigest,
         @Param("evidenceSnapshot") JsonNode evidenceSnapshot
+    );
+
+    @WorkspaceAgnostic("ID-based evidence-refusal transition; job ID + owner from worker-local execution context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.status = 'COMPLETED', j.completedAt = :now, j.output = :output, " +
+            "j.errorMessage = NULL WHERE j.id = :id AND j.status = 'RUNNING' " +
+            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) " +
+            "AND j.retryCount = :retryCount"
+    )
+    int transitionToEvidenceRefused(
+        @Param("id") UUID id,
+        @Param("workerId") String workerId,
+        @Param("retryCount") int retryCount,
+        @Param("now") Instant now,
+        @Param("output") JsonNode output
     );
 
     /**

@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceFreshness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
@@ -55,6 +56,13 @@ public class ContextManifestBuilder {
 
     static final String INTERNAL_MANIFEST_FILE = "artifact-source-manifest.json";
     static final String READINESS_REPORT_FILE = "practice-readiness-report.json";
+
+    public record PreparedReadiness(List<Practice> readyPractices, PracticeReadinessReport report) {
+        public PreparedReadiness {
+            readyPractices = List.copyOf(readyPractices);
+            Objects.requireNonNull(report, "report");
+        }
+    }
 
     public record CaptureMetadata(
         Map<SourceKind, SourceCompleteness> reportedCompleteness,
@@ -179,6 +187,10 @@ public class ContextManifestBuilder {
         return assessPractices(manifest, practices).readyPractices();
     }
 
+    boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind) {
+        return catalogs.isSourceUsePermitted(version, kind);
+    }
+
     public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices, String jobId) {
         return readyPractices(manifest, practices, jobId, clock.instant());
     }
@@ -189,26 +201,30 @@ public class ContextManifestBuilder {
         String jobId,
         Instant temporalAnchor
     ) {
+        return prepareReadiness(manifest, practices, jobId, temporalAnchor).readyPractices();
+    }
+
+    public PreparedReadiness prepareReadiness(
+        ArtifactSourceManifest manifest,
+        List<Practice> practices,
+        String jobId,
+        Instant temporalAnchor
+    ) {
         PracticeReadinessResult result = assessPractices(manifest, practices, temporalAnchor);
         if (result.decisions().isEmpty()) {
             throw new IllegalArgumentException("Cannot persist an empty practice readiness report");
         }
         Instant decidedAt = result.decisions().getFirst().decidedAt();
-        persistInternalJson(
-            jobId,
-            READINESS_REPORT_FILE,
-            objectMapper.writeValueAsBytes(
-                new PracticeReadinessReport(
-                    manifest.contractVersion(),
-                    manifest.catalogDigest(),
-                    manifest.profileId(),
-                    manifest.capturedAt(),
-                    decidedAt,
-                    result.decisions()
-                )
-            )
+        PracticeReadinessReport report = new PracticeReadinessReport(
+            manifest.contractVersion(),
+            manifest.catalogDigest(),
+            manifest.profileId(),
+            manifest.capturedAt(),
+            decidedAt,
+            result.decisions()
         );
-        return result.readyPractices();
+        persistInternalJson(jobId, READINESS_REPORT_FILE, objectMapper.writeValueAsBytes(report));
+        return new PreparedReadiness(result.readyPractices(), report);
     }
 
     PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {

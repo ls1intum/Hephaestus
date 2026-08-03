@@ -42,8 +42,10 @@ defines the governance decision that permits collection, retention, processing, 
 | Retention and erasure | Data owner and integration maintainer | Expiry trigger, deletion owner, derived-data graph, export and erasure tests |
 | Runtime contract | Agent/runtime maintainer | Schema, authority, timing, completeness, missingness, and contract tests |
 
-A material change reopens the affected reviews. One operator may disable a source immediately; re-enablement follows
-the normal decision path.
+A material change reopens the affected reviews. Runtime collection is also bounded by the deployment's
+`hephaestus.evidence.authorized-source-kinds` allowlist. The allowlist is empty by default: the controller must
+explicitly authorize each source kind before enabling practice detection. Removing a kind and restarting the server
+and workers is the emergency disable path; re-enablement follows the normal decision path.
 
 The runtime registry is
 [`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
@@ -54,11 +56,14 @@ It is an engineering gate and contains only a releasable decision summary:
 - `CONTROLLER_DECISION` requires a reviewer, decision time, expiry, and decided outcome. Only an unexpired
   `APPROVED` decision passes when that basis is used.
 
-Neither the registry nor CI can establish a legal basis, certify a DPIA, or replace the controller's record.
+Neither the registry nor CI can establish a legal basis, certify a DPIA, or replace the controller's record. The
+checked-in decision is necessary but never sufficient: collection and delivery require both an unexpired engineering
+decision and the deployment-scoped allowlist.
 
-`AGENT_EVIDENCE_RETENTION` resolves to the configured `hephaestus.agent.payload-retention` and
-`hephaestus.agent.row-retention` windows enforced by `AgentJobRetentionService`; CAS garbage collection removes
-blobs after their job manifests stop retaining them. `WORKSPACE_AND_PERSON_ERASURE` is a governance obligation,
+`AGENT_EVIDENCE_RETENTION` is a layered policy. Diagnostic job output uses
+`hephaestus.agent.payload-retention` (14 days by default); the job row and its durable manifest/readiness snapshot use
+`hephaestus.agent.row-retention` (90 days); replay directories and unreferenced CAS blobs use
+`hephaestus.fabric.gc-retention-days` (30 days). `WORKSPACE_AND_PERSON_ERASURE` is a governance obligation,
 not proof that every copy supports immediate selective deletion. Workspace purge removes agent SQL rows, while job
 replay directories and CAS blobs currently expire through the configured retention sweep. A production controller
 decision must explicitly accept that bounded residual window or require reference-aware immediate deletion first.
@@ -160,9 +165,11 @@ operators should alert when `artifact_source_governance_expiry_seconds` falls be
 to the instance privacy/governance owner.
 
 Before the deadline, that owner must review the source scopes, processors, retention, erasure coverage, and DPIA
-record; update `reviewer`, `decidedAt`, and `expiresAt`; run `pnpm run check:contracts`; and deploy the renewed
-release. Do not extend the date without the review. If renewal is denied or incomplete, remove the affected source
-from its profiles and practice declarations before expiry so review jobs decline cleanly instead of collecting it.
+record. Renewal creates a new contract version containing the new decision; published version directories are
+immutable. Migrate practice declarations and the runtime manifest reference to that version, run
+`pnpm run check:contracts`, and deploy. Never edit an existing version's dates. If renewal is denied or incomplete,
+remove the affected kinds from `hephaestus.evidence.authorized-source-kinds`; collection and delivery then decline
+without a semantic judgment.
 
 ## Change checklist
 

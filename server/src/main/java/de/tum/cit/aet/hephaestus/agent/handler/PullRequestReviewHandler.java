@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
+import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
@@ -16,7 +17,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
@@ -58,7 +61,7 @@ import tools.jackson.databind.node.ObjectNode;
  * /workspace/
  * ├── inputs/                            # read-only — the path-guard whitelists exactly this subtree
  * │   ├── manifest.json                  #   telescope: integration-agnostic index (path/connector/sha256)
- * │   ├── sources/scm/repo/            #   the SCM connector's source — git checkout (RO mount)
+ * │   ├── sources/scm/repo/              #   optional materialized repository tree
  * │   ├── context/                       #   workspace context (this handler populates via WorkspaceContextBuilder)
  * │   │   ├── metadata.json              #     PR metadata + commits
  * │   │   ├── comments.json              #     review comments
@@ -195,7 +198,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     @Override
-    public Map<String, byte[]> prepareInputFiles(AgentJob job) {
+    public PreparedJobInputs prepareInputs(AgentJob job) {
         long startNanos = System.nanoTime();
         JsonNode metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
@@ -209,14 +212,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             new ContextRequest.PracticeReviewRequest(job),
             EvidencePlan.compile(practices)
         );
-        practices = workspaceContextBuilder.readyPractices(
+        var artifactSourceManifest = prepared.manifest();
+        var readiness = workspaceContextBuilder.prepareReadiness(
             prepared.manifest(),
             practices,
             job.getId().toString(),
             job.getCreatedAt()
         );
+        practices = readiness.readyPractices();
         if (practices.isEmpty()) {
-            throw new JobPreparationException("No practice has sufficient evidence: jobId=" + job.getId());
+            throw new InsufficientEvidenceException(
+                "No practice has sufficient evidence: jobId=" + job.getId(),
+                new PreparedJobInputs(prepared.files(), artifactSourceManifest, readiness.report())
+            );
         }
         prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
@@ -233,7 +241,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             repositoryId,
             pullRequestId
         );
-        return files;
+        return new PreparedJobInputs(files, artifactSourceManifest, readiness.report());
     }
 
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {
@@ -503,21 +511,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         citation.put("side", "NEW");
         citation.put("startLine", hit.newLine());
         citation.put("endLine", hit.newLine());
-        citation.put("quote", hit.addedLine());
+        citation.put("quoteSha256", ProvenanceDigest.sha256Hex(hit.addedLine().getBytes(StandardCharsets.UTF_8)));
         ArrayNode locations = evidence.putArray("locations");
         ObjectNode location = locations.addObject();
         location.put("path", hit.path());
         location.put("startLine", hit.newLine());
         ArrayNode snippets = evidence.putArray("snippets");
-        snippets.add(hit.addedLine());
+        snippets.add("Secret value redacted");
 
         boolean lowSignal = secretDiffScanner.isLowSignalPath(hit.path());
         Severity severity = lowSignal ? Severity.MINOR : Severity.MAJOR;
 
         String reasoning =
-            "A credential appears on a changed line: `" +
-            hit.addedLine() +
-            "`. Committed secrets remain in the git history permanently — even after the line is removed — so the key must be treated as compromised.";
+            "A credential appears on the cited changed line. Committed secrets remain in git history even after removal, so treat the credential as compromised.";
         String guidance =
             "Remove the literal value, rotate the credential immediately, and load it at runtime from an environment variable or a secrets manager instead of hardcoding it.";
 

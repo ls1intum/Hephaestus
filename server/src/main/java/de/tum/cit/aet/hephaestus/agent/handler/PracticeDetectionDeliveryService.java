@@ -3,6 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -36,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Persists validated practice findings and publishes a completion event.
@@ -55,6 +59,7 @@ public class PracticeDetectionDeliveryService {
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final ContentAddressedStore cas;
+    private final ArtifactSourceCatalogRegistry sourceCatalogs;
 
     public PracticeDetectionDeliveryService(
         PracticeRevisionRepository practiceRevisionRepository,
@@ -63,7 +68,8 @@ public class PracticeDetectionDeliveryService {
         IssueRepository issueRepository,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper,
-        ContentAddressedStore cas
+        ContentAddressedStore cas,
+        ArtifactSourceCatalogRegistry sourceCatalogs
     ) {
         this.practiceRevisionRepository = practiceRevisionRepository;
         this.observationRepository = observationRepository;
@@ -72,6 +78,7 @@ public class PracticeDetectionDeliveryService {
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
         this.cas = cas;
+        this.sourceCatalogs = sourceCatalogs;
     }
 
     /** Resolved delivery target: who the finding is about + the typed (work artifact, id) reference. */
@@ -94,6 +101,16 @@ public class PracticeDetectionDeliveryService {
         }
 
         EvidenceBoundary evidenceBoundary = evidenceBoundary(job);
+        for (SourceKind kind : evidenceBoundary.availableSources()) {
+            if (!sourceCatalogs.isSourceUsePermitted(evidenceBoundary.contractVersion(), kind)) {
+                throw new JobDeliveryException(
+                    "Evidence source authorization was withdrawn before delivery: source=" +
+                        kind +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+        }
         Map<String, PracticeRevision> revisionsBySlug = admittedRevisions(job, workspaceId);
         for (ValidatedFinding finding : validFindings) {
             PracticeRevision revision = revisionsBySlug.get(finding.practiceSlug());
@@ -134,9 +151,9 @@ public class PracticeDetectionDeliveryService {
             String evidenceJson = null;
             if (finding.evidence() != null) {
                 try {
-                    evidenceJson = objectMapper.writeValueAsString(finding.evidence());
+                    evidenceJson = objectMapper.writeValueAsString(evidenceForPersistence(finding.evidence()));
                 } catch (JacksonException e) {
-                    log.debug("Failed to serialize evidence, storing null: jobId={}", job.getId());
+                    throw new JobDeliveryException("Could not serialize validated evidence: jobId=" + job.getId(), e);
                 }
             }
 
@@ -247,6 +264,12 @@ public class PracticeDetectionDeliveryService {
             JsonNode startLine = citation.path("startLine");
             JsonNode endLine = citation.path("endLine");
             JsonNode quote = citation.path("quote");
+            JsonNode quoteSha256 = citation.path("quoteSha256");
+            boolean redactedSecretCitation =
+                "secret-diff-scanner".equals(evidence.path("detector").asString()) &&
+                quote.isMissingNode() &&
+                quoteSha256.isTextual() &&
+                quoteSha256.asString().matches("[0-9a-f]{64}");
             if (
                 !citation.isObject() ||
                 !sourceKind.isTextual() ||
@@ -257,7 +280,7 @@ public class PracticeDetectionDeliveryService {
                 !startLine.isIntegralNumber() ||
                 startLine.asInt() < 1 ||
                 (!endLine.isMissingNode() && (!endLine.isIntegralNumber() || endLine.asInt() < startLine.asInt())) ||
-                !quote.isTextual()
+                (!quote.isTextual() && !redactedSecretCitation)
             ) {
                 throw new JobDeliveryException(
                     "Finding has an invalid evidence citation: slug=" +
@@ -294,8 +317,8 @@ public class PracticeDetectionDeliveryService {
                         job.getId()
                 );
             }
-            String exactQuote = quote.asText();
-            if (exactQuote.isBlank()) {
+            String exactQuote = quote.asText("");
+            if (!redactedSecretCitation && exactQuote.isBlank()) {
                 throw new JobDeliveryException(
                     "Finding has an empty evidence quote: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
                 );
@@ -321,14 +344,22 @@ public class PracticeDetectionDeliveryService {
             }
             if (
                 "scm.pull-request.diff".equals(kind.value()) &&
-                !diffContainsCitation(
-                    artifactContent,
-                    path.asText(),
-                    side.asText(),
-                    startLine.asInt(),
-                    endLine.isMissingNode() ? startLine.asInt() : endLine.asInt(),
-                    exactQuote
-                )
+                !(redactedSecretCitation
+                    ? diffContainsRedactedCitation(
+                          artifactContent,
+                          path.asText(),
+                          side.asText(),
+                          startLine.asInt(),
+                          quoteSha256.asText()
+                      )
+                    : diffContainsCitation(
+                          artifactContent,
+                          path.asText(),
+                          side.asText(),
+                          startLine.asInt(),
+                          endLine.isMissingNode() ? startLine.asInt() : endLine.asInt(),
+                          exactQuote
+                      ))
             ) {
                 throw new JobDeliveryException(
                     "Evidence quote does not match the cited diff location: path=" +
@@ -340,6 +371,53 @@ public class PracticeDetectionDeliveryService {
                 );
             }
         }
+    }
+
+    private static boolean diffContainsRedactedCitation(
+        String diff,
+        String citedPath,
+        String citedSide,
+        int citedLine,
+        String quoteSha256
+    ) {
+        String oldPath = null;
+        String newPath = null;
+        for (String storedLine : diff.split("\n", -1)) {
+            String line = storedLine;
+            Integer lineNumber = null;
+            if (storedLine.startsWith("[L")) {
+                int end = storedLine.indexOf("] ");
+                if (end <= 2) continue;
+                try {
+                    lineNumber = Integer.parseInt(storedLine.substring(2, end));
+                    line = storedLine.substring(end + 2);
+                } catch (NumberFormatException ignored) {
+                    return false;
+                }
+            }
+            if (line.startsWith("--- ")) oldPath = parseDiffPath(line.substring(4));
+            if (line.startsWith("+++ ")) newPath = parseDiffPath(line.substring(4));
+            if (lineNumber == null) continue;
+            String lineSide = line.startsWith("-") ? "OLD" : "NEW";
+            String linePath = "OLD".equals(lineSide) ? oldPath : newPath;
+            if (lineNumber == citedLine && citedSide.equals(lineSide) && citedPath.equals(linePath)) {
+                String content = line.startsWith("+") || line.startsWith("-") ? line.substring(1) : line;
+                return ProvenanceDigest.sha256Hex(content.strip().getBytes(StandardCharsets.UTF_8)).equals(quoteSha256);
+            }
+        }
+        return false;
+    }
+
+    private static JsonNode evidenceForPersistence(JsonNode evidence) {
+        JsonNode persisted = evidence.deepCopy();
+        if ("secret-diff-scanner".equals(persisted.path("detector").asString())) {
+            for (JsonNode citation : persisted.path("citations")) {
+                if (citation instanceof ObjectNode object) {
+                    object.remove("quoteSha256");
+                }
+            }
+        }
+        return persisted;
     }
 
     private static boolean diffContainsCitation(
@@ -410,6 +488,15 @@ public class PracticeDetectionDeliveryService {
 
     private EvidenceBoundary evidenceBoundary(AgentJob job) {
         JsonNode manifest = requireEvidenceSnapshot(job).path("manifest");
+        SourceContractVersion contractVersion;
+        try {
+            contractVersion = new SourceContractVersion(manifest.path("contractVersion").asString());
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(
+                "Job evidence snapshot has an invalid contract version: jobId=" + job.getId(),
+                e
+            );
+        }
         JsonNode sources = manifest.path("sources");
         if (!sources.isArray()) {
             throw new JobDeliveryException("Job evidence snapshot has no source manifest: jobId=" + job.getId());
@@ -438,7 +525,7 @@ public class PracticeDetectionDeliveryService {
                 }
             }
         }
-        return new EvidenceBoundary(Set.copyOf(available), Map.copyOf(artifacts));
+        return new EvidenceBoundary(contractVersion, Set.copyOf(available), Map.copyOf(artifacts));
     }
 
     private Map<String, PracticeRevision> admittedRevisions(AgentJob job, Long workspaceId) {
@@ -481,7 +568,11 @@ public class PracticeDetectionDeliveryService {
 
     private record SourceArtifactRef(SourceKind kind, String sha256) {}
 
-    private record EvidenceBoundary(Set<SourceKind> availableSources, Map<String, SourceArtifactRef> artifacts) {}
+    private record EvidenceBoundary(
+        SourceContractVersion contractVersion,
+        Set<SourceKind> availableSources,
+        Map<String, SourceArtifactRef> artifacts
+    ) {}
 
     /**
      * Route the delivery target on the job's artifact. Issue and conversation jobs stamp

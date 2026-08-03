@@ -44,11 +44,6 @@ public class ReviewThreadContentSource implements EvidenceSource {
         return KIND;
     }
 
-    @Override
-    public String originId() {
-        return "scm";
-    }
-
     private static final Logger log = LoggerFactory.getLogger(ReviewThreadContentSource.class);
 
     static final String FILE_NAME = "review_threads.json";
@@ -121,10 +116,6 @@ public class ReviewThreadContentSource implements EvidenceSource {
             }
             boolean decisionsTruncated = reviews.size() > MAX_DECISIONS;
             if (decisionsTruncated) reviews.remove(reviews.size() - 1);
-
-            if (threads.isEmpty() && reviews.isEmpty()) {
-                return;
-            }
 
             PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 

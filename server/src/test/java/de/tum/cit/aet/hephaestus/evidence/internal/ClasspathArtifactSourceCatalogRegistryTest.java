@@ -86,11 +86,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
             read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
         );
-        ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(
-            catalog,
-            decisions,
-            Instant.parse("2026-08-03T12:00:00Z")
-        );
+        ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
         assertThat(decisions.values()).allSatisfy(decision -> {
             assertThat(decision.basis()).isEqualTo(SourceUseBasis.ENGINEERING_BASELINE);
             assertThat(decision.outcome()).isEqualTo(SourceUseOutcome.ENGINEERING_APPROVED);
@@ -146,13 +142,38 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, clock);
         when(clock.instant()).thenReturn(Instant.parse("2027-08-03T00:00:00Z"));
 
-        assertThatIllegalStateException().isThrownBy(() ->
-            registry.requireSource(new SourceContractVersion("1.0.0"), new SourceKind("scm.pull-request.diff"))
-        );
+        assertThat(
+            registry.isSourceUsePermitted(new SourceContractVersion("1.0.0"), new SourceKind("scm.pull-request.diff"))
+        ).isFalse();
     }
 
     @Test
-    void shouldRejectExpiredControllerDecision() throws IOException {
+    void shouldRequireDeploymentAuthorizationInAdditionToEngineeringApproval() {
+        var denied = new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "");
+        var authorized = new ClasspathArtifactSourceCatalogRegistry(
+            objectMapper,
+            Clock.systemUTC(),
+            "scm.pull-request.diff"
+        );
+        var version = new SourceContractVersion("1.0.0");
+        var diff = new SourceKind("scm.pull-request.diff");
+
+        assertThat(denied.isSourceUsePermitted(version, diff)).isFalse();
+        assertThat(authorized.isSourceUsePermitted(version, diff)).isTrue();
+        assertThat(authorized.isSourceUsePermitted(version, new SourceKind("scm.pull-request.core"))).isFalse();
+    }
+
+    @Test
+    void shouldRejectUnknownDeploymentAuthorization() {
+        assertThatIllegalStateException()
+            .isThrownBy(() ->
+                new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "scm.unknown")
+            )
+            .withMessageContaining("Unknown authorized artifact source");
+    }
+
+    @Test
+    void shouldKeepExpiredControllerDecisionStructurallyValidButIneligible() throws IOException {
         JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
         var decision = (tools.jackson.databind.node.ObjectNode) root.path("decisions").get(0);
         decision.put("basis", "CONTROLLER_DECISION");
@@ -165,15 +186,10 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         );
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root);
 
-        assertThatIllegalStateException()
-            .isThrownBy(() ->
-                ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(
-                    catalog,
-                    decisions,
-                    Instant.parse("2027-08-03T00:00:00Z")
-                )
-            )
-            .withMessageContaining("not current");
+        ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
+        assertThat(decisions.values()).anySatisfy(expired ->
+            assertThat(expired.permitsProductUseAt(Instant.parse("2027-08-03T00:00:00Z"))).isFalse()
+        );
     }
 
     @Test
@@ -189,14 +205,25 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         decisions.remove("use-scm-repository-tree");
 
         assertThatIllegalStateException()
-            .isThrownBy(() ->
-                ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(
-                    catalog,
-                    decisions,
-                    Instant.parse("2026-08-03T12:00:00Z")
-                )
+            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
+            .withMessageContaining("must match the catalog exactly");
+    }
+
+    @Test
+    void shouldRejectOrphanUseDecision() throws IOException {
+        var catalog = ClasspathArtifactSourceCatalogRegistry.parse(
+            read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE)
+        );
+        var decisions = new HashMap<>(
+            ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
             )
-            .withMessageContaining("Missing source-use decision");
+        );
+        decisions.put("orphan", decisions.values().iterator().next());
+
+        assertThatIllegalStateException()
+            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
+            .withMessageContaining("must match the catalog exactly");
     }
 
     @Test

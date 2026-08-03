@@ -1,6 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPullRequestEvidence,
+} from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
@@ -26,6 +31,8 @@ const practiceDefinition = {
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "Our own criteria",
 	whyItMatters: "Reviewers need context",
+	evidence: mockPullRequestEvidence,
+	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
 function mockCatalog(overrides: Record<string, unknown> = {}) {
@@ -617,5 +624,47 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(() => expect(retriedIfMatch).toBe('"tag-2"'));
+	});
+
+	it.each([
+		["unchanged", false, true],
+		["changed", true, false],
+	] as const)("%s artifact sends the correct evidence update", async (_label, changeArtifact, includesEvidence) => {
+		mockCatalog();
+		let requestBody: Record<string, unknown> | undefined;
+		server.use(
+			http.get("*/admin/practice-catalog/practices/:slug", () =>
+				HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					status: status(),
+				}),
+			),
+			http.put("*/admin/practice-catalog/practices/:slug", async ({ request }) => {
+				requestBody = (await request.json()) as Record<string, unknown>;
+				return HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					status: status({ etag: "tag-2" }),
+				});
+			}),
+		);
+		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
+
+		await screen.findByRole("button", { name: "Save changes" }, ROUTE_RENDER_WAIT);
+		if (changeArtifact) {
+			const user = userEvent.setup();
+			await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
+			await user.click(await screen.findByRole("option", { name: "Conversation" }));
+			await screen.findByText("Evidence requirements will change");
+		}
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+		await waitFor(() => expect(requestBody).toBeDefined());
+		if (includesEvidence) {
+			expect(requestBody?.evidence).toEqual(mockPullRequestEvidence);
+		} else {
+			expect(requestBody).not.toHaveProperty("evidence");
+		}
 	});
 });

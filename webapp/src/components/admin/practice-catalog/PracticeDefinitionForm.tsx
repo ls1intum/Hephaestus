@@ -1,5 +1,5 @@
 import { useBlocker } from "@tanstack/react-router";
-import { ChevronRight, RotateCcw } from "lucide-react";
+import { ChevronRight, RotateCcw, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import {
 	FOCUS_ARTIFACT_OPTIONS,
@@ -10,6 +10,7 @@ import {
 	type WorkArtifact,
 } from "@/components/admin/practice-catalog/constants";
 import { CodeEditor } from "@/components/shared/CodeEditor";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -209,6 +210,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	};
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);
+	const artifactChanged = mode === "edit" && initialData.artifactType !== form.artifactType;
 
 	return (
 		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
@@ -382,6 +384,16 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								</Field>
 							</div>
 						</FieldGroup>
+						{artifactChanged && (
+							<Alert variant="warning">
+								<TriangleAlert />
+								<AlertTitle>Evidence requirements will change</AlertTitle>
+								<AlertDescription>
+									Changing the reviewed artifact replaces this practice’s evidence requirements with
+									the default contract for the new artifact.
+								</AlertDescription>
+							</Alert>
+						)}
 					</section>
 
 					<Separator />

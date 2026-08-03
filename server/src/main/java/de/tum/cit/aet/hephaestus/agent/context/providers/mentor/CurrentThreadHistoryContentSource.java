@@ -29,11 +29,6 @@ public class CurrentThreadHistoryContentSource implements ContentSource {
     private final ObjectMapper objectMapper;
 
     @Override
-    public String originId() {
-        return "core";
-    }
-
-    @Override
     public boolean supports(ContextRequest request) {
         return request instanceof MentorChatRequest;
     }

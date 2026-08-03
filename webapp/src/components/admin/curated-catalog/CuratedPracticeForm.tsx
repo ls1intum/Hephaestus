@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import type { CatalogEntryStatus, CuratedPracticeRequest } from "@/api/types.gen";
+import type { CatalogEntryStatus, CuratedPracticeDefinition } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
+import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -20,6 +21,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { canUseHephaestusVersion } from "./curated-entry-state";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
@@ -28,7 +30,9 @@ export type CuratedPracticeFormValue = PracticeDefinitionValue;
 
 export interface CuratedPracticeFormInitialValue extends CuratedPracticeFormValue {
 	status: CatalogEntryStatus;
-	shipped?: CuratedPracticeRequest;
+	evidence: CuratedPracticeDefinition["evidence"];
+	evidenceValidation: CuratedPracticeDefinition["evidenceValidation"];
+	shipped?: CuratedPracticeDefinition;
 }
 
 interface CuratedPracticeFormBaseProps {
@@ -184,6 +188,24 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					disabled={formDisabled}
 					isSubmitDisabled={conflict || isResetPending || isKeepPending}
 					cancelAction={cancelAction}
+					afterFields={
+						<>
+							<Separator />
+							<section className="space-y-4">
+								<div>
+									<h2 className="text-lg font-semibold">Saved evidence contract</h2>
+									<p className="text-sm text-muted-foreground">
+										The declared inputs and limits used to decide whether this practice can be
+										assessed.
+									</p>
+								</div>
+								<PracticeEvidenceSummary
+									declaration={initialData.evidence}
+									validation={initialData.evidenceValidation}
+								/>
+							</section>
+						</>
+					}
 					onSubmit={props.onSubmit}
 				/>
 			)}

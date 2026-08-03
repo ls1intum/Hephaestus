@@ -80,11 +80,6 @@ public class PullRequestContentSource implements EvidenceSource {
         return CORE;
     }
 
-    @Override
-    public String originId() {
-        return "scm";
-    }
-
     private static final Logger log = LoggerFactory.getLogger(PullRequestContentSource.class);
 
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */

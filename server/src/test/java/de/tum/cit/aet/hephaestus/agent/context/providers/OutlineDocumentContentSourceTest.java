@@ -210,11 +210,6 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void originIdIsOutline() {
-        assertThat(provider.originId()).isEqualTo("outline");
-    }
-
-    @Test
     void supportsMentorAndReviewVariantsOnly() {
         assertThat(provider.supports(mentorRequest())).isTrue();
         assertThat(provider.supports(prRequest("no links"))).isTrue();

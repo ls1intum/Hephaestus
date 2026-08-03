@@ -48,11 +48,6 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class WorkspaceContentSource implements ContentSource {
 
-    @Override
-    public String originId() {
-        return "core";
-    }
-
     private static final Logger log = LoggerFactory.getLogger(WorkspaceContentSource.class);
 
     /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */

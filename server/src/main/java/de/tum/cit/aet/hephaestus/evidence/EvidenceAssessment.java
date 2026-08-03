@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -22,6 +23,12 @@ public record EvidenceAssessment(
         reasonCodes = List.copyOf(Objects.requireNonNull(reasonCodes, "reasonCodes"));
         if (reasonCodes.stream().anyMatch(code -> code == null || !code.matches("[A-Z][A-Z0-9_]*"))) {
             throw new IllegalArgumentException("Invalid evidence assessment reason code");
+        }
+        if (new HashSet<>(reasonCodes).size() != reasonCodes.size()) {
+            throw new IllegalArgumentException("Evidence assessment reason codes must be unique");
+        }
+        if (acceptable && !reasonCodes.isEmpty()) {
+            throw new IllegalArgumentException("An acceptable assessment cannot have reason codes");
         }
         if (!acceptable && reasonCodes.isEmpty()) {
             throw new IllegalArgumentException("An unacceptable assessment requires a reason code");

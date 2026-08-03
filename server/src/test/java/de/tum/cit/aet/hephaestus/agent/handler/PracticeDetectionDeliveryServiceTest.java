@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -72,6 +73,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     @Mock
     private ContentAddressedStore cas;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry sourceCatalogs;
+
     @Captor
     private ArgumentCaptor<PracticeDetectionCompletedEvent> eventCaptor;
 
@@ -91,8 +95,11 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             issueRepository,
             eventPublisher,
             objectMapper,
-            cas
+            cas,
+            sourceCatalogs
         );
+
+        lenient().when(sourceCatalogs.isSourceUsePermitted(any(), any())).thenReturn(true);
 
         Workspace workspace = new Workspace();
         ReflectionTestUtils.setField(workspace, "id", 1L);
@@ -113,17 +120,21 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         metadata.put("pr_number", 42);
         testJob.setMetadata(metadata);
         ObjectNode snapshot = objectMapper.createObjectNode();
-        var source = snapshot
-            .putObject("manifest")
-            .putArray("sources")
-            .addObject()
-            .put("kind", "scm.pull-request.diff")
-            .put("availability", "AVAILABLE");
+        var sources = snapshot.putObject("manifest").put("contractVersion", "1.0.0").putArray("sources");
+        var source = sources.addObject().put("kind", "scm.pull-request.diff").put("availability", "AVAILABLE");
         source
             .putArray("artifacts")
             .addObject()
             .put("path", "inputs/context/diff.patch")
             .put("sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        sources
+            .addObject()
+            .put("kind", "scm.pull-request.core")
+            .put("availability", "AVAILABLE")
+            .putArray("artifacts")
+            .addObject()
+            .put("path", "inputs/context/pull_request.json")
+            .put("sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
         snapshot.putArray("practices").addObject().put("slug", "pr-description-quality").put("revisionId", 11L);
         testJob.setEvidenceSnapshot(snapshot);
 
@@ -257,12 +268,86 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void rejectsASourceWithdrawnAfterCapture() {
+            when(sourceCatalogs.isSourceUsePermitted(any(), any())).thenReturn(false);
+
+            assertThatThrownBy(() ->
+                service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)))
+            )
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("authorization was withdrawn");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void rejectsAnUncitedSourceWithdrawnAfterCapture() {
+            when(sourceCatalogs.isSourceUsePermitted(any(), eq(new SourceKind("scm.pull-request.core")))).thenReturn(
+                false
+            );
+
+            assertThatThrownBy(() ->
+                service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)))
+            )
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("scm.pull-request.core");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
         void rejectsAQuoteThatIsNotInTheCitedArtifact() {
             ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
             ((ObjectNode) ((ObjectNode) finding.evidence()).withArray("citations").get(0)).put(
                 "quote",
                 "fabricated quote"
             );
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("does not match the cited diff location");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void acceptsASecretScannerCitationWithoutPersistingTheSecret() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ObjectNode evidence = (ObjectNode) finding.evidence();
+            evidence.put("detector", "secret-diff-scanner");
+            ObjectNode citation = (ObjectNode) evidence.withArray("citations").get(0);
+            citation.remove("quote");
+            citation.put("quoteSha256", "cbbe06955840924d2ccb449029560ae1eb92f5ec9866804f1a34be23b61dc488");
+
+            assertThat(service.deliver(testJob, List.of(finding)).inserted()).isEqualTo(1);
+            ArgumentCaptor<String> persistedEvidence = ArgumentCaptor.forClass(String.class);
+            verify(observationRepository).insertIfAbsent(
+                any(),
+                anyString(),
+                any(),
+                anyLong(),
+                any(),
+                anyString(),
+                anyLong(),
+                anyLong(),
+                any(),
+                anyString(),
+                any(),
+                any(),
+                anyFloat(),
+                persistedEvidence.capture(),
+                any(),
+                anyString(),
+                any()
+            );
+            assertThat(persistedEvidence.getValue()).doesNotContain("quoteSha256", "cbbe06955840924d");
+        }
+
+        @Test
+        void rejectsAFabricatedSecretScannerDigest() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ObjectNode evidence = (ObjectNode) finding.evidence();
+            evidence.put("detector", "secret-diff-scanner");
+            ObjectNode citation = (ObjectNode) evidence.withArray("citations").get(0);
+            citation.remove("quote");
+            citation.put("quoteSha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 
             assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
                 .isInstanceOf(JobDeliveryException.class)

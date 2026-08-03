@@ -66,11 +66,6 @@ public class ConversationThreadContentSource implements EvidenceSource {
     }
 
     @Override
-    public String originId() {
-        return "slack";
-    }
-
-    @Override
     public boolean supports(ContextRequest request) {
         return request instanceof ContextRequest.ConversationReviewRequest;
     }

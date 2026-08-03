@@ -51,11 +51,6 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         return KIND;
     }
 
-    @Override
-    public String originId() {
-        return "scm";
-    }
-
     private static final Logger log = LoggerFactory.getLogger(LinkedWorkItemContentSource.class);
 
     static final String OUTPUT_FILE = OUTPUT_PREFIX + "linked_work_items.json";

@@ -22,6 +22,9 @@ public record ArtifactSourceManifest(
         Objects.requireNonNull(profileId, "profileId");
         Objects.requireNonNull(capturedAt, "capturedAt");
         sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
+        if (sources.isEmpty()) {
+            throw new IllegalArgumentException("sources must not be empty");
+        }
         viewTransformations = List.copyOf(Objects.requireNonNull(viewTransformations, "viewTransformations"));
         var kinds = new HashSet<SourceKind>();
         for (SourceCapture source : sources) {

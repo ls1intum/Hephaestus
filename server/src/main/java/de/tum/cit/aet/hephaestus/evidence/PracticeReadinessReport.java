@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-/** Durable audit record proving which practices were admitted or refused before model execution. */
+/** Audit record proving which practices were admitted or refused before model execution. */
 public record PracticeReadinessReport(
     SourceContractVersion contractVersion,
     String catalogDigest,
@@ -25,6 +26,12 @@ public record PracticeReadinessReport(
         decisions = List.copyOf(Objects.requireNonNull(decisions, "decisions"));
         if (decisions.isEmpty()) {
             throw new IllegalArgumentException("A readiness report requires at least one decision");
+        }
+        if (
+            new HashSet<>(decisions.stream().map(PracticeReadinessDecision::practiceSlug).toList()).size() !=
+            decisions.size()
+        ) {
+            throw new IllegalArgumentException("A readiness report cannot repeat a practice");
         }
         if (decisions.stream().anyMatch(decision -> !decision.decidedAt().equals(decidedAt))) {
             throw new IllegalArgumentException("Every readiness decision must use the report decision time");

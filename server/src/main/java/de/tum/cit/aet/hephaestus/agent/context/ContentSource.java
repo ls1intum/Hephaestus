@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import java.util.Map;
 
 /**
- * Projects integration-owned source data into read-only workspace inputs. Providers may reshape source
- * data only when the transformation is lossless and practice-agnostic; practice-specific features belong
- * downstream. Data derivable from an already materialised repository tree is not a separate integration source.
+ * Projects integration-owned source data into read-only workspace inputs. Transformations stay
+ * practice-agnostic and declare their fidelity in the artifact-source contract; practice-specific features
+ * belong downstream.
  */
 public interface ContentSource {
     String OUTPUT_PREFIX = SandboxLayout.CONTEXT_PREFIX;
@@ -16,9 +16,6 @@ public interface ContentSource {
     default boolean required() {
         return true;
     }
-
-    /** Stable provenance identifier recorded for every emitted artifact. */
-    String originId();
 
     /**
      * Whether {@code path} belongs to this provider's declared read-only namespace. Bulk sources may

@@ -5,18 +5,26 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const contractDir = path.join(
+const contractsRoot = path.join(
 	root,
-	"server/src/main/resources/contracts/artifact-source/1.0.0",
+	"server/src/main/resources/contracts/artifact-source",
 );
+const contractVersions = (await readdir(contractsRoot, { withFileTypes: true }))
+	.filter((entry) => entry.isDirectory())
+	.map((entry) => entry.name)
+	.sort();
+if (contractVersions.length === 0) throw new Error("No artifact-source contract versions found");
 const readJson = async (file) => JSON.parse(await readFile(file, "utf8"));
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
 
-for (const file of await readdir(contractDir)) {
-	if (file.endsWith(".schema.json")) {
-		ajv.addSchema(await readJson(path.join(contractDir, file)));
+for (const version of contractVersions) {
+	const versionDir = path.join(contractsRoot, version);
+	for (const file of await readdir(versionDir)) {
+		if (file.endsWith(".schema.json")) {
+			ajv.addSchema(await readJson(path.join(versionDir, file)));
+		}
 	}
 }
 
@@ -26,18 +34,109 @@ const validate = (schemaId, value, label) => {
 	}
 };
 
-validate(
-	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json",
-	await readJson(path.join(contractDir, "catalog.json")),
-	"catalog.json",
-);
-validate(
-	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/source-use-decisions.schema.json",
-	await readJson(path.join(contractDir, "source-use-decisions.json")),
-	"source-use-decisions.json",
-);
+const rejectDuplicateProperty = (values, property, label) => {
+	const seen = new Set();
+	for (const value of values) {
+		if (seen.has(value[property])) throw new Error(`${label} duplicates '${value[property]}'`);
+		seen.add(value[property]);
+	}
+};
 
-const sourceCatalog = await readJson(path.join(contractDir, "catalog.json"));
+const validateManifestSemantics = (value, label) => {
+	rejectDuplicateProperty(value.sources, "kind", `${label} source`);
+	for (const source of value.sources) {
+		rejectDuplicateProperty(source.artifacts, "path", `${label} source '${source.kind}' artifact path`);
+		if (source.state.availability !== "AVAILABLE" && source.artifacts.length > 0) {
+			throw new Error(`${label} unavailable source '${source.kind}' contains artifacts`);
+		}
+		if (
+			source.state.availability === "AVAILABLE" &&
+			source.state.content === "NON_EMPTY" &&
+			source.artifacts.length === 0
+		) {
+			throw new Error(`${label} non-empty source '${source.kind}' contains no artifacts`);
+		}
+	}
+};
+
+const validateReadinessSemantics = (value, label) => {
+	rejectDuplicateProperty(value.decisions, "practiceSlug", `${label} practice`);
+	for (const decision of value.decisions) {
+		if (decision.decidedAt !== value.decidedAt) {
+			throw new Error(`${label} practice '${decision.practiceSlug}' uses a different decision time`);
+		}
+		rejectDuplicateProperty(
+			decision.assessments,
+			"kind",
+			`${label} practice '${decision.practiceSlug}' assessment`,
+		);
+		for (const assessment of decision.assessments) {
+			if (new Set(assessment.reasonCodes).size !== assessment.reasonCodes.length) {
+				throw new Error(`${label} assessment '${assessment.kind}' repeats a reason code`);
+			}
+			if (assessment.acceptable !== (assessment.reasonCodes.length === 0)) {
+				throw new Error(`${label} assessment '${assessment.kind}' has inconsistent reason codes`);
+			}
+		}
+		if (decision.ready !== decision.assessments.every((assessment) => assessment.acceptable)) {
+			throw new Error(`${label} practice '${decision.practiceSlug}' has an inconsistent ready outcome`);
+		}
+	}
+};
+
+const validateContractVersion = async (version) => {
+	const versionDir = path.join(contractsRoot, version);
+	const catalog = await readJson(path.join(versionDir, "catalog.json"));
+	const decisionCatalog = await readJson(path.join(versionDir, "source-use-decisions.json"));
+	validate(
+		`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/artifact-source-catalog.schema.json`,
+		catalog,
+		`${version}/catalog.json`,
+	);
+	validate(
+		`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/source-use-decisions.schema.json`,
+		decisionCatalog,
+		`${version}/source-use-decisions.json`,
+	);
+
+	rejectDuplicateProperty(catalog.sources, "kind", `${version} source kind`);
+	rejectDuplicateProperty(catalog.profiles, "id", `${version} profile`);
+	rejectDuplicateProperty(decisionCatalog.decisions, "id", `${version} source-use decision`);
+
+	const versionSources = new Map(catalog.sources.map((source) => [source.kind, source]));
+	const decisions = new Map(decisionCatalog.decisions.map((decision) => [decision.id, decision]));
+	for (const profile of catalog.profiles) {
+		for (const kind of profile.allowedSources) {
+			const source = versionSources.get(kind);
+			if (!source) throw new Error(`${version} profile '${profile.id}' references unknown source '${kind}'`);
+			if (!source.artifactTypes.includes(profile.artifactType)) {
+				throw new Error(`${version} profile '${profile.id}' uses '${kind}' for an unsupported artifact type`);
+			}
+		}
+	}
+	for (const source of catalog.sources) {
+		const decision = decisions.get(source.useDecisionId);
+		if (!decision) throw new Error(`${version} source '${source.kind}' references unknown decision '${source.useDecisionId}'`);
+		for (const property of ["source", "purpose", "retentionPolicy", "erasurePolicy"]) {
+			const expected = property === "source" ? source.kind : source[property];
+			if (decision[property] !== expected) {
+				throw new Error(`${version} decision '${decision.id}' does not match source '${source.kind}' property '${property}'`);
+			}
+		}
+	}
+	const referencedDecisions = new Set(catalog.sources.map((source) => source.useDecisionId));
+	for (const decision of decisionCatalog.decisions) {
+		if (!referencedDecisions.has(decision.id)) {
+			throw new Error(`${version} decision '${decision.id}' is not referenced by a source`);
+		}
+	}
+	return catalog;
+};
+
+const catalogs = new Map();
+for (const version of contractVersions) catalogs.set(version, await validateContractVersion(version));
+
+const sourceCatalog = catalogs.get("1.0.0");
 const practiceCatalog = await readJson(
 	path.join(root, "server/src/main/resources/practices/default-catalog.json"),
 );
@@ -123,38 +222,58 @@ const manifestSchema =
 	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json";
 const manifest = {
 	contractVersion: "1.0.0",
-	catalogDigest: "a".repeat(64),
+	catalogDigest: "3ee0ecd611114c0543208598fe20af834c32f2f08827eed5afcafff323e09600",
 	profileId: "pull-request-review",
 	capturedAt: "2026-08-03T00:00:00Z",
-	sources: [
-		{
-			kind: "scm.pull-request.diff",
-			state: {
-				availability: "AVAILABLE",
-				content: "EMPTY",
-				completeness: "COMPLETE",
-				facts: {
-					capturedAt: "2026-08-03T00:00:00Z",
-					queryScope: "one pinned diff",
-					completenessBasis: "IMMUTABLE_OBJECT",
-					representationFidelity: "EXACT",
-				},
-			},
-			artifacts: [],
-		},
-	],
+	sources: profiles.get("pull-request-review").allowedSources.map((kind) => ({
+		kind,
+		state:
+			kind === "scm.pull-request.diff"
+				? {
+						availability: "AVAILABLE",
+						content: "EMPTY",
+						completeness: "COMPLETE",
+						facts: {
+							capturedAt: "2026-08-03T00:00:00Z",
+							queryScope: "one pinned diff",
+							completenessBasis: "IMMUTABLE_OBJECT",
+							representationFidelity: "EXACT",
+						},
+					}
+				: { availability: "NOT_COLLECTED", reasonCode: "MINIMIZED" },
+		artifacts: [],
+	})),
 	viewTransformations: [],
 };
 validate(manifestSchema, manifest, "valid manifest fixture");
+validateManifestSemantics(manifest, "valid manifest fixture");
 for (const [label, invalid] of [
 	["empty source list", { ...manifest, sources: [] }],
-	["invalid source kind", { ...manifest, sources: [{ ...manifest.sources[0], kind: "INVALID" }] }],
+	["unknown source kind", { ...manifest, sources: [{ ...manifest.sources[0], kind: "scm.unknown.source" }, ...manifest.sources.slice(1)] }],
+	["unknown profile", { ...manifest, profileId: "unknown-review" }],
+	["duplicate source capture", { ...manifest, sources: [...manifest.sources, structuredClone(manifest.sources[0])] }],
+	["wrong catalog digest", { ...manifest, catalogDigest: "a".repeat(64) }],
 	["unsafe artifact path", {
 		...manifest,
-		sources: [{ ...manifest.sources[0], state: { ...manifest.sources[0].state, content: "NON_EMPTY" }, artifacts: [{ path: "../secret", mediaType: "text/plain", sha256: "b".repeat(64), bytes: 1 }] }],
+		sources: [{ ...manifest.sources[0], state: { ...manifest.sources[0].state, content: "NON_EMPTY" }, artifacts: [{ path: "../secret", mediaType: "text/plain", sha256: "b".repeat(64), bytes: 1 }] }, ...manifest.sources.slice(1)],
+	}],
+	["non-canonical artifact path", {
+		...manifest,
+		sources: [{ ...manifest.sources[0], state: { ...manifest.sources[0].state, content: "NON_EMPTY" }, artifacts: [{ path: "./context.json", mediaType: "application/json", sha256: "b".repeat(64), bytes: 1 }] }, ...manifest.sources.slice(1)],
 	}],
 ]) {
 	if (ajv.validate(manifestSchema, invalid)) throw new Error(`manifest schema accepted ${label}`);
+}
+const duplicateArtifactPath = structuredClone(manifest);
+duplicateArtifactPath.sources[0].artifacts = [
+	{ path: "context.json", mediaType: "application/json", sha256: "b".repeat(64), bytes: 1 },
+	{ path: "context.json", mediaType: "application/json", sha256: "c".repeat(64), bytes: 2 },
+];
+try {
+	validateManifestSemantics(duplicateArtifactPath, "adversarial manifest");
+	throw new Error("manifest semantic validator accepted duplicate artifact paths");
+} catch (error) {
+	if (!String(error).includes("duplicates 'context.json'")) throw error;
 }
 
 const readinessSchema =
@@ -170,19 +289,46 @@ const assessment = {
 };
 const readiness = {
 	contractVersion: "1.0.0",
-	catalogDigest: "a".repeat(64),
+	catalogDigest: "3ee0ecd611114c0543208598fe20af834c32f2f08827eed5afcafff323e09600",
 	profileId: "pull-request-review",
 	manifestCapturedAt: "2026-08-03T00:00:00Z",
 	decidedAt: "2026-08-03T00:00:00Z",
 	decisions: [{ practiceSlug: "example", decidedAt: "2026-08-03T00:00:00Z", ready: true, assessments: [assessment] }],
 };
 validate(readinessSchema, readiness, "valid readiness fixture");
+validateReadinessSemantics(readiness, "valid readiness fixture");
 for (const [label, decision] of [
 	["zero assessments", { ...readiness.decisions[0], assessments: [] }],
+	["duplicate assessment", { ...readiness.decisions[0], assessments: [assessment, structuredClone(assessment)] }],
 	["ready with rejection", { ...readiness.decisions[0], assessments: [{ ...assessment, acceptable: false, reasonCodes: ["STALE"] }] }],
 	["refused without rejection", { ...readiness.decisions[0], ready: false }],
 	["rejection without reason", { ...readiness.decisions[0], ready: false, assessments: [{ ...assessment, acceptable: false }] }],
 ]) {
 	if (ajv.validate(readinessSchema, { ...readiness, decisions: [decision] }))
 		throw new Error(`readiness schema accepted ${label}`);
+}
+const wrongProfileAssessment = {
+	...readiness,
+	decisions: [{ ...readiness.decisions[0], assessments: [{ ...assessment, kind: "scm.issue.core" }] }],
+};
+if (ajv.validate(readinessSchema, wrongProfileAssessment)) {
+	throw new Error("readiness schema accepted an assessment outside the selected profile");
+}
+const duplicatePractice = {
+	...readiness,
+	decisions: [readiness.decisions[0], { ...structuredClone(readiness.decisions[0]), decidedAt: "2026-08-03T00:00:01Z" }],
+};
+try {
+	validateReadinessSemantics(duplicatePractice, "adversarial readiness");
+	throw new Error("readiness semantic validator accepted duplicate practices");
+} catch (error) {
+	if (!String(error).includes("duplicates 'example'")) throw error;
+}
+const inconsistentDecisionTime = structuredClone(readiness);
+inconsistentDecisionTime.decisions[0].decidedAt = "2026-08-03T00:00:01Z";
+try {
+	validateReadinessSemantics(inconsistentDecisionTime, "adversarial readiness");
+	throw new Error("readiness semantic validator accepted inconsistent decision times");
+} catch (error) {
+	if (!String(error).includes("different decision time")) throw error;
 }

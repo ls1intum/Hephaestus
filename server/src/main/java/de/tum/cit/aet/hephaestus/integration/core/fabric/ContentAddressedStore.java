@@ -2,13 +2,18 @@ package de.tum.cit.aet.hephaestus.integration.core.fabric;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.Set;
@@ -21,8 +26,8 @@ import org.springframework.stereotype.Component;
 /**
  * Content-addressed blob store (ADR 0020) — the connector-agnostic generalisation of the git clone:
  * a git pack, a diff export, a Slack archive and an Outline doc are all just blobs keyed by the
- * sha-256 of their bytes. Blobs are immutable, deduplicated, and rebuildable; SQL stays the source of
- * truth, so a blob may be swept and re-fetched at any time.
+ * sha-256 of their bytes. Blobs are immutable and deduplicated. Live job manifests protect referenced
+ * blobs; garbage collection removes only unreferenced blobs beyond the retention window.
  *
  * <p>On-disk layout under {@link FabricLayout#casRoot()}: {@code {ab}/{rest}} (git-style two-char
  * fan-out to keep directories small). Writes are build-on-miss and atomic (temp file + atomic move),
@@ -57,24 +62,16 @@ public class ContentAddressedStore {
     public String put(byte[] content) {
         String sha = sha256(content);
         Path blob = pathFor(sha);
-        if (Files.exists(blob)) {
-            return sha;
-        }
-        ReentrantLock lock = locks[Math.floorMod(sha.hashCode(), LOCK_STRIPES)];
-        lock.lock();
         Path temp = null;
-        try {
+        try (BlobLock ignored = lockBlob(sha)) {
             if (Files.exists(blob)) {
+                Files.setLastModifiedTime(blob, FileTime.from(Instant.now()));
                 return sha;
             }
             Files.createDirectories(blob.getParent());
             try {
                 temp = Files.createTempFile(blob.getParent(), ".tmp-", ".blob");
             } catch (NoSuchFileException vanished) {
-                // A concurrent sweep()'s pruneEmptyFanoutDirs can delete this just-created-but-still-empty
-                // {ab} fan-out dir in the window between createDirectories above and createTempFile here.
-                // Re-create the parent and retry once; the prune only ever removes EMPTY dirs, so a single
-                // retry is sufficient (our temp file now makes the dir non-empty, ineligible for pruning).
                 Files.createDirectories(blob.getParent());
                 temp = Files.createTempFile(blob.getParent(), ".tmp-", ".blob");
             }
@@ -94,7 +91,6 @@ public class ContentAddressedStore {
                     log.warn("CAS could not delete orphaned temp {}: {}", temp, cleanup.getMessage());
                 }
             }
-            lock.unlock();
         }
     }
 
@@ -135,10 +131,13 @@ public class ContentAddressedStore {
 
     /**
      * Mark-and-sweep GC: delete every stored blob whose sha is NOT in {@code liveShas}. Returns the
-     * number of blobs removed. Best-effort — a blob that fails to delete is logged and skipped; SQL
-     * remains the source of truth, so a wrongly-swept blob is simply rebuilt on next access.
+     * number of blobs removed. Best-effort — a blob that fails to delete is logged and skipped.
      */
     public int sweep(Set<String> liveShas) {
+        return sweep(liveShas, Instant.MAX);
+    }
+
+    public int sweep(Set<String> liveShas, Instant createdBefore) {
         Path casRoot = layout.casRoot();
         if (!Files.isDirectory(casRoot)) {
             return 0;
@@ -149,17 +148,12 @@ public class ContentAddressedStore {
                 .filter(Files::isRegularFile)
                 .forEach(blob -> {
                     String candidate = blob.getParent().getFileName() + blob.getFileName().toString();
-                    // ONLY a file whose {ab}/{rest} reconstructs to a valid 64-hex sha is a blob eligible
-                    // for sweeping. An in-flight `.tmp-*.blob` (or any stray file) reconstructs to a
-                    // non-sha and is left untouched, so this blob-delete pass never removes a put()'s temp.
-                    // The subsequent pruneEmptyFanoutDirs pass CAN delete a fan-out dir that a concurrent
-                    // put() created but has not yet populated; put() defends against that by re-creating the
-                    // parent and retrying createTempFile once (neither path is stripe-locked here).
                     if (isShaHex(candidate) && !liveShas.contains(candidate)) {
-                        try {
-                            Files.delete(blob);
-                            removed[0]++;
-                        } catch (IOException e) {
+                        try (BlobLock ignored = lockBlob(candidate)) {
+                            if (lastModifiedBefore(blob, createdBefore)) {
+                                if (Files.deleteIfExists(blob)) removed[0]++;
+                            }
+                        } catch (IOException | UncheckedIOException e) {
                             log.warn("CAS sweep could not delete {}: {}", blob, e.getMessage());
                         }
                     }
@@ -172,6 +166,15 @@ public class ContentAddressedStore {
         }
         pruneEmptyFanoutDirs(casRoot);
         return removed[0];
+    }
+
+    private static boolean lastModifiedBefore(Path path, Instant cutoff) {
+        try {
+            return Files.getLastModifiedTime(path).toInstant().isBefore(cutoff);
+        } catch (IOException e) {
+            log.warn("CAS sweep could not inspect {}: {}", path, e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -209,6 +212,47 @@ public class ContentAddressedStore {
             // A racing writer may have created the target between our exists() check and the move;
             // the blob is immutable, so either landing is byte-identical. Fall back to a plain move.
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private BlobLock lockBlob(String sha) {
+        ReentrantLock processLock = locks[Math.floorMod(Integer.parseInt(sha.substring(0, 2), 16), LOCK_STRIPES)];
+        processLock.lock();
+        try {
+            Path lockPath = layout.casRoot().resolve("locks").resolve(sha.substring(0, 2) + ".lock");
+            Files.createDirectories(lockPath.getParent());
+            FileChannel channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            try {
+                return new BlobLock(processLock, channel, channel.lock());
+            } catch (IOException | RuntimeException e) {
+                channel.close();
+                throw e;
+            }
+        } catch (IOException e) {
+            processLock.unlock();
+            throw new UncheckedIOException("Failed to lock CAS blob " + sha, e);
+        } catch (RuntimeException e) {
+            processLock.unlock();
+            throw e;
+        }
+    }
+
+    private record BlobLock(
+        ReentrantLock processLock,
+        FileChannel channel,
+        FileLock fileLock
+    ) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            try {
+                fileLock.release();
+            } finally {
+                try {
+                    channel.close();
+                } finally {
+                    processLock.unlock();
+                }
+            }
         }
     }
 

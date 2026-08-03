@@ -65,6 +65,15 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 Practice detection requires source authorization
+
+**Affected**: deployments that enable practice review.
+
+Set `HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS` to the comma-separated source kinds approved for the deployment.
+Leaving it empty is safe: review jobs decline without collecting evidence or making a semantic judgment. Use `*`
+only when the controller has approved every source in the active contract. Remove a kind and restart the server and
+workers to stop new collection and delayed delivery from that source.
+
 #### 🔴 Untouched instances start with Silent Mode engaged
 
 **Affected**: deployments where the instance Silent Mode setting has never been explicitly changed.

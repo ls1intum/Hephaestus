@@ -77,7 +77,7 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
 
     @Query(
         "SELECT prrc FROM PullRequestReviewComment prrc LEFT JOIN FETCH prrc.author " +
-            "WHERE prrc.pullRequest.id = :pullRequestId ORDER BY prrc.createdAt DESC"
+            "WHERE prrc.pullRequest.id = :pullRequestId ORDER BY prrc.createdAt DESC, prrc.id DESC"
     )
     List<PullRequestReviewComment> findRecentByPullRequestIdWithAuthor(
         @Param("pullRequestId") Long pullRequestId,

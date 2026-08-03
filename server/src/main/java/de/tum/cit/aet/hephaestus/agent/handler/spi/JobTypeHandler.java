@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.handler.spi;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import java.util.Map;
 
 /**
  * Domain-specific handler for a single {@link AgentJobType}.
@@ -14,7 +13,7 @@ import java.util.Map;
  * <h2>Lifecycle (called by executor)</h2>
  * <ol>
  *   <li>{@link #createSubmission} — event listener extracts metadata + idempotency key</li>
- *   <li>{@link #prepareInputFiles} — populate workspace files (including {@code task.json}) before container start</li>
+ *   <li>{@link #prepareInputs} — populate workspace files (including {@code task.json}) before container start</li>
  *   <li>{@link #deliver} — post-execution result delivery</li>
  * </ol>
  */
@@ -45,7 +44,7 @@ public interface JobTypeHandler {
      * @return workspace files (relative path → content)
      * @throws JobPreparationException if context preparation fails
      */
-    Map<String, byte[]> prepareInputFiles(AgentJob job);
+    PreparedJobInputs prepareInputs(AgentJob job);
 
     /**
      * Deliver results after successful execution.
@@ -70,21 +69,5 @@ public interface JobTypeHandler {
      */
     default ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
         return ExistingDeliveryLookup.unknown();
-    }
-
-    /**
-     * Provide host volume mounts for the sandbox container.
-     *
-     * <p>Returns a map of host paths to container paths. All mounts are read-only
-     * (enforced by the sandbox security policy). This allows handlers to mount
-     * real git repositories into the container for rich context.
-     *
-     * <p>Default implementation returns an empty map (no volume mounts).
-     *
-     * @param job the persisted job
-     * @return volume mounts (host path → container path)
-     */
-    default Map<String, String> volumeMounts(AgentJob job) {
-        return Map.of();
     }
 }

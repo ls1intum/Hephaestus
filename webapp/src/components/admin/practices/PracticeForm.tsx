@@ -10,6 +10,7 @@ import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
+import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
@@ -98,6 +99,19 @@ export function PracticeForm(props: PracticeFormProps) {
 	const reviewResults =
 		mode === "edit" ? (
 			<>
+				<Separator />
+				<section className="space-y-4">
+					<div>
+						<h2 className="text-lg font-semibold">Saved evidence contract</h2>
+						<p className="text-sm text-muted-foreground">
+							The declared inputs and limits used to decide whether this practice can be assessed.
+						</p>
+					</div>
+					<PracticeEvidenceSummary
+						declaration={initialData.evidence}
+						validation={initialData.evidenceValidation}
+					/>
+				</section>
 				<Separator />
 				<section className="space-y-4">
 					<div>

@@ -1,5 +1,9 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPullRequestEvidence,
+} from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
 import { CuratedPracticeForm } from "./CuratedPracticeForm";
 
@@ -72,6 +76,8 @@ describe("CuratedPracticeForm", () => {
 					artifactType: "PULL_REQUEST",
 					triggerEvents: ["PullRequestCreated"],
 					criteria: "Assess whether the description explains the change.",
+					evidence: mockPullRequestEvidence,
+					evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 					status: {
 						etag: "tag",
 						state: "FROM_HEPHAESTUS",

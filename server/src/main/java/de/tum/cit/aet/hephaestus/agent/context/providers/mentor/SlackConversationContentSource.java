@@ -16,8 +16,7 @@ import tools.jackson.databind.node.ObjectNode;
  * the requesting developer <em>participated in</em>, grouped by thread, from channels whose consent is
  * {@code ACTIVE}, non-tombstoned messages only. Pure EXTRACT+LOAD of the raw native Slack thread/message rows via
  * the agent-owned {@link ConversationThreadProjection} SPI (implemented by {@code integration.slack}, the owner of
- * the Slack schema) — no practice-shaped feature, no observation, no threshold (per the {@link ContentSource}
- * provenance contract). {@code originId="slack"}. Best-effort.
+ * the Slack schema) — no practice-shaped feature, no observation, no threshold. Best-effort.
  *
  * <p>This content source never reads {@code slack_*} tables itself: the projection lives behind the SPI so the
  * coupling runs one way ({@code integration.slack → agent}), and a Slack column rename is a compile error inside
@@ -44,11 +43,6 @@ public class SlackConversationContentSource implements ContentSource {
     public SlackConversationContentSource(ConversationThreadProjection projection, ObjectMapper objectMapper) {
         this.projection = projection;
         this.objectMapper = objectMapper;
-    }
-
-    @Override
-    public String originId() {
-        return "slack";
     }
 
     @Override

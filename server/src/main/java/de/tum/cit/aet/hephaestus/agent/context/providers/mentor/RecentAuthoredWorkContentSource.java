@@ -37,11 +37,6 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class RecentAuthoredWorkContentSource implements ContentSource {
 
-    @Override
-    public String originId() {
-        return "core";
-    }
-
     /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "recent_authored_work.json";
 

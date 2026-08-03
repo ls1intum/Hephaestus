@@ -219,6 +219,8 @@ services:
       # Agent job queue (practice review). The queue runs on PostgreSQL — no NATS involved. NATS
       # stays required elsewhere on this pod for webhook-driven sync consumption (NATS_ENABLED above).
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
+      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS:-}
+      HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
       # ── Retired. Nothing reads these; they are forwarded for ONE release so a stale line in your
       # docker/.env is visible. A .env entry is a Compose interpolation input, not container
       # environment: without this block the JVM never sees it and DeprecatedEnvVarStartupWarner
@@ -343,6 +345,8 @@ services:
       # Agent job queue (practice review). The queue runs on PostgreSQL — this pod needs no NATS at
       # all (it runs no sync/webhook role), so no NATS_SERVER is set here.
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
+      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS:-}
+      HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}

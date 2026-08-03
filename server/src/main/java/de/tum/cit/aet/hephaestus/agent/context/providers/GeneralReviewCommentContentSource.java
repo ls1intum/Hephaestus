@@ -56,11 +56,6 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
     }
 
     @Override
-    public String originId() {
-        return "scm";
-    }
-
-    @Override
     public boolean supports(ContextRequest request) {
         return request instanceof ContextRequest.PracticeReviewRequest;
     }

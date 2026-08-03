@@ -5,8 +5,10 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
@@ -31,6 +33,8 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReport;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -606,6 +610,32 @@ public class AgentJobExecutor {
         } catch (SandboxCancelledException e) {
             handleCancellation(jobId, job);
             metricOutcome = AgentJobStatus.CANCELLED.name();
+        } catch (InsufficientEvidenceException e) {
+            try {
+                persistRefusedEvidence(jobId, job.getRetryCount(), e.preparedInputs());
+                ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
+                Integer updated = transactionTemplate.execute(status ->
+                    jobRepository.transitionToEvidenceRefused(
+                        jobId,
+                        workerId,
+                        job.getRetryCount(),
+                        Instant.now(),
+                        output
+                    )
+                );
+                if (updated != null && updated == 1) {
+                    meterRegistry.counter("agent.job.evidence.refused").increment();
+                    metricOutcome = "INSUFFICIENT_EVIDENCE";
+                    log.info(
+                        "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
+                        jobId
+                    );
+                } else {
+                    metricOutcome = "OWNERSHIP_LOST";
+                }
+            } catch (Exception persistenceFailure) {
+                metricOutcome = handleExecutionFailure(jobId, job, persistenceFailure, false);
+            }
         } catch (TerminalPersistenceException e) {
             // Provider work already completed. Leave RUNNING for the zombie sweeper to terminalize
             // and account as UNPRICED; never execute the provider a second time.
@@ -646,12 +676,9 @@ public class AgentJobExecutor {
         // resolve lazy JPA proxies, and a re-fetch that eagerly loads the workspace.
         TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
         readOnlyTx.setReadOnly(true);
-        record PrepareResult(Map<String, byte[]> files, Map<String, String> volumeMounts) {}
-        PrepareResult prepared = readOnlyTx.execute(status -> {
+        PreparedJobInputs preparedInputs = readOnlyTx.execute(status -> {
             AgentJob managedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
-            Map<String, byte[]> files = handler.prepareInputFiles(managedJob);
-            Map<String, String> volumes = handler.volumeMounts(managedJob);
-            return new PrepareResult(files, volumes);
+            return handler.prepareInputs(managedJob);
         });
 
         // Every sandbox reaches the provider through the in-app LLM proxy with the job's own token;
@@ -668,26 +695,52 @@ public class AgentJobExecutor {
         );
 
         PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
-        SandboxSpec sandboxSpec = buildSandboxSpec(
+        SandboxSpec sandboxSpec = buildSandboxSpec(jobId, preparedInputs.files(), agentSpec, snapshot);
+        persistProvenanceDigests(
             jobId,
-            prepared.files(),
-            prepared.volumeMounts(),
-            agentSpec,
-            snapshot
+            agentSpec.promptDigest(),
+            sandboxSpec.inputFiles(),
+            job.getRetryCount(),
+            preparedInputs.artifactSourceManifest(),
+            preparedInputs.readinessReport()
         );
-        persistProvenanceDigests(jobId, agentSpec.promptDigest(), sandboxSpec.inputFiles());
         return sandboxSpec;
+    }
+
+    private void persistRefusedEvidence(UUID jobId, int retryCount, PreparedJobInputs preparedInputs) {
+        persistProvenanceDigests(
+            jobId,
+            null,
+            preparedInputs.files(),
+            retryCount,
+            preparedInputs.artifactSourceManifest(),
+            preparedInputs.readinessReport()
+        );
     }
 
     /**
      * Deliberately not best-effort: an observation that cannot be tied to the inputs that produced it
      * is unfixable evaluation data, so a failed write fails the run before any LLM cost accrues.
      */
-    private void persistProvenanceDigests(UUID jobId, @Nullable String promptDigest, Map<String, byte[]> inputFiles) {
+    private void persistProvenanceDigests(
+        UUID jobId,
+        @Nullable String promptDigest,
+        Map<String, byte[]> inputFiles,
+        int retryCount,
+        @Nullable ArtifactSourceManifest artifactSourceManifest,
+        @Nullable PracticeReadinessReport readinessReport
+    ) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
-        JsonNode evidenceSnapshot = evidenceSnapshot(inputFiles);
+        JsonNode evidenceSnapshot = evidenceSnapshot(inputFiles, artifactSourceManifest, readinessReport);
         Integer updated = transactionTemplate.execute(status ->
-            jobRepository.updateProvenanceDigests(jobId, promptDigest, inputsDigest, evidenceSnapshot)
+            jobRepository.updateProvenanceDigests(
+                jobId,
+                workerId,
+                retryCount,
+                promptDigest,
+                inputsDigest,
+                evidenceSnapshot
+            )
         );
         if (updated == null || updated != 1) {
             throw new IllegalStateException("Provenance digest write matched no job row: jobId=" + jobId);
@@ -695,46 +748,38 @@ public class AgentJobExecutor {
         log.debug("Provenance digests: jobId={}, prompt={}, inputs={}", jobId, promptDigest, inputsDigest);
     }
 
-    private JsonNode evidenceSnapshot(Map<String, byte[]> inputFiles) {
+    private JsonNode evidenceSnapshot(
+        Map<String, byte[]> inputFiles,
+        @Nullable ArtifactSourceManifest artifactSourceManifest,
+        @Nullable PracticeReadinessReport readinessReport
+    ) {
         byte[] manifest = inputFiles.get(SandboxLayout.MANIFEST_PATH);
         byte[] practices = inputFiles.get(SandboxLayout.PRACTICES_PREFIX + "index.json");
-        if (manifest == null && practices == null) return objectMapper.nullNode();
-        if (manifest == null || practices == null) {
+        if (manifest == null && practices == null && readinessReport == null) return objectMapper.nullNode();
+        if (manifest == null || readinessReport == null) {
             throw new IllegalStateException("Practice review inputs have an incomplete evidence snapshot");
         }
         ObjectNode snapshot = objectMapper.createObjectNode();
         snapshot.set("manifest", objectMapper.readTree(manifest));
-        snapshot.set("practices", objectMapper.readTree(practices));
+        snapshot.set("readiness", objectMapper.valueToTree(readinessReport));
+        if (practices != null) {
+            snapshot.set("practices", objectMapper.readTree(practices));
+        }
+        if (artifactSourceManifest != null) {
+            snapshot.set("artifactSourceManifest", objectMapper.valueToTree(artifactSourceManifest));
+        }
         return snapshot;
     }
 
     private static SandboxSpec buildSandboxSpec(
         UUID jobId,
         Map<String, byte[]> handlerFiles,
-        Map<String, String> handlerVolumeMounts,
         PracticeSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
         // The adapter takes precedence on collision.
         Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
         allInputFiles.putAll(agentSpec.inputFiles());
-
-        Map<String, String> allVolumeMounts = new HashMap<>(handlerVolumeMounts);
-        for (var entry : agentSpec.volumeMounts().entrySet()) {
-            String existing = allVolumeMounts.put(entry.getKey(), entry.getValue());
-            if (existing != null && !existing.equals(entry.getValue())) {
-                log.warn(
-                    "Volume mount collision: hostPath={}, handler={}, adapter={} (using adapter)",
-                    entry.getKey(),
-                    existing,
-                    entry.getValue()
-                );
-            }
-        }
-        Set<String> containerPaths = new HashSet<>(allVolumeMounts.values());
-        if (containerPaths.size() < allVolumeMounts.size()) {
-            log.warn("Multiple host paths mapped to the same container path: {}", allVolumeMounts);
-        }
 
         ResourceLimits limits = new ResourceLimits(
             ResourceLimits.DEFAULT.memoryBytes(),
@@ -753,7 +798,7 @@ public class AgentJobExecutor {
             agentSpec.securityProfile(),
             allInputFiles,
             agentSpec.outputPath(),
-            allVolumeMounts
+            agentSpec.volumeMounts()
         );
     }
 

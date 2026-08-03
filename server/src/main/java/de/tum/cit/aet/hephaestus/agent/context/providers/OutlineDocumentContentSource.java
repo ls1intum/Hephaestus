@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises a workspace's mirrored Outline documents into the sandbox context — a pure extract+load of raw doc
  * rows through the agent-owned {@link DocumentProjection} SPI, so this source never reads {@code outline_document}
- * itself and the coupling runs one way. Best-effort; {@code originId="outline"}.
+ * itself and the coupling runs one way. Best-effort.
  *
  * <p>Mentor chat emits one {@code outline_docs.json}; review emits a {@code .md} tree under
  * {@code inputs/context/outline/}. Both are telescoped, never the whole corpus.
@@ -126,11 +126,6 @@ public class OutlineDocumentContentSource implements EvidenceSource {
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
         this.chatMessageRepository = chatMessageRepository;
-    }
-
-    @Override
-    public String originId() {
-        return "outline";
     }
 
     @Override

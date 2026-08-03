@@ -38,6 +38,8 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -55,15 +57,26 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     private final ArtifactSourceCatalog catalog;
     private final String catalogDigest;
     private final Map<String, SourceUseDecision> useDecisions;
+    private final Set<SourceKind> authorizedSources;
     private final Clock clock;
 
     public ClasspathArtifactSourceCatalogRegistry(JsonMapper objectMapper, Clock clock) {
+        this(objectMapper, clock, "*");
+    }
+
+    @Autowired
+    public ClasspathArtifactSourceCatalogRegistry(
+        JsonMapper objectMapper,
+        Clock clock,
+        @Value("${hephaestus.evidence.authorized-source-kinds:}") String authorizedSourceKinds
+    ) {
         this.clock = clock;
         byte[] catalogBytes = readBytes(CATALOG_RESOURCE);
         this.catalog = parse(read(objectMapper, catalogBytes, CATALOG_RESOURCE));
         this.catalogDigest = sha256(catalogBytes);
         this.useDecisions = parseUseDecisions(read(objectMapper, USE_DECISIONS_RESOURCE));
-        validateUseDecisions(catalog, useDecisions, clock.instant());
+        validateUseDecisions(catalog, useDecisions);
+        this.authorizedSources = parseAuthorizedSources(catalog, authorizedSourceKinds);
         useDecisions
             .values()
             .stream()
@@ -100,11 +113,16 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             .orElseThrow(() ->
                 new IllegalArgumentException("Unknown source kind for contract " + version + ": " + kind)
             );
-        SourceUseDecision decision = requireUseDecision(version, contract.useDecisionId());
-        if (!decision.permitsProductUseAt(clock.instant())) {
-            throw new IllegalStateException("Source-use decision is not currently effective: " + decision.id());
-        }
         return contract;
+    }
+
+    @Override
+    public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind) {
+        ArtifactSourceContract contract = requireSource(version, kind);
+        return (
+            authorizedSources.contains(kind) &&
+            requireUseDecision(version, contract.useDecisionId()).permitsProductUseAt(clock.instant())
+        );
     }
 
     @Override
@@ -143,6 +161,28 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         if (!catalog.version().equals(version)) {
             throw new IllegalArgumentException("Unsupported source contract version: " + version);
         }
+    }
+
+    private static Set<SourceKind> parseAuthorizedSources(ArtifactSourceCatalog catalog, String configured) {
+        if (configured.isBlank()) {
+            return Set.of();
+        }
+        if ("*".equals(configured.trim())) {
+            return catalog
+                .sources()
+                .stream()
+                .map(ArtifactSourceContract::kind)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+        Set<SourceKind> authorized = new HashSet<>();
+        for (String value : configured.split(",")) {
+            SourceKind kind = new SourceKind(value.trim());
+            if (catalog.source(kind).isEmpty()) {
+                throw new IllegalStateException("Unknown authorized artifact source: " + kind);
+            }
+            authorized.add(kind);
+        }
+        return Set.copyOf(authorized);
     }
 
     static ArtifactSourceCatalog parse(JsonNode root) {
@@ -300,11 +340,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         return Map.copyOf(decisions);
     }
 
-    static void validateUseDecisions(
-        ArtifactSourceCatalog catalog,
-        Map<String, SourceUseDecision> decisions,
-        Instant now
-    ) {
+    static void validateUseDecisions(ArtifactSourceCatalog catalog, Map<String, SourceUseDecision> decisions) {
+        Set<String> referencedDecisionIds = catalog
+            .sources()
+            .stream()
+            .map(ArtifactSourceContract::useDecisionId)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        if (!decisions.keySet().equals(referencedDecisionIds)) {
+            throw new IllegalStateException("Source-use decisions must match the catalog exactly");
+        }
         for (ArtifactSourceContract source : catalog.sources()) {
             SourceUseDecision decision = decisions.get(source.useDecisionId());
             if (decision == null) {
@@ -324,11 +368,6 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             ) {
                 throw new IllegalStateException(
                     "Source-use decision lifecycle does not match: " + source.useDecisionId()
-                );
-            }
-            if (!decision.permitsProductUseAt(now)) {
-                throw new IllegalStateException(
-                    "Source-use decision is not current for product use: " + source.useDecisionId()
                 );
             }
         }

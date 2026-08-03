@@ -453,11 +453,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             }
 
             @Override
-            public String originId() {
-                return "test";
-            }
-
-            @Override
             public boolean supports(ContextRequest request) {
                 return true;
             }

@@ -47,11 +47,8 @@ class GitDiffOperationsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("C6: resets the line counter at each file's diff --git header (multi-file diff)")
+    @DisplayName("resets line numbers for each file")
     void multiFileDiff_resetsLineCounterPerFile() {
-        // Without the reset, the SECOND file's metadata + lines inherit the FIRST file's trailing line number
-        // until its first hunk header, mis-stamping every [L<n>] marker. The second file's hunk starts at L100,
-        // so its added line must be [L100], not a number continued from the first file.
         String diff =
             "diff --git a/First.swift b/First.swift\n" +
             "--- a/First.swift\n" +
@@ -69,16 +66,14 @@ class GitDiffOperationsTest extends BaseUnitTest {
 
         assertThat(annotated).contains("[L1]  line one");
         assertThat(annotated).contains("[L2] +line two");
-        // The second file's header is emitted verbatim and resets the counter; its hunk re-seeds it to 100.
         assertThat(annotated).contains("diff --git a/Second.swift b/Second.swift\n");
         assertThat(annotated).contains("[L100]  hundred");
         assertThat(annotated).contains("[L101] +hundred one");
-        // The second file must NOT continue the first file's numbering (no [L3] / [L4] on the second file).
         assertThat(annotated).doesNotContain("[L3]  hundred");
     }
 
     @Test
-    @DisplayName("C6: emits the \\ No newline at end of file marker verbatim without advancing the counter")
+    @DisplayName("preserves the no-newline marker without advancing the counter")
     void noNewlineMarker_emittedVerbatim_doesNotAdvanceCounter() {
         String diff =
             "diff --git a/Foo.swift b/Foo.swift\n" +
@@ -92,7 +87,6 @@ class GitDiffOperationsTest extends BaseUnitTest {
 
         assertThat(annotated).contains("[L1]  first");
         assertThat(annotated).contains("[L2] +second");
-        // The marker is metadata — emitted verbatim, never stamped with an [L<n>] prefix.
         assertThat(annotated).containsPattern("(?m)^\\\\ No newline at end of file$");
         assertThat(annotated).doesNotContain("[L3] \\ No newline");
     }
@@ -100,9 +94,6 @@ class GitDiffOperationsTest extends BaseUnitTest {
     @Test
     @DisplayName("does not emit a spurious [L<n>] for the trailing empty element of a diff ending in a newline")
     void trailingNewline_doesNotEmitSpuriousMarker() {
-        // split("\n", -1) on a diff ending with '\n' yields a trailing "" element. Inside a hunk (newLineNum
-        // non-null) that empty element must NOT be stamped with an [L<n>] prefix the model reads as a real
-        // (empty) source line. The diff below ends inside the hunk with a trailing '\n'.
         String diff =
             "diff --git a/Foo.swift b/Foo.swift\n" +
             "--- a/Foo.swift\n" +
@@ -114,7 +105,6 @@ class GitDiffOperationsTest extends BaseUnitTest {
 
         assertThat(annotated).contains("[L1]  first");
         assertThat(annotated).contains("[L2] +second");
-        // After "+second" the new-side counter is at 3; the trailing empty element must not surface as "[L3] ".
         assertThat(annotated).doesNotContain("[L3] ");
     }
 

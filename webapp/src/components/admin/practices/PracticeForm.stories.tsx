@@ -54,6 +54,16 @@ export const EditWithAdvanced: Story = {
 	),
 };
 
+export const EditWarnsBeforeReplacingEvidenceRequirements: Story = {
+	...EditWithAdvanced,
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: "Evaluates" }));
+		await userEvent.click(await screen.findByRole("option", { name: "Conversation" }));
+		await expect(canvas.getByText("Evidence requirements will change")).toBeVisible();
+	},
+};
+
 export const Submitting: Story = {
 	render: () => (
 		<PracticeForm mode="create" workspaceSlug="demo" areas={mockAreas} onSubmit={fn()} isPending />

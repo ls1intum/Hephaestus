@@ -1,4 +1,10 @@
-import type { PracticeEvidenceDeclaration } from "@/api/types.gen";
+import type { PracticeEvidenceDeclaration, PracticeEvidenceValidation } from "@/api/types.gen";
+
+export const mockAuthorDeclaredEvidenceValidation = {
+	status: "AUTHOR_DECLARED",
+	sourceContractVersion: "1.0.0",
+	declarationDigest: "0".repeat(64),
+} satisfies PracticeEvidenceValidation;
 
 export const mockPullRequestEvidence = {
 	sourceContractVersion: "1.0.0",

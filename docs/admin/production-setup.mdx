@@ -222,7 +222,8 @@ Practice review is not enabled by a single flag. The following settings must be 
 | `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
 | `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
 | `AGENT_ENABLED` | Enables the PostgreSQL-backed agent job queue and executor |
-| `GIT_CHECKOUT_ENABLED` | Enables local repo checkout and bind-mount into agent containers |
+| `GIT_CHECKOUT_ENABLED` | Enables local repository checkout used to materialize declared evidence |
+| `HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS` | Comma-separated deployment allowlist of source kinds. Empty by default; use `*` only after the controller has approved every source in the selected contract. |
 | `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
 | `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
 
@@ -243,7 +244,7 @@ The agent job queue (`agent_job`, polled by `AgentJobExecutor`) exposes its own 
 
 The queue-health gauges are sampled every 30s; timers and counters are recorded inline. None run on a request path.
 
-**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL` past that age; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row outright past that age. Both accept an ISO-8601 duration. The defaults are deliberately generous — tighten them only if storage pressure demands it, since a stripped-but-present row is still useful for a "how many jobs ran" count even after its diagnostic payload is gone.
+**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row and its durable evidence snapshot. Replay directories and unreferenced CAS blobs use `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` (default `30`, positive integer). Tighten these only against the deployment's approved retention policy.
 
 ### Rollout tiers
 

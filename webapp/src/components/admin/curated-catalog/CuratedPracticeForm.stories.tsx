@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
-import { mockPullRequestEvidence } from "@/mocks/fixtures/practice";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPullRequestEvidence,
+} from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { CuratedPracticeForm } from "./CuratedPracticeForm";
@@ -20,6 +23,8 @@ const initialData = {
 	whyItMatters: "Reviewers should not need to reconstruct the author's intent.",
 	whatGoodLooksLike: "The description states why, what changed, and how it was verified.",
 	precomputeScript: "export default function precompute() { return {}; }",
+	evidence: mockPullRequestEvidence,
+	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 	status: {
 		etag: "tag",
 		state: "FROM_HEPHAESTUS" as const,
@@ -100,6 +105,7 @@ export const HephaestusUpdateAvailable: Story = {
 				triggerEvents: ["PullRequestCreated"],
 				criteria: "The updated default criteria",
 				evidence: mockPullRequestEvidence,
+				evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},
 		},

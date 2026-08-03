@@ -6,11 +6,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.ContextManifestBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
@@ -23,6 +25,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReport;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
@@ -221,8 +224,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             )
             .thenReturn(prepared(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8))));
         lenient()
-            .when(workspaceContextBuilder.readyPractices(any(), any(), anyString(), any()))
-            .thenAnswer(invocation -> invocation.getArgument(1));
+            .when(workspaceContextBuilder.prepareReadiness(any(), any(), anyString(), any()))
+            .thenAnswer(invocation -> readiness(invocation.getArgument(1)));
         lenient()
             .when(workspaceContextBuilder.restrictTo(any(), any()))
             .thenAnswer(invocation -> invocation.getArgument(0));
@@ -238,6 +241,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     private PreparedEvidence prepared(Map<String, byte[]> files) {
         return new PreparedEvidence(files, org.mockito.Mockito.mock(ArtifactSourceManifest.class));
+    }
+
+    private ContextManifestBuilder.PreparedReadiness readiness(List<Practice> practices) {
+        return new ContextManifestBuilder.PreparedReadiness(practices, mock(PracticeReadinessReport.class));
     }
 
     @Nested
@@ -281,14 +288,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    class PrepareInputFiles {
+    class PrepareInputs {
 
         @Test
         void delegatesToWorkspaceContextBuilder() {
             stubDefaults();
             AgentJob job = jobWithMetadata(sampleJobMetadata());
 
-            handler.prepareInputFiles(job);
+            handler.prepareInputs(job);
 
             ArgumentCaptor<ContextRequest> captor = ArgumentCaptor.forClass(ContextRequest.class);
             verify(workspaceContextBuilder).prepare(captor.capture(), any(EvidencePlan.class));
@@ -305,8 +312,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     any(EvidencePlan.class)
                 )
             ).thenReturn(prepared(Map.of("inputs/context/metadata.json", metadataBytes)));
-            when(workspaceContextBuilder.readyPractices(any(), any(), anyString(), any())).thenAnswer(invocation ->
-                invocation.getArgument(1)
+            when(workspaceContextBuilder.prepareReadiness(any(), any(), anyString(), any())).thenAnswer(invocation ->
+                readiness(invocation.getArgument(1))
             );
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
@@ -315,7 +322,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 )
             ).thenReturn(samplePractices());
 
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+            Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
 
             assertThat(files.get("inputs/context/metadata.json")).isEqualTo(metadataBytes);
         }
@@ -323,7 +330,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void writesTaskJsonEnvelope() throws Exception {
             stubDefaults();
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+            Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
 
             assertThat(files).containsKey("task.json");
             JsonNode envelope = objectMapper.readTree(files.get("task.json"));
@@ -339,7 +346,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void injectsPracticeCatalog() {
             stubDefaults();
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+            Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
 
             assertThat(files).containsKey("inputs/practices/index.json");
             assertThat(files).containsKey("inputs/practices/all-criteria.md");
@@ -351,7 +358,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void doesNotWriteLegacyPromptFile() {
             stubDefaults();
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+            Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
             assertThat(files).doesNotContainKey(".prompt");
         }
 
@@ -364,7 +371,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 )
             ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
 
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
+            assertThatThrownBy(() -> handler.prepareInputs(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("Practice slug fails ABI pattern");
         }
@@ -378,7 +385,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 )
             ).thenReturn(List.of());
 
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
+            assertThatThrownBy(() -> handler.prepareInputs(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("No active PULL_REQUEST practices");
             verifyNoInteractions(workspaceContextBuilder);
@@ -388,7 +395,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void throwsWhenMetadataMissing() {
             var job = new AgentJob();
             job.setMetadata(null);
-            assertThatThrownBy(() -> handler.prepareInputFiles(job))
+            assertThatThrownBy(() -> handler.prepareInputs(job))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("no metadata");
         }
@@ -400,8 +407,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             providerFiles.put("inputs/context/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
             providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.prepare(any(), any())).thenReturn(prepared(providerFiles));
-            when(workspaceContextBuilder.readyPractices(any(), any(), anyString(), any())).thenAnswer(invocation ->
-                invocation.getArgument(1)
+            when(workspaceContextBuilder.prepareReadiness(any(), any(), anyString(), any())).thenAnswer(invocation ->
+                readiness(invocation.getArgument(1))
             );
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
@@ -410,7 +417,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 )
             ).thenReturn(samplePractices());
 
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+            Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
 
             // First three entries must be the provider files in their original order
             var keys = files.keySet().iterator();
@@ -693,6 +700,15 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 .orElseThrow();
             assertThat(secret.presence()).isEqualTo(Presence.PRESENT);
             assertThat(secret.assessment()).isEqualTo(Assessment.BAD);
+            assertThat(secret.reasoning()).doesNotContain("AKIA1234567890ABCDEF");
+            JsonNode evidence = secret.evidence();
+            assertThat(evidence.toString()).doesNotContain("AKIA1234567890ABCDEF");
+            assertThat(evidence.path("detector").asString()).isEqualTo("secret-diff-scanner");
+            JsonNode citation = evidence.path("citations").get(0);
+            assertThat(citation.has("quote")).isFalse();
+            assertThat(citation.path("quoteSha256").asString()).isEqualTo(
+                "b2b88104bf5c02259227480b0eabe2f9b7d63501e03e788b7b82a499b818e12a"
+            );
         }
 
         @Test

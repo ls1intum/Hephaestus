@@ -1,3 +1,4 @@
+import { CircleHelp, ClockAlert } from "lucide-react";
 import type {
 	ReviewFeedback,
 	ReviewFeedbackCounts,
@@ -5,6 +6,7 @@ import type {
 	ReviewFinding,
 	ReviewFindingCounts,
 } from "@/api/types.gen";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
 	ASSESSMENT_LABELS,
@@ -45,8 +47,25 @@ export function ClaimStatusBadge({ status }: { status: ReviewFinding["claimStatu
 	if (status === "CURRENT") return null;
 	return (
 		<Badge variant={status === "STALE" ? "warning" : "outline"}>
-			{status === "STALE" ? "Outdated result" : "Current status unknown"}
+			{status === "STALE" ? "Outdated result" : "Claim validity unknown"}
 		</Badge>
+	);
+}
+
+export function ClaimStatusAlert({ status }: { status: ReviewFinding["claimStatus"] }) {
+	if (status === "CURRENT") return null;
+	const stale = status === "STALE";
+	const Icon = stale ? ClockAlert : CircleHelp;
+	return (
+		<Alert variant="warning">
+			<Icon />
+			<AlertTitle>{stale ? "This result is outdated" : "This claim cannot be verified"}</AlertTitle>
+			<AlertDescription>
+				{stale
+					? "The practice definition has changed since this result was produced. Keep it as history, not as a current assessment."
+					: "The provenance needed to compare this result with the current practice is unavailable. Do not treat it as a current assessment."}
+			</AlertDescription>
+		</Alert>
 	);
 }
 

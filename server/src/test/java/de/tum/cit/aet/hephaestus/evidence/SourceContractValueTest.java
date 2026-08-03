@@ -82,4 +82,72 @@ class SourceContractValueTest {
             RuntimeException.class
         );
     }
+
+    @Test
+    void shouldRejectEmptyManifestAndReadinessCollections() {
+        Instant now = Instant.parse("2026-08-03T10:00:00Z");
+
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            new ArtifactSourceManifest(
+                new SourceContractVersion("1.0.0"),
+                "a".repeat(64),
+                new EvidenceProfileId("pull-request-review"),
+                now,
+                List.of(),
+                List.of()
+            )
+        );
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            new PracticeReadinessDecision("review-quality", now, true, List.of())
+        );
+    }
+
+    @Test
+    void shouldEnforceAssessmentReasonCodeSemantics() {
+        Instant now = Instant.parse("2026-08-03T10:00:00Z");
+        SourceKind kind = new SourceKind("scm.pull-request.diff");
+        SourceContractVersion version = new SourceContractVersion("1.0.0");
+
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            new EvidenceAssessment(kind, version, now, now, SourceFreshness.CURRENT, true, List.of("STALE"))
+        );
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            new EvidenceAssessment(kind, version, now, now, SourceFreshness.STALE, false, List.of("STALE", "STALE"))
+        );
+    }
+
+    @Test
+    void shouldRejectNonCanonicalArtifactPaths() {
+        for (String path : List.of("foo/..", "foo/../bar", "./foo", "foo\\bar")) {
+            assertThatIllegalArgumentException().isThrownBy(() ->
+                new SourceArtifact(path, "application/json", "a".repeat(64), 1)
+            );
+        }
+    }
+
+    @Test
+    void shouldRejectDuplicateArtifactPathsInACapture() {
+        SourceArtifact first = new SourceArtifact("context.json", "application/json", "a".repeat(64), 1);
+        SourceArtifact second = new SourceArtifact("context.json", "application/json", "b".repeat(64), 2);
+
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            new SourceCapture(
+                new SourceKind("scm.pull-request.core"),
+                new SourceCaptureState.Available(
+                    SourceContentState.NON_EMPTY,
+                    SourceCompleteness.COMPLETE,
+                    new SourceCaptureFacts(
+                        Instant.parse("2026-08-03T10:00:00Z"),
+                        null,
+                        null,
+                        null,
+                        "one pull request",
+                        CompletenessBasis.IMMUTABLE_OBJECT,
+                        RepresentationFidelity.EXACT
+                    )
+                ),
+                List.of(first, second)
+            )
+        );
+    }
 }

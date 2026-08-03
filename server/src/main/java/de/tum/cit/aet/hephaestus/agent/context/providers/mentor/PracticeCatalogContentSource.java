@@ -41,11 +41,6 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class PracticeCatalogContentSource implements ContentSource {
 
-    @Override
-    public String originId() {
-        return "core";
-    }
-
     /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_catalog.json";
 

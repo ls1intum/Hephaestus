@@ -22,7 +22,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Materialises {@code inputs/context/prepared_conversation_feedback.json} for a {@link MentorChatRequest}: the newest
  * PREPARED conversational feedback units queued for the requesting developer - the mentor's "raise these next"
  * shortlist. Facts + practice only, never a body (a PREPARED unit carries a NULL body by construction; the
- * mentor composes the wording at delivery). {@code originId="core"}. Best-effort.
+ * mentor composes the wording at delivery). Best-effort.
  *
  * <p><strong>Consent gate.</strong> CONVERSATION_THREAD-derived facts are consent-filtered before inclusion, and
  * this payload always carries the {@code UNTRUSTED_EXTERNAL} quarantine envelope; see {@link ConversationConsentGate}
@@ -48,11 +48,6 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.consentGate = consentGate;
         this.objectMapper = objectMapper;
-    }
-
-    @Override
-    public String originId() {
-        return "core";
     }
 
     @Override

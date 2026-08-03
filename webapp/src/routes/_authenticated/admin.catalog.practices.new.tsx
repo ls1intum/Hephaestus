@@ -66,12 +66,7 @@ function NewCuratedPracticePage() {
 			}))}
 			isPending={createPractice.isPending}
 			onSubmit={({ slug, ...definition }: CuratedPracticeFormValue) =>
-				createPractice.mutate({
-					body: {
-						slug,
-						definition,
-					},
-				})
+				createPractice.mutate({ body: { slug, definition } })
 			}
 		/>
 	);

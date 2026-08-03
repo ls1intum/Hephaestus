@@ -50,20 +50,6 @@ public record CuratedPracticeRequestDTO(
 
     @Size(max = 64, message = "Area slug must be at most 64 characters") @Nullable String areaSlug
 ) {
-    public static CuratedPracticeRequestDTO of(PracticeDefinition definition) {
-        return new CuratedPracticeRequestDTO(
-            definition.name(),
-            definition.artifactType(),
-            definition.triggerEvents(),
-            definition.criteria(),
-            definition.precomputeScript(),
-            definition.evidence(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike(),
-            definition.areaSlug()
-        );
-    }
-
     public PracticeDefinition definition(PracticeEvidenceDeclaration resolvedEvidence) {
         return new PracticeDefinition(
             name,

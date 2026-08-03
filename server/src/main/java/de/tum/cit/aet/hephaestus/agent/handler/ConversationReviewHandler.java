@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
+import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
@@ -11,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
@@ -113,7 +115,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
     }
 
     @Override
-    public Map<String, byte[]> prepareInputFiles(AgentJob job) {
+    public PreparedJobInputs prepareInputs(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
@@ -126,21 +128,26 @@ public class ConversationReviewHandler implements JobTypeHandler {
             new ContextRequest.ConversationReviewRequest(job),
             EvidencePlan.compile(practices)
         );
-        practices = workspaceContextBuilder.readyPractices(
+        var artifactSourceManifest = prepared.manifest();
+        var readiness = workspaceContextBuilder.prepareReadiness(
             prepared.manifest(),
             practices,
             job.getId().toString(),
             job.getCreatedAt()
         );
+        practices = readiness.readyPractices();
         if (practices.isEmpty()) {
-            throw new JobPreparationException("No practice has sufficient evidence: jobId=" + job.getId());
+            throw new InsufficientEvidenceException(
+                "No practice has sufficient evidence: jobId=" + job.getId(),
+                new PreparedJobInputs(prepared.files(), artifactSourceManifest, readiness.report())
+            );
         }
         prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, WorkArtifact.CONVERSATION_THREAD, practices);
         log.info("Conversation context preparation complete: {} files, jobId={}", files.size(), job.getId());
-        return files;
+        return new PreparedJobInputs(files, artifactSourceManifest, readiness.report());
     }
 
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {

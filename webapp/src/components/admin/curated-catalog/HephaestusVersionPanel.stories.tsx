@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
-import { mockPullRequestEvidence } from "@/mocks/fixtures/practice";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPullRequestEvidence,
+} from "@/mocks/fixtures/practice";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
@@ -19,6 +22,7 @@ const shipped = {
 	criteria: "The updated default criteria.",
 	whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 	evidence: mockPullRequestEvidence,
+	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
 const meta = {
@@ -69,8 +73,9 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("Starts a review when")).toBeVisible();
 		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
-		await expect(canvas.getByText(/Observability: Semantic/)).toBeVisible();
-		await expect(canvas.getByText(/scm\.pull-request\.core \(complete, current\)/)).toBeVisible();
+		await expect(canvas.getByText("Author-declared observability")).toBeVisible();
+		await expect(canvas.getByText("scm.pull-request.core")).toBeVisible();
+		await expect(canvas.getByText("Not independently validated")).toBeVisible();
 		await expect(canvas.getByText(/RUNTIME_BEHAVIOR_NOT_OBSERVED/)).toBeVisible();
 		await expect(canvas.queryByText("PullRequestCreated")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("button", { name: "Keep saved version" })).toBeVisible();

@@ -60,6 +60,8 @@ hephaestus:
     runtime:
         worker:
             enabled: false
+    evidence:
+        authorized-source-kinds: "*"
     # Loud enforcement under test: any unguarded scoped-table query throws.
     # Production runs in 'log' mode for the staging canary period; this override
     # ensures tenancy bugs surface in CI rather than being masked.
