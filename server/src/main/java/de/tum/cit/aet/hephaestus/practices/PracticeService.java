@@ -192,6 +192,7 @@ public class PracticeService {
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
+        practice.setActive(definition.evidence().detectorCapability().supportsAutomatedDetection());
         definitionValidator.validate(definition);
 
         try {
@@ -273,7 +274,11 @@ public class PracticeService {
         if (request.area() != null) {
             practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
         }
+        boolean wasActive = practice.isActive();
         applyDefinition(practice, afterDefinition);
+        if (!afterDefinition.evidence().detectorCapability().supportsAutomatedDetection()) {
+            practice.setActive(false);
+        }
         definitionValidator.validate(afterDefinition);
         practice = practiceRepository.save(practice);
         revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
@@ -286,6 +291,17 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
+        if (wasActive && !practice.isActive()) {
+            configAudit.record(
+                ConfigAuditEntry.updated(
+                    ConfigAuditEntityType.PRACTICE_ACTIVE,
+                    practice.getId(),
+                    ctx.id(),
+                    new PracticeActiveSnapshot(true),
+                    new PracticeActiveSnapshot(false)
+                )
+            );
+        }
         log.info("Updated practice '{}' (slug={}) in workspace {}", practice.getName(), slug, ctx.slug());
         return practice;
     }
@@ -299,6 +315,11 @@ public class PracticeService {
 
         if (practice.isActive() == active) {
             return practice;
+        }
+        if (active && !practice.getEvidence().detectorCapability().supportsAutomatedDetection()) {
+            throw new IllegalArgumentException(
+                "This practice cannot be used in automated reviews with its current detector capability"
+            );
         }
 
         practice.setActive(active);

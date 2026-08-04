@@ -12,7 +12,7 @@ public record EvidenceAssessment(
     Instant temporalAnchor,
     SourceFreshness freshness,
     boolean acceptable,
-    List<String> reasonCodes
+    List<EvidenceAssessmentReason> reasonCodes
 ) {
     public EvidenceAssessment {
         Objects.requireNonNull(kind, "kind");
@@ -21,9 +21,6 @@ public record EvidenceAssessment(
         Objects.requireNonNull(temporalAnchor, "temporalAnchor");
         Objects.requireNonNull(freshness, "freshness");
         reasonCodes = List.copyOf(Objects.requireNonNull(reasonCodes, "reasonCodes"));
-        if (reasonCodes.stream().anyMatch(code -> code == null || !code.matches("[A-Z][A-Z0-9_]*"))) {
-            throw new IllegalArgumentException("Invalid evidence assessment reason code");
-        }
         if (new HashSet<>(reasonCodes).size() != reasonCodes.size()) {
             throw new IllegalArgumentException("Evidence assessment reason codes must be unique");
         }

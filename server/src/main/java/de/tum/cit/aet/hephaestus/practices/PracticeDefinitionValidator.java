@@ -79,10 +79,6 @@ public final class PracticeDefinitionValidator {
         if (!profile.artifactType().equals(artifactType.name())) {
             throw new IllegalArgumentException("Evidence profile is not available for the selected work type");
         }
-        if (declaration.required().isEmpty()) {
-            throw new IllegalArgumentException("Declare at least one required evidence source");
-        }
-
         Set<SourceKind> required = validateRequirements(profile, declaration, declaration.required());
         Set<SourceKind> optional = validateOptionalRequirements(profile, declaration);
         if (required.stream().anyMatch(optional::contains)) {

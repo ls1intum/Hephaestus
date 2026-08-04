@@ -29,7 +29,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-core": {
       "sourceContractVersion": "1.0.0",
@@ -49,7 +52,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-core-diff-linked-work-items": {
       "sourceContractVersion": "1.0.0",
@@ -79,7 +85,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-core-review-threads": {
       "sourceContractVersion": "1.0.0",
@@ -104,7 +113,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-review-threads": {
       "sourceContractVersion": "1.0.0",
@@ -124,7 +136,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "issue-core-comments": {
       "sourceContractVersion": "1.0.0",
@@ -149,7 +164,10 @@
           "summary": "Issue evidence does not establish whether the described work was implemented correctly."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "issue-core": {
       "sourceContractVersion": "1.0.0",
@@ -169,7 +187,10 @@
           "summary": "Issue evidence does not establish whether the described work was implemented correctly."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-core-diff-comments-general-review-comments": {
       "sourceContractVersion": "1.0.0",
@@ -204,7 +225,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-core-comments-general-review-comments": {
       "sourceContractVersion": "1.0.0",
@@ -234,7 +258,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-core-diff-comments-general-review-comments-review-threads": {
       "sourceContractVersion": "1.0.0",
@@ -274,7 +301,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-diff": {
       "sourceContractVersion": "1.0.0",
@@ -294,7 +324,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "pull-request-core-diff-linked-work-items-documents": {
       "sourceContractVersion": "1.0.0",
@@ -329,7 +362,10 @@
           "summary": "Repository evidence does not establish behavior in a deployed runtime."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     },
     "conversation-thread": {
       "sourceContractVersion": "1.0.0",
@@ -349,7 +385,10 @@
           "summary": "The captured thread does not include decisions or context shared outside the conversation."
         }
       ],
-      "observability": "SEMANTIC"
+      "detectorCapability": {
+        "assessmentMethod": "SEMANTIC",
+        "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+      }
     }
   },
   "areas": [

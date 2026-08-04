@@ -134,6 +134,39 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         );
     }
 
+    private CreatePracticeRequestDTO withEvidence(
+        CreatePracticeRequestDTO request,
+        PracticeEvidenceDeclaration evidence
+    ) {
+        return new CreatePracticeRequestDTO(
+            request.slug(),
+            request.name(),
+            request.triggerEvents(),
+            request.criteria(),
+            request.precomputeScript(),
+            evidence,
+            request.artifactType(),
+            request.whyItMatters(),
+            request.whatGoodLooksLike(),
+            request.areaSlug()
+        );
+    }
+
+    private static PracticeEvidenceDeclaration withoutDetector(PracticeEvidenceDeclaration evidence) {
+        return new PracticeEvidenceDeclaration(
+            evidence.sourceContractVersion(),
+            evidence.profile(),
+            new PracticeDetectorCapability(
+                PracticeDetectorAssessmentMethod.NONE,
+                PracticeDetectorEvidenceCoverage.NONE
+            ),
+            List.of(),
+            List.of(),
+            evidence.onUnsatisfied(),
+            evidence.blindSpots()
+        );
+    }
+
     private Consumer<HttpHeaders> withCsrfForAnonymousWrite() {
         return TestAuthUtils.withCsrf(TestAuthUtils.fetchCsrfToken(webTestClient));
     }
@@ -429,6 +462,30 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
             assertThat(result.active()).isTrue();
             assertThat(result.evidence()).isEqualTo(evidenceDefaults.forArtifact(WorkArtifact.PULL_REQUEST));
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldCreatePracticeInactiveWhenHephaestusCannotDetectIt() {
+            ensureAdminMembership(workspace);
+            CreatePracticeRequestDTO baseline = validCreateRequest("human-assessment-only");
+            var request = withEvidence(baseline, withoutDetector(baseline.evidence()));
+
+            PracticeDTO result = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.active()).isFalse();
         }
 
         @Test
@@ -1467,6 +1524,25 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.active()).isTrue();
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldRejectActivationWithoutSupportedDetectorCoverage() {
+            ensureAdminMembership(workspace);
+            Practice practice = persistPractice("human-only", "Human only", false);
+            practice.setEvidence(withoutDetector(practice.getEvidence()));
+            practiceRepository.save(practice);
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "human-only")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeActiveRequestDTO(true))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
         }
 
         @Test

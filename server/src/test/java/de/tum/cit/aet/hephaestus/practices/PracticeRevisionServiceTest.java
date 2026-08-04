@@ -99,7 +99,10 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
             new PracticeEvidenceDeclaration(
                 practice.getEvidence().sourceContractVersion(),
                 practice.getEvidence().profile(),
-                PracticeObservability.SEMANTIC,
+                new PracticeDetectorCapability(
+                    PracticeDetectorAssessmentMethod.SEMANTIC,
+                    PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+                ),
                 List.of(
                     new PracticeEvidenceRequirement(
                         new de.tum.cit.aet.hephaestus.evidence.SourceKind("scm.pull-request.diff"),

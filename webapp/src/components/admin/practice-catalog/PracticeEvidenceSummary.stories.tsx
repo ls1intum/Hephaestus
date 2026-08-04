@@ -12,7 +12,7 @@ const meta = {
 			sourceContractVersion: "1.0.0",
 			declarationDigest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			validatedAt: new Date("2026-01-15T10:00:00Z"),
-			validator: "Independent observability review",
+			validator: "Independent detector evidence review",
 			validationReference: "review-1437",
 		},
 	},

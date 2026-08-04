@@ -71,6 +71,9 @@ const validateReadinessSemantics = (value, label) => {
 			"kind",
 			`${label} practice '${decision.practiceSlug}' assessment`,
 		);
+		if (new Set(decision.reasonCodes).size !== decision.reasonCodes.length) {
+			throw new Error(`${label} practice '${decision.practiceSlug}' repeats a reason code`);
+		}
 		for (const assessment of decision.assessments) {
 			if (new Set(assessment.reasonCodes).size !== assessment.reasonCodes.length) {
 				throw new Error(`${label} assessment '${assessment.kind}' repeats a reason code`);
@@ -79,7 +82,11 @@ const validateReadinessSemantics = (value, label) => {
 				throw new Error(`${label} assessment '${assessment.kind}' has inconsistent reason codes`);
 			}
 		}
-		if (decision.ready !== decision.assessments.every((assessment) => assessment.acceptable)) {
+		if (
+			decision.ready !==
+			(decision.reasonCodes.length === 0 &&
+				decision.assessments.every((assessment) => assessment.acceptable))
+		) {
 			throw new Error(`${label} practice '${decision.practiceSlug}' has an inconsistent ready outcome`);
 		}
 	}
@@ -224,6 +231,37 @@ if (ajv.validate(evidenceSchema, invalidOptional)) {
 	throw new Error("practice evidence schema accepted quality constraints on an optional source");
 }
 
+const withoutDetector = structuredClone(Object.values(practiceCatalog.evidenceDeclarations)[0]);
+withoutDetector.detectorCapability = { assessmentMethod: "NONE", evidenceCoverage: "NONE" };
+withoutDetector.required = [];
+withoutDetector.optional = [];
+validate(evidenceSchema, withoutDetector, "valid no-detector declaration fixture");
+
+const expectSchemaRejection = (label, mutate) => {
+	const declaration = structuredClone(Object.values(practiceCatalog.evidenceDeclarations)[0]);
+	mutate(declaration);
+	if (ajv.validate(evidenceSchema, declaration)) {
+		throw new Error(`practice evidence schema accepted ${label}`);
+	}
+};
+
+expectSchemaRejection("legacy observability property", (declaration) => {
+	declaration.observability = "SEMANTIC";
+	delete declaration.detectorCapability;
+});
+expectSchemaRejection("incoherent detector capability", (declaration) => {
+	declaration.detectorCapability = {
+		assessmentMethod: "NONE",
+		evidenceCoverage: "DECLARED_REQUIREMENTS_SUFFICIENT",
+	};
+});
+expectSchemaRejection("detector evidence on a human-only practice", (declaration) => {
+	declaration.detectorCapability = { assessmentMethod: "NONE", evidenceCoverage: "NONE" };
+});
+expectSchemaRejection("detector without required evidence", (declaration) => {
+	declaration.required = [];
+});
+
 const expectSemanticRejection = (mutate, expected) => {
 	const declaration = structuredClone(Object.values(practiceCatalog.evidenceDeclarations)[0]);
 	mutate(declaration);
@@ -322,10 +360,31 @@ const readiness = {
 	profileId: "pull-request-review",
 	manifestCapturedAt: "2026-08-03T00:00:00Z",
 	decidedAt: "2026-08-03T00:00:00Z",
-	decisions: [{ practiceSlug: "example", decidedAt: "2026-08-03T00:00:00Z", ready: true, assessments: [assessment] }],
+	decisions: [
+		{
+			practiceSlug: "example",
+			decidedAt: "2026-08-03T00:00:00Z",
+			ready: true,
+			reasonCodes: [],
+			assessments: [assessment],
+		},
+	],
 };
 validate(readinessSchema, readiness, "valid readiness fixture");
 validateReadinessSemantics(readiness, "valid readiness fixture");
+const detectorRefusal = {
+	...readiness,
+	decisions: [
+		{
+			...readiness.decisions[0],
+			ready: false,
+			reasonCodes: ["PRACTICE_NOT_DETECTABLE_BY_HEPHAESTUS"],
+			assessments: [],
+		},
+	],
+};
+validate(readinessSchema, detectorRefusal, "valid detector refusal fixture");
+validateReadinessSemantics(detectorRefusal, "valid detector refusal fixture");
 for (const [label, decision] of [
 	["zero assessments", { ...readiness.decisions[0], assessments: [] }],
 	["duplicate assessment", { ...readiness.decisions[0], assessments: [assessment, structuredClone(assessment)] }],

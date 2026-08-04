@@ -26,7 +26,10 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
             new PracticeEvidenceDeclaration(
                 new SourceContractVersion("1.0.0"),
                 new EvidenceProfileId("pull-request-review"),
-                PracticeObservability.SEMANTIC,
+                new PracticeDetectorCapability(
+                    PracticeDetectorAssessmentMethod.SEMANTIC,
+                    PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+                ),
                 List.of(
                     new PracticeEvidenceRequirement(
                         new SourceKind("scm.pull-request.diff"),

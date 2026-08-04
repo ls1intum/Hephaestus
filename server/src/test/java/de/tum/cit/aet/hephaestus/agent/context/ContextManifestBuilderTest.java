@@ -10,8 +10,10 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessment;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
@@ -22,10 +24,12 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
+import de.tum.cit.aet.hephaestus.practices.PracticeDetectorAssessmentMethod;
+import de.tum.cit.aet.hephaestus.practices.PracticeDetectorCapability;
+import de.tum.cit.aet.hephaestus.practices.PracticeDetectorEvidenceCoverage;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRefusal;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
-import de.tum.cit.aet.hephaestus.practices.PracticeObservability;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -162,6 +166,48 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(
             builder.assessPractices(manifest, List.of(practiceRequiring(CORE, "pr-core"))).readyPractices()
         ).isEmpty();
+    }
+
+    @Test
+    void shouldDeclineDetectorScopesThatCannotYetProduceASafeAutomatedJudgment() {
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-detector-scope", NOW);
+        List<PracticeDetectorCapability> capabilities = List.of(
+            new PracticeDetectorCapability(
+                PracticeDetectorAssessmentMethod.SEMANTIC,
+                PracticeDetectorEvidenceCoverage.CONDITIONAL
+            ),
+            new PracticeDetectorCapability(PracticeDetectorAssessmentMethod.NONE, PracticeDetectorEvidenceCoverage.NONE)
+        );
+        List<PracticeReadinessReason> expectedReasons = List.of(
+            PracticeReadinessReason.CONDITIONAL_DETECTABILITY_UNSUPPORTED,
+            PracticeReadinessReason.PRACTICE_NOT_DETECTABLE_BY_HEPHAESTUS
+        );
+
+        for (int index = 0; index < capabilities.size(); index++) {
+            Practice practice = practiceRequiring(CORE, "detector-scope-" + index);
+            boolean detectorAbsent =
+                capabilities.get(index).assessmentMethod() == PracticeDetectorAssessmentMethod.NONE;
+            practice.setEvidence(
+                new PracticeEvidenceDeclaration(
+                    practice.getEvidence().sourceContractVersion(),
+                    practice.getEvidence().profile(),
+                    capabilities.get(index),
+                    detectorAbsent ? List.of() : practice.getEvidence().required(),
+                    detectorAbsent ? List.of() : practice.getEvidence().optional(),
+                    practice.getEvidence().onUnsatisfied(),
+                    practice.getEvidence().blindSpots()
+                )
+            );
+
+            PracticeReadinessResult result = builder.assessPractices(manifest, List.of(practice));
+            assertThat(result.readyPractices()).isEmpty();
+            assertThat(result.decisions().getFirst().reasonCodes()).containsExactly(expectedReasons.get(index));
+            if (detectorAbsent) {
+                assertThat(result.decisions().getFirst().assessments()).isEmpty();
+            } else {
+                assertThat(result.decisions().getFirst().assessments()).allMatch(EvidenceAssessment::acceptable);
+            }
+        }
     }
 
     @Test
@@ -552,7 +598,10 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 sourceKind.equals(CONVERSATION)
                     ? new EvidenceProfileId("conversation-review")
                     : new EvidenceProfileId("pull-request-review"),
-                PracticeObservability.SEMANTIC,
+                new PracticeDetectorCapability(
+                    PracticeDetectorAssessmentMethod.SEMANTIC,
+                    PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+                ),
                 List.of(
                     new PracticeEvidenceRequirement(sourceKind, EvidenceCompletenessRequirement.COMPLETE, freshness)
                 ),

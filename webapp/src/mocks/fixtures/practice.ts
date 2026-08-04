@@ -13,7 +13,10 @@ export const mockAuthorDeclaredEvidenceValidation = {
 export const mockPullRequestEvidence = {
 	sourceContractVersion: "1.0.0",
 	profile: "pull-request-review",
-	observability: "SEMANTIC",
+	detectorCapability: {
+		assessmentMethod: "SEMANTIC",
+		evidenceCoverage: "DECLARED_REQUIREMENTS_SUFFICIENT",
+	},
 	required: [
 		{ sourceKind: "scm.pull-request.core", completeness: "COMPLETE", freshness: "CURRENT" },
 		{ sourceKind: "scm.pull-request.diff", completeness: "COMPLETE", freshness: "CURRENT" },
@@ -31,7 +34,10 @@ export const mockPullRequestEvidence = {
 const mockIssueEvidence = {
 	sourceContractVersion: "1.0.0",
 	profile: "issue-review",
-	observability: "SEMANTIC",
+	detectorCapability: {
+		assessmentMethod: "SEMANTIC",
+		evidenceCoverage: "DECLARED_REQUIREMENTS_SUFFICIENT",
+	},
 	required: [{ sourceKind: "scm.issue.core", completeness: "COMPLETE", freshness: "CURRENT" }],
 	optional: [{ sourceKind: "scm.issue.comments", completeness: "ANY", freshness: "ANY" }],
 	onUnsatisfied: "DECLINE_SEMANTIC_JUDGMENT",
@@ -46,7 +52,10 @@ const mockIssueEvidence = {
 const mockConversationEvidence = {
 	sourceContractVersion: "1.0.0",
 	profile: "conversation-review",
-	observability: "SEMANTIC",
+	detectorCapability: {
+		assessmentMethod: "SEMANTIC",
+		evidenceCoverage: "DECLARED_REQUIREMENTS_SUFFICIENT",
+	},
 	required: [
 		{
 			sourceKind: "slack.conversation.thread",

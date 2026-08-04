@@ -39,7 +39,10 @@ public final class PracticeTestEvidence {
         return new PracticeEvidenceDeclaration(
             new SourceContractVersion("1.0.0"),
             new EvidenceProfileId(profile),
-            PracticeObservability.SEMANTIC,
+            new PracticeDetectorCapability(
+                PracticeDetectorAssessmentMethod.SEMANTIC,
+                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            ),
             kinds
                 .stream()
                 .map(kind ->

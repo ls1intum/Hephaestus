@@ -21,11 +21,18 @@ const VALIDATION_VARIANTS: Record<
 	SUPERSEDED: "warning",
 };
 
-const OBSERVABILITY_LABELS: Record<PracticeEvidenceDeclaration["observability"], string> = {
-	MECHANICAL: "Mechanically checkable",
-	SEMANTIC: "Meaning requires judgment",
-	CONDITIONALLY_OBSERVABLE: "Only observable in some cases",
-	UNOBSERVABLE: "Not observable",
+type DetectorCapability = PracticeEvidenceDeclaration["detectorCapability"];
+
+const ASSESSMENT_METHOD_LABELS: Record<DetectorCapability["assessmentMethod"], string> = {
+	MECHANICAL: "Declared mechanical assessment",
+	SEMANTIC: "Declared semantic assessment",
+	NONE: "Hephaestus cannot judge it",
+};
+
+const EVIDENCE_COVERAGE_LABELS: Record<DetectorCapability["evidenceCoverage"], string> = {
+	DECLARED_REQUIREMENTS_SUFFICIENT: "Declared evidence covers every case",
+	CONDITIONAL: "Declared evidence covers only some cases",
+	NONE: "No automated evidence coverage",
 };
 
 function Requirements({
@@ -98,8 +105,16 @@ export function PracticeEvidenceSummary({
 				</dd>
 			</div>
 			<div>
-				<dt className="font-medium">How it can be judged</dt>
-				<dd className="text-muted-foreground">{OBSERVABILITY_LABELS[declaration.observability]}</dd>
+				<dt className="font-medium">Hephaestus detectability</dt>
+				<dd className="text-muted-foreground">
+					{ASSESSMENT_METHOD_LABELS[declaration.detectorCapability.assessmentMethod]}
+					<span className="block">
+						{EVIDENCE_COVERAGE_LABELS[declaration.detectorCapability.evidenceCoverage]}
+					</span>
+					<span className="mt-1 block text-xs">
+						This does not classify what a practitioner, peer, or human mentor can observe.
+					</span>
+				</dd>
 			</div>
 			<div>
 				<dt className="font-medium">Required evidence</dt>

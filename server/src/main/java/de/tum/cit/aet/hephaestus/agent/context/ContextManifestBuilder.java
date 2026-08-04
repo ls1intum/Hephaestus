@@ -6,10 +6,12 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.CompletenessBasis;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessment;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessmentReason;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceViewTransformation;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
 import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
 import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.RepresentationFidelity;
 import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
@@ -27,7 +29,8 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
-import de.tum.cit.aet.hephaestus.practices.PracticeObservability;
+import de.tum.cit.aet.hephaestus.practices.PracticeDetectorAssessmentMethod;
+import de.tum.cit.aet.hephaestus.practices.PracticeDetectorEvidenceCoverage;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -279,6 +282,13 @@ public class ContextManifestBuilder {
                     "Practice evidence contract does not match manifest: " + practice.getSlug()
                 );
             }
+            List<PracticeReadinessReason> decisionReasons = new ArrayList<>();
+            if (declaration.detectorCapability().assessmentMethod() == PracticeDetectorAssessmentMethod.NONE) {
+                decisionReasons.add(PracticeReadinessReason.PRACTICE_NOT_DETECTABLE_BY_HEPHAESTUS);
+            }
+            if (declaration.detectorCapability().evidenceCoverage() == PracticeDetectorEvidenceCoverage.CONDITIONAL) {
+                decisionReasons.add(PracticeReadinessReason.CONDITIONAL_DETECTABILITY_UNSUPPORTED);
+            }
             List<EvidenceAssessment> assessments = new ArrayList<>();
             for (var requirement : declaration.required()) {
                 SourceCapture capture = captures.get(requirement.sourceKind());
@@ -294,19 +304,16 @@ public class ContextManifestBuilder {
                           manifest.capturedAt()
                       )
                     : SourceFreshness.UNKNOWN;
-                List<String> reasons = new ArrayList<>();
-                if (declaration.observability() == PracticeObservability.UNOBSERVABLE) {
-                    reasons.add("PRACTICE_UNOBSERVABLE");
-                }
-                if (!available) reasons.add("SOURCE_NOT_AVAILABLE");
+                List<EvidenceAssessmentReason> reasons = new ArrayList<>();
+                if (!available) reasons.add(EvidenceAssessmentReason.SOURCE_NOT_AVAILABLE);
                 if (
                     requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
                     completeness != SourceCompleteness.COMPLETE
-                ) reasons.add("COMPLETENESS_UNSATISFIED");
+                ) reasons.add(EvidenceAssessmentReason.COMPLETENESS_UNSATISFIED);
                 if (
                     requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
                     freshness != SourceFreshness.CURRENT
-                ) reasons.add("FRESHNESS_UNSATISFIED");
+                ) reasons.add(EvidenceAssessmentReason.FRESHNESS_UNSATISFIED);
                 assessments.add(
                     new EvidenceAssessment(
                         requirement.sourceKind(),
@@ -322,7 +329,8 @@ public class ContextManifestBuilder {
             PracticeReadinessDecision decision = new PracticeReadinessDecision(
                 practice.getSlug(),
                 assessedAt,
-                assessments.stream().allMatch(EvidenceAssessment::acceptable),
+                decisionReasons.isEmpty() && assessments.stream().allMatch(EvidenceAssessment::acceptable),
+                decisionReasons,
                 assessments
             );
             decisions.add(decision);

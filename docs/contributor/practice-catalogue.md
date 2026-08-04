@@ -84,7 +84,7 @@ color; position is excluded.
 
 A practice must:
 
-1. describe an observable habit within supported reviewed work;
+1. identify who is expected to assess the habit and from which context;
 2. distinguish evidence from inference and avoid claims that the code is correct;
 3. define applicability and the evidence required to report it;
 4. define false-positive exclusions and proportionate severity;
@@ -95,7 +95,8 @@ Evidence requirements use the versioned
 [artifact-source contract](./artifact-source-contract). They declare logical required/optional sources, minimum
 completeness/freshness, conservative refusal, and known blind spots. They must not infer availability
 from a missing file or require desired content to be non-empty. An author declaration is not independent
-observability validation.
+validation of Hephaestus detectability. It says nothing about what the practitioner, a peer, or a human mentor can
+observe outside the governed integrations.
 
 The detection fingerprint uses an explicit scheme prefix. Evidence-aware definitions use `v2`; stored `v1`
 fingerprints retain their original pre-contract meaning and never compare equal by accident.

@@ -27,7 +27,7 @@ export const Customizing: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
 		await expect(canvas.getByText("Code changes")).toBeVisible();
-		await expect(canvas.getByLabelText("How can this practice be judged?")).toBeVisible();
+		await expect(canvas.getByLabelText("How can Hephaestus assess this practice?")).toBeVisible();
 	},
 };
 

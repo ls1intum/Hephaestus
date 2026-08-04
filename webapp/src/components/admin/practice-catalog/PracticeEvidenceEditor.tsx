@@ -22,30 +22,47 @@ import { evidenceQualityLabel, evidenceSourceLabel } from "./evidence-presentati
 
 type EvidenceRole = "NOT_USED" | "OPTIONAL" | "REQUIRED";
 
-const OBSERVABILITY_OPTIONS: Array<{
-	value: PracticeEvidenceDeclaration["observability"];
+type DetectorCapability = PracticeEvidenceDeclaration["detectorCapability"];
+
+const ASSESSMENT_METHOD_OPTIONS: Array<{
+	value: DetectorCapability["assessmentMethod"];
 	label: string;
 	description: string;
 }> = [
 	{
 		value: "SEMANTIC",
-		label: "Meaning requires judgment",
-		description: "The evidence supports a reasoned assessment, usually with AI.",
+		label: "Declared semantic assessment",
+		description:
+			"The author expects Hephaestus to make a reasoned assessment from the configured sources.",
 	},
 	{
 		value: "MECHANICAL",
-		label: "Mechanically checkable",
-		description: "A deterministic rule can decide the practice from these inputs.",
+		label: "Declared mechanical assessment",
+		description: "The author expects a deterministic rule to decide from the configured sources.",
 	},
 	{
-		value: "CONDITIONALLY_OBSERVABLE",
-		label: "Only observable in some cases",
-		description: "Even complete evidence may not always support a judgment.",
+		value: "NONE",
+		label: "Hephaestus cannot judge it",
+		description: "The configured integrations cannot support an automated judgment.",
+	},
+];
+
+const COVERAGE_OPTIONS: Array<{
+	value: Exclude<DetectorCapability["evidenceCoverage"], "NONE">;
+	label: string;
+	description: string;
+}> = [
+	{
+		value: "DECLARED_REQUIREMENTS_SUFFICIENT",
+		label: "Enough whenever requirements pass",
+		description:
+			"The declared sources can support every automated judgment after their checks pass.",
 	},
 	{
-		value: "UNOBSERVABLE",
-		label: "Not observable",
-		description: "Hephaestus will always decline this practice.",
+		value: "CONDITIONAL",
+		label: "Enough only in some cases",
+		description:
+			"Some cases need context outside these sources. Automated review currently declines this coverage.",
 	},
 ];
 
@@ -98,7 +115,13 @@ function nextBlindSpotCode(declaration: PracticeEvidenceDeclaration) {
 }
 
 export function practiceEvidenceError(declaration: PracticeEvidenceDeclaration) {
-	if (declaration.required.length === 0) return "Choose at least one required evidence source.";
+	const detectorAbsent = declaration.detectorCapability.assessmentMethod === "NONE";
+	if (detectorAbsent && (declaration.required.length > 0 || declaration.optional.length > 0)) {
+		return "A practice without automated detection cannot declare detector evidence.";
+	}
+	if (!detectorAbsent && declaration.required.length === 0) {
+		return "Choose at least one required evidence source.";
+	}
 	for (const blindSpot of declaration.blindSpots) {
 		if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(blindSpot.code)) {
 			return "Limitation identifiers must use 3–64 uppercase letters, numbers, and underscores.";
@@ -133,13 +156,17 @@ export function PracticeEvidenceEditor({
 	const optionalSources = value.optional.map((requirement) =>
 		evidenceSourceLabel(requirement.sourceKind),
 	);
-	const observability = OBSERVABILITY_OPTIONS.find(
-		(option) => option.value === value.observability,
+	const assessmentMethod = ASSESSMENT_METHOD_OPTIONS.find(
+		(option) => option.value === value.detectorCapability.assessmentMethod,
+	);
+	const evidenceCoverage = COVERAGE_OPTIONS.find(
+		(option) => option.value === value.detectorCapability.evidenceCoverage,
 	);
 	const unavailableRequiredSources = value.required.filter((requirement) => {
 		const source = options.sources.find((item) => item.sourceKind === requirement.sourceKind);
 		return !source?.authorizedForDetection;
 	});
+	const detectorAbsent = value.detectorCapability.assessmentMethod === "NONE";
 
 	return (
 		<section className="space-y-4" aria-labelledby="practice-evidence-heading">
@@ -192,7 +219,9 @@ export function PracticeEvidenceEditor({
 								))}
 							</ul>
 						) : (
-							<p className="mt-1 text-destructive">No required source selected</p>
+							<p className="mt-1 text-muted-foreground">
+								{detectorAbsent ? "No detector evidence required" : "No required source selected"}
+							</p>
 						)}
 					</div>
 					<div>
@@ -203,7 +232,12 @@ export function PracticeEvidenceEditor({
 					</div>
 				</div>
 				<p className="mt-3 text-muted-foreground">
-					{observability?.label}. {observability?.description}
+					{assessmentMethod?.label}. {assessmentMethod?.description}
+					{evidenceCoverage && ` ${evidenceCoverage.label}.`}
+				</p>
+				<p className="mt-2 text-muted-foreground">
+					This describes Hephaestus, not people. The practitioner, a peer, or a human mentor may
+					observe context that the connected systems cannot provide.
 				</p>
 			</div>
 
@@ -253,6 +287,99 @@ export function PracticeEvidenceEditor({
 					</Button>
 				</div>
 				<CollapsibleContent className="mt-4 space-y-6">
+					<div className="grid gap-4 sm:grid-cols-2">
+						<Field>
+							<FieldLabel htmlFor="practice-detector-method">
+								How can Hephaestus assess this practice?
+							</FieldLabel>
+							<Select
+								disabled={disabled}
+								value={value.detectorCapability.assessmentMethod}
+								onValueChange={(assessmentMethod) => {
+									if (assessmentMethod === "NONE") {
+										onChange({
+											...value,
+											detectorCapability: { assessmentMethod: "NONE", evidenceCoverage: "NONE" },
+											required: [],
+											optional: [],
+										});
+										return;
+									}
+									onChange({
+										...value,
+										detectorCapability: {
+											assessmentMethod: assessmentMethod as Exclude<
+												DetectorCapability["assessmentMethod"],
+												"NONE"
+											>,
+											evidenceCoverage:
+												value.detectorCapability.evidenceCoverage === "NONE"
+													? "DECLARED_REQUIREMENTS_SUFFICIENT"
+													: value.detectorCapability.evidenceCoverage,
+										},
+										required:
+											value.required.length > 0 ? value.required : options.baseline.required,
+										optional:
+											value.required.length > 0 ? value.optional : options.baseline.optional,
+									});
+								}}
+							>
+								<SelectTrigger id="practice-detector-method">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{ASSESSMENT_METHOD_OPTIONS.map((option) => (
+										<SelectItem key={option.value} value={option.value}>
+											{option.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<FieldDescription>{assessmentMethod?.description}</FieldDescription>
+						</Field>
+
+						<Field>
+							<FieldLabel htmlFor="practice-detector-coverage">
+								When evidence checks pass, is it enough?
+							</FieldLabel>
+							<Select
+								disabled={disabled || value.detectorCapability.assessmentMethod === "NONE"}
+								value={value.detectorCapability.evidenceCoverage}
+								onValueChange={(evidenceCoverage) =>
+									onChange({
+										...value,
+										detectorCapability: {
+											...value.detectorCapability,
+											evidenceCoverage: evidenceCoverage as Exclude<
+												DetectorCapability["evidenceCoverage"],
+												"NONE"
+											>,
+										},
+									})
+								}
+							>
+								<SelectTrigger id="practice-detector-coverage">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{detectorAbsent ? (
+										<SelectItem value="NONE">Not applicable</SelectItem>
+									) : (
+										COVERAGE_OPTIONS.map((option) => (
+											<SelectItem key={option.value} value={option.value}>
+												{option.label}
+											</SelectItem>
+										))
+									)}
+								</SelectContent>
+							</Select>
+							<FieldDescription>
+								{value.detectorCapability.assessmentMethod === "NONE"
+									? "Not applicable without automated detection."
+									: evidenceCoverage?.description}
+							</FieldDescription>
+						</Field>
+					</div>
 					<FieldGroup className="gap-4">
 						{options.sources.map((source) => {
 							const role = roleOf(value, source.sourceKind);
@@ -280,7 +407,7 @@ export function PracticeEvidenceEditor({
 												Use in this practice
 											</FieldLabel>
 											<Select
-												disabled={disabled}
+												disabled={disabled || detectorAbsent}
 												value={role}
 												onValueChange={(nextRole) =>
 													onChange(withRole(value, source, nextRole as EvidenceRole))
@@ -304,7 +431,7 @@ export function PracticeEvidenceEditor({
 													Minimum completeness
 												</FieldLabel>
 												<Select
-													disabled={disabled}
+													disabled={disabled || detectorAbsent}
 													value={requirement.completeness}
 													onValueChange={(completeness) =>
 														onChange({
@@ -333,7 +460,7 @@ export function PracticeEvidenceEditor({
 													Minimum freshness
 												</FieldLabel>
 												<Select
-													disabled={disabled}
+													disabled={disabled || detectorAbsent}
 													value={requirement.freshness}
 													onValueChange={(freshness) =>
 														onChange({
@@ -363,34 +490,6 @@ export function PracticeEvidenceEditor({
 							);
 						})}
 					</FieldGroup>
-
-					<Field>
-						<FieldLabel htmlFor="practice-observability">
-							How can this practice be judged?
-						</FieldLabel>
-						<Select
-							disabled={disabled}
-							value={value.observability}
-							onValueChange={(observability) =>
-								onChange({
-									...value,
-									observability: observability as PracticeEvidenceDeclaration["observability"],
-								})
-							}
-						>
-							<SelectTrigger id="practice-observability">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{OBSERVABILITY_OPTIONS.map((option) => (
-									<SelectItem key={option.value} value={option.value}>
-										{option.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<FieldDescription>{observability?.description}</FieldDescription>
-					</Field>
 
 					<div className="space-y-3">
 						<div>
@@ -463,12 +562,23 @@ export function PracticeEvidenceEditor({
 				</CollapsibleContent>
 			</Collapsible>
 
-			{value.observability === "UNOBSERVABLE" && (
+			{value.detectorCapability.assessmentMethod === "NONE" && (
 				<Alert variant="warning">
 					<TriangleAlert />
-					<AlertTitle>This practice cannot produce a judgment</AlertTitle>
+					<AlertTitle>Hephaestus cannot judge this practice</AlertTitle>
 					<AlertDescription>
-						It can be saved for documentation, but every detection attempt will decline it.
+						It will be saved inactive and cannot be enabled for automated review. A person may still
+						assess it through a separate self, peer, or mentor process.
+					</AlertDescription>
+				</Alert>
+			)}
+			{value.detectorCapability.evidenceCoverage === "CONDITIONAL" && (
+				<Alert variant="warning">
+					<TriangleAlert />
+					<AlertTitle>Conditional automated judgment is not supported yet</AlertTitle>
+					<AlertDescription>
+						The practice will be saved inactive. Hephaestus will not confuse missing human context
+						with an applicable or inapplicable result.
 					</AlertDescription>
 				</Alert>
 			)}

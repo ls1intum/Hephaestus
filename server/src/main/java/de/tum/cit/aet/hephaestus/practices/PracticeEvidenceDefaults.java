@@ -75,7 +75,10 @@ public class PracticeEvidenceDefaults {
         return new PracticeEvidenceDeclaration(
             catalogs.current().version(),
             new EvidenceProfileId(profile),
-            PracticeObservability.SEMANTIC,
+            new PracticeDetectorCapability(
+                PracticeDetectorAssessmentMethod.SEMANTIC,
+                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            ),
             required,
             optional,
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,

@@ -991,6 +991,20 @@ export type OptionalPracticeEvidenceRequirement = {
 };
 
 /**
+ * Hephaestus detection capability for the declared integration evidence
+ */
+export type PracticeDetectorCapability = {
+    /**
+     * How Hephaestus evaluates a practice when its evidence is sufficient
+     */
+    assessmentMethod: 'MECHANICAL' | 'SEMANTIC' | 'NONE';
+    /**
+     * Whether the declared integration evidence can support every detector judgment
+     */
+    evidenceCoverage: 'DECLARED_REQUIREMENTS_SUFFICIENT' | 'CONDITIONAL' | 'NONE';
+};
+
+/**
  * Author-declared limitation that remains when required evidence is available
  */
 export type PracticeEvidenceBlindSpot = {
@@ -1003,7 +1017,10 @@ export type PracticeEvidenceBlindSpot = {
  */
 export type PracticeEvidenceDeclaration = {
     blindSpots: Array<PracticeEvidenceBlindSpot>;
-    observability: 'MECHANICAL' | 'SEMANTIC' | 'CONDITIONALLY_OBSERVABLE' | 'UNOBSERVABLE';
+    /**
+     * Hephaestus detectability from the declared integration evidence; not human observability
+     */
+    detectorCapability: PracticeDetectorCapability;
     onUnsatisfied: 'DECLINE_SEMANTIC_JUDGMENT';
     optional: Array<OptionalPracticeEvidenceRequirement>;
     profile: string;

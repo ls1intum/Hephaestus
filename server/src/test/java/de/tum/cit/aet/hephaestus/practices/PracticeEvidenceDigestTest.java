@@ -31,26 +31,61 @@ class PracticeEvidenceDigestTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldChangeWhenObservabilityChanges() {
+    void shouldIncludeDetectorMethodAndCoverage() {
         var required = List.of(requirement("scm.pull-request.diff"));
-
-        assertThat(PracticeEvidenceDigest.digest(declaration(required, PracticeObservability.SEMANTIC))).isNotEqualTo(
-            PracticeEvidenceDigest.digest(declaration(required, PracticeObservability.UNOBSERVABLE))
+        String baseline = PracticeEvidenceDigest.digest(
+            declaration(
+                required,
+                capability(
+                    PracticeDetectorAssessmentMethod.SEMANTIC,
+                    PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+                )
+            )
         );
+
+        assertThat(baseline)
+            .isNotEqualTo(
+                PracticeEvidenceDigest.digest(
+                    declaration(
+                        required,
+                        capability(
+                            PracticeDetectorAssessmentMethod.MECHANICAL,
+                            PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+                        )
+                    )
+                )
+            )
+            .isNotEqualTo(
+                PracticeEvidenceDigest.digest(
+                    declaration(
+                        required,
+                        capability(
+                            PracticeDetectorAssessmentMethod.SEMANTIC,
+                            PracticeDetectorEvidenceCoverage.CONDITIONAL
+                        )
+                    )
+                )
+            );
     }
 
     private static PracticeEvidenceDeclaration declaration(List<PracticeEvidenceRequirement> required) {
-        return declaration(required, PracticeObservability.SEMANTIC);
+        return declaration(
+            required,
+            capability(
+                PracticeDetectorAssessmentMethod.SEMANTIC,
+                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            )
+        );
     }
 
     private static PracticeEvidenceDeclaration declaration(
         List<PracticeEvidenceRequirement> required,
-        PracticeObservability observability
+        PracticeDetectorCapability detectorCapability
     ) {
         return new PracticeEvidenceDeclaration(
             new SourceContractVersion("1.0.0"),
             new EvidenceProfileId("pull-request-review"),
-            observability,
+            detectorCapability,
             required,
             List.of(),
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
@@ -64,5 +99,12 @@ class PracticeEvidenceDigestTest extends BaseUnitTest {
             EvidenceCompletenessRequirement.COMPLETE,
             EvidenceFreshnessRequirement.CURRENT
         );
+    }
+
+    private static PracticeDetectorCapability capability(
+        PracticeDetectorAssessmentMethod method,
+        PracticeDetectorEvidenceCoverage coverage
+    ) {
+        return new PracticeDetectorCapability(method, coverage);
     }
 }

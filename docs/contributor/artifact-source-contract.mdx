@@ -10,7 +10,7 @@ description: Versioned evidence sources, missingness, practice requirements, and
 Hephaestus may make a practice judgment only from evidence with explicit semantics. Contract `1.0.0` defines the
 logical source catalog, capture states, evidence profiles, and practice requirements. A capture manifest records
 what was supplied to one run; it does not prove that a practice is empirically observable. Independent
-observability validation has separate provenance and status.
+validation of Hephaestus detectability has separate provenance and status.
 
 > If any required evidence clause is unsatisfied, record insufficient evidence and make no semantic claim.
 > Missing evidence is never `NOT_APPLICABLE`, a strength, or evidence that desired behaviour is absent.
@@ -144,7 +144,7 @@ Deliberate ablation is an evaluation transformation, not natural missingness. Pr
 view. The manifest can record evaluation transformations, but this contract version does not apply or authorize
 them; an evaluation runtime must define and validate its own dependency-aware view before enabling ablation.
 
-## Practice evidence declarations
+## Practice detection evidence declarations
 
 A declaration pins one contract version and profile, then lists required and optional sources. Required sources
 must satisfy their completeness and freshness clauses. The contract deliberately has no arbitrary expression
@@ -156,7 +156,10 @@ quality is necessary for a semantic claim.
 {
   "sourceContractVersion": "1.0.0",
   "profile": "pull-request-review",
-  "observability": "SEMANTIC",
+  "detectorCapability": {
+    "assessmentMethod": "SEMANTIC",
+    "evidenceCoverage": "DECLARED_REQUIREMENTS_SUFFICIENT"
+  },
   "required": [
     {
       "sourceKind": "scm.pull-request.diff",
@@ -176,12 +179,34 @@ quality is necessary for a semantic claim.
 ```
 
 Validation rejects unknown versions or kinds, sources outside the profile, impossible requirements, incompatible
-artifact types, and conflicting required and optional entries. Product readiness refuses an `UNOBSERVABLE`
-practice.
+artifact types, incoherent detector capability combinations, and conflicting required and optional entries.
+Runtime readiness refuses a `NONE` detector or `CONDITIONAL` evidence coverage.
 
-Author classifications (`MECHANICAL`, `SEMANTIC`, `CONDITIONALLY_OBSERVABLE`, or `UNOBSERVABLE`) are declarations,
-not empirical validation. Independent validation records their own scope, method, provenance, lifecycle, and
-outcome.
+The `detectorCapability` method and coverage are explicitly relative to Hephaestus, the pinned contract version,
+the selected profile, and its governed integration evidence. They do not claim that a practice is inherently
+observable or unobservable. A practitioner, peer, or human mentor may have experiential, interpersonal, or private
+context that Hephaestus cannot access. `assessmentMethod` records `MECHANICAL`, `SEMANTIC`, or `NONE`;
+`evidenceCoverage` records whether the declared requirements are sufficient, conditional, or absent. Keeping these
+dimensions separate represents semantic-but-conditional practices without collapsing method and coverage into one
+lossy classification. Both are author declarations, not empirical validation. Independent validation records its
+own scope, method, provenance, lifecycle, and outcome.
+
+This runtime admits `MECHANICAL` and `SEMANTIC` methods when coverage is
+`DECLARED_REQUIREMENTS_SUFFICIENT` and their evidence clauses pass. It conservatively refuses `CONDITIONAL`
+coverage until the detector has a typed per-practice insufficient-context outcome; model-authored
+`NOT_APPLICABLE` cannot stand in for that outcome. A `NONE` method has no detector evidence requirements, remains
+inactive, and is refused without collecting integration evidence. These refusals concern Hephaestus only and do
+not prevent a separate human assessment.
+
+Readiness records these practice-level refusals as `CONDITIONAL_DETECTABILITY_UNSUPPORTED` or
+`PRACTICE_NOT_DETECTABLE_BY_HEPHAESTUS`. Source assessments retain only source-quality failures, so a limitation
+of the detector is never misreported as a defective source.
+
+Human assessment is intentionally outside this detector contract. A future self-reflection, peer-review, or
+human-mentor channel must be versioned separately with its assessment target, observer relationship, rubric,
+evidence provenance, consent and access rules, result vocabulary, retention, and validation status. Declaring that
+a person might observe a practice must neither collect human assessments nor satisfy detector readiness. If a
+human assessment later becomes detector input, it needs its own governed source kind and purpose authorization.
 
 ## Conservative examples
 

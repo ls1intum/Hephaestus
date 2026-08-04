@@ -9757,6 +9757,28 @@ components:
       - id
       - name
       - slug
+    PracticeDetectorCapability:
+      type: object
+      description: Hephaestus detection capability for the declared integration evidence
+      properties:
+        assessmentMethod:
+          type: string
+          description: How Hephaestus evaluates a practice when its evidence is sufficient
+          enum:
+          - MECHANICAL
+          - SEMANTIC
+          - NONE
+        evidenceCoverage:
+          type: string
+          description: Whether the declared integration evidence can support every
+            detector judgment
+          enum:
+          - DECLARED_REQUIREMENTS_SUFFICIENT
+          - CONDITIONAL
+          - NONE
+      required:
+      - assessmentMethod
+      - evidenceCoverage
     PracticeEvidenceArtifactOptions:
       type: object
       description: Evidence choices and recommended rule for one work artifact
@@ -9810,13 +9832,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PracticeEvidenceBlindSpot"
-        observability:
-          type: string
-          enum:
-          - MECHANICAL
-          - SEMANTIC
-          - CONDITIONALLY_OBSERVABLE
-          - UNOBSERVABLE
+        detectorCapability:
+          $ref: "#/components/schemas/PracticeDetectorCapability"
+          description: Hephaestus detectability from the declared integration evidence;
+            not human observability
         onUnsatisfied:
           type: string
           enum:
@@ -9831,13 +9850,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PracticeEvidenceRequirement"
-          maxItems: 2147483647
-          minItems: 1
         sourceContractVersion:
           type: string
       required:
       - blindSpots
-      - observability
+      - detectorCapability
       - onUnsatisfied
       - optional
       - profile

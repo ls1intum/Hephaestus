@@ -46,6 +46,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessment;
+import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessmentReason;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReport;
@@ -697,7 +698,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 now,
                 SourceFreshness.UNKNOWN,
                 false,
-                List.of("NOT_COLLECTED")
+                List.of(EvidenceAssessmentReason.SOURCE_NOT_AVAILABLE)
             );
             PracticeReadinessReport readiness = new PracticeReadinessReport(
                 version,
@@ -705,7 +706,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 profile,
                 now,
                 now,
-                List.of(new PracticeReadinessDecision("example", now, false, List.of(assessment)))
+                List.of(new PracticeReadinessDecision("example", now, false, List.of(), List.of(assessment)))
             );
             PreparedJobInputs inputs = new PreparedJobInputs(
                 Map.of(SandboxLayout.MANIFEST_PATH, "{}".getBytes()),

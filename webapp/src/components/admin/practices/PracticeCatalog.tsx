@@ -389,13 +389,17 @@ function PracticeActions({
 	onSetActive: (slug: string, active: boolean) => void;
 	onDelete: (practice: Practice) => void;
 }) {
+	const supportsAutomatedDetection =
+		practice.evidence.detectorCapability.assessmentMethod !== "NONE" &&
+		practice.evidence.detectorCapability.evidenceCoverage === "DECLARED_REQUIREMENTS_SUFFICIENT";
+	const activationDisabled = pending || (!practice.active && !supportsAutomatedDetection);
 	return (
 		<>
 			<Switch
 				className="hidden sm:inline-flex"
 				checked={practice.active}
 				onCheckedChange={(active) => onSetActive(practice.slug, active)}
-				disabled={pending}
+				disabled={activationDisabled}
 				aria-label={`Use ${practice.name} in new reviews`}
 			/>
 			<DropdownMenu>
@@ -423,7 +427,7 @@ function PracticeActions({
 						Edit practice
 					</DropdownMenuItem>
 					<DropdownMenuItem
-						disabled={pending}
+						disabled={activationDisabled}
 						onClick={() => onSetActive(practice.slug, !practice.active)}
 					>
 						{practice.active ? "Stop using in new reviews" : "Use in new reviews"}
@@ -532,12 +536,16 @@ function RenameAreaDialog({
 }
 
 function PracticeRowDetails({ practice, title }: { practice: Practice; title: ReactNode }) {
+	const detectorUnavailable =
+		practice.evidence.detectorCapability.assessmentMethod === "NONE" ||
+		practice.evidence.detectorCapability.evidenceCoverage === "CONDITIONAL";
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{WORK_ARTIFACT_LABELS[practice.artifactType]}</span>
 				{!practice.active && <Badge variant="outline">Not used in new reviews</Badge>}
+				{detectorUnavailable && <Badge variant="warning">Automated detection unavailable</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</ItemDescription>
 		</ItemContent>

@@ -115,7 +115,10 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         PracticeEvidenceDeclaration declaration = new PracticeEvidenceDeclaration(
             VERSION,
             PROFILE,
-            PracticeObservability.SEMANTIC,
+            new PracticeDetectorCapability(
+                PracticeDetectorAssessmentMethod.SEMANTIC,
+                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            ),
             List.of(requirement),
             List.of(optionalRequirement),
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
@@ -158,7 +161,10 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         return new PracticeEvidenceDeclaration(
             VERSION,
             PROFILE,
-            PracticeObservability.SEMANTIC,
+            new PracticeDetectorCapability(
+                PracticeDetectorAssessmentMethod.SEMANTIC,
+                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            ),
             List.of(requirement),
             List.of(),
             PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,

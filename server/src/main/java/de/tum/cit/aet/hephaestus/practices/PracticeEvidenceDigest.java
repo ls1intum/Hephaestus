@@ -8,7 +8,8 @@ public final class PracticeEvidenceDigest {
         CanonicalDigest digest = new CanonicalDigest()
             .add(declaration.sourceContractVersion().value())
             .add(declaration.profile().value())
-            .add(declaration.observability().name())
+            .add(declaration.detectorCapability().assessmentMethod().name())
+            .add(declaration.detectorCapability().evidenceCoverage().name())
             .add(declaration.onUnsatisfied().name())
             .addInt(declaration.required().size());
         declaration.required().forEach(requirement -> add(digest, requirement));
