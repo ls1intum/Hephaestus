@@ -62,7 +62,7 @@ public class PracticeCatalogController {
         operationId = "getPracticeEvidenceOptions"
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeEvidenceAuthoringDTO> evidenceOptions() {
+    public ResponseEntity<PracticeEvidenceAuthoringDTO> evidenceOptions(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(evidenceAuthoringService.options());
     }
 
