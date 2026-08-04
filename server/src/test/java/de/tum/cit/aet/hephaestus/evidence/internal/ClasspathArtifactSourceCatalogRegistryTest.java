@@ -33,7 +33,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
     @Test
     void shouldLoadCurrentCatalogAndGovernanceDecisions() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "", "");
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "");
 
         assertThat(registry.current().version()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(registry.catalogDigest()).isEqualTo(VERSION_1_CATALOG_SHA256);
@@ -57,7 +57,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
     @Test
     void shouldRejectUnknownVersionKindAndProfile() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "", "");
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "");
 
         assertThatIllegalArgumentException().isThrownBy(() ->
             registry.requireSource(new SourceContractVersion("2.0.0"), new SourceKind("scm.repository.tree"))
@@ -102,7 +102,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
     @Test
     void shouldKeepEngineeringBaselineFrozenToPreExistingSources() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "", "");
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "");
 
         assertThat(registry.current().sources())
             .filteredOn(source ->
@@ -143,7 +143,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     void shouldRecheckApprovalExpiryWhenASourceIsRequested() {
         Clock clock = mock(Clock.class);
         when(clock.instant()).thenReturn(Instant.parse("2026-08-03T12:00:00Z"));
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, clock, "", "");
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, clock, "");
         when(clock.instant()).thenReturn(Instant.parse("2027-08-03T00:00:00Z"));
 
         assertThat(
@@ -157,7 +157,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
     @Test
     void shouldPermitReviewedEverydaySourcesWithoutOperatorConfiguration() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "", "");
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "");
         var version = new SourceContractVersion("1.0.0");
 
         assertThat(
@@ -180,12 +180,11 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     void shouldWithholdSensitiveSourcesUntilAnOperatorGrantsThem() {
         var version = new SourceContractVersion("1.0.0");
         var slack = new SourceKind("slack.conversation.thread");
-        var ungranted = new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "", "");
+        var ungranted = new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "");
         var granted = new ClasspathArtifactSourceCatalogRegistry(
             objectMapper,
             Clock.systemUTC(),
-            "slack.conversation.thread:AUTOMATED_PRACTICE_REVIEW",
-            ""
+            "slack.conversation.thread:AUTOMATED_PRACTICE_REVIEW"
         );
 
         assertThat(
@@ -196,35 +195,13 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     }
 
     @Test
-    void shouldLetAnOperatorWithholdASourceTheContractApproves() {
-        var version = new SourceContractVersion("1.0.0");
-        var diff = new SourceKind("scm.pull-request.diff");
-        var registry = new ClasspathArtifactSourceCatalogRegistry(
-            objectMapper,
-            Clock.systemUTC(),
-            "",
-            "scm.pull-request.diff"
-        );
-
-        assertThat(registry.isSourceUsePermitted(version, diff, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isFalse();
-        assertThat(
-            registry.isSourceUsePermitted(
-                version,
-                new SourceKind("scm.pull-request.core"),
-                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
-            )
-        ).isTrue();
-    }
-
-    @Test
     void shouldRejectGrantingANonSensitiveSource() {
         assertThatIllegalStateException()
             .isThrownBy(() ->
                 new ClasspathArtifactSourceCatalogRegistry(
                     objectMapper,
                     Clock.systemUTC(),
-                    "scm.pull-request.diff:AUTOMATED_PRACTICE_REVIEW",
-                    ""
+                    "scm.pull-request.diff:AUTOMATED_PRACTICE_REVIEW"
                 )
             )
             .withMessageContaining("needs no operator grant");
@@ -255,26 +232,16 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 new ClasspathArtifactSourceCatalogRegistry(
                     objectMapper,
                     Clock.systemUTC(),
-                    "scm.unknown:AUTOMATED_PRACTICE_REVIEW",
-                    ""
+                    "scm.unknown:AUTOMATED_PRACTICE_REVIEW"
                 )
             )
             .withMessageContaining("Unknown authorized artifact source");
     }
 
     @Test
-    void shouldRejectUnknownWithheldSource() {
-        assertThatIllegalStateException()
-            .isThrownBy(() ->
-                new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "", "scm.unknown")
-            )
-            .withMessageContaining("Unknown withheld artifact source");
-    }
-
-    @Test
     void shouldRejectWildcardDeploymentAuthorization() {
         assertThatIllegalStateException()
-            .isThrownBy(() -> new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "*", ""))
+            .isThrownBy(() -> new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "*"))
             .withMessageContaining("Wildcard");
     }
 

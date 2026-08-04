@@ -48,12 +48,23 @@ export function automatedReviewUnavailableLabel(
 	return null;
 }
 
-export function mentoringSupportLabel(
+/**
+ * The label a list row needs, or null when the practice behaves the way every other one does.
+ * AI-supported mentoring is the norm, so badging it says nothing and hides the two answers that do.
+ */
+export function automatedReviewLimitationLabel(
 	automatedReview: PracticeAutomatedReviewPolicy["automatedReview"],
 ) {
 	if (automatedReview.mode === "NONE") return "Guidance only";
 	if (automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
 		return "Human review needed";
 	}
-	return "AI-supported mentoring";
+	return null;
+}
+
+/** The full label for a detail view, where the reader is asking what this practice does. */
+export function mentoringSupportLabel(
+	automatedReview: PracticeAutomatedReviewPolicy["automatedReview"],
+) {
+	return automatedReviewLimitationLabel(automatedReview) ?? "AI-supported mentoring";
 }

@@ -39,13 +39,6 @@ const EVIDENCE_ROLE_OPTIONS = [
 	{ value: "NOT_USED", label: "Not used" },
 ] satisfies Array<{ value: EvidenceRole; label: string }>;
 
-const PRIVACY_LABELS: Record<PracticeEvidenceSourceOption["privacyClass"], string> = {
-	PUBLIC: "Public",
-	INTERNAL: "Internal",
-	PERSONAL: "Personal data",
-	SENSITIVE_PERSONAL: "Sensitive personal data",
-};
-
 function mentoringSupportOf(requirements: PracticeAutomatedReviewPolicy): MentoringSupport {
 	if (requirements.automatedReview.mode === "NONE") return "GUIDANCE_ONLY";
 	if (requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
@@ -462,12 +455,12 @@ export function PracticeEvidenceEditor({
 											<div>
 												<div className="flex flex-wrap items-center gap-2">
 													<p className="font-medium">{sourceLabel}</p>
-													<Badge variant="outline">{PRIVACY_LABELS[source.privacyClass]}</Badge>
-													{source.supportsEmpty && (
-														<Badge variant="outline">Empty can be valid</Badge>
+													{source.privacyClass === "SENSITIVE_PERSONAL" && (
+														<Badge variant="outline">Private conversations</Badge>
 													)}
+													{!source.supportsEmpty && <Badge variant="outline">Never empty</Badge>}
 													{!source.authorizedForAutomatedReview && (
-														<Badge variant="warning">Not authorized on this instance</Badge>
+														<Badge variant="warning">Needs a privacy decision</Badge>
 													)}
 												</div>
 												<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>

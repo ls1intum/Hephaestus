@@ -17,12 +17,7 @@ class PracticeDefinitionOptionsServiceTest {
 
     @Test
     void exposesTheCurrentBaselineAndOnlyProfileCompatibleSources() {
-        var catalogs = new ClasspathArtifactSourceCatalogRegistry(
-            JsonMapper.builder().build(),
-            Clock.systemUTC(),
-            "",
-            ""
-        );
+        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC(), "");
         var service = new PracticeDefinitionOptionsService(catalogs, new PracticeEvidenceDefaults(catalogs));
 
         PracticeDefinitionOptionsDTO result = service.options();

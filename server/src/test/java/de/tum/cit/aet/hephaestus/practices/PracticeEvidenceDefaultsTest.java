@@ -26,7 +26,7 @@ class PracticeEvidenceDefaultsTest {
         List<String> optional
     ) {
         JsonMapper mapper = JsonMapper.builder().build();
-        var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC(), "", "");
+        var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC(), "");
 
         PracticeAutomatedReviewPolicy requirements = new PracticeEvidenceDefaults(catalogs).forArtifact(artifact);
 

@@ -100,10 +100,11 @@ refused, or expired is never read, whatever the deployment sets. Within that bou
 integration and enabling a practice is what authorizes the everyday code sources the product exists to read, so a
 default deployment reviews pull requests and issues without further configuration.
 
-Two operator controls sit on top. `hephaestus.evidence.sensitive-source-uses` grants explicit `source:purpose`
-pairs for `SENSITIVE_PERSONAL` sources, which are read only after a deliberate decision; wildcards are rejected,
-and listing a non-sensitive source is a startup error rather than a silent no-op. `hephaestus.evidence.withheld-source-kinds`
-withholds any source an operator does not want read even though the contract approves it.
+One operator control sits on top: `hephaestus.evidence.sensitive-source-uses` grants explicit `source:purpose`
+pairs for `SENSITIVE_PERSONAL` sources, which are read only after a deliberate decision. Wildcards are rejected,
+and listing a non-sensitive source is a startup error rather than a silent no-op, so the grant list cannot quietly
+grow back into an everything-list. Withholding an everyday source needs no separate switch: a practice author
+chooses which sources a practice uses, and an integration that is not connected yields nothing.
 
 Requiring operators to re-declare the sources the product exists to read would minimise no data — the deployment
 and the workspace connection already state that purpose — while a prompt that fires on every source trains
