@@ -57,7 +57,7 @@ const PRACTICE_FIELDS = {
 	artifactType: "Evaluates",
 	areaSlug: "Area",
 	triggerEvents: "Starts a review when",
-	criteria: "Evaluation criteria",
+	criteria: "Review criteria",
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Precompute script",

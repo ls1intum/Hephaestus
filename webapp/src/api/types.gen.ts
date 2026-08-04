@@ -957,7 +957,7 @@ export type UpdatePracticeRequest = {
      */
     clear?: Array<'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE'>;
     /**
-     * Practice evaluation criteria
+     * Practice review criteria
      */
     criteria?: string;
     /**
@@ -2888,7 +2888,7 @@ export type Practice = {
      */
     createdAt: Date;
     /**
-     * Practice evaluation criteria
+     * Practice review criteria
      */
     criteria: string;
     /**
@@ -4361,7 +4361,7 @@ export type CreatePracticeRequest = {
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
-     * Practice evaluation criteria
+     * Practice review criteria
      */
     criteria: string;
     /**

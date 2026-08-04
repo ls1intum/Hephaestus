@@ -7647,7 +7647,7 @@ components:
             omit to use the recommended requirements for the selected work type
         criteria:
           type: string
-          description: Practice evaluation criteria
+          description: Practice review criteria
           maxLength: 50000
           minLength: 0
         name:
@@ -9642,7 +9642,7 @@ components:
           description: Timestamp when the practice was created
         criteria:
           type: string
-          description: Practice evaluation criteria
+          description: Practice review criteria
         displayOrder:
           type: integer
           format: int32
@@ -12247,7 +12247,7 @@ components:
           uniqueItems: true
         criteria:
           type: string
-          description: Practice evaluation criteria
+          description: Practice review criteria
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*

@@ -40,7 +40,7 @@ public record CreatePracticeRequestDTO(
 
     @NotBlank(message = "Criteria is required")
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
-    @Schema(description = "Practice evaluation criteria")
+    @Schema(description = "Practice review criteria")
     String criteria,
 
     @Size(

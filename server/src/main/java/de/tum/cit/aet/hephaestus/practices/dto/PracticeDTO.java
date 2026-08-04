@@ -17,7 +17,7 @@ public record PracticeDTO(
     @NonNull @Schema(description = "URL-safe identifier unique within workspace") String slug,
     @NonNull @Schema(description = "Human-readable name") String name,
     @NonNull @Schema(description = "Domain events that start a practice review") List<String> triggerEvents,
-    @NonNull @Schema(description = "Practice evaluation criteria") String criteria,
+    @NonNull @Schema(description = "Practice review criteria") String criteria,
     @Nullable
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,

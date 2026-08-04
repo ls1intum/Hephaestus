@@ -27,7 +27,7 @@ public record UpdatePracticeRequestDTO(
 
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Criteria must not be blank")
-    @Schema(description = "Practice evaluation criteria")
+    @Schema(description = "Practice review criteria")
     @Nullable
     String criteria,
 

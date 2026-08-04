@@ -141,7 +141,7 @@ export const ValidationAndSubmit: Story = {
 			canvas.getByRole("checkbox", { name: "Pull or merge request is opened" }),
 		);
 		await userEvent.type(
-			canvas.getByRole("textbox", { name: /Evaluation criteria/ }),
+			canvas.getByRole("textbox", { name: /Review criteria/ }),
 			"Check whether the reviewed work explains its purpose.",
 		);
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
@@ -178,7 +178,7 @@ export const ConversationPractice: Story = {
 		await userEvent.click(await screen.findByRole("option", { name: "Conversation" }));
 		await expect(canvas.queryByText("Start a review when… *")).not.toBeInTheDocument();
 		await userEvent.type(
-			canvas.getByRole("textbox", { name: /Evaluation criteria/ }),
+			canvas.getByRole("textbox", { name: /Review criteria/ }),
 			"Check whether the conversation stays constructive.",
 		);
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
