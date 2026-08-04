@@ -73,8 +73,8 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("Starts a review when")).toBeVisible();
 		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
-		await expect(canvas.getByText("How it can be judged")).toBeVisible();
-		await expect(canvas.getByText("Meaning requires judgment")).toBeVisible();
+		await expect(canvas.getByText("Hephaestus detectability")).toBeVisible();
+		await expect(canvas.getByText("Declared semantic assessment")).toBeVisible();
 		await expect(canvas.getByText("scm.pull-request.core")).toBeVisible();
 		await expect(canvas.getByText("Not independently validated")).toBeVisible();
 		await expect(
