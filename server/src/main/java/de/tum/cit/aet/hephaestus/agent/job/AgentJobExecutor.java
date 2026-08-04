@@ -34,7 +34,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -702,7 +702,7 @@ public class AgentJobExecutor {
             sandboxSpec.inputFiles(),
             job.getRetryCount(),
             preparedInputs.artifactSourceManifest(),
-            preparedInputs.automatedAssessmentReadinessReport()
+            preparedInputs.automatedReviewReadinessReport()
         );
         return sandboxSpec;
     }
@@ -714,7 +714,7 @@ public class AgentJobExecutor {
             preparedInputs.files(),
             retryCount,
             preparedInputs.artifactSourceManifest(),
-            preparedInputs.automatedAssessmentReadinessReport()
+            preparedInputs.automatedReviewReadinessReport()
         );
     }
 
@@ -728,13 +728,13 @@ public class AgentJobExecutor {
         Map<String, byte[]> inputFiles,
         int retryCount,
         @Nullable ArtifactSourceManifest artifactSourceManifest,
-        @Nullable AutomatedAssessmentReadinessReport automatedAssessmentReadinessReport
+        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
     ) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
         JsonNode evidenceSnapshot = evidenceSnapshot(
             inputFiles,
             artifactSourceManifest,
-            automatedAssessmentReadinessReport
+            automatedReviewReadinessReport
         );
         Integer updated = transactionTemplate.execute(status ->
             jobRepository.updateProvenanceDigests(
@@ -755,19 +755,19 @@ public class AgentJobExecutor {
     private JsonNode evidenceSnapshot(
         Map<String, byte[]> inputFiles,
         @Nullable ArtifactSourceManifest artifactSourceManifest,
-        @Nullable AutomatedAssessmentReadinessReport automatedAssessmentReadinessReport
+        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
     ) {
         byte[] manifest = inputFiles.get(SandboxLayout.MANIFEST_PATH);
         byte[] practices = inputFiles.get(SandboxLayout.PRACTICES_PREFIX + "index.json");
         if (
-            manifest == null && practices == null && automatedAssessmentReadinessReport == null
+            manifest == null && practices == null && automatedReviewReadinessReport == null
         ) return objectMapper.nullNode();
-        if (manifest == null || automatedAssessmentReadinessReport == null) {
+        if (manifest == null || automatedReviewReadinessReport == null) {
             throw new IllegalStateException("Practice review inputs have an incomplete evidence snapshot");
         }
         ObjectNode snapshot = objectMapper.createObjectNode();
         snapshot.set("manifest", objectMapper.readTree(manifest));
-        snapshot.set("automatedAssessmentReadiness", objectMapper.valueToTree(automatedAssessmentReadinessReport));
+        snapshot.set("automatedReviewReadiness", objectMapper.valueToTree(automatedReviewReadinessReport));
         if (practices != null) {
             snapshot.set("practices", objectMapper.readTree(practices));
         }

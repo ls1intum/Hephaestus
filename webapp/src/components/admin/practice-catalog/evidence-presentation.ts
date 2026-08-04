@@ -1,18 +1,13 @@
-import type {
-	PracticeAutomatedAssessmentPolicy,
-	PracticeEvidenceSourceOption,
-} from "@/api/types.gen";
+import type { PracticeAutomatedReviewPolicy, PracticeEvidenceSourceOption } from "@/api/types.gen";
 
-const ASSESSMENT_MODE_LABELS: Record<
-	PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"],
-	string
-> = {
-	LANGUAGE_MODEL: "Language model",
-	NONE: "No automated assessment",
-};
+const REVIEW_MODE_LABELS: Record<PracticeAutomatedReviewPolicy["automatedReview"]["mode"], string> =
+	{
+		LANGUAGE_MODEL: "Language model",
+		NONE: "No automated review",
+	};
 
 const EVIDENCE_SUFFICIENCY_LABELS: Record<
-	PracticeAutomatedAssessmentPolicy["automatedAssessment"]["evidenceSufficiency"],
+	PracticeAutomatedReviewPolicy["automatedReview"]["evidenceSufficiency"],
 	string
 > = {
 	SUFFICIENT_WHEN_REQUIREMENTS_MET: "Requirements are sufficient",
@@ -30,7 +25,7 @@ export function evidenceSourceLabel(
 }
 
 export function evidenceQualityLabel(
-	requirement: PracticeAutomatedAssessmentPolicy["requiredEvidence"][number],
+	requirement: PracticeAutomatedReviewPolicy["requiredEvidence"][number],
 ) {
 	if (requirement.completeness === "COMPLETE" && requirement.freshness === "CURRENT") {
 		return "Complete and current";
@@ -44,47 +39,45 @@ export function evidenceQualityLabel(
 	return "Available; no completeness or freshness requirement";
 }
 
-export function assessmentModeLabel(
-	mode: PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"],
-) {
-	return ASSESSMENT_MODE_LABELS[mode];
+export function reviewModeLabel(mode: PracticeAutomatedReviewPolicy["automatedReview"]["mode"]) {
+	return REVIEW_MODE_LABELS[mode];
 }
 
 export function evidenceSufficiencyLabel(
-	sufficiency: PracticeAutomatedAssessmentPolicy["automatedAssessment"]["evidenceSufficiency"],
+	sufficiency: PracticeAutomatedReviewPolicy["automatedReview"]["evidenceSufficiency"],
 ) {
 	return EVIDENCE_SUFFICIENCY_LABELS[sufficiency];
 }
 
-export function canAttemptAutomatedAssessment(
-	requirements: PracticeAutomatedAssessmentPolicy,
-	supportedModes: readonly PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"][],
+export function canAttemptAutomatedReview(
+	requirements: PracticeAutomatedReviewPolicy,
+	supportedModes: readonly PracticeAutomatedReviewPolicy["automatedReview"]["mode"][],
 ) {
 	return (
-		supportedModes.includes(requirements.automatedAssessment.mode) &&
-		requirements.automatedAssessment.evidenceSufficiency === "SUFFICIENT_WHEN_REQUIREMENTS_MET"
+		supportedModes.includes(requirements.automatedReview.mode) &&
+		requirements.automatedReview.evidenceSufficiency === "SUFFICIENT_WHEN_REQUIREMENTS_MET"
 	);
 }
 
-export function automatedAssessmentUnavailableLabel(
-	requirements: PracticeAutomatedAssessmentPolicy,
-	supportedModes: readonly PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"][],
+export function automatedReviewUnavailableLabel(
+	requirements: PracticeAutomatedReviewPolicy,
+	supportedModes: readonly PracticeAutomatedReviewPolicy["automatedReview"]["mode"][],
 ) {
-	if (requirements.automatedAssessment.mode === "NONE") return "No automated assessment";
-	if (!supportedModes.includes(requirements.automatedAssessment.mode)) {
-		return "Assessment mode not supported";
+	if (requirements.automatedReview.mode === "NONE") return "No automated review";
+	if (!supportedModes.includes(requirements.automatedReview.mode)) {
+		return "Review mode not supported";
 	}
-	if (requirements.automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
+	if (requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
 		return "Additional context required";
 	}
 	return null;
 }
 
-export function automatedAssessmentStatusLabel(
-	automatedAssessment: PracticeAutomatedAssessmentPolicy["automatedAssessment"],
+export function automatedReviewStatusLabel(
+	automatedReview: PracticeAutomatedReviewPolicy["automatedReview"],
 ) {
-	if (automatedAssessment.mode === "NONE") return "No automated assessment";
-	if (automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
+	if (automatedReview.mode === "NONE") return "No automated review";
+	if (automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
 		return "Additional context required";
 	}
 	return null;

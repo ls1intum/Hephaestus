@@ -10,7 +10,7 @@ import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
-import { PracticeAutomatedAssessmentValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -34,8 +34,8 @@ export type CuratedPracticeFormValue = PracticeDefinitionValue;
 
 export interface CuratedPracticeFormInitialValue extends CuratedPracticeFormValue {
 	status: CatalogEntryStatus;
-	automatedAssessmentPolicy: CuratedPracticeDefinition["automatedAssessmentPolicy"];
-	automatedAssessmentValidation: CuratedPracticeDefinition["automatedAssessmentValidation"];
+	automatedReviewPolicy: CuratedPracticeDefinition["automatedReviewPolicy"];
+	automatedReviewValidation: CuratedPracticeDefinition["automatedReviewValidation"];
 	shipped?: CuratedPracticeDefinition;
 }
 
@@ -202,14 +202,14 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 							<Separator />
 							<section className="space-y-4">
 								<div>
-									<h2 className="text-lg font-semibold">Automated assessment validation</h2>
+									<h2 className="text-lg font-semibold">Automated review validation</h2>
 									<p className="text-sm text-muted-foreground">
 										The evidence requirements above are the author's declaration. This status says
 										whether an independent evaluator has validated the exact practice definition.
 									</p>
 								</div>
-								<PracticeAutomatedAssessmentValidationSummary
-									validation={initialData.automatedAssessmentValidation}
+								<PracticeAutomatedReviewValidationSummary
+									validation={initialData.automatedReviewValidation}
 								/>
 							</section>
 						</>

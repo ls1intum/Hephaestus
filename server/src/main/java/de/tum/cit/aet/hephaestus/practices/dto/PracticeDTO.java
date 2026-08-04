@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentValidation;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewValidation;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -21,9 +21,9 @@ public record PracticeDTO(
     @Nullable
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
-    @NonNull PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
-    @NonNull PracticeAutomatedAssessmentValidation automatedAssessmentValidation,
-    @NonNull @Schema(description = "Type of work this practice assesses") WorkArtifact artifactType,
+    @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
+    @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
+    @NonNull @Schema(description = "Type of work this practice reviews") WorkArtifact artifactType,
     @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
     @NonNull @Schema(description = "Position within its area (lowest first); ties broken by name") Integer displayOrder,
     @Nullable @Schema(description = "Developer-facing rationale (learner layer)") String whyItMatters,
@@ -41,8 +41,8 @@ public record PracticeDTO(
             TriggerEventsConverter.toList(practice.getTriggerEvents()),
             practice.getCriteria(),
             practice.getPrecomputeScript(),
-            practice.getAutomatedAssessmentPolicy(),
-            PracticeAutomatedAssessmentValidation.authorDeclared(practice.getSlug(), PracticeDefinition.from(practice)),
+            practice.getAutomatedReviewPolicy(),
+            PracticeAutomatedReviewValidation.authorDeclared(practice.getSlug(), PracticeDefinition.from(practice)),
             practice.getArtifactType(),
             practice.getArea() != null ? practice.getArea().getSlug() : null,
             practice.getDisplayOrder(),

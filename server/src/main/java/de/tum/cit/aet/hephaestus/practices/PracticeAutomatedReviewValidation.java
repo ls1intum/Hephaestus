@@ -7,15 +7,17 @@ import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "Independent validation status and provenance for automated assessment requirements")
-public record PracticeAutomatedAssessmentValidation(
+@Schema(description = "Independent validation status and provenance for automated review requirements")
+public record PracticeAutomatedReviewValidation(
     @NonNull
-    @Schema(description = "Validation lifecycle; authors cannot mark their own assessment as independently validated")
-    PracticeAutomatedAssessmentValidationStatus status,
+    @Schema(
+        description = "Validation lifecycle; authors cannot mark their own review policy as independently validated"
+    )
+    PracticeAutomatedReviewValidationStatus status,
     @NonNull
     @Schema(description = "Source contract used by the validated practice definition")
     SourceContractVersion sourceContractVersion,
-    @NonNull @Schema(description = "SHA-256 digest of the exact automated-assessment policy") String policyDigest,
+    @NonNull @Schema(description = "SHA-256 digest of the exact automated-review policy") String policyDigest,
     @NonNull @Schema(description = "Versioned fingerprint of the exact review rules") String reviewRuleFingerprint,
     @Nullable
     @Schema(
@@ -26,7 +28,7 @@ public record PracticeAutomatedAssessmentValidation(
     @Nullable @Schema(description = "Time the independent validation was completed") Instant validatedAt,
     @Nullable @Schema(description = "Traceable reference to the validation record") String validationReference
 ) {
-    public PracticeAutomatedAssessmentValidation {
+    public PracticeAutomatedReviewValidation {
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(sourceContractVersion, "sourceContractVersion");
         Objects.requireNonNull(policyDigest, "policyDigest");
@@ -37,7 +39,7 @@ public record PracticeAutomatedAssessmentValidation(
         if (!reviewRuleFingerprint.matches("v[0-9]+:[0-9a-f]{64}")) {
             throw new IllegalArgumentException("Invalid review-rule fingerprint");
         }
-        if (status == PracticeAutomatedAssessmentValidationStatus.AUTHOR_DECLARED) {
+        if (status == PracticeAutomatedReviewValidationStatus.AUTHOR_DECLARED) {
             if (
                 evaluatorProcedureFingerprint != null ||
                 validator != null ||
@@ -65,17 +67,14 @@ public record PracticeAutomatedAssessmentValidation(
         }
     }
 
-    public static PracticeAutomatedAssessmentValidation authorDeclared(
-        String practiceSlug,
-        PracticeDefinition definition
-    ) {
+    public static PracticeAutomatedReviewValidation authorDeclared(String practiceSlug, PracticeDefinition definition) {
         Objects.requireNonNull(practiceSlug, "practiceSlug");
         Objects.requireNonNull(definition, "definition");
-        PracticeAutomatedAssessmentPolicy requirements = definition.automatedAssessmentPolicy();
-        return new PracticeAutomatedAssessmentValidation(
-            PracticeAutomatedAssessmentValidationStatus.AUTHOR_DECLARED,
+        PracticeAutomatedReviewPolicy requirements = definition.automatedReviewPolicy();
+        return new PracticeAutomatedReviewValidation(
+            PracticeAutomatedReviewValidationStatus.AUTHOR_DECLARED,
             requirements.sourceContractVersion(),
-            PracticeAutomatedAssessmentPolicyDigest.digest(requirements),
+            PracticeAutomatedReviewPolicyDigest.digest(requirements),
             definition.provenanceFingerprint(practiceSlug),
             null,
             null,

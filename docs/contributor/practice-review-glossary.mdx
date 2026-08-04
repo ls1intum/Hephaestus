@@ -1,0 +1,136 @@
+# Practice review glossary
+
+This glossary is the canonical language for the versioned evidence contract and automated review. Use the
+same concept name for these concepts in UI copy, API fields, Java types, database columns, tests, and documentation. The broader
+[practice feedback language](./practice-feedback-language.md) remains canonical for findings and feedback.
+
+## Product terms
+
+| Term | Plain meaning | Do not use for this concept |
+| --- | --- | --- |
+| **Practice review** | The end-to-end product flow that gathers evidence, reviews configured practices, records findings, and may deliver feedback. | practice detection, scan, assessment |
+| **Automated review** | Hephaestus reviews work against one practice. | detection, detector capability, assessment, judgment |
+| **Finding detection** | The internal step that turns an automated review into candidate findings. Use this only for that pipeline step, not for the product flow or a practice's overall review support. | practice review, automated review policy |
+| **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
+| **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
+| **Automated-review policy** | The complete rule for how Hephaestus may review one practice, including mode, evidence, refusal behavior, and known limits. | evidence requirements |
+| **Evidence requirements** | The versioned rule describing what Hephaestus must receive before automated review may start. | evidence declaration, evidence contract, detector configuration |
+| **Required evidence** | A source that must pass its stated completeness and freshness checks. | mandatory artifact |
+| **Optional context** | A source that may help but never blocks a review when absent. | optional requirement |
+| **Evidence sufficiency** | Whether passing every requirement gives Hephaestus enough context to review the practice. | evidence coverage, confidence |
+| **Source contract** | A versioned catalog defining each source and the meaning of its states. | integration version |
+| **Artifact source** | A registered logical input that can supply evidence. | file, mount, cache |
+| **Materialization** | A file, database projection, cache entry, or tool result representing a source for one use. | source kind |
+| **Evidence profile** | The sources allowed for one type of reviewed work. | artifact profile |
+| **Source kind** | A stable identifier for one logical source, such as pull request details. | file type |
+| **Known limitation** | A claim the evidence cannot support even when every requirement passes. | blind spot, caveat |
+| **When evidence is insufficient** | The required behavior when evidence requirements are not met. Contract `1.0.0` always skips automated review. | fallback, error handling |
+| **Skip automated review** | Make no practice claim because the requirements are not met or the mode is unsupported. | not applicable, decline judgment, failure |
+| **Automated review validation** | Status and provenance for evaluating exact review rules with an exact evaluator procedure. | certification, approval |
+| **Source authorization** | Instance governance permits a source for an explicit product use. | enabled, available |
+| **Source-use purpose** | Why Hephaestus processes evidence, such as automated review or feedback delivery. | audience, recipient |
+| **Audience / recipient** | Who may receive or inspect evidence. | purpose |
+| **Integration availability** | A workspace integration can provide a source. | authorized, collected |
+| **Runtime support** | The deployed implementation supports the configured review mode. | source availability |
+| **Review readiness** | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks. | validation, activation |
+| **Used in new reviews** | A workspace currently includes the practice in newly started reviews. | detectable, universally observable |
+
+A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
+review is accurate. Independent validation records provenance separately.
+
+## Who may review
+
+Review is relational: it has a reviewer, reviewed work, a practice, a procedure, evidence, and a time. Do not
+label a practice as universally observable or unobservable.
+
+| Reviewer | Current system support |
+| --- | --- |
+| **Hephaestus** | Modeled by `automatedReview` and governed evidence requirements. |
+| **Developer** | A self-review may be possible for a specific practice; Hephaestus does not collect it. |
+| **Peer** | A peer review may be possible from team context; Hephaestus does not collect it. |
+| **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it. |
+
+A future human-review feature needs its own consent, provenance, retention, access, rubric, and validation
+model. It must record the reviewer relationship (`SELF`, `PEER`, or `MENTOR`) at review time. Human reviews
+may use different rubrics and evidence, and disagreement remains multiple provenance-bearing reviews rather
+than one ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an automated review.
+
+## Machine names
+
+| Concept | JSON / API | Java | Database |
+| --- | --- | --- | --- |
+| Practice-review AI purpose | `PRACTICE_REVIEW` | `AgentPurpose.PRACTICE_REVIEW` | `PRACTICE_REVIEW` |
+| Automated-review policy | `automatedReviewPolicy` | `PracticeAutomatedReviewPolicy` | `automated_review_policy` |
+| Evidence profile | `evidenceProfile` | `EvidenceProfileId` | inside `automated_review_policy` |
+| Source display name | `displayName` | `ArtifactSourceContract.displayName` | source catalog |
+| Automated review | `automatedReview` | `PracticeAutomatedReview` | inside `automated_review_policy` |
+| Review mode | `mode` | `PracticeAutomatedReviewMode` | inside `automated_review_policy` |
+| Evidence sufficiency | `evidenceSufficiency` | `PracticeEvidenceSufficiency` | inside `automated_review_policy` |
+| Required evidence | `requiredEvidence` | `PracticeEvidenceRequirement` | inside `automated_review_policy` |
+| Optional context | `optionalContext` | `PracticeOptionalContextSource` | inside `automated_review_policy` |
+| Insufficient evidence action | `whenEvidenceIsInsufficient` | `PracticeInsufficientEvidenceAction` | inside `automated_review_policy` |
+| Known limitations | `knownLimitations` | `PracticeEvidenceLimitation` | inside `automated_review_policy` |
+| Automated review validation | `automatedReviewValidation` | `PracticeAutomatedReviewValidation` | derived API value |
+| Automated review readiness | `automatedReviewReadiness` | `AutomatedReviewReadinessReport` | inside `agent_job.evidence_snapshot` |
+| Source readiness checks | `sourceChecks` | `SourceReadinessCheck` | internal readiness report |
+| Source-use purpose | `purpose` | `SourceUsePurpose` | deployment configuration |
+| Source absence state | `supportedAbsenceStates` | `SourceAbsenceState` | source catalog |
+| Materialization | `artifacts` | `SourceArtifact` | manifest and content-addressed storage metadata |
+| Used in new reviews | `usedInNewReviews` | `Practice.usedInNewReviews` | `used_in_new_reviews` |
+| Area dashboard visibility | `visibleInPracticeDashboards` | `PracticeArea.visibleInPracticeDashboards` | `visible_in_practice_dashboards` |
+| Claim currentness | `claimCurrentness` | `ReviewClaimCurrentness` | derived API value |
+| Review-rule fingerprint | `reviewRuleFingerprint` | `ReviewRuleFingerprint` | `review_rule_fingerprint` |
+
+The contract uses stable uppercase values. UI copy translates them into plain language:
+
+- `LANGUAGE_MODEL` → **Language model**
+- `NONE` → **No automated review**
+- `SUFFICIENT_WHEN_REQUIREMENTS_MET` → **Requirements are sufficient**
+- `DECLARED_EVIDENCE_INSUFFICIENT` → **Available evidence is not enough**
+- `SKIP_AUTOMATED_REVIEW` → **Skip automated review**
+
+## Source states
+
+Keep availability, content, completeness, freshness, and collection outcome separate. In particular:
+
+- **Available and empty** means collection succeeded and the source legitimately contained no items.
+- **Not collected** means collection was not attempted.
+- **Redacted** means policy withheld the source.
+- **Partial** means only part of the requested scope was captured.
+- **Not current** is a time-based readiness result, not another word for unavailable.
+- **Collection error** means collection was attempted and failed.
+- **Ablated** means evaluation deliberately removed evidence; production does not treat it as natural absence.
+
+## Lifecycle
+
+1. A practice author defines the practice and its evidence requirements.
+2. An instance operator authorizes each source and product use through a reviewed governance decision.
+3. A workspace integration makes authorized sources available.
+4. A workspace administrator chooses whether the practice is used in new reviews.
+5. Each review captures evidence and records explicit source states.
+6. Source readiness checks decide whether every required source meets its requirements.
+7. Hephaestus reviews the work or records that the practice was skipped.
+8. Findings retain the exact practice revision, source contract, and evidence provenance.
+9. Practice or source-contract changes can mark earlier claims stale.
+10. Automated review validation remains separate from source authorization, use in new reviews, and per-run readiness.
+
+## Writing rules
+
+1. Name the actor: “Hephaestus reviews the work,” not “the practice is detectable.”
+2. Name the outcome: “skip automated review,” not “return not applicable.”
+3. Use provider terms when known: **pull request**, **merge request**, **issue**, or **Slack thread**.
+4. Put stable reason codes in machine fields and plain explanations in UI messages.
+5. Prefer short names only when they remain unambiguous.
+
+These rules follow [Digital.gov plain-language guidance](https://digital.gov/guides/plain-language), Nielsen
+Norman Group’s [match between the system and the real world](https://www.nngroup.com/articles/ten-usability-heuristics/#toc-2-match-between-the-system-and-the-real-world-2),
+[WCAG consistent identification](https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification.html), and
+[OpenTelemetry naming guidance](https://opentelemetry.io/docs/specs/semconv/general/naming/). The reviewer-relative
+model follows [W3C SOSA observations](https://www.w3.org/TR/vocab-ssn/#SOSAObservation): an observation relates the
+procedure, observed property, feature, result, and the human or software sensor that made it. Conservative skipping
+follows selective-classification research on [reject options](https://www.jmlr.org/papers/v11/el-yaniv10a.html).
+The voluntary [NIST AI RMF](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-ai-rmf-10)
+recommends documenting knowledge limits and designing for safe failure. The contract follows
+[JSON Schema's annotation model](https://json-schema.org/understanding-json-schema/reference/annotations) so machine
+schemas carry human definitions, and uses explicit absence reasons in the same spirit as
+[HL7 Data Absent Reason](https://terminology.hl7.org/6.5.0/CodeSystem-data-absent-reason.html).

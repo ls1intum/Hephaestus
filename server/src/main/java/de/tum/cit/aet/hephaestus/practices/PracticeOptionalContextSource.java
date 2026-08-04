@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "Source that may add context but never blocks automated assessment when absent")
+@Schema(description = "Source that may add context but never blocks automated review when absent")
 public record PracticeOptionalContextSource(
     @NonNull
     @NotNull

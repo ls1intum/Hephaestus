@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -35,7 +35,7 @@ public record UpdatePracticeRequestDTO(
         max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
         message = "Precompute script must be at most 100000 characters"
     )
-    @Schema(description = "TypeScript/Bun static analysis run before automated assessment")
+    @Schema(description = "TypeScript/Bun static analysis run before automated review")
     @Nullable
     String precomputeScript,
 
@@ -44,7 +44,7 @@ public record UpdatePracticeRequestDTO(
         description = "Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactType changes"
     )
     @Nullable
-    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
+    PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
     @Schema(description = "Type of reviewed work", example = "ISSUE") @Nullable WorkArtifact artifactType,
 
@@ -56,7 +56,7 @@ public record UpdatePracticeRequestDTO(
 
     @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "What-good-looks-like must not be blank")
-    @Schema(description = "Concrete example shown to the developer; not assessment criteria")
+    @Schema(description = "Concrete example shown to the developer; not review criteria")
     @Nullable
     String whatGoodLooksLike,
 

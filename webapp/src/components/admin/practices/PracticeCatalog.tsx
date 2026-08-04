@@ -8,8 +8,8 @@ import {
 	WORK_ARTIFACT_LABELS,
 } from "@/components/admin/practice-catalog/constants";
 import {
-	automatedAssessmentUnavailableLabel,
-	canAttemptAutomatedAssessment,
+	automatedReviewUnavailableLabel,
+	canAttemptAutomatedReview,
 } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
@@ -123,7 +123,7 @@ export function PracticeCatalog({
 				);
 	const supportedModesFor = (practice: Practice) =>
 		evidenceOptions.workTypes.find((option) => option.artifactType === practice.artifactType)
-			?.supportedAutomatedAssessmentModes ?? [];
+			?.supportedAutomatedReviewModes ?? [];
 
 	return (
 		<div className="space-y-4">
@@ -402,7 +402,7 @@ function PracticeActions({
 	onDelete,
 }: {
 	practice: Practice;
-	supportedModes: readonly Practice["automatedAssessmentPolicy"]["automatedAssessment"]["mode"][];
+	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
@@ -410,11 +410,8 @@ function PracticeActions({
 	onSetUsedInNewReviews: (slug: string, usedInNewReviews: boolean) => void;
 	onDelete: (practice: Practice) => void;
 }) {
-	const canAssess = canAttemptAutomatedAssessment(
-		practice.automatedAssessmentPolicy,
-		supportedModes,
-	);
-	const usageChangeDisabled = pending || (!practice.usedInNewReviews && !canAssess);
+	const canReview = canAttemptAutomatedReview(practice.automatedReviewPolicy, supportedModes);
+	const usageChangeDisabled = pending || (!practice.usedInNewReviews && !canReview);
 	return (
 		<>
 			<Switch
@@ -566,10 +563,10 @@ function PracticeRowDetails({
 }: {
 	practice: Practice;
 	title: ReactNode;
-	supportedModes: readonly Practice["automatedAssessmentPolicy"]["automatedAssessment"]["mode"][];
+	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
 }) {
-	const unavailableLabel = automatedAssessmentUnavailableLabel(
-		practice.automatedAssessmentPolicy,
+	const unavailableLabel = automatedReviewUnavailableLabel(
+		practice.automatedReviewPolicy,
 		supportedModes,
 	);
 	return (
@@ -590,7 +587,7 @@ function PracticeDragPreview({
 	supportedModes,
 }: {
 	practice: Practice;
-	supportedModes: readonly Practice["automatedAssessmentPolicy"]["automatedAssessment"]["mode"][];
+	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
 }) {
 	return (
 		<Item

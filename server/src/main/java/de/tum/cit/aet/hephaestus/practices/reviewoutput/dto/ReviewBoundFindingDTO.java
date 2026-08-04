@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
-import de.tum.cit.aet.hephaestus.practices.AssessmentClaimCurrentness;
+import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.BoundObservation;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -24,7 +24,7 @@ public record ReviewBoundFindingDTO(
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "Finding confidence", minimum = "0", maximum = "1") Float confidence,
-    @NonNull AssessmentClaimCurrentness claimCurrentness,
+    @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt
 ) {
     public static ReviewBoundFindingDTO from(BoundObservation row) {
@@ -40,7 +40,7 @@ public record ReviewBoundFindingDTO(
             row.getAssessment(),
             row.getSeverity(),
             row.getConfidence(),
-            AssessmentClaimCurrentness.of(
+            ReviewClaimCurrentness.of(
                 row.getPracticeRevisionFingerprint(),
                 row.getCurrentPracticeRevisionFingerprint()
             ),

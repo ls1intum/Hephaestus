@@ -40,7 +40,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         when(practice.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
         when(practice.getTriggerEvents()).thenReturn(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         when(practice.getCriteria()).thenReturn("Review the change");
-        when(practice.getAutomatedAssessmentPolicy()).thenReturn(PracticeTestEvidence.pullRequest());
+        when(practice.getAutomatedReviewPolicy()).thenReturn(PracticeTestEvidence.pullRequest());
     }
 
     @Test

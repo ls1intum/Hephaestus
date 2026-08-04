@@ -130,7 +130,7 @@ class CatalogOriginTest extends BaseUnitTest {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria(criteria);
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         practice.setWhyItMatters("Reason");
         if (copiedFromFingerprint != null) {
             practice.setSourceCuratedSlug(SLUG);

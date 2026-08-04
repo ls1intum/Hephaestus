@@ -66,7 +66,7 @@ public class CuratedCatalogAdminController {
 
     @GetMapping("/evidence-options")
     @Operation(
-        summary = "Read automated assessment evidence options",
+        summary = "Read automated review evidence options",
         description = "Returns recommended requirements and allowed evidence sources for each type of reviewed work",
         operationId = "adminGetPracticeEvidenceOptions"
     )
@@ -456,9 +456,9 @@ public class CuratedCatalogAdminController {
 
     private PracticeDefinition definition(CuratedPracticeRequestDTO request) {
         var evidence =
-            request.automatedAssessmentPolicy() == null
+            request.automatedReviewPolicy() == null
                 ? evidenceDefaults.forArtifact(request.artifactType())
-                : request.automatedAssessmentPolicy();
+                : request.automatedReviewPolicy();
         return request.definition(evidence);
     }
 

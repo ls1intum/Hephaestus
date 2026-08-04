@@ -274,8 +274,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .hasMessageContaining("practice current revision does not match its current projection");
         assertThatThrownBy(() ->
             execute(
-                "UPDATE practice SET automated_assessment_policy = " +
-                    "jsonb_set(automated_assessment_policy, '{evidenceProfile}', '\"issue-review\"') WHERE id = 136301"
+                "UPDATE practice SET automated_review_policy = " +
+                    "jsonb_set(automated_review_policy, '{evidenceProfile}', '\"issue-review\"') WHERE id = 136301"
             )
         )
             .isInstanceOf(SQLException.class)
@@ -285,7 +285,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 """
                 INSERT INTO practice (
                     workspace_id, slug, name, applies_to, display_order, trigger_events,
-                    criteria, automated_assessment_policy, used_in_new_reviews, created_at
+                    criteria, automated_review_policy, used_in_new_reviews, created_at
                 ) VALUES (
                     136103, 'missing-current-revision', 'Missing revision', 'PULL_REQUEST', 3,
                     '[]'::jsonb, 'criteria', '{}'::jsonb, true, now()
@@ -306,7 +306,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
 
         assertThatThrownBy(() ->
             execute(
-                "UPDATE practice_revision SET automated_assessment_policy = '{}'::jsonb " +
+                "UPDATE practice_revision SET automated_review_policy = '{}'::jsonb " +
                     "WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)"
             )
         )
@@ -348,7 +348,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     slug, name, applies_to, trigger_events, precompute_script,
                     why_it_matters, what_good_looks_like,
                     area_slug, area_name, area_description, area_icon, area_color,
-                    review_rule_fingerprint, automated_assessment_policy
+                    review_rule_fingerprint, automated_review_policy
                 )
                 SELECT practice.id,
                        (SELECT max(revision_number) + 1 FROM practice_revision WHERE practice_id = practice.id),
@@ -367,7 +367,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                        area.icon,
                        area.color,
                        ('v2:' || repeat('a', 64)),
-                       practice.automated_assessment_policy
+                       practice.automated_review_policy
                 FROM practice
                 LEFT JOIN practice_area area ON area.id = practice.practice_area_id
                 WHERE practice.id = 136301
@@ -444,18 +444,18 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                             SELECT count(*)::text
                             FROM practice_revision
                             WHERE practice_id IN (136301, 136302)
-                              AND automated_assessment_policy IS NOT NULL
-                              AND automated_assessment_policy ? 'sourceContractVersion'
-                              AND automated_assessment_policy ? 'evidenceProfile'
-                              AND automated_assessment_policy #>> '{automatedAssessment,mode}' = 'LANGUAGE_MODEL'
-                              AND automated_assessment_policy #>> '{automatedAssessment,evidenceSufficiency}' =
+                              AND automated_review_policy IS NOT NULL
+                              AND automated_review_policy ? 'sourceContractVersion'
+                              AND automated_review_policy ? 'evidenceProfile'
+                              AND automated_review_policy #>> '{automatedReview,mode}' = 'LANGUAGE_MODEL'
+                              AND automated_review_policy #>> '{automatedReview,evidenceSufficiency}' =
                                   'SUFFICIENT_WHEN_REQUIREMENTS_MET'
-                              AND jsonb_typeof(automated_assessment_policy -> 'requiredEvidence') = 'array'
-                              AND jsonb_array_length(automated_assessment_policy -> 'requiredEvidence') > 0
-                              AND jsonb_typeof(automated_assessment_policy -> 'optionalContext') = 'array'
-                              AND NOT automated_assessment_policy ? 'profile'
-                              AND NOT automated_assessment_policy ? 'detectorCapability'
-                  AND NOT automated_assessment_policy ? 'optionalEvidence'
+                              AND jsonb_typeof(automated_review_policy -> 'requiredEvidence') = 'array'
+                              AND jsonb_array_length(automated_review_policy -> 'requiredEvidence') > 0
+                              AND jsonb_typeof(automated_review_policy -> 'optionalContext') = 'array'
+                              AND NOT automated_review_policy ? 'profile'
+                              AND NOT automated_review_policy ? 'detectorCapability'
+                  AND NOT automated_review_policy ? 'optionalEvidence'
                 """
             )
         ).isEqualTo("1");
@@ -469,8 +469,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 FROM practice practice
                 JOIN practice_revision revision ON revision.id = practice.current_revision_id
                 WHERE practice.id IN (136301, 136302)
-                  AND revision.automated_assessment_policy = practice.automated_assessment_policy
-                  AND revision.automated_assessment_policy IS NOT NULL
+                  AND revision.automated_review_policy = practice.automated_review_policy
+                  AND revision.automated_review_policy IS NOT NULL
                 """
             )
         ).isEqualTo("2");
@@ -480,7 +480,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE practice_id IN (136301, 136302)
-                  AND automated_assessment_policy IS NULL
+                  AND automated_review_policy IS NULL
                 """
             )
         ).isEqualTo("3");

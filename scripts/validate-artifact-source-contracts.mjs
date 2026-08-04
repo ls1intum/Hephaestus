@@ -140,7 +140,7 @@ const validateContractVersion = async (version) => {
 	const catalogDigest = createHash("sha256").update(catalogBytes).digest("hex");
 	for (const schemaFile of [
 		"artifact-source-manifest.schema.json",
-		"automated-assessment-readiness-report.schema.json",
+		"automated-review-readiness-report.schema.json",
 	]) {
 		const schema = await readJson(path.join(versionDir, schemaFile));
 		if (schema.properties.catalogDigest.const !== catalogDigest) {
@@ -176,7 +176,7 @@ const validateContractVersion = async (version) => {
 		}
 	}
 	const sourceUsePurposes = new Set([
-		"AUTOMATED_PRACTICE_ASSESSMENT",
+		"AUTOMATED_PRACTICE_REVIEW",
 		"PRACTICE_FEEDBACK_DELIVERY",
 		"CONVERSATIONAL_MENTORING",
 		"OPERATOR_EVIDENCE_REVIEW",
@@ -249,13 +249,13 @@ const validatePracticeCatalogSemantics = () => {
 				throw new Error(`default-catalog.json duplicates practice '${practice.slug}'`);
 			}
 			practiceSlugs.add(practice.slug);
-			const policy = practiceCatalog.automatedAssessmentPolicy[practice.automatedAssessmentPolicyId];
+			const policy = practiceCatalog.automatedReviewPolicy[practice.automatedReviewPolicyId];
 			if (!policy) {
 				throw new Error(
-					`default-catalog.json practice '${practice.slug}' references unknown automated-assessment setup '${practice.automatedAssessmentPolicyId}'`,
+					`default-catalog.json practice '${practice.slug}' references unknown automated-review setup '${practice.automatedReviewPolicyId}'`,
 				);
 			}
-			referencedPolicies.add(practice.automatedAssessmentPolicyId);
+			referencedPolicies.add(practice.automatedReviewPolicyId);
 			const profile = profiles.get(policy.evidenceProfile);
 			if (profile?.artifactType !== practice.artifactType) {
 				throw new Error(
@@ -273,14 +273,14 @@ const validatePracticeCatalogSemantics = () => {
 					`default-catalog.json practice '${practice.slug}' uses incompatible trigger '${incompatibleTrigger}'`,
 				);
 			}
-			const automatedAssessment = policy.automatedAssessment.mode !== "NONE";
-			if (!automatedAssessment && practice.triggerEvents.length > 0) {
+			const automatedReview = policy.automatedReview.mode !== "NONE";
+			if (!automatedReview && practice.triggerEvents.length > 0) {
 				throw new Error(
-					`default-catalog.json practice '${practice.slug}' starts reviews without automated assessment`,
+					`default-catalog.json practice '${practice.slug}' starts reviews without automated review`,
 				);
 			}
 			if (
-				automatedAssessment &&
+				automatedReview &&
 				practice.artifactType !== "CONVERSATION_THREAD" &&
 				practice.triggerEvents.length === 0
 			) {
@@ -298,9 +298,9 @@ const validatePracticeCatalogSemantics = () => {
 						`default-catalog.json practice '${practice.slug}' references missing precompute script '${practice.precomputeScript}'`,
 					);
 				}
-				if (!automatedAssessment) {
+				if (!automatedReview) {
 					throw new Error(
-						`default-catalog.json practice '${practice.slug}' precomputes without automated assessment`,
+						`default-catalog.json practice '${practice.slug}' precomputes without automated review`,
 					);
 				}
 				referencedPrecomputeScripts.add(practice.precomputeScript);
@@ -310,9 +310,9 @@ const validatePracticeCatalogSemantics = () => {
 	if (practiceSlugs.size === 0) {
 		throw new Error("default-catalog.json must define at least one practice");
 	}
-	for (const policyId of Object.keys(practiceCatalog.automatedAssessmentPolicy)) {
+	for (const policyId of Object.keys(practiceCatalog.automatedReviewPolicy)) {
 		if (!referencedPolicies.has(policyId)) {
-			throw new Error(`default-catalog.json automated-assessment setup '${policyId}' is unused`);
+			throw new Error(`default-catalog.json automated-review setup '${policyId}' is unused`);
 		}
 	}
 	for (const script of precomputeScripts) {
@@ -355,18 +355,18 @@ const validateEvidenceSemantics = (requirements, label) => {
 	}
 };
 
-for (const [name, requirements] of Object.entries(practiceCatalog.automatedAssessmentPolicy)) {
+for (const [name, requirements] of Object.entries(practiceCatalog.automatedReviewPolicy)) {
 	validate(
-		"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-assessment-policy.schema.json",
+		"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json",
 		requirements,
-		`default-catalog.json automatedAssessmentPolicy.${name}`,
+		`default-catalog.json automatedReviewPolicy.${name}`,
 	);
-	validateEvidenceSemantics(requirements, `default-catalog.json automatedAssessmentPolicy.${name}`);
+	validateEvidenceSemantics(requirements, `default-catalog.json automatedReviewPolicy.${name}`);
 }
 
 const evidenceSchema =
-	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-assessment-policy.schema.json";
-const invalidOptional = structuredClone(Object.values(practiceCatalog.automatedAssessmentPolicy)[0]);
+	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json";
+const invalidOptional = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
 invalidOptional.optionalContext = [
 	{
 		sourceKind: invalidOptional.requiredEvidence[0].sourceKind,
@@ -378,22 +378,22 @@ if (ajv.validate(evidenceSchema, invalidOptional)) {
 	throw new Error("practice evidence schema accepted quality constraints on an optional source");
 }
 
-const unexplainedAdditionalContext = structuredClone(Object.values(practiceCatalog.automatedAssessmentPolicy)[0]);
-unexplainedAdditionalContext.automatedAssessment.evidenceSufficiency = "DECLARED_EVIDENCE_INSUFFICIENT";
+const unexplainedAdditionalContext = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
+unexplainedAdditionalContext.automatedReview.evidenceSufficiency = "DECLARED_EVIDENCE_INSUFFICIENT";
 unexplainedAdditionalContext.knownLimitations = [];
 if (ajv.validate(evidenceSchema, unexplainedAdditionalContext)) {
 	throw new Error("practice evidence schema accepted unexplained additional context");
 }
 
-const withoutAssessment = structuredClone(Object.values(practiceCatalog.automatedAssessmentPolicy)[0]);
-withoutAssessment.automatedAssessment = { mode: "NONE", evidenceSufficiency: "NONE" };
-withoutAssessment.requiredEvidence = [];
-withoutAssessment.optionalContext = [];
-withoutAssessment.knownLimitations = [];
-validate(evidenceSchema, withoutAssessment, "valid no-assessment requirements fixture");
+const withoutAutomatedReview = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
+withoutAutomatedReview.automatedReview = { mode: "NONE", evidenceSufficiency: "NONE" };
+withoutAutomatedReview.requiredEvidence = [];
+withoutAutomatedReview.optionalContext = [];
+withoutAutomatedReview.knownLimitations = [];
+validate(evidenceSchema, withoutAutomatedReview, "valid no-automated-review requirements fixture");
 
 const expectSchemaRejection = (label, mutate) => {
-	const requirements = structuredClone(Object.values(practiceCatalog.automatedAssessmentPolicy)[0]);
+	const requirements = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
 	mutate(requirements);
 	if (ajv.validate(evidenceSchema, requirements)) {
 		throw new Error(`practice evidence schema accepted ${label}`);
@@ -402,13 +402,13 @@ const expectSchemaRejection = (label, mutate) => {
 
 expectSchemaRejection("legacy observability property", (requirements) => {
 	requirements.observability = "LANGUAGE_MODEL";
-	delete requirements.automatedAssessment;
+	delete requirements.automatedReview;
 });
 for (const [legacyName, currentName] of [
 	["profile", "evidenceProfile"],
 	["required", "requiredEvidence"],
 	["optional", "optionalContext"],
-	["detectorCapability", "automatedAssessment"],
+	["detectorCapability", "automatedReview"],
 	["onUnsatisfied", "whenEvidenceIsInsufficient"],
 	["blindSpots", "knownLimitations"],
 ]) {
@@ -421,24 +421,24 @@ expectSchemaRejection("legacy limitation summary", (requirements) => {
 	requirements.knownLimitations[0].summary = requirements.knownLimitations[0].description;
 	delete requirements.knownLimitations[0].description;
 });
-expectSchemaRejection("legacy semantic assessment mode", (requirements) => {
-	requirements.automatedAssessment.mode = "SEMANTIC";
+expectSchemaRejection("legacy semantic review mode", (requirements) => {
+	requirements.automatedReview.mode = "SEMANTIC";
 });
-expectSchemaRejection("incoherent automated assessment", (requirements) => {
-	requirements.automatedAssessment = {
+expectSchemaRejection("incoherent automated review", (requirements) => {
+	requirements.automatedReview = {
 		mode: "NONE",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	};
 });
-expectSchemaRejection("assessment evidence on a no-automated-assessment practice", (requirements) => {
-	requirements.automatedAssessment = { mode: "NONE", evidenceSufficiency: "NONE" };
+expectSchemaRejection("review evidence on a no-automated-review practice", (requirements) => {
+	requirements.automatedReview = { mode: "NONE", evidenceSufficiency: "NONE" };
 });
-expectSchemaRejection("assessment without required evidence", (requirements) => {
+expectSchemaRejection("automated review without required evidence", (requirements) => {
 	requirements.requiredEvidence = [];
 });
 
 const expectSemanticRejection = (mutate, expected) => {
-	const requirements = structuredClone(Object.values(practiceCatalog.automatedAssessmentPolicy)[0]);
+	const requirements = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
 	mutate(requirements);
 	try {
 		validateEvidenceSemantics(requirements, "adversarial requirements");
@@ -520,7 +520,7 @@ try {
 }
 
 const readinessSchema =
-	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/automated-assessment-readiness-report.schema.json";
+	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/automated-review-readiness-report.schema.json";
 const sourceCheck = {
 	sourceKind: "scm.pull-request.diff",
 	sourceContractVersion: "1.0.0",
@@ -548,19 +548,19 @@ const readiness = {
 };
 validate(readinessSchema, readiness, "valid readiness fixture");
 validateReadinessSemantics(readiness, "valid readiness fixture");
-const skippedAssessment = {
+const skippedReview = {
 	...readiness,
 	decisions: [
 		{
 			...readiness.decisions[0],
 			ready: false,
-			reasonCodes: ["NO_AUTOMATED_ASSESSMENT"],
+			reasonCodes: ["NO_AUTOMATED_REVIEW"],
 			sourceChecks: [],
 		},
 	],
 };
-validate(readinessSchema, skippedAssessment, "valid skipped-assessment fixture");
-validateReadinessSemantics(skippedAssessment, "valid skipped-assessment fixture");
+validate(readinessSchema, skippedReview, "valid skipped-review fixture");
+validateReadinessSemantics(skippedReview, "valid skipped-review fixture");
 for (const [label, decision] of [
 	["zero source checks", { ...readiness.decisions[0], sourceChecks: [] }],
 	["duplicate source check", { ...readiness.decisions[0], sourceChecks: [sourceCheck, structuredClone(sourceCheck)] }],

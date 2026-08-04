@@ -32,8 +32,8 @@ const practiceDefinition = {
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "Our own criteria",
 	whyItMatters: "Reviewers need context",
-	automatedAssessmentPolicy: mockPullRequestEvidence,
-	automatedAssessmentValidation: mockAuthorDeclaredEvidenceValidation,
+	automatedReviewPolicy: mockPullRequestEvidence,
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
 function mockCatalog(overrides: Record<string, unknown> = {}) {
@@ -56,7 +56,7 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 				slug: "describe-what-and-why",
 				name: practiceDefinition.name,
 				artifactType: "PULL_REQUEST",
-				automatedAssessment: mockPullRequestEvidence.automatedAssessment,
+				automatedReview: mockPullRequestEvidence.automatedReview,
 				areaSlug: "packaging",
 				position: 0,
 				effectivelyOffered: true,
@@ -667,6 +667,6 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(() => expect(requestBody).toBeDefined());
-		expect(requestBody?.automatedAssessmentPolicy).toEqual(expectedEvidence);
+		expect(requestBody?.automatedReviewPolicy).toEqual(expectedEvidence);
 	});
 });

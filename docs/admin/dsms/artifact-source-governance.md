@@ -27,7 +27,7 @@ defines the governance decision that permits collection, retention, processing, 
 5. **Separate responsibilities.** Workspace administrators select sources within the operator-approved envelope;
    they do not approve legal basis, processors, transfers, DPIA outcomes, or new data categories.
 6. **Propagate restrictions.** Derivations inherit the strictest audience, egress, region, retention, and erasure
-   rules of their dependencies. The runtime separately enforces `AUTOMATED_PRACTICE_ASSESSMENT`,
+   rules of their dependencies. The runtime separately enforces `AUTOMATED_PRACTICE_REVIEW`,
    `PRACTICE_FEEDBACK_DELIVERY`, `CONVERSATIONAL_MENTORING`, and `OPERATOR_EVIDENCE_REVIEW` at their boundaries.
 7. **Erasure beats replay.** Erasure or expiry may make a case unreplayable. Retain only a non-content tombstone
    where an approved audit purpose requires one.
@@ -51,7 +51,7 @@ the server and workers is the emergency disable path; re-enablement follows the 
 
 The runtime registry is
 [`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
-It is an engineering gate and contains only releasable decision summaries. Each record governs exactly one source-use purpose; a source references separate records for automated assessment, feedback delivery, Mentor context, and operator evidence review:
+It is an engineering gate and contains only releasable decision summaries. Each record governs exactly one source-use purpose; a source references separate records for automated review, feedback delivery, Mentor context, and operator evidence review:
 
 - `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized
   product scope. It is not controller or DPO approval and cannot cover scope expansion.
@@ -85,7 +85,7 @@ sourceContractVersion: 1.0.0
 deploymentScope: tumaet-production
 
 sourceUse:
-  purpose: AUTOMATED_PRACTICE_ASSESSMENT
+  purpose: AUTOMATED_PRACTICE_REVIEW
   consumers: [practice-slug]
   necessity: "Why a less intrusive source is insufficient"
   minimumScope: "Fields, query, event, window, ordering, and caps"
@@ -139,7 +139,7 @@ reviewBy: YYYY-MM-DD
 supersedes: null
 ```
 
-Create a separate record for each additional source-use purpose. Do not copy automated-assessment processor-egress terms into
+Create a separate record for each additional source-use purpose. Do not copy automated-review processor-egress terms into
 feedback or operator review records when those uses do not invoke a model.
 
 ## Retention and erasure
@@ -175,7 +175,7 @@ record. Renewal creates a new contract version containing the new decision; publ
 immutable. Migrate practice declarations and the runtime manifest reference to that version, run
 `pnpm run check:contracts`, and deploy. Never edit an existing version's dates. If renewal is denied or incomplete,
 remove the affected grants from `hephaestus.evidence.authorized-source-uses`; collection and disclosure then stop,
-and Hephaestus makes no automated assessment claim.
+and Hephaestus makes no automated review claim.
 
 ## Change checklist
 
@@ -191,7 +191,7 @@ and Hephaestus makes no automated assessment claim.
 - [ ] Test every supported state, including valid empty evidence and applicable truncation or redaction.
 - [ ] Use low-cardinality health metrics without workspace, repository, person, URL, or digest labels.
 - [ ] Document the kill switch and operator remediation.
-- [ ] Mark affected automated-assessment validation and operator-audit claims stale.
+- [ ] Mark affected automated-review validation and operator-audit claims stale.
 - [ ] Link the approved decision from the source descriptor.
 
 The TUM deployment's current Art. 35 status and expansion restrictions are recorded in the

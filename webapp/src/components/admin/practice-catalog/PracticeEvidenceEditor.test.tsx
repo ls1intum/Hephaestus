@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { PracticeAutomatedAssessmentPolicy } from "@/api/types.gen";
+import type { PracticeAutomatedReviewPolicy } from "@/api/types.gen";
 import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
 import { PracticeEvidenceEditor, practiceEvidenceError } from "./PracticeEvidenceEditor";
@@ -22,7 +22,7 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
 		await user.click(
 			screen.getByRole("combobox", {
 				name: "Use in this practice for Inline review comments",
@@ -46,11 +46,11 @@ describe("PracticeEvidenceEditor", () => {
 		).toBe("Choose at least one required evidence source.");
 	});
 
-	it("does not require integration evidence for a practice without automated assessment", () => {
+	it("does not require integration evidence for a practice without automated review", () => {
 		expect(
 			practiceEvidenceError({
 				...options.recommendedRequirements,
-				automatedAssessment: { mode: "NONE", evidenceSufficiency: "NONE" },
+				automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
 				requiredEvidence: [],
 				optionalContext: [],
 				knownLimitations: [],
@@ -58,7 +58,7 @@ describe("PracticeEvidenceEditor", () => {
 		).toBeUndefined();
 	});
 
-	it("does not offer an assessment mode the runtime cannot execute", async () => {
+	it("does not offer an review mode the runtime cannot execute", async () => {
 		const user = userEvent.setup();
 		await renderWithRouter(
 			<PracticeEvidenceEditor
@@ -69,9 +69,9 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
 		await user.click(
-			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
+			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
 		);
 
 		expect(screen.queryByRole("option", { name: "Rule-based (not supported)" })).toBeNull();
@@ -88,9 +88,9 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
 		expect(
-			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
+			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
 		).toHaveProperty("textContent", expect.stringContaining("Language model"));
 		expect(
 			screen.getByRole("combobox", { name: "When evidence checks pass, is it enough?" }),
@@ -121,7 +121,7 @@ describe("PracticeEvidenceEditor", () => {
 		expect(screen.getByText(/An instance operator must authorize Slack thread/)).toBeTruthy();
 	});
 
-	it("separates Hephaestus assessment from human assessment", async () => {
+	it("separates Hephaestus review from human review", async () => {
 		await renderWithRouter(
 			<PracticeEvidenceEditor
 				options={options}
@@ -132,10 +132,10 @@ describe("PracticeEvidenceEditor", () => {
 		);
 
 		expect(screen.getByText(/This setting only controls Hephaestus/)).toBeTruthy();
-		expect(screen.getByText(/Human assessment, if applicable/)).toBeTruthy();
+		expect(screen.getByText(/Human review, if applicable/)).toBeTruthy();
 	});
 
-	it("restores edited evidence after temporarily disabling automated assessment", async () => {
+	it("restores edited evidence after temporarily disabling automated review", async () => {
 		const user = userEvent.setup();
 		const edited = {
 			...options.recommendedRequirements,
@@ -144,20 +144,20 @@ describe("PracticeEvidenceEditor", () => {
 			],
 		};
 		function ControlledEditor() {
-			const [value, setValue] = useState<PracticeAutomatedAssessmentPolicy>(edited);
+			const [value, setValue] = useState<PracticeAutomatedReviewPolicy>(edited);
 			return <PracticeEvidenceEditor options={options} value={value} onChange={setValue} />;
 		}
 		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
 
-		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
 		await user.click(
-			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
+			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
 		);
-		await user.click(await screen.findByRole("option", { name: "No automated assessment" }));
+		await user.click(await screen.findByRole("option", { name: "No automated review" }));
 
 		expect(screen.queryByText("1. A practice review starts")).toBeNull();
 		await user.click(
-			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
+			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
 		);
 		await user.click(await screen.findByRole("option", { name: "Language model" }));
 
@@ -167,7 +167,7 @@ describe("PracticeEvidenceEditor", () => {
 		).toBe("Keep this edited limitation.");
 	});
 
-	it("keeps disabled assessment drafts separate by evidence profile", async () => {
+	it("keeps disabled review drafts separate by evidence profile", async () => {
 		const user = userEvent.setup();
 		const pullRequest = {
 			...options.recommendedRequirements,
@@ -178,7 +178,7 @@ describe("PracticeEvidenceEditor", () => {
 		const issue = mockPracticeEvidenceOptions.workTypes[1];
 		function ProfileEditor() {
 			const [selectedOptions, setSelectedOptions] = useState(options);
-			const [value, setValue] = useState<PracticeAutomatedAssessmentPolicy>(pullRequest);
+			const [value, setValue] = useState<PracticeAutomatedReviewPolicy>(pullRequest);
 			return (
 				<>
 					<button
@@ -196,7 +196,7 @@ describe("PracticeEvidenceEditor", () => {
 							setSelectedOptions(options);
 							setValue({
 								...options.recommendedRequirements,
-								automatedAssessment: { mode: "NONE", evidenceSufficiency: "NONE" },
+								automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
 								requiredEvidence: [],
 								optionalContext: [],
 								knownLimitations: [],
@@ -211,15 +211,15 @@ describe("PracticeEvidenceEditor", () => {
 		}
 		await renderWithRouter(<ProfileEditor />, "/admin/practices/new");
 
-		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
 		await user.click(
-			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
+			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
 		);
-		await user.click(await screen.findByRole("option", { name: "No automated assessment" }));
+		await user.click(await screen.findByRole("option", { name: "No automated review" }));
 		await user.click(screen.getByRole("button", { name: "Edit issue evidence" }));
 		await user.click(screen.getByRole("button", { name: "Return to pull request evidence" }));
 		await user.click(
-			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
+			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
 		);
 		await user.click(await screen.findByRole("option", { name: "Language model" }));
 
@@ -230,7 +230,7 @@ describe("PracticeEvidenceEditor", () => {
 	it("opens invalid requirements and manages limitation focus", async () => {
 		const user = userEvent.setup();
 		function ControlledEditor() {
-			const [value, setValue] = useState<PracticeAutomatedAssessmentPolicy>({
+			const [value, setValue] = useState<PracticeAutomatedReviewPolicy>({
 				...options.recommendedRequirements,
 				requiredEvidence: [],
 			});
@@ -244,7 +244,7 @@ describe("PracticeEvidenceEditor", () => {
 			);
 		}
 		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
-		const evidenceGroup = screen.getByRole("region", { name: "Automated assessment" });
+		const evidenceGroup = screen.getByRole("region", { name: "Automated review" });
 		expect(evidenceGroup.getAttribute("aria-invalid")).toBe("true");
 		expect(evidenceGroup.getAttribute("aria-describedby")).toBe("practice-evidence-error");
 

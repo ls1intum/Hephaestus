@@ -16,7 +16,7 @@ const meta = {
 			reviewRuleFingerprint: `v2:${"0".repeat(64)}`,
 			evaluatorProcedureFingerprint: `v1:${"1".repeat(64)}`,
 			validatedAt: new Date("2026-01-15T10:00:00Z"),
-			validator: "Independent automated assessment review",
+			validator: "Independent automated review review",
 			validationReference: "review-1437",
 		},
 	},

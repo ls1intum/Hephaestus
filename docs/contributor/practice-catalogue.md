@@ -20,7 +20,7 @@ it propagates:
 | Decision | Hephaestus defaults | Instance catalog | Workspace practices |
 | --- | --- | --- | --- |
 | Name, work type, criteria, and guidance | maintained in the repository | inherited or customized by an instance administrator | copied at workspace creation, then owned by the workspace |
-| Automated assessment and required evidence | selected by `automatedAssessmentPolicyId`; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
+| Automated review and required evidence | selected by `automatedReviewPolicyId`; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
 | Included in new workspaces | default is included | instance administrator can include or exclude | not applicable after installation |
 | Used in new reviews | not a repository setting | not a curated-catalog setting | workspace administrator controls it; unavailable automation cannot be enabled |
 | Area and order | JSON array order | inherited or changed with drag-and-drop or move actions | copied, then independently managed |
@@ -29,15 +29,15 @@ This is a one-way lifecycle: a repository update can update an uncustomized inst
 an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
 definition or an existing workspace.
 
-## Human assessment without Hephaestus
+## Human review without Hephaestus
 
-A practice can still be useful when a developer, peer, or human mentor can assess it but Hephaestus
-cannot. Set **How should Hephaestus assess reviewed work?** to **No automated assessment**. The
+A practice can still be useful when a developer, peer, or human mentor can review it but Hephaestus
+cannot. Set **How should Hephaestus review this practice?** to **No automated review**. The
 practice keeps its criteria and guidance, but has no automated-review triggers, evidence requirements,
 or precompute script. Instance administrators can include it in the catalog for new workspaces;
 workspace administrators cannot enable it for automated reviews.
 
-For example, “Explain the reasoning behind a difficult trade-off” may be assessable in a mentoring
+For example, “Explain the reasoning behind a difficult trade-off” may be reviewable in a mentoring
 conversation that is not available through an authorized integration. Its criteria remain a useful
 human rubric. Hephaestus must not infer the conversation or produce a review finding from unrelated
 repository data.
@@ -112,7 +112,7 @@ color; position is excluded.
 
 A practice must:
 
-1. identify who is expected to assess the habit and from which context;
+1. identify who is expected to review the habit and from which context;
 2. distinguish evidence from inference and avoid claims that the code is correct;
 3. define applicability and the evidence required to report it;
 4. define false-positive exclusions and proportionate severity;
@@ -121,10 +121,10 @@ A practice must:
 
 Evidence requirements use the versioned
 [artifact-source contract](./artifact-source-contract) and the canonical
-[practice assessment glossary](./practice-assessment-glossary.mdx). They define required evidence, optional context,
+[practice review glossary](./practice-review-glossary.mdx). They define required evidence, optional context,
 minimum completeness and freshness, conservative skipping, and known limitations. They must not infer availability
 from a missing file or require desired content to be non-empty. Author-defined requirements are not independent
-validation of automated assessment. They say nothing about whether a developer, peer, or human mentor can assess the practice
+validation of automated review. They say nothing about whether a developer, peer, or human mentor can review the practice
 outside the governed integrations.
 
 The review-rule fingerprint uses an explicit scheme prefix. Evidence-aware definitions use `v2`; stored `v1`
@@ -155,7 +155,7 @@ standard as an experiment or a convention as a proven outcome.
 5. Update `server/src/main/resources/practices/default-catalog.json`; its adjacent JSON Schema provides
    editor completion and CI validation, and Git history is the bundled version history. Reference any
    precompute script explicitly; unreferenced scripts fail validation.
-6. Add or update focused automated-assessment tests, including required-source skipping and valid-empty evidence.
+6. Add or update focused automated-review tests, including required-source skipping and valid-empty evidence.
 7. Review the admin presentation and a representative delivered message.
 
 Create workspace-specific practices through the admin UI or API so validation, ordering, revisions,

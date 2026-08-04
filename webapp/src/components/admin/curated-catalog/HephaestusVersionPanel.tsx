@@ -61,11 +61,8 @@ const PRACTICE_FIELDS = {
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Precompute script",
-	automatedAssessmentPolicy: "Evidence requirements",
-} satisfies Record<
-	Exclude<keyof CuratedPracticeDefinition, "automatedAssessmentValidation">,
-	string
->;
+	automatedReviewPolicy: "Evidence requirements",
+} satisfies Record<Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation">, string>;
 
 function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
@@ -185,11 +182,11 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 													field === "precomputeScript" && "font-mono",
 												)}
 											>
-												{field === "automatedAssessmentPolicy" && shippedPractice ? (
+												{field === "automatedReviewPolicy" && shippedPractice ? (
 													shippedEvidenceOptions ? (
 														<PracticeEvidenceSummary
-															policy={shippedPractice.automatedAssessmentPolicy}
-															validation={shippedPractice.automatedAssessmentValidation}
+															policy={shippedPractice.automatedReviewPolicy}
+															validation={shippedPractice.automatedReviewValidation}
 															sources={shippedEvidenceOptions.allowedSources}
 															workTypeLabel={
 																FOCUS_ARTIFACT_OPTIONS.find(

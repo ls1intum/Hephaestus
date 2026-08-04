@@ -125,7 +125,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             EvidencePlan.compile(practices)
         );
         var artifactSourceManifest = prepared.manifest();
-        var readiness = workspaceContextBuilder.prepareAutomatedAssessmentReadiness(
+        var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
             prepared.manifest(),
             practices,
             job.getId().toString(),

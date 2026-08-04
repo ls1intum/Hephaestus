@@ -1,6 +1,6 @@
 import type {
-	PracticeAutomatedAssessmentPolicy,
-	PracticeAutomatedAssessmentValidation,
+	PracticeAutomatedReviewPolicy,
+	PracticeAutomatedReviewValidation,
 	PracticeEvidenceOptions,
 } from "@/api/types.gen";
 
@@ -9,12 +9,12 @@ export const mockAuthorDeclaredEvidenceValidation = {
 	sourceContractVersion: "1.0.0",
 	policyDigest: "0".repeat(64),
 	reviewRuleFingerprint: `v2:${"0".repeat(64)}`,
-} satisfies PracticeAutomatedAssessmentValidation;
+} satisfies PracticeAutomatedReviewValidation;
 
 export const mockPullRequestEvidence = {
 	sourceContractVersion: "1.0.0",
 	evidenceProfile: "pull-request-review",
-	automatedAssessment: {
+	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
@@ -23,19 +23,19 @@ export const mockPullRequestEvidence = {
 		{ sourceKind: "scm.pull-request.diff", completeness: "COMPLETE", freshness: "CURRENT" },
 	],
 	optionalContext: [{ sourceKind: "scm.pull-request.comments" }],
-	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_ASSESSMENT",
+	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
 			code: "RUNTIME_BEHAVIOR_NOT_OBSERVED",
 			description: "Repository evidence does not establish behavior in a deployed runtime.",
 		},
 	],
-} satisfies PracticeAutomatedAssessmentPolicy;
+} satisfies PracticeAutomatedReviewPolicy;
 
 const mockIssueEvidence = {
 	sourceContractVersion: "1.0.0",
 	evidenceProfile: "issue-review",
-	automatedAssessment: {
+	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
@@ -43,7 +43,7 @@ const mockIssueEvidence = {
 		{ sourceKind: "scm.issue.core", completeness: "COMPLETE", freshness: "CURRENT" },
 	],
 	optionalContext: [{ sourceKind: "scm.issue.comments" }],
-	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_ASSESSMENT",
+	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
 			code: "IMPLEMENTATION_NOT_OBSERVED",
@@ -51,12 +51,12 @@ const mockIssueEvidence = {
 				"Issue evidence does not establish whether the described work was implemented correctly.",
 		},
 	],
-} satisfies PracticeAutomatedAssessmentPolicy;
+} satisfies PracticeAutomatedReviewPolicy;
 
 const mockConversationEvidence = {
 	sourceContractVersion: "1.0.0",
 	evidenceProfile: "conversation-review",
-	automatedAssessment: {
+	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
@@ -68,7 +68,7 @@ const mockConversationEvidence = {
 		},
 	],
 	optionalContext: [],
-	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_ASSESSMENT",
+	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
 			code: "PRIVATE_CONTEXT_NOT_OBSERVED",
@@ -76,13 +76,13 @@ const mockConversationEvidence = {
 				"The captured thread does not include decisions or context shared outside the conversation.",
 		},
 	],
-} satisfies PracticeAutomatedAssessmentPolicy;
+} satisfies PracticeAutomatedReviewPolicy;
 
 export const mockPracticeEvidenceOptions = {
 	workTypes: [
 		{
 			artifactType: "PULL_REQUEST",
-			supportedAutomatedAssessmentModes: ["LANGUAGE_MODEL"],
+			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedRequirements: mockPullRequestEvidence,
 			allowedSources: [
 				{
@@ -93,7 +93,7 @@ export const mockPracticeEvidenceOptions = {
 					supportsComplete: true,
 					supportsCurrent: true,
 					supportsEmpty: false,
-					authorizedForAutomatedAssessment: true,
+					authorizedForAutomatedReview: true,
 				},
 				{
 					sourceKind: "scm.pull-request.diff",
@@ -103,7 +103,7 @@ export const mockPracticeEvidenceOptions = {
 					supportsComplete: true,
 					supportsCurrent: true,
 					supportsEmpty: true,
-					authorizedForAutomatedAssessment: true,
+					authorizedForAutomatedReview: true,
 				},
 				{
 					sourceKind: "scm.pull-request.comments",
@@ -113,13 +113,13 @@ export const mockPracticeEvidenceOptions = {
 					supportsComplete: true,
 					supportsCurrent: false,
 					supportsEmpty: true,
-					authorizedForAutomatedAssessment: true,
+					authorizedForAutomatedReview: true,
 				},
 			],
 		},
 		{
 			artifactType: "ISSUE",
-			supportedAutomatedAssessmentModes: ["LANGUAGE_MODEL"],
+			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedRequirements: mockIssueEvidence,
 			allowedSources: [
 				{
@@ -130,7 +130,7 @@ export const mockPracticeEvidenceOptions = {
 					supportsComplete: true,
 					supportsCurrent: true,
 					supportsEmpty: false,
-					authorizedForAutomatedAssessment: true,
+					authorizedForAutomatedReview: true,
 				},
 				{
 					sourceKind: "scm.issue.comments",
@@ -140,13 +140,13 @@ export const mockPracticeEvidenceOptions = {
 					supportsComplete: true,
 					supportsCurrent: false,
 					supportsEmpty: true,
-					authorizedForAutomatedAssessment: true,
+					authorizedForAutomatedReview: true,
 				},
 			],
 		},
 		{
 			artifactType: "CONVERSATION_THREAD",
-			supportedAutomatedAssessmentModes: ["LANGUAGE_MODEL"],
+			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedRequirements: mockConversationEvidence,
 			allowedSources: [
 				{
@@ -157,7 +157,7 @@ export const mockPracticeEvidenceOptions = {
 					supportsComplete: true,
 					supportsCurrent: true,
 					supportsEmpty: false,
-					authorizedForAutomatedAssessment: false,
+					authorizedForAutomatedReview: false,
 				},
 			],
 		},

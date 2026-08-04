@@ -13,5 +13,5 @@ public record PracticeEvidenceSourceOptionDTO(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean supportsComplete,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean supportsCurrent,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean supportsEmpty,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean authorizedForAutomatedAssessment
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean authorizedForAutomatedReview
 ) {}

@@ -37,7 +37,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private Practice createPractice(String slug, String name) {
         Practice practice = new Practice();
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);

@@ -14,7 +14,7 @@ public record PracticeDefinition(
     List<String> triggerEvents,
     String criteria,
     @Nullable String precomputeScript,
-    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
+    PracticeAutomatedReviewPolicy automatedReviewPolicy,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
     @Nullable String areaSlug
@@ -26,7 +26,7 @@ public record PracticeDefinition(
         Objects.requireNonNull(artifactType, "artifactType");
         triggerEvents = List.copyOf(Objects.requireNonNull(triggerEvents, "triggerEvents").stream().sorted().toList());
         Objects.requireNonNull(criteria, "criteria");
-        Objects.requireNonNull(automatedAssessmentPolicy, "automatedAssessmentPolicy");
+        Objects.requireNonNull(automatedReviewPolicy, "automatedReviewPolicy");
         precomputeScript = blankToNull(precomputeScript);
         whyItMatters = blankToNull(whyItMatters);
         whatGoodLooksLike = blankToNull(whatGoodLooksLike);
@@ -39,7 +39,7 @@ public record PracticeDefinition(
             TriggerEventsConverter.toList(practice.getTriggerEvents()),
             practice.getCriteria(),
             practice.getPrecomputeScript(),
-            practice.getAutomatedAssessmentPolicy(),
+            practice.getAutomatedReviewPolicy(),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
             practice.getArea() == null ? null : practice.getArea().getSlug()
@@ -59,7 +59,7 @@ public record PracticeDefinition(
             triggerEvents,
             criteria,
             precomputeScript,
-            automatedAssessmentPolicy,
+            automatedReviewPolicy,
             areaSlug
         );
     }

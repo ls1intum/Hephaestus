@@ -25,7 +25,7 @@ purpose, retention, erasure, and its governance decision. Evidence profiles clos
 to each reviewed artifact type.
 
 A practice revision declares required and optional source kinds. The runtime records a full source manifest and a
-per-automated-assessment readiness report. If required evidence is unavailable, stale, incomplete, redacted, or denied, that
+per-automated-review readiness report. If required evidence is unavailable, stale, incomplete, redacted, or denied, that
 practice is marked not ready with typed evidence reasons. If no practice remains ready, the job completes with
 `INSUFFICIENT_EVIDENCE` without starting the detector; it never manufactures a semantic `NOT_APPLICABLE` result.
 

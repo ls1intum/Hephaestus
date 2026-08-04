@@ -6,32 +6,32 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <changeSet author="hephaestus-evidence-contract" id="1785743133884-1">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.automated_assessment_policy already present">
-            <not><columnExists tableName="practice" columnName="automated_assessment_policy"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.automated_review_policy already present">
+            <not><columnExists tableName="practice" columnName="automated_review_policy"/></not>
         </preConditions>
         <comment>Pin every workspace practice to an explicit artifact-source contract.</comment>
         <addColumn tableName="practice">
-            <column name="automated_assessment_policy" type="jsonb"/>
+            <column name="automated_review_policy" type="jsonb"/>
         </addColumn>
         <sql>
             UPDATE practice
-            SET automated_assessment_policy = CASE applies_to
-                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
-                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
-                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+            SET automated_review_policy = CASE applies_to
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
             END
         </sql>
-        <addNotNullConstraint tableName="practice" columnName="automated_assessment_policy" columnDataType="jsonb"/>
-        <rollback><dropColumn tableName="practice" columnName="automated_assessment_policy"/></rollback>
+        <addNotNullConstraint tableName="practice" columnName="automated_review_policy" columnDataType="jsonb"/>
+        <rollback><dropColumn tableName="practice" columnName="automated_review_policy"/></rollback>
     </changeSet>
 
     <changeSet author="hephaestus-evidence-contract" id="1785743133884-2">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision.automated_assessment_policy already present">
-            <not><columnExists tableName="practice_revision" columnName="automated_assessment_policy"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision.automated_review_policy already present">
+            <not><columnExists tableName="practice_revision" columnName="automated_review_policy"/></not>
         </preConditions>
-        <comment>Create a new current revision for the automated-assessment policy while preserving historical meaning.</comment>
+        <comment>Create a new current revision for the automated-review policy while preserving historical meaning.</comment>
         <addColumn tableName="practice_revision">
-            <column name="automated_assessment_policy" type="jsonb"/>
+            <column name="automated_review_policy" type="jsonb"/>
         </addColumn>
         <sql splitStatements="false"><![CDATA[
             INSERT INTO practice_revision (
@@ -39,7 +39,7 @@
                 slug, name, applies_to, trigger_events, precompute_script,
                 why_it_matters, what_good_looks_like,
                 area_slug, area_name, area_description, area_icon, area_color,
-                detection_fingerprint, automated_assessment_policy
+                detection_fingerprint, automated_review_policy
             )
             SELECT practice.id,
                    COALESCE((
@@ -62,7 +62,7 @@
                    area.icon,
                    area.color,
                    NULL,
-                   practice.automated_assessment_policy
+                   practice.automated_review_policy
             FROM practice
             LEFT JOIN practice_area area ON area.id = practice.practice_area_id;
 
@@ -70,12 +70,12 @@
             SET current_revision_id = revision.id
             FROM practice_revision revision
             WHERE revision.practice_id = practice.id
-              AND revision.automated_assessment_policy IS NOT NULL
+              AND revision.automated_review_policy IS NOT NULL
               AND revision.revision_number = (
                   SELECT MAX(candidate.revision_number)
                   FROM practice_revision candidate
                   WHERE candidate.practice_id = practice.id
-                    AND candidate.automated_assessment_policy IS NOT NULL
+                    AND candidate.automated_review_policy IS NOT NULL
               );
         ]]></sql>
         <rollback>
@@ -101,8 +101,8 @@
                   ON previous.practice_id = boundary.practice_id
                  AND previous.revision_number = boundary.revision_number - 1
                 WHERE boundary.practice_id = practice.id
-                  AND boundary.automated_assessment_policy IS NOT NULL
-                  AND previous.automated_assessment_policy IS NULL
+                  AND boundary.automated_review_policy IS NOT NULL
+                  AND previous.automated_review_policy IS NULL
                   AND boundary.revision_number = (
                       SELECT MIN(candidate.revision_number)
                       FROM practice_revision candidate
@@ -110,41 +110,41 @@
                         ON before_candidate.practice_id = candidate.practice_id
                        AND before_candidate.revision_number = candidate.revision_number - 1
                       WHERE candidate.practice_id = practice.id
-                        AND candidate.automated_assessment_policy IS NOT NULL
-                        AND before_candidate.automated_assessment_policy IS NULL
+                        AND candidate.automated_review_policy IS NOT NULL
+                        AND before_candidate.automated_review_policy IS NULL
                   );
 
                 DELETE FROM practice_revision
-                WHERE automated_assessment_policy IS NOT NULL;
+                WHERE automated_review_policy IS NOT NULL;
             ]]></sql>
-            <dropColumn tableName="practice_revision" columnName="automated_assessment_policy"/>
+            <dropColumn tableName="practice_revision" columnName="automated_review_policy"/>
         </rollback>
     </changeSet>
 
     <changeSet author="hephaestus-evidence-contract" id="1785743133884-3">
-        <preConditions onFail="MARK_RAN" onFailMessage="curated_practice_override.automated_assessment_policy already present">
-            <not><columnExists tableName="curated_practice_override" columnName="automated_assessment_policy"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="curated_practice_override.automated_review_policy already present">
+            <not><columnExists tableName="curated_practice_override" columnName="automated_review_policy"/></not>
         </preConditions>
         <comment>Keep evidence requirements with complete instance-curated practice overrides.</comment>
         <addColumn tableName="curated_practice_override">
-            <column name="automated_assessment_policy" type="jsonb"/>
+            <column name="automated_review_policy" type="jsonb"/>
         </addColumn>
         <sql>
             UPDATE curated_practice_override
-            SET automated_assessment_policy = CASE applies_to
-                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
-                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
-                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+            SET automated_review_policy = CASE applies_to
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
             END
             WHERE applies_to IS NOT NULL
         </sql>
-        <rollback><dropColumn tableName="curated_practice_override" columnName="automated_assessment_policy"/></rollback>
+        <rollback><dropColumn tableName="curated_practice_override" columnName="automated_review_policy"/></rollback>
     </changeSet>
 
     <changeSet author="hephaestus-evidence-contract" id="1785743133884-4">
         <preConditions onFail="HALT">
-            <columnExists tableName="practice" columnName="automated_assessment_policy"/>
-            <columnExists tableName="practice_revision" columnName="automated_assessment_policy"/>
+            <columnExists tableName="practice" columnName="automated_review_policy"/>
+            <columnExists tableName="practice_revision" columnName="automated_review_policy"/>
         </preConditions>
         <comment>Enforce evidence requirements in immutable revisions and the current practice projection.</comment>
         <sql splitStatements="false"><![CDATA[
@@ -162,7 +162,7 @@
                    AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
                    AND NEW.criteria = OLD.criteria
                    AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
-                   AND NEW.automated_assessment_policy IS NOT DISTINCT FROM OLD.automated_assessment_policy
+                   AND NEW.automated_review_policy IS NOT DISTINCT FROM OLD.automated_review_policy
                    AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
                    AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
                    AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
@@ -200,7 +200,7 @@
                       AND revision.trigger_events = practice.trigger_events
                       AND revision.criteria = practice.criteria
                       AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
-                      AND revision.automated_assessment_policy = practice.automated_assessment_policy
+                      AND revision.automated_review_policy = practice.automated_review_policy
                       AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
                       AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
                       AND revision.area_slug IS NOT DISTINCT FROM area.slug
@@ -215,7 +215,7 @@
             DROP TRIGGER practice_requires_current_revision_projection ON practice;
             CREATE CONSTRAINT TRIGGER practice_requires_current_revision_projection
                 AFTER INSERT OR UPDATE OF current_revision_id, slug, name, applies_to, trigger_events,
-                    criteria, precompute_script, automated_assessment_policy, why_it_matters, what_good_looks_like,
+                    criteria, precompute_script, automated_review_policy, why_it_matters, what_good_looks_like,
                     practice_area_id
                 ON practice
                 DEFERRABLE INITIALLY DEFERRED
@@ -396,7 +396,7 @@
                    AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
                    AND NEW.criteria = OLD.criteria
                    AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
-                   AND NEW.automated_assessment_policy IS NOT DISTINCT FROM OLD.automated_assessment_policy
+                   AND NEW.automated_review_policy IS NOT DISTINCT FROM OLD.automated_review_policy
                    AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
                    AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
                    AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
@@ -432,7 +432,7 @@
                        AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
                        AND NEW.criteria = OLD.criteria
                        AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
-                       AND NEW.automated_assessment_policy IS NOT DISTINCT FROM OLD.automated_assessment_policy
+                       AND NEW.automated_review_policy IS NOT DISTINCT FROM OLD.automated_review_policy
                        AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
                        AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
                        AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug

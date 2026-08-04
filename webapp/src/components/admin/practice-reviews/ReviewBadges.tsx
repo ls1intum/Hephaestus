@@ -9,9 +9,9 @@ import type {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
-	ASSESSMENT_LABELS,
 	DELIVERY_STATE_LABELS,
 	deliveryStateBadgeVariant,
+	REVIEW_RESULT_LABELS,
 	SEVERITY_LABELS,
 	severityBadgeVariant,
 } from "./review-format";
@@ -49,19 +49,19 @@ export function FeedbackStateBadge({ state }: { state: ReviewFeedback["deliveryS
 	return <Badge variant={deliveryStateBadgeVariant(state)}>{DELIVERY_STATE_LABELS[state]}</Badge>;
 }
 
-type FindingAssessment = Pick<ReviewFinding, "presence" | "assessment" | "severity">;
+type FindingResult = Pick<ReviewFinding, "presence" | "assessment" | "severity">;
 
-export function FindingAssessmentBadge({ finding }: { finding: FindingAssessment }) {
+export function FindingResultBadge({ finding }: { finding: FindingResult }) {
 	if (finding.presence === "NOT_APPLICABLE") {
 		return <Badge variant="outline">Not applicable</Badge>;
 	}
 	if (!finding.assessment) {
-		return <Badge variant="secondary">Unassessed</Badge>;
+		return <Badge variant="secondary">No result</Badge>;
 	}
 	return (
 		<span className="flex flex-wrap items-center gap-1.5">
 			<Badge variant={finding.assessment === "GOOD" ? "success" : "destructive"}>
-				{ASSESSMENT_LABELS[finding.assessment]}
+				{REVIEW_RESULT_LABELS[finding.assessment]}
 			</Badge>
 			{finding.assessment === "BAD" && finding.severity && (
 				<Badge variant={severityBadgeVariant(finding.severity)}>

@@ -2,7 +2,7 @@
 
 Use these product terms in user-facing interfaces, documentation, and release notes. Practice-evidence terms and
 their exact API, Java, and persistence names are defined in the
-[practice assessment glossary](./practice-assessment-glossary.mdx).
+[practice review glossary](./practice-review-glossary.mdx).
 
 Within a surface already titled **Practice reviews**, shorten **practice feedback** to **feedback**.
 Use the full term when the surrounding context does not establish which kind of feedback is meant.
@@ -13,13 +13,13 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 | **Practice**          | A defined way of working used to review work                                    | rule, detector                     |
 | **Practice area**     | A group of related practices                                                    | category, goal, learning objective |
 | **Unassigned**        | Practices that are not in a practice area                                       | ungrouped, unbound                 |
-| **Practice review**   | One assessment of reviewed work against the practices selected when the review starts | run                          |
+| **Practice review**   | One review of work against the practices selected when the review starts              | run, assessment              |
 | **Finding**           | One strength, improvement, or not-applicable result                             | observation                        |
 | **Practice feedback** | The collective guidance created from findings                                   | AI feedback, feedback items        |
 | **Message**           | One countable unit of feedback                                                  | ledger unit                        |
 | **Delivery**          | A message's prepared, delivered, withheld, failed, or replaced outcome          | placement, surface                 |
 | **Channel**           | Where feedback is intended to appear: reviewed work, Mentor, or Review activity   | destination, surface               |
-| **Reviewed work**     | A pull request, merge request, issue, or conversation being assessed            | artifact, target                   |
+| **Reviewed work**     | A pull request, merge request, issue, or conversation being reviewed             | artifact, target                   |
 | **Developer**         | The person a finding is about                                                   | learner                            |
 | **Contributor**       | A repository role relevant to review eligibility                                | user, when the role matters        |
 | **Heph**              | The conversational assistant                                                    | agent, bot                         |

@@ -90,7 +90,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(workspace);
 
         Practice practice = new Practice();
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("submit-test");
         practice.setName("Submit test");

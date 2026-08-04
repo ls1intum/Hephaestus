@@ -20,7 +20,7 @@ class PracticeEvidenceOptionsServiceTest {
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(
             JsonMapper.builder().build(),
             Clock.systemUTC(),
-            "scm.pull-request.core:AUTOMATED_PRACTICE_ASSESSMENT"
+            "scm.pull-request.core:AUTOMATED_PRACTICE_REVIEW"
         );
         var service = new PracticeEvidenceOptionsService(catalogs, new PracticeEvidenceDefaults(catalogs));
 
@@ -30,8 +30,8 @@ class PracticeEvidenceOptionsServiceTest {
             .extracting(PracticeWorkTypeEvidenceOptionsDTO::artifactType)
             .containsExactly(WorkArtifact.PULL_REQUEST, WorkArtifact.ISSUE, WorkArtifact.CONVERSATION_THREAD);
         PracticeWorkTypeEvidenceOptionsDTO pullRequests = result.workTypes().getFirst();
-        assertThat(pullRequests.supportedAutomatedAssessmentModes()).containsExactly(
-            PracticeAutomatedAssessmentMode.LANGUAGE_MODEL
+        assertThat(pullRequests.supportedAutomatedReviewModes()).containsExactly(
+            PracticeAutomatedReviewMode.LANGUAGE_MODEL
         );
         assertThat(pullRequests.recommendedRequirements().requiredEvidence())
             .extracting(requirement -> requirement.sourceKind().value())
@@ -45,7 +45,7 @@ class PracticeEvidenceOptionsServiceTest {
             .singleElement()
             .satisfies(option -> {
                 assertThat(option.displayName()).isEqualTo("Pull request details");
-                assertThat(option.authorizedForAutomatedAssessment()).isTrue();
+                assertThat(option.authorizedForAutomatedReview()).isTrue();
             });
     }
 }

@@ -152,7 +152,7 @@ export const ValidationAndSubmit: Story = {
 				criteria: "Check whether the reviewed work explains its purpose.",
 				triggerEvents: ["PullRequestCreated"],
 				artifactType: "PULL_REQUEST",
-				automatedAssessmentPolicy: mockPracticeEvidenceOptions.workTypes[0].recommendedRequirements,
+				automatedReviewPolicy: mockPracticeEvidenceOptions.workTypes[0].recommendedRequirements,
 			},
 			null,
 		);
@@ -189,7 +189,7 @@ export const ConversationPractice: Story = {
 				criteria: "Check whether the conversation stays constructive.",
 				triggerEvents: [],
 				artifactType: "CONVERSATION_THREAD",
-				automatedAssessmentPolicy: mockPracticeEvidenceOptions.workTypes[2].recommendedRequirements,
+				automatedReviewPolicy: mockPracticeEvidenceOptions.workTypes[2].recommendedRequirements,
 			},
 			null,
 		);

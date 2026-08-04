@@ -25,7 +25,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
@@ -199,7 +199,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setCriteria(criteria);
         p.setUsedInNewReviews(true);
         p.setArtifactType(WorkArtifact.PULL_REQUEST);
-        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         var revision = new PracticeRevision();
         ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
         p.setCurrentRevision(revision);
@@ -224,7 +224,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             )
             .thenReturn(prepared(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8))));
         lenient()
-            .when(workspaceContextBuilder.prepareAutomatedAssessmentReadiness(any(), any(), anyString(), any()))
+            .when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any()))
             .thenAnswer(invocation -> readiness(invocation.getArgument(1)));
         lenient()
             .when(workspaceContextBuilder.restrictTo(any(), any()))
@@ -243,10 +243,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         return new PreparedEvidence(files, org.mockito.Mockito.mock(ArtifactSourceManifest.class));
     }
 
-    private ContextManifestBuilder.PreparedAutomatedAssessmentReadiness readiness(List<Practice> practices) {
-        return new ContextManifestBuilder.PreparedAutomatedAssessmentReadiness(
+    private ContextManifestBuilder.PreparedAutomatedReviewReadiness readiness(List<Practice> practices) {
+        return new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
             practices,
-            mock(AutomatedAssessmentReadinessReport.class)
+            mock(AutomatedReviewReadinessReport.class)
         );
     }
 
@@ -315,9 +315,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     any(EvidencePlan.class)
                 )
             ).thenReturn(prepared(Map.of("inputs/context/metadata.json", metadataBytes)));
-            when(
-                workspaceContextBuilder.prepareAutomatedAssessmentReadiness(any(), any(), anyString(), any())
-            ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
+            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any())).thenAnswer(
+                invocation -> readiness(invocation.getArgument(1))
+            );
             when(
                 practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
                     WORKSPACE_ID,
@@ -410,9 +410,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             providerFiles.put("inputs/context/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
             providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.prepare(any(), any())).thenReturn(prepared(providerFiles));
-            when(
-                workspaceContextBuilder.prepareAutomatedAssessmentReadiness(any(), any(), anyString(), any())
-            ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
+            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any())).thenAnswer(
+                invocation -> readiness(invocation.getArgument(1))
+            );
             when(
                 practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
                     WORKSPACE_ID,

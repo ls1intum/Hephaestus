@@ -57,7 +57,7 @@ public class PracticeCatalogController {
 
     @GetMapping("/evidence-options")
     @Operation(
-        summary = "Read automated assessment evidence options",
+        summary = "Read automated review evidence options",
         description = "Returns recommended requirements and allowed evidence sources for each type of reviewed work",
         operationId = "getPracticeEvidenceOptions"
     )

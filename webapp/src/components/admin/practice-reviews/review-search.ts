@@ -2,18 +2,18 @@ import { z } from "zod";
 import { dayAfterInstant, dayStartInstant, fromDayParam } from "@/lib/date-range-search";
 import { multiValue, narrowToEnum } from "@/lib/search-params";
 import type {
-	Assessment,
 	FeedbackChannel,
 	FeedbackDeliveryState,
 	FeedbackSuppressionReason,
 	Presence,
+	ReviewResult,
 	Severity,
 } from "./review-format";
 import {
-	ASSESSMENT_LABELS,
 	DELIVERY_STATE_LABELS,
 	FEEDBACK_CHANNELS,
 	PRESENCE_LABELS,
+	REVIEW_RESULT_LABELS,
 	SEVERITY_LABELS,
 	SUPPRESSION_REASON_LABELS,
 } from "./review-format";
@@ -23,7 +23,7 @@ const positiveId = z.coerce.number().int().positive().optional().catch(undefined
 const page = z.coerce.number().int().min(0).optional().catch(undefined);
 const day = z.iso.date().optional().catch(undefined);
 const PRESENCES = Object.keys(PRESENCE_LABELS) as Presence[];
-const ASSESSMENTS = Object.keys(ASSESSMENT_LABELS) as Assessment[];
+const REVIEW_RESULTS = Object.keys(REVIEW_RESULT_LABELS) as ReviewResult[];
 const SEVERITIES = Object.keys(SEVERITY_LABELS) as Severity[];
 const DELIVERY_STATES = Object.keys(DELIVERY_STATE_LABELS) as FeedbackDeliveryState[];
 const SUPPRESSION_REASONS = Object.keys(SUPPRESSION_REASON_LABELS) as FeedbackSuppressionReason[];
@@ -66,7 +66,7 @@ export const findingsSearchSchema = z
 		areaSlug: multiValue,
 		practiceSlug: multiValue,
 		presence: enumValues(PRESENCES),
-		assessment: enumValues(ASSESSMENTS),
+		assessment: enumValues(REVIEW_RESULTS),
 		severity: enumValues(SEVERITIES),
 		subjectUserId: positiveId,
 	})

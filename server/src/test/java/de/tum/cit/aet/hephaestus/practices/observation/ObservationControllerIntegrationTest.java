@@ -91,7 +91,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private Practice persistPractice(String slug, String name) {
         Practice practice = new Practice();
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);
@@ -478,7 +478,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             ensureWorkspaceMembership(otherWorkspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             Practice otherPractice = new Practice();
-            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
@@ -1038,7 +1038,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             ensureWorkspaceMembership(otherWorkspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             Practice otherPractice = new Practice();
-            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("ws2-practice");
             otherPractice.setName("WS2 Practice");

@@ -18,7 +18,7 @@ public final class ReviewRuleFingerprint {
         List<String> triggerEvents,
         String criteria,
         @Nullable String precomputeScript,
-        PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
+        PracticeAutomatedReviewPolicy automatedReviewPolicy,
         @Nullable String areaSlug
     ) {
         CanonicalDigest digest = new CanonicalDigest()
@@ -32,7 +32,7 @@ public final class ReviewRuleFingerprint {
             digest
                 .add(criteria)
                 .addNullable(precomputeScript)
-                .add(PracticeAutomatedAssessmentPolicyDigest.digest(automatedAssessmentPolicy))
+                .add(PracticeAutomatedReviewPolicyDigest.digest(automatedReviewPolicy))
                 .addNullable(areaSlug)
                 .hex()
         );

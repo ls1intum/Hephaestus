@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.spi;
 
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,11 +11,11 @@ import org.jspecify.annotations.Nullable;
 public record PreparedJobInputs(
     Map<String, byte[]> files,
     @Nullable ArtifactSourceManifest artifactSourceManifest,
-    @Nullable AutomatedAssessmentReadinessReport automatedAssessmentReadinessReport
+    @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
 ) {
     public PreparedJobInputs {
         files = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(files, "files")));
-        if ((artifactSourceManifest == null) != (automatedAssessmentReadinessReport == null)) {
+        if ((artifactSourceManifest == null) != (automatedReviewReadinessReport == null)) {
             throw new IllegalArgumentException("Evidence manifest and readiness report must be provided together");
         }
     }

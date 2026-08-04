@@ -192,9 +192,7 @@ public class PracticeService {
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
-        practice.setUsedInNewReviews(
-            definition.automatedAssessmentPolicy().automatedAssessment().canAttemptAutomatedAssessment()
-        );
+        practice.setUsedInNewReviews(definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview());
         definitionValidator.validate(definition);
 
         try {
@@ -241,32 +239,32 @@ public class PracticeService {
         Set<ClearablePracticeField> fieldsToClear = request.clear() == null ? Set.of() : request.clear();
         WorkArtifact artifactType =
             request.artifactType() == null ? beforeDefinition.artifactType() : request.artifactType();
-        PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy =
-            request.automatedAssessmentPolicy() != null
-                ? request.automatedAssessmentPolicy()
+        PracticeAutomatedReviewPolicy automatedReviewPolicy =
+            request.automatedReviewPolicy() != null
+                ? request.automatedReviewPolicy()
                 : artifactType == beforeDefinition.artifactType()
-                    ? beforeDefinition.automatedAssessmentPolicy()
+                    ? beforeDefinition.automatedReviewPolicy()
                     : evidenceDefaults.forArtifact(artifactType);
-        boolean removesAutomatedAssessment =
-            request.automatedAssessmentPolicy() != null &&
-            !automatedAssessmentPolicy.automatedAssessment().canAttemptAutomatedAssessment();
+        boolean removesAutomatedReview =
+            request.automatedReviewPolicy() != null &&
+            !automatedReviewPolicy.automatedReview().canAttemptAutomatedReview();
         PracticeDefinition afterDefinition = new PracticeDefinition(
             request.name() == null ? beforeDefinition.name() : request.name(),
             artifactType,
             request.triggerEvents() == null
-                ? removesAutomatedAssessment
+                ? removesAutomatedReview
                     ? List.of()
                     : beforeDefinition.triggerEvents()
                 : request.triggerEvents(),
             request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
-            removesAutomatedAssessment && request.precomputeScript() == null
+            removesAutomatedReview && request.precomputeScript() == null
                 ? null
                 : patch(
                       beforeDefinition.precomputeScript(),
                       request.precomputeScript(),
                       fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
                   ),
-            automatedAssessmentPolicy,
+            automatedReviewPolicy,
             patch(
                 beforeDefinition.whyItMatters(),
                 request.whyItMatters(),
@@ -289,7 +287,7 @@ public class PracticeService {
         }
         boolean wasUsedInNewReviews = practice.isUsedInNewReviews();
         applyDefinition(practice, afterDefinition);
-        if (!afterDefinition.automatedAssessmentPolicy().automatedAssessment().canAttemptAutomatedAssessment()) {
+        if (!afterDefinition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
             practice.setUsedInNewReviews(false);
         }
         definitionValidator.validate(afterDefinition);
@@ -329,12 +327,9 @@ public class PracticeService {
         if (practice.isUsedInNewReviews() == usedInNewReviews) {
             return practice;
         }
-        if (
-            usedInNewReviews &&
-            !practice.getAutomatedAssessmentPolicy().automatedAssessment().canAttemptAutomatedAssessment()
-        ) {
+        if (usedInNewReviews && !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
             throw new IllegalArgumentException(
-                "This practice cannot be used in automated reviews with its current assessment settings"
+                "This practice cannot be used in automated reviews with its current review settings"
             );
         }
 
@@ -387,9 +382,9 @@ public class PracticeService {
             request.triggerEvents(),
             request.criteria(),
             request.precomputeScript(),
-            request.automatedAssessmentPolicy() == null
+            request.automatedReviewPolicy() == null
                 ? evidenceDefaults.forArtifact(artifactType)
-                : request.automatedAssessmentPolicy(),
+                : request.automatedReviewPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
             request.areaSlug()
@@ -402,7 +397,7 @@ public class PracticeService {
         practice.setTriggerEvents(definition.triggerEventsJson());
         practice.setCriteria(definition.criteria());
         practice.setPrecomputeScript(definition.precomputeScript());
-        practice.setAutomatedAssessmentPolicy(definition.automatedAssessmentPolicy());
+        practice.setAutomatedReviewPolicy(definition.automatedReviewPolicy());
         practice.setWhyItMatters(definition.whyItMatters());
         practice.setWhatGoodLooksLike(definition.whatGoodLooksLike());
     }

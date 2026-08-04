@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class PracticeAutomatedAssessmentPolicyTest extends BaseUnitTest {
+class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
 
     private static final SourceContractVersion VERSION = new SourceContractVersion("1.0.0");
     private static final EvidenceProfileId PROFILE = new EvidenceProfileId("pull-request-review");
@@ -18,15 +18,15 @@ class PracticeAutomatedAssessmentPolicyTest extends BaseUnitTest {
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
 
     @Test
-    void shouldRejectEvidenceWithoutAutomatedAssessment() {
+    void shouldRejectEvidenceWithoutAutomatedReview() {
         assertThatThrownBy(() -> requirements(none(), List.of(required(CORE)), List.of(), List.of()))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("without automated assessment");
+            .hasMessageContaining("without automated review");
         assertThatThrownBy(() ->
             requirements(none(), List.of(), List.of(new PracticeOptionalContextSource(CORE)), List.of())
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("without automated assessment");
+            .hasMessageContaining("without automated review");
         assertThatThrownBy(() ->
             requirements(
                 none(),
@@ -36,11 +36,11 @@ class PracticeAutomatedAssessmentPolicyTest extends BaseUnitTest {
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("without automated assessment");
+            .hasMessageContaining("without automated review");
     }
 
     @Test
-    void shouldRejectAutomatedAssessmentWithoutRequiredEvidence() {
+    void shouldRejectAutomatedReviewWithoutRequiredEvidence() {
         assertThatThrownBy(() -> requirements(languageModel(), List.of(), List.of(), List.of()))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("requires at least one evidence source");
@@ -86,8 +86,8 @@ class PracticeAutomatedAssessmentPolicyTest extends BaseUnitTest {
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("codes must be unique");
-        PracticeAutomatedAssessment additionalContext = new PracticeAutomatedAssessment(
-            PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+        PracticeAutomatedReview additionalContext = new PracticeAutomatedReview(
+            PracticeAutomatedReviewMode.LANGUAGE_MODEL,
             PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
         );
         assertThatThrownBy(() -> requirements(additionalContext, List.of(required(CORE)), List.of(), List.of()))
@@ -97,7 +97,7 @@ class PracticeAutomatedAssessmentPolicyTest extends BaseUnitTest {
 
     @Test
     void shouldCanonicalizeSourceAndLimitationOrder() {
-        PracticeAutomatedAssessmentPolicy requirements = requirements(
+        PracticeAutomatedReviewPolicy requirements = requirements(
             languageModel(),
             List.of(required(DIFF), required(CORE)),
             List.of(
@@ -121,32 +121,32 @@ class PracticeAutomatedAssessmentPolicyTest extends BaseUnitTest {
             .containsExactly("FIRST_LIMITATION", "SECOND_LIMITATION");
     }
 
-    private static PracticeAutomatedAssessmentPolicy requirements(
-        PracticeAutomatedAssessment automatedAssessment,
+    private static PracticeAutomatedReviewPolicy requirements(
+        PracticeAutomatedReview automatedReview,
         List<PracticeEvidenceRequirement> requiredEvidence,
         List<PracticeOptionalContextSource> optionalContext,
         List<PracticeEvidenceLimitation> knownLimitations
     ) {
-        return new PracticeAutomatedAssessmentPolicy(
+        return new PracticeAutomatedReviewPolicy(
             VERSION,
             PROFILE,
-            automatedAssessment,
+            automatedReview,
             requiredEvidence,
             optionalContext,
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             knownLimitations
         );
     }
 
-    private static PracticeAutomatedAssessment languageModel() {
-        return new PracticeAutomatedAssessment(
-            PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+    private static PracticeAutomatedReview languageModel() {
+        return new PracticeAutomatedReview(
+            PracticeAutomatedReviewMode.LANGUAGE_MODEL,
             PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
         );
     }
 
-    private static PracticeAutomatedAssessment none() {
-        return new PracticeAutomatedAssessment(PracticeAutomatedAssessmentMode.NONE, PracticeEvidenceSufficiency.NONE);
+    private static PracticeAutomatedReview none() {
+        return new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE);
     }
 
     private static PracticeEvidenceRequirement required(SourceKind sourceKind) {

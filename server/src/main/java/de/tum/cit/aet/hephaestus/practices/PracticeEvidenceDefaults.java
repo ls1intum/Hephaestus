@@ -16,7 +16,7 @@ public class PracticeEvidenceDefaults {
         this.catalogs = catalogs;
     }
 
-    public PracticeAutomatedAssessmentPolicy forArtifact(WorkArtifact artifact) {
+    public PracticeAutomatedReviewPolicy forArtifact(WorkArtifact artifact) {
         return switch (artifact) {
             case PULL_REQUEST -> requirements(
                 "pull-request-review",
@@ -65,23 +65,23 @@ public class PracticeEvidenceDefaults {
         };
     }
 
-    private PracticeAutomatedAssessmentPolicy requirements(
+    private PracticeAutomatedReviewPolicy requirements(
         String profile,
         List<PracticeEvidenceRequirement> required,
         List<PracticeOptionalContextSource> optional,
         String limitationCode,
         String limitationDescription
     ) {
-        return new PracticeAutomatedAssessmentPolicy(
+        return new PracticeAutomatedReviewPolicy(
             catalogs.current().version(),
             new EvidenceProfileId(profile),
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             required,
             optional,
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(new PracticeEvidenceLimitation(limitationCode, limitationDescription))
         );
     }

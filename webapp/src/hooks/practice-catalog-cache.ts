@@ -82,10 +82,10 @@ export function selectPracticePatch(
 	return {
 		...("artifactType" in request ? { artifactType: practice.artifactType } : {}),
 		...("criteria" in request ? { criteria: practice.criteria } : {}),
-		...("automatedAssessmentPolicy" in request || "artifactType" in request
+		...("automatedReviewPolicy" in request || "artifactType" in request
 			? {
-					automatedAssessmentPolicy: practice.automatedAssessmentPolicy,
-					automatedAssessmentValidation: practice.automatedAssessmentValidation,
+					automatedReviewPolicy: practice.automatedReviewPolicy,
+					automatedReviewValidation: practice.automatedReviewValidation,
 				}
 			: {}),
 		...("name" in request ? { name: practice.name } : {}),

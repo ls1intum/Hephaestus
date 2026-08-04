@@ -98,14 +98,14 @@ class SourceContractValueTest {
             )
         );
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new AutomatedAssessmentReadinessDecision("review-quality", now, true, List.of(), List.of())
+            new AutomatedReviewReadinessDecision("review-quality", now, true, List.of(), List.of())
         );
         assertThat(
-            new AutomatedAssessmentReadinessDecision(
-                "no-automated-assessment",
+            new AutomatedReviewReadinessDecision(
+                "no-automated-review",
                 now,
                 false,
-                List.of(AutomatedAssessmentReadinessReason.NO_AUTOMATED_ASSESSMENT),
+                List.of(AutomatedReviewReadinessReason.NO_AUTOMATED_REVIEW),
                 List.of()
             ).sourceChecks()
         ).isEmpty();

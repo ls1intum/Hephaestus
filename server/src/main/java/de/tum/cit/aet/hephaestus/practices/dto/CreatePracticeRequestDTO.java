@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -47,16 +47,16 @@ public record CreatePracticeRequestDTO(
         max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
         message = "Precompute script must be at most 100000 characters"
     )
-    @Schema(description = "TypeScript/Bun static analysis run before automated assessment")
+    @Schema(description = "TypeScript/Bun static analysis run before automated review")
     String precomputeScript,
 
     @Valid
     @Schema(
-        description = "Versioned evidence required before Hephaestus may assess reviewed work; " +
+        description = "Versioned evidence required before Hephaestus may review work; " +
             "omit to use the recommended requirements for the selected work type"
     )
     @Nullable
-    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
+    PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
     @Schema(description = "Type of reviewed work. Defaults to PULL_REQUEST when omitted.", example = "PULL_REQUEST")
     @Nullable
@@ -68,7 +68,7 @@ public record CreatePracticeRequestDTO(
     String whyItMatters,
 
     @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
-    @Schema(description = "Developer-facing exemplar; a concrete instance, not the assessment criteria")
+    @Schema(description = "Developer-facing exemplar; a concrete instance, not the review criteria")
     @Nullable
     String whatGoodLooksLike,
 

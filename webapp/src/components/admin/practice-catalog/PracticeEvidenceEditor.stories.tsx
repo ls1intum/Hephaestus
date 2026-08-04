@@ -24,11 +24,11 @@ export const RecommendedRule: Story = {};
 
 export const Customizing: Story = {
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Configure automated assessment" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Configure automated review" }));
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
 		await expect(canvas.getByText("Code changes")).toBeVisible();
 		await expect(
-			canvas.getByLabelText("How should Hephaestus assess reviewed work?"),
+			canvas.getByLabelText("How should Hephaestus review this practice?"),
 		).toBeVisible();
 	},
 };

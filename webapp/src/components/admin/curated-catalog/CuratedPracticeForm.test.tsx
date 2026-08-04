@@ -18,9 +18,9 @@ const initialData: CuratedPracticeFormInitialValue = {
 	name: "Write a clear pull request description",
 	artifactType: "PULL_REQUEST",
 	triggerEvents: ["PullRequestCreated"],
-	criteria: "Assess whether the description explains the change.",
-	automatedAssessmentPolicy: mockPullRequestEvidence,
-	automatedAssessmentValidation: mockAuthorDeclaredEvidenceValidation,
+	criteria: "Review whether the description explains the change.",
+	automatedReviewPolicy: mockPullRequestEvidence,
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	status: {
 		etag: "tag",
 		state: "FROM_HEPHAESTUS",
@@ -47,7 +47,7 @@ describe("CuratedPracticeForm", () => {
 		expect(name.getAttribute("aria-invalid")).toBe("true");
 		expect(name.getAttribute("aria-describedby")).toBe("practice-name-error");
 		expect(
-			screen.getByRole("textbox", { name: /Evaluation criteria/ }).getAttribute("aria-describedby"),
+			screen.getByRole("textbox", { name: /Review criteria/ }).getAttribute("aria-describedby"),
 		).toBe("practice-criteria-description practice-criteria-error");
 		expect(screen.getByText("Select at least one trigger event")).toBeTruthy();
 	});
@@ -141,18 +141,18 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
 		await user.click(
-			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
+			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
 		);
-		await user.click(await screen.findByRole("option", { name: "No automated assessment" }));
+		await user.click(await screen.findByRole("option", { name: "No automated review" }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).toHaveBeenCalledWith(
 			expect.objectContaining({
 				triggerEvents: [],
-				automatedAssessmentPolicy: expect.objectContaining({
-					automatedAssessment: { mode: "NONE", evidenceSufficiency: "NONE" },
+				automatedReviewPolicy: expect.objectContaining({
+					automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
 					requiredEvidence: [],
 					optionalContext: [],
 					knownLimitations: [],
@@ -177,7 +177,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
 		await user.click(screen.getByRole("button", { name: "Add limitation" }));
 		const limitationDescription = screen.getByRole("textbox", {
 			name: "Description for limitation 2",

@@ -1,7 +1,7 @@
 import { ChevronRight, Info, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
-	PracticeAutomatedAssessmentPolicy,
+	PracticeAutomatedReviewPolicy,
 	PracticeEvidenceSourceOption,
 	PracticeWorkTypeEvidenceOptions,
 } from "@/api/types.gen";
@@ -19,43 +19,43 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import {
-	assessmentModeLabel,
-	canAttemptAutomatedAssessment,
+	canAttemptAutomatedReview,
 	evidenceQualityLabel,
 	evidenceSourceLabel,
 	evidenceSufficiencyLabel,
+	reviewModeLabel,
 } from "./evidence-presentation";
 
 type EvidenceRole = "NOT_USED" | "OPTIONAL" | "REQUIRED";
 
-type AutomatedAssessment = PracticeAutomatedAssessmentPolicy["automatedAssessment"];
+type AutomatedReview = PracticeAutomatedReviewPolicy["automatedReview"];
 
-const ASSESSMENT_MODE_OPTIONS: Array<{
-	value: AutomatedAssessment["mode"];
+const REVIEW_MODE_OPTIONS: Array<{
+	value: AutomatedReview["mode"];
 	label: string;
 	description: string;
 }> = [
 	{
 		value: "LANGUAGE_MODEL",
-		label: assessmentModeLabel("LANGUAGE_MODEL"),
-		description: "Hephaestus assesses the reviewed work using a language model.",
+		label: reviewModeLabel("LANGUAGE_MODEL"),
+		description: "Hephaestus reviews the work using a language model.",
 	},
 	{
 		value: "NONE",
-		label: assessmentModeLabel("NONE"),
-		description: "Hephaestus does not assess reviewed work against this practice.",
+		label: reviewModeLabel("NONE"),
+		description: "Hephaestus does not review work against this practice.",
 	},
 ];
 
 const SUFFICIENCY_OPTIONS: Array<{
-	value: Exclude<AutomatedAssessment["evidenceSufficiency"], "NONE">;
+	value: Exclude<AutomatedReview["evidenceSufficiency"], "NONE">;
 	label: string;
 	description: string;
 }> = [
 	{
 		value: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 		label: evidenceSufficiencyLabel("SUFFICIENT_WHEN_REQUIREMENTS_MET"),
-		description: "Hephaestus may assess the reviewed work after every required source passes.",
+		description: "Hephaestus may review the work after every required source passes.",
 	},
 	{
 		value: "DECLARED_EVIDENCE_INSUFFICIENT",
@@ -79,7 +79,7 @@ const PRIVACY_LABELS: Record<PracticeEvidenceSourceOption["privacyClass"], strin
 	SENSITIVE_PERSONAL: "Sensitive personal data",
 };
 
-function roleOf(requirements: PracticeAutomatedAssessmentPolicy, sourceKind: string): EvidenceRole {
+function roleOf(requirements: PracticeAutomatedReviewPolicy, sourceKind: string): EvidenceRole {
 	if (requirements.requiredEvidence.some((requirement) => requirement.sourceKind === sourceKind)) {
 		return "REQUIRED";
 	}
@@ -90,10 +90,10 @@ function roleOf(requirements: PracticeAutomatedAssessmentPolicy, sourceKind: str
 }
 
 function withRole(
-	requirements: PracticeAutomatedAssessmentPolicy,
+	requirements: PracticeAutomatedReviewPolicy,
 	source: PracticeEvidenceSourceOption,
 	role: EvidenceRole,
-): PracticeAutomatedAssessmentPolicy {
+): PracticeAutomatedReviewPolicy {
 	const required = requirements.requiredEvidence.filter(
 		(requirement) => requirement.sourceKind !== source.sourceKind,
 	);
@@ -117,17 +117,17 @@ function newLimitationCode() {
 	return `LIMITATION_${crypto.randomUUID().replaceAll("-", "").toUpperCase()}`;
 }
 
-export function practiceEvidenceError(requirements: PracticeAutomatedAssessmentPolicy) {
-	const noAutomatedAssessment = requirements.automatedAssessment.mode === "NONE";
+export function practiceEvidenceError(requirements: PracticeAutomatedReviewPolicy) {
+	const noAutomatedReview = requirements.automatedReview.mode === "NONE";
 	if (
-		noAutomatedAssessment &&
+		noAutomatedReview &&
 		(requirements.requiredEvidence.length > 0 ||
 			requirements.optionalContext.length > 0 ||
 			requirements.knownLimitations.length > 0)
 	) {
-		return "A practice without automated assessment cannot require evidence or declare evidence limitations.";
+		return "A practice without automated review cannot require evidence or declare evidence limitations.";
 	}
-	if (!noAutomatedAssessment && requirements.requiredEvidence.length === 0) {
+	if (!noAutomatedReview && requirements.requiredEvidence.length === 0) {
 		return "Choose at least one required evidence source.";
 	}
 	for (const limitation of requirements.knownLimitations) {
@@ -139,7 +139,7 @@ export function practiceEvidenceError(requirements: PracticeAutomatedAssessmentP
 		}
 	}
 	if (
-		requirements.automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" &&
+		requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" &&
 		requirements.knownLimitations.length === 0
 	) {
 		return "Explain at least one limitation that requires additional context.";
@@ -149,8 +149,8 @@ export function practiceEvidenceError(requirements: PracticeAutomatedAssessmentP
 
 export interface PracticeEvidenceEditorProps {
 	options: PracticeWorkTypeEvidenceOptions;
-	value: PracticeAutomatedAssessmentPolicy;
-	onChange: (value: PracticeAutomatedAssessmentPolicy) => void;
+	value: PracticeAutomatedReviewPolicy;
+	onChange: (value: PracticeAutomatedReviewPolicy) => void;
 	error?: string;
 	disabled?: boolean;
 }
@@ -164,12 +164,12 @@ export function PracticeEvidenceEditor({
 }: PracticeEvidenceEditorProps) {
 	const [open, setOpen] = useState(Boolean(error));
 	const profileKey = `${value.sourceContractVersion}:${value.evidenceProfile}`;
-	const savedAutomatedRequirements = useRef<Map<string, PracticeAutomatedAssessmentPolicy>>(
-		new Map(value.automatedAssessment.mode === "NONE" ? [] : [[profileKey, value]]),
+	const savedAutomatedRequirements = useRef<Map<string, PracticeAutomatedReviewPolicy>>(
+		new Map(value.automatedReview.mode === "NONE" ? [] : [[profileKey, value]]),
 	);
 	const addLimitationButton = useRef<HTMLButtonElement>(null);
 	useEffect(() => {
-		if (value.automatedAssessment.mode !== "NONE") {
+		if (value.automatedReview.mode !== "NONE") {
 			savedAutomatedRequirements.current.set(profileKey, value);
 		}
 	}, [profileKey, value]);
@@ -192,29 +192,24 @@ export function PracticeEvidenceEditor({
 	const optionalSources = value.optionalContext.map((requirement) =>
 		evidenceSourceLabel(requirement.sourceKind, options.allowedSources),
 	);
-	const mode = ASSESSMENT_MODE_OPTIONS.find(
-		(option) => option.value === value.automatedAssessment.mode,
-	);
-	const assessmentModeOptions = ASSESSMENT_MODE_OPTIONS.filter(
+	const mode = REVIEW_MODE_OPTIONS.find((option) => option.value === value.automatedReview.mode);
+	const reviewModeOptions = REVIEW_MODE_OPTIONS.filter(
 		(option) =>
 			option.value === "NONE" ||
-			options.supportedAutomatedAssessmentModes.includes(option.value) ||
-			value.automatedAssessment.mode === option.value,
+			options.supportedAutomatedReviewModes.includes(option.value) ||
+			value.automatedReview.mode === option.value,
 	);
 	const evidenceSufficiency = SUFFICIENCY_OPTIONS.find(
-		(option) => option.value === value.automatedAssessment.evidenceSufficiency,
+		(option) => option.value === value.automatedReview.evidenceSufficiency,
 	);
 	const unavailableRequiredSources = value.requiredEvidence.filter((requirement) => {
 		const source = options.allowedSources.find(
 			(item) => item.sourceKind === requirement.sourceKind,
 		);
-		return !source?.authorizedForAutomatedAssessment;
+		return !source?.authorizedForAutomatedReview;
 	});
-	const noAutomatedAssessment = value.automatedAssessment.mode === "NONE";
-	const canAttemptAssessment = canAttemptAutomatedAssessment(
-		value,
-		options.supportedAutomatedAssessmentModes,
-	);
+	const noAutomatedReview = value.automatedReview.mode === "NONE";
+	const canAttemptReview = canAttemptAutomatedReview(value, options.supportedAutomatedReviewModes);
 
 	return (
 		<section
@@ -230,14 +225,14 @@ export function PracticeEvidenceEditor({
 					tabIndex={-1}
 					aria-describedby={error ? "practice-evidence-error" : undefined}
 				>
-					Automated assessment
+					Automated review
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Choose whether Hephaestus may assess this practice and what evidence it needs.
+					Choose whether Hephaestus may review this practice and what evidence it needs.
 				</p>
 			</div>
 
-			{canAttemptAssessment && (
+			{canAttemptReview && (
 				<ol className="grid gap-3 text-sm sm:grid-cols-3">
 					<li className="rounded-lg border p-3">
 						<span className="font-medium">1. A practice review starts</span>
@@ -248,7 +243,7 @@ export function PracticeEvidenceEditor({
 						<p className="mt-1 text-muted-foreground">Every required source must pass.</p>
 					</li>
 					<li className="rounded-lg border p-3">
-						<span className="font-medium">3. Assess or skip</span>
+						<span className="font-medium">3. Review or skip</span>
 						<p className="mt-1 text-muted-foreground">Missing evidence never becomes a guess.</p>
 					</li>
 				</ol>
@@ -274,7 +269,7 @@ export function PracticeEvidenceEditor({
 							</ul>
 						) : (
 							<p className="mt-1 text-muted-foreground">
-								{noAutomatedAssessment ? "No automated assessment" : "No required source selected"}
+								{noAutomatedReview ? "No automated review" : "No required source selected"}
 							</p>
 						)}
 					</div>
@@ -290,12 +285,12 @@ export function PracticeEvidenceEditor({
 					{evidenceSufficiency && ` ${evidenceSufficiency.label}.`}
 				</p>
 				<p className="mt-2 text-muted-foreground">
-					This setting only controls Hephaestus. Human assessment, if applicable, is a separate
-					process and is not collected.
+					This setting only controls Hephaestus. Human review, if applicable, is a separate process
+					and is not collected.
 				</p>
 			</div>
 
-			{canAttemptAssessment && unavailableRequiredSources.length > 0 && (
+			{canAttemptReview && unavailableRequiredSources.length > 0 && (
 				<Alert variant="warning">
 					<TriangleAlert />
 					<AlertTitle>Required evidence is not authorized</AlertTitle>
@@ -304,13 +299,13 @@ export function PracticeEvidenceEditor({
 						{unavailableRequiredSources
 							.map((source) => evidenceSourceLabel(source.sourceKind, options.allowedSources))
 							.join(", ")}{" "}
-						for automated assessment through the source-governance configuration. The workspace
+						for automated review through the source-governance configuration. The workspace
 						integration must also provide them. Until then, Hephaestus skips this practice.
 					</AlertDescription>
 				</Alert>
 			)}
 
-			{!noAutomatedAssessment && (
+			{!noAutomatedReview && (
 				<Alert>
 					<Info />
 					<AlertTitle>Declaring a source does not collect or authorize it</AlertTitle>
@@ -328,7 +323,7 @@ export function PracticeEvidenceEditor({
 						render={
 							<Button type="button" variant="outline" disabled={disabled}>
 								<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
-								Configure automated assessment
+								Configure automated review
 							</Button>
 						}
 						className="group"
@@ -346,19 +341,19 @@ export function PracticeEvidenceEditor({
 				<CollapsibleContent className="mt-4 space-y-6">
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field>
-							<FieldLabel htmlFor="practice-assessment-mode">
-								How should Hephaestus assess reviewed work?
+							<FieldLabel htmlFor="practice-review-mode">
+								How should Hephaestus review this practice?
 							</FieldLabel>
 							<Select
 								disabled={disabled}
-								items={assessmentModeOptions}
-								value={value.automatedAssessment.mode}
+								items={reviewModeOptions}
+								value={value.automatedReview.mode}
 								onValueChange={(mode) => {
 									if (mode === "NONE") {
 										savedAutomatedRequirements.current.set(profileKey, value);
 										onChange({
 											...value,
-											automatedAssessment: { mode: "NONE", evidenceSufficiency: "NONE" },
+											automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
 											requiredEvidence: [],
 											optionalContext: [],
 											knownLimitations: [],
@@ -370,30 +365,30 @@ export function PracticeEvidenceEditor({
 										options.recommendedRequirements;
 									onChange({
 										...restored,
-										automatedAssessment: {
-											mode: mode as Exclude<AutomatedAssessment["mode"], "NONE">,
+										automatedReview: {
+											mode: mode as Exclude<AutomatedReview["mode"], "NONE">,
 											evidenceSufficiency:
-												restored.automatedAssessment.evidenceSufficiency === "NONE"
+												restored.automatedReview.evidenceSufficiency === "NONE"
 													? "SUFFICIENT_WHEN_REQUIREMENTS_MET"
-													: restored.automatedAssessment.evidenceSufficiency,
+													: restored.automatedReview.evidenceSufficiency,
 										},
 									});
 								}}
 							>
 								<SelectTrigger
-									id="practice-assessment-mode"
-									aria-describedby="practice-assessment-mode-description"
+									id="practice-review-mode"
+									aria-describedby="practice-review-mode-description"
 								>
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{assessmentModeOptions.map((option) => (
+									{reviewModeOptions.map((option) => (
 										<SelectItem
 											key={option.value}
 											value={option.value}
 											disabled={
 												option.value !== "NONE" &&
-												!options.supportedAutomatedAssessmentModes.includes(option.value)
+												!options.supportedAutomatedReviewModes.includes(option.value)
 											}
 										>
 											{option.label}
@@ -401,7 +396,7 @@ export function PracticeEvidenceEditor({
 									))}
 								</SelectContent>
 							</Select>
-							<FieldDescription id="practice-assessment-mode-description">
+							<FieldDescription id="practice-review-mode-description">
 								{mode?.description}
 							</FieldDescription>
 						</Field>
@@ -411,16 +406,16 @@ export function PracticeEvidenceEditor({
 								When evidence checks pass, is it enough?
 							</FieldLabel>
 							<Select
-								disabled={disabled || value.automatedAssessment.mode === "NONE"}
-								items={noAutomatedAssessment ? NO_EVIDENCE_CHECK_OPTION : SUFFICIENCY_OPTIONS}
-								value={value.automatedAssessment.evidenceSufficiency}
+								disabled={disabled || value.automatedReview.mode === "NONE"}
+								items={noAutomatedReview ? NO_EVIDENCE_CHECK_OPTION : SUFFICIENCY_OPTIONS}
+								value={value.automatedReview.evidenceSufficiency}
 								onValueChange={(evidenceSufficiency) =>
 									onChange({
 										...value,
-										automatedAssessment: {
-											...value.automatedAssessment,
+										automatedReview: {
+											...value.automatedReview,
 											evidenceSufficiency: evidenceSufficiency as Exclude<
-												AutomatedAssessment["evidenceSufficiency"],
+												AutomatedReview["evidenceSufficiency"],
 												"NONE"
 											>,
 										},
@@ -434,7 +429,7 @@ export function PracticeEvidenceEditor({
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{noAutomatedAssessment ? (
+									{noAutomatedReview ? (
 										<SelectItem value="NONE">No evidence check</SelectItem>
 									) : (
 										SUFFICIENCY_OPTIONS.map((option) => (
@@ -446,8 +441,8 @@ export function PracticeEvidenceEditor({
 								</SelectContent>
 							</Select>
 							<FieldDescription id="practice-evidence-sufficiency-description">
-								{value.automatedAssessment.mode === "NONE"
-									? "No evidence check is needed without automated assessment."
+								{value.automatedReview.mode === "NONE"
+									? "No evidence check is needed without automated review."
 									: evidenceSufficiency?.description}
 							</FieldDescription>
 						</Field>
@@ -469,7 +464,7 @@ export function PracticeEvidenceEditor({
 												{source.supportsEmpty && (
 													<Badge variant="outline">Empty can be valid</Badge>
 												)}
-												{!source.authorizedForAutomatedAssessment && (
+												{!source.authorizedForAutomatedReview && (
 													<Badge variant="warning">Not authorized on this instance</Badge>
 												)}
 											</div>
@@ -480,7 +475,7 @@ export function PracticeEvidenceEditor({
 												Use in this practice <span className="sr-only">for {sourceLabel}</span>
 											</FieldLabel>
 											<Select
-												disabled={disabled || noAutomatedAssessment}
+												disabled={disabled || noAutomatedReview}
 												items={EVIDENCE_ROLE_OPTIONS}
 												value={role}
 												onValueChange={(nextRole) =>
@@ -505,7 +500,7 @@ export function PracticeEvidenceEditor({
 													Minimum completeness <span className="sr-only">for {sourceLabel}</span>
 												</FieldLabel>
 												<Select
-													disabled={disabled || noAutomatedAssessment}
+													disabled={disabled || noAutomatedReview}
 													items={[
 														...(source.supportsComplete
 															? [{ value: "COMPLETE", label: "Complete" }]
@@ -545,7 +540,7 @@ export function PracticeEvidenceEditor({
 													Minimum freshness <span className="sr-only">for {sourceLabel}</span>
 												</FieldLabel>
 												<Select
-													disabled={disabled || noAutomatedAssessment}
+													disabled={disabled || noAutomatedReview}
 													items={[
 														...(source.supportsCurrent
 															? [{ value: "CURRENT", label: "Current" }]
@@ -604,7 +599,7 @@ export function PracticeEvidenceEditor({
 											Description <span className="sr-only">for limitation {index + 1}</span>
 										</FieldLabel>
 										<Input
-											disabled={disabled || noAutomatedAssessment}
+											disabled={disabled || noAutomatedReview}
 											id={`practice-limitation-description-${limitationId}`}
 											value={limitation.description}
 											onChange={(event) =>
@@ -622,7 +617,7 @@ export function PracticeEvidenceEditor({
 									</Field>
 									<Button
 										type="button"
-										disabled={disabled || noAutomatedAssessment}
+										disabled={disabled || noAutomatedReview}
 										variant="ghost"
 										size="icon-sm"
 										className="self-end"
@@ -648,7 +643,7 @@ export function PracticeEvidenceEditor({
 						<Button
 							ref={addLimitationButton}
 							type="button"
-							disabled={disabled || noAutomatedAssessment}
+							disabled={disabled || noAutomatedReview}
 							variant="outline"
 							size="sm"
 							onClick={() => {
@@ -670,17 +665,17 @@ export function PracticeEvidenceEditor({
 				</CollapsibleContent>
 			</Collapsible>
 
-			{value.automatedAssessment.mode === "NONE" && (
+			{value.automatedReview.mode === "NONE" && (
 				<Alert variant="warning">
 					<TriangleAlert />
-					<AlertTitle>No automated assessment</AlertTitle>
+					<AlertTitle>No automated review</AlertTitle>
 					<AlertDescription>
-						Hephaestus cannot use this practice in automated reviews. Human assessment, if
-						applicable, is a separate process and is not collected.
+						Hephaestus cannot use this practice in automated reviews. Human review, if applicable,
+						is a separate process and is not collected.
 					</AlertDescription>
 				</Alert>
 			)}
-			{value.automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" && (
+			{value.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" && (
 				<Alert variant="warning">
 					<TriangleAlert />
 					<AlertTitle>Declared evidence is insufficient</AlertTitle>

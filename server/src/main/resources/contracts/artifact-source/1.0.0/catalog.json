@@ -24,7 +24,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-pull-request-core-automated-assessment",
+        "use-scm-pull-request-core-automated-review",
         "use-scm-pull-request-core-feedback-delivery",
         "use-scm-pull-request-core-mentor-context",
         "use-scm-pull-request-core-operator-review"
@@ -58,7 +58,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-pull-request-diff-automated-assessment",
+        "use-scm-pull-request-diff-automated-review",
         "use-scm-pull-request-diff-feedback-delivery",
         "use-scm-pull-request-diff-mentor-context",
         "use-scm-pull-request-diff-operator-review"
@@ -92,7 +92,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-pull-request-comments-automated-assessment",
+        "use-scm-pull-request-comments-automated-review",
         "use-scm-pull-request-comments-feedback-delivery",
         "use-scm-pull-request-comments-mentor-context",
         "use-scm-pull-request-comments-operator-review"
@@ -126,7 +126,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-repository-tree-automated-assessment",
+        "use-scm-repository-tree-automated-review",
         "use-scm-repository-tree-feedback-delivery",
         "use-scm-repository-tree-mentor-context",
         "use-scm-repository-tree-operator-review"
@@ -161,7 +161,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-issue-core-automated-assessment",
+        "use-scm-issue-core-automated-review",
         "use-scm-issue-core-feedback-delivery",
         "use-scm-issue-core-mentor-context",
         "use-scm-issue-core-operator-review"
@@ -195,7 +195,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-issue-comments-automated-assessment",
+        "use-scm-issue-comments-automated-review",
         "use-scm-issue-comments-feedback-delivery",
         "use-scm-issue-comments-mentor-context",
         "use-scm-issue-comments-operator-review"
@@ -229,7 +229,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-slack-conversation-thread-automated-assessment",
+        "use-slack-conversation-thread-automated-review",
         "use-slack-conversation-thread-feedback-delivery",
         "use-slack-conversation-thread-mentor-context",
         "use-slack-conversation-thread-operator-review"
@@ -263,7 +263,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-linked-work-items-automated-assessment",
+        "use-scm-linked-work-items-automated-review",
         "use-scm-linked-work-items-feedback-delivery",
         "use-scm-linked-work-items-mentor-context",
         "use-scm-linked-work-items-operator-review"
@@ -297,7 +297,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-review-threads-automated-assessment",
+        "use-scm-review-threads-automated-review",
         "use-scm-review-threads-feedback-delivery",
         "use-scm-review-threads-mentor-context",
         "use-scm-review-threads-operator-review"
@@ -331,7 +331,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-scm-general-review-comments-automated-assessment",
+        "use-scm-general-review-comments-automated-review",
         "use-scm-general-review-comments-feedback-delivery",
         "use-scm-general-review-comments-mentor-context",
         "use-scm-general-review-comments-operator-review"
@@ -367,7 +367,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-workspace-project-inventory-automated-assessment",
+        "use-workspace-project-inventory-automated-review",
         "use-workspace-project-inventory-feedback-delivery",
         "use-workspace-project-inventory-mentor-context",
         "use-workspace-project-inventory-operator-review"
@@ -402,7 +402,7 @@
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "useDecisionIds": [
-        "use-outline-documents-automated-assessment",
+        "use-outline-documents-automated-review",
         "use-outline-documents-feedback-delivery",
         "use-outline-documents-mentor-context",
         "use-outline-documents-operator-review"

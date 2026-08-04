@@ -14,7 +14,7 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
-import { ClaimCurrentnessBadge, FeedbackStateBadge, FindingAssessmentBadge } from "./ReviewBadges";
+import { ClaimCurrentnessBadge, FeedbackStateBadge, FindingResultBadge } from "./ReviewBadges";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
 import { CHANNEL_LABELS, SUPPRESSION_REASON_LABELS, subjectLabel } from "./review-format";
 
@@ -225,7 +225,7 @@ function FindingsSection({
 									)}
 								</ItemContent>
 								<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
-									<FindingAssessmentBadge finding={finding} />
+									<FindingResultBadge finding={finding} />
 									<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
 								</ItemFooter>
 							</Item>

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -51,8 +51,8 @@ public class CuratedPracticeOverride {
     private @Nullable String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "automated_assessment_policy", columnDefinition = "jsonb")
-    private @Nullable PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy;
+    @Column(name = "automated_review_policy", columnDefinition = "jsonb")
+    private @Nullable PracticeAutomatedReviewPolicy automatedReviewPolicy;
 
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     private @Nullable String whyItMatters;
@@ -94,7 +94,7 @@ public class CuratedPracticeOverride {
             artifactType == null ||
             triggerEvents == null ||
             criteria == null ||
-            automatedAssessmentPolicy == null
+            automatedReviewPolicy == null
         ) {
             return null;
         }
@@ -104,7 +104,7 @@ public class CuratedPracticeOverride {
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
-            automatedAssessmentPolicy,
+            automatedReviewPolicy,
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
@@ -117,7 +117,7 @@ public class CuratedPracticeOverride {
         this.triggerEvents = definition.triggerEventsJson();
         this.criteria = definition.criteria();
         this.precomputeScript = definition.precomputeScript();
-        this.automatedAssessmentPolicy = definition.automatedAssessmentPolicy();
+        this.automatedReviewPolicy = definition.automatedReviewPolicy();
         this.whyItMatters = definition.whyItMatters();
         this.whatGoodLooksLike = definition.whatGoodLooksLike();
         this.areaSlug = definition.areaSlug();
@@ -131,7 +131,7 @@ public class CuratedPracticeOverride {
         this.triggerEvents = null;
         this.criteria = null;
         this.precomputeScript = null;
-        this.automatedAssessmentPolicy = null;
+        this.automatedReviewPolicy = null;
         this.whyItMatters = null;
         this.whatGoodLooksLike = null;
         this.areaSlug = null;

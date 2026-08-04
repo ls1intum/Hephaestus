@@ -33,12 +33,12 @@ public class PracticeEvidenceOptionsService {
     }
 
     private PracticeWorkTypeEvidenceOptionsDTO options(ArtifactSourceCatalog catalog, WorkArtifact artifact) {
-        PracticeAutomatedAssessmentPolicy recommendedPolicy = defaults.forArtifact(artifact);
+        PracticeAutomatedReviewPolicy recommendedPolicy = defaults.forArtifact(artifact);
         EvidenceProfile profile = catalogs.requireProfile(catalog.version(), recommendedPolicy.evidenceProfile());
         return new PracticeWorkTypeEvidenceOptionsDTO(
             artifact,
             recommendedPolicy,
-            List.of(PracticeAutomatedAssessmentMode.LANGUAGE_MODEL),
+            List.of(PracticeAutomatedReviewMode.LANGUAGE_MODEL),
             catalog
                 .sources()
                 .stream()
@@ -55,7 +55,7 @@ public class PracticeEvidenceOptionsService {
                         catalogs.isSourceUsePermitted(
                             catalog.version(),
                             source.kind(),
-                            SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT
+                            SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
                         )
                     )
                 )

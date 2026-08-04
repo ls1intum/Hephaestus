@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
@@ -125,7 +125,7 @@ public class BundledPracticeCatalogLoader {
             triggerEvents,
             criteria,
             loadPrecomputeScript(node, slug),
-            automatedAssessmentPolicy(objectMapper, catalog, node, slug),
+            automatedReviewPolicy(objectMapper, catalog, node, slug),
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
@@ -134,21 +134,21 @@ public class BundledPracticeCatalogLoader {
         return definition;
     }
 
-    private static PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy(
+    private static PracticeAutomatedReviewPolicy automatedReviewPolicy(
         JsonMapper objectMapper,
         JsonNode catalog,
         JsonNode node,
         String slug
     ) {
-        String automatedAssessmentPolicyId = requiredText(node, "automatedAssessmentPolicyId");
-        JsonNode automatedAssessmentPolicy = catalog.path("automatedAssessmentPolicy").get(automatedAssessmentPolicyId);
-        if (automatedAssessmentPolicy == null || !automatedAssessmentPolicy.isObject()) {
+        String automatedReviewPolicyId = requiredText(node, "automatedReviewPolicyId");
+        JsonNode automatedReviewPolicy = catalog.path("automatedReviewPolicy").get(automatedReviewPolicyId);
+        if (automatedReviewPolicy == null || !automatedReviewPolicy.isObject()) {
             throw new IllegalStateException(
-                "unknown bundled practice automated-assessment policy: " + automatedAssessmentPolicyId
+                "unknown bundled practice automated-review policy: " + automatedReviewPolicyId
             );
         }
         try {
-            return objectMapper.treeToValue(automatedAssessmentPolicy, PracticeAutomatedAssessmentPolicy.class);
+            return objectMapper.treeToValue(automatedReviewPolicy, PracticeAutomatedReviewPolicy.class);
         } catch (RuntimeException exception) {
             throw new IllegalStateException("invalid bundled practice evidence: " + slug, exception);
         }

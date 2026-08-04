@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
-public enum AutomatedAssessmentReadinessReason {
-    NO_AUTOMATED_ASSESSMENT,
+public enum AutomatedReviewReadinessReason {
+    NO_AUTOMATED_REVIEW,
     DECLARED_EVIDENCE_INSUFFICIENT,
 }

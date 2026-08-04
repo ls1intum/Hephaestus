@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -119,7 +119,7 @@ public class PracticeDetectionDeliveryService {
                         job.getId()
                 );
             }
-            enforceEvidenceBoundary(finding, revision.getAutomatedAssessmentPolicy(), evidenceBoundary, job);
+            enforceEvidenceBoundary(finding, revision.getAutomatedReviewPolicy(), evidenceBoundary, job);
         }
 
         Long aboutUserId = target.aboutUserId();
@@ -230,7 +230,7 @@ public class PracticeDetectionDeliveryService {
 
     private void enforceEvidenceBoundary(
         ValidatedFinding finding,
-        @Nullable PracticeAutomatedAssessmentPolicy requirements,
+        @Nullable PracticeAutomatedReviewPolicy requirements,
         EvidenceBoundary boundary,
         AgentJob job
     ) {

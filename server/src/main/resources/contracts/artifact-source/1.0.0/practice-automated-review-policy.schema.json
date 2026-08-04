@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-assessment-policy.schema.json",
-  "title": "Practice automated-assessment policy",
-  "description": "Author-defined evidence Hephaestus needs before it may assess reviewed work against one practice revision.",
+  "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json",
+  "title": "Practice automated-review policy",
+  "description": "Author-defined evidence Hephaestus needs before it may review work against one practice revision.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "sourceContractVersion",
     "evidenceProfile",
-    "automatedAssessment",
+    "automatedReview",
     "requiredEvidence",
     "optionalContext",
     "whenEvidenceIsInsufficient",
@@ -26,9 +26,9 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
     },
-    "automatedAssessment": {
-      "title": "Automated assessment",
-      "description": "How Hephaestus may assess the practice. This author declaration does not describe or validate assessment by a developer, peer, or human mentor.",
+    "automatedReview": {
+      "title": "Automated review",
+      "description": "How Hephaestus may review the practice. This author declaration does not describe or validate review by a developer, peer, or human mentor.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -37,8 +37,8 @@
       ],
       "properties": {
         "mode": {
-          "title": "Assessment mode",
-          "description": "Implementation Hephaestus uses for automated assessment.",
+          "title": "Review mode",
+          "description": "Implementation Hephaestus uses for automated review.",
           "enum": [
             "LANGUAGE_MODEL",
             "NONE"
@@ -46,7 +46,7 @@
         },
         "evidenceSufficiency": {
           "title": "Evidence sufficiency",
-          "description": "Whether meeting every declared requirement is enough for Hephaestus to assess the reviewed work.",
+          "description": "Whether meeting every declared requirement is enough for Hephaestus to review the work.",
           "enum": [
             "SUFFICIENT_WHEN_REQUIREMENTS_MET",
             "DECLARED_EVIDENCE_INSUFFICIENT",
@@ -88,7 +88,7 @@
     },
     "requiredEvidence": {
       "title": "Required evidence",
-      "description": "Every source in this list must meet its quality requirements before automated assessment may start.",
+      "description": "Every source in this list must meet its quality requirements before automated review may start.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/requirement"
@@ -96,7 +96,7 @@
     },
     "optionalContext": {
       "title": "Optional context",
-      "description": "Sources that may add context but never block automated assessment when absent.",
+      "description": "Sources that may add context but never block automated review when absent.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/optionalContextSource"
@@ -105,7 +105,7 @@
     "whenEvidenceIsInsufficient": {
       "title": "Insufficient evidence action",
       "description": "Conservative action when a required source is unavailable, incomplete, or not current.",
-      "const": "SKIP_AUTOMATED_ASSESSMENT"
+      "const": "SKIP_AUTOMATED_REVIEW"
     },
     "knownLimitations": {
       "title": "Known limitations",
@@ -120,7 +120,7 @@
     {
       "if": {
         "properties": {
-          "automatedAssessment": {
+          "automatedReview": {
             "type": "object",
             "properties": {
               "mode": {
@@ -133,7 +133,7 @@
           }
         },
         "required": [
-          "automatedAssessment"
+          "automatedReview"
         ]
       },
       "then": {
@@ -164,7 +164,7 @@
     {
       "if": {
         "properties": {
-          "automatedAssessment": {
+          "automatedReview": {
             "type": "object",
             "properties": {
               "evidenceSufficiency": {
@@ -177,7 +177,7 @@
           }
         },
         "required": [
-          "automatedAssessment"
+          "automatedReview"
         ]
       },
       "then": {
@@ -228,7 +228,7 @@
     },
     "optionalContextSource": {
       "title": "Optional context source",
-      "description": "A source that may add context but never blocks automated assessment when absent.",
+      "description": "A source that may add context but never blocks automated review when absent.",
       "type": "object",
       "additionalProperties": false,
       "required": [

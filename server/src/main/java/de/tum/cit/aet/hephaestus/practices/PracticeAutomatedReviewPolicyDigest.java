@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-public final class PracticeAutomatedAssessmentPolicyDigest {
+public final class PracticeAutomatedReviewPolicyDigest {
 
-    private PracticeAutomatedAssessmentPolicyDigest() {}
+    private PracticeAutomatedReviewPolicyDigest() {}
 
-    public static String digest(PracticeAutomatedAssessmentPolicy requirements) {
+    public static String digest(PracticeAutomatedReviewPolicy requirements) {
         CanonicalDigest digest = new CanonicalDigest()
             .add(requirements.sourceContractVersion().value())
             .add(requirements.evidenceProfile().value())
-            .add(requirements.automatedAssessment().mode().name())
-            .add(requirements.automatedAssessment().evidenceSufficiency().name())
+            .add(requirements.automatedReview().mode().name())
+            .add(requirements.automatedReview().evidenceSufficiency().name())
             .add(requirements.whenEvidenceIsInsufficient().name())
             .addInt(requirements.requiredEvidence().size());
         requirements.requiredEvidence().forEach(requirement -> add(digest, requirement));

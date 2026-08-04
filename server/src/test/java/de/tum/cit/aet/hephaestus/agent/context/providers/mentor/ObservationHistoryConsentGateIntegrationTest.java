@@ -52,7 +52,7 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         setUpWorkspaceAndRecipient("obs-consent-gate-test");
         practice = new Practice();
         practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.conversationThread());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");

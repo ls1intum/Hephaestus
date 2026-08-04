@@ -49,7 +49,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         p.setSlug(slug);
         p.setName(slug);
         p.setCriteria("criteria for " + slug);
-        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         var revision = new PracticeRevision();
         ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
         p.setCurrentRevision(revision);

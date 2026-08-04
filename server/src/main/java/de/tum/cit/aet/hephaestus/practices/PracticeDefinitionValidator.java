@@ -23,17 +23,15 @@ public final class PracticeDefinitionValidator {
     }
 
     public void validate(PracticeDefinition definition) {
-        boolean automatedAssessment =
-            definition.automatedAssessmentPolicy().automatedAssessment().mode() != PracticeAutomatedAssessmentMode.NONE;
-        validateTriggers(definition.artifactType(), definition.triggerEvents(), automatedAssessment);
-        if (!automatedAssessment && definition.precomputeScript() != null) {
-            throw new IllegalArgumentException(
-                "A practice without automated assessment cannot define a precompute script"
-            );
+        boolean automatedReview =
+            definition.automatedReviewPolicy().automatedReview().mode() != PracticeAutomatedReviewMode.NONE;
+        validateTriggers(definition.artifactType(), definition.triggerEvents(), automatedReview);
+        if (!automatedReview && definition.precomputeScript() != null) {
+            throw new IllegalArgumentException("A practice without automated review cannot define a precompute script");
         }
         rejectDetectorVocabulary("Why it matters", definition.whyItMatters());
         rejectDetectorVocabulary("What good looks like", definition.whatGoodLooksLike());
-        validateEvidence(definition.artifactType(), definition.automatedAssessmentPolicy());
+        validateEvidence(definition.artifactType(), definition.automatedReviewPolicy());
     }
 
     public static void validate(
@@ -50,18 +48,18 @@ public final class PracticeDefinitionValidator {
     private static void validateTriggers(
         WorkArtifact artifactType,
         List<String> triggerEvents,
-        boolean automatedAssessment
+        boolean automatedReview
     ) {
         if (new HashSet<>(triggerEvents).size() != triggerEvents.size()) {
             throw new IllegalArgumentException("Trigger events must not contain duplicates");
         }
-        if (!automatedAssessment && !triggerEvents.isEmpty()) {
+        if (!automatedReview && !triggerEvents.isEmpty()) {
             throw new IllegalArgumentException(
-                "A practice without automated assessment cannot define events that start a review"
+                "A practice without automated review cannot define events that start a review"
             );
         }
         Set<String> allowed = TriggerEventCatalog.eligibleFor(artifactType);
-        if (automatedAssessment && artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
+        if (automatedReview && artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
             throw new IllegalArgumentException("Choose at least one event that starts a review");
         }
         List<String> incompatible = triggerEvents
@@ -81,7 +79,7 @@ public final class PracticeDefinitionValidator {
         }
     }
 
-    private void validateEvidence(WorkArtifact artifactType, PracticeAutomatedAssessmentPolicy requirements) {
+    private void validateEvidence(WorkArtifact artifactType, PracticeAutomatedReviewPolicy requirements) {
         EvidenceProfile profile = sourceCatalogs.requireProfile(
             requirements.sourceContractVersion(),
             requirements.evidenceProfile()
@@ -93,7 +91,7 @@ public final class PracticeDefinitionValidator {
         validateOptionalRequirements(profile, requirements);
     }
 
-    private void validateOptionalRequirements(EvidenceProfile profile, PracticeAutomatedAssessmentPolicy requirements) {
+    private void validateOptionalRequirements(EvidenceProfile profile, PracticeAutomatedReviewPolicy requirements) {
         for (PracticeOptionalContextSource requirement : requirements.optionalContext()) {
             sourceCatalogs.requireSource(requirements.sourceContractVersion(), requirement.sourceKind());
             if (!profile.allows(requirement.sourceKind())) {
@@ -104,12 +102,12 @@ public final class PracticeDefinitionValidator {
 
     private void validateRequirements(
         EvidenceProfile profile,
-        PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
+        PracticeAutomatedReviewPolicy automatedReviewPolicy,
         List<PracticeEvidenceRequirement> sourceRequirements
     ) {
         for (PracticeEvidenceRequirement requirement : sourceRequirements) {
             ArtifactSourceContract source = sourceCatalogs.requireSource(
-                automatedAssessmentPolicy.sourceContractVersion(),
+                automatedReviewPolicy.sourceContractVersion(),
                 requirement.sourceKind()
             );
             if (!profile.allows(requirement.sourceKind())) {

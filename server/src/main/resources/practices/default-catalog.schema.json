@@ -8,7 +8,7 @@
   "required": [
     "$schema",
     "criteriaPreambles",
-    "automatedAssessmentPolicy",
+    "automatedReviewPolicy",
     "areas"
   ],
   "properties": {
@@ -17,7 +17,7 @@
       "const": "./default-catalog.schema.json"
     },
     "criteriaPreambles": {
-      "description": "Shared assessment instructions keyed by reviewed work type or a named specialization.",
+      "description": "Shared review instructions keyed by reviewed work type or a named specialization.",
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {
@@ -25,15 +25,15 @@
         "minLength": 1
       }
     },
-    "automatedAssessmentPolicy": {
-      "description": "Reusable automated-assessment setups referenced by practices in this catalog.",
+    "automatedReviewPolicy": {
+      "description": "Reusable automated-review setups referenced by practices in this catalog.",
       "type": "object",
       "minProperties": 1,
       "propertyNames": {
         "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
       },
       "additionalProperties": {
-        "$ref": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-assessment-policy.schema.json"
+        "$ref": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json"
       }
     },
     "areas": {
@@ -100,7 +100,7 @@
         "name",
         "artifactType",
         "triggerEvents",
-        "automatedAssessmentPolicyId",
+        "automatedReviewPolicyId",
         "criteria"
       ],
       "properties": {
@@ -113,7 +113,7 @@
           "$ref": "#/$defs/name"
         },
         "artifactType": {
-          "description": "Type of work against which the practice is assessed.",
+          "description": "Type of work against which the practice is reviewed.",
           "enum": [
             "PULL_REQUEST",
             "ISSUE",
@@ -121,7 +121,7 @@
           ]
         },
         "triggerEvents": {
-          "description": "Events that start automated assessment; empty when assessment is not event-driven.",
+          "description": "Events that start automated review; empty when review is not event-driven.",
           "type": "array",
           "uniqueItems": true,
           "items": {
@@ -129,8 +129,8 @@
             "minLength": 1
           }
         },
-        "automatedAssessmentPolicyId": {
-          "description": "Identifier of the automated-assessment setup used by this practice.",
+        "automatedReviewPolicyId": {
+          "description": "Identifier of the automated-review setup used by this practice.",
           "$ref": "#/$defs/policyId"
         },
         "precomputeScript": {
@@ -144,7 +144,7 @@
           "minLength": 1
         },
         "criteria": {
-          "description": "Markdown rules used by any assessor and by Hephaestus when automated assessment is enabled.",
+          "description": "Markdown rules used by any reviewer and by Hephaestus when automated review is enabled.",
           "type": "string",
           "minLength": 3,
           "maxLength": 50000
@@ -171,7 +171,7 @@
       "maxLength": 64
     },
     "policyId": {
-      "description": "Lowercase, hyphen-separated automated-assessment setup identifier.",
+      "description": "Lowercase, hyphen-separated automated-review setup identifier.",
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "minLength": 3,

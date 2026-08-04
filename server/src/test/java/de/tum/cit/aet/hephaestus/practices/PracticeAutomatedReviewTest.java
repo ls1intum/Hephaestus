@@ -6,43 +6,40 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
-class PracticeAutomatedAssessmentTest extends BaseUnitTest {
+class PracticeAutomatedReviewTest extends BaseUnitTest {
 
     @Test
     void shouldRejectIncoherentNoneCombinations() {
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.NONE,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.NONE,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             )
         );
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.NONE
-            )
+            new PracticeAutomatedReview(PracticeAutomatedReviewMode.LANGUAGE_MODEL, PracticeEvidenceSufficiency.NONE)
         );
     }
 
     @Test
     void shouldAttemptOnlySupportedLanguageModelAssessment() {
         assertThat(
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            ).canAttemptAutomatedAssessment()
+            ).canAttemptAutomatedReview()
         ).isTrue();
         assertThat(
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
-            ).canAttemptAutomatedAssessment()
+            ).canAttemptAutomatedReview()
         ).isFalse();
         assertThat(
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.NONE,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.NONE,
                 PracticeEvidenceSufficiency.NONE
-            ).canAttemptAutomatedAssessment()
+            ).canAttemptAutomatedReview()
         ).isFalse();
     }
 }

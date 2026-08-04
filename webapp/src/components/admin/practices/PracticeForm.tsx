@@ -11,7 +11,7 @@ import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
-import { PracticeAutomatedAssessmentValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
@@ -58,7 +58,7 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 		...(practice.whyItMatters ? { whyItMatters: practice.whyItMatters } : {}),
 		...(practice.whatGoodLooksLike ? { whatGoodLooksLike: practice.whatGoodLooksLike } : {}),
 		...(practice.precomputeScript ? { precomputeScript: practice.precomputeScript } : {}),
-		automatedAssessmentPolicy: practice.automatedAssessmentPolicy,
+		automatedReviewPolicy: practice.automatedReviewPolicy,
 	};
 }
 
@@ -95,7 +95,7 @@ export function PracticeForm(props: PracticeFormProps) {
 				whyItMatters: definition.whyItMatters,
 				whatGoodLooksLike: definition.whatGoodLooksLike,
 				precomputeScript: definition.precomputeScript,
-				automatedAssessmentPolicy: definition.automatedAssessmentPolicy,
+				automatedReviewPolicy: definition.automatedReviewPolicy,
 				clear: clear.length > 0 ? clear : undefined,
 			},
 			areaSlug ?? null,
@@ -107,15 +107,15 @@ export function PracticeForm(props: PracticeFormProps) {
 				<Separator />
 				<section className="space-y-4">
 					<div>
-						<h2 className="text-lg font-semibold">Automated assessment validation</h2>
+						<h2 className="text-lg font-semibold">Automated review validation</h2>
 						<p className="text-sm text-muted-foreground">
 							The requirements above are the author's declaration. This status says whether an
 							independent evaluator has validated the exact practice definition; it does not
 							guarantee every finding is correct.
 						</p>
 					</div>
-					<PracticeAutomatedAssessmentValidationSummary
-						validation={initialData.automatedAssessmentValidation}
+					<PracticeAutomatedReviewValidationSummary
+						validation={initialData.automatedReviewValidation}
 					/>
 				</section>
 				<Separator />

@@ -431,7 +431,7 @@ public class CuratedCatalogService {
             definition.triggerEvents(),
             definition.criteria(),
             definition.precomputeScript(),
-            definition.automatedAssessmentPolicy(),
+            definition.automatedReviewPolicy(),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
             areaSlug

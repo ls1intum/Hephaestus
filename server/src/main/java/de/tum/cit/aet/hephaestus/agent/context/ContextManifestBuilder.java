@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessDecision;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReason;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.CompletenessBasis;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceViewTransformation;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
@@ -29,7 +29,7 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentMode;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.io.IOException;
@@ -56,13 +56,13 @@ import tools.jackson.databind.json.JsonMapper;
 public class ContextManifestBuilder {
 
     static final String INTERNAL_MANIFEST_FILE = "artifact-source-manifest.json";
-    static final String AUTOMATED_ASSESSMENT_READINESS_REPORT_FILE = "automated-assessment-readiness-report.json";
+    static final String AUTOMATED_REVIEW_READINESS_REPORT_FILE = "automated-review-readiness-report.json";
 
-    public record PreparedAutomatedAssessmentReadiness(
+    public record PreparedAutomatedReviewReadiness(
         List<Practice> readyPractices,
-        AutomatedAssessmentReadinessReport report
+        AutomatedReviewReadinessReport report
     ) {
-        public PreparedAutomatedAssessmentReadiness {
+        public PreparedAutomatedReviewReadiness {
             readyPractices = List.copyOf(readyPractices);
             Objects.requireNonNull(report, "report");
         }
@@ -184,25 +184,21 @@ public class ContextManifestBuilder {
     }
 
     boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind) {
-        return catalogs.isSourceUsePermitted(version, kind, SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT);
+        return catalogs.isSourceUsePermitted(version, kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
     }
 
-    public PreparedAutomatedAssessmentReadiness prepareAutomatedAssessmentReadiness(
+    public PreparedAutomatedReviewReadiness prepareAutomatedReviewReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices,
         String jobId,
         Instant temporalAnchor
     ) {
-        AutomatedAssessmentReadinessResult result = checkAutomatedAssessmentReadiness(
-            manifest,
-            practices,
-            temporalAnchor
-        );
+        AutomatedReviewReadinessResult result = checkAutomatedReviewReadiness(manifest, practices, temporalAnchor);
         if (result.decisions().isEmpty()) {
-            throw new IllegalArgumentException("Cannot persist an empty automated-assessment readiness report");
+            throw new IllegalArgumentException("Cannot persist an empty automated-review readiness report");
         }
         Instant decidedAt = result.decisions().getFirst().decidedAt();
-        AutomatedAssessmentReadinessReport report = new AutomatedAssessmentReadinessReport(
+        AutomatedReviewReadinessReport report = new AutomatedReviewReadinessReport(
             manifest.contractVersion(),
             manifest.catalogDigest(),
             manifest.evidenceProfile(),
@@ -210,8 +206,8 @@ public class ContextManifestBuilder {
             decidedAt,
             result.decisions()
         );
-        persistInternalJson(jobId, AUTOMATED_ASSESSMENT_READINESS_REPORT_FILE, objectMapper.writeValueAsBytes(report));
-        return new PreparedAutomatedAssessmentReadiness(result.readyPractices(), report);
+        persistInternalJson(jobId, AUTOMATED_REVIEW_READINESS_REPORT_FILE, objectMapper.writeValueAsBytes(report));
+        return new PreparedAutomatedReviewReadiness(result.readyPractices(), report);
     }
 
     PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {
@@ -255,14 +251,14 @@ public class ContextManifestBuilder {
         return new PreparedEvidence(files, restricted);
     }
 
-    public AutomatedAssessmentReadinessResult checkAutomatedAssessmentReadiness(
+    public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices
     ) {
-        return checkAutomatedAssessmentReadiness(manifest, practices, clock.instant());
+        return checkAutomatedReviewReadiness(manifest, practices, clock.instant());
     }
 
-    public AutomatedAssessmentReadinessResult checkAutomatedAssessmentReadiness(
+    public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices,
         Instant temporalAnchor
@@ -292,9 +288,9 @@ public class ContextManifestBuilder {
         manifest.sources().forEach(capture -> captures.put(capture.kind(), capture));
         Instant checkedAt = clock.instant();
         List<Practice> ready = new ArrayList<>();
-        List<AutomatedAssessmentReadinessDecision> decisions = new ArrayList<>();
+        List<AutomatedReviewReadinessDecision> decisions = new ArrayList<>();
         for (Practice practice : practices) {
-            var requirements = practice.getAutomatedAssessmentPolicy();
+            var requirements = practice.getAutomatedReviewPolicy();
             if (requirements == null) {
                 throw new IllegalArgumentException("Practice has no evidence requirements: " + practice.getSlug());
             }
@@ -306,15 +302,15 @@ public class ContextManifestBuilder {
                     "Practice evidence contract does not match manifest: " + practice.getSlug()
                 );
             }
-            List<AutomatedAssessmentReadinessReason> decisionReasons = new ArrayList<>();
-            switch (requirements.automatedAssessment().mode()) {
-                case NONE -> decisionReasons.add(AutomatedAssessmentReadinessReason.NO_AUTOMATED_ASSESSMENT);
+            List<AutomatedReviewReadinessReason> decisionReasons = new ArrayList<>();
+            switch (requirements.automatedReview().mode()) {
+                case NONE -> decisionReasons.add(AutomatedReviewReadinessReason.NO_AUTOMATED_REVIEW);
                 case LANGUAGE_MODEL -> {
                 }
             }
-            switch (requirements.automatedAssessment().evidenceSufficiency()) {
+            switch (requirements.automatedReview().evidenceSufficiency()) {
                 case DECLARED_EVIDENCE_INSUFFICIENT -> decisionReasons.add(
-                    AutomatedAssessmentReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT
+                    AutomatedReviewReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT
                 );
                 case SUFFICIENT_WHEN_REQUIREMENTS_MET, NONE -> {
                 }
@@ -356,7 +352,7 @@ public class ContextManifestBuilder {
                     )
                 );
             }
-            AutomatedAssessmentReadinessDecision decision = new AutomatedAssessmentReadinessDecision(
+            AutomatedReviewReadinessDecision decision = new AutomatedReviewReadinessDecision(
                 practice.getSlug(),
                 checkedAt,
                 decisionReasons.isEmpty() && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements),
@@ -366,7 +362,7 @@ public class ContextManifestBuilder {
             decisions.add(decision);
             if (decision.ready()) ready.add(practice);
         }
-        return new AutomatedAssessmentReadinessResult(ready, decisions);
+        return new AutomatedReviewReadinessResult(ready, decisions);
     }
 
     private SourceFreshness assessFreshness(

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation.dto;
 
-import de.tum.cit.aet.hephaestus.practices.AssessmentClaimCurrentness;
+import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -36,7 +36,7 @@ public record ObservationDetailDTO(
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
-    @NonNull AssessmentClaimCurrentness claimCurrentness,
+    @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     public static ObservationDetailDTO from(
@@ -59,7 +59,7 @@ public record ObservationDetailDTO(
             includeEvidence ? ObservationEvidenceDTO.from(observation.getEvidence()) : null,
             observation.getReasoning(),
             deliveredGuidance,
-            AssessmentClaimCurrentness.of(observation.getPracticeRevision(), practice),
+            ReviewClaimCurrentness.of(observation.getPracticeRevision(), practice),
             observation.getObservedAt()
         );
     }

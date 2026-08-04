@@ -128,16 +128,16 @@ describe("practice catalog cache updates", () => {
 		).toEqual({ whyItMatters: undefined });
 		expect(
 			selectPracticePatch(updated, {
-				automatedAssessmentPolicy: updated.automatedAssessmentPolicy,
+				automatedReviewPolicy: updated.automatedReviewPolicy,
 			}),
 		).toEqual({
-			automatedAssessmentPolicy: updated.automatedAssessmentPolicy,
-			automatedAssessmentValidation: updated.automatedAssessmentValidation,
+			automatedReviewPolicy: updated.automatedReviewPolicy,
+			automatedReviewValidation: updated.automatedReviewValidation,
 		});
 		expect(selectPracticePatch(updated, { artifactType: "PULL_REQUEST" })).toEqual({
 			artifactType: "PULL_REQUEST",
-			automatedAssessmentPolicy: updated.automatedAssessmentPolicy,
-			automatedAssessmentValidation: updated.automatedAssessmentValidation,
+			automatedReviewPolicy: updated.automatedReviewPolicy,
+			automatedReviewValidation: updated.automatedReviewValidation,
 		});
 	});
 });

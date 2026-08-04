@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,10 +29,10 @@ public record EvidencePlan(
         if (practices.isEmpty()) {
             throw new JobPreparationException("Cannot compile evidence for an empty practice set");
         }
-        PracticeAutomatedAssessmentPolicy first = requireRequirements(practices.getFirst());
+        PracticeAutomatedReviewPolicy first = requireRequirements(practices.getFirst());
         Set<SourceKind> selected = new LinkedHashSet<>();
         for (Practice practice : practices) {
-            PracticeAutomatedAssessmentPolicy requirements = requireRequirements(practice);
+            PracticeAutomatedReviewPolicy requirements = requireRequirements(practice);
             if (
                 !first.sourceContractVersion().equals(requirements.sourceContractVersion()) ||
                 !first.evidenceProfile().equals(requirements.evidenceProfile())
@@ -47,10 +47,10 @@ public record EvidencePlan(
         return new EvidencePlan(first.sourceContractVersion(), first.evidenceProfile(), selected);
     }
 
-    private static PracticeAutomatedAssessmentPolicy requireRequirements(Practice practice) {
-        if (practice.getAutomatedAssessmentPolicy() == null) {
+    private static PracticeAutomatedReviewPolicy requireRequirements(Practice practice) {
+        if (practice.getAutomatedReviewPolicy() == null) {
             throw new JobPreparationException("Practice has no evidence requirements: " + practice.getSlug());
         }
-        return practice.getAutomatedAssessmentPolicy();
+        return practice.getAutomatedReviewPolicy();
     }
 }

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.ReviewRuleFingerprint;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
@@ -97,9 +97,9 @@ public class PracticeRevision {
     private String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "automated_assessment_policy", columnDefinition = "jsonb")
+    @Column(name = "automated_review_policy", columnDefinition = "jsonb")
     @ToString.Exclude
-    private PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy;
+    private PracticeAutomatedReviewPolicy automatedReviewPolicy;
 
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     @ToString.Exclude
@@ -142,9 +142,9 @@ public class PracticeRevision {
         this.triggerEvents = Objects.requireNonNull(practice.getTriggerEvents(), "practice.triggerEvents").deepCopy();
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
         this.precomputeScript = practice.getPrecomputeScript();
-        this.automatedAssessmentPolicy = Objects.requireNonNull(
-            practice.getAutomatedAssessmentPolicy(),
-            "practice.automatedAssessmentPolicy"
+        this.automatedReviewPolicy = Objects.requireNonNull(
+            practice.getAutomatedReviewPolicy(),
+            "practice.automatedReviewPolicy"
         );
         this.whyItMatters = practice.getWhyItMatters();
         this.whatGoodLooksLike = practice.getWhatGoodLooksLike();
@@ -163,7 +163,7 @@ public class PracticeRevision {
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
-            automatedAssessmentPolicy,
+            automatedReviewPolicy,
             areaSlug
         );
     }
@@ -176,7 +176,7 @@ public class PracticeRevision {
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
-            automatedAssessmentPolicy,
+            automatedReviewPolicy,
             areaSlug
         );
     }

@@ -1,27 +1,27 @@
 import type {
-	PracticeAutomatedAssessmentPolicy,
-	PracticeAutomatedAssessmentValidation,
+	PracticeAutomatedReviewPolicy,
+	PracticeAutomatedReviewValidation,
 	PracticeEvidenceSourceOption,
 } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-	assessmentModeLabel,
 	evidenceQualityLabel,
 	evidenceSourceLabel,
 	evidenceSufficiencyLabel,
+	reviewModeLabel,
 } from "./evidence-presentation";
 
-const VALIDATION_LABELS: Record<PracticeAutomatedAssessmentValidation["status"], string> = {
+const VALIDATION_LABELS: Record<PracticeAutomatedReviewValidation["status"], string> = {
 	AUTHOR_DECLARED: "Not independently validated",
-	INDEPENDENTLY_VALIDATED: "Automated assessment independently validated",
+	INDEPENDENTLY_VALIDATED: "Automated review independently validated",
 	STALE: "Validation is stale",
 	SUPERSEDED: "Validation is superseded",
 };
 
 const VALIDATION_VARIANTS: Record<
-	PracticeAutomatedAssessmentValidation["status"],
+	PracticeAutomatedReviewValidation["status"],
 	"outline" | "success" | "warning"
 > = {
 	AUTHOR_DECLARED: "outline",
@@ -34,7 +34,7 @@ function RequiredEvidence({
 	requirements,
 	sources,
 }: {
-	requirements: PracticeAutomatedAssessmentPolicy["requiredEvidence"];
+	requirements: PracticeAutomatedReviewPolicy["requiredEvidence"];
 	sources: readonly PracticeEvidenceSourceOption[];
 }) {
 	if (requirements.length === 0) return <span>None</span>;
@@ -54,7 +54,7 @@ function OptionalContext({
 	sources,
 	options,
 }: {
-	sources: PracticeAutomatedAssessmentPolicy["optionalContext"];
+	sources: PracticeAutomatedReviewPolicy["optionalContext"];
 	options: readonly PracticeEvidenceSourceOption[];
 }) {
 	if (sources.length === 0) return <span>None</span>;
@@ -65,7 +65,7 @@ function OptionalContext({
 					<span>{evidenceSourceLabel(source.sourceKind, options)}</span>
 					<span className="text-muted-foreground">
 						{" "}
-						· Used when available; never blocks assessment
+						· Used when available; never blocks a review
 					</span>
 				</li>
 			))}
@@ -74,20 +74,20 @@ function OptionalContext({
 }
 
 export interface PracticeEvidenceSummaryProps {
-	policy: PracticeAutomatedAssessmentPolicy;
-	validation: PracticeAutomatedAssessmentValidation;
+	policy: PracticeAutomatedReviewPolicy;
+	validation: PracticeAutomatedReviewValidation;
 	sources: readonly PracticeEvidenceSourceOption[];
 	workTypeLabel: string;
 	className?: string;
 }
 
-export interface PracticeAutomatedAssessmentValidationSummaryProps {
-	validation: PracticeAutomatedAssessmentValidation;
+export interface PracticeAutomatedReviewValidationSummaryProps {
+	validation: PracticeAutomatedReviewValidation;
 }
 
-export function PracticeAutomatedAssessmentValidationSummary({
+export function PracticeAutomatedReviewValidationSummary({
 	validation,
-}: PracticeAutomatedAssessmentValidationSummaryProps) {
+}: PracticeAutomatedReviewValidationSummaryProps) {
 	return (
 		<div className="space-y-1 text-sm">
 			<Badge variant={VALIDATION_VARIANTS[validation.status]}>
@@ -110,7 +110,7 @@ export function PracticeAutomatedAssessmentValidationSummary({
 						<p className="mt-1">
 							Review rules <code className="break-all">{validation.reviewRuleFingerprint}</code>
 							<br />
-							Assessment policy <code className="break-all">{validation.policyDigest}</code>
+							Review policy <code className="break-all">{validation.policyDigest}</code>
 							{validation.evaluatorProcedureFingerprint && (
 								<>
 									<br />
@@ -142,14 +142,14 @@ export function PracticeEvidenceSummary({
 				</dd>
 			</div>
 			<div>
-				<dt className="font-medium">Automated assessment</dt>
+				<dt className="font-medium">Automated review</dt>
 				<dd className="text-muted-foreground">
-					{assessmentModeLabel(policy.automatedAssessment.mode)}
+					{reviewModeLabel(policy.automatedReview.mode)}
 					<span className="block">
-						{evidenceSufficiencyLabel(policy.automatedAssessment.evidenceSufficiency)}
+						{evidenceSufficiencyLabel(policy.automatedReview.evidenceSufficiency)}
 					</span>
 					<span className="mt-1 block text-xs">
-						This setting only controls Hephaestus. Human assessment, if applicable, is a separate
+						This setting only controls Hephaestus. Human review, if applicable, is a separate
 						process and is not collected.
 					</span>
 				</dd>
@@ -171,9 +171,9 @@ export function PracticeEvidenceSummary({
 				<dd className="text-muted-foreground">Skip this practice rather than guess</dd>
 			</div>
 			<div>
-				<dt className="font-medium">Automated assessment validation</dt>
+				<dt className="font-medium">Automated review validation</dt>
 				<dd>
-					<PracticeAutomatedAssessmentValidationSummary validation={validation} />
+					<PracticeAutomatedReviewValidationSummary validation={validation} />
 				</dd>
 			</div>
 			{policy.knownLimitations.length > 0 && (

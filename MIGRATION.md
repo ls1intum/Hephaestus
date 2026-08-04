@@ -65,7 +65,7 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
-#### 🔴 Practice-assessment API uses one vocabulary
+#### 🔴 Practice-review API uses one vocabulary
 
 **Affected**: API clients that configure practices, read findings, or manage AI bindings.
 
@@ -74,7 +74,7 @@ Update clients in the same deployment as the server and webapp. The old names ha
 | Was | Now |
 | --- | --- |
 | AI purpose `PRACTICE_DETECTION` | `PRACTICE_REVIEW` |
-| `evidenceRequirements` | `automatedAssessmentPolicy` |
+| `evidenceRequirements` | `automatedReviewPolicy` |
 | `evidenceSupport` | `evidenceSufficiency` |
 | practice `active` and `/active` | `usedInNewReviews` and `/used-in-new-reviews` |
 | practice-area `active` | `visibleInPracticeDashboards` |
@@ -83,12 +83,12 @@ Update clients in the same deployment as the server and webapp. The old names ha
 Database values and columns migrate automatically. This change removes ambiguous uses of “active,” “support,” and
 “detection”; it does not change historical finding results.
 
-#### 🔴 Automated practice assessment requires source authorization
+#### 🔴 Automated practice review requires source authorization
 
 **Affected**: deployments that enable practice review.
 
 Set `HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES` to comma-separated `source:purpose` grants, for example
-`scm.pull-request.diff:AUTOMATED_PRACTICE_ASSESSMENT`. Grant automated assessment, feedback delivery, Mentor context, and operator evidence review separately.
+`scm.pull-request.diff:AUTOMATED_PRACTICE_REVIEW`. Grant automated review, feedback delivery, Mentor context, and operator evidence review separately.
 Leaving it empty is safe: review jobs decline without collecting evidence or making a semantic judgment. Wildcards
 are rejected so upgrades cannot silently authorize new sources or uses. Remove a grant and restart the server and
 workers to stop that use.

@@ -6,26 +6,26 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Whether a finding was produced using the current review rules")
-public enum AssessmentClaimCurrentness {
+public enum ReviewClaimCurrentness {
     CURRENT,
     STALE,
     UNVERIFIABLE;
 
-    public static AssessmentClaimCurrentness of(@Nullable PracticeRevision evaluated, Practice practice) {
+    public static ReviewClaimCurrentness of(@Nullable PracticeRevision evaluated, Practice practice) {
         PracticeRevision current = practice.getCurrentRevision();
         if (
             evaluated != null &&
             current != null &&
             !evaluated.equals(current) &&
-            evaluated.getAutomatedAssessmentPolicy() == null &&
-            current.getAutomatedAssessmentPolicy() != null
+            evaluated.getAutomatedReviewPolicy() == null &&
+            current.getAutomatedReviewPolicy() != null
         ) {
             return STALE;
         }
         return of(fingerprint(evaluated), fingerprint(current));
     }
 
-    public static AssessmentClaimCurrentness of(
+    public static ReviewClaimCurrentness of(
         @Nullable String evaluatedFingerprint,
         @Nullable String currentFingerprint
     ) {

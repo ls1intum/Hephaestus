@@ -153,7 +153,7 @@ export const adminUpdateLoginProviderResponseTransformer = async (data: any): Pr
     return data;
 };
 
-const practiceAutomatedAssessmentValidationSchemaResponseTransformer = (data: any) => {
+const practiceAutomatedReviewValidationSchemaResponseTransformer = (data: any) => {
     if (data.validatedAt) {
         data.validatedAt = new Date(data.validatedAt);
     }
@@ -161,7 +161,7 @@ const practiceAutomatedAssessmentValidationSchemaResponseTransformer = (data: an
 };
 
 const curatedPracticeDefinitionSchemaResponseTransformer = (data: any) => {
-    data.automatedAssessmentValidation = practiceAutomatedAssessmentValidationSchemaResponseTransformer(data.automatedAssessmentValidation);
+    data.automatedReviewValidation = practiceAutomatedReviewValidationSchemaResponseTransformer(data.automatedReviewValidation);
     return data;
 };
 
@@ -793,7 +793,7 @@ export const getCuratedPracticeCatalogEntryResponseTransformer = async (data: an
 };
 
 const practiceSchemaResponseTransformer = (data: any) => {
-    data.automatedAssessmentValidation = practiceAutomatedAssessmentValidationSchemaResponseTransformer(data.automatedAssessmentValidation);
+    data.automatedReviewValidation = practiceAutomatedReviewValidationSchemaResponseTransformer(data.automatedReviewValidation);
     data.createdAt = new Date(data.createdAt);
     data.updatedAt = new Date(data.updatedAt);
     return data;

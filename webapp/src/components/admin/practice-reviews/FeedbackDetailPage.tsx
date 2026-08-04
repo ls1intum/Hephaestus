@@ -26,7 +26,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { FeedbackMessage } from "./FeedbackMessage";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
-import { ClaimCurrentnessBadge, FindingAssessmentBadge } from "./ReviewBadges";
+import { ClaimCurrentnessBadge, FindingResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
@@ -185,7 +185,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 										<Badge variant="outline">
 											{finding.role === "PRIMARY" ? "Main finding" : "Supporting finding"}
 										</Badge>
-										<FindingAssessmentBadge finding={finding} />
+										<FindingResultBadge finding={finding} />
 										<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
 									</ItemFooter>
 								</Item>

@@ -7,10 +7,10 @@ description: Versioned evidence sources, explicit absence states, practice requi
 
 # Artifact-source contract
 
-Hephaestus may assess reviewed work against a practice only from evidence with explicit semantics. Contract `1.0.0` defines the
+Hephaestus may review work against a practice only from evidence with explicit semantics. Contract `1.0.0` defines the
 logical source catalog, capture states, evidence profiles, and practice requirements. A capture manifest records
 what was supplied to one run; it does not prove that a practice is empirically observable. Independent
-validation of automated assessment has separate provenance and status.
+validation of automated review has separate provenance and status.
 
 > If any required evidence clause is unsatisfied, record insufficient evidence and make no practice claim.
 > Missing evidence is never `NOT_APPLICABLE`, a strength, or evidence that desired behaviour is absent.
@@ -31,9 +31,9 @@ Runtime components must reference the exact contract version and catalog digest 
 `schemaVersion: 1` context index is not an artifact-source manifest and must not acquire `1.0.0` semantics.
 Inputs outside the catalog cannot satisfy a practice requirement.
 
-This contract governs automated-assessment evidence, not every file used by the separate Mentor conversation
+This contract governs automated-review evidence, not every file used by the separate Mentor conversation
 runtime. Mentor inputs remain subject to Mentor consent and integration controls and cannot support an automated
-practice assessment. Reusing one for assessment requires registering it as a source kind first.
+practice review. Reusing one for review requires registering it as a source kind first.
 
 ## Source vocabulary
 
@@ -60,12 +60,12 @@ Privacy class describes risk; it does not authorize collection, disclosure, or m
 | Class | Scope | Minimum treatment |
 | --- | --- | --- |
 | `PUBLIC` | Content verified as intentionally public within the approved scope | Integrity and purpose controls |
-| `INTERNAL` | Non-public project or workspace content without person-level assessment | Workspace authorization and purpose-bound retention |
+| `INTERNAL` | Non-public project or workspace content without person-level review findings | Workspace authorization and purpose-bound retention |
 | `PERSONAL` | User-linked project content, authorship, reviews, comments, or activity | Personal-data access, export, and erasure coverage |
-| `SENSITIVE_PERSONAL` | Private conversations or derived person-level assessments | Restricted audience and stricter disclosure and retention controls |
+| `SENSITIVE_PERSONAL` | Private conversations or derived person-level review findings | Restricted audience and stricter disclosure and retention controls |
 
 Each catalog source references separate source-use decisions whose purposes are machine-enforced. Capture requires
-`AUTOMATED_PRACTICE_ASSESSMENT`; finding persistence, delivery, and contributor evidence APIs require
+`AUTOMATED_PRACTICE_REVIEW`; finding persistence, delivery, and contributor evidence APIs require
 `PRACTICE_FEEDBACK_DELIVERY`; mentor reuse requires `CONVERSATIONAL_MENTORING`; and workspace-admin evidence review
 requires `OPERATOR_EVIDENCE_REVIEW`. Processor, region, transfer, and model-egress controls remain separate
 deployment obligations. A source allowed in an internal mirror is not thereby allowed in an external model request.
@@ -144,11 +144,11 @@ Deliberate ablation is an evaluation transformation, not natural absence. Produc
 view. The manifest can record evaluation transformations, but this contract version does not apply or authorize
 them; an evaluation runtime must define and validate its own dependency-aware view before enabling ablation.
 
-## Practice automated-assessment policy
+## Practice automated-review policy
 
-The [practice assessment glossary](./practice-assessment-glossary.mdx) defines the canonical product and machine
+The [practice review glossary](./practice-review-glossary.mdx) defines the canonical product and machine
 terms. Evidence requirements pin one source-contract version and evidence profile, then list required evidence and
-optional context. Required sources must satisfy their completeness and freshness requirements. Optional context never controls assessment readiness and has no completeness or freshness fields.
+optional context. Required sources must satisfy their completeness and freshness requirements. Optional context never controls review readiness and has no completeness or freshness fields.
 
 The contract deliberately has no arbitrary expression language and cannot require `NON_EMPTY`. A successful query
 that returns no items is valid evidence when the source contract allows empty content.
@@ -157,7 +157,7 @@ that returns no items is valid evidence when the source contract allows empty co
 {
   "sourceContractVersion": "1.0.0",
   "evidenceProfile": "pull-request-review",
-  "automatedAssessment": {
+  "automatedReview": {
     "mode": "LANGUAGE_MODEL",
     "evidenceSufficiency": "SUFFICIENT_WHEN_REQUIREMENTS_MET"
   },
@@ -169,7 +169,7 @@ that returns no items is valid evidence when the source contract allows empty co
     }
   ],
   "optionalContext": [],
-  "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_ASSESSMENT",
+  "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
   "knownLimitations": [
     {
       "code": "RUNTIME_BEHAVIOR_NOT_OBSERVED",
@@ -180,15 +180,15 @@ that returns no items is valid evidence when the source contract allows empty co
 ```
 
 Validation rejects unknown versions or source kinds, sources outside the evidence profile, impossible quality
-requirements, incompatible reviewed-work types, incoherent assessment settings, duplicate sources, and a source
+requirements, incompatible reviewed-work types, incoherent review settings, duplicate sources, and a source
 listed as both required evidence and optional context.
 
-`automatedAssessment` is explicitly relative to Hephaestus, the pinned source contract, the evidence profile, and
-the governed integrations. It does not claim that a practice is universally observable. A developer, peer, or human mentor may have different context for a particular practice. This contract makes no claim that human assessment is always possible.
+`automatedReview` is explicitly relative to Hephaestus, the pinned source contract, the evidence profile, and
+the governed integrations. It does not claim that a practice is universally observable. A developer, peer, or human mentor may have different context for a particular practice. This contract makes no claim that human review is always possible.
 
 `mode` is `LANGUAGE_MODEL` or `NONE`. `evidenceSufficiency` says whether passing every requirement is
-enough, the declared sources cannot support assessment, or automated assessment is not configured. These are author-defined
-settings, not empirical validation. `automatedAssessmentValidation` is bound to the exact automated-assessment
+enough, the declared sources cannot support review, or automated review is not configured. These are author-defined
+settings, not empirical validation. `automatedReviewValidation` is bound to the exact automated-review
 policy and review-rule fingerprint. A reviewed status must also identify the exact evaluator procedure: model,
 prompt, tools, and preprocessing. This release reports `AUTHOR_DECLARED`; independent validation is introduced by
 [#1437](https://github.com/ls1intum/Hephaestus/issues/1437) and must record its evaluation protocol and scope.
@@ -197,18 +197,18 @@ Validation never certifies every future finding.
 The current runtime admits only `LANGUAGE_MODEL` with `SUFFICIENT_WHEN_REQUIREMENTS_MET`. It skips:
 
 - `DECLARED_EVIDENCE_INSUFFICIENT` with `DECLARED_EVIDENCE_INSUFFICIENT`;
-- `NONE` with `NO_AUTOMATED_ASSESSMENT`.
+- `NONE` with `NO_AUTOMATED_REVIEW`.
 
-A skipped practice is omitted from that assessment request; whether the workspace uses it in new reviews is
+A skipped practice is omitted from that review request; whether the workspace uses it in new reviews is
 unchanged. Source readiness checks contain only
-source-quality reasons such as `SOURCE_NOT_AVAILABLE`, `SOURCE_INCOMPLETE`, or `SOURCE_NOT_CURRENT`; assessment-mode
+source-quality reasons such as `SOURCE_NOT_AVAILABLE`, `SOURCE_INCOMPLETE`, or `SOURCE_NOT_CURRENT`; review-mode
 limitations are never misreported as defective sources. Missing evidence never becomes a fabricated
 `NOT_APPLICABLE` finding.
 
-Human assessment is outside this contract. A future self-assessment, peer-review, or human-mentor channel needs its
-own assessment target, assessor relationship, rubric, evidence provenance, consent, access, retention, result
+Human review is outside this contract. A future self-review, peer-review, or human-mentor channel needs its
+own review target, reviewer relationship, rubric, evidence provenance, consent, access, retention, result
 vocabulary, and validation status. Merely declaring that a person could observe a practice neither collects a human
-assessment nor makes an automated assessment ready to run. If a human assessment later becomes automated-assessment
+review nor makes an automated review ready to run. If a human review later becomes automated-review
 input, it needs a governed source kind and purpose authorization.
 
 ## Conservative examples
@@ -252,14 +252,14 @@ Historical records keep their original contract and practice revision. Currentne
 - source and profile resources are immutable within a published contract version; any semantic change creates a new
   version;
 - moving a practice to that version changes its evidence requirements and stales that practice's earlier claims;
-- changing a practice automated-assessment policy stales that practice's claims;
+- changing a practice automated-review policy stales that practice's claims;
 - adding a source cannot silently alter existing requirements because its exact version and source list remain
   pinned;
 - governance withdrawal disables its exact future use, including collection, finding persistence and delivery,
   mentoring reuse, or evidence disclosure, without rewriting historical semantics; and
 - erasure or expiry may make a claim unreplayable without making the historical result false.
 
-Semantic currentness, automated-assessment-validation status, governance eligibility, and replayability remain separate.
+Semantic currentness, automated-review-validation status, governance eligibility, and replayability remain separate.
 Observation and review APIs expose `CURRENT`, `STALE`, or `UNVERIFIABLE` by comparing the evaluated practice
 revision's review-rule fingerprint with the current revision's fingerprint. Presentation-only edits retain semantic
 currentness; rows without comparable versioned fingerprints are `UNVERIFIABLE`.

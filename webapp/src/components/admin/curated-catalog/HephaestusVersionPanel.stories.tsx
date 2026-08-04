@@ -22,8 +22,8 @@ const shipped = {
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "The updated default criteria.",
 	whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
-	automatedAssessmentPolicy: mockPullRequestEvidence,
-	automatedAssessmentValidation: mockAuthorDeclaredEvidenceValidation,
+	automatedReviewPolicy: mockPullRequestEvidence,
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
 const meta = {

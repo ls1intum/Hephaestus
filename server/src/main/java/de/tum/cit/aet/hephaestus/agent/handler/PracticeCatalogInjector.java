@@ -159,12 +159,12 @@ class PracticeCatalogInjector {
             ArrayNode allowedSources = entry.putArray("allowedSources");
             java.util.stream.Stream.concat(
                 p
-                    .getAutomatedAssessmentPolicy()
+                    .getAutomatedReviewPolicy()
                     .requiredEvidence()
                     .stream()
                     .map(requirement -> requirement.sourceKind().value()),
                 p
-                    .getAutomatedAssessmentPolicy()
+                    .getAutomatedReviewPolicy()
                     .optionalContext()
                     .stream()
                     .map(requirement -> requirement.sourceKind().value())

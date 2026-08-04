@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentValidation;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewValidation;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,8 +16,8 @@ public record CuratedPracticeDefinitionDTO(
     @NonNull List<String> triggerEvents,
     @NonNull String criteria,
     @Nullable String precomputeScript,
-    @NonNull PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
-    @NonNull PracticeAutomatedAssessmentValidation automatedAssessmentValidation,
+    @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
+    @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
     @Nullable String areaSlug
@@ -29,8 +29,8 @@ public record CuratedPracticeDefinitionDTO(
             definition.triggerEvents(),
             definition.criteria(),
             definition.precomputeScript(),
-            definition.automatedAssessmentPolicy(),
-            PracticeAutomatedAssessmentValidation.authorDeclared(practiceSlug, definition),
+            definition.automatedReviewPolicy(),
+            PracticeAutomatedReviewValidation.authorDeclared(practiceSlug, definition),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
             definition.areaSlug()

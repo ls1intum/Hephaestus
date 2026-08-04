@@ -5,15 +5,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-public record AutomatedAssessmentReadinessReport(
+public record AutomatedReviewReadinessReport(
     SourceContractVersion contractVersion,
     String catalogDigest,
     EvidenceProfileId evidenceProfile,
     Instant manifestCapturedAt,
     Instant decidedAt,
-    List<AutomatedAssessmentReadinessDecision> decisions
+    List<AutomatedReviewReadinessDecision> decisions
 ) {
-    public AutomatedAssessmentReadinessReport {
+    public AutomatedReviewReadinessReport {
         Objects.requireNonNull(contractVersion, "contractVersion");
         Objects.requireNonNull(catalogDigest, "catalogDigest");
         if (!catalogDigest.matches("[0-9a-f]{64}")) {
@@ -27,7 +27,7 @@ public record AutomatedAssessmentReadinessReport(
             throw new IllegalArgumentException("A readiness report requires at least one decision");
         }
         if (
-            new HashSet<>(decisions.stream().map(AutomatedAssessmentReadinessDecision::practiceSlug).toList()).size() !=
+            new HashSet<>(decisions.stream().map(AutomatedReviewReadinessDecision::practiceSlug).toList()).size() !=
             decisions.size()
         ) {
             throw new IllegalArgumentException("A readiness report cannot repeat a practice");

@@ -5,14 +5,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-public record AutomatedAssessmentReadinessDecision(
+public record AutomatedReviewReadinessDecision(
     String practiceSlug,
     Instant decidedAt,
     boolean ready,
-    List<AutomatedAssessmentReadinessReason> reasonCodes,
+    List<AutomatedReviewReadinessReason> reasonCodes,
     List<SourceReadinessCheck> sourceChecks
 ) {
-    public AutomatedAssessmentReadinessDecision {
+    public AutomatedReviewReadinessDecision {
         Objects.requireNonNull(practiceSlug, "practiceSlug");
         if (practiceSlug.isBlank()) {
             throw new IllegalArgumentException("practiceSlug must not be blank");

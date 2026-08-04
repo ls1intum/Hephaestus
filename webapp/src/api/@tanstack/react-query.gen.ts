@@ -703,7 +703,7 @@ export const adminUpdateCuratedAreaStatusMutation = (options?: Partial<Options<A
 export const adminGetPracticeEvidenceOptionsQueryKey = (options?: Options<AdminGetPracticeEvidenceOptionsData>) => createQueryKey('adminGetPracticeEvidenceOptions', options, false, ['Admin Practice Catalog']);
 
 /**
- * Read automated assessment evidence options
+ * Read automated review evidence options
  *
  * Returns recommended requirements and allowed evidence sources for each type of reviewed work
  */
@@ -2939,7 +2939,7 @@ export const createPracticeMutation = (options?: Partial<Options<CreatePracticeD
 export const getPracticeEvidenceOptionsQueryKey = (options: Options<GetPracticeEvidenceOptionsData>) => createQueryKey('getPracticeEvidenceOptions', options, false, ['Practice Catalog']);
 
 /**
- * Read automated assessment evidence options
+ * Read automated review evidence options
  *
  * Returns recommended requirements and allowed evidence sources for each type of reviewed work
  */

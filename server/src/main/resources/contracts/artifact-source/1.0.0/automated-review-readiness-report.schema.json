@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/automated-assessment-readiness-report.schema.json",
-  "title": "Practice assessment readiness report",
-  "description": "Per-practice decision to run or skip automated assessment for one captured evidence manifest.",
+  "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/automated-review-readiness-report.schema.json",
+  "title": "Practice review readiness report",
+  "description": "Per-practice decision to run or skip automated review for one captured evidence manifest.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,7 @@
       "description": "Source contract used to interpret the referenced manifest and source checks."
     },
     "catalogDigest": {
-      "const": "80c589bbe5c2ba5b4907f30dee1d0ed4d217379d1c8d762fd5658e5bfc5770f3",
+      "const": "dd101d6b5ca0f9aa97675a8770a78fbf1cc3bbbf2c57a41523b7d1db0014e617",
       "description": "SHA-256 digest of the exact source catalog used by the runtime."
     },
     "evidenceProfile": {
@@ -33,7 +33,7 @@
     "manifestCapturedAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Capture time of the evidence manifest assessed by this report."
+      "description": "Capture time of the evidence manifest checked by this report."
     },
     "decidedAt": {
       "type": "string",
@@ -70,11 +70,11 @@
         "decidedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Time this automated-assessment readiness decision was made."
+          "description": "Time this automated-review readiness decision was made."
         },
         "ready": {
           "type": "boolean",
-          "description": "Whether automated assessment may run for this practice."
+          "description": "Whether automated review may run for this practice."
         },
         "sourceChecks": {
           "type": "array",
@@ -282,7 +282,7 @@
           "uniqueItems": true,
           "items": {
             "enum": [
-              "NO_AUTOMATED_ASSESSMENT",
+              "NO_AUTOMATED_REVIEW",
               "DECLARED_EVIDENCE_INSUFFICIENT"
             ]
           },

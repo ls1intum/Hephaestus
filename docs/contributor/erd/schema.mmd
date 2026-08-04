@@ -258,7 +258,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
-        JSONB automated_assessment_policy
+        JSONB automated_review_policy
     }
 
     Discussion {
@@ -808,7 +808,7 @@ erDiagram
         BIGINT current_revision_id FK,UK
         VARCHAR(64) source_curated_slug
         VARCHAR(96) source_curated_fingerprint
-        JSONB automated_assessment_policy "NOT NULL"
+        JSONB automated_review_policy "NOT NULL"
     }
 
     PracticeArea {
@@ -852,7 +852,7 @@ erDiagram
         VARCHAR(64) area_icon
         VARCHAR(32) area_color
         VARCHAR(96) review_rule_fingerprint
-        JSONB automated_assessment_policy
+        JSONB automated_review_policy
     }
 
     Project {

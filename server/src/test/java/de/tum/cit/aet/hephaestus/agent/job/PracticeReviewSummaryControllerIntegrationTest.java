@@ -180,7 +180,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
 
     private Practice persistPractice(Workspace targetWorkspace) {
         Practice result = new Practice();
-        result.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        result.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         result.setWorkspace(targetWorkspace);
         result.setSlug("review-quality");
         result.setName("Review quality");

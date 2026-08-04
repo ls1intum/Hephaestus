@@ -12,20 +12,20 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class PracticeAutomatedAssessmentValidationTest extends BaseUnitTest {
+class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
 
     @Test
     void shouldKeepAuthorDeclarationSeparateFromIndependentValidation() {
-        PracticeAutomatedAssessmentPolicy requirements = requirements();
+        PracticeAutomatedReviewPolicy requirements = requirements();
         PracticeDefinition definition = definition(requirements);
 
-        PracticeAutomatedAssessmentValidation validation = PracticeAutomatedAssessmentValidation.authorDeclared(
+        PracticeAutomatedReviewValidation validation = PracticeAutomatedReviewValidation.authorDeclared(
             "focused-review",
             definition
         );
 
-        assertThat(validation.status()).isEqualTo(PracticeAutomatedAssessmentValidationStatus.AUTHOR_DECLARED);
-        assertThat(validation.policyDigest()).isEqualTo(PracticeAutomatedAssessmentPolicyDigest.digest(requirements));
+        assertThat(validation.status()).isEqualTo(PracticeAutomatedReviewValidationStatus.AUTHOR_DECLARED);
+        assertThat(validation.policyDigest()).isEqualTo(PracticeAutomatedReviewPolicyDigest.digest(requirements));
         assertThat(validation.reviewRuleFingerprint()).isEqualTo(definition.provenanceFingerprint("focused-review"));
         assertThat(validation.validator()).isNull();
     }
@@ -39,7 +39,7 @@ class PracticeAutomatedAssessmentValidationTest extends BaseUnitTest {
             original.triggerEvents(),
             original.criteria(),
             original.precomputeScript(),
-            original.automatedAssessmentPolicy(),
+            original.automatedReviewPolicy(),
             "Reviews reduce integration risk.",
             original.whatGoodLooksLike(),
             original.areaSlug()
@@ -53,8 +53,8 @@ class PracticeAutomatedAssessmentValidationTest extends BaseUnitTest {
     @Test
     void shouldRejectSelfCertifiedAuthorValidation() {
         assertThatThrownBy(() ->
-            new PracticeAutomatedAssessmentValidation(
-                PracticeAutomatedAssessmentValidationStatus.AUTHOR_DECLARED,
+            new PracticeAutomatedReviewValidation(
+                PracticeAutomatedReviewValidationStatus.AUTHOR_DECLARED,
                 new SourceContractVersion("1.0.0"),
                 "0".repeat(64),
                 "v2:" + "0".repeat(64),
@@ -68,12 +68,12 @@ class PracticeAutomatedAssessmentValidationTest extends BaseUnitTest {
             .hasMessageContaining("cannot carry validation provenance");
     }
 
-    private static PracticeAutomatedAssessmentPolicy requirements() {
-        return new PracticeAutomatedAssessmentPolicy(
+    private static PracticeAutomatedReviewPolicy requirements() {
+        return new PracticeAutomatedReviewPolicy(
             new SourceContractVersion("1.0.0"),
             new EvidenceProfileId("pull-request-review"),
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             List.of(
@@ -84,12 +84,12 @@ class PracticeAutomatedAssessmentValidationTest extends BaseUnitTest {
                 )
             ),
             List.of(),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of()
         );
     }
 
-    private static PracticeDefinition definition(PracticeAutomatedAssessmentPolicy requirements) {
+    private static PracticeDefinition definition(PracticeAutomatedReviewPolicy requirements) {
         return new PracticeDefinition(
             "Focused review",
             WorkArtifact.PULL_REQUEST,

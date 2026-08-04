@@ -43,7 +43,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     @Test
     void rejectsUnknownEvidenceSource() {
-        PracticeAutomatedAssessmentPolicy requirements = requirements(
+        PracticeAutomatedReviewPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 new SourceKind("scm.pull-request.unknown"),
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -58,7 +58,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     @Test
     void rejectsEvidenceOutsideSelectedProfile() {
-        PracticeAutomatedAssessmentPolicy requirements = requirements(
+        PracticeAutomatedReviewPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 OUTSIDE_PROFILE,
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -73,7 +73,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     @Test
     void rejectsImpossibleCompletenessRequirement() {
-        PracticeAutomatedAssessmentPolicy requirements = requirements(
+        PracticeAutomatedReviewPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 PARTIAL,
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -88,7 +88,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     @Test
     void rejectsImpossibleFreshnessRequirement() {
-        PracticeAutomatedAssessmentPolicy requirements = requirements(
+        PracticeAutomatedReviewPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 TIMELESS,
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -104,36 +104,36 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     @Test
     void acceptsHumanAssessmentOnlyPracticeWithoutAutomatedInputs() {
         assertThatCode(() ->
-            validator.validate(definition(List.of(), null, withoutAutomatedAssessment()))
+            validator.validate(definition(List.of(), null, withoutAutomatedReview()))
         ).doesNotThrowAnyException();
     }
 
     @Test
-    void rejectsReviewTriggersWithoutAutomatedAssessment() {
+    void rejectsReviewTriggersWithoutAutomatedReview() {
         assertThatThrownBy(() ->
-            validator.validate(definition(List.of("PullRequestCreated"), null, withoutAutomatedAssessment()))
+            validator.validate(definition(List.of("PullRequestCreated"), null, withoutAutomatedReview()))
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A practice without automated assessment cannot define events that start a review");
+            .hasMessage("A practice without automated review cannot define events that start a review");
     }
 
     @Test
-    void rejectsPrecomputeScriptWithoutAutomatedAssessment() {
+    void rejectsPrecomputeScriptWithoutAutomatedReview() {
         assertThatThrownBy(() ->
-            validator.validate(definition(List.of(), "export default {}", withoutAutomatedAssessment()))
+            validator.validate(definition(List.of(), "export default {}", withoutAutomatedReview()))
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A practice without automated assessment cannot define a precompute script");
+            .hasMessage("A practice without automated review cannot define a precompute script");
     }
 
-    private static PracticeDefinition definition(PracticeAutomatedAssessmentPolicy requirements) {
+    private static PracticeDefinition definition(PracticeAutomatedReviewPolicy requirements) {
         return definition(List.of("PullRequestCreated"), null, requirements);
     }
 
     private static PracticeDefinition definition(
         List<String> triggerEvents,
         String precomputeScript,
-        PracticeAutomatedAssessmentPolicy requirements
+        PracticeAutomatedReviewPolicy requirements
     ) {
         return new PracticeDefinition(
             "Focused review",
@@ -148,29 +148,29 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         );
     }
 
-    private static PracticeAutomatedAssessmentPolicy requirements(PracticeEvidenceRequirement requirement) {
-        return new PracticeAutomatedAssessmentPolicy(
+    private static PracticeAutomatedReviewPolicy requirements(PracticeEvidenceRequirement requirement) {
+        return new PracticeAutomatedReviewPolicy(
             VERSION,
             PROFILE,
-            new PracticeAutomatedAssessment(
-                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             List.of(requirement),
             List.of(),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of()
         );
     }
 
-    private static PracticeAutomatedAssessmentPolicy withoutAutomatedAssessment() {
-        return new PracticeAutomatedAssessmentPolicy(
+    private static PracticeAutomatedReviewPolicy withoutAutomatedReview() {
+        return new PracticeAutomatedReviewPolicy(
             VERSION,
             PROFILE,
-            new PracticeAutomatedAssessment(PracticeAutomatedAssessmentMode.NONE, PracticeEvidenceSufficiency.NONE),
+            new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
             List.of(),
             List.of(),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of()
         );
     }

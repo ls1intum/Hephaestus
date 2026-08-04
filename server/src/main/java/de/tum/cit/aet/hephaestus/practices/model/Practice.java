@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -153,9 +153,9 @@ public class Practice {
     private String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "automated_assessment_policy", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "automated_review_policy", columnDefinition = "jsonb", nullable = false)
     @ToString.Exclude
-    private PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy;
+    private PracticeAutomatedReviewPolicy automatedReviewPolicy;
 
     @Column(name = "used_in_new_reviews", nullable = false)
     private boolean usedInNewReviews = true;

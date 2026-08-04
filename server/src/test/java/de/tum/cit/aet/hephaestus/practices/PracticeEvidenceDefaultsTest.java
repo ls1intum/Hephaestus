@@ -28,7 +28,7 @@ class PracticeEvidenceDefaultsTest {
         JsonMapper mapper = JsonMapper.builder().build();
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC(), "");
 
-        PracticeAutomatedAssessmentPolicy requirements = new PracticeEvidenceDefaults(catalogs).forArtifact(artifact);
+        PracticeAutomatedReviewPolicy requirements = new PracticeEvidenceDefaults(catalogs).forArtifact(artifact);
 
         assertThat(requirements.sourceContractVersion()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(requirements.evidenceProfile()).isEqualTo(new EvidenceProfileId(profile));
@@ -39,7 +39,7 @@ class PracticeEvidenceDefaultsTest {
             .extracting(item -> item.sourceKind().value())
             .containsExactlyElementsOf(optional);
         assertThat(requirements.whenEvidenceIsInsufficient()).isEqualTo(
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW
         );
         assertThat(requirements.knownLimitations()).isNotEmpty();
     }

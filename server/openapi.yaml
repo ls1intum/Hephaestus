@@ -1117,7 +1117,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PracticeEvidenceOptions"
           description: OK
-      summary: Read automated assessment evidence options
+      summary: Read automated review evidence options
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/order:
@@ -4290,7 +4290,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PracticeEvidenceOptions"
           description: OK
-      summary: Read automated assessment evidence options
+      summary: Read automated review evidence options
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/feedback/engagement:
@@ -7641,10 +7641,10 @@ components:
           - ISSUE
           - CONVERSATION_THREAD
           example: PULL_REQUEST
-        automatedAssessmentPolicy:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
-          description: Versioned evidence required before Hephaestus may assess reviewed
-            work; omit to use the recommended requirements for the selected work type
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+          description: Versioned evidence required before Hephaestus may review work;
+            omit to use the recommended requirements for the selected work type
         criteria:
           type: string
           description: Practice evaluation criteria
@@ -7658,7 +7658,7 @@ components:
           minLength: 3
         precomputeScript:
           type: string
-          description: TypeScript/Bun static analysis run before automated assessment
+          description: TypeScript/Bun static analysis run before automated review
           maxLength: 100000
           minLength: 0
         slug:
@@ -7681,7 +7681,7 @@ components:
           minItems: 0
         whatGoodLooksLike:
           type: string
-          description: "Developer-facing exemplar; a concrete instance, not the assessment\
+          description: "Developer-facing exemplar; a concrete instance, not the review\
             \ criteria"
           maxLength: 2000
           minLength: 0
@@ -8015,10 +8015,10 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
-        automatedAssessmentPolicy:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
-        automatedAssessmentValidation:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentValidation"
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+        automatedReviewValidation:
+          $ref: "#/components/schemas/PracticeAutomatedReviewValidation"
         criteria:
           type: string
         name:
@@ -8035,8 +8035,8 @@ components:
           type: string
       required:
       - artifactType
-      - automatedAssessmentPolicy
-      - automatedAssessmentValidation
+      - automatedReviewPolicy
+      - automatedReviewValidation
       - criteria
       - name
       - triggerEvents
@@ -8054,8 +8054,8 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
-        automatedAssessmentPolicy:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
           description: Evidence requirements; omit to use the recommended requirements
             for the selected work type
         criteria:
@@ -8100,8 +8100,8 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
-        automatedAssessment:
-          $ref: "#/components/schemas/PracticeAutomatedAssessment"
+        automatedReview:
+          $ref: "#/components/schemas/PracticeAutomatedReview"
         effectivelyOffered:
           type: boolean
         name:
@@ -8115,7 +8115,7 @@ components:
           $ref: "#/components/schemas/CatalogEntryStatus"
       required:
       - artifactType
-      - automatedAssessment
+      - automatedReview
       - effectivelyOffered
       - name
       - position
@@ -9625,15 +9625,15 @@ components:
           description: "Slug of the practice area this practice is bound to, if any"
         artifactType:
           type: string
-          description: Type of work this practice assesses
+          description: Type of work this practice reviews
           enum:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
-        automatedAssessmentPolicy:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
-        automatedAssessmentValidation:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentValidation"
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+        automatedReviewValidation:
+          $ref: "#/components/schemas/PracticeAutomatedReviewValidation"
         catalogOrigin:
           $ref: "#/components/schemas/CatalogOrigin"
         createdAt:
@@ -9681,8 +9681,8 @@ components:
           description: Developer-facing rationale (learner layer)
       required:
       - artifactType
-      - automatedAssessmentPolicy
-      - automatedAssessmentValidation
+      - automatedReviewPolicy
+      - automatedReviewValidation
       - createdAt
       - criteria
       - displayOrder
@@ -9739,36 +9739,36 @@ components:
       - name
       - slug
       - visibleInPracticeDashboards
-    PracticeAutomatedAssessment:
+    PracticeAutomatedReview:
       type: object
-      description: Author-declared automated assessment and evidence sufficiency for
-        one practice
+      description: Author-declared automated review and evidence sufficiency for one
+        practice
       properties:
         evidenceSufficiency:
           type: string
           description: Whether meeting every evidence requirement provides enough
-            context to assess
+            context to review the work
           enum:
           - SUFFICIENT_WHEN_REQUIREMENTS_MET
           - DECLARED_EVIDENCE_INSUFFICIENT
           - NONE
         mode:
           type: string
-          description: Implementation Hephaestus uses for automated assessment
+          description: Implementation Hephaestus uses for automated review
           enum:
           - LANGUAGE_MODEL
           - NONE
       required:
       - evidenceSufficiency
       - mode
-    PracticeAutomatedAssessmentPolicy:
+    PracticeAutomatedReviewPolicy:
       type: object
-      description: Author-defined automated assessment and evidence requirements for
-        one practice revision
+      description: Author-defined automated review and evidence requirements for one
+        practice revision
       properties:
-        automatedAssessment:
-          $ref: "#/components/schemas/PracticeAutomatedAssessment"
-          description: Automated assessment configuration; human assessment is a separate
+        automatedReview:
+          $ref: "#/components/schemas/PracticeAutomatedReview"
+          description: Automated review configuration; human review is a separate
             process
         evidenceProfile:
           type: string
@@ -9781,14 +9781,14 @@ components:
             $ref: "#/components/schemas/PracticeEvidenceLimitation"
         optionalContext:
           type: array
-          description: Sources that may add context but never block assessment when
-            absent
+          description: Sources that may add context but never block automated review
+            when absent
           items:
             $ref: "#/components/schemas/PracticeOptionalContextSource"
         requiredEvidence:
           type: array
-          description: Sources that must meet their quality requirements before assessment
-            may start
+          description: Sources that must meet their quality requirements before automated
+            review may start
           items:
             $ref: "#/components/schemas/PracticeEvidenceRequirement"
         sourceContractVersion:
@@ -9799,18 +9799,18 @@ components:
           type: string
           description: Conservative action when required evidence does not pass
           enum:
-          - SKIP_AUTOMATED_ASSESSMENT
+          - SKIP_AUTOMATED_REVIEW
       required:
-      - automatedAssessment
+      - automatedReview
       - evidenceProfile
       - knownLimitations
       - optionalContext
       - requiredEvidence
       - sourceContractVersion
       - whenEvidenceIsInsufficient
-    PracticeAutomatedAssessmentValidation:
+    PracticeAutomatedReviewValidation:
       type: object
-      description: Independent validation status and provenance for automated assessment
+      description: Independent validation status and provenance for automated review
         requirements
       properties:
         evaluatorProcedureFingerprint:
@@ -9819,7 +9819,7 @@ components:
             \ prompt, tools, and preprocessing"
         policyDigest:
           type: string
-          description: SHA-256 digest of the exact automated-assessment policy
+          description: SHA-256 digest of the exact automated-review policy
         reviewRuleFingerprint:
           type: string
           description: Versioned fingerprint of the exact review rules
@@ -9828,8 +9828,8 @@ components:
           description: Source contract used by the validated practice definition
         status:
           type: string
-          description: Validation lifecycle; authors cannot mark their own assessment
-            as independently validated
+          description: Validation lifecycle; authors cannot mark their own review
+            policy as independently validated
           enum:
           - AUTHOR_DECLARED
           - INDEPENDENTLY_VALIDATED
@@ -9903,7 +9903,7 @@ components:
       type: object
       description: An evidence source allowed by the selected evidence profile
       properties:
-        authorizedForAutomatedAssessment:
+        authorizedForAutomatedReview:
           type: boolean
         description:
           type: string
@@ -9925,7 +9925,7 @@ components:
         supportsEmpty:
           type: boolean
       required:
-      - authorizedForAutomatedAssessment
+      - authorizedForAutomatedReview
       - description
       - displayName
       - privacyClass
@@ -9935,8 +9935,8 @@ components:
       - supportsEmpty
     PracticeOptionalContextSource:
       type: object
-      description: Source that may add context but never blocks automated assessment
-        when absent
+      description: Source that may add context but never blocks automated review when
+        absent
       properties:
         sourceKind:
           type: string
@@ -9995,13 +9995,13 @@ components:
           - ISSUE
           - CONVERSATION_THREAD
         recommendedRequirements:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
-        supportedAutomatedAssessmentModes:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+        supportedAutomatedReviewModes:
           type: array
           items:
             type: string
-            description: Author-declared approach for automated assessment; this does
-              not describe human assessment
+            description: Author-declared approach for automated review; this does
+              not describe human review
             enum:
             - LANGUAGE_MODEL
             - NONE
@@ -10009,7 +10009,7 @@ components:
       - allowedSources
       - artifactType
       - recommendedRequirements
-      - supportedAutomatedAssessmentModes
+      - supportedAutomatedReviewModes
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential
@@ -12231,8 +12231,8 @@ components:
           - ISSUE
           - CONVERSATION_THREAD
           example: ISSUE
-        automatedAssessmentPolicy:
-          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
           description: "Replacement evidence requirements; omit to preserve them,\
             \ or to use the recommended requirements when artifactType changes"
         clear:
@@ -12260,7 +12260,7 @@ components:
           pattern: .*\S.*
         precomputeScript:
           type: string
-          description: TypeScript/Bun static analysis run before automated assessment
+          description: TypeScript/Bun static analysis run before automated review
           maxLength: 100000
           minLength: 0
         triggerEvents:
@@ -12273,7 +12273,7 @@ components:
           minItems: 0
         whatGoodLooksLike:
           type: string
-          description: Concrete example shown to the developer; not assessment criteria
+          description: Concrete example shown to the developer; not review criteria
           maxLength: 2000
           minLength: 0
           pattern: .*\S.*

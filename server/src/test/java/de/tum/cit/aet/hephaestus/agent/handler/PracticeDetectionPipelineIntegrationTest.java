@@ -222,7 +222,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     private Practice createPractice(String slug, String name) {
         Practice p = new Practice();
-        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);

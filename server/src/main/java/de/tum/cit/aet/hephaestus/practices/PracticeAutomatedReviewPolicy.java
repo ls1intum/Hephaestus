@@ -12,8 +12,8 @@ import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "Author-defined automated assessment and evidence requirements for one practice revision")
-public record PracticeAutomatedAssessmentPolicy(
+@Schema(description = "Author-defined automated review and evidence requirements for one practice revision")
+public record PracticeAutomatedReviewPolicy(
     @NonNull
     @NotNull
     @Schema(description = "Exact contract version that defines source kinds and source-state semantics")
@@ -25,17 +25,17 @@ public record PracticeAutomatedAssessmentPolicy(
     @NonNull
     @NotNull
     @Valid
-    @Schema(description = "Automated assessment configuration; human assessment is a separate process")
-    PracticeAutomatedAssessment automatedAssessment,
+    @Schema(description = "Automated review configuration; human review is a separate process")
+    PracticeAutomatedReview automatedReview,
     @NonNull
     @NotNull
     @Valid
-    @Schema(description = "Sources that must meet their quality requirements before assessment may start")
+    @Schema(description = "Sources that must meet their quality requirements before automated review may start")
     List<PracticeEvidenceRequirement> requiredEvidence,
     @NonNull
     @NotNull
     @Valid
-    @Schema(description = "Sources that may add context but never block assessment when absent")
+    @Schema(description = "Sources that may add context but never block automated review when absent")
     List<PracticeOptionalContextSource> optionalContext,
     @NonNull
     @NotNull
@@ -47,10 +47,10 @@ public record PracticeAutomatedAssessmentPolicy(
     @Schema(description = "Claims the selected evidence cannot support even when every requirement passes")
     List<PracticeEvidenceLimitation> knownLimitations
 ) {
-    public PracticeAutomatedAssessmentPolicy {
+    public PracticeAutomatedReviewPolicy {
         Objects.requireNonNull(sourceContractVersion, "sourceContractVersion");
         Objects.requireNonNull(evidenceProfile, "evidenceProfile");
-        Objects.requireNonNull(automatedAssessment, "automatedAssessment");
+        Objects.requireNonNull(automatedReview, "automatedReview");
         requiredEvidence = sortedRequirements(requiredEvidence, "requiredEvidence");
         optionalContext = Objects.requireNonNull(optionalContext, "optionalContext")
             .stream()
@@ -77,17 +77,17 @@ public record PracticeAutomatedAssessmentPolicy(
         if (requiredKinds.stream().anyMatch(optionalKinds::contains)) {
             throw new IllegalArgumentException("A source cannot be both required evidence and optional context");
         }
-        boolean assessmentAbsent = automatedAssessment.mode() == PracticeAutomatedAssessmentMode.NONE;
+        boolean automatedReviewDisabled = automatedReview.mode() == PracticeAutomatedReviewMode.NONE;
         if (
-            assessmentAbsent &&
+            automatedReviewDisabled &&
             (!requiredEvidence.isEmpty() || !optionalContext.isEmpty() || !knownLimitations.isEmpty())
         ) {
             throw new IllegalArgumentException(
-                "A practice without automated assessment cannot declare assessment evidence or limitations"
+                "A practice without automated review cannot declare review evidence or limitations"
             );
         }
-        if (!assessmentAbsent && requiredEvidence.isEmpty()) {
-            throw new IllegalArgumentException("Automated assessment requires at least one evidence source");
+        if (!automatedReviewDisabled && requiredEvidence.isEmpty()) {
+            throw new IllegalArgumentException("Automated review requires at least one evidence source");
         }
         Objects.requireNonNull(whenEvidenceIsInsufficient, "whenEvidenceIsInsufficient");
         Set<String> limitationCodes = new HashSet<>();
@@ -100,7 +100,7 @@ public record PracticeAutomatedAssessmentPolicy(
             throw new IllegalArgumentException("Known limitation codes must be unique");
         }
         if (
-            automatedAssessment.evidenceSufficiency() == PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT &&
+            automatedReview.evidenceSufficiency() == PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT &&
             knownLimitations.isEmpty()
         ) {
             throw new IllegalArgumentException(

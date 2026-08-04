@@ -951,7 +951,7 @@ export type UpdatePracticeRequest = {
     /**
      * Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactType changes
      */
-    automatedAssessmentPolicy?: PracticeAutomatedAssessmentPolicy;
+    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
      * Optional fields to clear before applying supplied values
      */
@@ -965,7 +965,7 @@ export type UpdatePracticeRequest = {
      */
     name?: string;
     /**
-     * TypeScript/Bun static analysis run before automated assessment
+     * TypeScript/Bun static analysis run before automated review
      */
     precomputeScript?: string;
     /**
@@ -973,7 +973,7 @@ export type UpdatePracticeRequest = {
      */
     triggerEvents?: Array<string>;
     /**
-     * Concrete example shown to the developer; not assessment criteria
+     * Concrete example shown to the developer; not review criteria
      */
     whatGoodLooksLike?: string;
     /**
@@ -992,7 +992,7 @@ export type PracticeEvidenceRequirement = {
 };
 
 /**
- * Source that may add context but never blocks automated assessment when absent
+ * Source that may add context but never blocks automated review when absent
  */
 export type PracticeOptionalContextSource = {
     /**
@@ -1016,27 +1016,27 @@ export type PracticeEvidenceLimitation = {
 };
 
 /**
- * Author-declared automated assessment and evidence sufficiency for one practice
+ * Author-declared automated review and evidence sufficiency for one practice
  */
-export type PracticeAutomatedAssessment = {
+export type PracticeAutomatedReview = {
     /**
-     * Whether meeting every evidence requirement provides enough context to assess
+     * Whether meeting every evidence requirement provides enough context to review the work
      */
     evidenceSufficiency: 'SUFFICIENT_WHEN_REQUIREMENTS_MET' | 'DECLARED_EVIDENCE_INSUFFICIENT' | 'NONE';
     /**
-     * Implementation Hephaestus uses for automated assessment
+     * Implementation Hephaestus uses for automated review
      */
     mode: 'LANGUAGE_MODEL' | 'NONE';
 };
 
 /**
- * Author-defined automated assessment and evidence requirements for one practice revision
+ * Author-defined automated review and evidence requirements for one practice revision
  */
-export type PracticeAutomatedAssessmentPolicy = {
+export type PracticeAutomatedReviewPolicy = {
     /**
-     * Automated assessment configuration; human assessment is a separate process
+     * Automated review configuration; human review is a separate process
      */
-    automatedAssessment: PracticeAutomatedAssessment;
+    automatedReview: PracticeAutomatedReview;
     /**
      * Set of evidence sources allowed for this type of reviewed work
      */
@@ -1046,11 +1046,11 @@ export type PracticeAutomatedAssessmentPolicy = {
      */
     knownLimitations: Array<PracticeEvidenceLimitation>;
     /**
-     * Sources that may add context but never block assessment when absent
+     * Sources that may add context but never block automated review when absent
      */
     optionalContext: Array<PracticeOptionalContextSource>;
     /**
-     * Sources that must meet their quality requirements before assessment may start
+     * Sources that must meet their quality requirements before automated review may start
      */
     requiredEvidence: Array<PracticeEvidenceRequirement>;
     /**
@@ -1060,7 +1060,7 @@ export type PracticeAutomatedAssessmentPolicy = {
     /**
      * Conservative action when required evidence does not pass
      */
-    whenEvidenceIsInsufficient: 'SKIP_AUTOMATED_ASSESSMENT';
+    whenEvidenceIsInsufficient: 'SKIP_AUTOMATED_REVIEW';
 };
 
 /**
@@ -2705,15 +2705,15 @@ export type ProbeLlmConnectionRequest = {
 export type PracticeWorkTypeEvidenceOptions = {
     allowedSources: Array<PracticeEvidenceSourceOption>;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
-    recommendedRequirements: PracticeAutomatedAssessmentPolicy;
-    supportedAutomatedAssessmentModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
+    recommendedRequirements: PracticeAutomatedReviewPolicy;
+    supportedAutomatedReviewModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
 };
 
 /**
  * An evidence source allowed by the selected evidence profile
  */
 export type PracticeEvidenceSourceOption = {
-    authorizedForAutomatedAssessment: boolean;
+    authorizedForAutomatedReview: boolean;
     description: string;
     displayName: string;
     privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
@@ -2769,15 +2769,15 @@ export type PracticeEvidenceOptions = {
 };
 
 /**
- * Independent validation status and provenance for automated assessment requirements
+ * Independent validation status and provenance for automated review requirements
  */
-export type PracticeAutomatedAssessmentValidation = {
+export type PracticeAutomatedReviewValidation = {
     /**
      * Versioned fingerprint of the independently validated model, prompt, tools, and preprocessing
      */
     evaluatorProcedureFingerprint?: string;
     /**
-     * SHA-256 digest of the exact automated-assessment policy
+     * SHA-256 digest of the exact automated-review policy
      */
     policyDigest: string;
     /**
@@ -2789,7 +2789,7 @@ export type PracticeAutomatedAssessmentValidation = {
      */
     sourceContractVersion: string;
     /**
-     * Validation lifecycle; authors cannot mark their own assessment as independently validated
+     * Validation lifecycle; authors cannot mark their own review policy as independently validated
      */
     status: 'AUTHOR_DECLARED' | 'INDEPENDENTLY_VALIDATED' | 'STALE' | 'SUPERSEDED';
     /**
@@ -2877,11 +2877,11 @@ export type Practice = {
      */
     areaSlug?: string;
     /**
-     * Type of work this practice assesses
+     * Type of work this practice reviews
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
-    automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
-    automatedAssessmentValidation: PracticeAutomatedAssessmentValidation;
+    automatedReviewPolicy: PracticeAutomatedReviewPolicy;
+    automatedReviewValidation: PracticeAutomatedReviewValidation;
     catalogOrigin?: CatalogOrigin;
     /**
      * Timestamp when the practice was created
@@ -4098,7 +4098,7 @@ export type CurrentUserView = {
 export type CuratedPracticeSummary = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
-    automatedAssessment: PracticeAutomatedAssessment;
+    automatedReview: PracticeAutomatedReview;
     effectivelyOffered: boolean;
     name: string;
     position: number;
@@ -4125,7 +4125,7 @@ export type CuratedPracticeRequest = {
     /**
      * Evidence requirements; omit to use the recommended requirements for the selected work type
      */
-    automatedAssessmentPolicy?: PracticeAutomatedAssessmentPolicy;
+    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     criteria: string;
     name: string;
     precomputeScript?: string;
@@ -4140,8 +4140,8 @@ export type CuratedPracticeRequest = {
 export type CuratedPracticeDefinition = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
-    automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
-    automatedAssessmentValidation: PracticeAutomatedAssessmentValidation;
+    automatedReviewPolicy: PracticeAutomatedReviewPolicy;
+    automatedReviewValidation: PracticeAutomatedReviewValidation;
     criteria: string;
     name: string;
     precomputeScript?: string;
@@ -4357,9 +4357,9 @@ export type CreatePracticeRequest = {
      */
     artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**
-     * Versioned evidence required before Hephaestus may assess reviewed work; omit to use the recommended requirements for the selected work type
+     * Versioned evidence required before Hephaestus may review work; omit to use the recommended requirements for the selected work type
      */
-    automatedAssessmentPolicy?: PracticeAutomatedAssessmentPolicy;
+    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
      * Practice evaluation criteria
      */
@@ -4369,7 +4369,7 @@ export type CreatePracticeRequest = {
      */
     name: string;
     /**
-     * TypeScript/Bun static analysis run before automated assessment
+     * TypeScript/Bun static analysis run before automated review
      */
     precomputeScript?: string;
     /**
@@ -4381,7 +4381,7 @@ export type CreatePracticeRequest = {
      */
     triggerEvents: Array<string>;
     /**
-     * Developer-facing exemplar; a concrete instance, not the assessment criteria
+     * Developer-facing exemplar; a concrete instance, not the review criteria
      */
     whatGoodLooksLike?: string;
     /**

@@ -115,7 +115,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     private Practice persistPractice(Workspace ws, String slug, String name) {
         Practice practice = new Practice();
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(ws);
         practice.setSlug(slug);
         practice.setName(name);

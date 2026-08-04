@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json",
   "title": "Artifact source manifest",
-  "description": "Immutable record of the evidence captured, omitted, or withheld for one automated-assessment invocation.",
+  "description": "Immutable record of the evidence captured, omitted, or withheld for one automated-review invocation.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,7 @@
       "description": "Source contract used to interpret every source state in this manifest."
     },
     "catalogDigest": {
-      "const": "80c589bbe5c2ba5b4907f30dee1d0ed4d217379d1c8d762fd5658e5bfc5770f3",
+      "const": "dd101d6b5ca0f9aa97675a8770a78fbf1cc3bbbf2c57a41523b7d1db0014e617",
       "description": "SHA-256 digest of the exact source catalog used by the runtime."
     },
     "evidenceProfile": {

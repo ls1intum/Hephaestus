@@ -113,7 +113,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         testPractice = new Practice();
         ReflectionTestUtils.setField(testPractice, "id", 10L);
         testPractice.setSlug("pr-description-quality");
-        testPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        testPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         testPractice.setWorkspace(workspace);
 
         testJob = new AgentJob();
@@ -148,7 +148,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getId()).thenReturn(11L);
         lenient().when(revision.getSlug()).thenReturn("pr-description-quality");
         lenient().when(revision.getPractice()).thenReturn(testPractice);
-        lenient().when(revision.getAutomatedAssessmentPolicy()).thenReturn(testPractice.getAutomatedAssessmentPolicy());
+        lenient().when(revision.getAutomatedReviewPolicy()).thenReturn(testPractice.getAutomatedReviewPolicy());
         lenient().when(practiceRevisionRepository.findById(11L)).thenReturn(Optional.of(revision));
         lenient()
             .when(cas.get("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
@@ -238,7 +238,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getId()).thenReturn(revisionId);
         lenient().when(revision.getSlug()).thenReturn(practice.getSlug());
         lenient().when(revision.getPractice()).thenReturn(practice);
-        lenient().when(revision.getAutomatedAssessmentPolicy()).thenReturn(practice.getAutomatedAssessmentPolicy());
+        lenient().when(revision.getAutomatedReviewPolicy()).thenReturn(practice.getAutomatedReviewPolicy());
         lenient().when(practiceRevisionRepository.findById(revisionId)).thenReturn(Optional.of(revision));
     }
 
@@ -634,7 +634,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
             admit(otherPractice, 22L);
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
@@ -802,7 +802,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
             admit(otherPractice, 22L);
 
             var findings = List.of(

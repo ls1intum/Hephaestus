@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
@@ -144,7 +144,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             AgentJob job = conversationJob();
             Practice practice = new Practice();
             practice.setSlug("conversation-practice");
-            practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.CONVERSATION_THREAD));
+            practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.CONVERSATION_THREAD));
             var revision = new PracticeRevision();
             ReflectionTestUtils.setField(revision, "id", 12L);
             practice.setCurrentRevision(revision);
@@ -157,12 +157,10 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
                     org.mockito.Mockito.mock(ArtifactSourceManifest.class)
                 )
             );
-            when(
-                workspaceContextBuilder.prepareAutomatedAssessmentReadiness(any(), any(), anyString(), any())
-            ).thenReturn(
-                new ContextManifestBuilder.PreparedAutomatedAssessmentReadiness(
+            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any())).thenReturn(
+                new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
                     List.of(practice),
-                    mock(AutomatedAssessmentReadinessReport.class)
+                    mock(AutomatedReviewReadinessReport.class)
                 )
             );
             when(workspaceContextBuilder.restrictTo(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));

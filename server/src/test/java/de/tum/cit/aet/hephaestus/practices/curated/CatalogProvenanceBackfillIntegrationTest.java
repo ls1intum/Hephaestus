@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -101,7 +101,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
 
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT automated_assessment_policy = ?::jsonb FROM practice WHERE workspace_id = ?",
+                "SELECT automated_review_policy = ?::jsonb FROM practice WHERE workspace_id = ?",
                 Boolean.class,
                 evidenceJson(shipped),
                 matching.getId()
@@ -128,14 +128,14 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
 
     private void seedLegacyWorkspace(Workspace workspace, String criteria, boolean provenancePending) {
         PracticeDefinition shipped = shipped();
-        seedLegacyWorkspace(workspace, criteria, provenancePending, shipped.automatedAssessmentPolicy(), null);
+        seedLegacyWorkspace(workspace, criteria, provenancePending, shipped.automatedReviewPolicy(), null);
     }
 
     private void seedLegacyWorkspace(
         Workspace workspace,
         String criteria,
         boolean provenancePending,
-        PracticeAutomatedAssessmentPolicy evidence,
+        PracticeAutomatedReviewPolicy evidence,
         String fingerprint
     ) {
         PracticeDefinition shipped = shipped();
@@ -156,7 +156,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 """
                 INSERT INTO practice (
                     workspace_id, practice_area_id, slug, name, applies_to, display_order, trigger_events,
-                    criteria, automated_assessment_policy, why_it_matters, source_curated_slug,
+                    criteria, automated_review_policy, why_it_matters, source_curated_slug,
                     source_curated_fingerprint, used_in_new_reviews, created_at
                 ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, true, now())
                 RETURNING id
@@ -177,7 +177,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
-                    automated_assessment_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
+                    automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
                 ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, now())
                 RETURNING id
                 """,
@@ -197,7 +197,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                     """
                     INSERT INTO practice_revision (
                         practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
-                        automated_assessment_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
+                        automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
                     ) VALUES (?, 2, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, NULL, now())
                     RETURNING id
                     """,
@@ -229,10 +229,10 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     private String evidenceJson(PracticeDefinition definition) {
-        return evidenceJson(definition.automatedAssessmentPolicy());
+        return evidenceJson(definition.automatedReviewPolicy());
     }
 
-    private String evidenceJson(PracticeAutomatedAssessmentPolicy evidence) {
+    private String evidenceJson(PracticeAutomatedReviewPolicy evidence) {
         return objectMapper.valueToTree(evidence).toString();
     }
 

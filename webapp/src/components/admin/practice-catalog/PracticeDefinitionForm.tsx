@@ -2,7 +2,7 @@ import { useBlocker } from "@tanstack/react-router";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
 import type {
-	PracticeAutomatedAssessmentPolicy,
+	PracticeAutomatedReviewPolicy,
 	PracticeEvidenceOptions,
 	PracticeWorkTypeEvidenceOptions,
 } from "@/api/types.gen";
@@ -69,7 +69,7 @@ export interface PracticeDefinitionValue {
 	whyItMatters?: string;
 	whatGoodLooksLike?: string;
 	precomputeScript?: string;
-	automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
+	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 }
 
 interface PracticeDefinitionFormBaseProps {
@@ -107,7 +107,7 @@ interface FormState {
 	whyItMatters: string;
 	whatGoodLooksLike: string;
 	precomputeScript: string;
-	automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
+	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 }
 
 function optionsForArtifact(
@@ -134,8 +134,8 @@ function initialState(
 		whyItMatters: initialData?.whyItMatters ?? "",
 		whatGoodLooksLike: initialData?.whatGoodLooksLike ?? "",
 		precomputeScript: initialData?.precomputeScript ?? "",
-		automatedAssessmentPolicy:
-			initialData?.automatedAssessmentPolicy ??
+		automatedReviewPolicy:
+			initialData?.automatedReviewPolicy ??
 			optionsForArtifact(evidenceOptions, artifactType).recommendedRequirements,
 	};
 }
@@ -154,15 +154,15 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(evidenceOptions, initialData));
-	const evidenceDrafts = useRef<Partial<Record<WorkArtifact, PracticeAutomatedAssessmentPolicy>>>({
-		[form.artifactType]: form.automatedAssessmentPolicy,
+	const evidenceDrafts = useRef<Partial<Record<WorkArtifact, PracticeAutomatedReviewPolicy>>>({
+		[form.artifactType]: form.automatedReviewPolicy,
 	});
 	const triggerDrafts = useRef<Partial<Record<WorkArtifact, string[]>>>({
 		[form.artifactType]: form.triggerEvents,
 	});
 	const [submitted, setSubmitted] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
-	const hasAutomatedAssessment = form.automatedAssessmentPolicy.automatedAssessment.mode !== "NONE";
+	const hasAutomatedReview = form.automatedReviewPolicy.automatedReview.mode !== "NONE";
 	const isDirty =
 		JSON.stringify(form) !== JSON.stringify(initialState(evidenceOptions, initialData));
 	const blocker = useBlocker({
@@ -201,7 +201,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			: undefined;
 	const triggerError =
 		submitted &&
-		hasAutomatedAssessment &&
+		hasAutomatedReview &&
 		form.artifactType !== "CONVERSATION_THREAD" &&
 		form.triggerEvents.length === 0
 			? "Select at least one trigger event"
@@ -210,12 +210,12 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		submitted && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
 			: undefined;
-	const evidenceError = practiceEvidenceError(form.automatedAssessmentPolicy);
+	const evidenceError = practiceEvidenceError(form.automatedReviewPolicy);
 
 	const valid =
 		form.name.trim().length >= 3 &&
 		form.criteria.trim().length >= 3 &&
-		(!hasAutomatedAssessment ||
+		(!hasAutomatedReview ||
 			form.artifactType === "CONVERSATION_THREAD" ||
 			form.triggerEvents.length > 0) &&
 		!evidenceError &&
@@ -230,7 +230,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					? "practice-name"
 					: mode === "create" && !isValidSlug(form.slug)
 						? "practice-slug"
-						: hasAutomatedAssessment &&
+						: hasAutomatedReview &&
 								form.artifactType !== "CONVERSATION_THREAD" &&
 								form.triggerEvents.length === 0
 							? `practice-trigger-${TRIGGER_EVENTS_BY_FOCUS[form.artifactType][0]?.value}`
@@ -245,17 +245,17 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			slug: form.slug,
 			name: form.name.trim(),
 			artifactType: form.artifactType,
-			triggerEvents: hasAutomatedAssessment ? form.triggerEvents : [],
+			triggerEvents: hasAutomatedReview ? form.triggerEvents : [],
 			criteria: form.criteria.trim(),
 			...(form.areaSlug === NO_AREA ? {} : { areaSlug: form.areaSlug }),
 			...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
 			...(form.whatGoodLooksLike.trim()
 				? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
 				: {}),
-			...(hasAutomatedAssessment && form.precomputeScript.trim()
+			...(hasAutomatedReview && form.precomputeScript.trim()
 				? { precomputeScript: form.precomputeScript.trim() }
 				: {}),
-			automatedAssessmentPolicy: form.automatedAssessmentPolicy,
+			automatedReviewPolicy: form.automatedReviewPolicy,
 		});
 	};
 
@@ -366,12 +366,12 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 											setForm((previous) => {
 												const artifactType = value as WorkArtifact;
 												evidenceDrafts.current[previous.artifactType] =
-													previous.automatedAssessmentPolicy;
+													previous.automatedReviewPolicy;
 												triggerDrafts.current[previous.artifactType] = previous.triggerEvents;
 												return {
 													...previous,
 													artifactType,
-													automatedAssessmentPolicy:
+													automatedReviewPolicy:
 														evidenceDrafts.current[artifactType] ??
 														optionsForArtifact(evidenceOptions, artifactType)
 															.recommendedRequirements,
@@ -445,10 +445,10 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					<section>
 						<Field data-invalid={criteriaError ? "true" : undefined}>
 							<FieldLabel htmlFor="practice-criteria" className="text-lg font-semibold">
-								Evaluation criteria *
+								Review criteria *
 							</FieldLabel>
 							<FieldDescription id="practice-criteria-description">
-								Rules for assessing this practice. Hephaestus uses them when automated assessment is
+								Rules for reviewing this practice. Hephaestus uses them when automated review is
 								enabled. Supports Markdown.
 							</FieldDescription>
 							<Textarea
@@ -457,7 +457,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								onChange={(event) =>
 									setForm((previous) => ({ ...previous, criteria: event.target.value }))
 								}
-								placeholder="## Practice name&#10;&#10;Describe what to evaluate, required elements, and anti-patterns…"
+								placeholder="## Practice name&#10;&#10;Describe what to review, required elements, and anti-patterns…"
 								className="min-h-64 font-mono text-sm"
 								required
 								minLength={3}
@@ -514,12 +514,12 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 					<PracticeEvidenceEditor
 						options={selectedEvidenceOptions}
-						value={form.automatedAssessmentPolicy}
+						value={form.automatedReviewPolicy}
 						disabled={formDisabled}
-						onChange={(automatedAssessmentPolicy) =>
+						onChange={(automatedReviewPolicy) =>
 							setForm((previous) => {
-								evidenceDrafts.current[previous.artifactType] = automatedAssessmentPolicy;
-								return { ...previous, automatedAssessmentPolicy };
+								evidenceDrafts.current[previous.artifactType] = automatedReviewPolicy;
+								return { ...previous, automatedReviewPolicy };
 							})
 						}
 						error={submitted ? evidenceError : undefined}
@@ -527,7 +527,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 					<Separator />
 
-					{hasAutomatedAssessment && form.artifactType !== "CONVERSATION_THREAD" && (
+					{hasAutomatedReview && form.artifactType !== "CONVERSATION_THREAD" && (
 						<>
 							<FieldSet
 								data-invalid={triggerError ? "true" : undefined}
@@ -562,7 +562,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						</>
 					)}
 
-					{hasAutomatedAssessment && (
+					{hasAutomatedReview && (
 						<Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
 							<CollapsibleTrigger
 								render={

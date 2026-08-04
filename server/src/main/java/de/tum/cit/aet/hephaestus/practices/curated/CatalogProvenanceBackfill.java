@@ -74,7 +74,7 @@ public class CatalogProvenanceBackfill {
                 .ifPresent(entry ->
                     transactionOperations.executeWithoutResult(ignored -> {
                         Practice managed = practiceRepository.findById(practice.getId()).orElseThrow();
-                        managed.setAutomatedAssessmentPolicy(entry.definition().automatedAssessmentPolicy());
+                        managed.setAutomatedReviewPolicy(entry.definition().automatedReviewPolicy());
                         managed.setSourceCuratedFingerprint(entry.definition().provenanceFingerprint(entry.slug()));
                         revisionService.append(managed);
                     })

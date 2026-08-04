@@ -23,17 +23,17 @@ import { FindingResults } from "./FindingResults";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { ReviewMoreFilters } from "./ReviewMoreFilters";
 import {
-	ASSESSMENT_LABELS,
-	type Assessment,
 	PRESENCE_LABELS,
 	type Presence,
+	REVIEW_RESULT_LABELS,
+	type ReviewResult,
 	SEVERITY_LABELS,
 	type Severity,
 } from "./review-format";
 import { type FindingsSearch, findingsQuery } from "./review-search";
 
 const PAGE_SIZE = 25;
-const ASSESSMENT_OPTIONS: FacetOption<Assessment>[] = toFacetOptions(ASSESSMENT_LABELS);
+const REVIEW_RESULT_OPTIONS: FacetOption<ReviewResult>[] = toFacetOptions(REVIEW_RESULT_LABELS);
 const PRESENCE_OPTIONS: FacetOption<Presence>[] = toFacetOptions(PRESENCE_LABELS);
 const SEVERITY_OPTIONS: FacetOption<Severity>[] = toFacetOptions(SEVERITY_LABELS);
 
@@ -133,8 +133,8 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 						}
 					/>
 					<FacetMultiSelect
-						title="Assessment"
-						options={ASSESSMENT_OPTIONS}
+						title="Result"
+						options={REVIEW_RESULT_OPTIONS}
 						selected={search.assessment ?? []}
 						onChange={(values) => patchFilter({ assessment: nonEmpty(values) })}
 					/>

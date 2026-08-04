@@ -6,7 +6,7 @@ import type {
 } from "@/api/types.gen";
 
 export type Presence = ReviewFinding["presence"];
-export type Assessment = NonNullable<ReviewFinding["assessment"]>;
+export type ReviewResult = NonNullable<ReviewFinding["assessment"]>;
 export type Severity = NonNullable<ReviewFinding["severity"]>;
 export type FeedbackDeliveryState = ReviewFeedback["deliveryState"];
 export type FeedbackSuppressionReason = NonNullable<ReviewFeedback["suppressionReason"]>;
@@ -19,7 +19,7 @@ export const PRESENCE_LABELS: Record<Presence, string> = {
 	NOT_APPLICABLE: "Not applicable",
 };
 
-export const ASSESSMENT_LABELS: Record<Assessment, string> = {
+export const REVIEW_RESULT_LABELS: Record<ReviewResult, string> = {
 	GOOD: "Strength",
 	BAD: "Needs improvement",
 };

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.practices.AssessmentClaimCurrentness;
+import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import org.springframework.stereotype.Component;
@@ -17,8 +17,8 @@ public class ObservationVisibilityPolicy {
 
     public boolean permits(long workspaceId, Observation observation, SourceUsePurpose purpose) {
         return (
-            AssessmentClaimCurrentness.of(observation.getPracticeRevision(), observation.getPractice()) ==
-                AssessmentClaimCurrentness.CURRENT &&
+            ReviewClaimCurrentness.of(observation.getPracticeRevision(), observation.getPractice()) ==
+                ReviewClaimCurrentness.CURRENT &&
             evidenceAuthorization.permits(workspaceId, observation, purpose)
         );
     }

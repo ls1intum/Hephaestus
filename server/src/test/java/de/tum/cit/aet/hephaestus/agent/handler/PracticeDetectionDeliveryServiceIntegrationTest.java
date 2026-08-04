@@ -226,7 +226,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);
-        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         p = practiceRepository.saveAndFlush(p);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(p, 1));

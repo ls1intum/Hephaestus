@@ -45,8 +45,8 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessDecision;
-import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -668,13 +668,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 false,
                 List.of(SourceReadinessReason.SOURCE_NOT_AVAILABLE)
             );
-            AutomatedAssessmentReadinessReport readiness = new AutomatedAssessmentReadinessReport(
+            AutomatedReviewReadinessReport readiness = new AutomatedReviewReadinessReport(
                 version,
                 "a".repeat(64),
                 profile,
                 now,
                 now,
-                List.of(new AutomatedAssessmentReadinessDecision("example", now, false, List.of(), List.of(assessment)))
+                List.of(new AutomatedReviewReadinessDecision("example", now, false, List.of(), List.of(assessment)))
             );
             PreparedJobInputs inputs = new PreparedJobInputs(
                 Map.of(SandboxLayout.MANIFEST_PATH, "{}".getBytes()),
@@ -699,13 +699,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 evidence.capture()
             );
             assertThat(
-                evidence
-                    .getValue()
-                    .path("automatedAssessmentReadiness")
-                    .path("decisions")
-                    .get(0)
-                    .path("ready")
-                    .asBoolean()
+                evidence.getValue().path("automatedReviewReadiness").path("decisions").get(0).path("ready").asBoolean()
             ).isFalse();
             ArgumentCaptor<JsonNode> output = ArgumentCaptor.forClass(JsonNode.class);
             verify(jobRepository).transitionToEvidenceRefused(eq(jobId), isNull(), eq(0), any(), output.capture());

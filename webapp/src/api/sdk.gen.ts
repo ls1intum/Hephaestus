@@ -376,7 +376,7 @@ export const adminUpdateCuratedAreaStatus = <ThrowOnError extends boolean = fals
 });
 
 /**
- * Read automated assessment evidence options
+ * Read automated review evidence options
  *
  * Returns recommended requirements and allowed evidence sources for each type of reviewed work
  */
@@ -1554,7 +1554,7 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Read automated assessment evidence options
+ * Read automated review evidence options
  *
  * Returns recommended requirements and allowed evidence sources for each type of reviewed work
  */

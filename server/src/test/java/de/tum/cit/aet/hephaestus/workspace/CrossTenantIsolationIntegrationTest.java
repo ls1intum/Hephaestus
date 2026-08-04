@@ -154,7 +154,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private TenantData seed(Workspace ws) {
         String practiceSlug = "practice-" + ws.getWorkspaceSlug();
         Practice practice = new Practice();
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(ws);
         practice.setSlug(practiceSlug);
         practice.setName("Practice of " + ws.getWorkspaceSlug());

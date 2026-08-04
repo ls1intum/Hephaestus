@@ -83,7 +83,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .isEqualTo(0)
             .jsonPath("$.practices[0].status.state")
             .isEqualTo("FROM_HEPHAESTUS")
-            .jsonPath("$.practices[0].automatedAssessment.mode")
+            .jsonPath("$.practices[0].automatedReview.mode")
             .isEqualTo("LANGUAGE_MODEL");
     }
 
@@ -142,7 +142,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             before.definition().triggerEvents(),
             before.definition().criteria(),
             before.definition().precomputeScript(),
-            before.definition().automatedAssessmentPolicy(),
+            before.definition().automatedReviewPolicy(),
             "Our own words about why this matters.",
             before.definition().whatGoodLooksLike(),
             before.definition().areaSlug()
@@ -667,7 +667,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .getResponseBody();
 
         assertThat(created).isNotNull();
-        assertThat(created.definition().automatedAssessmentPolicy()).isEqualTo(
+        assertThat(created.definition().automatedReviewPolicy()).isEqualTo(
             evidenceDefaults.forArtifact(source.artifactType())
         );
     }
@@ -928,7 +928,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             edited.definition().triggerEvents(),
             edited.definition().criteria(),
             edited.definition().precomputeScript(),
-            edited.definition().automatedAssessmentPolicy(),
+            edited.definition().automatedReviewPolicy(),
             "Updated guidance",
             edited.definition().whatGoodLooksLike(),
             edited.definition().areaSlug()
@@ -979,7 +979,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
                 : practice.definition().triggerEvents(),
             criteria,
             practice.definition().precomputeScript(),
-            practice.definition().automatedAssessmentPolicy(),
+            practice.definition().automatedReviewPolicy(),
             practice.definition().whyItMatters(),
             practice.definition().whatGoodLooksLike(),
             practice.definition().areaSlug()

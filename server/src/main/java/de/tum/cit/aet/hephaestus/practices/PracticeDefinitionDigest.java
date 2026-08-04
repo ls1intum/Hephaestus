@@ -14,7 +14,7 @@ final class PracticeDefinitionDigest {
         return digest
             .add(definition.criteria())
             .addNullable(definition.precomputeScript())
-            .add(PracticeAutomatedAssessmentPolicyDigest.digest(definition.automatedAssessmentPolicy()))
+            .add(PracticeAutomatedReviewPolicyDigest.digest(definition.automatedReviewPolicy()))
             .addNullable(definition.whyItMatters())
             .addNullable(definition.whatGoodLooksLike())
             .addNullable(definition.areaSlug())

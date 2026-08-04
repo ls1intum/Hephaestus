@@ -38,7 +38,7 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria("Give specific feedback");
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         when(practiceRepository.findByIdForUpdate(42L)).thenReturn(Optional.of(practice));
         when(revisionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -95,12 +95,12 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
         String before = service.append(practice).getReviewRuleFingerprint();
 
-        practice.setAutomatedAssessmentPolicy(
-            new PracticeAutomatedAssessmentPolicy(
-                practice.getAutomatedAssessmentPolicy().sourceContractVersion(),
-                practice.getAutomatedAssessmentPolicy().evidenceProfile(),
-                new PracticeAutomatedAssessment(
-                    PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+        practice.setAutomatedReviewPolicy(
+            new PracticeAutomatedReviewPolicy(
+                practice.getAutomatedReviewPolicy().sourceContractVersion(),
+                practice.getAutomatedReviewPolicy().evidenceProfile(),
+                new PracticeAutomatedReview(
+                    PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
                 List.of(
@@ -111,7 +111,7 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
                     )
                 ),
                 List.of(),
-                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
                 List.of()
             )
         );

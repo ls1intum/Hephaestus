@@ -87,7 +87,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         adminUser = ensureAdminMembership(workspace).getUser();
 
         Practice practice = new Practice();
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");

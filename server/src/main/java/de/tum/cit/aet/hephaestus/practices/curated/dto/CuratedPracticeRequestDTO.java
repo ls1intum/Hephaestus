@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.dto.ValidTriggerEvents;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -43,7 +43,7 @@ public record CuratedPracticeRequestDTO(
     @Valid
     @Schema(description = "Evidence requirements; omit to use the recommended requirements for the selected work type")
     @Nullable
-    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
+    PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
     @Size(max = 2000, message = "Why it matters must be at most 2000 characters") @Nullable String whyItMatters,
 
@@ -53,7 +53,7 @@ public record CuratedPracticeRequestDTO(
 
     @Size(max = 64, message = "Area slug must be at most 64 characters") @Nullable String areaSlug
 ) {
-    public PracticeDefinition definition(PracticeAutomatedAssessmentPolicy resolvedEvidence) {
+    public PracticeDefinition definition(PracticeAutomatedReviewPolicy resolvedEvidence) {
         return new PracticeDefinition(
             name,
             artifactType,

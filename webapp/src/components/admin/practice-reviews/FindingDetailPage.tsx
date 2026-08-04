@@ -23,7 +23,7 @@ import {
 	ClaimCurrentnessAlert,
 	ClaimCurrentnessBadge,
 	FeedbackStateBadge,
-	FindingAssessmentBadge,
+	FindingResultBadge,
 } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
@@ -88,7 +88,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 			<header className="space-y-4">
 				<div className="space-y-2">
 					<div className="flex flex-wrap items-center gap-2">
-						<FindingAssessmentBadge finding={finding} />
+						<FindingResultBadge finding={finding} />
 						<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
 					</div>
 					<h2 className="break-words text-2xl font-semibold tracking-tight">{finding.title}</h2>
@@ -121,12 +121,12 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 			<Alert>
 				<InfoIcon />
 				<AlertTitle>AI-generated finding</AlertTitle>
-				<AlertDescription>Verify this assessment against the evidence.</AlertDescription>
+				<AlertDescription>Verify this finding against the evidence.</AlertDescription>
 			</Alert>
 			{finding.reasoning && (
-				<section aria-labelledby="assessment-heading" className="space-y-2">
-					<h3 id="assessment-heading" className="text-lg font-semibold">
-						Hephaestus's assessment
+				<section aria-labelledby="review-heading" className="space-y-2">
+					<h3 id="review-heading" className="text-lg font-semibold">
+						Hephaestus review
 					</h3>
 					<p className="whitespace-pre-wrap text-sm leading-relaxed">{finding.reasoning}</p>
 				</section>

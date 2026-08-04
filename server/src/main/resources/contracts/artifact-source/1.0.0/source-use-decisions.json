@@ -2,9 +2,9 @@
   "contractVersion": "1.0.0",
   "decisions": [
     {
-      "id": "use-scm-pull-request-core-automated-assessment",
+      "id": "use-scm-pull-request-core-automated-review",
       "sourceKind": "scm.pull-request.core",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -58,9 +58,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-pull-request-diff-automated-assessment",
+      "id": "use-scm-pull-request-diff-automated-review",
       "sourceKind": "scm.pull-request.diff",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -114,9 +114,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-pull-request-comments-automated-assessment",
+      "id": "use-scm-pull-request-comments-automated-review",
       "sourceKind": "scm.pull-request.comments",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -170,9 +170,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-repository-tree-automated-assessment",
+      "id": "use-scm-repository-tree-automated-review",
       "sourceKind": "scm.repository.tree",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -226,9 +226,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-issue-core-automated-assessment",
+      "id": "use-scm-issue-core-automated-review",
       "sourceKind": "scm.issue.core",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -282,9 +282,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-issue-comments-automated-assessment",
+      "id": "use-scm-issue-comments-automated-review",
       "sourceKind": "scm.issue.comments",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -338,9 +338,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-slack-conversation-thread-automated-assessment",
+      "id": "use-slack-conversation-thread-automated-review",
       "sourceKind": "slack.conversation.thread",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -394,9 +394,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-linked-work-items-automated-assessment",
+      "id": "use-scm-linked-work-items-automated-review",
       "sourceKind": "scm.linked-work-items",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -450,9 +450,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-review-threads-automated-assessment",
+      "id": "use-scm-review-threads-automated-review",
       "sourceKind": "scm.review-threads",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -506,9 +506,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-general-review-comments-automated-assessment",
+      "id": "use-scm-general-review-comments-automated-review",
       "sourceKind": "scm.general-review-comments",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -562,9 +562,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-workspace-project-inventory-automated-assessment",
+      "id": "use-workspace-project-inventory-automated-review",
       "sourceKind": "workspace.project-inventory",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",
@@ -618,9 +618,9 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-outline-documents-automated-assessment",
+      "id": "use-outline-documents-automated-review",
       "sourceKind": "outline.documents",
-      "purpose": "AUTOMATED_PRACTICE_ASSESSMENT",
+      "purpose": "AUTOMATED_PRACTICE_REVIEW",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
       "modelProcessor": "workspace-configured-llm",

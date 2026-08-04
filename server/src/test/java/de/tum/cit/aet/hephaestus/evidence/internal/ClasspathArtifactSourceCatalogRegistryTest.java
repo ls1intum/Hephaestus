@@ -146,7 +146,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var registry = new ClasspathArtifactSourceCatalogRegistry(
             objectMapper,
             clock,
-            "scm.pull-request.diff:AUTOMATED_PRACTICE_ASSESSMENT"
+            "scm.pull-request.diff:AUTOMATED_PRACTICE_REVIEW"
         );
         when(clock.instant()).thenReturn(Instant.parse("2027-08-03T00:00:00Z"));
 
@@ -154,7 +154,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             registry.isSourceUsePermitted(
                 new SourceContractVersion("1.0.0"),
                 new SourceKind("scm.pull-request.diff"),
-                SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT
+                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
             )
         ).isFalse();
     }
@@ -165,17 +165,13 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var authorized = new ClasspathArtifactSourceCatalogRegistry(
             objectMapper,
             Clock.systemUTC(),
-            "scm.pull-request.diff:AUTOMATED_PRACTICE_ASSESSMENT,scm.pull-request.diff:PRACTICE_FEEDBACK_DELIVERY"
+            "scm.pull-request.diff:AUTOMATED_PRACTICE_REVIEW,scm.pull-request.diff:PRACTICE_FEEDBACK_DELIVERY"
         );
         var version = new SourceContractVersion("1.0.0");
         var diff = new SourceKind("scm.pull-request.diff");
 
-        assertThat(
-            denied.isSourceUsePermitted(version, diff, SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
-        ).isFalse();
-        assertThat(
-            authorized.isSourceUsePermitted(version, diff, SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
-        ).isTrue();
+        assertThat(denied.isSourceUsePermitted(version, diff, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isFalse();
+        assertThat(authorized.isSourceUsePermitted(version, diff, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isTrue();
         assertThat(
             authorized.isSourceUsePermitted(version, diff, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
         ).isTrue();
@@ -184,7 +180,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             authorized.isSourceUsePermitted(
                 version,
                 new SourceKind("scm.pull-request.core"),
-                SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT
+                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
             )
         ).isFalse();
     }
@@ -193,11 +189,11 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     void shouldEnforceEachApprovedPurpose() throws IOException {
         JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root);
-        var assessment = decisions.get("use-scm-pull-request-core-automated-assessment");
+        var assessment = decisions.get("use-scm-pull-request-core-automated-review");
         var feedback = decisions.get("use-scm-pull-request-core-feedback-delivery");
 
         assertThat(
-            assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
+            assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
         ).isTrue();
         assertThat(
             assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
@@ -214,7 +210,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 new ClasspathArtifactSourceCatalogRegistry(
                     objectMapper,
                     Clock.systemUTC(),
-                    "scm.unknown:AUTOMATED_PRACTICE_ASSESSMENT"
+                    "scm.unknown:AUTOMATED_PRACTICE_REVIEW"
                 )
             )
             .withMessageContaining("Unknown authorized artifact source");
@@ -244,7 +240,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
         assertThat(decisions.values()).anySatisfy(expired ->
             assertThat(
-                expired.permitsAt(Instant.parse("2027-08-03T00:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
+                expired.permitsAt(Instant.parse("2027-08-03T00:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
             ).isFalse()
         );
     }
@@ -259,7 +255,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
             )
         );
-        decisions.remove("use-scm-repository-tree-automated-assessment");
+        decisions.remove("use-scm-repository-tree-automated-review");
 
         assertThatIllegalStateException()
             .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
@@ -288,8 +284,8 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         for (String name : new String[] {
             "artifact-source-catalog.schema.json",
             "artifact-source-manifest.schema.json",
-            "practice-automated-assessment-policy.schema.json",
-            "automated-assessment-readiness-report.schema.json",
+            "practice-automated-review-policy.schema.json",
+            "automated-review-readiness-report.schema.json",
             "source-use-decisions.schema.json",
         }) {
             JsonNode schema = read("contracts/artifact-source/1.0.0/" + name);

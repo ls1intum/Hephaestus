@@ -48,7 +48,7 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
             owner
         );
         Practice practice = new Practice();
-        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("review-quality");
         practice.setName("Review quality");

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicyDigest;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicyDigest;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
@@ -18,7 +18,7 @@ record CuratedPracticeSnapshot(
     List<String> triggerEvents,
     String criteriaSha256,
     @Nullable String precomputeScriptSha256,
-    String automatedAssessmentPolicySha256,
+    String automatedReviewPolicySha256,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
     @Nullable String areaSlug,
@@ -36,7 +36,7 @@ record CuratedPracticeSnapshot(
             definition.triggerEvents(),
             CanonicalDigest.sha256Hex(definition.criteria()),
             definition.precomputeScript() == null ? null : CanonicalDigest.sha256Hex(definition.precomputeScript()),
-            PracticeAutomatedAssessmentPolicyDigest.digest(definition.automatedAssessmentPolicy()),
+            PracticeAutomatedReviewPolicyDigest.digest(definition.automatedReviewPolicy()),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
             definition.areaSlug(),
