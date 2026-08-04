@@ -393,14 +393,18 @@ export function PracticeEvidenceEditor({
 			{canAttemptReview && unavailableRequiredSources.length > 0 && (
 				<Alert variant="warning">
 					<TriangleAlert />
-					<AlertTitle>Required evidence is not authorized</AlertTitle>
+					<AlertTitle>This evidence needs a privacy decision first</AlertTitle>
 					<AlertDescription>
-						An instance operator must authorize{" "}
 						{unavailableRequiredSources
 							.map((source) => evidenceSourceLabel(source.sourceKind, options.allowedSources))
 							.join(", ")}{" "}
-						for AI-supported mentoring through the source-governance configuration. The workspace
-						integration must also provide them. Until then, Hephaestus skips this practice.
+						{unavailableRequiredSources.length === 1 ? "contains" : "contain"} people's private
+						conversations, so Hephaestus does not read{" "}
+						{unavailableRequiredSources.length === 1 ? "it" : "them"} until an instance operator
+						turns it on with{" "}
+						<code className="font-mono text-xs">HEPHAESTUS_EVIDENCE_SENSITIVE_SOURCE_USES</code>.
+						Everyday code sources such as pull requests and issues need no such step. Until then,
+						Hephaestus skips this practice rather than guessing.
 					</AlertDescription>
 				</Alert>
 			)}

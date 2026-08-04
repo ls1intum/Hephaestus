@@ -95,10 +95,19 @@ The constraints with direct authoring consequences are:
 scope. It is not controller or DPO approval and cannot cover an expanded source, purpose, audience, processor,
 retention policy, or collection scope. `CONTROLLER_DECISION` records the releasable subset of a traceable decision;
 only an unexpired `APPROVED` decision passes when that basis is used. The controller's complete record remains
-separate. A deployment must additionally list approved source uses in
-`hephaestus.evidence.authorized-source-uses`; the default-empty allowlist authorizes explicit `source:purpose`
-pairs. Wildcards are rejected so a contract upgrade cannot authorize a newly added source or use. The checked-in
-engineering decision cannot authorize an independent operator's processing.
+separate. The reviewed decision is the gate that runtime configuration cannot waive: a source whose decision is missing,
+refused, or expired is never read, whatever the deployment sets. Within that boundary, connecting a workspace
+integration and enabling a practice is what authorizes the everyday code sources the product exists to read, so a
+default deployment reviews pull requests and issues without further configuration.
+
+Two operator controls sit on top. `hephaestus.evidence.sensitive-source-uses` grants explicit `source:purpose`
+pairs for `SENSITIVE_PERSONAL` sources, which are read only after a deliberate decision; wildcards are rejected,
+and listing a non-sensitive source is a startup error rather than a silent no-op. `hephaestus.evidence.withheld-source-kinds`
+withholds any source an operator does not want read even though the contract approves it.
+
+Requiring operators to re-declare the sources the product exists to read would minimise no data — the deployment
+and the workspace connection already state that purpose — while a prompt that fires on every source trains
+operators to wave through the sources where a deliberate answer actually carries information.
 
 Changing a source's meaning, selection scope, limit, mapping, freshness policy, dependency, or normalization
 requires a new contract version. Repository history is not part of `scm.repository.tree` and requires its own

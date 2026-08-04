@@ -20,7 +20,8 @@ class PracticeDefinitionOptionsServiceTest {
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(
             JsonMapper.builder().build(),
             Clock.systemUTC(),
-            "scm.pull-request.core:AUTOMATED_PRACTICE_REVIEW"
+            "",
+            ""
         );
         var service = new PracticeDefinitionOptionsService(catalogs, new PracticeEvidenceDefaults(catalogs));
 

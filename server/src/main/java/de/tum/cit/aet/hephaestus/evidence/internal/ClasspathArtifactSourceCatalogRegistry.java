@@ -55,13 +55,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     private final ArtifactSourceCatalog catalog;
     private final String catalogDigest;
     private final Map<String, SourceUseDecision> useDecisions;
-    private final Set<SourceUseGrant> authorizedUses;
+    private final Set<SourceUseGrant> sensitiveUses;
+    private final Set<SourceKind> withheldKinds;
     private final Clock clock;
 
     public ClasspathArtifactSourceCatalogRegistry(
         JsonMapper objectMapper,
         Clock clock,
-        @Value("${hephaestus.evidence.authorized-source-uses:}") String authorizedSourceUses
+        @Value("${hephaestus.evidence.sensitive-source-uses:}") String sensitiveSourceUses,
+        @Value("${hephaestus.evidence.withheld-source-kinds:}") String withheldSourceKinds
     ) {
         this.clock = clock;
         byte[] catalogBytes = readBytes(CATALOG_RESOURCE);
@@ -69,7 +71,8 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         this.catalogDigest = sha256(catalogBytes);
         this.useDecisions = parseUseDecisions(read(objectMapper, USE_DECISIONS_RESOURCE));
         validateUseDecisions(catalog, useDecisions);
-        this.authorizedUses = parseAuthorizedUses(catalog, authorizedSourceUses);
+        this.sensitiveUses = parseSensitiveUses(catalog, sensitiveSourceUses);
+        this.withheldKinds = parseWithheldKinds(catalog, withheldSourceKinds);
         useDecisions
             .values()
             .stream()
@@ -109,17 +112,35 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         return contract;
     }
 
+    /**
+     * A use is permitted when the shipped contract carries a reviewed, unexpired decision for exactly this
+     * source and purpose, the operator has not withheld the source, and — for {@link
+     * PrivacyClass#SENSITIVE_PERSONAL} sources only — the operator has additionally granted it.
+     *
+     * <p>The reviewed decision in {@code source-use-decisions.json} is the governance record, and it is
+     * the gate that cannot be waived at runtime: no configuration grants a source whose decision is
+     * missing, refused, or expired. Requiring operators to re-enter the sources the product exists to
+     * read would not minimise any data — the deployment and the workspace connection already state that
+     * purpose — and a prompt that fires on every source trains operators to wave through the one source
+     * where a deliberate answer carries information.
+     */
     @Override
     public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUsePurpose purpose) {
         ArtifactSourceContract contract = requireSource(version, kind);
-        return (
-            authorizedUses.contains(new SourceUseGrant(kind, purpose)) &&
-            contract
-                .useDecisionIds()
-                .stream()
-                .map(id -> requireUseDecision(version, id))
-                .anyMatch(decision -> decision.permitsAt(clock.instant(), purpose))
-        );
+        if (withheldKinds.contains(kind)) {
+            return false;
+        }
+        if (
+            contract.privacyClass() == PrivacyClass.SENSITIVE_PERSONAL &&
+            !sensitiveUses.contains(new SourceUseGrant(kind, purpose))
+        ) {
+            return false;
+        }
+        return contract
+            .useDecisionIds()
+            .stream()
+            .map(id -> requireUseDecision(version, id))
+            .anyMatch(decision -> decision.permitsAt(clock.instant(), purpose));
     }
 
     @Override
@@ -160,7 +181,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         }
     }
 
-    private static Set<SourceUseGrant> parseAuthorizedUses(ArtifactSourceCatalog catalog, String configured) {
+    private static Set<SourceUseGrant> parseSensitiveUses(ArtifactSourceCatalog catalog, String configured) {
         if (configured.isBlank()) {
             return Set.of();
         }
@@ -176,8 +197,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             try {
                 SourceKind kind = new SourceKind(parts[0]);
                 SourceUsePurpose purpose = SourceUsePurpose.valueOf(parts[1]);
-                if (catalog.source(kind).isEmpty()) {
-                    throw new IllegalStateException("Unknown authorized artifact source: " + kind);
+                ArtifactSourceContract contract = catalog
+                    .source(kind)
+                    .orElseThrow(() -> new IllegalStateException("Unknown authorized artifact source: " + kind));
+                if (contract.privacyClass() != PrivacyClass.SENSITIVE_PERSONAL) {
+                    throw new IllegalStateException(
+                        "Artifact source " +
+                            kind +
+                            " is not sensitive and needs no operator grant; remove it from hephaestus.evidence.sensitive-source-uses"
+                    );
                 }
                 authorized.add(new SourceUseGrant(kind, purpose));
             } catch (IllegalStateException exception) {
@@ -187,6 +215,21 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             }
         }
         return Set.copyOf(authorized);
+    }
+
+    private static Set<SourceKind> parseWithheldKinds(ArtifactSourceCatalog catalog, String configured) {
+        if (configured.isBlank()) {
+            return Set.of();
+        }
+        Set<SourceKind> withheld = new HashSet<>();
+        for (String value : configured.split(",")) {
+            SourceKind kind = new SourceKind(value.trim());
+            if (catalog.source(kind).isEmpty()) {
+                throw new IllegalStateException("Unknown withheld artifact source: " + kind);
+            }
+            withheld.add(kind);
+        }
+        return Set.copyOf(withheld);
     }
 
     private record SourceUseGrant(SourceKind source, SourceUsePurpose purpose) {}

@@ -15,7 +15,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
         objectMapper,
         new PracticeDefinitionValidator(
-            new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "")
+            new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "", "")
         )
     );
 

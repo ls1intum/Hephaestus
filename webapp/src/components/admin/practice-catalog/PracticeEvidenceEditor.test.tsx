@@ -120,7 +120,7 @@ describe("PracticeEvidenceEditor", () => {
 		expect(screen.getByDisplayValue("Keep this edited limitation.")).toBeTruthy();
 	});
 
-	it("explains when an operator must authorize required evidence", async () => {
+	it("explains that private conversation evidence needs a deliberate privacy decision", async () => {
 		const conversation = mockPracticeDefinitionOptions.workTypes[2];
 		await renderWithRouter(
 			<PracticeEvidenceEditor
@@ -131,8 +131,9 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		expect(screen.getByText("Required evidence is not authorized")).toBeTruthy();
-		expect(screen.getByText(/An instance operator must authorize Slack thread/)).toBeTruthy();
+		expect(screen.getByText("This evidence needs a privacy decision first")).toBeTruthy();
+		expect(screen.getByText(/HEPHAESTUS_EVIDENCE_SENSITIVE_SOURCE_USES/)).toBeTruthy();
+		expect(screen.getByText(/pull requests and issues need no such step/)).toBeTruthy();
 	});
 
 	it("still allows human review when AI support is unavailable", async () => {

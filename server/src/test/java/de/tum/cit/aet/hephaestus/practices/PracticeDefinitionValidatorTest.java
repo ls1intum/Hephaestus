@@ -24,7 +24,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final PracticeDefinitionValidator validator = new PracticeDefinitionValidator(
-        new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC(), "")
+        new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC(), "", "")
     );
 
     @Test
