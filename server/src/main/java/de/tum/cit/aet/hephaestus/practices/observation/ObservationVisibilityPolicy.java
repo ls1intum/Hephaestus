@@ -1,16 +1,17 @@
-package de.tum.cit.aet.hephaestus.agent.context;
+package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.EvaluationClaimStatus;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ObservationVisibilityPolicy {
 
-    private final EvidenceDeliveryAuthorization evidenceAuthorization;
+    private final EvidenceAuthorization evidenceAuthorization;
 
-    public ObservationVisibilityPolicy(EvidenceDeliveryAuthorization evidenceAuthorization) {
+    public ObservationVisibilityPolicy(EvidenceAuthorization evidenceAuthorization) {
         this.evidenceAuthorization = evidenceAuthorization;
     }
 

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -13,7 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -43,12 +43,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Persists validated practice findings and publishes a completion event.
- *
- * <p>Safe to retry — rolled-back inserts leave no trace; committed inserts are
- * deduplicated by idempotency_key via {@code ON CONFLICT DO NOTHING}.
- */
 @Service
 public class PracticeDetectionDeliveryService {
 
@@ -58,7 +52,7 @@ public class PracticeDetectionDeliveryService {
     private final ObservationRepository observationRepository;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
-    private final SlackThreadRepository slackThreadRepository;
+    private final ConversationSourceLiveness conversationSourceLiveness;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final ContentAddressedStore cas;
@@ -69,7 +63,7 @@ public class PracticeDetectionDeliveryService {
         ObservationRepository observationRepository,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
-        SlackThreadRepository slackThreadRepository,
+        ConversationSourceLiveness conversationSourceLiveness,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper,
         ContentAddressedStore cas,
@@ -79,27 +73,18 @@ public class PracticeDetectionDeliveryService {
         this.observationRepository = observationRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
-        this.slackThreadRepository = slackThreadRepository;
+        this.conversationSourceLiveness = conversationSourceLiveness;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
         this.cas = cas;
         this.sourceCatalogs = sourceCatalogs;
     }
 
-    /** Resolved delivery target: who the finding is about + the typed (work artifact, id) reference. */
     private record Target(WorkArtifact type, Long id, Long aboutUserId) {}
 
-    /**
-     * Persist validated findings and publish completion event.
-     *
-     * @param job the completed agent job (must have metadata with pull_request_id)
-     * @param validFindings parsed and validated findings from the result parser
-     * @return delivery result with insert/discard counts
-     * @throws JobDeliveryException if the target PR or author cannot be resolved
-     */
     @Transactional
     public DeliveryResult deliver(AgentJob job, List<ValidatedFinding> validFindings) {
-        Long workspaceId = job.getWorkspace().getId(); // Hibernate proxy returns the FK without initialization
+        Long workspaceId = job.getWorkspace().getId();
         JsonNode metadata = job.getMetadata();
         if (metadata == null) {
             throw new JobDeliveryException("Missing job metadata: jobId=" + job.getId());
@@ -609,9 +594,9 @@ public class PracticeDetectionDeliveryService {
             long threadId = threadIdNode.asLong();
             long aboutUserId = aboutUserNode.asLong();
             if (
-                !slackThreadRepository.existsDeliverableThread(
-                    threadId,
+                !conversationSourceLiveness.isDeliverableThread(
                     job.getWorkspace().getId(),
+                    threadId,
                     channelId,
                     threadTs,
                     aboutUserId

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.context;
+package de.tum.cit.aet.hephaestus.practices.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
 
     @Test
     void permitsCurrentAuthorizedObservation() {
-        EvidenceDeliveryAuthorization authorization = mock(EvidenceDeliveryAuthorization.class);
+        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
         Observation observation = observation("fingerprint", "fingerprint");
         when(authorization.permits(7L, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(true);
 
@@ -33,7 +34,7 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
 
     @Test
     void rejectsCurrentObservationWhenAudienceAuthorizationIsWithdrawn() {
-        EvidenceDeliveryAuthorization authorization = mock(EvidenceDeliveryAuthorization.class);
+        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
         Observation observation = observation("fingerprint", "fingerprint");
         when(authorization.permits(7L, observation, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)).thenReturn(false);
 
@@ -49,7 +50,7 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
 
     @Test
     void rejectsStaleObservationWithoutCheckingSourceAuthorization() {
-        EvidenceDeliveryAuthorization authorization = mock(EvidenceDeliveryAuthorization.class);
+        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
 
         assertThat(
             new ObservationVisibilityPolicy(authorization).permits(

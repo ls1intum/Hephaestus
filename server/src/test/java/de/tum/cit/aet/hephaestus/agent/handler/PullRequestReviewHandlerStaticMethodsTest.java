@@ -23,12 +23,32 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
     class FilterByDiffScope {
 
         private PracticeDetectionResultParser.ValidatedFinding makeFinding(String slug, List<String> filePaths) {
+            return makeFinding(slug, "scm.pull-request.diff", filePaths);
+        }
+
+        private PracticeDetectionResultParser.ValidatedFinding makeFinding(
+            String slug,
+            String sourceKind,
+            List<String> filePaths
+        ) {
             ObjectNode evidence = objectMapper.createObjectNode();
             ArrayNode citations = objectMapper.createArrayNode();
             for (String path : filePaths) {
                 ObjectNode citation = objectMapper.createObjectNode();
+                citation.put("sourceKind", sourceKind);
+                citation.put(
+                    "artifactPath",
+                    sourceKind.equals("scm.pull-request.diff")
+                        ? "inputs/context/diff.patch"
+                        : "inputs/context/metadata.json"
+                );
                 citation.put("path", path);
+                if (sourceKind.equals("scm.pull-request.diff")) {
+                    citation.put("side", "NEW");
+                }
                 citation.put("startLine", 1);
+                citation.put("endLine", 1);
+                citation.put("quote", "evidence");
                 citations.add(citation);
             }
             evidence.set("citations", citations);
@@ -111,9 +131,11 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
 
         @Test
         void keepsMetadataLevelPracticeEvenWithOutOfDiffLocation() {
-            // A process/metadata-level practice (evidence = commit subjects, not a diff line) must survive
-            // even when the agent attaches a stray non-diff location, or its finding is silently dropped.
-            var finding = makeFinding("commit-subjects-explain-each-change", List.of("some-commit-ref"));
+            var finding = makeFinding(
+                "commit-subjects-explain-each-change",
+                "scm.pull-request.core",
+                List.of("some-commit-ref")
+            );
             var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }

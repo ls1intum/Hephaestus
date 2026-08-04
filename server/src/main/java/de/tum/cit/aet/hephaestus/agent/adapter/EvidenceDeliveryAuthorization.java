@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.context;
+package de.tum.cit.aet.hephaestus.agent.adapter;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
@@ -6,13 +6,14 @@ import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 @Component
-public class EvidenceDeliveryAuthorization {
+public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
 
     private final AgentJobRepository jobRepository;
     private final ArtifactSourceCatalogRegistry sourceCatalogs;
@@ -25,6 +26,7 @@ public class EvidenceDeliveryAuthorization {
         this.sourceCatalogs = sourceCatalogs;
     }
 
+    @Override
     public boolean permits(long workspaceId, Observation observation, SourceUseAudience audience) {
         return permits(workspaceId, observation.getAgentJobId(), observation.getEvidence(), audience);
     }

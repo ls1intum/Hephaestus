@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
-import de.tum.cit.aet.hephaestus.agent.context.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -10,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;

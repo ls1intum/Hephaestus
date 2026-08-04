@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceDeliveryAuthorization;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -15,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundFeedbackD
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFindingDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFindingDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,7 +34,7 @@ class ReviewFindingQueryService {
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final ReviewSubjectResolver subjectResolver;
     private final ReviewArtifactResolver artifactResolver;
-    private final EvidenceDeliveryAuthorization evidenceAuthorization;
+    private final EvidenceAuthorization evidenceAuthorization;
 
     @Transactional(readOnly = true)
     Page<ReviewFindingDTO> list(

@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -24,7 +25,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -70,7 +70,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
 
     @Mock
-    private SlackThreadRepository slackThreadRepository;
+    private ConversationSourceLiveness conversationSourceLiveness;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -98,7 +98,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             observationRepository,
             pullRequestRepository,
             issueRepository,
-            slackThreadRepository,
+            conversationSourceLiveness,
             eventPublisher,
             objectMapper,
             cas,
@@ -576,7 +576,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "resolveTarget", testJob, metadata))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("no longer authorized");
-            verify(slackThreadRepository).existsDeliverableThread(77L, 1L, "C123", "1700000000.100000", 789L);
+            verify(conversationSourceLiveness).isDeliverableThread(1L, 77L, "C123", "1700000000.100000", 789L);
         }
     }
 

@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceDeliveryAuthorization;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -8,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSumm
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,7 +47,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class ObservationController {
 
     private final ObservationService observationService;
-    private final EvidenceDeliveryAuthorization evidenceAuthorization;
+    private final EvidenceAuthorization evidenceAuthorization;
 
     @GetMapping
     @Operation(
