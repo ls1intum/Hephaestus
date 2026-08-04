@@ -54,7 +54,7 @@ setTimeout(() => {
 mkdirSync(OUTPUT, { recursive: true });
 
 const manifest = JSON.parse(readFileSync(`${CWD}/inputs/manifest.json`, "utf8"));
-const allowedSources = new Set(
+const availableSourceKinds = new Set(
     manifest.sources
         .filter((source) => source.state.availability === "AVAILABLE")
         .map((source) => source.kind),
@@ -267,9 +267,9 @@ function appendFindings(findings) {
 
 function normalizeAndValidateFinding(rawFinding) {
     const finding = normalizeFinding(rawFinding);
-    const allowedSources = practiceSources.get(finding.practiceSlug);
-    if (!allowedSources) throw new Error(`unknown practice '${finding.practiceSlug}'`);
-    validateEvidenceSources(finding, allowedSources, allowedSources, artifactSources);
+    const declaredSourceKinds = practiceSources.get(finding.practiceSlug);
+    if (!declaredSourceKinds) throw new Error(`unknown practice '${finding.practiceSlug}'`);
+    validateEvidenceSources(finding, declaredSourceKinds, availableSourceKinds, artifactSources);
     for (const citation of finding.evidence.citations) {
         const content = readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
         if (!citationMatchesArtifact(citation, content)) {
