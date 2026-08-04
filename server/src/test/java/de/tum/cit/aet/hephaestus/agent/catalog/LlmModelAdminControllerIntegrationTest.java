@@ -258,7 +258,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         );
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setInstanceModel(llmModelFromRepository(model.id()));
         agentBindingRepository.save(binding);
 

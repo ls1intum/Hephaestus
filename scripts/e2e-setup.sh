@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Configures a running local stack for a live practice-detection review against an SCM repository and
+# Configures a running local stack for a live practice-review review against an SCM repository and
 # an OpenAI-compatible model. Idempotent; credentials are accepted only through environment variables.
 #
 # Prereq: the app booted with the `local,e2e` profiles (dev-login + cookie-secure=false +
@@ -198,7 +198,7 @@ api PATCH "/workspaces/$WS_SLUG/features" -H 'content-type: application/json' \
   -d '{"practicesEnabled":true,"mentorEnabled":true,"practiceReviewAutoTriggerEnabled":true,"practiceReviewManualTriggerEnabled":true}' >/dev/null
 api PATCH "/workspaces/$WS_SLUG/practices/review-settings" -H 'content-type: application/json' \
   -d '{"cooldownMinutes":0}' >/dev/null
-say "practice detection and mentor enabled on the workspace"
+say "practice reviews and mentor enabled on the workspace"
 
 # ---- 5. OpenAI-compatible catalog + runtime bindings ----------------------
 # The provider key stays in the connection catalog and never enters the sandbox.
@@ -253,13 +253,13 @@ api PATCH "/workspaces/$WS_SLUG/llm/models/$MODEL_ID" -H 'content-type: applicat
 # PUT is an upsert, so re-running the script refreshes both purpose bindings.
 BINDING_BODY="$(jq -nc --argjson m "$MODEL_ID" \
   '{workspaceModelId:$m,enabled:true,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:true}')"
-for PURPOSE in PRACTICE_DETECTION MENTOR; do
+for PURPOSE in PRACTICE_REVIEW MENTOR; do
   api PUT "/workspaces/$WS_SLUG/agents/$PURPOSE" \
     -H 'content-type: application/json' -d "$BINDING_BODY" >/dev/null
 done
 READY="$(api GET "/workspaces/$WS_SLUG/agents" | jq -r '[.[] | select(.ready)] | length')"
 [ "$READY" = "2" ] || die "expected both purposes bound and ready, got $READY"
-say "catalog model bound to practice detection and mentor (both ready)"
+say "catalog model bound to practice reviews and mentor (both ready)"
 
 # ---- 6. the practices ------------------------------------------------------
 practice() { local slug="$1" name="$2" trig="$3" crit="$4" body
@@ -272,14 +272,14 @@ practice() { local slug="$1" name="$2" trig="$3" crit="$4" body
     echo "$body" | api POST "/workspaces/$WS_SLUG/practices" \
       -H 'content-type: application/json' --data-binary @- >/dev/null
   fi
-  api PATCH "/workspaces/$WS_SLUG/practices/$slug/active" \
-    -H 'content-type: application/json' -d '{"active":true}' >/dev/null
+  api PATCH "/workspaces/$WS_SLUG/practices/$slug/used-in-new-reviews" \
+    -H 'content-type: application/json' -d '{"usedInNewReviews":true}' >/dev/null
 }
 PRACTICES="$(api GET "/workspaces/$WS_SLUG/practices")"
 while IFS= read -r slug; do
-  api PATCH "/workspaces/$WS_SLUG/practices/$slug/active" \
-    -H 'content-type: application/json' -d '{"active":false}' >/dev/null
-done < <(echo "$PRACTICES" | jq -r '.[] | select(.active) | .slug')
+  api PATCH "/workspaces/$WS_SLUG/practices/$slug/used-in-new-reviews" \
+    -H 'content-type: application/json' -d '{"usedInNewReviews":false}' >/dev/null
+done < <(echo "$PRACTICES" | jq -r '.[] | select(.usedInNewReviews) | .slug')
 practice submit-reviewable-work "Submit reviewable work" '["PullRequestCreated","PullRequestReady","PullRequestSynchronized"]' \
   "The MR is appropriately scoped, has a clear description, passes CI, and is not a draft dump. Flag oversized/unfocused MRs and missing descriptions."
 practice act-on-feedback "Act on feedback" '["ReviewSubmitted","PullRequestSynchronized"]' \

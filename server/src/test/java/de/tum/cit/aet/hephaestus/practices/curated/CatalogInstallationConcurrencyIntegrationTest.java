@@ -50,7 +50,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
             definition.triggerEvents(),
             "Committed catalog criteria",
             definition.precomputeScript(),
-            definition.evidence(),
+            definition.automatedAssessmentPolicy(),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
             definition.areaSlug()

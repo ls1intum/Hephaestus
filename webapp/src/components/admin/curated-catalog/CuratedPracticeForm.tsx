@@ -4,13 +4,13 @@ import { useState } from "react";
 import type {
 	CatalogEntryStatus,
 	CuratedPracticeDefinition,
-	PracticeEvidenceAuthoring,
+	PracticeEvidenceOptions,
 } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
-import { PracticeEvidenceValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { PracticeAutomatedAssessmentValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -34,8 +34,8 @@ export type CuratedPracticeFormValue = PracticeDefinitionValue;
 
 export interface CuratedPracticeFormInitialValue extends CuratedPracticeFormValue {
 	status: CatalogEntryStatus;
-	evidence: CuratedPracticeDefinition["evidence"];
-	evidenceValidation: CuratedPracticeDefinition["evidenceValidation"];
+	automatedAssessmentPolicy: CuratedPracticeDefinition["automatedAssessmentPolicy"];
+	automatedAssessmentValidation: CuratedPracticeDefinition["automatedAssessmentValidation"];
 	shipped?: CuratedPracticeDefinition;
 }
 
@@ -48,7 +48,7 @@ interface CuratedPracticeFormBaseProps {
 	isKeepPending?: boolean;
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
-	evidenceAuthoring: PracticeEvidenceAuthoring;
+	evidenceOptions: PracticeEvidenceOptions;
 }
 
 interface CuratedPracticeFormCreateProps extends CuratedPracticeFormBaseProps {
@@ -78,7 +78,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		isKeepPending = false,
 		onUseHephaestusVersion,
 		initialData,
-		evidenceAuthoring,
+		evidenceOptions,
 		onKeepCurrentDefinition,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
@@ -149,6 +149,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					status={initialData.status}
 					kind="practice"
 					shipped={initialData.shipped}
+					evidenceOptions={evidenceOptions}
 					areaNames={Object.fromEntries(areas.map((area) => [area.slug, area.name]))}
 					isResetPending={isResetPending}
 					isKeepPending={isKeepPending}
@@ -181,7 +182,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
-					evidenceAuthoring={evidenceAuthoring}
+					evidenceOptions={evidenceOptions}
 					disabled={formDisabled}
 					cancelAction={cancelAction}
 					onSubmit={props.onSubmit}
@@ -192,7 +193,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					initialData={initialData}
 					areas={areas}
 					isPending={isPending}
-					evidenceAuthoring={evidenceAuthoring}
+					evidenceOptions={evidenceOptions}
 					disabled={formDisabled}
 					isSubmitDisabled={conflict || isResetPending || isKeepPending}
 					cancelAction={cancelAction}
@@ -201,13 +202,15 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 							<Separator />
 							<section className="space-y-4">
 								<div>
-									<h2 className="text-lg font-semibold">Independent review</h2>
+									<h2 className="text-lg font-semibold">Automated assessment validation</h2>
 									<p className="text-sm text-muted-foreground">
-										The evidence rule above is the author's declaration. This status says whether
-										someone else has validated it.
+										The evidence requirements above are the author's declaration. This status says
+										whether an independent evaluator has validated the exact practice definition.
 									</p>
 								</div>
-								<PracticeEvidenceValidationSummary validation={initialData.evidenceValidation} />
+								<PracticeAutomatedAssessmentValidationSummary
+									validation={initialData.automatedAssessmentValidation}
+								/>
 							</section>
 						</>
 					}

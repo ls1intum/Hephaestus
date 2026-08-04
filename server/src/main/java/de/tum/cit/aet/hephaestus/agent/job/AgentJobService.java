@@ -149,13 +149,13 @@ public class AgentJobService {
         return job
             .map(j -> "Job submitted: " + j.getId())
             .orElse(
-                "No job created. Practice detection is unbound or disabled for this workspace, or its " +
+                "No job created. Practice reviews are unbound or disabled for this workspace, or their " +
                     "monthly AI budget is reached (see the workspace's AI usage report)."
             );
     }
 
     /**
-     * Submit the workspace's practice-detection job for one reviewable artifact, if it has an enabled
+     * Submit the workspace's practice-review job for one reviewable artifact, if it has an enabled
      * binding and the purse funding that binding still has room.
      *
      * <p><strong>Callers MUST NOT wrap this in a transaction.</strong> {@link #submitForBinding} opens
@@ -163,7 +163,7 @@ public class AgentJobService {
      * transaction, the same race would poison the caller's whole unit of work.
      *
      * @return the created (or existing, deduplicated) job; empty when the workspace has no enabled
-     *     practice-detection binding, or the cap funding it is reached
+     *     practice-review binding, or the cap funding it is reached
      */
     public Optional<AgentJob> submit(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
         Workspace workspace = workspaceRepository
@@ -171,11 +171,11 @@ public class AgentJobService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
         WorkspaceAgentBinding binding = agentBindingRepository
-            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_DETECTION)
+            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_REVIEW)
             .filter(WorkspaceAgentBinding::isEnabled)
             .orElse(null);
         if (binding == null) {
-            log.debug("No practice-detection binding to run: workspaceId={}", workspaceId);
+            log.debug("No practice-review binding to run: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
@@ -193,7 +193,7 @@ public class AgentJobService {
     }
 
     /**
-     * Submit exactly one practice-detection job — never a fan-out. The binding is re-fetched inside the
+     * Submit exactly one practice-review job — never a fan-out. The binding is re-fetched inside the
      * transaction because the discovery read in {@link #submit} runs detached.
      */
     private @Nullable AgentJob submitForBinding(Workspace workspace, AgentJobType jobType, JobSubmission submission) {
@@ -219,7 +219,7 @@ public class AgentJobService {
                 return null;
             }
             if (
-                !practiceRepository.existsByWorkspaceIdAndActiveTrueAndArtifactType(
+                !practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
                     workspace.getId(),
                     artifactTypeFor(jobType)
                 )
@@ -233,7 +233,7 @@ public class AgentJobService {
             }
 
             WorkspaceAgentBinding binding = agentBindingRepository
-                .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_DETECTION)
+                .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_REVIEW)
                 .filter(WorkspaceAgentBinding::isEnabled)
                 .orElse(null);
             if (binding == null) {
@@ -281,7 +281,7 @@ public class AgentJobService {
 
             AgentJob job = new AgentJob();
             job.setWorkspace(currentWorkspace);
-            job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+            job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
             job.setJobType(jobType);
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
@@ -290,7 +290,7 @@ public class AgentJobService {
                 job.setConfigSnapshot(ConfigSnapshot.from(binding, llmModelResolver).toJson(objectMapper));
             } catch (IllegalStateException unavailableModel) {
                 log.warn(
-                    "Skipping practice-detection binding whose model is no longer available: workspaceId={}",
+                    "Skipping practice-review binding whose model is no longer available: workspaceId={}",
                     workspace.getId()
                 );
                 return null;

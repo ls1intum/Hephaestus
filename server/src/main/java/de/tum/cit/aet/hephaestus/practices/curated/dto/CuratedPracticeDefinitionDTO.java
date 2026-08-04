@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentValidation;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceValidation;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
@@ -16,21 +16,21 @@ public record CuratedPracticeDefinitionDTO(
     @NonNull List<String> triggerEvents,
     @NonNull String criteria,
     @Nullable String precomputeScript,
-    @NonNull PracticeEvidenceDeclaration evidence,
-    @NonNull PracticeEvidenceValidation evidenceValidation,
+    @NonNull PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
+    @NonNull PracticeAutomatedAssessmentValidation automatedAssessmentValidation,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
     @Nullable String areaSlug
 ) {
-    public static CuratedPracticeDefinitionDTO from(PracticeDefinition definition) {
+    public static CuratedPracticeDefinitionDTO from(String practiceSlug, PracticeDefinition definition) {
         return new CuratedPracticeDefinitionDTO(
             definition.name(),
             definition.artifactType(),
             definition.triggerEvents(),
             definition.criteria(),
             definition.precomputeScript(),
-            definition.evidence(),
-            PracticeEvidenceValidation.authorDeclared(definition.evidence()),
+            definition.automatedAssessmentPolicy(),
+            PracticeAutomatedAssessmentValidation.authorDeclared(practiceSlug, definition),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
             definition.areaSlug()

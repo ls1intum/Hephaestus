@@ -95,10 +95,12 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.artifacts[2].artifactType")
+            .jsonPath("$.workTypes[2].artifactType")
             .isEqualTo("CONVERSATION_THREAD")
-            .jsonPath("$.artifacts[2].baseline.required[0].sourceKind")
-            .isEqualTo("slack.conversation.thread");
+            .jsonPath("$.workTypes[2].recommendedRequirements.requiredEvidence[0].sourceKind")
+            .isEqualTo("slack.conversation.thread")
+            .jsonPath("$.workTypes[2].allowedSources[0].displayName")
+            .isEqualTo("Slack thread");
     }
 
     @Test
@@ -138,7 +140,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             before.definition().triggerEvents(),
             before.definition().criteria(),
             before.definition().precomputeScript(),
-            before.definition().evidence(),
+            before.definition().automatedAssessmentPolicy(),
             "Our own words about why this matters.",
             before.definition().whatGoodLooksLike(),
             before.definition().areaSlug()
@@ -663,7 +665,9 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .getResponseBody();
 
         assertThat(created).isNotNull();
-        assertThat(created.definition().evidence()).isEqualTo(evidenceDefaults.forArtifact(source.artifactType()));
+        assertThat(created.definition().automatedAssessmentPolicy()).isEqualTo(
+            evidenceDefaults.forArtifact(source.artifactType())
+        );
     }
 
     @Test
@@ -922,7 +926,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             edited.definition().triggerEvents(),
             edited.definition().criteria(),
             edited.definition().precomputeScript(),
-            edited.definition().evidence(),
+            edited.definition().automatedAssessmentPolicy(),
             "Updated guidance",
             edited.definition().whatGoodLooksLike(),
             edited.definition().areaSlug()
@@ -973,7 +977,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
                 : practice.definition().triggerEvents(),
             criteria,
             practice.definition().precomputeScript(),
-            practice.definition().evidence(),
+            practice.definition().automatedAssessmentPolicy(),
             practice.definition().whyItMatters(),
             practice.definition().whatGoodLooksLike(),
             practice.definition().areaSlug()

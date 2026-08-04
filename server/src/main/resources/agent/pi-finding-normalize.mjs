@@ -100,13 +100,13 @@ export function dedupeKeyForFinding(finding) {
     return `${finding.practiceSlug}|${finding.title}|${citations}`;
 }
 
-export function validateEvidenceSources(finding, allowedSources, availableSources, artifactSources = new Map()) {
+export function validateEvidenceSources(finding, allowedSources, allowedSources, artifactSources = new Map()) {
     for (const citation of finding.evidence.citations) {
         const sourceKind = citation.sourceKind;
         if (!allowedSources.has(sourceKind)) {
             throw new Error(`practice '${finding.practiceSlug}' does not declare evidence source '${sourceKind}'`);
         }
-        if (!availableSources.has(sourceKind)) {
+        if (!allowedSources.has(sourceKind)) {
             throw new Error(`evidence source '${sourceKind}' was not available to this invocation`);
         }
         if (artifactSources.get(citation.artifactPath) !== sourceKind) {

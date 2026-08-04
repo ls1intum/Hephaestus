@@ -15,7 +15,7 @@ record PracticeDefinitionSnapshot(
     @Nullable Integer criteriaRevision,
     String criteriaSha256,
     @Nullable String precomputeScriptSha256,
-    String evidenceDeclarationSha256,
+    String automatedAssessmentPolicySha256,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
     @Nullable String areaSlug
@@ -29,7 +29,7 @@ record PracticeDefinitionSnapshot(
             criteriaRevision,
             CanonicalDigest.sha256Hex(practice.getCriteria()),
             practice.getPrecomputeScript() == null ? null : CanonicalDigest.sha256Hex(practice.getPrecomputeScript()),
-            PracticeEvidenceDigest.digest(practice.getEvidence()),
+            PracticeAutomatedAssessmentPolicyDigest.digest(practice.getAutomatedAssessmentPolicy()),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
             practice.getArea() == null ? null : practice.getArea().getSlug()

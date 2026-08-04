@@ -10,26 +10,27 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessment;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
-import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
-import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
-import de.tum.cit.aet.hephaestus.practices.PracticeDetectorAssessmentMethod;
-import de.tum.cit.aet.hephaestus.practices.PracticeDetectorCapability;
-import de.tum.cit.aet.hephaestus.practices.PracticeDetectorEvidenceCoverage;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRefusal;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessment;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentMode;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
+import de.tum.cit.aet.hephaestus.practices.PracticeInsufficientEvidenceAction;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -98,8 +99,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(visible.path("contractVersion").asString()).isEqualTo("1.0.0");
         assertThat(visible.toString()).doesNotContain("job-42").doesNotContain("workspaceId");
         JsonNode diffSource = findSource(visible, DIFF.value());
-        assertThat(diffSource.path("availability").asString()).isEqualTo("AVAILABLE");
-        assertThat(diffSource.path("paths").get(0).asString()).isEqualTo("inputs/context/diff.patch");
+        assertThat(diffSource.path("state").path("availability").asString()).isEqualTo("AVAILABLE");
+        assertThat(diffSource.path("artifacts").get(0).path("path").asString()).isEqualTo("inputs/context/diff.patch");
         assertThat(diffSource.path("artifacts").get(0).path("sha256").asString()).matches("[0-9a-f]{64}");
 
         Path internalPath = layout.jobDir("job-42").resolve("artifact-source-manifest.json");
@@ -117,11 +118,11 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         JsonNode visible = mapper.readTree(files.get("inputs/manifest.json"));
         JsonNode diff = findSource(visible, DIFF.value());
-        assertThat(diff.path("availability").asString()).isEqualTo("NOT_COLLECTED");
+        assertThat(diff.path("state").path("availability").asString()).isEqualTo("NOT_COLLECTED");
         assertThat(diff.has("paths")).isFalse();
         JsonNode comments = findSource(visible, COMMENTS.value());
-        assertThat(comments.path("content").asString()).isEqualTo("EMPTY");
-        assertThat(comments.path("completeness").asString()).isEqualTo("COMPLETE");
+        assertThat(comments.path("state").path("content").asString()).isEqualTo("EMPTY");
+        assertThat(comments.path("state").path("completeness").asString()).isEqualTo("COMPLETE");
     }
 
     @Test
@@ -132,7 +133,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         target.isSourceUsePermitted(version, DIFF);
 
-        verify(catalogs).isSourceUsePermitted(version, DIFF, SourceUseAudience.PRACTICE_DETECTION);
+        verify(catalogs).isSourceUsePermitted(version, DIFF, SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT);
     }
 
     @Test
@@ -155,7 +156,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), COMMENTS.value());
-        assertThat(source.path("availability").asString()).isEqualTo("REDACTED");
+        assertThat(source.path("state").path("availability").asString()).isEqualTo("REDACTED");
         assertThat(source.has("paths")).isFalse();
     }
 
@@ -164,48 +165,66 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         var manifest = coreManifest(builder, "job-stale", Instant.EPOCH);
 
         assertThat(
-            builder.assessPractices(manifest, List.of(practiceRequiring(CORE, "pr-core"))).readyPractices()
+            builder
+                .checkAutomatedAssessmentReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")))
+                .readyPractices()
         ).isEmpty();
     }
 
     @Test
-    void shouldDeclineDetectorScopesThatCannotYetProduceASafeAutomatedJudgment() {
-        ArtifactSourceManifest manifest = coreManifest(builder, "job-detector-scope", NOW);
-        List<PracticeDetectorCapability> capabilities = List.of(
-            new PracticeDetectorCapability(
-                PracticeDetectorAssessmentMethod.SEMANTIC,
-                PracticeDetectorEvidenceCoverage.CONDITIONAL
+    void shouldSkipAutomatedAssessmentsThatCannotRun() {
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-unsupported-assessment", NOW);
+        List<PracticeAutomatedAssessment> configurations = List.of(
+            new PracticeAutomatedAssessment(
+                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+                PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
             ),
-            new PracticeDetectorCapability(PracticeDetectorAssessmentMethod.NONE, PracticeDetectorEvidenceCoverage.NONE)
+            new PracticeAutomatedAssessment(PracticeAutomatedAssessmentMode.NONE, PracticeEvidenceSufficiency.NONE)
         );
-        List<PracticeReadinessReason> expectedReasons = List.of(
-            PracticeReadinessReason.CONDITIONAL_DETECTABILITY_UNSUPPORTED,
-            PracticeReadinessReason.PRACTICE_NOT_DETECTABLE_BY_HEPHAESTUS
+        List<AutomatedAssessmentReadinessReason> expectedReasons = List.of(
+            AutomatedAssessmentReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT,
+            AutomatedAssessmentReadinessReason.NO_AUTOMATED_ASSESSMENT
         );
 
-        for (int index = 0; index < capabilities.size(); index++) {
-            Practice practice = practiceRequiring(CORE, "detector-scope-" + index);
-            boolean detectorAbsent =
-                capabilities.get(index).assessmentMethod() == PracticeDetectorAssessmentMethod.NONE;
-            practice.setEvidence(
-                new PracticeEvidenceDeclaration(
-                    practice.getEvidence().sourceContractVersion(),
-                    practice.getEvidence().profile(),
-                    capabilities.get(index),
-                    detectorAbsent ? List.of() : practice.getEvidence().required(),
-                    detectorAbsent ? List.of() : practice.getEvidence().optional(),
-                    practice.getEvidence().onUnsatisfied(),
-                    practice.getEvidence().blindSpots()
+        for (int index = 0; index < configurations.size(); index++) {
+            Practice practice = practiceRequiring(CORE, "unsupported-assessment-" + index);
+            boolean assessmentAbsent = configurations.get(index).mode() == PracticeAutomatedAssessmentMode.NONE;
+            boolean needsAdditionalContext =
+                configurations.get(index).evidenceSufficiency() ==
+                PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT;
+            practice.setAutomatedAssessmentPolicy(
+                new PracticeAutomatedAssessmentPolicy(
+                    practice.getAutomatedAssessmentPolicy().sourceContractVersion(),
+                    practice.getAutomatedAssessmentPolicy().evidenceProfile(),
+                    configurations.get(index),
+                    assessmentAbsent ? List.of() : practice.getAutomatedAssessmentPolicy().requiredEvidence(),
+                    assessmentAbsent ? List.of() : practice.getAutomatedAssessmentPolicy().optionalContext(),
+                    practice.getAutomatedAssessmentPolicy().whenEvidenceIsInsufficient(),
+                    assessmentAbsent
+                        ? List.of()
+                        : needsAdditionalContext
+                            ? List.of(
+                                  new PracticeEvidenceLimitation(
+                                      "ADDITIONAL_CONTEXT_NEEDED",
+                                      "The available sources do not contain the context required for this assessment."
+                                  )
+                              )
+                            : practice.getAutomatedAssessmentPolicy().knownLimitations()
                 )
             );
 
-            PracticeReadinessResult result = builder.assessPractices(manifest, List.of(practice));
+            AutomatedAssessmentReadinessResult result = builder.checkAutomatedAssessmentReadiness(
+                manifest,
+                List.of(practice)
+            );
             assertThat(result.readyPractices()).isEmpty();
             assertThat(result.decisions().getFirst().reasonCodes()).containsExactly(expectedReasons.get(index));
-            if (detectorAbsent) {
-                assertThat(result.decisions().getFirst().assessments()).isEmpty();
+            if (assessmentAbsent) {
+                assertThat(result.decisions().getFirst().sourceChecks()).isEmpty();
             } else {
-                assertThat(result.decisions().getFirst().assessments()).allMatch(EvidenceAssessment::acceptable);
+                assertThat(result.decisions().getFirst().sourceChecks()).allMatch(
+                    SourceReadinessCheck::meetsRequirements
+                );
             }
         }
     }
@@ -217,7 +236,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ContextManifestBuilder replayBuilder = builderAt(NOW.plusSeconds(301));
 
         assertThat(
-            replayBuilder.assessPractices(manifest, List.of(practiceRequiring(CORE, "pr-core"))).readyPractices()
+            replayBuilder
+                .checkAutomatedAssessmentReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")))
+                .readyPractices()
         ).isEmpty();
     }
 
@@ -227,16 +248,21 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         assertThat(
             builder
-                .prepareReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")), "job-refused", NOW)
+                .prepareAutomatedAssessmentReadiness(
+                    manifest,
+                    List.of(practiceRequiring(CORE, "pr-core")),
+                    "job-refused",
+                    NOW
+                )
                 .readyPractices()
         ).isEmpty();
         JsonNode report = mapper.readTree(
-            layout.jobDir("job-refused").resolve("practice-readiness-report.json").toFile()
+            layout.jobDir("job-refused").resolve("automated-assessment-readiness-report.json").toFile()
         );
         JsonNode decision = report.path("decisions").get(0);
         assertThat(decision.path("ready").asBoolean()).isFalse();
-        assertThat(decision.path("assessments").get(0).path("reasonCodes").get(0).asString()).isEqualTo(
-            "FRESHNESS_UNSATISFIED"
+        assertThat(decision.path("sourceChecks").get(0).path("reasonCodes").get(0).asString()).isEqualTo(
+            "SOURCE_NOT_CURRENT"
         );
     }
 
@@ -246,7 +272,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         var manifest = builder.augment(files, Map.of(), "job-empty", plan(Set.of(COMMENTS)), metadata(COMMENTS, NOW));
         Practice practice = practiceRequiringComments();
 
-        assertThat(builder.assessPractices(manifest, List.of(practice)).readyPractices()).containsExactly(practice);
+        assertThat(
+            builder.checkAutomatedAssessmentReadiness(manifest, List.of(practice)).readyPractices()
+        ).containsExactly(practice);
     }
 
     @Test
@@ -255,7 +283,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         builder.augment(files, Map.of(), "job-invalid-empty", plan(Set.of(CORE)), metadata(CORE, NOW));
 
         JsonNode core = findSource(mapper.readTree(files.get("inputs/manifest.json")), CORE.value());
-        assertThat(core.path("availability").asString()).isEqualTo("UNAVAILABLE");
+        assertThat(core.path("state").path("availability").asString()).isEqualTo("UNAVAILABLE");
     }
 
     @Test
@@ -271,13 +299,15 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ArtifactSourceManifest changedContract = new ArtifactSourceManifest(
             manifest.contractVersion(),
             "0".repeat(64),
-            manifest.profileId(),
+            manifest.evidenceProfile(),
             manifest.capturedAt(),
             manifest.sources(),
             manifest.viewTransformations()
         );
 
-        assertThatThrownBy(() -> builder.assessPractices(changedContract, List.of(practiceRequiringComments())))
+        assertThatThrownBy(() ->
+            builder.checkAutomatedAssessmentReadiness(changedContract, List.of(practiceRequiringComments()))
+        )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("exact source contract");
     }
@@ -302,7 +332,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
         Practice practice = practiceRequiring(CONVERSATION, "conversation");
 
-        assertThat(builder.assessPractices(manifest, List.of(practice)).readyPractices()).containsExactly(practice);
+        assertThat(
+            builder.checkAutomatedAssessmentReadiness(manifest, List.of(practice)).readyPractices()
+        ).containsExactly(practice);
     }
 
     @Test
@@ -312,7 +344,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         Practice practice = practiceRequiring(CORE, "pr-core");
         assertThat(
-            laterBuilder.prepareReadiness(manifest, List.of(practice), "job-future-watermark", NOW).readyPractices()
+            laterBuilder
+                .prepareAutomatedAssessmentReadiness(manifest, List.of(practice), "job-future-watermark", NOW)
+                .readyPractices()
         ).containsExactly(practice);
     }
 
@@ -321,7 +355,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-invalid-watermark", NOW.plusSeconds(60));
 
         assertThat(
-            builder.assessPractices(manifest, List.of(practiceRequiring(CORE, "pr-core"))).readyPractices()
+            builder
+                .checkAutomatedAssessmentReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")))
+                .readyPractices()
         ).isEmpty();
     }
 
@@ -340,16 +376,18 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         Practice practice = practiceRequiring(CORE, "pr-core");
 
         assertThat(
-            delayedBuilder.prepareReadiness(manifest, List.of(practice), "job-delayed", NOW).readyPractices()
+            delayedBuilder
+                .prepareAutomatedAssessmentReadiness(manifest, List.of(practice), "job-delayed", NOW)
+                .readyPractices()
         ).containsExactly(practice);
-        JsonNode assessment = mapper
-            .readTree(layout.jobDir("job-delayed").resolve("practice-readiness-report.json").toFile())
+        JsonNode sourceCheck = mapper
+            .readTree(layout.jobDir("job-delayed").resolve("automated-assessment-readiness-report.json").toFile())
             .path("decisions")
             .get(0)
-            .path("assessments")
+            .path("sourceChecks")
             .get(0);
-        assertThat(assessment.path("assessedAt").asString()).isEqualTo(NOW.plusSeconds(3_600).toString());
-        assertThat(assessment.path("temporalAnchor").asString()).isEqualTo(NOW.toString());
+        assertThat(sourceCheck.path("checkedAt").asString()).isEqualTo(NOW.plusSeconds(3_600).toString());
+        assertThat(sourceCheck.path("temporalAnchor").asString()).isEqualTo(NOW.toString());
     }
 
     @Test
@@ -372,7 +410,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), LINKED_ITEMS.value());
-        assertThat(source.path("completeness").asString()).isEqualTo("PARTIAL");
+        assertThat(source.path("state").path("completeness").asString()).isEqualTo("PARTIAL");
     }
 
     @Test
@@ -391,21 +429,21 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectGeneratedMissingnessForbiddenByTheSourceContract() {
+    void shouldRejectAbsenceStateForbiddenByTheSourceContract() {
         var realCatalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC(), "");
         ArtifactSourceContract diff = realCatalogs.requireSource(plan(Set.of(DIFF)).contractVersion(), DIFF);
         ArtifactSourceContract restrictedDiff = new ArtifactSourceContract(
             diff.kind(),
+            diff.displayName(),
             diff.description(),
             diff.selectionScope(),
             diff.artifactTypes(),
             diff.authority(),
-            diff.captureTime(),
+            diff.captureTimeBasis(),
             diff.freshnessPolicy(),
             diff.completenessPolicy(),
             diff.privacyClass(),
-            Set.of(MissingnessKind.UNAVAILABLE),
-            diff.purpose(),
+            Set.of(SourceAbsenceState.UNAVAILABLE),
             diff.retentionPolicy(),
             diff.erasurePolicy(),
             diff.useDecisionIds()
@@ -430,13 +468,13 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             restrictedBuilder.augment(
                 new LinkedHashMap<>(),
                 Map.of(),
-                "job-unsupported-missingness",
+                "job-unsupported-absence-state",
                 plan(Set.of(COMMENTS)),
                 metadata(COMMENTS, NOW)
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("does not support missingness state NOT_COLLECTED");
+            .hasMessageContaining("does not support absence state NOT_COLLECTED");
     }
 
     @Test
@@ -450,10 +488,69 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         assertThatThrownBy(() ->
-            builder.assessPractices(manifest, List.of(practiceRequiring(CONVERSATION, "conversation")))
+            builder.checkAutomatedAssessmentReadiness(
+                manifest,
+                List.of(practiceRequiring(CONVERSATION, "conversation"))
+            )
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("does not match manifest");
+    }
+
+    @Test
+    void shouldRejectManifestThatOmitsAProfileSource() {
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-incomplete-profile", NOW);
+        ArtifactSourceManifest incomplete = new ArtifactSourceManifest(
+            manifest.contractVersion(),
+            manifest.catalogDigest(),
+            manifest.evidenceProfile(),
+            manifest.capturedAt(),
+            manifest
+                .sources()
+                .stream()
+                .filter(source -> !source.kind().equals(COMMENTS))
+                .toList(),
+            manifest.viewTransformations()
+        );
+
+        assertThatThrownBy(() ->
+            builder.checkAutomatedAssessmentReadiness(incomplete, List.of(practiceRequiring(CORE, "pr-core")))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("do not match its evidence profile");
+    }
+
+    @Test
+    void shouldPreserveExplicitAbsenceWhenMinimizingPreparedEvidence() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(),
+            "job-minimized",
+            plan(Set.of(CORE, COMMENTS)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(CORE, SourceCompleteness.COMPLETE, COMMENTS, SourceCompleteness.COMPLETE),
+                Map.of(CORE, "commit:core"),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(CORE, COMMENTS)
+            )
+        );
+
+        PreparedEvidence restricted = builder.restrictTo(new PreparedEvidence(files, manifest), plan(Set.of(CORE)));
+
+        assertThat(restricted.manifest().sources()).hasSameSizeAs(manifest.sources());
+        assertThat(
+            restricted
+                .manifest()
+                .sources()
+                .stream()
+                .filter(source -> source.kind().equals(COMMENTS))
+                .findFirst()
+                .orElseThrow()
+                .state()
+        ).isEqualTo(new SourceCaptureState.NotCollected("MINIMIZED"));
     }
 
     @Test
@@ -475,9 +572,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), REPOSITORY_TREE.value());
-        assertThat(source.path("availability").asString()).isEqualTo("AVAILABLE");
-        assertThat(source.path("content").asString()).isEqualTo("EMPTY");
-        assertThat(source.path("completeness").asString()).isEqualTo("COMPLETE");
+        assertThat(source.path("state").path("availability").asString()).isEqualTo("AVAILABLE");
+        assertThat(source.path("state").path("content").asString()).isEqualTo("EMPTY");
+        assertThat(source.path("state").path("completeness").asString()).isEqualTo("COMPLETE");
     }
 
     @Test
@@ -499,9 +596,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         JsonNode source = findSource(mapper.readTree(files.get("inputs/manifest.json")), OUTLINE.value());
-        assertThat(source.path("availability").asString()).isEqualTo("AVAILABLE");
-        assertThat(source.path("content").asString()).isEqualTo("EMPTY");
-        assertThat(source.path("completeness").asString()).isEqualTo("PARTIAL");
+        assertThat(source.path("state").path("availability").asString()).isEqualTo("AVAILABLE");
+        assertThat(source.path("state").path("content").asString()).isEqualTo("EMPTY");
+        assertThat(source.path("state").path("completeness").asString()).isEqualTo("PARTIAL");
     }
 
     @Test
@@ -578,7 +675,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     private static Practice practiceRequiringComments() {
-        return practiceRequiring(COMMENTS, "review-comments", EvidenceFreshnessRequirement.ANY);
+        return practiceRequiring(COMMENTS, "review-comments", EvidenceFreshnessRequirement.NO_REQUIREMENT);
     }
 
     private static Practice practiceRequiring(SourceKind sourceKind, String slug) {
@@ -592,21 +689,21 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     ) {
         Practice practice = new Practice();
         practice.setSlug(slug);
-        practice.setEvidence(
-            new PracticeEvidenceDeclaration(
+        practice.setAutomatedAssessmentPolicy(
+            new PracticeAutomatedAssessmentPolicy(
                 new SourceContractVersion("1.0.0"),
                 sourceKind.equals(CONVERSATION)
                     ? new EvidenceProfileId("conversation-review")
                     : new EvidenceProfileId("pull-request-review"),
-                new PracticeDetectorCapability(
-                    PracticeDetectorAssessmentMethod.SEMANTIC,
-                    PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+                new PracticeAutomatedAssessment(
+                    PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+                    PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
                 List.of(
                     new PracticeEvidenceRequirement(sourceKind, EvidenceCompletenessRequirement.COMPLETE, freshness)
                 ),
                 List.of(),
-                PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
                 List.of()
             )
         );

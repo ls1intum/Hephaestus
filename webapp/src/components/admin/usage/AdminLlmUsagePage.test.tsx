@@ -147,7 +147,7 @@ describe("AdminLlmUsagePage", () => {
 				"an exhausted shared budget",
 				{ instancePaused: true, instanceBudgetVerdict: "EXHAUSTED", instanceTotalCostUsd: 25 },
 				"Shared-model budget reached",
-				"Paused until August 1 (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.",
+				"Paused until August 1 (UTC), or until your host raises the budget. Practice reviews and Mentor can keep running on your own models.",
 				"/w/acme/admin/models",
 			],
 			[

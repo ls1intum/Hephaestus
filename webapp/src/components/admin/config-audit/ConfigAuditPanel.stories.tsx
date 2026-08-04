@@ -10,7 +10,7 @@ const entries: ConfigAuditEntryView[] = [
 		occurredAt: "2026-07-24T09:14:32Z" as unknown as Date,
 		action: "UPDATED",
 		entityType: "AGENT_BINDING",
-		entityId: "PRACTICE_DETECTION",
+		entityId: "PRACTICE_REVIEW",
 		actorKind: "USER",
 		actorAccountId: 7,
 		actor: { id: 7, displayName: "Ada Lovelace", email: "ada@example.com" },

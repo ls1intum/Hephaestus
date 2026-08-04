@@ -37,7 +37,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private Practice createPractice(String slug, String name) {
         Practice practice = new Practice();
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);
@@ -53,7 +53,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         void savesAndRetrieves() {
             Practice practice = createPractice("test-slug", "Test Practice");
             practice.setCriteria("Check for quality");
-            practice.setActive(false);
+            practice.setUsedInNewReviews(false);
 
             Practice saved = practiceRepository.save(practice);
 
@@ -66,7 +66,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getName()).isEqualTo("Test Practice");
             assertThat(found.getTriggerEvents().toString()).contains("PullRequestCreated");
             assertThat(found.getCriteria()).isEqualTo("Check for quality");
-            assertThat(found.isActive()).isFalse();
+            assertThat(found.isUsedInNewReviews()).isFalse();
         }
     }
 
@@ -105,11 +105,11 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         void findsActivePracticesOnly() {
             Practice active = createPractice("active", "Active");
             Practice inactive = createPractice("inactive", "Inactive");
-            inactive.setActive(false);
+            inactive.setUsedInNewReviews(false);
             practiceRepository.save(active);
             practiceRepository.save(inactive);
 
-            List<Practice> result = practiceRepository.findByWorkspaceIdAndActiveTrue(workspace.getId());
+            List<Practice> result = practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrue(workspace.getId());
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getSlug()).isEqualTo("active");

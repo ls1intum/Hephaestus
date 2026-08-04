@@ -117,22 +117,22 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.getFeatures().setPracticesEnabled(true);
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         lenient()
-            .when(practiceRepository.existsByWorkspaceIdAndActiveTrueAndArtifactType(anyLong(), any()))
+            .when(practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(anyLong(), any()))
             .thenReturn(true);
 
         enabledBinding = new WorkspaceAgentBinding();
         enabledBinding.setId(10L);
         enabledBinding.setWorkspace(workspace);
-        enabledBinding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        enabledBinding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         enabledBinding.setEnabled(true);
         enabledBinding.setTimeoutSeconds(600);
         // Two lookups, deliberately: submit() discovers the binding WITH its models (it needs the
         // funding source to pick the right cap), then re-reads it inside the write transaction.
         lenient()
-            .when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION))
+            .when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
             .thenReturn(Optional.of(enabledBinding));
         lenient()
-            .when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION))
+            .when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
             .thenReturn(Optional.of(enabledBinding));
 
         lenient()
@@ -194,7 +194,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnEmptyWhenPracticeIsUnbound() {
             when(
-                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)
+                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)
             ).thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
@@ -248,7 +248,10 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldNotSubmitWithoutAnActivePracticeForTheReviewedWork() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(
-                practiceRepository.existsByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.CONVERSATION_THREAD)
+                practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                    1L,
+                    WorkArtifact.CONVERSATION_THREAD
+                )
             ).thenReturn(false);
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.CONVERSATION_REVIEW)).thenReturn(handler);
@@ -408,7 +411,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(result).isPresent();
             AgentJob job = result.get();
             assertThat(job.getWorkspace()).isEqualTo(workspace);
-            assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
+            assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_REVIEW);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:detection");
             assertThat(job.getConfigSnapshot()).isNotNull();
@@ -615,7 +618,7 @@ class AgentJobServiceTest extends BaseUnitTest {
                     return callback.doInTransaction(mock(TransactionStatus.class));
                 });
             when(
-                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)
+                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)
             ).thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 

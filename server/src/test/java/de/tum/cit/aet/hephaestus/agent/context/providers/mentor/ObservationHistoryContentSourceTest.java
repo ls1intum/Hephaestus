@@ -8,7 +8,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -65,7 +65,13 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void authorizeObservations() {
         lenient()
-            .when(visibilityPolicy.permits(anyLong(), any(Observation.class), eq(SourceUseAudience.PRACTICE_MENTORING)))
+            .when(
+                visibilityPolicy.permits(
+                    anyLong(),
+                    any(Observation.class),
+                    eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                )
+            )
             .thenReturn(true);
     }
 
@@ -112,7 +118,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         when(
             queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of());
-        when(visibilityPolicy.permits(1L, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(false);
+        when(visibilityPolicy.permits(1L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(false);
 
         ObjectNode root = provider.buildPayload(1L, 2L);
 

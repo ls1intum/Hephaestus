@@ -73,7 +73,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("feedback-observation-test"));
 
         practice = new Practice();
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");

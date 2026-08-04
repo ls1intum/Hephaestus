@@ -52,7 +52,7 @@ class PracticeCatalogInjector {
      */
     Map<String, String> whyBySlug(Long workspaceId, WorkArtifact focus) {
         return practiceRepository
-            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
+            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(workspaceId, focus)
             .stream()
             .filter(p -> p.getWhyItMatters() != null && !p.getWhyItMatters().isBlank())
             .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
@@ -111,7 +111,7 @@ class PracticeCatalogInjector {
         }
         Long workspaceId = job.getWorkspace().getId();
         List<Practice> practices = practiceRepository
-            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
+            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(workspaceId, focus)
             .stream()
             .sorted(Comparator.comparing(Practice::getSlug))
             .toList();
@@ -159,13 +159,13 @@ class PracticeCatalogInjector {
             ArrayNode allowedSources = entry.putArray("allowedSources");
             java.util.stream.Stream.concat(
                 p
-                    .getEvidence()
-                    .required()
+                    .getAutomatedAssessmentPolicy()
+                    .requiredEvidence()
                     .stream()
                     .map(requirement -> requirement.sourceKind().value()),
                 p
-                    .getEvidence()
-                    .optional()
+                    .getAutomatedAssessmentPolicy()
+                    .optionalContext()
                     .stream()
                     .map(requirement -> requirement.sourceKind().value())
             )

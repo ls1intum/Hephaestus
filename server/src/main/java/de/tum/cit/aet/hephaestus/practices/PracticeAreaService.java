@@ -37,9 +37,11 @@ public class PracticeAreaService {
     private final WorkspaceRepository workspaceRepository;
 
     @Transactional(readOnly = true)
-    public List<PracticeArea> listAreas(WorkspaceContext ctx, @Nullable Boolean activeOnly) {
-        return Boolean.TRUE.equals(activeOnly)
-            ? practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(ctx.id())
+    public List<PracticeArea> listAreas(WorkspaceContext ctx, @Nullable Boolean visibleInPracticeDashboardsOnly) {
+        return Boolean.TRUE.equals(visibleInPracticeDashboardsOnly)
+            ? practiceAreaRepository.findByWorkspaceIdAndVisibleInPracticeDashboardsTrueOrderByDisplayOrderAscNameAsc(
+                  ctx.id()
+              )
             : practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(ctx.id());
     }
 
@@ -166,7 +168,7 @@ public class PracticeAreaService {
         WorkspaceContext ctx,
         String slug,
         AreaAttributes attributes,
-        @Nullable Boolean active
+        @Nullable Boolean visibleInPracticeDashboards
     ) {
         lockWorkspace(ctx);
         PracticeArea area = getArea(ctx, slug);
@@ -191,8 +193,8 @@ public class PracticeAreaService {
         if (attributes.color() != null) {
             area.setColor(attributes.color());
         }
-        if (active != null) {
-            area.setActive(active);
+        if (visibleInPracticeDashboards != null) {
+            area.setVisibleInPracticeDashboards(visibleInPracticeDashboards);
         }
         area = practiceAreaRepository.save(area);
         if (snapshotChanged) {

@@ -115,7 +115,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
-        agentJob.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        agentJob.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
@@ -187,20 +187,29 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             .put("contractVersion", "1.0.0")
             .putArray("sources")
             .addObject()
-            .put("kind", "scm.pull-request.diff")
-            .put("availability", "AVAILABLE");
+            .put("kind", "scm.pull-request.diff");
+        source
+            .putObject("state")
+            .put("availability", "AVAILABLE")
+            .put("content", "NON_EMPTY")
+            .put("completeness", "COMPLETE")
+            .putObject("facts")
+            .put("capturedAt", "2026-08-03T00:00:00Z")
+            .put("immutableIdentity", "abc123")
+            .put("queryScope", "merge-base-to-head diff")
+            .put("completenessBasis", "IMMUTABLE_OBJECT")
+            .put("representationFidelity", "EXACT");
+        byte[] diff =
+            "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n".getBytes(
+                StandardCharsets.UTF_8
+            );
         source
             .putArray("artifacts")
             .addObject()
             .put("path", "inputs/context/diff.patch")
-            .put(
-                "sha256",
-                cas.put(
-                    "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n".getBytes(
-                        StandardCharsets.UTF_8
-                    )
-                )
-            );
+            .put("mediaType", "text/x-diff")
+            .put("sha256", cas.put(diff))
+            .put("bytes", diff.length);
         var admitted = snapshot.putArray("practices");
         admitted
             .addObject()
@@ -217,7 +226,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);
-        p.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         p = practiceRepository.saveAndFlush(p);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(p, 1));

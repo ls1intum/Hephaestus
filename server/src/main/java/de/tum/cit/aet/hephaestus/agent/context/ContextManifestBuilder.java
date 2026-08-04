@@ -4,16 +4,14 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReason;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedAssessmentReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.CompletenessBasis;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessment;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceAssessmentReason;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceViewTransformation;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
-import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
-import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessDecision;
-import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReason;
-import de.tum.cit.aet.hephaestus.evidence.PracticeReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.RepresentationFidelity;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
 import de.tum.cit.aet.hephaestus.evidence.SourceAuthority;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
@@ -24,13 +22,15 @@ import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceFreshness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
-import de.tum.cit.aet.hephaestus.practices.PracticeDetectorAssessmentMethod;
-import de.tum.cit.aet.hephaestus.practices.PracticeDetectorEvidenceCoverage;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentMode;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -51,17 +51,18 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
 @Component
 public class ContextManifestBuilder {
 
     static final String INTERNAL_MANIFEST_FILE = "artifact-source-manifest.json";
-    static final String READINESS_REPORT_FILE = "practice-readiness-report.json";
+    static final String AUTOMATED_ASSESSMENT_READINESS_REPORT_FILE = "automated-assessment-readiness-report.json";
 
-    public record PreparedReadiness(List<Practice> readyPractices, PracticeReadinessReport report) {
-        public PreparedReadiness {
+    public record PreparedAutomatedAssessmentReadiness(
+        List<Practice> readyPractices,
+        AutomatedAssessmentReadinessReport report
+    ) {
+        public PreparedAutomatedAssessmentReadiness {
             readyPractices = List.copyOf(readyPractices);
             Objects.requireNonNull(report, "report");
         }
@@ -137,7 +138,7 @@ public class ContextManifestBuilder {
         CaptureMetadata metadata
     ) {
         Instant capturedAt = clock.instant();
-        var profile = catalogs.requireProfile(plan.contractVersion(), plan.profileId());
+        var profile = catalogs.requireProfile(plan.contractVersion(), plan.evidenceProfile());
         if (!profile.allowedSources().containsAll(plan.selectedSources())) {
             Set<SourceKind> disallowed = new HashSet<>(plan.selectedSources());
             disallowed.removeAll(profile.allowedSources());
@@ -167,7 +168,7 @@ public class ContextManifestBuilder {
         ArtifactSourceManifest manifest = new ArtifactSourceManifest(
             plan.contractVersion(),
             catalogs.catalogDigest(),
-            plan.profileId(),
+            plan.evidenceProfile(),
             capturedAt,
             captures,
             List.<EvidenceViewTransformation>of()
@@ -175,7 +176,7 @@ public class ContextManifestBuilder {
         try {
             byte[] internalBytes = objectMapper.writeValueAsBytes(manifest);
             persistInternalManifest(jobId, internalBytes);
-            files.put(SandboxLayout.MANIFEST_PATH, modelVisibleIndex(manifest));
+            files.put(SandboxLayout.MANIFEST_PATH, internalBytes);
             return manifest;
         } catch (RuntimeException e) {
             throw new IllegalStateException("Artifact-source manifest generation failed", e);
@@ -183,30 +184,34 @@ public class ContextManifestBuilder {
     }
 
     boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind) {
-        return catalogs.isSourceUsePermitted(version, kind, SourceUseAudience.PRACTICE_DETECTION);
+        return catalogs.isSourceUsePermitted(version, kind, SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT);
     }
 
-    public PreparedReadiness prepareReadiness(
+    public PreparedAutomatedAssessmentReadiness prepareAutomatedAssessmentReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices,
         String jobId,
         Instant temporalAnchor
     ) {
-        PracticeReadinessResult result = assessPractices(manifest, practices, temporalAnchor);
+        AutomatedAssessmentReadinessResult result = checkAutomatedAssessmentReadiness(
+            manifest,
+            practices,
+            temporalAnchor
+        );
         if (result.decisions().isEmpty()) {
-            throw new IllegalArgumentException("Cannot persist an empty practice readiness report");
+            throw new IllegalArgumentException("Cannot persist an empty automated-assessment readiness report");
         }
         Instant decidedAt = result.decisions().getFirst().decidedAt();
-        PracticeReadinessReport report = new PracticeReadinessReport(
+        AutomatedAssessmentReadinessReport report = new AutomatedAssessmentReadinessReport(
             manifest.contractVersion(),
             manifest.catalogDigest(),
-            manifest.profileId(),
+            manifest.evidenceProfile(),
             manifest.capturedAt(),
             decidedAt,
             result.decisions()
         );
-        persistInternalJson(jobId, READINESS_REPORT_FILE, objectMapper.writeValueAsBytes(report));
-        return new PreparedReadiness(result.readyPractices(), report);
+        persistInternalJson(jobId, AUTOMATED_ASSESSMENT_READINESS_REPORT_FILE, objectMapper.writeValueAsBytes(report));
+        return new PreparedAutomatedAssessmentReadiness(result.readyPractices(), report);
     }
 
     PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {
@@ -214,10 +219,15 @@ public class ContextManifestBuilder {
             .manifest()
             .sources()
             .stream()
-            .filter(source -> plan.selectedSources().contains(source.kind()))
+            .map(source ->
+                plan.selectedSources().contains(source.kind())
+                    ? source
+                    : new SourceCapture(source.kind(), new SourceCaptureState.NotCollected("MINIMIZED"), List.of())
+            )
             .toList();
         Set<String> retainedArtifacts = sources
             .stream()
+            .filter(source -> plan.selectedSources().contains(source.kind()))
             .flatMap(source -> source.artifacts().stream())
             .map(SourceArtifact::path)
             .collect(java.util.stream.Collectors.toSet());
@@ -236,20 +246,23 @@ public class ContextManifestBuilder {
         ArtifactSourceManifest restricted = new ArtifactSourceManifest(
             prepared.manifest().contractVersion(),
             prepared.manifest().catalogDigest(),
-            prepared.manifest().profileId(),
+            prepared.manifest().evidenceProfile(),
             prepared.manifest().capturedAt(),
             sources,
             prepared.manifest().viewTransformations()
         );
-        files.put(SandboxLayout.MANIFEST_PATH, modelVisibleIndex(restricted));
+        files.put(SandboxLayout.MANIFEST_PATH, objectMapper.writeValueAsBytes(restricted));
         return new PreparedEvidence(files, restricted);
     }
 
-    public PracticeReadinessResult assessPractices(ArtifactSourceManifest manifest, List<Practice> practices) {
-        return assessPractices(manifest, practices, clock.instant());
+    public AutomatedAssessmentReadinessResult checkAutomatedAssessmentReadiness(
+        ArtifactSourceManifest manifest,
+        List<Practice> practices
+    ) {
+        return checkAutomatedAssessmentReadiness(manifest, practices, clock.instant());
     }
 
-    public PracticeReadinessResult assessPractices(
+    public AutomatedAssessmentReadinessResult checkAutomatedAssessmentReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices,
         Instant temporalAnchor
@@ -264,33 +277,50 @@ public class ContextManifestBuilder {
         ) {
             throw new IllegalArgumentException("Manifest does not reference the runtime's exact source contract");
         }
+        Set<SourceKind> expectedKinds = catalogs
+            .requireProfile(manifest.contractVersion(), manifest.evidenceProfile())
+            .allowedSources();
+        Set<SourceKind> capturedKinds = manifest
+            .sources()
+            .stream()
+            .map(SourceCapture::kind)
+            .collect(java.util.stream.Collectors.toSet());
+        if (!capturedKinds.equals(expectedKinds)) {
+            throw new IllegalArgumentException("Manifest source captures do not match its evidence profile");
+        }
         Map<SourceKind, SourceCapture> captures = new HashMap<>();
         manifest.sources().forEach(capture -> captures.put(capture.kind(), capture));
-        Instant assessedAt = clock.instant();
+        Instant checkedAt = clock.instant();
         List<Practice> ready = new ArrayList<>();
-        List<PracticeReadinessDecision> decisions = new ArrayList<>();
+        List<AutomatedAssessmentReadinessDecision> decisions = new ArrayList<>();
         for (Practice practice : practices) {
-            var declaration = practice.getEvidence();
-            if (declaration == null) {
-                throw new IllegalArgumentException("Practice has no evidence declaration: " + practice.getSlug());
+            var requirements = practice.getAutomatedAssessmentPolicy();
+            if (requirements == null) {
+                throw new IllegalArgumentException("Practice has no evidence requirements: " + practice.getSlug());
             }
             if (
-                !declaration.sourceContractVersion().equals(manifest.contractVersion()) ||
-                !declaration.profile().equals(manifest.profileId())
+                !requirements.sourceContractVersion().equals(manifest.contractVersion()) ||
+                !requirements.evidenceProfile().equals(manifest.evidenceProfile())
             ) {
                 throw new IllegalArgumentException(
                     "Practice evidence contract does not match manifest: " + practice.getSlug()
                 );
             }
-            List<PracticeReadinessReason> decisionReasons = new ArrayList<>();
-            if (declaration.detectorCapability().assessmentMethod() == PracticeDetectorAssessmentMethod.NONE) {
-                decisionReasons.add(PracticeReadinessReason.PRACTICE_NOT_DETECTABLE_BY_HEPHAESTUS);
+            List<AutomatedAssessmentReadinessReason> decisionReasons = new ArrayList<>();
+            switch (requirements.automatedAssessment().mode()) {
+                case NONE -> decisionReasons.add(AutomatedAssessmentReadinessReason.NO_AUTOMATED_ASSESSMENT);
+                case LANGUAGE_MODEL -> {
+                }
             }
-            if (declaration.detectorCapability().evidenceCoverage() == PracticeDetectorEvidenceCoverage.CONDITIONAL) {
-                decisionReasons.add(PracticeReadinessReason.CONDITIONAL_DETECTABILITY_UNSUPPORTED);
+            switch (requirements.automatedAssessment().evidenceSufficiency()) {
+                case DECLARED_EVIDENCE_INSUFFICIENT -> decisionReasons.add(
+                    AutomatedAssessmentReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT
+                );
+                case SUFFICIENT_WHEN_REQUIREMENTS_MET, NONE -> {
+                }
             }
-            List<EvidenceAssessment> assessments = new ArrayList<>();
-            for (var requirement : declaration.required()) {
+            List<SourceReadinessCheck> sourceChecks = new ArrayList<>();
+            for (var requirement : requirements.requiredEvidence()) {
                 SourceCapture capture = captures.get(requirement.sourceKind());
                 boolean available = capture != null && capture.state() instanceof SourceCaptureState.Available;
                 SourceCompleteness completeness = available
@@ -304,21 +334,21 @@ public class ContextManifestBuilder {
                           manifest.capturedAt()
                       )
                     : SourceFreshness.UNKNOWN;
-                List<EvidenceAssessmentReason> reasons = new ArrayList<>();
-                if (!available) reasons.add(EvidenceAssessmentReason.SOURCE_NOT_AVAILABLE);
+                List<SourceReadinessReason> reasons = new ArrayList<>();
+                if (!available) reasons.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
                 if (
                     requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
                     completeness != SourceCompleteness.COMPLETE
-                ) reasons.add(EvidenceAssessmentReason.COMPLETENESS_UNSATISFIED);
+                ) reasons.add(SourceReadinessReason.SOURCE_INCOMPLETE);
                 if (
                     requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
                     freshness != SourceFreshness.CURRENT
-                ) reasons.add(EvidenceAssessmentReason.FRESHNESS_UNSATISFIED);
-                assessments.add(
-                    new EvidenceAssessment(
+                ) reasons.add(SourceReadinessReason.SOURCE_NOT_CURRENT);
+                sourceChecks.add(
+                    new SourceReadinessCheck(
                         requirement.sourceKind(),
                         manifest.contractVersion(),
-                        assessedAt,
+                        checkedAt,
                         temporalAnchor,
                         freshness,
                         reasons.isEmpty(),
@@ -326,17 +356,17 @@ public class ContextManifestBuilder {
                     )
                 );
             }
-            PracticeReadinessDecision decision = new PracticeReadinessDecision(
+            AutomatedAssessmentReadinessDecision decision = new AutomatedAssessmentReadinessDecision(
                 practice.getSlug(),
-                assessedAt,
-                decisionReasons.isEmpty() && assessments.stream().allMatch(EvidenceAssessment::acceptable),
+                checkedAt,
+                decisionReasons.isEmpty() && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements),
                 decisionReasons,
-                assessments
+                sourceChecks
             );
             decisions.add(decision);
             if (decision.ready()) ready.add(practice);
         }
-        return new PracticeReadinessResult(ready, decisions);
+        return new AutomatedAssessmentReadinessResult(ready, decisions);
     }
 
     private SourceFreshness assessFreshness(
@@ -429,9 +459,9 @@ public class ContextManifestBuilder {
     }
 
     private static SourceCapture missingCapture(ArtifactSourceContract contract, SourceCaptureState state) {
-        MissingnessKind missingness = missingness(state);
-        if (!contract.supportedMissingness().contains(missingness)) {
-            throw new IllegalArgumentException(contract.kind() + " does not support missingness state " + missingness);
+        SourceAbsenceState absenceState = absenceState(state);
+        if (!contract.supportedAbsenceStates().contains(absenceState)) {
+            throw new IllegalArgumentException(contract.kind() + " does not support absence state " + absenceState);
         }
         return new SourceCapture(contract.kind(), state, List.of());
     }
@@ -484,49 +514,12 @@ public class ContextManifestBuilder {
         return new SourceArtifact(path, mediaType(path), cas.put(bytes), bytes.length);
     }
 
-    private byte[] modelVisibleIndex(ArtifactSourceManifest manifest) {
-        ObjectNode root = objectMapper.createObjectNode();
-        root.put("contractVersion", manifest.contractVersion().value());
-        root.put("profile", manifest.profileId().value());
-        ArrayNode sources = root.putArray("sources");
-        for (SourceCapture capture : manifest.sources()) {
-            ObjectNode node = sources.addObject();
-            node.put("kind", capture.kind().value());
-            node.put("availability", availability(capture.state()));
-            if (capture.state() instanceof SourceCaptureState.Available available) {
-                node.put("content", available.content().name());
-                node.put("completeness", available.completeness().name());
-                ArrayNode paths = node.putArray("paths");
-                capture.artifacts().stream().map(SourceArtifact::path).sorted().forEach(paths::add);
-                ArrayNode artifacts = node.putArray("artifacts");
-                capture
-                    .artifacts()
-                    .stream()
-                    .sorted(Comparator.comparing(SourceArtifact::path))
-                    .forEach(artifact -> {
-                        ObjectNode artifactNode = artifacts.addObject();
-                        artifactNode.put("path", artifact.path());
-                        artifactNode.put("sha256", artifact.sha256());
-                    });
-            }
-        }
-        return objectMapper.writeValueAsBytes(root);
-    }
-
-    private static String availability(SourceCaptureState state) {
-        if (state instanceof SourceCaptureState.Available) return "AVAILABLE";
-        if (state instanceof SourceCaptureState.NotCollected) return "NOT_COLLECTED";
-        if (state instanceof SourceCaptureState.Unavailable) return "UNAVAILABLE";
-        if (state instanceof SourceCaptureState.Redacted) return "REDACTED";
-        return "COLLECTION_ERROR";
-    }
-
-    private static MissingnessKind missingness(SourceCaptureState state) {
-        if (state instanceof SourceCaptureState.NotCollected) return MissingnessKind.NOT_COLLECTED;
-        if (state instanceof SourceCaptureState.Unavailable) return MissingnessKind.UNAVAILABLE;
-        if (state instanceof SourceCaptureState.Redacted) return MissingnessKind.REDACTED;
-        if (state instanceof SourceCaptureState.CollectionError) return MissingnessKind.COLLECTION_ERROR;
-        throw new IllegalArgumentException("AVAILABLE is not a missingness override");
+    private static SourceAbsenceState absenceState(SourceCaptureState state) {
+        if (state instanceof SourceCaptureState.NotCollected) return SourceAbsenceState.NOT_COLLECTED;
+        if (state instanceof SourceCaptureState.Unavailable) return SourceAbsenceState.UNAVAILABLE;
+        if (state instanceof SourceCaptureState.Redacted) return SourceAbsenceState.REDACTED;
+        if (state instanceof SourceCaptureState.CollectionError) return SourceAbsenceState.COLLECTION_ERROR;
+        throw new IllegalArgumentException("AVAILABLE is not an absence state");
     }
 
     private void persistInternalManifest(String jobId, byte[] bytes) {
@@ -574,7 +567,7 @@ public class ContextManifestBuilder {
         if (completeness == SourceCompleteness.PARTIAL) {
             return CompletenessBasis.BOUNDED_SCOPE;
         }
-        return switch (contract.captureTime()) {
+        return switch (contract.captureTimeBasis()) {
             case PINNED_IMMUTABLE_IDENTITY -> CompletenessBasis.IMMUTABLE_OBJECT;
             default -> CompletenessBasis.BOUNDED_SCOPE;
         };

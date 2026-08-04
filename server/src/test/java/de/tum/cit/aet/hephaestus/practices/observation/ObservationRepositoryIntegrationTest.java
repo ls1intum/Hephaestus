@@ -97,7 +97,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-test"));
 
         practice = new Practice();
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
@@ -287,7 +287,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             // Create workspace B with its own practice and finding
             Workspace workspaceB = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("ws-b"));
             Practice practiceB = new Practice();
-            practiceB.setEvidence(PracticeTestEvidence.pullRequest());
+            practiceB.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
             practiceB.setWorkspace(workspaceB);
             practiceB.setSlug("practice-b");
             practiceB.setName("Practice B");
@@ -360,7 +360,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         void cascadesFromPracticeSelectively() {
             // Create a second practice with its own finding
             Practice otherPractice = new Practice();
-            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
+            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(workspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
@@ -676,7 +676,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
             Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-other"));
             Practice otherPractice = new Practice();
-            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
+            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");

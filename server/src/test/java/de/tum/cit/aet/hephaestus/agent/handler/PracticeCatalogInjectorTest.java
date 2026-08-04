@@ -49,7 +49,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         p.setSlug(slug);
         p.setName(slug);
         p.setCriteria("criteria for " + slug);
-        p.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         var revision = new PracticeRevision();
         ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
         p.setCurrentRevision(revision);
@@ -82,7 +82,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a trigger event materialises only the practices that declare it")
     void filtersToTriggerMatchingPractices() {
         when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(
             List.of(
                 practice("authoring", "PullRequestCreated"),
@@ -103,7 +103,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a job with no trigger event keeps the full focus set (legacy / bot-command path)")
     void noTriggerEventKeepsFullSet() {
         when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(
             List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
         );
@@ -119,7 +119,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a trigger event that matches nothing fails closed")
     void noMatchFailsClosed() {
         when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(
             List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
         );
@@ -137,7 +137,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         // Defense-in-depth: slugs are interpolated into filesystem paths, so a mis-seeded slug with a path
         // traversal must be rejected, not written to disk.
         when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(List.of(practice("../escape", "PullRequestCreated")));
 
         assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), WorkArtifact.PULL_REQUEST))
@@ -159,7 +159,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("an empty active-practice set throws JobPreparationException")
     void emptyFocusSetThrows() {
         when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(List.of());
 
         assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), WorkArtifact.PULL_REQUEST))
@@ -175,7 +175,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         Practice blankScript = practice("retrospective", "PullRequestMerged");
         blankScript.setPrecomputeScript("   "); // blank → no .ts written
         when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(List.of(withScript, blankScript));
         Map<String, byte[]> files = new HashMap<>();
 
@@ -205,7 +205,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         Practice blankWhy = practice("retrospective", "PullRequestMerged");
         blankWhy.setWhyItMatters("   ");
         when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
         ).thenReturn(List.of(withWhy, blankWhy));
 
         Map<String, String> why = injector.whyBySlug(1L, WorkArtifact.PULL_REQUEST);

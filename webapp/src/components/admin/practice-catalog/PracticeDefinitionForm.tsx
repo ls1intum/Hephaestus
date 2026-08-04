@@ -1,17 +1,16 @@
 import { useBlocker } from "@tanstack/react-router";
-import { ChevronRight, RotateCcw, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight, RotateCcw } from "lucide-react";
+import { useRef, useState } from "react";
 import type {
-	PracticeEvidenceArtifactOptions,
-	PracticeEvidenceAuthoring,
-	PracticeEvidenceDeclaration,
+	PracticeAutomatedAssessmentPolicy,
+	PracticeEvidenceOptions,
+	PracticeWorkTypeEvidenceOptions,
 } from "@/api/types.gen";
 import {
 	FOCUS_ARTIFACT_OPTIONS,
 	generateSlug,
 	isValidSlug,
 	TRIGGER_EVENTS_BY_FOCUS,
-	triggerEventsForFocus,
 	type WorkArtifact,
 } from "@/components/admin/practice-catalog/constants";
 import {
@@ -19,7 +18,6 @@ import {
 	practiceEvidenceError,
 } from "@/components/admin/practice-catalog/PracticeEvidenceEditor";
 import { CodeEditor } from "@/components/shared/CodeEditor";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -71,7 +69,7 @@ export interface PracticeDefinitionValue {
 	whyItMatters?: string;
 	whatGoodLooksLike?: string;
 	precomputeScript?: string;
-	evidence: PracticeEvidenceDeclaration;
+	automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
 }
 
 interface PracticeDefinitionFormBaseProps {
@@ -82,7 +80,7 @@ interface PracticeDefinitionFormBaseProps {
 	afterFields?: React.ReactNode;
 	cancelAction: React.ReactNode;
 	onSubmit: (value: PracticeDefinitionValue) => void;
-	evidenceAuthoring: PracticeEvidenceAuthoring;
+	evidenceOptions: PracticeEvidenceOptions;
 }
 
 interface PracticeDefinitionFormCreateProps extends PracticeDefinitionFormBaseProps {
@@ -109,20 +107,20 @@ interface FormState {
 	whyItMatters: string;
 	whatGoodLooksLike: string;
 	precomputeScript: string;
-	evidence: PracticeEvidenceDeclaration;
+	automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
 }
 
 function optionsForArtifact(
-	authoring: PracticeEvidenceAuthoring,
+	evidenceOptions: PracticeEvidenceOptions,
 	artifactType: WorkArtifact,
-): PracticeEvidenceArtifactOptions {
-	const options = authoring.artifacts.find((item) => item.artifactType === artifactType);
-	if (!options) throw new Error(`Missing evidence authoring options for ${artifactType}`);
+): PracticeWorkTypeEvidenceOptions {
+	const options = evidenceOptions.workTypes.find((item) => item.artifactType === artifactType);
+	if (!options) throw new Error(`Missing evidence options for ${artifactType}`);
 	return options;
 }
 
 function initialState(
-	evidenceAuthoring: PracticeEvidenceAuthoring,
+	evidenceOptions: PracticeEvidenceOptions,
 	initialData?: PracticeDefinitionValue,
 ): FormState {
 	const artifactType = initialData?.artifactType ?? "PULL_REQUEST";
@@ -136,7 +134,9 @@ function initialState(
 		whyItMatters: initialData?.whyItMatters ?? "",
 		whatGoodLooksLike: initialData?.whatGoodLooksLike ?? "",
 		precomputeScript: initialData?.precomputeScript ?? "",
-		evidence: initialData?.evidence ?? optionsForArtifact(evidenceAuthoring, artifactType).baseline,
+		automatedAssessmentPolicy:
+			initialData?.automatedAssessmentPolicy ??
+			optionsForArtifact(evidenceOptions, artifactType).recommendedRequirements,
 	};
 }
 
@@ -150,14 +150,20 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		afterFields,
 		cancelAction,
 		initialData,
-		evidenceAuthoring,
+		evidenceOptions,
 	} = props;
 	const formDisabled = isPending || disabled;
-	const [form, setForm] = useState<FormState>(() => initialState(evidenceAuthoring, initialData));
+	const [form, setForm] = useState<FormState>(() => initialState(evidenceOptions, initialData));
+	const evidenceDrafts = useRef<Partial<Record<WorkArtifact, PracticeAutomatedAssessmentPolicy>>>({
+		[form.artifactType]: form.automatedAssessmentPolicy,
+	});
+	const triggerDrafts = useRef<Partial<Record<WorkArtifact, string[]>>>({
+		[form.artifactType]: form.triggerEvents,
+	});
 	const [submitted, setSubmitted] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 	const isDirty =
-		JSON.stringify(form) !== JSON.stringify(initialState(evidenceAuthoring, initialData));
+		JSON.stringify(form) !== JSON.stringify(initialState(evidenceOptions, initialData));
 	const blocker = useBlocker({
 		shouldBlockFn: () => isDirty,
 		enableBeforeUnload: isDirty,
@@ -177,12 +183,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	};
 
 	const toggleTrigger = (trigger: string, checked: boolean) => {
-		setForm((previous) => ({
-			...previous,
-			triggerEvents: checked
+		setForm((previous) => {
+			const triggerEvents = checked
 				? [...previous.triggerEvents, trigger]
-				: previous.triggerEvents.filter((value) => value !== trigger),
-		}));
+				: previous.triggerEvents.filter((value) => value !== trigger);
+			triggerDrafts.current[previous.artifactType] = triggerEvents;
+			return { ...previous, triggerEvents };
+		});
 	};
 
 	const nameError =
@@ -199,7 +206,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		submitted && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
 			: undefined;
-	const evidenceError = practiceEvidenceError(form.evidence);
+	const evidenceError = practiceEvidenceError(form.automatedAssessmentPolicy);
 
 	const valid =
 		form.name.trim().length >= 3 &&
@@ -238,13 +245,12 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
 				: {}),
 			...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
-			evidence: form.evidence,
+			automatedAssessmentPolicy: form.automatedAssessmentPolicy,
 		});
 	};
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);
-	const artifactChanged = mode === "edit" && initialData.artifactType !== form.artifactType;
-	const evidenceOptions = optionsForArtifact(evidenceAuthoring, form.artifactType);
+	const selectedEvidenceOptions = optionsForArtifact(evidenceOptions, form.artifactType);
 
 	return (
 		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
@@ -349,14 +355,17 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										onValueChange={(value) =>
 											setForm((previous) => {
 												const artifactType = value as WorkArtifact;
-												const allowed = triggerEventsForFocus(artifactType);
+												evidenceDrafts.current[previous.artifactType] =
+													previous.automatedAssessmentPolicy;
+												triggerDrafts.current[previous.artifactType] = previous.triggerEvents;
 												return {
 													...previous,
 													artifactType,
-													evidence: optionsForArtifact(evidenceAuthoring, artifactType).baseline,
-													triggerEvents: previous.triggerEvents.filter((event) =>
-														allowed.includes(event),
-													),
+													automatedAssessmentPolicy:
+														evidenceDrafts.current[artifactType] ??
+														optionsForArtifact(evidenceOptions, artifactType)
+															.recommendedRequirements,
+													triggerEvents: triggerDrafts.current[artifactType] ?? [],
 												};
 											})
 										}
@@ -419,16 +428,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								</Field>
 							</div>
 						</FieldGroup>
-						{artifactChanged && (
-							<Alert variant="warning">
-								<TriangleAlert />
-								<AlertTitle>Evidence requirements will change</AlertTitle>
-								<AlertDescription>
-									Changing the reviewed artifact has reset the evidence rule to the recommended
-									starting point for the new artifact. Review it below before saving.
-								</AlertDescription>
-							</Alert>
-						)}
 					</section>
 
 					<Separator />
@@ -469,10 +468,15 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					)}
 
 					<PracticeEvidenceEditor
-						options={evidenceOptions}
-						value={form.evidence}
+						options={selectedEvidenceOptions}
+						value={form.automatedAssessmentPolicy}
 						disabled={formDisabled}
-						onChange={(evidence) => setForm((previous) => ({ ...previous, evidence }))}
+						onChange={(automatedAssessmentPolicy) =>
+							setForm((previous) => {
+								evidenceDrafts.current[previous.artifactType] = automatedAssessmentPolicy;
+								return { ...previous, automatedAssessmentPolicy };
+							})
+						}
 						error={submitted ? evidenceError : undefined}
 					/>
 

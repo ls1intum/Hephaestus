@@ -22,7 +22,7 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
      * The gate passed: the practice review agent should run.
      *
      * @param workspace         the resolved workspace for this PR's repository
-     * @param matchedPractices  active practices whose trigger events match the current event
+     * @param matchedPractices practices used in new reviews whose trigger events match the current event
      */
     record Detect(Workspace workspace, List<Practice> matchedPractices) implements GateDecision {
         public Detect {

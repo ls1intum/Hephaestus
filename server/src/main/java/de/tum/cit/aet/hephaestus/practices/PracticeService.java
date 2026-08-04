@@ -45,9 +45,9 @@ public class PracticeService {
     private final PracticeEvidenceDefaults evidenceDefaults;
 
     @Transactional(readOnly = true)
-    public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {
-        log.debug("Listing practices for workspace {} (active={})", ctx.slug(), active);
-        return practiceRepository.findByFilters(ctx.id(), active);
+    public List<Practice> listPractices(WorkspaceContext ctx, Boolean usedInNewReviews) {
+        log.debug("Listing practices for workspace {} (usedInNewReviews={})", ctx.slug(), usedInNewReviews);
+        return practiceRepository.findByFilters(ctx.id(), usedInNewReviews);
     }
 
     @Transactional
@@ -192,7 +192,9 @@ public class PracticeService {
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
-        practice.setActive(definition.evidence().detectorCapability().supportsAutomatedDetection());
+        practice.setUsedInNewReviews(
+            definition.automatedAssessmentPolicy().automatedAssessment().canAttemptAutomatedAssessment()
+        );
         definitionValidator.validate(definition);
 
         try {
@@ -249,10 +251,10 @@ public class PracticeService {
                 request.precomputeScript(),
                 fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
             ),
-            request.evidence() != null
-                ? request.evidence()
+            request.automatedAssessmentPolicy() != null
+                ? request.automatedAssessmentPolicy()
                 : artifactType == beforeDefinition.artifactType()
-                    ? beforeDefinition.evidence()
+                    ? beforeDefinition.automatedAssessmentPolicy()
                     : evidenceDefaults.forArtifact(artifactType),
             patch(
                 beforeDefinition.whyItMatters(),
@@ -274,10 +276,10 @@ public class PracticeService {
         if (request.area() != null) {
             practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
         }
-        boolean wasActive = practice.isActive();
+        boolean wasUsedInNewReviews = practice.isUsedInNewReviews();
         applyDefinition(practice, afterDefinition);
-        if (!afterDefinition.evidence().detectorCapability().supportsAutomatedDetection()) {
-            practice.setActive(false);
+        if (!afterDefinition.automatedAssessmentPolicy().automatedAssessment().canAttemptAutomatedAssessment()) {
+            practice.setUsedInNewReviews(false);
         }
         definitionValidator.validate(afterDefinition);
         practice = practiceRepository.save(practice);
@@ -291,14 +293,14 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
-        if (wasActive && !practice.isActive()) {
+        if (wasUsedInNewReviews && !practice.isUsedInNewReviews()) {
             configAudit.record(
                 ConfigAuditEntry.updated(
-                    ConfigAuditEntityType.PRACTICE_ACTIVE,
+                    ConfigAuditEntityType.PRACTICE_USAGE,
                     practice.getId(),
                     ctx.id(),
-                    new PracticeActiveSnapshot(true),
-                    new PracticeActiveSnapshot(false)
+                    new PracticeUsageSnapshot(true),
+                    new PracticeUsageSnapshot(false)
                 )
             );
         }
@@ -307,33 +309,42 @@ public class PracticeService {
     }
 
     @Transactional
-    public Practice setActive(WorkspaceContext ctx, String slug, boolean active) {
+    public Practice setUsedInNewReviews(WorkspaceContext ctx, String slug, boolean usedInNewReviews) {
         lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
-        if (practice.isActive() == active) {
+        if (practice.isUsedInNewReviews() == usedInNewReviews) {
             return practice;
         }
-        if (active && !practice.getEvidence().detectorCapability().supportsAutomatedDetection()) {
+        if (
+            usedInNewReviews &&
+            !practice.getAutomatedAssessmentPolicy().automatedAssessment().canAttemptAutomatedAssessment()
+        ) {
             throw new IllegalArgumentException(
-                "This practice cannot be used in automated reviews with its current detector capability"
+                "This practice cannot be used in automated reviews with its current assessment settings"
             );
         }
 
-        practice.setActive(active);
+        practice.setUsedInNewReviews(usedInNewReviews);
         practice = practiceRepository.save(practice);
         configAudit.record(
             ConfigAuditEntry.updated(
-                ConfigAuditEntityType.PRACTICE_ACTIVE,
+                ConfigAuditEntityType.PRACTICE_USAGE,
                 practice.getId(),
                 ctx.id(),
-                new PracticeActiveSnapshot(!active),
-                new PracticeActiveSnapshot(active)
+                new PracticeUsageSnapshot(!usedInNewReviews),
+                new PracticeUsageSnapshot(usedInNewReviews)
             )
         );
-        log.info("Set practice '{}' (slug={}) active={} in workspace {}", practice.getName(), slug, active, ctx.slug());
+        log.info(
+            "Set practice '{}' (slug={}) usedInNewReviews={} in workspace {}",
+            practice.getName(),
+            slug,
+            usedInNewReviews,
+            ctx.slug()
+        );
         return practice;
     }
 
@@ -365,7 +376,9 @@ public class PracticeService {
             request.triggerEvents(),
             request.criteria(),
             request.precomputeScript(),
-            request.evidence() == null ? evidenceDefaults.forArtifact(artifactType) : request.evidence(),
+            request.automatedAssessmentPolicy() == null
+                ? evidenceDefaults.forArtifact(artifactType)
+                : request.automatedAssessmentPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
             request.areaSlug()
@@ -378,7 +391,7 @@ public class PracticeService {
         practice.setTriggerEvents(definition.triggerEventsJson());
         practice.setCriteria(definition.criteria());
         practice.setPrecomputeScript(definition.precomputeScript());
-        practice.setEvidence(definition.evidence());
+        practice.setAutomatedAssessmentPolicy(definition.automatedAssessmentPolicy());
         practice.setWhyItMatters(definition.whyItMatters());
         practice.setWhatGoodLooksLike(definition.whatGoodLooksLike());
     }

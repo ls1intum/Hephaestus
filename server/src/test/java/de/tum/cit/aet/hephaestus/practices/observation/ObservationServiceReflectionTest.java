@@ -7,7 +7,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -71,7 +71,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 visibilityPolicy.permits(
                     eq(WORKSPACE_ID),
                     any(Observation.class),
-                    eq(SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+                    eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
                 )
             )
             .thenReturn(true);
@@ -132,7 +132,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
             )
         ).thenReturn(List.of(observation));
         when(
-            visibilityPolicy.permits(WORKSPACE_ID, observation, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+            visibilityPolicy.permits(WORKSPACE_ID, observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
         ).thenReturn(false);
 
         assertThat(observationService.getReflection(WORKSPACE_ID)).isEmpty();

@@ -48,13 +48,13 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
             owner
         );
         Practice practice = new Practice();
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("review-quality");
         practice.setName("Review quality");
         practice.setCriteria("Review the change");
         practice.setTriggerEvents(objectMapper.valueToTree(List.of("PullRequestCreated")));
-        practice.setActive(true);
+        practice.setUsedInNewReviews(true);
         practice = practiceRepository.save(practice);
 
         AgentJob referenced = oldTerminalJob(workspace);
@@ -94,7 +94,7 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
     private AgentJob oldTerminalJob(Workspace workspace) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setDeliveryStatus(DeliveryStatus.DELIVERED);

@@ -3,6 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeEvidenceOptions,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
@@ -21,8 +22,8 @@ const shipped = {
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "The updated default criteria.",
 	whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
-	evidence: mockPullRequestEvidence,
-	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
+	automatedAssessmentPolicy: mockPullRequestEvidence,
+	automatedAssessmentValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
 const meta = {
@@ -35,6 +36,7 @@ const meta = {
 		status: status(),
 		isResetPending: false,
 		disabled: false,
+		evidenceOptions: mockPracticeEvidenceOptions,
 		onUseHephaestusVersion: fn(),
 		onKeepCurrentDefinition: fn(),
 	},
@@ -73,9 +75,9 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("Starts a review when")).toBeVisible();
 		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
-		await expect(canvas.getByText("Hephaestus detectability")).toBeVisible();
-		await expect(canvas.getByText("Declared semantic assessment")).toBeVisible();
-		await expect(canvas.getByText("scm.pull-request.core")).toBeVisible();
+		await expect(canvas.getByText("Evidence requirements")).toBeVisible();
+		await expect(canvas.getByText("Language model")).toBeVisible();
+		await expect(canvas.getByText("Pull request details")).toBeVisible();
 		await expect(canvas.getByText("Not independently validated")).toBeVisible();
 		await expect(
 			canvas.getByText("Repository evidence does not establish behavior in a deployed runtime."),

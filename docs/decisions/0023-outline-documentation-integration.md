@@ -8,7 +8,7 @@
 ## Context
 
 Team wikis (Outline) hold the design docs, ADRs, and decision records that a good engineering
-practice produces — yet none of that ever reaches practice detection. Mentor feedback on
+practice produces — yet none of that ever reaches practice reviews. Mentor feedback on
 "records significant decisions with rationale" or "documents public API and behaviour changes"
 is blind to the very artifacts those practices are about. Making an allow-listed set of Outline
 collections available as **context** lets existing practices reason over the docs a change refers

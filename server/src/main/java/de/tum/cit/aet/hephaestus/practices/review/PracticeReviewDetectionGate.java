@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
@@ -40,7 +40,7 @@ import tools.jackson.databind.JsonNode;
  *   <li>(2a) Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
  *   <li>(2b) Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
  *   <li>(3) No runnable practice config for workspace → SKIP</li>
- *   <li>(4) No active practices match trigger event → SKIP</li>
+ *   <li>(4) No practices used in new reviews match the trigger event → SKIP</li>
  *   <li>(5) {@code runForAllUsers} setting → DETECT (bypass role check)</li>
  *   <li>(6) No assignee → SKIP</li>
  *   <li>(7) Role checker unhealthy → SKIP</li>
@@ -56,7 +56,7 @@ public class PracticeReviewDetectionGate {
 
     private final PracticeReviewProperties properties;
     private final UserRoleChecker userRoleChecker;
-    private final PracticeDetectionReadiness practiceDetectionReadiness;
+    private final PracticeReviewReadiness practiceDetectionReadiness;
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
 
@@ -66,7 +66,7 @@ public class PracticeReviewDetectionGate {
     public PracticeReviewDetectionGate(
         PracticeReviewProperties properties,
         UserRoleChecker userRoleChecker,
-        PracticeDetectionReadiness practiceDetectionReadiness,
+        PracticeReviewReadiness practiceDetectionReadiness,
         PracticeRepository practiceRepository,
         WorkspaceResolver workspaceResolver
     ) {
@@ -180,10 +180,10 @@ public class PracticeReviewDetectionGate {
                 reviewable.getId(),
                 workspace.getId()
             );
-            return new GateDecision.Skip("no runnable practice-detection agent");
+            return new GateDecision.Skip("no runnable practice-review agent");
         }
 
-        // 4. Practice matching: at least one active practice must match the trigger event
+        // 4. Practice matching: at least one selected practice must match the trigger event
         List<Practice> matchedPractices = findMatchingPractices(workspace.getId(), triggerEventName);
         if (matchedPractices.isEmpty()) {
             log.debug(
@@ -288,7 +288,7 @@ public class PracticeReviewDetectionGate {
 
     private List<Practice> findMatchingPractices(Long workspaceId, String triggerEventName) {
         return practiceRepository
-            .findByWorkspaceIdAndActiveTrue(workspaceId)
+            .findByWorkspaceIdAndUsedInNewReviewsTrue(workspaceId)
             .stream()
             .filter(p -> containsTriggerEvent(p.getTriggerEvents(), triggerEventName))
             .toList();

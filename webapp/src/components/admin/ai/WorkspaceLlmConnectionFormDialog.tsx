@@ -147,8 +147,8 @@ function WorkspaceLlmConnectionFormDialogContent({
 							<AlertTriangle aria-hidden />
 							<AlertTitle>All workspace models will stop immediately</AlertTitle>
 							<AlertDescription>
-								Practice detection and the mentor can't run until you reactivate this provider or
-								pick another model.
+								Practice reviews and the mentor can't run until you reactivate this provider or pick
+								another model.
 							</AlertDescription>
 						</Alert>
 					)}

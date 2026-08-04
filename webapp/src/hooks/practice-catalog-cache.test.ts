@@ -92,18 +92,18 @@ describe("practice catalog cache updates", () => {
 
 	it("supports empty destinations and structural-only rollback", () => {
 		const practices = [
-			{ ...practice("moving", "quality", 0), active: true },
+			{ ...practice("moving", "quality", 0), usedInNewReviews: true },
 			practice("remaining", "quality", 1),
 		];
 		const snapshot = practicePlacementSnapshot(practices, "moving", null);
 		const moved = placePractice(practices, "moving", null, 0).map((item) =>
-			item.slug === "moving" ? { ...item, active: false } : item,
+			item.slug === "moving" ? { ...item, usedInNewReviews: false } : item,
 		);
 
 		const restored = applyPracticePlacements(moved, snapshot);
 
 		expect(restored.find(({ slug }) => slug === "moving")).toMatchObject({
-			active: false,
+			usedInNewReviews: false,
 			areaSlug: "quality",
 			displayOrder: 0,
 		});
@@ -113,7 +113,7 @@ describe("practice catalog cache updates", () => {
 	it("reconciles only fields owned by the edit request", () => {
 		const updated = {
 			...practice("edited", "delivery", 4),
-			active: false,
+			usedInNewReviews: false,
 			name: "Updated",
 		};
 
@@ -126,14 +126,18 @@ describe("practice catalog cache updates", () => {
 		expect(
 			selectPracticePatch({ ...updated, whyItMatters: undefined }, { clear: ["WHY_IT_MATTERS"] }),
 		).toEqual({ whyItMatters: undefined });
-		expect(selectPracticePatch(updated, { evidence: updated.evidence })).toEqual({
-			evidence: updated.evidence,
-			evidenceValidation: updated.evidenceValidation,
+		expect(
+			selectPracticePatch(updated, {
+				automatedAssessmentPolicy: updated.automatedAssessmentPolicy,
+			}),
+		).toEqual({
+			automatedAssessmentPolicy: updated.automatedAssessmentPolicy,
+			automatedAssessmentValidation: updated.automatedAssessmentValidation,
 		});
 		expect(selectPracticePatch(updated, { artifactType: "PULL_REQUEST" })).toEqual({
 			artifactType: "PULL_REQUEST",
-			evidence: updated.evidence,
-			evidenceValidation: updated.evidenceValidation,
+			automatedAssessmentPolicy: updated.automatedAssessmentPolicy,
+			automatedAssessmentValidation: updated.automatedAssessmentValidation,
 		});
 	});
 });

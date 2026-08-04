@@ -12,7 +12,7 @@ import {
 	adminKeepCuratedPracticeMutation,
 	adminUpdateCuratedPracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { CuratedArea, CuratedPractice, PracticeEvidenceAuthoring } from "@/api/types.gen";
+import type { CuratedArea, CuratedPractice, PracticeEvidenceOptions } from "@/api/types.gen";
 import {
 	CuratedPracticeForm,
 	type CuratedPracticeFormValue,
@@ -67,7 +67,7 @@ function EditCuratedPracticePage() {
 			practiceSlug={practiceSlug}
 			initialPractice={practiceQuery.data}
 			areas={catalogQuery.data.areas}
-			evidenceAuthoring={evidenceQuery.data}
+			evidenceOptions={evidenceQuery.data}
 		/>
 	);
 }
@@ -76,14 +76,14 @@ interface LoadedEditCuratedPracticePageProps {
 	practiceSlug: string;
 	initialPractice: CuratedPractice;
 	areas: CuratedArea[];
-	evidenceAuthoring: PracticeEvidenceAuthoring;
+	evidenceOptions: PracticeEvidenceOptions;
 }
 
 function LoadedEditCuratedPracticePage({
 	practiceSlug,
 	initialPractice,
 	areas,
-	evidenceAuthoring,
+	evidenceOptions,
 }: LoadedEditCuratedPracticePageProps) {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
@@ -190,7 +190,7 @@ function LoadedEditCuratedPracticePage({
 				shipped: basePractice.shipped,
 			}}
 			areas={areas.map((area) => ({ slug: area.slug, name: area.definition.name }))}
-			evidenceAuthoring={evidenceAuthoring}
+			evidenceOptions={evidenceOptions}
 			isPending={updatePractice.isPending}
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}

@@ -616,8 +616,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    o.confidence AS "confidence",
                    o.recurrence_key AS "recurrenceKey",
                    o.practice_revision_id AS "practiceRevisionId",
-                   evaluated_revision.detection_fingerprint AS "practiceRevisionFingerprint",
-                   current_revision.detection_fingerprint AS "currentPracticeRevisionFingerprint",
+                   evaluated_revision.review_rule_fingerprint AS "practiceRevisionFingerprint",
+                   current_revision.review_rule_fingerprint AS "currentPracticeRevisionFingerprint",
                    o.observed_at AS "observedAt"
             FROM observation o
             JOIN practice p ON p.id = o.practice_id

@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,7 +33,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
             catalogs.isSourceUsePermitted(
                 new SourceContractVersion("1.0.0"),
                 new SourceKind("scm.pull-request.diff"),
-                SourceUseAudience.PRACTICE_MENTORING
+                SourceUsePurpose.CONVERSATIONAL_MENTORING
             )
         ).thenReturn(false);
 
@@ -41,7 +41,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
             7L,
             jobId,
             MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
-            SourceUseAudience.PRACTICE_MENTORING
+            SourceUsePurpose.CONVERSATIONAL_MENTORING
         );
 
         assertThat(permitted).isFalse();
@@ -59,7 +59,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
             catalogs.isSourceUsePermitted(
                 new SourceContractVersion("1.0.0"),
                 new SourceKind("scm.pull-request.diff"),
-                SourceUseAudience.OPERATOR_QUALITY_ASSURANCE
+                SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
             )
         ).thenReturn(true);
 
@@ -68,7 +68,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                 7L,
                 jobId,
                 MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
-                SourceUseAudience.OPERATOR_QUALITY_ASSURANCE
+                SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
             )
         ).isTrue();
     }
@@ -84,14 +84,14 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         when(jobs.findByIdAndWorkspaceId(malformedJobId, 7L)).thenReturn(Optional.of(job));
 
         assertThat(
-            authorization.permits(7L, (UUID) null, (JsonNode) null, SourceUseAudience.PRACTICE_MENTORING)
+            authorization.permits(7L, (UUID) null, (JsonNode) null, SourceUsePurpose.CONVERSATIONAL_MENTORING)
         ).isFalse();
         assertThat(
             authorization.permits(
                 7L,
                 UUID.randomUUID(),
                 MAPPER.readTree("{\"citations\":[]}"),
-                SourceUseAudience.PRACTICE_MENTORING
+                SourceUsePurpose.CONVERSATIONAL_MENTORING
             )
         ).isFalse();
         assertThat(
@@ -99,7 +99,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                 7L,
                 malformedJobId,
                 MAPPER.readTree("{\"citations\":[{\"sourceKind\":7}]}"),
-                SourceUseAudience.PRACTICE_MENTORING
+                SourceUsePurpose.CONVERSATIONAL_MENTORING
             )
         ).isFalse();
     }

@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import java.util.UUID;
@@ -27,15 +27,15 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
     }
 
     @Override
-    public boolean permits(long workspaceId, Observation observation, SourceUseAudience audience) {
-        return permits(workspaceId, observation.getAgentJobId(), observation.getEvidence(), audience);
+    public boolean permits(long workspaceId, Observation observation, SourceUsePurpose requestedPurpose) {
+        return permits(workspaceId, observation.getAgentJobId(), observation.getEvidence(), requestedPurpose);
     }
 
     public boolean permits(
         long workspaceId,
         @Nullable UUID jobId,
         @Nullable JsonNode evidence,
-        SourceUseAudience audience
+        SourceUsePurpose requestedPurpose
     ) {
         if (
             jobId == null ||
@@ -47,11 +47,11 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
         }
         return jobRepository
             .findByIdAndWorkspaceId(jobId, workspaceId)
-            .map(job -> permits(job.getEvidenceSnapshot(), evidence.path("citations"), audience))
+            .map(job -> permits(job.getEvidenceSnapshot(), evidence.path("citations"), requestedPurpose))
             .orElse(false);
     }
 
-    private boolean permits(@Nullable JsonNode snapshot, JsonNode citations, SourceUseAudience audience) {
+    private boolean permits(@Nullable JsonNode snapshot, JsonNode citations, SourceUsePurpose requestedPurpose) {
         if (snapshot == null) return false;
         try {
             SourceContractVersion version = new SourceContractVersion(
@@ -61,7 +61,11 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
                 JsonNode sourceKind = citation.path("sourceKind");
                 if (
                     !sourceKind.isString() ||
-                    !sourceCatalogs.isSourceUsePermitted(version, new SourceKind(sourceKind.asString()), audience)
+                    !sourceCatalogs.isSourceUsePermitted(
+                        version,
+                        new SourceKind(sourceKind.asString()),
+                        requestedPurpose
+                    )
                 ) {
                     return false;
                 }

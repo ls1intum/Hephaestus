@@ -28,10 +28,10 @@ class ReviewRunSummaryQueryService {
     Page<ReviewRunSummaryDTO> list(Long workspaceId, AgentJobStatus status, Pageable pageable) {
         Page<ReviewRunSummaryRow> reviews =
             status == null
-                ? agentJobRepository.findReviewRunSummaries(workspaceId, AgentPurpose.PRACTICE_DETECTION, pageable)
+                ? agentJobRepository.findReviewRunSummaries(workspaceId, AgentPurpose.PRACTICE_REVIEW, pageable)
                 : agentJobRepository.findReviewRunSummaries(
                       workspaceId,
-                      AgentPurpose.PRACTICE_DETECTION,
+                      AgentPurpose.PRACTICE_REVIEW,
                       status,
                       pageable
                   );

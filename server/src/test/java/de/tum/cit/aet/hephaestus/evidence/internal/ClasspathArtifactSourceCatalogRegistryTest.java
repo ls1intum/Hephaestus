@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseBasis;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseOutcome;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Clock;
@@ -27,7 +27,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "a9a10fb19e2c2ac4f7bb506ae82e8d27e13b432e6792d946e7e0c3fba82c8a0e";
+        "80c589bbe5c2ba5b4907f30dee1d0ed4d217379d1c8d762fd5658e5bfc5770f3";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -50,6 +50,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             new SourceContractVersion("1.0.0"),
             new SourceKind("scm.repository.tree")
         );
+        assertThat(repositoryTree.displayName()).isEqualTo("Repository files");
         assertThat(repositoryTree.completenessPolicy().supportsPartial()).isTrue();
         assertThat(repositoryTree.completenessPolicy().supportsEmpty()).isTrue();
     }
@@ -94,8 +95,8 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             assertThat(decision.reviewer()).isNotBlank();
             assertThat(decision.decidedAt()).isNotNull();
             assertThat(decision.expiresAt()).isNotNull();
-            SourceUseAudience audience = decision.audiences().iterator().next();
-            assertThat(decision.permitsProductUseAt(Instant.parse("2026-08-03T12:00:00Z"), audience)).isTrue();
+            SourceUsePurpose purpose = decision.purpose();
+            assertThat(decision.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), purpose)).isTrue();
         });
     }
 
@@ -145,7 +146,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var registry = new ClasspathArtifactSourceCatalogRegistry(
             objectMapper,
             clock,
-            "scm.pull-request.diff:PRACTICE_DETECTION"
+            "scm.pull-request.diff:AUTOMATED_PRACTICE_ASSESSMENT"
         );
         when(clock.instant()).thenReturn(Instant.parse("2027-08-03T00:00:00Z"));
 
@@ -153,7 +154,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             registry.isSourceUsePermitted(
                 new SourceContractVersion("1.0.0"),
                 new SourceKind("scm.pull-request.diff"),
-                SourceUseAudience.PRACTICE_DETECTION
+                SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT
             )
         ).isFalse();
     }
@@ -164,47 +165,45 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var authorized = new ClasspathArtifactSourceCatalogRegistry(
             objectMapper,
             Clock.systemUTC(),
-            "scm.pull-request.diff:PRACTICE_DETECTION,scm.pull-request.diff:PRACTICE_FEEDBACK_RECIPIENTS"
+            "scm.pull-request.diff:AUTOMATED_PRACTICE_ASSESSMENT,scm.pull-request.diff:PRACTICE_FEEDBACK_DELIVERY"
         );
         var version = new SourceContractVersion("1.0.0");
         var diff = new SourceKind("scm.pull-request.diff");
 
-        assertThat(denied.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_DETECTION)).isFalse();
-        assertThat(authorized.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_DETECTION)).isTrue();
         assertThat(
-            authorized.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+            denied.isSourceUsePermitted(version, diff, SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
+        ).isFalse();
+        assertThat(
+            authorized.isSourceUsePermitted(version, diff, SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
         ).isTrue();
-        assertThat(authorized.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_MENTORING)).isFalse();
+        assertThat(
+            authorized.isSourceUsePermitted(version, diff, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
+        ).isTrue();
+        assertThat(authorized.isSourceUsePermitted(version, diff, SourceUsePurpose.CONVERSATIONAL_MENTORING)).isFalse();
         assertThat(
             authorized.isSourceUsePermitted(
                 version,
                 new SourceKind("scm.pull-request.core"),
-                SourceUseAudience.PRACTICE_DETECTION
+                SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT
             )
         ).isFalse();
     }
 
     @Test
-    void shouldEnforceEachApprovedAudience() throws IOException {
+    void shouldEnforceEachApprovedPurpose() throws IOException {
         JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root);
-        var detection = decisions.get("use-scm-pull-request-core-detection");
-        var feedback = decisions.get("use-scm-pull-request-core-feedback");
+        var assessment = decisions.get("use-scm-pull-request-core-automated-assessment");
+        var feedback = decisions.get("use-scm-pull-request-core-feedback-delivery");
 
         assertThat(
-            detection.permitsProductUseAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUseAudience.PRACTICE_DETECTION)
+            assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
         ).isTrue();
         assertThat(
-            detection.permitsProductUseAt(
-                Instant.parse("2026-08-03T12:00:00Z"),
-                SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
-            )
+            assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
         ).isFalse();
         assertThat(
-            feedback.permitsProductUseAt(
-                Instant.parse("2026-08-03T12:00:00Z"),
-                SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
-            )
+            feedback.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
         ).isTrue();
     }
 
@@ -215,7 +214,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 new ClasspathArtifactSourceCatalogRegistry(
                     objectMapper,
                     Clock.systemUTC(),
-                    "scm.unknown:PRACTICE_DETECTION"
+                    "scm.unknown:AUTOMATED_PRACTICE_ASSESSMENT"
                 )
             )
             .withMessageContaining("Unknown authorized artifact source");
@@ -245,7 +244,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
         assertThat(decisions.values()).anySatisfy(expired ->
             assertThat(
-                expired.permitsProductUseAt(Instant.parse("2027-08-03T00:00:00Z"), SourceUseAudience.PRACTICE_DETECTION)
+                expired.permitsAt(Instant.parse("2027-08-03T00:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_ASSESSMENT)
             ).isFalse()
         );
     }
@@ -260,7 +259,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
             )
         );
-        decisions.remove("use-scm-repository-tree-detection");
+        decisions.remove("use-scm-repository-tree-automated-assessment");
 
         assertThatIllegalStateException()
             .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
@@ -289,8 +288,8 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         for (String name : new String[] {
             "artifact-source-catalog.schema.json",
             "artifact-source-manifest.schema.json",
-            "practice-evidence-declaration.schema.json",
-            "practice-readiness-report.schema.json",
+            "practice-automated-assessment-policy.schema.json",
+            "automated-assessment-readiness-report.schema.json",
             "source-use-decisions.schema.json",
         }) {
             JsonNode schema = read("contracts/artifact-source/1.0.0/" + name);

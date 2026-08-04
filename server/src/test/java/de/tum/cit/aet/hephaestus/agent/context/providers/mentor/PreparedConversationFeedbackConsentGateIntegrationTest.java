@@ -76,7 +76,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         setUpWorkspaceAndRecipient("conv-consent-gate-test");
         practice = new Practice();
         practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
-        practice.setEvidence(PracticeTestEvidence.conversationThread());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
@@ -125,7 +125,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     @DisplayName("Slack consent does not suppress an otherwise-authorized pull-request observation")
     void nonSlackArtifactFactAlwaysSurfaces() {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 2));
         practice.setCurrentRevision(revision);
         practice = practiceRepository.saveAndFlush(practice);

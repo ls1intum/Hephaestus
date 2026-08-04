@@ -189,7 +189,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             EvidencePlan.compile(practices)
         );
         var artifactSourceManifest = prepared.manifest();
-        var readiness = workspaceContextBuilder.prepareReadiness(
+        var readiness = workspaceContextBuilder.prepareAutomatedAssessmentReadiness(
             prepared.manifest(),
             practices,
             job.getId().toString(),
@@ -520,7 +520,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (JsonNode source : sources) {
             if (
                 !"scm.pull-request.diff".equals(source.path("kind").asString()) ||
-                !"AVAILABLE".equals(source.path("availability").asString())
+                !"AVAILABLE".equals(source.path("state").path("availability").asString())
             ) {
                 continue;
             }

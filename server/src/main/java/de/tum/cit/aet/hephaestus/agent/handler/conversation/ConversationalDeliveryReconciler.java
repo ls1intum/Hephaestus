@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
@@ -64,7 +64,7 @@ public class ConversationalDeliveryReconciler {
                 .orElse(null);
             if (
                 observation == null ||
-                !visibilityPolicy.permits(workspaceId, observation, SourceUseAudience.PRACTICE_MENTORING)
+                !visibilityPolicy.permits(workspaceId, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)
             ) {
                 continue;
             }

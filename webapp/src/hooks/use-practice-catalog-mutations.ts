@@ -9,7 +9,7 @@ import {
 	listPracticesQueryKey,
 	placePracticeMutation,
 	reorderAreasMutation,
-	setActiveMutation,
+	setUsedInNewReviewsMutation,
 	updateAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
@@ -274,25 +274,25 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
-	const setActive = useMutation({
-		...filedUnder(practiceMutationKey, setActiveMutation()),
+	const setUsedInNewReviews = useMutation({
+		...filedUnder(practiceMutationKey, setUsedInNewReviewsMutation()),
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: practicesQueryKey });
-			const previousActive = queryClient
+			const previousValue = queryClient
 				.getQueryData<Practice[]>(practicesQueryKey)
-				?.find((practice) => practice.slug === variables.path.practiceSlug)?.active;
+				?.find((practice) => practice.slug === variables.path.practiceSlug)?.usedInNewReviews;
 			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
 				patchPractice(practices, variables.path.practiceSlug, {
-					active: variables.body.active,
+					usedInNewReviews: variables.body.usedInNewReviews,
 				}),
 			);
-			return { previousActive };
+			return { previousValue };
 		},
 		onError: (_error, variables, context) => {
-			if (context?.previousActive !== undefined) {
+			if (context?.previousValue !== undefined) {
 				queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
 					patchPractice(practices, variables.path.practiceSlug, {
-						active: context.previousActive,
+						usedInNewReviews: context.previousValue,
 					}),
 				);
 			}
@@ -300,13 +300,14 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		},
 		onSuccess: (updated) => {
 			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-				patchPractice(practices, updated.slug, { active: updated.active }),
+				patchPractice(practices, updated.slug, { usedInNewReviews: updated.usedInNewReviews }),
 			);
 			queryClient.setQueryData<Practice>(
 				getPracticeQueryKey({
 					path: { workspaceSlug, practiceSlug: updated.slug },
 				}),
-				(practice) => (practice ? { ...practice, active: updated.active } : practice),
+				(practice) =>
+					practice ? { ...practice, usedInNewReviews: updated.usedInNewReviews } : practice,
 			);
 		},
 		onSettled: invalidatePracticesAfterLastWrite,
@@ -359,7 +360,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		blockedMoveDestinationSlugs,
 		blockedPracticeOrderBuckets,
 		reorderAreas,
-		setActive,
+		setUsedInNewReviews,
 		updateArea,
 	};
 }

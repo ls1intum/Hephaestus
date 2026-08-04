@@ -10,17 +10,16 @@ import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessPolicy;
-import de.tum.cit.aet.hephaestus.evidence.MissingnessKind;
 import de.tum.cit.aet.hephaestus.evidence.PrivacyClass;
 import de.tum.cit.aet.hephaestus.evidence.RetentionPolicy;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceAuthority;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseBasis;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseDecision;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseMode;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseOutcome;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -111,15 +110,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     }
 
     @Override
-    public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUseAudience audience) {
+    public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUsePurpose purpose) {
         ArtifactSourceContract contract = requireSource(version, kind);
         return (
-            authorizedUses.contains(new SourceUseGrant(kind, audience)) &&
+            authorizedUses.contains(new SourceUseGrant(kind, purpose)) &&
             contract
                 .useDecisionIds()
                 .stream()
                 .map(id -> requireUseDecision(version, id))
-                .anyMatch(decision -> decision.permitsProductUseAt(clock.instant(), audience))
+                .anyMatch(decision -> decision.permitsAt(clock.instant(), purpose))
         );
     }
 
@@ -172,15 +171,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         for (String value : configured.split(",")) {
             String[] parts = value.trim().split(":", -1);
             if (parts.length != 2) {
-                throw new IllegalStateException("Artifact-source authorization must use source:audience syntax");
+                throw new IllegalStateException("Artifact-source authorization must use source:purpose syntax");
             }
             try {
                 SourceKind kind = new SourceKind(parts[0]);
-                SourceUseAudience audience = SourceUseAudience.valueOf(parts[1]);
+                SourceUsePurpose purpose = SourceUsePurpose.valueOf(parts[1]);
                 if (catalog.source(kind).isEmpty()) {
                     throw new IllegalStateException("Unknown authorized artifact source: " + kind);
                 }
-                authorized.add(new SourceUseGrant(kind, audience));
+                authorized.add(new SourceUseGrant(kind, purpose));
             } catch (IllegalStateException exception) {
                 throw exception;
             } catch (IllegalArgumentException exception) {
@@ -190,7 +189,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         return Set.copyOf(authorized);
     }
 
-    private record SourceUseGrant(SourceKind source, SourceUseAudience audience) {}
+    private record SourceUseGrant(SourceKind source, SourceUsePurpose purpose) {}
 
     static ArtifactSourceCatalog parse(JsonNode root) {
         requireObject(root, "catalog");
@@ -217,16 +216,16 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             node,
             Set.of(
                 "kind",
+                "displayName",
                 "description",
                 "selectionScope",
                 "artifactTypes",
                 "authority",
-                "captureTime",
+                "captureTimeBasis",
                 "freshness",
                 "completeness",
                 "privacyClass",
-                "supportedMissingness",
-                "purpose",
+                "supportedAbsenceStates",
                 "retentionPolicy",
                 "erasurePolicy",
                 "useDecisionIds"
@@ -252,11 +251,12 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
 
         return new ArtifactSourceContract(
             kind,
+            requiredText(node, "displayName", kind.toString()),
             requiredText(node, "description", kind.toString()),
             requiredText(node, "selectionScope", kind.toString()),
             textSet(node, "artifactTypes", kind.toString()),
             enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
-            enumValue(CaptureTimeBasis.class, requiredText(node, "captureTime", kind.toString()), "capture time"),
+            enumValue(CaptureTimeBasis.class, requiredText(node, "captureTimeBasis", kind.toString()), "capture time"),
             new FreshnessPolicy(freshnessMode, maxAgeSeconds),
             new CompletenessPolicy(
                 requiredBoolean(completeness, "supportsComplete", kind.toString()),
@@ -264,8 +264,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 requiredBoolean(completeness, "supportsEmpty", kind.toString())
             ),
             enumValue(PrivacyClass.class, requiredText(node, "privacyClass", kind.toString()), "privacy class"),
-            enumSet(MissingnessKind.class, node, "supportedMissingness", kind.toString()),
-            requiredText(node, "purpose", kind.toString()),
+            enumSet(SourceAbsenceState.class, node, "supportedAbsenceStates", kind.toString()),
             enumValue(
                 RetentionPolicy.class,
                 requiredText(node, "retentionPolicy", kind.toString()),
@@ -307,12 +306,10 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 node,
                 Set.of(
                     "id",
-                    "source",
+                    "sourceKind",
                     "purpose",
-                    "mode",
                     "basis",
                     "outcome",
-                    "audiences",
                     "modelProcessor",
                     "retentionPolicy",
                     "erasurePolicy",
@@ -326,12 +323,10 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             String id = requiredText(node, "id", "source-use decision");
             SourceUseDecision decision = new SourceUseDecision(
                 id,
-                new SourceKind(requiredText(node, "source", id)),
-                requiredText(node, "purpose", id),
-                enumValue(SourceUseMode.class, requiredText(node, "mode", id), "source-use mode"),
+                new SourceKind(requiredText(node, "sourceKind", id)),
+                enumValue(SourceUsePurpose.class, requiredText(node, "purpose", id), "source-use purpose"),
                 enumValue(SourceUseBasis.class, requiredText(node, "basis", id), "source-use basis"),
                 enumValue(SourceUseOutcome.class, requiredText(node, "outcome", id), "source-use outcome"),
-                enumSet(SourceUseAudience.class, node, "audiences", id),
                 optionalText(node, "modelProcessor", id),
                 enumValue(RetentionPolicy.class, requiredText(node, "retentionPolicy", id), "retention policy"),
                 enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", id), "erasure policy"),
@@ -357,21 +352,14 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             throw new IllegalStateException("Source-use decisions must match the catalog exactly");
         }
         for (ArtifactSourceContract source : catalog.sources()) {
-            java.util.EnumSet<SourceUseAudience> covered = java.util.EnumSet.noneOf(SourceUseAudience.class);
+            java.util.EnumSet<SourceUsePurpose> covered = java.util.EnumSet.noneOf(SourceUsePurpose.class);
             for (String decisionId : source.useDecisionIds()) {
                 SourceUseDecision decision = decisions.get(decisionId);
-                if (!decision.source().equals(source.kind())) {
+                if (!decision.sourceKind().equals(source.kind())) {
                     throw new IllegalStateException("Source-use decision kind does not match: " + decisionId);
                 }
-                if (decision.audiences().size() != 1) {
-                    throw new IllegalStateException("Source-use decision must grant one audience: " + decisionId);
-                }
-                SourceUseAudience audience = decision.audiences().iterator().next();
-                if (!decision.purpose().equals(purposeFor(audience))) {
-                    throw new IllegalStateException("Source-use decision purpose does not match: " + decisionId);
-                }
-                if (!covered.add(audience)) {
-                    throw new IllegalStateException("Duplicate source-use audience decision: " + decisionId);
+                if (!covered.add(decision.purpose())) {
+                    throw new IllegalStateException("Duplicate source-use purpose decision: " + decisionId);
                 }
                 if (
                     !decision.retentionPolicy().equals(source.retentionPolicy()) ||
@@ -380,21 +368,12 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                     throw new IllegalStateException("Source-use decision lifecycle does not match: " + decisionId);
                 }
             }
-            if (!covered.equals(java.util.EnumSet.allOf(SourceUseAudience.class))) {
+            if (!covered.equals(java.util.EnumSet.allOf(SourceUsePurpose.class))) {
                 throw new IllegalStateException(
-                    "Source-use decisions do not cover every product audience: " + source.kind()
+                    "Source-use decisions do not cover every product purpose: " + source.kind()
                 );
             }
         }
-    }
-
-    private static String purposeFor(SourceUseAudience audience) {
-        return switch (audience) {
-            case PRACTICE_DETECTION -> "practice-detection";
-            case PRACTICE_FEEDBACK_RECIPIENTS -> "practice-feedback";
-            case PRACTICE_MENTORING -> "practice-mentoring";
-            case OPERATOR_QUALITY_ASSURANCE -> "operator-quality-assurance";
-        };
     }
 
     private static JsonNode read(JsonMapper objectMapper, String resource) {

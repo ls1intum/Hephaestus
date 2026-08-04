@@ -19,7 +19,7 @@ async function openPracticeReviewAdvanced(canvas: Canvas) {
 }
 
 const detectionBinding: AgentBinding = {
-	purpose: "PRACTICE_DETECTION",
+	purpose: "PRACTICE_REVIEW",
 	instanceModelId: 1,
 	enabled: true,
 	ready: true,
@@ -97,7 +97,7 @@ export const ProjectReviewsDisabled: Story = {
 };
 
 export const OnlyThePendingCardIsFrozen: Story = {
-	args: { pendingPurposes: new Set(["PRACTICE_DETECTION" as const]) },
+	args: { pendingPurposes: new Set(["PRACTICE_REVIEW" as const]) },
 	play: async ({ canvas }) => {
 		await expect(
 			purposeCard(canvas, "Practice reviews").getByRole("button", { name: "Save assignment" }),

@@ -2,7 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
-import { listAreasOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getPracticeEvidenceOptionsOptions,
+	listAreasOptions,
+	listPracticesOptions,
+} from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
@@ -49,6 +53,9 @@ function PracticeCatalogRoute() {
 	const practicesQuery = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
 	});
+	const evidenceOptionsQuery = useQuery({
+		...getPracticeEvidenceOptionsOptions({ path: { workspaceSlug } }),
+	});
 
 	return (
 		<PageLayout>
@@ -57,17 +64,18 @@ function PracticeCatalogRoute() {
 				title="Practices"
 				description="Choose the practices Hephaestus uses for new reviews in this workspace. Changes affect only this workspace."
 			/>
-			{areasQuery.isPending || practicesQuery.isPending ? (
+			{areasQuery.isPending || practicesQuery.isPending || evidenceOptionsQuery.isPending ? (
 				<div className="flex h-64 items-center justify-center">
 					<Spinner className="size-8" />
 				</div>
-			) : areasQuery.isError || practicesQuery.isError ? (
+			) : areasQuery.isError || practicesQuery.isError || evidenceOptionsQuery.isError ? (
 				<QueryErrorAlert
-					error={areasQuery.error ?? practicesQuery.error}
+					error={areasQuery.error ?? practicesQuery.error ?? evidenceOptionsQuery.error}
 					title="Couldn't load practices"
 					onRetry={() => {
 						areasQuery.refetch();
 						practicesQuery.refetch();
+						evidenceOptionsQuery.refetch();
 					}}
 				/>
 			) : (
@@ -75,6 +83,7 @@ function PracticeCatalogRoute() {
 					workspaceSlug={workspaceSlug}
 					areas={areasQuery.data}
 					practices={practicesQuery.data}
+					evidenceOptions={evidenceOptionsQuery.data}
 					pending={{
 						areaSlugs: catalog.pendingAreaSlugs,
 						practiceSlugs: catalog.pendingPracticeSlugs,
@@ -111,8 +120,11 @@ function PracticeCatalogRoute() {
 							return false;
 						}
 					}}
-					onToggleAreaActive={(areaSlug, active) =>
-						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: { active } })
+					onSetAreaDashboardVisibility={(areaSlug, visibleInPracticeDashboards) =>
+						catalog.updateArea.mutate({
+							path: { workspaceSlug, areaSlug },
+							body: { visibleInPracticeDashboards },
+						})
 					}
 					onDeleteArea={(areaSlug) =>
 						setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
@@ -123,10 +135,10 @@ function PracticeCatalogRoute() {
 					onSetAreaVisual={(areaSlug, patch) =>
 						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: patch })
 					}
-					onSetPracticeActive={(practiceSlug, active) =>
-						catalog.setActive.mutate({
+					onSetPracticeUsedInNewReviews={(practiceSlug, usedInNewReviews) =>
+						catalog.setUsedInNewReviews.mutate({
 							path: { workspaceSlug, practiceSlug },
-							body: { active },
+							body: { usedInNewReviews },
 						})
 					}
 					onDeletePractice={setDeletingPractice}

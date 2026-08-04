@@ -79,7 +79,7 @@ function RepositoryRow({
 								This stops syncing the repository and{" "}
 								<strong>
 									permanently erases everything Hephaestus has mirrored from it — its issues, pull
-									requests, reviews, and the practice detections built from them
+									requests, reviews, and the practice reviews built from them
 								</strong>
 								. The repository on {providerLabel} itself is not affected, and you can start
 								monitoring it again later.
@@ -148,7 +148,7 @@ export function AdminRepositoriesSettings({
 				<CardHeader>
 					<IntegrationCardHeading>Manage repositories</IntegrationCardHeading>
 					<CardDescription>
-						Add or remove the repositories Hephaestus watches for practice detection and mentoring.
+						Add or remove the repositories Hephaestus watches for practice reviews and mentoring.
 						Their per-class sync freshness is shown in the sync-state table above.
 					</CardDescription>
 				</CardHeader>
@@ -195,7 +195,7 @@ export function AdminRepositoriesSettings({
 								</EmptyMedia>
 								<EmptyTitle>No repositories monitored yet</EmptyTitle>
 								<EmptyDescription>
-									Add a repository below to start monitoring it for practice detection.
+									Add a repository below to start monitoring it for practice reviews.
 								</EmptyDescription>
 							</EmptyHeader>
 						</Empty>

@@ -220,13 +220,13 @@ Filters don't delete data – they just skip sync operations. Workspace and orga
 
 ### AI model (local)
 
-Practice detection and the mentor need at least one enabled model. Providers are registered at
+Practice reviews and the mentor need at least one enabled model. Providers are registered at
 runtime — either an instance-wide catalog entry (Instance admin → AI models) or a workspace's own
 "bring your own AI provider" connection. Configure it through the same admin UI/API used in
 production; there is deliberately no second env-var catalog or startup seeder that can drift from
 the stored configuration. New connections and models start inactive. Test the connection, declare
 its price (or explicitly mark it as having no metered API cost), then activate it and bind it to a
-purpose (`PRACTICE_DETECTION` or `MENTOR`) on the workspace's **AI models** page.
+purpose (`PRACTICE_REVIEW` or `MENTOR`) on the workspace's **AI models** page.
 
 For an automated local end-to-end setup, use `scripts/e2e-setup.sh`. It creates the connection,
 model, and agent binding through the application API and keeps provider credentials out of source

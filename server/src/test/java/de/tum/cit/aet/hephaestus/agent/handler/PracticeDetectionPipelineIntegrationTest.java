@@ -194,7 +194,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
-        agentJob.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        agentJob.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setStatus(AgentJobStatus.COMPLETED);
         agentJob.setConfigSnapshot(
@@ -222,7 +222,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     private Practice createPractice(String slug, String name) {
         Practice p = new Practice();
-        p.setEvidence(PracticeTestEvidence.pullRequest());
+        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
@@ -258,7 +258,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private AgentJob newJobWithOutput(String rawOutput) {
         AgentJob next = new AgentJob();
         next.setWorkspace(workspace);
-        next.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        next.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         next.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         next.setStatus(AgentJobStatus.COMPLETED);
         next.setConfigSnapshot(agentJob.getConfigSnapshot());
@@ -274,12 +274,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
         var sources = snapshot.putObject("manifest").put("contractVersion", "1.0.0").putArray("sources");
         addArtifact(
-            sources.addObject().put("kind", "scm.pull-request.core").put("availability", "AVAILABLE"),
+            sources.addObject().put("kind", "scm.pull-request.core"),
             "inputs/context/metadata.json",
             "{\"body\":\"Test body\"}"
         );
         addArtifact(
-            sources.addObject().put("kind", "scm.pull-request.diff").put("availability", "AVAILABLE"),
+            sources.addObject().put("kind", "scm.pull-request.diff"),
             "inputs/context/diff.patch",
             "diff --git a/src/Main.java b/src/Main.java\n+++ b/src/Main.java\n@@ -10 +10 @@\n[L10] + insecure();\n"
         );
@@ -294,11 +294,28 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     private void addArtifact(ObjectNode source, String path, String content) {
+        var facts = source
+            .putObject("state")
+            .put("availability", "AVAILABLE")
+            .put("content", "NON_EMPTY")
+            .put("completeness", "COMPLETE")
+            .putObject("facts")
+            .put("capturedAt", "2026-08-03T00:00:00Z")
+            .put("queryScope", "integration-test fixture")
+            .put("representationFidelity", "EXACT");
+        if ("scm.pull-request.diff".equals(source.path("kind").asString())) {
+            facts.put("immutableIdentity", "pipelinesha").put("completenessBasis", "IMMUTABLE_OBJECT");
+        } else {
+            facts.put("sourceEffectiveAt", "2026-08-03T00:00:00Z").put("completenessBasis", "KNOWN_TOTAL");
+        }
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
         source
             .putArray("artifacts")
             .addObject()
             .put("path", path)
-            .put("sha256", cas.put(content.getBytes(StandardCharsets.UTF_8)));
+            .put("mediaType", path.endsWith(".json") ? "application/json" : "text/x-diff")
+            .put("sha256", cas.put(bytes))
+            .put("bytes", bytes.length);
     }
 
     private String withEvidence(String rawOutput) {

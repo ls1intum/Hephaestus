@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -191,7 +191,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
             feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of(feedback));
         Observation observation = bind(feedback);
-        when(visibilityPolicy.permits(1L, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(false);
+        when(visibilityPolicy.permits(1L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(false);
 
         ObjectNode root = provider.buildPayload(1L, 2L);
 
@@ -206,7 +206,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
             when(binding.getFeedbackId()).thenReturn(unit.getId());
             when(binding.getObservation()).thenReturn(observation);
             bindings.add(binding);
-            when(visibilityPolicy.permits(1L, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(true);
+            when(visibilityPolicy.permits(1L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(true);
         }
         when(feedbackObservationRepository.findForVisibility(eq(1L), any())).thenReturn(bindings);
     }

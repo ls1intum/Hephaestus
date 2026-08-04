@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
-import { mockPracticeEvidenceAuthoring } from "@/mocks/fixtures/practice";
+import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
 import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 
-const pullRequestOptions = mockPracticeEvidenceAuthoring.artifacts[0];
+const pullRequestOptions = mockPracticeEvidenceOptions.workTypes[0];
 
 const meta = {
 	title: "Workspace admin/Practices/Evidence editor",
 	component: PracticeEvidenceEditor,
 	args: {
 		options: pullRequestOptions,
-		value: pullRequestOptions.baseline,
+		value: pullRequestOptions.recommendedRequirements,
 		onChange: fn(),
 	},
 	parameters: { layout: "padded" },
@@ -24,16 +24,18 @@ export const RecommendedRule: Story = {};
 
 export const Customizing: Story = {
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Edit evidence requirements" }));
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
 		await expect(canvas.getByText("Code changes")).toBeVisible();
-		await expect(canvas.getByLabelText("How can Hephaestus assess this practice?")).toBeVisible();
+		await expect(
+			canvas.getByLabelText("How should Hephaestus assess reviewed work?"),
+		).toBeVisible();
 	},
 };
 
 export const InvalidRule: Story = {
 	args: {
-		value: { ...pullRequestOptions.baseline, required: [] },
+		value: { ...pullRequestOptions.recommendedRequirements, requiredEvidence: [] },
 		error: "Choose at least one required evidence source.",
 	},
 };

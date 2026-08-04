@@ -8,13 +8,13 @@ import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -91,12 +91,12 @@ public class PracticeDetectionDeliveryService {
         }
 
         EvidenceBoundary evidenceBoundary = evidenceBoundary(job);
-        for (SourceKind kind : evidenceBoundary.availableSources()) {
+        for (SourceKind kind : evidenceBoundary.allowedSources()) {
             if (
                 !sourceCatalogs.isSourceUsePermitted(
                     evidenceBoundary.contractVersion(),
                     kind,
-                    SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+                    SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
                 )
             ) {
                 throw new JobDeliveryException(
@@ -107,6 +107,7 @@ public class PracticeDetectionDeliveryService {
                 );
             }
         }
+        Target target = resolveTarget(job, metadata);
         Map<String, PracticeRevision> revisionsBySlug = admittedRevisions(job, workspaceId);
         for (ValidatedFinding finding : validFindings) {
             PracticeRevision revision = revisionsBySlug.get(finding.practiceSlug());
@@ -118,10 +119,9 @@ public class PracticeDetectionDeliveryService {
                         job.getId()
                 );
             }
-            enforceEvidenceBoundary(finding, revision.getEvidence(), evidenceBoundary, job);
+            enforceEvidenceBoundary(finding, revision.getAutomatedAssessmentPolicy(), evidenceBoundary, job);
         }
 
-        Target target = resolveTarget(job, metadata);
         Long aboutUserId = target.aboutUserId();
         WorkArtifact artifactType = target.type();
         Long artifactId = target.id();
@@ -206,7 +206,7 @@ public class PracticeDetectionDeliveryService {
         }
 
         log.info(
-            "Practice detection delivery: inserted={}, duplicate={}, jobId={}",
+            "Practice reviews delivery: inserted={}, duplicate={}, jobId={}",
             inserted,
             discardedDuplicate,
             job.getId()
@@ -230,13 +230,13 @@ public class PracticeDetectionDeliveryService {
 
     private void enforceEvidenceBoundary(
         ValidatedFinding finding,
-        @Nullable PracticeEvidenceDeclaration declaration,
+        @Nullable PracticeAutomatedAssessmentPolicy requirements,
         EvidenceBoundary boundary,
         AgentJob job
     ) {
-        if (declaration == null) {
+        if (requirements == null) {
             throw new JobDeliveryException(
-                "Practice has no evidence declaration: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
+                "Practice has no evidence requirements: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
             );
         }
         JsonNode evidence = finding.evidence();
@@ -250,8 +250,8 @@ public class PracticeDetectionDeliveryService {
             );
         }
         Set<SourceKind> declared = new HashSet<>();
-        declaration.required().forEach(requirement -> declared.add(requirement.sourceKind()));
-        declaration.optional().forEach(requirement -> declared.add(requirement.sourceKind()));
+        requirements.requiredEvidence().forEach(requirement -> declared.add(requirement.sourceKind()));
+        requirements.optionalContext().forEach(requirement -> declared.add(requirement.sourceKind()));
         for (JsonNode citation : citations) {
             JsonNode sourceKind = citation.path("sourceKind");
             JsonNode artifactPath = citation.path("artifactPath");
@@ -301,7 +301,7 @@ public class PracticeDetectionDeliveryService {
             SourceArtifactRef artifact = boundary.artifacts().get(artifactPath.asText());
             if (
                 !declared.contains(kind) ||
-                !boundary.availableSources().contains(kind) ||
+                !boundary.allowedSources().contains(kind) ||
                 artifact == null ||
                 !artifact.kind().equals(kind)
             ) {
@@ -501,7 +501,7 @@ public class PracticeDetectionDeliveryService {
         Set<SourceKind> available = new HashSet<>();
         Map<String, SourceArtifactRef> artifacts = new HashMap<>();
         for (JsonNode source : sources) {
-            if ("AVAILABLE".equals(source.path("availability").asString())) {
+            if ("AVAILABLE".equals(source.path("state").path("availability").asString())) {
                 SourceKind kind = new SourceKind(source.path("kind").asString());
                 available.add(kind);
                 JsonNode sourceArtifacts = source.path("artifacts");
@@ -567,7 +567,7 @@ public class PracticeDetectionDeliveryService {
 
     private record EvidenceBoundary(
         SourceContractVersion contractVersion,
-        Set<SourceKind> availableSources,
+        Set<SourceKind> allowedSources,
         Map<String, SourceArtifactRef> artifacts
     ) {}
 

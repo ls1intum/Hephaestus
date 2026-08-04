@@ -72,7 +72,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         subject = persistUser("review-summary-subject");
         ensureWorkspaceMembership(workspace, subject, WorkspaceMembership.WorkspaceRole.MEMBER);
         practice = persistPractice(workspace);
-        job = persistJob(workspace, AgentPurpose.PRACTICE_DETECTION);
+        job = persistJob(workspace, AgentPurpose.PRACTICE_REVIEW);
 
         otherWorkspace = createWorkspace(
             "other-review-summary",
@@ -105,11 +105,11 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             )
         );
         jobRepository.save(job);
-        persistJob(workspace, AgentPurpose.PRACTICE_DETECTION);
+        persistJob(workspace, AgentPurpose.PRACTICE_REVIEW);
         AgentJob mentorJob = persistJob(workspace, AgentPurpose.MENTOR);
         mentorJob.setStatus(AgentJobStatus.COMPLETED);
         jobRepository.save(mentorJob);
-        AgentJob otherJob = persistJob(otherWorkspace, AgentPurpose.PRACTICE_DETECTION);
+        AgentJob otherJob = persistJob(otherWorkspace, AgentPurpose.PRACTICE_REVIEW);
         otherJob.setStatus(AgentJobStatus.COMPLETED);
         jobRepository.save(otherJob);
 
@@ -180,13 +180,13 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
 
     private Practice persistPractice(Workspace targetWorkspace) {
         Practice result = new Practice();
-        result.setEvidence(PracticeTestEvidence.pullRequest());
+        result.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         result.setWorkspace(targetWorkspace);
         result.setSlug("review-quality");
         result.setName("Review quality");
         result.setCriteria("Review the change");
         result.setTriggerEvents(objectMapper.valueToTree(List.of("PullRequestCreated")));
-        result.setActive(true);
+        result.setUsedInNewReviews(true);
         return practiceRepository.save(result);
     }
 

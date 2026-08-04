@@ -55,7 +55,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(MAPPER.createObjectNode());
         job.prePersist();

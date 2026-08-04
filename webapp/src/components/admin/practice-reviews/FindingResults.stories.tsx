@@ -77,7 +77,7 @@ export const OutdatedResult: Story = {
 	args: {
 		state: {
 			status: "ready",
-			findings: [{ ...reviewFindings[0], claimStatus: "STALE" }],
+			findings: [{ ...reviewFindings[0], claimCurrentness: "STALE" }],
 		},
 	},
 	play: async ({ canvasElement }) => {

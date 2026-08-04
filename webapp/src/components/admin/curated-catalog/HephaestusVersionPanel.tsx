@@ -4,6 +4,7 @@ import type {
 	CatalogEntryStatus,
 	CuratedAreaRequest,
 	CuratedPracticeDefinition,
+	PracticeEvidenceOptions,
 } from "@/api/types.gen";
 import {
 	FOCUS_ARTIFACT_OPTIONS,
@@ -36,7 +37,11 @@ interface HephaestusVersionPanelBaseProps {
 
 export type HephaestusVersionPanelProps = HephaestusVersionPanelBaseProps &
 	(
-		| { kind: "practice"; shipped?: CuratedPracticeDefinition }
+		| {
+				kind: "practice";
+				shipped?: CuratedPracticeDefinition;
+				evidenceOptions: PracticeEvidenceOptions;
+		  }
 		| { kind: "area"; shipped?: CuratedAreaRequest }
 	);
 
@@ -56,8 +61,11 @@ const PRACTICE_FIELDS = {
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Precompute script",
-	evidence: "Evidence contract",
-} satisfies Record<Exclude<keyof CuratedPracticeDefinition, "evidenceValidation">, string>;
+	automatedAssessmentPolicy: "Evidence requirements",
+} satisfies Record<
+	Exclude<keyof CuratedPracticeDefinition, "automatedAssessmentValidation">,
+	string
+>;
 
 function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
@@ -121,6 +129,12 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 	} = props;
 	const shippedDefinition: ShippedDefinition | undefined = shipped;
 	const shippedPractice = props.kind === "practice" ? props.shipped : undefined;
+	const shippedEvidenceOptions =
+		props.kind === "practice" && shippedPractice
+			? props.evidenceOptions.workTypes.find(
+					(option) => option.artifactType === shippedPractice.artifactType,
+				)
+			: undefined;
 	const headingId = useId();
 	const copy = curatedEntryCopy(status, kind);
 	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion;
@@ -171,11 +185,21 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 													field === "precomputeScript" && "font-mono",
 												)}
 											>
-												{field === "evidence" && shippedPractice ? (
-													<PracticeEvidenceSummary
-														declaration={shippedPractice.evidence}
-														validation={shippedPractice.evidenceValidation}
-													/>
+												{field === "automatedAssessmentPolicy" && shippedPractice ? (
+													shippedEvidenceOptions ? (
+														<PracticeEvidenceSummary
+															policy={shippedPractice.automatedAssessmentPolicy}
+															validation={shippedPractice.automatedAssessmentValidation}
+															sources={shippedEvidenceOptions.allowedSources}
+															workTypeLabel={
+																FOCUS_ARTIFACT_OPTIONS.find(
+																	(option) => option.value === shippedPractice.artifactType,
+																)?.label ?? "Reviewed work"
+															}
+														/>
+													) : (
+														"Evidence details are unavailable for this work type."
+													)
 												) : (
 													displayValue(
 														field,

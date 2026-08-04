@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -20,7 +21,7 @@ public record UpdatePracticeRequestDTO(
 
     @Size(max = 10, message = "Trigger events must contain at most 10 entries")
     @ValidTriggerEvents
-    @Schema(description = "Domain events that trigger detection; empty for scheduled conversation reviews")
+    @Schema(description = "Events that start a practice review; empty for scheduled conversation reviews")
     @Nullable
     List<String> triggerEvents,
 
@@ -30,29 +31,32 @@ public record UpdatePracticeRequestDTO(
     @Nullable
     String criteria,
 
-    @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
-    @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+    @Size(
+        max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
+        message = "Precompute script must be at most 100000 characters"
+    )
+    @Schema(description = "TypeScript/Bun static analysis run before automated assessment")
     @Nullable
     String precomputeScript,
 
     @Valid
     @Schema(
-        description = "Replacement evidence declaration; omit to preserve it, or to use the server baseline when artifactType changes"
+        description = "Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactType changes"
     )
     @Nullable
-    PracticeEvidenceDeclaration evidence,
+    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
 
-    @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact artifactType,
+    @Schema(description = "Type of reviewed work", example = "ISSUE") @Nullable WorkArtifact artifactType,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Why-it-matters must not be blank")
-    @Schema(description = "Developer-facing rationale (learner layer); plain language, never the detection rubric")
+    @Schema(description = "Plain-language rationale shown to the developer")
     @Nullable
     String whyItMatters,
 
     @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "What-good-looks-like must not be blank")
-    @Schema(description = "Developer-facing exemplar (learner layer); a concrete instance, not the rubric")
+    @Schema(description = "Concrete example shown to the developer; not assessment criteria")
     @Nullable
     String whatGoodLooksLike,
 

@@ -1,7 +1,8 @@
 # Practice feedback language
 
-Use these terms in user-facing interfaces, documentation, and release notes. Domain and persistence
-names may differ, but should not leak into product copy.
+Use these product terms in user-facing interfaces, documentation, and release notes. Practice-evidence terms and
+their exact API, Java, and persistence names are defined in the
+[practice assessment glossary](./practice-assessment-glossary.mdx).
 
 Within a surface already titled **Practice reviews**, shorten **practice feedback** to **feedback**.
 Use the full term when the surrounding context does not establish which kind of feedback is meant.
@@ -9,10 +10,10 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 
 | Term                  | Meaning                                                                         | Avoid for this concept             |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------- |
-| **Practice**          | An observable standard used to review work                                      | rule, detector                     |
+| **Practice**          | A defined way of working used to review work                                    | rule, detector                     |
 | **Practice area**     | A group of related practices                                                    | category, goal, learning objective |
 | **Unassigned**        | Practices that are not in a practice area                                       | ungrouped, unbound                 |
-| **Practice review**   | One evaluation of work against relevant enabled practices                      | run                                |
+| **Practice review**   | One assessment of reviewed work against the practices selected when the review starts | run                          |
 | **Finding**           | One strength, improvement, or not-applicable result                             | observation                        |
 | **Practice feedback** | The collective guidance created from findings                                   | AI feedback, feedback items        |
 | **Message**           | One countable unit of feedback                                                  | ledger unit                        |

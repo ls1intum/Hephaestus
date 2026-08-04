@@ -59,7 +59,7 @@ function OutlineIntegrationPage() {
 			<PageHeader
 				icon={<OutlineIcon className="size-6" />}
 				title="Outline"
-				description="Mirror Outline collections so their documents reach practice detection as context."
+				description="Mirror Outline collections so their documents reach practice reviews as context."
 			/>
 
 			{workspaceSlug != null && outline.isLoading && <Skeleton className="h-48 w-full" />}

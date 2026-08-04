@@ -901,6 +901,16 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
+ * Request to choose whether new reviews include a practice
+ */
+export type UpdatePracticeUsageRequest = {
+    /**
+     * Whether new reviews should include the practice
+     */
+    usedInNewReviews: boolean;
+};
+
+/**
  * Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.
  */
 export type UpdatePracticeReviewSettingsRequest = {
@@ -935,9 +945,13 @@ export type UpdatePracticeRequest = {
      */
     area?: BindPracticeAreaRequest;
     /**
-     * Artifact this practice evaluates
+     * Type of reviewed work
      */
     artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactType changes
+     */
+    automatedAssessmentPolicy?: PracticeAutomatedAssessmentPolicy;
     /**
      * Optional fields to clear before applying supplied values
      */
@@ -947,27 +961,23 @@ export type UpdatePracticeRequest = {
      */
     criteria?: string;
     /**
-     * Replacement evidence declaration; omit to preserve it, or to use the server baseline when artifactType changes
-     */
-    evidence?: PracticeEvidenceDeclaration;
-    /**
      * Human-readable name
      */
     name?: string;
     /**
-     * TypeScript/Bun precompute script for static analysis before AI review
+     * TypeScript/Bun static analysis run before automated assessment
      */
     precomputeScript?: string;
     /**
-     * Domain events that trigger detection; empty for scheduled conversation reviews
+     * Events that start a practice review; empty for scheduled conversation reviews
      */
     triggerEvents?: Array<string>;
     /**
-     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     * Concrete example shown to the developer; not assessment criteria
      */
     whatGoodLooksLike?: string;
     /**
-     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     * Plain-language rationale shown to the developer
      */
     whyItMatters?: string;
 };
@@ -976,56 +986,81 @@ export type UpdatePracticeRequest = {
  * Source and minimum capture quality required by a practice
  */
 export type PracticeEvidenceRequirement = {
-    completeness: 'COMPLETE' | 'ANY';
-    freshness: 'CURRENT' | 'ANY';
+    completeness: 'COMPLETE' | 'NO_REQUIREMENT';
+    freshness: 'CURRENT' | 'NO_REQUIREMENT';
     sourceKind: string;
 };
 
 /**
- * Optional source that may be used at any available quality
+ * Source that may add context but never blocks automated assessment when absent
  */
-export type OptionalPracticeEvidenceRequirement = {
-    completeness: 'ANY';
-    freshness: 'ANY';
+export type PracticeOptionalContextSource = {
+    /**
+     * Stable source identifier from the selected source contract
+     */
     sourceKind: string;
 };
 
 /**
- * Hephaestus detection capability for the declared integration evidence
+ * Known claim that the selected evidence cannot support even when every requirement passes
  */
-export type PracticeDetectorCapability = {
+export type PracticeEvidenceLimitation = {
     /**
-     * How Hephaestus evaluates a practice when its evidence is sufficient
+     * Stable machine-readable identifier
      */
-    assessmentMethod: 'MECHANICAL' | 'SEMANTIC' | 'NONE';
-    /**
-     * Whether the declared integration evidence can support every detector judgment
-     */
-    evidenceCoverage: 'DECLARED_REQUIREMENTS_SUFFICIENT' | 'CONDITIONAL' | 'NONE';
-};
-
-/**
- * Author-declared limitation that remains when required evidence is available
- */
-export type PracticeEvidenceBlindSpot = {
     code: string;
-    summary: string;
+    /**
+     * Plain-language explanation of the claim the evidence cannot support
+     */
+    description: string;
 };
 
 /**
- * Author-declared, versioned evidence boundary for a practice definition
+ * Author-declared automated assessment and evidence sufficiency for one practice
  */
-export type PracticeEvidenceDeclaration = {
-    blindSpots: Array<PracticeEvidenceBlindSpot>;
+export type PracticeAutomatedAssessment = {
     /**
-     * Hephaestus detectability from the declared integration evidence; not human observability
+     * Whether meeting every evidence requirement provides enough context to assess
      */
-    detectorCapability: PracticeDetectorCapability;
-    onUnsatisfied: 'DECLINE_SEMANTIC_JUDGMENT';
-    optional: Array<OptionalPracticeEvidenceRequirement>;
-    profile: string;
-    required: Array<PracticeEvidenceRequirement>;
+    evidenceSufficiency: 'SUFFICIENT_WHEN_REQUIREMENTS_MET' | 'DECLARED_EVIDENCE_INSUFFICIENT' | 'NONE';
+    /**
+     * Implementation Hephaestus uses for automated assessment
+     */
+    mode: 'LANGUAGE_MODEL' | 'NONE';
+};
+
+/**
+ * Author-defined automated assessment and evidence requirements for one practice revision
+ */
+export type PracticeAutomatedAssessmentPolicy = {
+    /**
+     * Automated assessment configuration; human assessment is a separate process
+     */
+    automatedAssessment: PracticeAutomatedAssessment;
+    /**
+     * Set of evidence sources allowed for this type of reviewed work
+     */
+    evidenceProfile: string;
+    /**
+     * Claims the selected evidence cannot support even when every requirement passes
+     */
+    knownLimitations: Array<PracticeEvidenceLimitation>;
+    /**
+     * Sources that may add context but never block assessment when absent
+     */
+    optionalContext: Array<PracticeOptionalContextSource>;
+    /**
+     * Sources that must meet their quality requirements before assessment may start
+     */
+    requiredEvidence: Array<PracticeEvidenceRequirement>;
+    /**
+     * Exact contract version that defines source kinds and source-state semantics
+     */
     sourceContractVersion: string;
+    /**
+     * Conservative action when required evidence does not pass
+     */
+    whenEvidenceIsInsufficient: 'SKIP_AUTOMATED_ASSESSMENT';
 };
 
 /**
@@ -1042,10 +1077,6 @@ export type BindPracticeAreaRequest = {
  * Request to update an existing practice area (PATCH — only non-null fields applied)
  */
 export type UpdatePracticeAreaRequest = {
-    /**
-     * Whether this area is active
-     */
-    active?: boolean;
     /**
      * Optional palette colour key for the area's chip
      */
@@ -1066,16 +1097,10 @@ export type UpdatePracticeAreaRequest = {
      * Human-readable name
      */
     name?: string;
-};
-
-/**
- * Request to set a practice's active state
- */
-export type UpdatePracticeActiveRequest = {
     /**
-     * Whether the practice should be active
+     * Whether this area is shown in practice dashboards
      */
-    active: boolean;
+    visibleInPracticeDashboards?: boolean;
 };
 
 /**
@@ -1810,11 +1835,11 @@ export type ReviewFindingDetail = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Validity of an evaluation claim against the practice revision currently in force
+     * Whether a finding was produced using the current review rules
      */
-    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Detector confidence
+     * Finding confidence
      */
     confidence: number;
     evidence?: ObservationEvidence;
@@ -1936,11 +1961,11 @@ export type ReviewFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Validity of an evaluation claim against the practice revision currently in force
+     * Whether a finding was produced using the current review rules
      */
-    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Detector confidence
+     * Finding confidence
      */
     confidence: number;
     /**
@@ -2057,11 +2082,11 @@ export type ReviewBoundFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Validity of an evaluation claim against the practice revision currently in force
+     * Whether a finding was produced using the current review rules
      */
-    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Detector confidence
+     * Finding confidence
      */
     confidence: number;
     findingId: string;
@@ -2675,6 +2700,30 @@ export type ProbeLlmConnectionRequest = {
 };
 
 /**
+ * Evidence choices and recommended requirements for one type of reviewed work
+ */
+export type PracticeWorkTypeEvidenceOptions = {
+    allowedSources: Array<PracticeEvidenceSourceOption>;
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    recommendedRequirements: PracticeAutomatedAssessmentPolicy;
+    supportedAutomatedAssessmentModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
+};
+
+/**
+ * An evidence source allowed by the selected evidence profile
+ */
+export type PracticeEvidenceSourceOption = {
+    authorizedForAutomatedAssessment: boolean;
+    description: string;
+    displayName: string;
+    privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
+    sourceKind: string;
+    supportsComplete: boolean;
+    supportsCurrent: boolean;
+    supportsEmpty: boolean;
+};
+
+/**
  * A workspace's practice-review policy: effective values plus raw overrides
  */
 export type PracticeReviewSettings = {
@@ -2713,57 +2762,54 @@ export type PracticeReviewSettings = {
 };
 
 /**
- * Independent validation status and provenance for an evidence declaration
+ * Evidence options for each type of reviewed work
  */
-export type PracticeEvidenceValidation = {
-    declarationDigest: string;
+export type PracticeEvidenceOptions = {
+    workTypes: Array<PracticeWorkTypeEvidenceOptions>;
+};
+
+/**
+ * Independent validation status and provenance for automated assessment requirements
+ */
+export type PracticeAutomatedAssessmentValidation = {
+    /**
+     * Versioned fingerprint of the independently validated model, prompt, tools, and preprocessing
+     */
+    evaluatorProcedureFingerprint?: string;
+    /**
+     * SHA-256 digest of the exact automated-assessment policy
+     */
+    policyDigest: string;
+    /**
+     * Versioned fingerprint of the exact review rules
+     */
+    reviewRuleFingerprint: string;
+    /**
+     * Source contract used by the validated practice definition
+     */
     sourceContractVersion: string;
     /**
-     * Independent status; evidence authors cannot promote their own declaration
+     * Validation lifecycle; authors cannot mark their own assessment as independently validated
      */
     status: 'AUTHOR_DECLARED' | 'INDEPENDENTLY_VALIDATED' | 'STALE' | 'SUPERSEDED';
+    /**
+     * Time the independent validation was completed
+     */
     validatedAt?: Date;
+    /**
+     * Traceable reference to the validation record
+     */
     validationReference?: string;
+    /**
+     * Independent validator identity
+     */
     validator?: string;
-};
-
-/**
- * An evidence source that a practice may require or use as optional context
- */
-export type PracticeEvidenceSourceOption = {
-    authorizedForDetection?: boolean;
-    description: string;
-    privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
-    sourceKind: string;
-    supportsComplete?: boolean;
-    supportsCurrent?: boolean;
-    supportsEmpty?: boolean;
-};
-
-/**
- * Server-supported options for authoring practice evidence requirements
- */
-export type PracticeEvidenceAuthoring = {
-    artifacts: Array<PracticeEvidenceArtifactOptions>;
-};
-
-/**
- * Evidence choices and recommended rule for one work artifact
- */
-export type PracticeEvidenceArtifactOptions = {
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
-    baseline: PracticeEvidenceDeclaration;
-    sources: Array<PracticeEvidenceSourceOption>;
 };
 
 /**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
-    /**
-     * Whether this area is active
-     */
-    active: boolean;
     catalogOrigin?: CatalogOrigin;
     /**
      * Optional palette colour key for the area's chip
@@ -2801,6 +2847,10 @@ export type PracticeArea = {
      * Timestamp when the area was last updated
      */
     updatedAt?: Date;
+    /**
+     * Whether this area is shown in practice dashboards
+     */
+    visibleInPracticeDashboards: boolean;
 };
 
 /**
@@ -2823,17 +2873,15 @@ export type CatalogOrigin = {
  */
 export type Practice = {
     /**
-     * Whether this practice is actively being detected
-     */
-    active: boolean;
-    /**
      * Slug of the practice area this practice is bound to, if any
      */
     areaSlug?: string;
     /**
-     * Artifact this practice evaluates
+     * Type of work this practice assesses
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
+    automatedAssessmentValidation: PracticeAutomatedAssessmentValidation;
     catalogOrigin?: CatalogOrigin;
     /**
      * Timestamp when the practice was created
@@ -2847,8 +2895,6 @@ export type Practice = {
      * Position within its area (lowest first); ties broken by name
      */
     displayOrder: number;
-    evidence: PracticeEvidenceDeclaration;
-    evidenceValidation: PracticeEvidenceValidation;
     /**
      * Practice ID
      */
@@ -2866,13 +2912,17 @@ export type Practice = {
      */
     slug: string;
     /**
-     * Domain events that trigger detection
+     * Domain events that start a practice review
      */
     triggerEvents: Array<string>;
     /**
      * Timestamp when the practice was last updated
      */
     updatedAt: Date;
+    /**
+     * Whether new reviews include this practice
+     */
+    usedInNewReviews: boolean;
     /**
      * Developer-facing exemplar (learner layer)
      */
@@ -2973,9 +3023,9 @@ export type ObservationList = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Validity of an evaluation claim against the practice revision currently in force
+     * Whether a finding was produced using the current review rules
      */
-    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -3062,7 +3112,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -3379,9 +3429,9 @@ export type ObservationDetail = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Validity of an evaluation claim against the practice revision currently in force
+     * Whether a finding was produced using the current review rules
      */
-    claimStatus: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -4071,11 +4121,11 @@ export type CatalogEntryStatus = {
 export type CuratedPracticeRequest = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
-    criteria: string;
     /**
-     * Evidence declaration; omit to use the server baseline for the selected artifact
+     * Evidence requirements; omit to use the recommended requirements for the selected work type
      */
-    evidence?: PracticeEvidenceDeclaration;
+    automatedAssessmentPolicy?: PracticeAutomatedAssessmentPolicy;
+    criteria: string;
     name: string;
     precomputeScript?: string;
     triggerEvents: Array<string>;
@@ -4089,9 +4139,9 @@ export type CuratedPracticeRequest = {
 export type CuratedPracticeDefinition = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    automatedAssessmentPolicy: PracticeAutomatedAssessmentPolicy;
+    automatedAssessmentValidation: PracticeAutomatedAssessmentValidation;
     criteria: string;
-    evidence: PracticeEvidenceDeclaration;
-    evidenceValidation: PracticeEvidenceValidation;
     name: string;
     precomputeScript?: string;
     triggerEvents: Array<string>;
@@ -4302,23 +4352,23 @@ export type CreatePracticeRequest = {
      */
     areaSlug?: string | null;
     /**
-     * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
+     * Type of reviewed work. Defaults to PULL_REQUEST when omitted.
      */
     artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Versioned evidence required before Hephaestus may assess reviewed work; omit to use the recommended requirements for the selected work type
+     */
+    automatedAssessmentPolicy?: PracticeAutomatedAssessmentPolicy;
     /**
      * Practice evaluation criteria
      */
     criteria: string;
     /**
-     * Versioned sources and quality required before this practice may be judged; omit to use the server baseline for the selected artifact
-     */
-    evidence?: PracticeEvidenceDeclaration;
-    /**
      * Human-readable name
      */
     name: string;
     /**
-     * TypeScript/Bun precompute script for static analysis before AI review
+     * TypeScript/Bun static analysis run before automated assessment
      */
     precomputeScript?: string;
     /**
@@ -4326,7 +4376,7 @@ export type CreatePracticeRequest = {
      */
     slug: string;
     /**
-     * Domain events that trigger detection; empty for scheduled conversation reviews
+     * Events that start a practice review; empty for scheduled conversation reviews
      */
     triggerEvents: Array<string>;
     /**
@@ -4334,7 +4384,7 @@ export type CreatePracticeRequest = {
      */
     whatGoodLooksLike?: string;
     /**
-     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     * Plain-language rationale shown to the developer
      */
     whyItMatters?: string;
 };
@@ -4820,7 +4870,7 @@ export type AgentBinding = {
     enabled: boolean;
     instanceModelId?: number;
     maxConcurrentJobs?: number;
-    purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+    purpose: 'PRACTICE_REVIEW' | 'MENTOR';
     /**
      * True when the bound model is available to run right now
      */
@@ -5030,7 +5080,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -5725,7 +5775,7 @@ export type AdminGetPracticeEvidenceOptionsResponses = {
     /**
      * OK
      */
-    200: PracticeEvidenceAuthoring;
+    200: PracticeEvidenceOptions;
 };
 
 export type AdminGetPracticeEvidenceOptionsResponse = AdminGetPracticeEvidenceOptionsResponses[keyof AdminGetPracticeEvidenceOptionsResponses];
@@ -6767,7 +6817,7 @@ export type DeleteAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/agents/{purpose}';
@@ -6789,7 +6839,7 @@ export type ConfigureAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/agents/{purpose}';
@@ -6822,7 +6872,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -8227,9 +8277,9 @@ export type ListAreasData = {
     };
     query?: {
         /**
-         * Return only active areas
+         * Return only areas shown in practice dashboards
          */
-        activeOnly?: boolean;
+        visibleInPracticeDashboardsOnly?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practice-areas';
 };
@@ -8422,9 +8472,9 @@ export type ListPracticesData = {
     };
     query?: {
         /**
-         * Filter by active state
+         * Filter by whether new reviews include the practice
          */
-        active?: boolean;
+        usedInNewReviews?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practices';
 };
@@ -8488,7 +8538,7 @@ export type GetPracticeEvidenceOptionsResponses = {
     /**
      * OK
      */
-    200: PracticeEvidenceAuthoring;
+    200: PracticeEvidenceOptions;
 };
 
 export type GetPracticeEvidenceOptionsResponse = GetPracticeEvidenceOptionsResponses[keyof GetPracticeEvidenceOptionsResponses];
@@ -9099,37 +9149,6 @@ export type UpdatePracticeResponses = {
 
 export type UpdatePracticeResponse = UpdatePracticeResponses[keyof UpdatePracticeResponses];
 
-export type SetActiveData = {
-    body: UpdatePracticeActiveRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        practiceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/active';
-};
-
-export type SetActiveErrors = {
-    /**
-     * Practice not found
-     */
-    404: ProblemDetail;
-};
-
-export type SetActiveError = SetActiveErrors[keyof SetActiveErrors];
-
-export type SetActiveResponses = {
-    /**
-     * Active state updated
-     */
-    200: Practice;
-};
-
-export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
-
 export type BindAreaData = {
     body: BindPracticeAreaRequest;
     path: {
@@ -9195,6 +9214,37 @@ export type PlacePracticeResponses = {
 };
 
 export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
+
+export type SetUsedInNewReviewsData = {
+    body: UpdatePracticeUsageRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/used-in-new-reviews';
+};
+
+export type SetUsedInNewReviewsErrors = {
+    /**
+     * Practice not found
+     */
+    404: ProblemDetail;
+};
+
+export type SetUsedInNewReviewsError = SetUsedInNewReviewsErrors[keyof SetUsedInNewReviewsErrors];
+
+export type SetUsedInNewReviewsResponses = {
+    /**
+     * Review participation updated
+     */
+    200: Practice;
+};
+
+export type SetUsedInNewReviewsResponse = SetUsedInNewReviewsResponses[keyof SetUsedInNewReviewsResponses];
 
 export type GetUserProfileData = {
     body?: never;

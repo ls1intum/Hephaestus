@@ -85,7 +85,7 @@ const COPY = {
 			"New models are saved inactive. Review the saved price and sharing before activating.",
 		deactivationTitle: "Work on this model stops immediately, in every workspace",
 		deactivationBody:
-			"Practice detection and Mentor can't run on it until you reactivate it, or until each workspace picks another model.",
+			"Practice reviews and Mentor can't run on it until you reactivate it, or until each workspace picks another model.",
 	},
 	workspace: {
 		displayNamePlaceholder: "e.g. GPT-5 mini",
@@ -95,7 +95,7 @@ const COPY = {
 		activeHintCreate: "Starts inactive. Add a price, then activate.",
 		deactivationTitle: "Work on this model stops immediately",
 		deactivationBody:
-			"Practice detection and the mentor can't run until you reactivate this model or pick another.",
+			"Practice reviews and the mentor can't run until you reactivate this model or pick another.",
 	},
 } satisfies Record<LlmAudience, Record<string, string>>;
 

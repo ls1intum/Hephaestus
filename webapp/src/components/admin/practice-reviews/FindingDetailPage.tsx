@@ -20,8 +20,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { FindingEvidence } from "./FindingEvidence";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
 import {
-	ClaimStatusAlert,
-	ClaimStatusBadge,
+	ClaimCurrentnessAlert,
+	ClaimCurrentnessBadge,
 	FeedbackStateBadge,
 	FindingAssessmentBadge,
 } from "./ReviewBadges";
@@ -89,7 +89,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 				<div className="space-y-2">
 					<div className="flex flex-wrap items-center gap-2">
 						<FindingAssessmentBadge finding={finding} />
-						<ClaimStatusBadge status={finding.claimStatus} />
+						<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
 					</div>
 					<h2 className="break-words text-2xl font-semibold tracking-tight">{finding.title}</h2>
 					<ReviewPracticeLabel
@@ -116,7 +116,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 					</div>
 				</div>
 			</header>
-			<ClaimStatusAlert status={finding.claimStatus} />
+			<ClaimCurrentnessAlert currentness={finding.claimCurrentness} />
 
 			<Alert>
 				<InfoIcon />

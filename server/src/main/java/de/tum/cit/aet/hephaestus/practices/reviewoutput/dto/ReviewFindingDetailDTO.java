@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
-import de.tum.cit.aet.hephaestus.practices.EvaluationClaimStatus;
+import de.tum.cit.aet.hephaestus.practices.AssessmentClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -27,11 +27,11 @@ public record ReviewFindingDetailDTO(
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Detector confidence", minimum = "0", maximum = "1") Float confidence,
+    @NonNull @Schema(description = "Finding confidence", minimum = "0", maximum = "1") Float confidence,
     ObservationEvidenceDTO evidence,
     String reasoning,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
-    @NonNull EvaluationClaimStatus claimStatus,
+    @NonNull AssessmentClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt,
     @NonNull @Schema(description = "Linked feedback, newest first") List<ReviewBoundFeedbackDTO> feedback
 ) {
@@ -61,7 +61,7 @@ public record ReviewFindingDetailDTO(
             includeEvidence ? ObservationEvidenceDTO.from(observation.getEvidence()) : null,
             observation.getReasoning(),
             observation.getRecurrenceKey(),
-            EvaluationClaimStatus.of(revision, practice),
+            AssessmentClaimCurrentness.of(revision, practice),
             observation.getObservedAt(),
             feedback
         );

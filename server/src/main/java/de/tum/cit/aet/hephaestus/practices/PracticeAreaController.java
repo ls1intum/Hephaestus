@@ -63,11 +63,13 @@ public class PracticeAreaController {
     @SecurityRequirements
     public ResponseEntity<List<PracticeAreaDTO>> listAreas(
         WorkspaceContext workspaceContext,
-        @RequestParam(name = "activeOnly", required = false) @Parameter(
-            description = "Return only active areas"
-        ) Boolean activeOnly
+        @RequestParam(name = "visibleInPracticeDashboardsOnly", required = false) @Parameter(
+            description = "Return only areas shown in practice dashboards"
+        ) Boolean visibleInPracticeDashboardsOnly
     ) {
-        List<PracticeAreaDTO> areas = presenter.presentAreas(areaService.listAreas(workspaceContext, activeOnly));
+        List<PracticeAreaDTO> areas = presenter.presentAreas(
+            areaService.listAreas(workspaceContext, visibleInPracticeDashboardsOnly)
+        );
         return ResponseEntity.ok(areas);
     }
 
@@ -153,7 +155,7 @@ public class PracticeAreaController {
                 request.icon(),
                 request.color()
             ),
-            request.active()
+            request.visibleInPracticeDashboards()
         );
         return ResponseEntity.ok(presenter.present(area));
     }

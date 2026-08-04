@@ -1,4 +1,4 @@
-# Live practice-detection E2E
+# Live practice-review E2E
 
 This setup runs the complete local path: workspace creation, SCM sync, job execution in Docker, LLM
 calls through the application proxy, observation persistence, and feedback delivery to a PR or MR.

@@ -21,7 +21,7 @@ public final class CatalogOrigin {
         boolean sourceOffered = entry != null && catalog.isEffectivelyOffered(entry);
         return describe(
             practice.getSourceCuratedSlug(),
-            practice.getCurrentRevision().getDetectionFingerprint(),
+            practice.getCurrentRevision().getReviewRuleFingerprint(),
             practice.getSourceCuratedFingerprint(),
             entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
             sourceOffered

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import {
 	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeEvidenceAuthoring,
+	mockPracticeEvidenceOptions,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
@@ -24,8 +24,8 @@ const initialData = {
 	whyItMatters: "Reviewers should not need to reconstruct the author's intent.",
 	whatGoodLooksLike: "The description states why, what changed, and how it was verified.",
 	precomputeScript: "export default function precompute() { return {}; }",
-	evidence: mockPullRequestEvidence,
-	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
+	automatedAssessmentPolicy: mockPullRequestEvidence,
+	automatedAssessmentValidation: mockAuthorDeclaredEvidenceValidation,
 	status: {
 		etag: "tag",
 		state: "FROM_HEPHAESTUS" as const,
@@ -43,7 +43,7 @@ const meta = {
 	},
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
-	args: { evidenceAuthoring: mockPracticeEvidenceAuthoring },
+	args: { evidenceOptions: mockPracticeEvidenceOptions },
 } satisfies Meta<typeof CuratedPracticeForm>;
 
 export default meta;
@@ -106,8 +106,8 @@ export const HephaestusUpdateAvailable: Story = {
 				artifactType: "PULL_REQUEST",
 				triggerEvents: ["PullRequestCreated"],
 				criteria: "The updated default criteria",
-				evidence: mockPullRequestEvidence,
-				evidenceValidation: mockAuthorDeclaredEvidenceValidation,
+				automatedAssessmentPolicy: mockPullRequestEvidence,
+				automatedAssessmentValidation: mockAuthorDeclaredEvidenceValidation,
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},
 		},

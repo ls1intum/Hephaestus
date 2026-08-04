@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen } from "storybook/test";
-import { mockPracticeEvidenceAuthoring } from "@/mocks/fixtures/practice";
+import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeForm } from "./PracticeForm";
@@ -29,7 +29,7 @@ export const Create: Story = {
 			mode="create"
 			workspaceSlug="demo"
 			areas={mockAreas}
-			evidenceAuthoring={mockPracticeEvidenceAuthoring}
+			evidenceOptions={mockPracticeEvidenceOptions}
 			onSubmit={createSubmit}
 			isPending={false}
 		/>
@@ -50,21 +50,11 @@ export const EditWithAdvanced: Story = {
 			workspaceSlug="demo"
 			initialData={mockPracticeWithAllTriggers}
 			areas={mockAreas}
-			evidenceAuthoring={mockPracticeEvidenceAuthoring}
+			evidenceOptions={mockPracticeEvidenceOptions}
 			onSubmit={fn()}
 			isPending={false}
 		/>
 	),
-};
-
-export const EditWarnsBeforeReplacingEvidenceRequirements: Story = {
-	...EditWithAdvanced,
-	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("combobox", { name: "Evaluates" }));
-		await userEvent.click(await screen.findByRole("option", { name: "Conversation" }));
-		await expect(canvas.getByText("Evidence requirements will change")).toBeVisible();
-	},
 };
 
 export const Submitting: Story = {
@@ -73,7 +63,7 @@ export const Submitting: Story = {
 			mode="create"
 			workspaceSlug="demo"
 			areas={mockAreas}
-			evidenceAuthoring={mockPracticeEvidenceAuthoring}
+			evidenceOptions={mockPracticeEvidenceOptions}
 			onSubmit={fn()}
 			isPending
 		/>
@@ -94,7 +84,7 @@ export const EditClearsOptionalGuidance: Story = {
 				whatGoodLooksLike: "Each commit explains one coherent change.",
 			}}
 			areas={mockAreas}
-			evidenceAuthoring={mockPracticeEvidenceAuthoring}
+			evidenceOptions={mockPracticeEvidenceOptions}
 			onSubmit={editSubmit}
 			isPending={false}
 		/>
@@ -122,7 +112,7 @@ export const ValidationErrors: Story = {
 			mode="create"
 			workspaceSlug="demo"
 			areas={mockAreas}
-			evidenceAuthoring={mockPracticeEvidenceAuthoring}
+			evidenceOptions={mockPracticeEvidenceOptions}
 			onSubmit={createSubmit}
 			isPending={false}
 		/>
@@ -162,7 +152,7 @@ export const ValidationAndSubmit: Story = {
 				criteria: "Check whether the reviewed work explains its purpose.",
 				triggerEvents: ["PullRequestCreated"],
 				artifactType: "PULL_REQUEST",
-				evidence: mockPracticeEvidenceAuthoring.artifacts[0].baseline,
+				automatedAssessmentPolicy: mockPracticeEvidenceOptions.workTypes[0].recommendedRequirements,
 			},
 			null,
 		);
@@ -175,7 +165,7 @@ export const ConversationPractice: Story = {
 			mode="create"
 			workspaceSlug="demo"
 			areas={mockAreas}
-			evidenceAuthoring={mockPracticeEvidenceAuthoring}
+			evidenceOptions={mockPracticeEvidenceOptions}
 			onSubmit={createSubmit}
 			isPending={false}
 		/>
@@ -199,7 +189,7 @@ export const ConversationPractice: Story = {
 				criteria: "Check whether the conversation stays constructive.",
 				triggerEvents: [],
 				artifactType: "CONVERSATION_THREAD",
-				evidence: mockPracticeEvidenceAuthoring.artifacts[2].baseline,
+				automatedAssessmentPolicy: mockPracticeEvidenceOptions.workTypes[2].recommendedRequirements,
 			},
 			null,
 		);

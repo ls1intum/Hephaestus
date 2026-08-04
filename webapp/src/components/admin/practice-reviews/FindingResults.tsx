@@ -27,7 +27,11 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { ReviewArtifact, ReviewArtifactLink } from "./ReviewArtifact";
-import { ClaimStatusBadge, FindingAssessmentBadge, FindingFeedbackSummary } from "./ReviewBadges";
+import {
+	ClaimCurrentnessBadge,
+	FindingAssessmentBadge,
+	FindingFeedbackSummary,
+} from "./ReviewBadges";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
@@ -95,7 +99,7 @@ export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
 									<div className="mt-2">
 										<div className="flex flex-wrap gap-2">
 											<FindingAssessmentBadge finding={finding} />
-											<ClaimStatusBadge status={finding.claimStatus} />
+											<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
 										</div>
 									</div>
 									<div className="mt-2">
@@ -141,7 +145,7 @@ export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
 								</ItemDescription>
 								<div className="mt-1 flex flex-wrap items-center gap-2">
 									<FindingAssessmentBadge finding={finding} />
-									<ClaimStatusBadge status={finding.claimStatus} />
+									<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
 									<RelativeTime value={finding.observedAt} />
 								</div>
 								<FindingFeedbackSummary disposition={finding.feedbackDisposition} />

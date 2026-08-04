@@ -118,7 +118,7 @@ So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) 
 9. **Describe the process fact, never the author's character or intent (level discipline).** Feedback that judges the
    PERSON — their honesty, motives, diligence, or good faith — is the least effective and most harmful register (Hattie &
    Timperley): it does not tell the author what to change and it makes them defensive. So you may NEVER characterise the
-   author's honesty, intent, or motives. The test is SEMANTIC, not a word-list: before you write `reasoning`/`guidance`, ask
+   author's honesty, intent, or motives. The test is LANGUAGE_MODEL, not a word-list: before you write `reasoning`/`guidance`, ask
    whether the phrasing assigns a motive, character flaw, or state of mind to a gap — if it does, rewrite it as the observable
    fact. Intent-imputing words (`dishonest`, `misleading`, `deceptive`, `lying`, `in bad faith`, `claims falsely`, and the
    like) are the common symptoms, but a sentence that imputes carelessness, laziness, or bad faith WITHOUT those exact words

@@ -4,7 +4,7 @@ import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import {
 	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeEvidenceAuthoring,
+	mockPracticeEvidenceOptions,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
@@ -32,8 +32,8 @@ const practiceDefinition = {
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "Our own criteria",
 	whyItMatters: "Reviewers need context",
-	evidence: mockPullRequestEvidence,
-	evidenceValidation: mockAuthorDeclaredEvidenceValidation,
+	automatedAssessmentPolicy: mockPullRequestEvidence,
+	automatedAssessmentValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
 function mockCatalog(overrides: Record<string, unknown> = {}) {
@@ -67,7 +67,7 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 	server.use(http.get("*/admin/practice-catalog", () => HttpResponse.json(catalog)));
 	server.use(
 		http.get("*/admin/practice-catalog/evidence-options", () =>
-			HttpResponse.json(mockPracticeEvidenceAuthoring),
+			HttpResponse.json(mockPracticeEvidenceOptions),
 		),
 	);
 	return catalog;
@@ -634,7 +634,7 @@ describe("instance catalog routes", () => {
 
 	it.each([
 		["unchanged", false, mockPullRequestEvidence],
-		["changed", true, mockPracticeEvidenceAuthoring.artifacts[2].baseline],
+		["changed", true, mockPracticeEvidenceOptions.workTypes[2].recommendedRequirements],
 	] as const)("%s artifact sends the visible evidence rule", async (_label, changeArtifact, expectedEvidence) => {
 		mockCatalog();
 		let requestBody: Record<string, unknown> | undefined;
@@ -662,11 +662,10 @@ describe("instance catalog routes", () => {
 			const user = userEvent.setup();
 			await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
 			await user.click(await screen.findByRole("option", { name: "Conversation" }));
-			await screen.findByText("Evidence requirements will change");
 		}
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(() => expect(requestBody).toBeDefined());
-		expect(requestBody?.evidence).toEqual(expectedEvidence);
+		expect(requestBody?.automatedAssessmentPolicy).toEqual(expectedEvidence);
 	});
 });

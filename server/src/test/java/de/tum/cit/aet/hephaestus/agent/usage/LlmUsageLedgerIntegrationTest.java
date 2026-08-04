@@ -181,13 +181,13 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * Give the workspace a PRACTICE_DETECTION binding funded by {@code fundingSource} — submission
+     * Give the workspace a PRACTICE_REVIEW binding funded by {@code fundingSource} — submission
      * resolves it first, because the cap that applies is the one belonging to whoever pays for it.
      */
     private WorkspaceAgentBinding bindDetectionTo(Workspace workspace, FundingSource fundingSource) {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setEnabled(true);
         binding.setTimeoutSeconds(300);
         if (fundingSource == FundingSource.INSTANCE) {
@@ -205,7 +205,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setStatus(AgentJobStatus.QUEUED);
         job.setConfigSnapshot(new ObjectMapper().createObjectNode());
         job.prePersist();

@@ -22,13 +22,13 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("ReviewSubmitted", "PullRequestCreated")));
         practice.setCriteria("abc");
         practice.setPrecomputeScript("console.log('x')");
-        practice.setEvidence(
-            new PracticeEvidenceDeclaration(
+        practice.setAutomatedAssessmentPolicy(
+            new PracticeAutomatedAssessmentPolicy(
                 new SourceContractVersion("1.0.0"),
                 new EvidenceProfileId("pull-request-review"),
-                new PracticeDetectorCapability(
-                    PracticeDetectorAssessmentMethod.SEMANTIC,
-                    PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+                new PracticeAutomatedAssessment(
+                    PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+                    PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
                 List.of(
                     new PracticeEvidenceRequirement(
@@ -38,7 +38,7 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
                     )
                 ),
                 List.of(),
-                PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
                 List.of()
             )
         );

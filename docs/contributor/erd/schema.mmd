@@ -258,7 +258,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
-        JSONB evidence_declaration
+        JSONB automated_assessment_policy
     }
 
     Discussion {
@@ -796,7 +796,7 @@ erDiagram
         VARCHAR(128) name "NOT NULL"
         JSONB trigger_events "NOT NULL"
         TEXT criteria "NOT NULL"
-        BOOLEAN is_active "NOT NULL"
+        BOOLEAN used_in_new_reviews "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
@@ -808,7 +808,7 @@ erDiagram
         BIGINT current_revision_id FK,UK
         VARCHAR(64) source_curated_slug
         VARCHAR(96) source_curated_fingerprint
-        JSONB evidence_declaration "NOT NULL"
+        JSONB automated_assessment_policy "NOT NULL"
     }
 
     PracticeArea {
@@ -817,7 +817,7 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
         TEXT description
-        BOOLEAN is_active "NOT NULL"
+        BOOLEAN visible_in_practice_dashboards "NOT NULL"
         INTEGER display_order "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
@@ -851,8 +851,8 @@ erDiagram
         TEXT area_description
         VARCHAR(64) area_icon
         VARCHAR(32) area_color
-        VARCHAR(96) detection_fingerprint
-        JSONB evidence_declaration
+        VARCHAR(96) review_rule_fingerprint
+        JSONB automated_assessment_policy
     }
 
     Project {

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -40,7 +40,7 @@ import tools.jackson.databind.JsonNode;
         columnNames = { "workspace_id", "slug" }
     ),
     indexes = {
-        @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
+        @Index(name = "idx_practice_workspace_usage", columnList = "workspace_id, used_in_new_reviews"),
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
         @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
         @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
@@ -153,12 +153,12 @@ public class Practice {
     private String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "evidence_declaration", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "automated_assessment_policy", columnDefinition = "jsonb", nullable = false)
     @ToString.Exclude
-    private PracticeEvidenceDeclaration evidence;
+    private PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean active = true;
+    @Column(name = "used_in_new_reviews", nullable = false)
+    private boolean usedInNewReviews = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

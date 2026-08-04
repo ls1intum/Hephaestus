@@ -176,7 +176,7 @@ public class BotCommandProcessor {
                                 ),
                             () ->
                                 log.warn(
-                                    "Bot command: no job created (practice detection unbound/disabled, or the " +
+                                    "Bot command: no job created (practice reviews unbound/disabled, or the " +
                                         "workspace's monthly LLM budget is exhausted), prId={}, mrNumber={}",
                                     pr.getId(),
                                     mrNumber

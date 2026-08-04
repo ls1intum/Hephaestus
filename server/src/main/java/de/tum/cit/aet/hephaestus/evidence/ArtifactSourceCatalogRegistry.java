@@ -11,7 +11,7 @@ public interface ArtifactSourceCatalogRegistry {
 
     ArtifactSourceContract requireSource(SourceContractVersion version, SourceKind kind);
 
-    boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUseAudience audience);
+    boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUsePurpose purpose);
 
     EvidenceProfile requireProfile(SourceContractVersion version, EvidenceProfileId id);
 

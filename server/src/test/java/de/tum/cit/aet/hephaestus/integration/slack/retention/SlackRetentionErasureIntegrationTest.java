@@ -293,7 +293,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     private Practice savePractice(Workspace ws) {
         Practice p = new Practice();
         p.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
-        p.setEvidence(PracticeTestEvidence.conversationThread());
+        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.conversationThread());
         p.setWorkspace(ws);
         p.setSlug("retain-practice-" + ws.getId());
         p.setName("Retention Practice");

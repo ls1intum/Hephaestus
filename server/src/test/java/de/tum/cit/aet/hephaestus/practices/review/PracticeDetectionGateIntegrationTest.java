@@ -123,7 +123,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setEnabled(true);
         binding.setWorkspaceModel(workspaceModel);
         binding.setTimeoutSeconds(300);
@@ -156,13 +156,13 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
     private Practice createPractice(String slug, String name, List<String> triggerEvents, boolean active) {
         Practice p = new Practice();
-        p.setEvidence(PracticeTestEvidence.pullRequest());
+        p.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(triggerEvents));
-        p.setActive(active);
+        p.setUsedInNewReviews(active);
         return practiceRepository.save(p);
     }
 
@@ -282,7 +282,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-detection agent");
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-review agent");
         }
 
         @Test
@@ -295,7 +295,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-detection agent");
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-review agent");
         }
 
         @Test

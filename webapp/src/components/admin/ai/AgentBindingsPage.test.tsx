@@ -13,7 +13,7 @@ const model: AvailableLlmModel = {
 };
 
 const detectionBinding: AgentBinding = {
-	purpose: "PRACTICE_DETECTION",
+	purpose: "PRACTICE_REVIEW",
 	instanceModelId: 20,
 	enabled: true,
 	ready: false,
@@ -48,7 +48,7 @@ function renderPage(overrides: Partial<AgentBindingsPageProps> = {}) {
 function practiceDetectionCard(): HTMLElement {
 	const field = screen.getByLabelText("Practice reviews model");
 	const form = field.closest("form");
-	if (form == null) throw new Error("practice-detection card has no form");
+	if (form == null) throw new Error("practice-review card has no form");
 	return form;
 }
 
@@ -78,7 +78,7 @@ describe("AgentBindingsPage", () => {
 		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		expect(onSave).toHaveBeenCalledWith(
-			"PRACTICE_DETECTION",
+			"PRACTICE_REVIEW",
 			expect.objectContaining({ instanceModelId: 20, enabled: true }),
 		);
 	});
@@ -126,7 +126,7 @@ describe("AgentBindingsPage", () => {
 		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		expect(onSave).toHaveBeenCalledWith(
-			"PRACTICE_DETECTION",
+			"PRACTICE_REVIEW",
 			expect.objectContaining({ timeoutSeconds: 45 }),
 		);
 	});
@@ -148,7 +148,7 @@ describe("AgentBindingsPage", () => {
 		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		expect(onSave).toHaveBeenCalledWith(
-			"PRACTICE_DETECTION",
+			"PRACTICE_REVIEW",
 			expect.objectContaining({ timeoutSeconds: 3600 }),
 		);
 	});
@@ -195,6 +195,6 @@ describe("AgentBindingsPage", () => {
 
 		fireEvent.click(clearAssignment);
 
-		expect(onTurnOff).toHaveBeenCalledWith("PRACTICE_DETECTION");
+		expect(onTurnOff).toHaveBeenCalledWith("PRACTICE_REVIEW");
 	});
 });

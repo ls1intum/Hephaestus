@@ -1,6 +1,6 @@
 /**
  * Outline vendor adapter: mirrors allow-listed Outline collections into local documents and projects them
- * into the agent's context so design docs and decision records reach practice detection. A closed Modulith
+ * into the agent's context so design docs and decision records reach practice reviews. A closed Modulith
  * module — the agent reads through its own {@code agent::documentation-source} SPI, which this module
  * implements. Outline is a content source only: it never emits observations or findings.
  */

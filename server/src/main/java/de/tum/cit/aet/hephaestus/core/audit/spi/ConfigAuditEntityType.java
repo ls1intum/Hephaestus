@@ -11,7 +11,7 @@ package de.tum.cit.aet.hephaestus.core.audit.spi;
 public enum ConfigAuditEntityType {
     /** Per-workspace practice-review trigger/delivery policy overrides. */
     PRACTICE_REVIEW_SETTINGS,
-    /** Which model, with what limits, runs practice detection / the mentor for a workspace. */
+    /** Which model, with what limits, runs practice reviews / the mentor for a workspace. */
     AGENT_BINDING,
     /**
      * Historical only. {@code trg_config_audit_event_block_mutation} makes this table append-only, so
@@ -38,7 +38,7 @@ public enum ConfigAuditEntityType {
     WORKSPACE_VISIBILITY,
 
     /** A practice being activated or deactivated, which gates whether it is reviewed at all. */
-    PRACTICE_ACTIVE,
+    PRACTICE_USAGE,
     /** A practice's review definition, excluding its active state and catalog placement. */
     PRACTICE_DEFINITION,
     PRACTICE_AREA,

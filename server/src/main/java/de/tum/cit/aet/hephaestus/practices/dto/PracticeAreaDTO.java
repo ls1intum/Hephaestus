@@ -17,7 +17,9 @@ public record PracticeAreaDTO(
     @Nullable @Schema(description = "What this area develops") String description,
     @Nullable @Schema(description = "Optional lucide icon name for the area's chip") String icon,
     @Nullable @Schema(description = "Optional palette colour key for the area's chip") String color,
-    @NonNull @Schema(description = "Whether this area is active") Boolean active,
+    @NonNull
+    @Schema(description = "Whether this area is shown in practice dashboards")
+    Boolean visibleInPracticeDashboards,
     @NonNull @Schema(description = "Sort order within the workspace") Integer displayOrder,
     @NonNull @Schema(description = "Timestamp when the area was created") Instant createdAt,
     @Nullable @Schema(description = "Timestamp when the area was last updated") Instant updatedAt,
@@ -31,7 +33,7 @@ public record PracticeAreaDTO(
             area.getDescription(),
             area.getIcon(),
             area.getColor(),
-            area.isActive(),
+            area.isVisibleInPracticeDashboards(),
             area.getDisplayOrder(),
             area.getCreatedAt(),
             area.getUpdatedAt(),

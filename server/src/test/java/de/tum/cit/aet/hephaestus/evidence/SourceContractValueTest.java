@@ -98,16 +98,16 @@ class SourceContractValueTest {
             )
         );
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new PracticeReadinessDecision("review-quality", now, true, List.of(), List.of())
+            new AutomatedAssessmentReadinessDecision("review-quality", now, true, List.of(), List.of())
         );
         assertThat(
-            new PracticeReadinessDecision(
-                "human-only",
+            new AutomatedAssessmentReadinessDecision(
+                "no-automated-assessment",
                 now,
                 false,
-                List.of(PracticeReadinessReason.PRACTICE_NOT_DETECTABLE_BY_HEPHAESTUS),
+                List.of(AutomatedAssessmentReadinessReason.NO_AUTOMATED_ASSESSMENT),
                 List.of()
-            ).assessments()
+            ).sourceChecks()
         ).isEmpty();
     }
 
@@ -118,25 +118,25 @@ class SourceContractValueTest {
         SourceContractVersion version = new SourceContractVersion("1.0.0");
 
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new EvidenceAssessment(
+            new SourceReadinessCheck(
                 kind,
                 version,
                 now,
                 now,
                 SourceFreshness.CURRENT,
                 true,
-                List.of(EvidenceAssessmentReason.FRESHNESS_UNSATISFIED)
+                List.of(SourceReadinessReason.SOURCE_NOT_CURRENT)
             )
         );
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new EvidenceAssessment(
+            new SourceReadinessCheck(
                 kind,
                 version,
                 now,
                 now,
                 SourceFreshness.STALE,
                 false,
-                List.of(EvidenceAssessmentReason.FRESHNESS_UNSATISFIED, EvidenceAssessmentReason.FRESHNESS_UNSATISFIED)
+                List.of(SourceReadinessReason.SOURCE_NOT_CURRENT, SourceReadinessReason.SOURCE_NOT_CURRENT)
             )
         );
     }

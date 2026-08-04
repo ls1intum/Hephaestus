@@ -115,13 +115,13 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     private Practice persistPractice(Workspace ws, String slug, String name) {
         Practice practice = new Practice();
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(ws);
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCriteria("Criteria for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        practice.setActive(true);
+        practice.setUsedInNewReviews(true);
         return practiceRepository.save(practice);
     }
 
@@ -138,7 +138,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
     private AgentJob persistJob(Workspace ws) {
         AgentJob agentJob = new AgentJob();
         agentJob.setWorkspace(ws);
-        agentJob.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        agentJob.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob.setEvidenceSnapshot(OBJECT_MAPPER.valueToTree(Map.of("manifest", Map.of("contractVersion", "1.0.0"))));
@@ -332,7 +332,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .isEqualTo(2)
                 .jsonPath("$.content[?(@.title == 'Alice problem')].subject.login")
                 .isEqualTo("alice")
-                .jsonPath("$.content[?(@.title == 'Alice problem')].claimStatus")
+                .jsonPath("$.content[?(@.title == 'Alice problem')].claimCurrentness")
                 .isEqualTo("UNVERIFIABLE")
                 .jsonPath("$.content[?(@.title == 'Bob problem')].subject.login")
                 .isEqualTo("bob");

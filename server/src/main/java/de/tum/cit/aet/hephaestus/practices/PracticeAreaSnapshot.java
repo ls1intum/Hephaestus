@@ -8,7 +8,7 @@ record PracticeAreaSnapshot(
     String slug,
     String name,
     @Nullable String description,
-    boolean active,
+    boolean visibleInPracticeDashboards,
     @Nullable String icon,
     @Nullable String color
 ) implements ConfigAuditSnapshot {
@@ -17,7 +17,7 @@ record PracticeAreaSnapshot(
             area.getSlug(),
             area.getName(),
             area.getDescription(),
-            area.isActive(),
+            area.isVisibleInPracticeDashboards(),
             area.getIcon(),
             area.getColor()
         );

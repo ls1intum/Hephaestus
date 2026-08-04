@@ -91,13 +91,13 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private Practice persistPractice(String slug, String name) {
         Practice practice = new Practice();
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCriteria("Description for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        practice.setActive(true);
+        practice.setUsedInNewReviews(true);
         practice = practiceRepository.saveAndFlush(practice);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
@@ -478,13 +478,13 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             ensureWorkspaceMembership(otherWorkspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             Practice otherPractice = new Practice();
-            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
+            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Desc");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-            otherPractice.setActive(true);
+            otherPractice.setUsedInNewReviews(true);
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();
@@ -1038,13 +1038,13 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             ensureWorkspaceMembership(otherWorkspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             Practice otherPractice = new Practice();
-            otherPractice.setEvidence(PracticeTestEvidence.pullRequest());
+            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("ws2-practice");
             otherPractice.setName("WS2 Practice");
             otherPractice.setCriteria("Desc");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-            otherPractice.setActive(true);
+            otherPractice.setUsedInNewReviews(true);
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();

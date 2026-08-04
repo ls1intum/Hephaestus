@@ -6,77 +6,49 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <changeSet author="hephaestus-evidence-contract" id="1785743133884-1">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.evidence_declaration already present">
-            <not><columnExists tableName="practice" columnName="evidence_declaration"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.automated_assessment_policy already present">
+            <not><columnExists tableName="practice" columnName="automated_assessment_policy"/></not>
         </preConditions>
         <comment>Pin every workspace practice to an explicit artifact-source contract.</comment>
         <addColumn tableName="practice">
-            <column name="evidence_declaration" type="jsonb"/>
+            <column name="automated_assessment_policy" type="jsonb"/>
         </addColumn>
         <sql>
             UPDATE practice
-            SET evidence_declaration = CASE applies_to
-                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","detectorCapability":{"assessmentMethod":"SEMANTIC","evidenceCoverage":"DECLARED_REQUIREMENTS_SUFFICIENT"},"required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
-                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","detectorCapability":{"assessmentMethod":"SEMANTIC","evidenceCoverage":"DECLARED_REQUIREMENTS_SUFFICIENT"},"required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
-                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","detectorCapability":{"assessmentMethod":"SEMANTIC","evidenceCoverage":"DECLARED_REQUIREMENTS_SUFFICIENT"},"required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+            SET automated_assessment_policy = CASE applies_to
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
             END
         </sql>
-        <addNotNullConstraint tableName="practice" columnName="evidence_declaration" columnDataType="jsonb"/>
-        <rollback><dropColumn tableName="practice" columnName="evidence_declaration"/></rollback>
+        <addNotNullConstraint tableName="practice" columnName="automated_assessment_policy" columnDataType="jsonb"/>
+        <rollback><dropColumn tableName="practice" columnName="automated_assessment_policy"/></rollback>
     </changeSet>
 
     <changeSet author="hephaestus-evidence-contract" id="1785743133884-2">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision.evidence_declaration already present">
-            <not><columnExists tableName="practice_revision" columnName="evidence_declaration"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision.automated_assessment_policy already present">
+            <not><columnExists tableName="practice_revision" columnName="automated_assessment_policy"/></not>
         </preConditions>
-        <comment>
-            Add evidence declarations for new revisions. Historical revisions remain null so they cannot
-            silently acquire artifact-source semantics that did not exist when they were evaluated.
-        </comment>
+        <comment>Create a new current revision for the automated-assessment policy while preserving historical meaning.</comment>
         <addColumn tableName="practice_revision">
-            <column name="evidence_declaration" type="jsonb"/>
+            <column name="automated_assessment_policy" type="jsonb"/>
         </addColumn>
-        <rollback><dropColumn tableName="practice_revision" columnName="evidence_declaration"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-evidence-contract" id="1785743133884-3">
-        <preConditions onFail="MARK_RAN" onFailMessage="curated_practice_override.evidence_declaration already present">
-            <not><columnExists tableName="curated_practice_override" columnName="evidence_declaration"/></not>
-        </preConditions>
-        <comment>Keep evidence declarations with complete instance-curated practice overrides.</comment>
-        <addColumn tableName="curated_practice_override">
-            <column name="evidence_declaration" type="jsonb"/>
-        </addColumn>
-        <sql>
-            UPDATE curated_practice_override
-            SET evidence_declaration = CASE applies_to
-                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","profile":"issue-review","detectorCapability":{"assessmentMethod":"SEMANTIC","evidenceCoverage":"DECLARED_REQUIREMENTS_SUFFICIENT"},"required":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.issue.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"IMPLEMENTATION_NOT_OBSERVED","summary":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
-                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","profile":"conversation-review","detectorCapability":{"assessmentMethod":"SEMANTIC","evidenceCoverage":"DECLARED_REQUIREMENTS_SUFFICIENT"},"required":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","summary":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
-                ELSE '{"sourceContractVersion":"1.0.0","profile":"pull-request-review","detectorCapability":{"assessmentMethod":"SEMANTIC","evidenceCoverage":"DECLARED_REQUIREMENTS_SUFFICIENT"},"required":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optional":[{"sourceKind":"scm.pull-request.comments","completeness":"ANY","freshness":"ANY"}],"onUnsatisfied":"DECLINE_SEMANTIC_JUDGMENT","blindSpots":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","summary":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
-            END
-            WHERE applies_to IS NOT NULL
-        </sql>
-        <rollback><dropColumn tableName="curated_practice_override" columnName="evidence_declaration"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-evidence-contract" id="1785743133884-4">
-        <preConditions onFail="HALT">
-            <columnExists tableName="practice" columnName="evidence_declaration"/>
-            <columnExists tableName="practice_revision" columnName="evidence_declaration"/>
-        </preConditions>
-        <comment>Create a new immutable practice revision for the source contract and enforce evidence projection.</comment>
         <sql splitStatements="false"><![CDATA[
             INSERT INTO practice_revision (
                 practice_id, revision_number, criteria, created_at,
                 slug, name, applies_to, trigger_events, precompute_script,
                 why_it_matters, what_good_looks_like,
                 area_slug, area_name, area_description, area_icon, area_color,
-                evidence_declaration
+                detection_fingerprint, automated_assessment_policy
             )
             SELECT practice.id,
-                   COALESCE(max_revision.revision_number, 0) + 1,
+                   COALESCE((
+                       SELECT MAX(existing.revision_number) + 1
+                       FROM practice_revision existing
+                       WHERE existing.practice_id = practice.id
+                   ), 1),
                    practice.criteria,
-                   CURRENT_TIMESTAMP,
+                   now(),
                    practice.slug,
                    practice.name,
                    practice.applies_to,
@@ -89,25 +61,93 @@
                    area.description,
                    area.icon,
                    area.color,
-                   practice.evidence_declaration
+                   NULL,
+                   practice.automated_assessment_policy
             FROM practice
-            LEFT JOIN practice_area area ON area.id = practice.practice_area_id
-            LEFT JOIN (
-                SELECT practice_id, max(revision_number) AS revision_number
-                FROM practice_revision
-                GROUP BY practice_id
-            ) max_revision ON max_revision.practice_id = practice.id;
+            LEFT JOIN practice_area area ON area.id = practice.practice_area_id;
 
             UPDATE practice
-            SET current_revision_id = current_revision.id
-            FROM practice_revision current_revision
-            WHERE current_revision.practice_id = practice.id
-              AND current_revision.revision_number = (
-                  SELECT max(candidate.revision_number)
+            SET current_revision_id = revision.id
+            FROM practice_revision revision
+            WHERE revision.practice_id = practice.id
+              AND revision.automated_assessment_policy IS NOT NULL
+              AND revision.revision_number = (
+                  SELECT MAX(candidate.revision_number)
                   FROM practice_revision candidate
                   WHERE candidate.practice_id = practice.id
+                    AND candidate.automated_assessment_policy IS NOT NULL
               );
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                UPDATE practice
+                SET current_revision_id = previous.id,
+                    slug = previous.slug,
+                    name = previous.name,
+                    applies_to = previous.applies_to,
+                    trigger_events = previous.trigger_events,
+                    criteria = previous.criteria,
+                    precompute_script = previous.precompute_script,
+                    why_it_matters = previous.why_it_matters,
+                    what_good_looks_like = previous.what_good_looks_like,
+                    practice_area_id = (
+                        SELECT area.id
+                        FROM practice_area area
+                        WHERE area.workspace_id = practice.workspace_id
+                          AND area.slug = previous.area_slug
+                    )
+                FROM practice_revision boundary
+                JOIN practice_revision previous
+                  ON previous.practice_id = boundary.practice_id
+                 AND previous.revision_number = boundary.revision_number - 1
+                WHERE boundary.practice_id = practice.id
+                  AND boundary.automated_assessment_policy IS NOT NULL
+                  AND previous.automated_assessment_policy IS NULL
+                  AND boundary.revision_number = (
+                      SELECT MIN(candidate.revision_number)
+                      FROM practice_revision candidate
+                      JOIN practice_revision before_candidate
+                        ON before_candidate.practice_id = candidate.practice_id
+                       AND before_candidate.revision_number = candidate.revision_number - 1
+                      WHERE candidate.practice_id = practice.id
+                        AND candidate.automated_assessment_policy IS NOT NULL
+                        AND before_candidate.automated_assessment_policy IS NULL
+                  );
 
+                DELETE FROM practice_revision
+                WHERE automated_assessment_policy IS NOT NULL;
+            ]]></sql>
+            <dropColumn tableName="practice_revision" columnName="automated_assessment_policy"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="curated_practice_override.automated_assessment_policy already present">
+            <not><columnExists tableName="curated_practice_override" columnName="automated_assessment_policy"/></not>
+        </preConditions>
+        <comment>Keep evidence requirements with complete instance-curated practice overrides.</comment>
+        <addColumn tableName="curated_practice_override">
+            <column name="automated_assessment_policy" type="jsonb"/>
+        </addColumn>
+        <sql>
+            UPDATE curated_practice_override
+            SET automated_assessment_policy = CASE applies_to
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedAssessment":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_ASSESSMENT","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+            END
+            WHERE applies_to IS NOT NULL
+        </sql>
+        <rollback><dropColumn tableName="curated_practice_override" columnName="automated_assessment_policy"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-4">
+        <preConditions onFail="HALT">
+            <columnExists tableName="practice" columnName="automated_assessment_policy"/>
+            <columnExists tableName="practice_revision" columnName="automated_assessment_policy"/>
+        </preConditions>
+        <comment>Enforce evidence requirements in immutable revisions and the current practice projection.</comment>
+        <sql splitStatements="false"><![CDATA[
             CREATE OR REPLACE FUNCTION enforce_practice_revision_immutability()
             RETURNS trigger
             LANGUAGE plpgsql
@@ -122,7 +162,7 @@
                    AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
                    AND NEW.criteria = OLD.criteria
                    AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
-                   AND NEW.evidence_declaration IS NOT DISTINCT FROM OLD.evidence_declaration
+                   AND NEW.automated_assessment_policy IS NOT DISTINCT FROM OLD.automated_assessment_policy
                    AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
                    AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
                    AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
@@ -160,7 +200,7 @@
                       AND revision.trigger_events = practice.trigger_events
                       AND revision.criteria = practice.criteria
                       AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
-                      AND revision.evidence_declaration = practice.evidence_declaration
+                      AND revision.automated_assessment_policy = practice.automated_assessment_policy
                       AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
                       AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
                       AND revision.area_slug IS NOT DISTINCT FROM area.slug
@@ -175,7 +215,7 @@
             DROP TRIGGER practice_requires_current_revision_projection ON practice;
             CREATE CONSTRAINT TRIGGER practice_requires_current_revision_projection
                 AFTER INSERT OR UPDATE OF current_revision_id, slug, name, applies_to, trigger_events,
-                    criteria, precompute_script, evidence_declaration, why_it_matters, what_good_looks_like,
+                    criteria, precompute_script, automated_assessment_policy, why_it_matters, what_good_looks_like,
                     practice_area_id
                 ON practice
                 DEFERRABLE INITIALLY DEFERRED
@@ -317,6 +357,225 @@
         </addColumn>
         <rollback>
             <dropColumn tableName="agent_job" columnName="evidence_snapshot"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-7">
+        <preConditions onFail="HALT">
+            <columnExists tableName="practice" columnName="is_active"/>
+            <not><columnExists tableName="practice" columnName="used_in_new_reviews"/></not>
+        </preConditions>
+        <comment>Name workspace practice participation by its actual effect.</comment>
+        <renameColumn tableName="practice" oldColumnName="is_active" newColumnName="used_in_new_reviews" columnDataType="boolean"/>
+        <sql>ALTER INDEX idx_practice_workspace_active RENAME TO idx_practice_workspace_usage</sql>
+        <rollback>
+            <sql>ALTER INDEX idx_practice_workspace_usage RENAME TO idx_practice_workspace_active</sql>
+            <renameColumn tableName="practice" oldColumnName="used_in_new_reviews" newColumnName="is_active" columnDataType="boolean"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-8">
+        <preConditions onFail="HALT">
+            <columnExists tableName="practice_revision" columnName="detection_fingerprint"/>
+            <not><columnExists tableName="practice_revision" columnName="review_rule_fingerprint"/></not>
+        </preConditions>
+        <comment>Name the fingerprint by the review rules whose currentness it tracks.</comment>
+        <renameColumn tableName="practice_revision" oldColumnName="detection_fingerprint" newColumnName="review_rule_fingerprint" columnDataType="varchar(96)"/>
+        <sql splitStatements="false"><![CDATA[
+            CREATE OR REPLACE FUNCTION enforce_practice_revision_immutability()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $immutable_revision$
+            BEGIN
+                IF NEW.practice_id = OLD.practice_id
+                   AND NEW.revision_number = OLD.revision_number
+                   AND NEW.created_at = OLD.created_at
+                   AND NEW.slug IS NOT DISTINCT FROM OLD.slug
+                   AND NEW.name IS NOT DISTINCT FROM OLD.name
+                   AND NEW.applies_to IS NOT DISTINCT FROM OLD.applies_to
+                   AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
+                   AND NEW.criteria = OLD.criteria
+                   AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
+                   AND NEW.automated_assessment_policy IS NOT DISTINCT FROM OLD.automated_assessment_policy
+                   AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
+                   AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
+                   AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
+                   AND NEW.area_name IS NOT DISTINCT FROM OLD.area_name
+                   AND NEW.area_description IS NOT DISTINCT FROM OLD.area_description
+                   AND NEW.area_icon IS NOT DISTINCT FROM OLD.area_icon
+                   AND NEW.area_color IS NOT DISTINCT FROM OLD.area_color
+                   AND (
+                       NEW.review_rule_fingerprint IS NOT DISTINCT FROM OLD.review_rule_fingerprint
+                       OR OLD.review_rule_fingerprint IS NULL
+                   )
+                THEN
+                    RETURN NEW;
+                END IF;
+                RAISE EXCEPTION 'practice revisions are immutable' USING ERRCODE = '55000';
+            END;
+            $immutable_revision$;
+        ]]></sql>
+        <rollback>
+            <renameColumn tableName="practice_revision" oldColumnName="review_rule_fingerprint" newColumnName="detection_fingerprint" columnDataType="varchar(96)"/>
+            <sql splitStatements="false"><![CDATA[
+                CREATE OR REPLACE FUNCTION enforce_practice_revision_immutability()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $immutable_revision$
+                BEGIN
+                    IF NEW.practice_id = OLD.practice_id
+                       AND NEW.revision_number = OLD.revision_number
+                       AND NEW.created_at = OLD.created_at
+                       AND NEW.slug IS NOT DISTINCT FROM OLD.slug
+                       AND NEW.name IS NOT DISTINCT FROM OLD.name
+                       AND NEW.applies_to IS NOT DISTINCT FROM OLD.applies_to
+                       AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
+                       AND NEW.criteria = OLD.criteria
+                       AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
+                       AND NEW.automated_assessment_policy IS NOT DISTINCT FROM OLD.automated_assessment_policy
+                       AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
+                       AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
+                       AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
+                       AND NEW.area_name IS NOT DISTINCT FROM OLD.area_name
+                       AND NEW.area_description IS NOT DISTINCT FROM OLD.area_description
+                       AND NEW.area_icon IS NOT DISTINCT FROM OLD.area_icon
+                       AND NEW.area_color IS NOT DISTINCT FROM OLD.area_color
+                       AND (
+                           NEW.detection_fingerprint IS NOT DISTINCT FROM OLD.detection_fingerprint
+                           OR OLD.detection_fingerprint IS NULL
+                       )
+                    THEN
+                        RETURN NEW;
+                    END IF;
+                    RAISE EXCEPTION 'practice revisions are immutable' USING ERRCODE = '55000';
+                END;
+                $immutable_revision$;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-9">
+        <preConditions onFail="HALT">
+            <tableExists tableName="config_audit_event"/>
+            <columnExists tableName="config_audit_event" columnName="entity_type"/>
+        </preConditions>
+        <comment>Name practice usage audit events by the setting they change.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            UPDATE config_audit_event SET entity_type = 'PRACTICE_USAGE' WHERE entity_type = 'PRACTICE_ACTIVE';
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_USAGE',
+                    'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                    'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                ));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                UPDATE config_audit_event SET entity_type = 'PRACTICE_ACTIVE' WHERE entity_type = 'PRACTICE_USAGE';
+                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN (
+                        'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                        'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                        'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                        'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                        'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                    ));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-10">
+        <preConditions onFail="HALT">
+            <columnExists tableName="practice_area" columnName="is_active"/>
+            <not><columnExists tableName="practice_area" columnName="visible_in_practice_dashboards"/></not>
+        </preConditions>
+        <comment>Name practice-area visibility by where it takes effect.</comment>
+        <renameColumn tableName="practice_area" oldColumnName="is_active" newColumnName="visible_in_practice_dashboards" columnDataType="boolean"/>
+        <sql>ALTER INDEX idx_practice_area_workspace_active RENAME TO idx_practice_area_workspace_dashboard_visibility</sql>
+        <rollback>
+            <sql>ALTER INDEX idx_practice_area_workspace_dashboard_visibility RENAME TO idx_practice_area_workspace_active</sql>
+            <renameColumn tableName="practice_area" oldColumnName="visible_in_practice_dashboards" newColumnName="is_active" columnDataType="boolean"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-11">
+        <preConditions onFail="HALT">
+            <tableExists tableName="workspace_agent_binding"/>
+            <columnExists tableName="agent_job" columnName="purpose"/>
+        </preConditions>
+        <comment>Name the AI purpose after the product feature it runs.</comment>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE workspace_agent_binding SET purpose = 'PRACTICE_REVIEW' WHERE purpose = 'PRACTICE_DETECTION';
+            UPDATE agent_job SET purpose = 'PRACTICE_REVIEW' WHERE purpose = 'PRACTICE_DETECTION';
+            UPDATE config_audit_event
+               SET entity_id = CASE WHEN entity_id = 'PRACTICE_DETECTION' THEN 'PRACTICE_REVIEW' ELSE entity_id END,
+                   old_value = CASE
+                       WHEN old_value->>'purpose' = 'PRACTICE_DETECTION'
+                       THEN jsonb_set(old_value, '{purpose}', '"PRACTICE_REVIEW"')
+                       ELSE old_value
+                   END,
+                   new_value = CASE
+                       WHEN new_value->>'purpose' = 'PRACTICE_DETECTION'
+                       THEN jsonb_set(new_value, '{purpose}', '"PRACTICE_REVIEW"')
+                       ELSE new_value
+                   END
+             WHERE entity_id = 'PRACTICE_DETECTION'
+                OR old_value->>'purpose' = 'PRACTICE_DETECTION'
+                OR new_value->>'purpose' = 'PRACTICE_DETECTION';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DO $rollback$
+                BEGIN
+                    IF to_regclass('workspace_agent_binding') IS NOT NULL THEN
+                        UPDATE workspace_agent_binding
+                        SET purpose = 'PRACTICE_DETECTION'
+                        WHERE purpose = 'PRACTICE_REVIEW';
+                    END IF;
+
+                    IF EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = current_schema()
+                          AND table_name = 'agent_job'
+                          AND column_name = 'purpose'
+                    ) THEN
+                        UPDATE agent_job
+                        SET purpose = 'PRACTICE_DETECTION'
+                        WHERE purpose = 'PRACTICE_REVIEW';
+                    END IF;
+
+                    IF to_regclass('config_audit_event') IS NOT NULL THEN
+                        UPDATE config_audit_event
+                           SET entity_id = CASE
+                                   WHEN entity_id = 'PRACTICE_REVIEW' THEN 'PRACTICE_DETECTION'
+                                   ELSE entity_id
+                               END,
+                               old_value = CASE
+                                   WHEN old_value->>'purpose' = 'PRACTICE_REVIEW'
+                                   THEN jsonb_set(old_value, '{purpose}', '"PRACTICE_DETECTION"')
+                                   ELSE old_value
+                               END,
+                               new_value = CASE
+                                   WHEN new_value->>'purpose' = 'PRACTICE_REVIEW'
+                                   THEN jsonb_set(new_value, '{purpose}', '"PRACTICE_DETECTION"')
+                                   ELSE new_value
+                               END
+                         WHERE entity_id = 'PRACTICE_REVIEW'
+                            OR old_value->>'purpose' = 'PRACTICE_REVIEW'
+                            OR new_value->>'purpose' = 'PRACTICE_REVIEW';
+                    END IF;
+                END
+                $rollback$;
+            ]]></sql>
         </rollback>
     </changeSet>
 

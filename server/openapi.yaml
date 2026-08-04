@@ -357,7 +357,7 @@ paths:
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
-            - PRACTICE_ACTIVE
+            - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_AREA
             - CURATED_PRACTICE
@@ -1106,17 +1106,17 @@ paths:
       - Admin Practice Catalog
   /admin/practice-catalog/evidence-options:
     get:
-      description: Returns the current baseline and allowed evidence sources for each
-        artifact type
+      description: Returns recommended requirements and allowed evidence sources for
+        each type of reviewed work
       operationId: adminGetPracticeEvidenceOptions
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PracticeEvidenceAuthoring"
+                $ref: "#/components/schemas/PracticeEvidenceOptions"
           description: OK
-      summary: Read practice evidence authoring options
+      summary: Read automated assessment evidence options
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/order:
@@ -2238,7 +2238,7 @@ paths:
         schema:
           type: string
           enum:
-          - PRACTICE_DETECTION
+          - PRACTICE_REVIEW
           - MENTOR
       responses:
         "204":
@@ -2262,7 +2262,7 @@ paths:
         schema:
           type: string
           enum:
-          - PRACTICE_DETECTION
+          - PRACTICE_REVIEW
           - MENTOR
       requestBody:
         content:
@@ -2324,7 +2324,7 @@ paths:
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
-            - PRACTICE_ACTIVE
+            - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_AREA
             - CURATED_PRACTICE
@@ -4003,9 +4003,9 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Return only active areas
+      - description: Return only areas shown in practice dashboards
         in: query
-        name: activeOnly
+        name: visibleInPracticeDashboardsOnly
         required: false
         schema:
           type: boolean
@@ -4201,8 +4201,8 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices:
     get:
-      description: "Returns all practice definitions for the workspace, optionally\
-        \ filtered by active state"
+      description: "Returns workspace practice definitions, optionally filtered by\
+        \ review participation"
       operationId: listPractices
       parameters:
       - description: Workspace slug
@@ -4212,9 +4212,9 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Filter by active state
+      - description: Filter by whether new reviews include the practice
         in: query
-        name: active
+        name: usedInNewReviews
         required: false
         schema:
           type: boolean
@@ -4270,8 +4270,8 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/evidence-options:
     get:
-      description: Returns the current baseline and allowed evidence sources for each
-        artifact type
+      description: Returns recommended requirements and allowed evidence sources for
+        each type of reviewed work
       operationId: getPracticeEvidenceOptions
       parameters:
       - description: Workspace slug
@@ -4286,9 +4286,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PracticeEvidenceAuthoring"
+                $ref: "#/components/schemas/PracticeEvidenceOptions"
           description: OK
-      summary: Read practice evidence authoring options
+      summary: Read automated assessment evidence options
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/feedback/engagement:
@@ -4390,9 +4390,8 @@ paths:
       - Feedback Reaction
   /workspaces/{workspaceSlug}/practices/learner:
     get:
-      description: "Active practices projected for a developer: name, area, why-it-matters,\
-        \ what-good-looks-like. The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO\
-        \ has no such field)."
+      description: "Returns the learner-facing name, area, rationale, and example\
+        \ for practices used in new reviews"
       operationId: listLearnerPractices
       parameters:
       - description: Workspace slug
@@ -4412,7 +4411,7 @@ paths:
                   $ref: "#/components/schemas/LearnerPractice"
           description: Learner practices returned
       security: []
-      summary: "List active practices, learner-facing"
+      summary: "List practices used in new reviews, learner-facing"
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/observations:
@@ -5170,44 +5169,6 @@ paths:
       summary: Update a practice
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/{practiceSlug}/active:
-    patch:
-      operationId: setActive
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: practiceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdatePracticeActiveRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Practice"
-          description: Active state updated
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: Practice not found
-      summary: Set practice active state
-      tags:
-      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/area:
     put:
       description: "Moves the practice to the requested area, or to Unassigned when\
@@ -5294,6 +5255,44 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Practice or area not found
       summary: Place a practice in the catalog
+      tags:
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/used-in-new-reviews:
+    patch:
+      operationId: setUsedInNewReviews
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeUsageRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Review participation updated
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Practice not found
+      summary: Choose whether new reviews include a practice
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
@@ -6625,7 +6624,7 @@ components:
         purpose:
           type: string
           enum:
-          - PRACTICE_DETECTION
+          - PRACTICE_REVIEW
           - MENTOR
         ready:
           type: boolean
@@ -7136,7 +7135,7 @@ components:
           - WORKSPACE_STATUS
           - WORKSPACE_TOKEN
           - WORKSPACE_VISIBILITY
-          - PRACTICE_ACTIVE
+          - PRACTICE_USAGE
           - PRACTICE_DEFINITION
           - PRACTICE_AREA
           - CURATED_PRACTICE
@@ -7633,22 +7632,21 @@ components:
             Unassigned.
         artifactType:
           type: string
-          description: Artifact this practice evaluates. Defaults to PULL_REQUEST
-            when omitted.
+          description: Type of reviewed work. Defaults to PULL_REQUEST when omitted.
           enum:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
           example: PULL_REQUEST
+        automatedAssessmentPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+          description: Versioned evidence required before Hephaestus may assess reviewed
+            work; omit to use the recommended requirements for the selected work type
         criteria:
           type: string
           description: Practice evaluation criteria
           maxLength: 50000
           minLength: 0
-        evidence:
-          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
-          description: Versioned sources and quality required before this practice
-            may be judged; omit to use the server baseline for the selected artifact
         name:
           type: string
           description: Human-readable name
@@ -7657,8 +7655,7 @@ components:
           minLength: 3
         precomputeScript:
           type: string
-          description: TypeScript/Bun precompute script for static analysis before
-            AI review
+          description: TypeScript/Bun static analysis run before automated assessment
           maxLength: 100000
           minLength: 0
         slug:
@@ -7670,7 +7667,7 @@ components:
           pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         triggerEvents:
           type: array
-          description: Domain events that trigger detection; empty for scheduled conversation
+          description: Events that start a practice review; empty for scheduled conversation
             reviews
           example:
           - PullRequestCreated
@@ -7687,8 +7684,7 @@ components:
           minLength: 0
         whyItMatters:
           type: string
-          description: "Developer-facing rationale (learner layer); plain language,\
-            \ never the detection rubric"
+          description: Plain-language rationale shown to the developer
           maxLength: 2000
           minLength: 0
       required:
@@ -8016,12 +8012,12 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        automatedAssessmentPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+        automatedAssessmentValidation:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentValidation"
         criteria:
           type: string
-        evidence:
-          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
-        evidenceValidation:
-          $ref: "#/components/schemas/PracticeEvidenceValidation"
         name:
           type: string
         precomputeScript:
@@ -8036,9 +8032,9 @@ components:
           type: string
       required:
       - artifactType
+      - automatedAssessmentPolicy
+      - automatedAssessmentValidation
       - criteria
-      - evidence
-      - evidenceValidation
       - name
       - triggerEvents
     CuratedPracticeRequest:
@@ -8055,21 +8051,21 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        automatedAssessmentPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+          description: Evidence requirements; omit to use the recommended requirements
+            for the selected work type
         criteria:
           type: string
           maxLength: 50000
           minLength: 0
-        evidence:
-          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
-          description: Evidence declaration; omit to use the server baseline for the
-            selected artifact
         name:
           type: string
           maxLength: 128
           minLength: 3
         precomputeScript:
           type: string
-          maxLength: 50000
+          maxLength: 100000
           minLength: 0
         triggerEvents:
           type: array
@@ -9099,10 +9095,9 @@ components:
           enum:
           - GOOD
           - BAD
-        claimStatus:
+        claimCurrentness:
           type: string
-          description: Validity of an evaluation claim against the practice revision
-            currently in force
+          description: Whether a finding was produced using the current review rules
           enum:
           - CURRENT
           - STALE
@@ -9155,7 +9150,7 @@ components:
       required:
       - artifactId
       - artifactType
-      - claimStatus
+      - claimCurrentness
       - confidence
       - id
       - observedAt
@@ -9196,10 +9191,9 @@ components:
           enum:
           - GOOD
           - BAD
-        claimStatus:
+        claimCurrentness:
           type: string
-          description: Validity of an evaluation claim against the practice revision
-            currently in force
+          description: Whether a finding was produced using the current review rules
           enum:
           - CURRENT
           - STALE
@@ -9243,7 +9237,7 @@ components:
       required:
       - artifactId
       - artifactType
-      - claimStatus
+      - claimCurrentness
       - confidence
       - id
       - observedAt
@@ -9251,24 +9245,6 @@ components:
       - practiceSlug
       - presence
       - title
-    OptionalPracticeEvidenceRequirement:
-      type: object
-      description: Optional source that may be used at any available quality
-      properties:
-        completeness:
-          type: string
-          enum:
-          - ANY
-        freshness:
-          type: string
-          enum:
-          - ANY
-        sourceKind:
-          type: string
-      required:
-      - completeness
-      - freshness
-      - sourceKind
     OutlineCollection:
       type: object
       description: A mirrored Outline collection with its sync state and live document
@@ -9638,19 +9614,20 @@ components:
       type: object
       description: Practice definition for evaluating developer contributions
       properties:
-        active:
-          type: boolean
-          description: Whether this practice is actively being detected
         areaSlug:
           type: string
           description: "Slug of the practice area this practice is bound to, if any"
         artifactType:
           type: string
-          description: Artifact this practice evaluates
+          description: Type of work this practice assesses
           enum:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        automatedAssessmentPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+        automatedAssessmentValidation:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentValidation"
         catalogOrigin:
           $ref: "#/components/schemas/CatalogOrigin"
         createdAt:
@@ -9664,10 +9641,6 @@ components:
           type: integer
           format: int32
           description: Position within its area (lowest first); ties broken by name
-        evidence:
-          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
-        evidenceValidation:
-          $ref: "#/components/schemas/PracticeEvidenceValidation"
         id:
           type: integer
           format: int64
@@ -9684,13 +9657,16 @@ components:
           description: URL-safe identifier unique within workspace
         triggerEvents:
           type: array
-          description: Domain events that trigger detection
+          description: Domain events that start a practice review
           items:
             type: string
         updatedAt:
           type: string
           format: date-time
           description: Timestamp when the practice was last updated
+        usedInNewReviews:
+          type: boolean
+          description: Whether new reviews include this practice
         whatGoodLooksLike:
           type: string
           description: Developer-facing exemplar (learner layer)
@@ -9698,25 +9674,22 @@ components:
           type: string
           description: Developer-facing rationale (learner layer)
       required:
-      - active
       - artifactType
+      - automatedAssessmentPolicy
+      - automatedAssessmentValidation
       - createdAt
       - criteria
       - displayOrder
-      - evidence
-      - evidenceValidation
       - id
       - name
       - slug
       - triggerEvents
       - updatedAt
+      - usedInNewReviews
     PracticeArea:
       type: object
       description: A practice area grouping related practices into a learning objective
       properties:
-        active:
-          type: boolean
-          description: Whether this area is active
         catalogOrigin:
           $ref: "#/components/schemas/CatalogOrigin"
         color:
@@ -9750,116 +9723,156 @@ components:
           type: string
           format: date-time
           description: Timestamp when the area was last updated
+        visibleInPracticeDashboards:
+          type: boolean
+          description: Whether this area is shown in practice dashboards
       required:
-      - active
       - createdAt
       - displayOrder
       - id
       - name
       - slug
-    PracticeDetectorCapability:
+      - visibleInPracticeDashboards
+    PracticeAutomatedAssessment:
       type: object
-      description: Hephaestus detection capability for the declared integration evidence
+      description: Author-declared automated assessment and evidence sufficiency for
+        one practice
       properties:
-        assessmentMethod:
+        evidenceSufficiency:
           type: string
-          description: How Hephaestus evaluates a practice when its evidence is sufficient
+          description: Whether meeting every evidence requirement provides enough
+            context to assess
           enum:
-          - MECHANICAL
-          - SEMANTIC
+          - SUFFICIENT_WHEN_REQUIREMENTS_MET
+          - DECLARED_EVIDENCE_INSUFFICIENT
           - NONE
-        evidenceCoverage:
+        mode:
           type: string
-          description: Whether the declared integration evidence can support every
-            detector judgment
+          description: Implementation Hephaestus uses for automated assessment
           enum:
-          - DECLARED_REQUIREMENTS_SUFFICIENT
-          - CONDITIONAL
+          - LANGUAGE_MODEL
           - NONE
       required:
-      - assessmentMethod
-      - evidenceCoverage
-    PracticeEvidenceArtifactOptions:
+      - evidenceSufficiency
+      - mode
+    PracticeAutomatedAssessmentPolicy:
       type: object
-      description: Evidence choices and recommended rule for one work artifact
+      description: Author-defined automated assessment and evidence requirements for
+        one practice revision
       properties:
-        artifactType:
+        automatedAssessment:
+          $ref: "#/components/schemas/PracticeAutomatedAssessment"
+          description: Automated assessment configuration; human assessment is a separate
+            process
+        evidenceProfile:
           type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-        baseline:
-          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
-        sources:
+          description: Set of evidence sources allowed for this type of reviewed work
+        knownLimitations:
           type: array
+          description: Claims the selected evidence cannot support even when every
+            requirement passes
           items:
-            $ref: "#/components/schemas/PracticeEvidenceSourceOption"
-      required:
-      - artifactType
-      - baseline
-      - sources
-    PracticeEvidenceAuthoring:
-      type: object
-      description: Server-supported options for authoring practice evidence requirements
-      properties:
-        artifacts:
+            $ref: "#/components/schemas/PracticeEvidenceLimitation"
+        optionalContext:
           type: array
+          description: Sources that may add context but never block assessment when
+            absent
           items:
-            $ref: "#/components/schemas/PracticeEvidenceArtifactOptions"
-      required:
-      - artifacts
-    PracticeEvidenceBlindSpot:
-      type: object
-      description: Author-declared limitation that remains when required evidence
-        is available
-      properties:
-        code:
-          type: string
-          pattern: "[A-Z][A-Z0-9_]{2,63}"
-        summary:
-          type: string
-          maxLength: 500
-          minLength: 0
-      required:
-      - code
-      - summary
-    PracticeEvidenceDeclaration:
-      type: object
-      description: "Author-declared, versioned evidence boundary for a practice definition"
-      properties:
-        blindSpots:
+            $ref: "#/components/schemas/PracticeOptionalContextSource"
+        requiredEvidence:
           type: array
-          items:
-            $ref: "#/components/schemas/PracticeEvidenceBlindSpot"
-        detectorCapability:
-          $ref: "#/components/schemas/PracticeDetectorCapability"
-          description: Hephaestus detectability from the declared integration evidence;
-            not human observability
-        onUnsatisfied:
-          type: string
-          enum:
-          - DECLINE_SEMANTIC_JUDGMENT
-        optional:
-          type: array
-          items:
-            $ref: "#/components/schemas/OptionalPracticeEvidenceRequirement"
-        profile:
-          type: string
-        required:
-          type: array
+          description: Sources that must meet their quality requirements before assessment
+            may start
           items:
             $ref: "#/components/schemas/PracticeEvidenceRequirement"
         sourceContractVersion:
           type: string
+          description: Exact contract version that defines source kinds and source-state
+            semantics
+        whenEvidenceIsInsufficient:
+          type: string
+          description: Conservative action when required evidence does not pass
+          enum:
+          - SKIP_AUTOMATED_ASSESSMENT
       required:
-      - blindSpots
-      - detectorCapability
-      - onUnsatisfied
-      - optional
-      - profile
-      - required
+      - automatedAssessment
+      - evidenceProfile
+      - knownLimitations
+      - optionalContext
+      - requiredEvidence
       - sourceContractVersion
+      - whenEvidenceIsInsufficient
+    PracticeAutomatedAssessmentValidation:
+      type: object
+      description: Independent validation status and provenance for automated assessment
+        requirements
+      properties:
+        evaluatorProcedureFingerprint:
+          type: string
+          description: "Versioned fingerprint of the independently validated model,\
+            \ prompt, tools, and preprocessing"
+        policyDigest:
+          type: string
+          description: SHA-256 digest of the exact automated-assessment policy
+        reviewRuleFingerprint:
+          type: string
+          description: Versioned fingerprint of the exact review rules
+        sourceContractVersion:
+          type: string
+          description: Source contract used by the validated practice definition
+        status:
+          type: string
+          description: Validation lifecycle; authors cannot mark their own assessment
+            as independently validated
+          enum:
+          - AUTHOR_DECLARED
+          - INDEPENDENTLY_VALIDATED
+          - STALE
+          - SUPERSEDED
+        validatedAt:
+          type: string
+          format: date-time
+          description: Time the independent validation was completed
+        validationReference:
+          type: string
+          description: Traceable reference to the validation record
+        validator:
+          type: string
+          description: Independent validator identity
+      required:
+      - policyDigest
+      - reviewRuleFingerprint
+      - sourceContractVersion
+      - status
+    PracticeEvidenceLimitation:
+      type: object
+      description: Known claim that the selected evidence cannot support even when
+        every requirement passes
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable identifier
+          example: RUNTIME_BEHAVIOR_NOT_OBSERVED
+          pattern: "[A-Z][A-Z0-9_]{2,63}"
+        description:
+          type: string
+          description: Plain-language explanation of the claim the evidence cannot
+            support
+          maxLength: 500
+          minLength: 1
+      required:
+      - code
+      - description
+    PracticeEvidenceOptions:
+      type: object
+      description: Evidence options for each type of reviewed work
+      properties:
+        workTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeWorkTypeEvidenceOptions"
+      required:
+      - workTypes
     PracticeEvidenceRequirement:
       type: object
       description: Source and minimum capture quality required by a practice
@@ -9868,12 +9881,12 @@ components:
           type: string
           enum:
           - COMPLETE
-          - ANY
+          - NO_REQUIREMENT
         freshness:
           type: string
           enum:
           - CURRENT
-          - ANY
+          - NO_REQUIREMENT
         sourceKind:
           type: string
       required:
@@ -9882,12 +9895,13 @@ components:
       - sourceKind
     PracticeEvidenceSourceOption:
       type: object
-      description: An evidence source that a practice may require or use as optional
-        context
+      description: An evidence source allowed by the selected evidence profile
       properties:
-        authorizedForDetection:
+        authorizedForAutomatedAssessment:
           type: boolean
         description:
+          type: string
+        displayName:
           type: string
         privacyClass:
           type: string
@@ -9905,37 +9919,24 @@ components:
         supportsEmpty:
           type: boolean
       required:
+      - authorizedForAutomatedAssessment
       - description
+      - displayName
       - privacyClass
       - sourceKind
-    PracticeEvidenceValidation:
+      - supportsComplete
+      - supportsCurrent
+      - supportsEmpty
+    PracticeOptionalContextSource:
       type: object
-      description: Independent validation status and provenance for an evidence declaration
+      description: Source that may add context but never blocks automated assessment
+        when absent
       properties:
-        declarationDigest:
+        sourceKind:
           type: string
-        sourceContractVersion:
-          type: string
-        status:
-          type: string
-          description: Independent status; evidence authors cannot promote their own
-            declaration
-          enum:
-          - AUTHOR_DECLARED
-          - INDEPENDENTLY_VALIDATED
-          - STALE
-          - SUPERSEDED
-        validatedAt:
-          type: string
-          format: date-time
-        validationReference:
-          type: string
-        validator:
-          type: string
+          description: Stable source identifier from the selected source contract
       required:
-      - declarationDigest
-      - sourceContractVersion
-      - status
+      - sourceKind
     PracticeReviewSettings:
       type: object
       description: "A workspace's practice-review policy: effective values plus raw\
@@ -9972,6 +9973,37 @@ components:
       - deliverToMerged
       - runForAllUsers
       - skipDrafts
+    PracticeWorkTypeEvidenceOptions:
+      type: object
+      description: Evidence choices and recommended requirements for one type of reviewed
+        work
+      properties:
+        allowedSources:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceSourceOption"
+        artifactType:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        recommendedRequirements:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+        supportedAutomatedAssessmentModes:
+          type: array
+          items:
+            type: string
+            description: Author-declared approach for automated assessment; this does
+              not describe human assessment
+            enum:
+            - LANGUAGE_MODEL
+            - NONE
+      required:
+      - allowedSources
+      - artifactType
+      - recommendedRequirements
+      - supportedAutomatedAssessmentModes
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential
@@ -10815,10 +10847,9 @@ components:
           enum:
           - GOOD
           - BAD
-        claimStatus:
+        claimCurrentness:
           type: string
-          description: Validity of an evaluation claim against the practice revision
-            currently in force
+          description: Whether a finding was produced using the current review rules
           enum:
           - CURRENT
           - STALE
@@ -10826,7 +10857,7 @@ components:
         confidence:
           type: number
           format: float
-          description: Detector confidence
+          description: Finding confidence
           maximum: 1
           minimum: 0
         findingId:
@@ -10866,7 +10897,7 @@ components:
         title:
           type: string
       required:
-      - claimStatus
+      - claimCurrentness
       - confidence
       - findingId
       - observedAt
@@ -11112,10 +11143,9 @@ components:
           enum:
           - GOOD
           - BAD
-        claimStatus:
+        claimCurrentness:
           type: string
-          description: Validity of an evaluation claim against the practice revision
-            currently in force
+          description: Whether a finding was produced using the current review rules
           enum:
           - CURRENT
           - STALE
@@ -11123,7 +11153,7 @@ components:
         confidence:
           type: number
           format: float
-          description: Detector confidence
+          description: Finding confidence
           maximum: 1
           minimum: 0
         feedbackDisposition:
@@ -11165,7 +11195,7 @@ components:
       required:
       - agentJobId
       - artifact
-      - claimStatus
+      - claimCurrentness
       - confidence
       - feedbackDisposition
       - id
@@ -11209,10 +11239,9 @@ components:
           enum:
           - GOOD
           - BAD
-        claimStatus:
+        claimCurrentness:
           type: string
-          description: Validity of an evaluation claim against the practice revision
-            currently in force
+          description: Whether a finding was produced using the current review rules
           enum:
           - CURRENT
           - STALE
@@ -11220,7 +11249,7 @@ components:
         confidence:
           type: number
           format: float
-          description: Detector confidence
+          description: Finding confidence
           maximum: 1
           minimum: 0
         evidence:
@@ -11272,7 +11301,7 @@ components:
       required:
       - agentJobId
       - artifact
-      - claimStatus
+      - claimCurrentness
       - confidence
       - feedback
       - id
@@ -12145,23 +12174,11 @@ components:
           - PAUSED
       required:
       - state
-    UpdatePracticeActiveRequest:
-      type: object
-      description: Request to set a practice's active state
-      properties:
-        active:
-          type: boolean
-          description: Whether the practice should be active
-      required:
-      - active
     UpdatePracticeAreaRequest:
       type: object
       description: Request to update an existing practice area (PATCH — only non-null
         fields applied)
       properties:
-        active:
-          type: boolean
-          description: Whether this area is active
         color:
           type: string
           description: Optional palette colour key for the area's chip
@@ -12189,6 +12206,9 @@ components:
           maxLength: 128
           minLength: 3
           pattern: .*\S.*
+        visibleInPracticeDashboards:
+          type: boolean
+          description: Whether this area is shown in practice dashboards
     UpdatePracticeRequest:
       type: object
       description: Request to update a practice; omitted fields remain unchanged
@@ -12199,12 +12219,16 @@ components:
             to leave unchanged
         artifactType:
           type: string
-          description: Artifact this practice evaluates
+          description: Type of reviewed work
           enum:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
           example: ISSUE
+        automatedAssessmentPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedAssessmentPolicy"
+          description: "Replacement evidence requirements; omit to preserve them,\
+            \ or to use the recommended requirements when artifactType changes"
         clear:
           type: array
           description: Optional fields to clear before applying supplied values
@@ -12221,10 +12245,6 @@ components:
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*
-        evidence:
-          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
-          description: "Replacement evidence declaration; omit to preserve it, or\
-            \ to use the server baseline when artifactType changes"
         name:
           type: string
           description: Human-readable name
@@ -12234,13 +12254,12 @@ components:
           pattern: .*\S.*
         precomputeScript:
           type: string
-          description: TypeScript/Bun precompute script for static analysis before
-            AI review
+          description: TypeScript/Bun static analysis run before automated assessment
           maxLength: 100000
           minLength: 0
         triggerEvents:
           type: array
-          description: Domain events that trigger detection; empty for scheduled conversation
+          description: Events that start a practice review; empty for scheduled conversation
             reviews
           items:
             type: string
@@ -12248,15 +12267,13 @@ components:
           minItems: 0
         whatGoodLooksLike:
           type: string
-          description: "Developer-facing exemplar (learner layer); a concrete instance,\
-            \ not the rubric"
+          description: Concrete example shown to the developer; not assessment criteria
           maxLength: 2000
           minLength: 0
           pattern: .*\S.*
         whyItMatters:
           type: string
-          description: "Developer-facing rationale (learner layer); plain language,\
-            \ never the detection rubric"
+          description: Plain-language rationale shown to the developer
           maxLength: 2000
           minLength: 0
           pattern: .*\S.*
@@ -12293,6 +12310,15 @@ components:
         skipDrafts:
           type: boolean
           description: Skip practice review for draft PRs/MRs
+    UpdatePracticeUsageRequest:
+      type: object
+      description: Request to choose whether new reviews include a practice
+      properties:
+        usedInNewReviews:
+          type: boolean
+          description: Whether new reviews should include the practice
+      required:
+      - usedInNewReviews
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in

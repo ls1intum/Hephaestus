@@ -14,17 +14,19 @@ public record PracticeDefinition(
     List<String> triggerEvents,
     String criteria,
     @Nullable String precomputeScript,
-    PracticeEvidenceDeclaration evidence,
+    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
     @Nullable String areaSlug
 ) implements CatalogDefinition {
+    public static final int MAX_PRECOMPUTE_SCRIPT_LENGTH = 100_000;
+
     public PracticeDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(artifactType, "artifactType");
         triggerEvents = List.copyOf(Objects.requireNonNull(triggerEvents, "triggerEvents").stream().sorted().toList());
         Objects.requireNonNull(criteria, "criteria");
-        Objects.requireNonNull(evidence, "evidence");
+        Objects.requireNonNull(automatedAssessmentPolicy, "automatedAssessmentPolicy");
         precomputeScript = blankToNull(precomputeScript);
         whyItMatters = blankToNull(whyItMatters);
         whatGoodLooksLike = blankToNull(whatGoodLooksLike);
@@ -37,7 +39,7 @@ public record PracticeDefinition(
             TriggerEventsConverter.toList(practice.getTriggerEvents()),
             practice.getCriteria(),
             practice.getPrecomputeScript(),
-            practice.getEvidence(),
+            practice.getAutomatedAssessmentPolicy(),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
             practice.getArea() == null ? null : practice.getArea().getSlug()
@@ -50,14 +52,14 @@ public record PracticeDefinition(
 
     @Override
     public String provenanceFingerprint(String slug) {
-        return PracticeDetectionFingerprint.of(
+        return ReviewRuleFingerprint.of(
             slug,
             name,
             artifactType,
             triggerEvents,
             criteria,
             precomputeScript,
-            evidence,
+            automatedAssessmentPolicy,
             areaSlug
         );
     }
@@ -65,6 +67,10 @@ public record PracticeDefinition(
     @Override
     public String digest(String slug) {
         return PracticeDefinitionDigest.digest(slug, this);
+    }
+
+    public String exactFingerprint(String slug) {
+        return "v1:" + digest(slug);
     }
 
     private static String blankToNull(@Nullable String value) {

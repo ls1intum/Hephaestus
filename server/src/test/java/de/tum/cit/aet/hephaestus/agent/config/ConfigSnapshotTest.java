@@ -38,7 +38,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setId(42L);
         binding.setWorkspace(ws);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         LlmModel model = new LlmModel();
         model.setId(20L);
         binding.setInstanceModel(model);

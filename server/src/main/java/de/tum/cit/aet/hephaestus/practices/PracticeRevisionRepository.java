@@ -27,7 +27,7 @@ public interface PracticeRevisionRepository
         """
         SELECT DISTINCT r.practice.workspace.id FROM PracticeRevision r
         WHERE r.slug IS NOT NULL
-          AND r.detectionFingerprint IS NULL
+          AND r.reviewRuleFingerprint IS NULL
         ORDER BY r.practice.workspace.id
         """
     )
@@ -38,7 +38,7 @@ public interface PracticeRevisionRepository
         SELECT r FROM PracticeRevision r
         WHERE r.practice.workspace.id = :workspaceId
           AND r.slug IS NOT NULL
-          AND r.detectionFingerprint IS NULL
+          AND r.reviewRuleFingerprint IS NULL
         ORDER BY r.id
         """
     )
@@ -46,10 +46,10 @@ public interface PracticeRevisionRepository
 
     @Modifying
     @Query(
-        value = "UPDATE practice_revision SET detection_fingerprint = :fingerprint WHERE id = :revisionId",
+        value = "UPDATE practice_revision SET review_rule_fingerprint = :fingerprint WHERE id = :revisionId",
         nativeQuery = true
     )
-    void setDetectionFingerprint(@Param("revisionId") long revisionId, @Param("fingerprint") String fingerprint);
+    void setReviewRuleFingerprint(@Param("revisionId") long revisionId, @Param("fingerprint") String fingerprint);
 
     /**
      * Returns the definition available at {@code asOf}, so an edit during detection cannot change the

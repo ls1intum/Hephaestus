@@ -1,6 +1,6 @@
 # Practice catalog curation
 
-The practice catalog turns observable engineering habits into review criteria. Product terminology
+The practice catalog turns defined engineering practices into review criteria. Product terminology
 lives in the [practice feedback language guide](practice-feedback-language.md); this page covers how
 to maintain the catalog.
 
@@ -76,7 +76,7 @@ The ordinary matching state has no badge. Exceptions say **Customized for this w
 never rewrites the workspace.
 
 A practice comparison covers the inputs that affect review behavior: slug, name, work type, trigger
-events, criteria, evidence declaration, precompute script, and area. **Why it matters** and **What good looks like** are
+events, criteria, evidence requirements, precompute script, and area. **Why it matters** and **What good looks like** are
 guidance and do not affect review-rule drift. An area comparison covers name, description, icon, and
 color; position is excluded.
 
@@ -92,13 +92,14 @@ A practice must:
 6. cite research, a standard, or an explicitly identified practitioner norm.
 
 Evidence requirements use the versioned
-[artifact-source contract](./artifact-source-contract). They declare logical required/optional sources, minimum
-completeness/freshness, conservative refusal, and known blind spots. They must not infer availability
-from a missing file or require desired content to be non-empty. An author declaration is not independent
-validation of Hephaestus detectability. It says nothing about what the practitioner, a peer, or a human mentor can
-observe outside the governed integrations.
+[artifact-source contract](./artifact-source-contract) and the canonical
+[practice assessment glossary](./practice-assessment-glossary.mdx). They define required evidence, optional context,
+minimum completeness and freshness, conservative skipping, and known limitations. They must not infer availability
+from a missing file or require desired content to be non-empty. Author-defined requirements are not independent
+validation of automated assessment. They say nothing about whether a developer, peer, or human mentor can assess the practice
+outside the governed integrations.
 
-The detection fingerprint uses an explicit scheme prefix. Evidence-aware definitions use `v2`; stored `v1`
+The review-rule fingerprint uses an explicit scheme prefix. Evidence-aware definitions use `v2`; stored `v1`
 fingerprints retain their original pre-contract meaning and never compare equal by accident.
 
 Architecture-wide qualities cannot be inferred from one change. A practice may review an observable
@@ -125,7 +126,7 @@ standard as an experiment or a convention as a proven outcome.
    [artifact-source governance gate](../admin/dsms/artifact-source-governance).
 5. Update `server/src/main/resources/practices/default-catalog.json`; its Git history is the bundled
    version history.
-6. Add or update focused detection tests, including required-source refusal and valid-empty evidence.
+6. Add or update focused automated-assessment tests, including required-source skipping and valid-empty evidence.
 7. Review the admin presentation and a representative delivered message.
 
 Create workspace-specific practices through the admin UI or API so validation, ordering, revisions,

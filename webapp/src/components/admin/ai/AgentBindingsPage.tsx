@@ -40,7 +40,7 @@ interface PurposeMeta {
 
 const PURPOSES: PurposeMeta[] = [
 	{
-		purpose: "PRACTICE_DETECTION",
+		purpose: "PRACTICE_REVIEW",
 		title: "Practice reviews",
 		description: "Reviews connected project work and conversations.",
 		disabledLabel: "Practice reviews off",
@@ -287,14 +287,14 @@ function AgentPurposeCard({
 								<div>
 									<Link
 										to={
-											meta.purpose === "PRACTICE_DETECTION"
+											meta.purpose === "PRACTICE_REVIEW"
 												? "/w/$workspaceSlug/admin/practices/settings"
 												: "/w/$workspaceSlug/admin/settings"
 										}
 										params={{ workspaceSlug }}
 										className="underline underline-offset-4"
 									>
-										{meta.purpose === "PRACTICE_DETECTION"
+										{meta.purpose === "PRACTICE_REVIEW"
 											? "Open Review settings"
 											: "Open Workspace settings"}
 									</Link>

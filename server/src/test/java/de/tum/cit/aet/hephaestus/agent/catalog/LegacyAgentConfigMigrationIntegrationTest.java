@@ -94,7 +94,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .as("the mentor fell back to it and detection fanned out to it, so it keeps both purposes")
             .containsExactly(
                 new String[] { "MENTOR", "900", "5", "true" },
-                new String[] { "PRACTICE_DETECTION", "900", "5", "true" }
+                new String[] { "PRACTICE_REVIEW", "900", "5", "true" }
             );
     }
 
@@ -129,7 +129,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     void aConfigSharedByBothPurposesBecomesTwoBindingsOnOneModel() throws SQLException {
         assertThat(bindingsOf("legacy-bound")).containsExactly(
             new String[] { "MENTOR", "600", "3", "false" },
-            new String[] { "PRACTICE_DETECTION", "600", "3", "false" }
+            new String[] { "PRACTICE_REVIEW", "600", "3", "false" }
         );
         assertThat(
             scalar(
@@ -195,7 +195,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .as("the limits are what the binding exists to carry; skipping the model would have dropped them")
             .containsExactly(
                 new String[] { "MENTOR", "1200", "7", "true" },
-                new String[] { "PRACTICE_DETECTION", "1200", "7", "true" }
+                new String[] { "PRACTICE_REVIEW", "1200", "7", "true" }
             );
     }
 
@@ -229,7 +229,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     void aPointerAtADisabledConfigPausesDetectionButNotTheMentor() throws SQLException {
         assertThat(purposeToModelSlug("legacy-paused")).containsExactly(
             Map.entry("MENTOR", "legacy-9509"),
-            Map.entry("PRACTICE_DETECTION", "legacy-9508")
+            Map.entry("PRACTICE_REVIEW", "legacy-9508")
         );
     }
 
@@ -445,7 +445,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             INSERT INTO agent_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
                                    retry_count, created_at, completed_at, llm_model, llm_total_calls,
                                    llm_total_input_tokens, llm_total_output_tokens, llm_cost_usd)
-            VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_DETECTION', 'COMPLETED',
+            VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_REVIEW', 'COMPLETED',
                     '{}'::jsonb, 'token', 0, now(), now(), 'gpt-4o', 3, 1000, 500, 0.25)
             """,
             """

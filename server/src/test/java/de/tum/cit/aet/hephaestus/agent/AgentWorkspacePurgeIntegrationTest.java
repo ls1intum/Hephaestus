@@ -122,7 +122,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         Workspace workspace = workspaceRepository.save(TestEntities.activeWorkspace("pending-delivery"));
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setDeliveryStatus(DeliveryStatus.PENDING);
@@ -159,7 +159,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
 
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setWorkspaceModel(model);
         bindingRepository.save(binding);
 
@@ -169,7 +169,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
 
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setDeliveryStatus(DeliveryStatus.DELIVERED);

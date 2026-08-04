@@ -102,7 +102,7 @@ public class WorkspaceContextBuilder {
         }
     }
 
-    public ContextManifestBuilder.PreparedReadiness prepareReadiness(
+    public ContextManifestBuilder.PreparedAutomatedAssessmentReadiness prepareAutomatedAssessmentReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices,
         String jobId,
@@ -111,7 +111,7 @@ public class WorkspaceContextBuilder {
         if (manifestBuilder == null) {
             throw new IllegalStateException("Evidence readiness requires a manifest builder");
         }
-        return manifestBuilder.prepareReadiness(manifest, practices, jobId, temporalAnchor);
+        return manifestBuilder.prepareAutomatedAssessmentReadiness(manifest, practices, jobId, temporalAnchor);
     }
 
     public PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {

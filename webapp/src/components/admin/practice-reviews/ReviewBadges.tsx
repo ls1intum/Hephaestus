@@ -16,27 +16,26 @@ import {
 	severityBadgeVariant,
 } from "./review-format";
 
-type NonCurrentClaimStatus = Exclude<ReviewFinding["claimStatus"], "CURRENT">;
+type NonCurrentClaimCurrentness = Exclude<ReviewFinding["claimCurrentness"], "CURRENT">;
 
-const CLAIM_STATUS_CONFIG = {
+const CLAIM_CURRENTNESS_CONFIG = {
 	STALE: {
-		badge: "Outdated result",
+		badge: "Uses older review rules",
 		badgeVariant: "warning",
 		Icon: ClockAlert,
-		title: "This result is outdated",
-		description:
-			"The practice definition has changed since this result was produced. Keep it as history, not as a current assessment.",
+		title: "This result uses older review rules",
+		description: "This result was produced using an older practice definition.",
 	},
 	UNVERIFIABLE: {
-		badge: "Claim validity unknown",
+		badge: "Currentness unknown",
 		badgeVariant: "outline",
 		Icon: CircleHelp,
-		title: "This claim cannot be verified",
+		title: "Currentness is unknown",
 		description:
-			"The provenance needed to compare this result with the current practice is unavailable. Do not treat it as a current assessment.",
+			"We can’t determine whether this result uses the current review rules because comparison provenance is unavailable.",
 	},
 } as const satisfies Record<
-	NonCurrentClaimStatus,
+	NonCurrentClaimCurrentness,
 	{
 		badge: string;
 		badgeVariant: "warning" | "outline";
@@ -73,15 +72,23 @@ export function FindingAssessmentBadge({ finding }: { finding: FindingAssessment
 	);
 }
 
-export function ClaimStatusBadge({ status }: { status: ReviewFinding["claimStatus"] }) {
-	if (status === "CURRENT") return null;
-	const config = CLAIM_STATUS_CONFIG[status];
+export function ClaimCurrentnessBadge({
+	currentness,
+}: {
+	currentness: ReviewFinding["claimCurrentness"];
+}) {
+	if (currentness === "CURRENT") return null;
+	const config = CLAIM_CURRENTNESS_CONFIG[currentness];
 	return <Badge variant={config.badgeVariant}>{config.badge}</Badge>;
 }
 
-export function ClaimStatusAlert({ status }: { status: ReviewFinding["claimStatus"] }) {
-	if (status === "CURRENT") return null;
-	const { Icon, title, description } = CLAIM_STATUS_CONFIG[status];
+export function ClaimCurrentnessAlert({
+	currentness,
+}: {
+	currentness: ReviewFinding["claimCurrentness"];
+}) {
+	if (currentness === "CURRENT") return null;
+	const { Icon, title, description } = CLAIM_CURRENTNESS_CONFIG[currentness];
 	return (
 		<Alert variant="warning">
 			<Icon />

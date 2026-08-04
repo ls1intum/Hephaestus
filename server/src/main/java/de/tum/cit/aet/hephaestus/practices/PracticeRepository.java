@@ -22,13 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
+    List<Practice> findByWorkspaceIdAndUsedInNewReviewsTrue(Long workspaceId);
 
-    /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
+    /** Practices included in new reviews for one work type. */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+    List<Practice> findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
-    boolean existsByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+    boolean existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
@@ -64,13 +64,13 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
             "WHERE p.sourceCuratedSlug IS NOT NULL " +
             "AND previous.practice = p " +
             "AND previous.revisionNumber = current.revisionNumber - 1 " +
-            "AND p.sourceCuratedFingerprint = previous.detectionFingerprint " +
+            "AND p.sourceCuratedFingerprint = previous.reviewRuleFingerprint " +
             "AND p.sourceCuratedFingerprint LIKE 'v1:%'"
     )
     List<Practice> findSourceAlignedV1Practices();
 
     /**
-     * Lists practices for a workspace with an optional active filter.
+     * Lists practices for a workspace with an optional review-participation filter.
      * Null filter values are ignored (match all).
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
@@ -79,11 +79,14 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         SELECT p FROM Practice p
         LEFT JOIN FETCH p.area a
         WHERE p.workspace.id = :workspaceId
-        AND (:active IS NULL OR p.active = :active)
+        AND (:usedInNewReviews IS NULL OR p.usedInNewReviews = :usedInNewReviews)
         ORDER BY a.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
         """
     )
-    List<Practice> findByFilters(@Param("workspaceId") Long workspaceId, @Param("active") Boolean active);
+    List<Practice> findByFilters(
+        @Param("workspaceId") Long workspaceId,
+        @Param("usedInNewReviews") Boolean usedInNewReviews
+    );
 
     /** Deletes all practices for the workspace. Cascades to observation via ON DELETE CASCADE. */
     @Modifying

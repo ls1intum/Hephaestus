@@ -28,31 +28,8 @@ import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The atomic unit of practice detection: one detector's evaluation of one {@link Practice} on one
- * {@link WorkArtifact} (ADR 0022). It is a <b>presence × assessment</b> record — whether the practice's
- * target signal was {@link #presence seen, expected-but-absent, or inapplicable} and, when applicable,
- * whether that is {@link #assessment good or bad} for the developer. The two axes are orthogonal: their
- * 2×2 distinguishes a strength, a problem-by-commission, a clean avoidance, and a gap-by-omission, a
- * distinction a single signed verdict cannot express (ADR 0022 §1).
- *
- * <p><b>Lifecycle:</b> append-only and {@code @Immutable} — an observation is the immutable measurement
- * a re-detection produces, never edited in place; a later run files a fresh row sharing the same
- * {@link #recurrenceKey}, so trend/baseline is derived on read across the locus chain and the delivered
- * {@code Feedback} supersedes rather than re-posts (the row itself is never superseded). The production
- * write path is the native, race-safe
- * {@code ObservationRepository.insertIfAbsent} keyed on the per-occurrence {@link #occurrenceKey}; no
- * caller invokes {@code save()}.
- *
- * <p><b>Place in the model:</b> references a {@link Practice} (the rule) and the {@link PracticeRevision}
- * snapshot it fired against; targets a {@link WorkArtifact} by {@code (artifactType, artifactId)}; is
- * filed against the subject {@link #aboutUserId}. A {@code Feedback} unit composes one or more
- * observations into a delivered message, and a reaction follows the underlying locus across runs by the
- * shared {@link #recurrenceKey}.
- *
- * @see Practice the rule being evaluated
- * @see Presence the measurement axis (seen / absent / inapplicable)
- * @see Assessment the valence axis (good / bad)
- * @see Severity the impact band of a {@link Assessment#BAD} observation
+ * Immutable assessment of one practice on one work artifact. Presence and assessment are separate axes;
+ * later reviews append a new row linked by {@link #recurrenceKey}.
  */
 @Entity
 @Immutable
@@ -63,12 +40,10 @@ import tools.jackson.databind.JsonNode;
         @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
         @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
         @Index(name = "idx_observation_target", columnList = "artifact_type, artifact_id"),
-        // A1 (ADR 0021): rank a target's review runs by recency without scanning the workspace (ObservationTrendService).
         @Index(
             name = "idx_observation_target_run",
             columnList = "artifact_type, artifact_id, agent_job_id, observed_at DESC"
         ),
-        // Cross-run locus (ADR 0021 C2): supersession + reaction-history follow one observation across re-detections.
         @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
         // Reviewer-side observations are filed against the subject (about_user_id); index for subject dashboards.
         @Index(name = "idx_observation_subject", columnList = "about_user_id"),
@@ -196,7 +171,7 @@ public class Observation {
     private Severity severity;
 
     /**
-     * Detector confidence in {@code [0, 1]}, DB-enforced by CHECK {@code chk_observation_confidence}
+     * Finding confidence in {@code [0, 1]}, DB-enforced by CHECK {@code chk_observation_confidence}
      * ({@code confidence >= 0 AND confidence <= 1}) — the bounded range is not implied by the {@code Float} type.
      */
     @NotNull

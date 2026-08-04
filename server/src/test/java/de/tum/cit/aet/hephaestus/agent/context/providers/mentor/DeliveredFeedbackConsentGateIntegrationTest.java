@@ -66,7 +66,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         setUpWorkspaceAndRecipient("delivered-consent-gate-test");
         practice = new Practice();
         practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
-        practice.setEvidence(PracticeTestEvidence.conversationThread());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");

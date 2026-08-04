@@ -243,7 +243,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 new ClasspathArtifactSourceCatalogRegistry(
                     mapper,
                     java.time.Clock.systemUTC(),
-                    "scm.pull-request.comments:PRACTICE_DETECTION"
+                    "scm.pull-request.comments:AUTOMATED_PRACTICE_ASSESSMENT"
                 ),
                 Clock.systemUTC()
             );
@@ -313,7 +313,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 new ClasspathArtifactSourceCatalogRegistry(
                     mapper,
                     Clock.systemUTC(),
-                    "scm.pull-request.diff:PRACTICE_DETECTION"
+                    "scm.pull-request.diff:AUTOMATED_PRACTICE_ASSESSMENT"
                 ),
                 Clock.systemUTC()
             );

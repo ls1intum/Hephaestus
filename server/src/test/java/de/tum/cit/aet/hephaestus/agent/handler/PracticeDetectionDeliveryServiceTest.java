@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Val
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -113,7 +113,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         testPractice = new Practice();
         ReflectionTestUtils.setField(testPractice, "id", 10L);
         testPractice.setSlug("pr-description-quality");
-        testPractice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        testPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         testPractice.setWorkspace(workspace);
 
         testJob = new AgentJob();
@@ -127,16 +127,16 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         testJob.setMetadata(metadata);
         ObjectNode snapshot = objectMapper.createObjectNode();
         var sources = snapshot.putObject("manifest").put("contractVersion", "1.0.0").putArray("sources");
-        var source = sources.addObject().put("kind", "scm.pull-request.diff").put("availability", "AVAILABLE");
+        var source = sources.addObject().put("kind", "scm.pull-request.diff");
+        source.putObject("state").put("availability", "AVAILABLE").put("content", "NON_EMPTY");
         source
             .putArray("artifacts")
             .addObject()
             .put("path", "inputs/context/diff.patch")
             .put("sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        sources
-            .addObject()
-            .put("kind", "scm.pull-request.core")
-            .put("availability", "AVAILABLE")
+        var coreSource = sources.addObject().put("kind", "scm.pull-request.core");
+        coreSource.putObject("state").put("availability", "AVAILABLE").put("content", "NON_EMPTY");
+        coreSource
             .putArray("artifacts")
             .addObject()
             .put("path", "inputs/context/pull_request.json")
@@ -148,7 +148,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getId()).thenReturn(11L);
         lenient().when(revision.getSlug()).thenReturn("pr-description-quality");
         lenient().when(revision.getPractice()).thenReturn(testPractice);
-        lenient().when(revision.getEvidence()).thenReturn(testPractice.getEvidence());
+        lenient().when(revision.getAutomatedAssessmentPolicy()).thenReturn(testPractice.getAutomatedAssessmentPolicy());
         lenient().when(practiceRevisionRepository.findById(11L)).thenReturn(Optional.of(revision));
         lenient()
             .when(cas.get("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
@@ -238,7 +238,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getId()).thenReturn(revisionId);
         lenient().when(revision.getSlug()).thenReturn(practice.getSlug());
         lenient().when(revision.getPractice()).thenReturn(practice);
-        lenient().when(revision.getEvidence()).thenReturn(practice.getEvidence());
+        lenient().when(revision.getAutomatedAssessmentPolicy()).thenReturn(practice.getAutomatedAssessmentPolicy());
         lenient().when(practiceRevisionRepository.findById(revisionId)).thenReturn(Optional.of(revision));
     }
 
@@ -297,7 +297,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void rejectsASourceWithdrawnAfterCapture() {
             when(
-                sourceCatalogs.isSourceUsePermitted(any(), any(), eq(SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS))
+                sourceCatalogs.isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
             ).thenReturn(false);
 
             assertThatThrownBy(() ->
@@ -306,11 +306,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("authorization was withdrawn");
             verifyNoInteractions(observationRepository);
-            verify(sourceCatalogs).isSourceUsePermitted(
-                any(),
-                any(),
-                eq(SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
-            );
+            verify(sourceCatalogs).isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY));
         }
 
         @Test
@@ -449,7 +445,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void rejectsACitationToAnUnavailableSource() {
-            ((ObjectNode) testJob.getEvidenceSnapshot().path("manifest").path("sources").get(0)).put(
+            ((ObjectNode) testJob.getEvidenceSnapshot().path("manifest").path("sources").get(0).path("state")).put(
                 "availability",
                 "UNAVAILABLE"
             );
@@ -638,7 +634,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            otherPractice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
             admit(otherPractice, 22L);
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
@@ -806,7 +802,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            otherPractice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            otherPractice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
             admit(otherPractice, 22L);
 
             var findings = List.of(

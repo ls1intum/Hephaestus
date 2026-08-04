@@ -165,8 +165,8 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
                o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
                o.confidence AS confidence, evaluatedRevision.id AS practiceRevisionId,
-               evaluatedRevision.detectionFingerprint AS practiceRevisionFingerprint,
-               currentRevision.detectionFingerprint AS currentPracticeRevisionFingerprint,
+               evaluatedRevision.reviewRuleFingerprint AS practiceRevisionFingerprint,
+               currentRevision.reviewRuleFingerprint AS currentPracticeRevisionFingerprint,
                o.observedAt AS observedAt
         FROM FeedbackObservation fo
         JOIN fo.observation o

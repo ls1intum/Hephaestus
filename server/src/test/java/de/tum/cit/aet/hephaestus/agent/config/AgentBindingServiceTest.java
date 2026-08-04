@@ -67,7 +67,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void upsertBindsAnAvailableInstanceModel() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.empty()
         );
         LlmModel model = new LlmModel();
@@ -76,10 +76,10 @@ class AgentBindingServiceTest extends BaseUnitTest {
         when(bindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new AgentBindingRequestDTO(99L, null, 300, 2, true, true);
-        WorkspaceAgentBinding saved = service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request);
+        WorkspaceAgentBinding saved = service.upsertBinding(context(), AgentPurpose.PRACTICE_REVIEW, request);
 
         assertThat(saved.getWorkspace()).isSameAs(w);
-        assertThat(saved.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
+        assertThat(saved.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_REVIEW);
         assertThat(saved.getInstanceModel().getId()).isEqualTo(99L);
         assertThat(saved.getWorkspaceModel()).isNull();
         assertThat(saved.getTimeoutSeconds()).isEqualTo(300);
@@ -93,7 +93,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
         ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
         verify(configAudit).record(entry.capture());
         assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.AGENT_BINDING);
-        assertThat(entry.getValue().entityId()).isEqualTo(AgentPurpose.PRACTICE_DETECTION.name());
+        assertThat(entry.getValue().entityId()).isEqualTo(AgentPurpose.PRACTICE_REVIEW.name());
         assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
         assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.UPDATED);
         assertThat(entry.getValue().before()).hasFieldOrPropertyWithValue("instanceModelId", null);
@@ -107,7 +107,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void upsertRejectsAModelThatIsNotAvailableToTheWorkspace() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.empty()
         );
         LlmModel model = new LlmModel();
@@ -118,9 +118,9 @@ class AgentBindingServiceTest extends BaseUnitTest {
         );
 
         var request = new AgentBindingRequestDTO(99L, null, null, null, null, true);
-        assertThatThrownBy(() ->
-            service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request)
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.PRACTICE_REVIEW, request)).isInstanceOf(
+            IllegalArgumentException.class
+        );
         verify(bindingRepository, never()).save(any());
     }
 

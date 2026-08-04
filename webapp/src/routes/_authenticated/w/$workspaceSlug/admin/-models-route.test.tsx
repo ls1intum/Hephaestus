@@ -118,17 +118,17 @@ describe("workspace AI models route", () => {
 		});
 		let detectionSaves = 0;
 		server.use(
-			http.put("*/workspaces/:workspaceSlug/agents/PRACTICE_DETECTION", async () => {
+			http.put("*/workspaces/:workspaceSlug/agents/PRACTICE_REVIEW", async () => {
 				detectionSaves += 1;
 				await slowSave;
-				return HttpResponse.json(binding("PRACTICE_DETECTION", 20));
+				return HttpResponse.json(binding("PRACTICE_REVIEW", 20));
 			}),
 			http.put("*/workspaces/:workspaceSlug/agents/MENTOR", () =>
 				HttpResponse.json(binding("MENTOR", 20)),
 			),
 		);
 
-		await renderModelsRoute(() => [binding("PRACTICE_DETECTION", 20), binding("MENTOR", 20)]);
+		await renderModelsRoute(() => [binding("PRACTICE_REVIEW", 20), binding("MENTOR", 20)]);
 
 		fireEvent.click(saveButton("Practice reviews model"));
 		await waitFor(() => expect(detectionSaves).toBe(1));
@@ -143,7 +143,7 @@ describe("workspace AI models route", () => {
 	});
 
 	it("keeps unsaved run limits when another admin repoints the same purpose", async () => {
-		let bindings = [binding("PRACTICE_DETECTION", 20)];
+		let bindings = [binding("PRACTICE_REVIEW", 20)];
 		const queryClient = await renderModelsRoute(() => bindings);
 
 		const detection = card("Practice reviews model");
@@ -152,7 +152,7 @@ describe("workspace AI models route", () => {
 		fireEvent.change(timeout, { target: { value: "900" } });
 		expect(timeout.value).toBe("900");
 
-		bindings = [{ ...binding("PRACTICE_DETECTION", 21), ready: false }];
+		bindings = [{ ...binding("PRACTICE_REVIEW", 21), ready: false }];
 		await queryClient.invalidateQueries({
 			queryKey: listAgentsQueryKey({ path: { workspaceSlug: "acme" } }),
 		});
@@ -168,15 +168,15 @@ describe("workspace AI models route", () => {
 	});
 
 	it("reads back what was just saved, not what the card was showing before", async () => {
-		let bindings = [binding("PRACTICE_DETECTION", 20)];
+		let bindings = [binding("PRACTICE_REVIEW", 20)];
 		const queryClient = await renderModelsRoute(() => bindings);
 		const refetch = deferredBindingsRefetch(() => bindings);
 		server.use(
 			refetch.handler,
-			http.put("*/workspaces/:workspaceSlug/agents/PRACTICE_DETECTION", async ({ request }) => {
+			http.put("*/workspaces/:workspaceSlug/agents/PRACTICE_REVIEW", async ({ request }) => {
 				const body = (await request.json()) as { instanceModelId: number; timeoutSeconds: number };
 				const saved: AgentBinding = {
-					...binding("PRACTICE_DETECTION", body.instanceModelId),
+					...binding("PRACTICE_REVIEW", body.instanceModelId),
 					timeoutSeconds: body.timeoutSeconds,
 					ready: false,
 				};
@@ -206,12 +206,12 @@ describe("workspace AI models route", () => {
 	});
 
 	it("reseeds the card to its defaults when the purpose is turned off", async () => {
-		let bindings = [{ ...binding("PRACTICE_DETECTION", 20), timeoutSeconds: 900 }];
+		let bindings = [{ ...binding("PRACTICE_REVIEW", 20), timeoutSeconds: 900 }];
 		const queryClient = await renderModelsRoute(() => bindings);
 		const refetch = deferredBindingsRefetch(() => bindings);
 		server.use(
 			refetch.handler,
-			http.delete("*/workspaces/:workspaceSlug/agents/PRACTICE_DETECTION", () => {
+			http.delete("*/workspaces/:workspaceSlug/agents/PRACTICE_REVIEW", () => {
 				bindings = [];
 				return new HttpResponse(null, { status: 204 });
 			}),

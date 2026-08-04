@@ -10,15 +10,15 @@ public final class PracticeTestEvidence {
 
     private PracticeTestEvidence() {}
 
-    public static PracticeEvidenceDeclaration pullRequest() {
+    public static PracticeAutomatedAssessmentPolicy pullRequest() {
         return forArtifact(WorkArtifact.PULL_REQUEST);
     }
 
-    public static PracticeEvidenceDeclaration conversationThread() {
+    public static PracticeAutomatedAssessmentPolicy conversationThread() {
         return forArtifact(WorkArtifact.CONVERSATION_THREAD);
     }
 
-    public static PracticeEvidenceDeclaration forArtifact(WorkArtifact artifactType) {
+    public static PracticeAutomatedAssessmentPolicy forArtifact(WorkArtifact artifactType) {
         String profile;
         List<String> kinds;
         switch (artifactType) {
@@ -36,12 +36,12 @@ public final class PracticeTestEvidence {
             }
             default -> throw new IllegalArgumentException("Unsupported artifact type: " + artifactType);
         }
-        return new PracticeEvidenceDeclaration(
+        return new PracticeAutomatedAssessmentPolicy(
             new SourceContractVersion("1.0.0"),
             new EvidenceProfileId(profile),
-            new PracticeDetectorCapability(
-                PracticeDetectorAssessmentMethod.SEMANTIC,
-                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            new PracticeAutomatedAssessment(
+                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             kinds
                 .stream()
@@ -54,7 +54,7 @@ public final class PracticeTestEvidence {
                 )
                 .toList(),
             List.of(),
-            PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
             List.of()
         );
     }

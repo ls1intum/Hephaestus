@@ -89,7 +89,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         assertThat(created.getDescription()).isEqualTo("blurb");
         assertThat(created.getIcon()).isEqualTo("MessageSquareReply");
         assertThat(created.getColor()).isEqualTo("cyan");
-        assertThat(created.isActive()).isTrue();
+        assertThat(created.isVisibleInPracticeDashboards()).isTrue();
         verify(practiceAreaRepository).save(any(PracticeArea.class));
     }
 
@@ -163,7 +163,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         PracticeArea area = area("guidance");
         area.setId(7L);
         area.setName("Old");
-        area.setActive(true);
+        area.setVisibleInPracticeDashboards(true);
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "guidance")).thenReturn(Optional.of(area));
         when(practiceAreaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -323,7 +323,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria("criteria");
-        practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         return practice;
     }
 

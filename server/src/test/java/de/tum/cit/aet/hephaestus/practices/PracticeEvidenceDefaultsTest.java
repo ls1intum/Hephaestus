@@ -28,18 +28,20 @@ class PracticeEvidenceDefaultsTest {
         JsonMapper mapper = JsonMapper.builder().build();
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC(), "");
 
-        PracticeEvidenceDeclaration declaration = new PracticeEvidenceDefaults(catalogs).forArtifact(artifact);
+        PracticeAutomatedAssessmentPolicy requirements = new PracticeEvidenceDefaults(catalogs).forArtifact(artifact);
 
-        assertThat(declaration.sourceContractVersion()).isEqualTo(new SourceContractVersion("1.0.0"));
-        assertThat(declaration.profile()).isEqualTo(new EvidenceProfileId(profile));
-        assertThat(declaration.required())
+        assertThat(requirements.sourceContractVersion()).isEqualTo(new SourceContractVersion("1.0.0"));
+        assertThat(requirements.evidenceProfile()).isEqualTo(new EvidenceProfileId(profile));
+        assertThat(requirements.requiredEvidence())
             .extracting(item -> item.sourceKind().value())
             .containsExactlyElementsOf(required);
-        assertThat(declaration.optional())
+        assertThat(requirements.optionalContext())
             .extracting(item -> item.sourceKind().value())
             .containsExactlyElementsOf(optional);
-        assertThat(declaration.onUnsatisfied()).isEqualTo(PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT);
-        assertThat(declaration.blindSpots()).isNotEmpty();
+        assertThat(requirements.whenEvidenceIsInsufficient()).isEqualTo(
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT
+        );
+        assertThat(requirements.knownLimitations()).isNotEmpty();
     }
 
     private static Stream<Arguments> baselines() {

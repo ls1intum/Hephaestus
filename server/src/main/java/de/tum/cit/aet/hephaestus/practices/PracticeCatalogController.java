@@ -8,10 +8,10 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceAuthoringDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeUsageRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -53,23 +53,23 @@ public class PracticeCatalogController {
     private final PracticeService practiceService;
     private final CatalogOriginPresenter presenter;
     private final PracticeAreaService areaService;
-    private final PracticeEvidenceAuthoringService evidenceAuthoringService;
+    private final PracticeEvidenceOptionsService evidenceOptionsService;
 
     @GetMapping("/evidence-options")
     @Operation(
-        summary = "Read practice evidence authoring options",
-        description = "Returns the current baseline and allowed evidence sources for each artifact type",
+        summary = "Read automated assessment evidence options",
+        description = "Returns recommended requirements and allowed evidence sources for each type of reviewed work",
         operationId = "getPracticeEvidenceOptions"
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeEvidenceAuthoringDTO> evidenceOptions(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(evidenceAuthoringService.options());
+    public ResponseEntity<PracticeEvidenceOptionsDTO> evidenceOptions(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(evidenceOptionsService.options());
     }
 
     @GetMapping
     @Operation(
         summary = "List practice definitions",
-        description = "Returns all practice definitions for the workspace, optionally filtered by active state"
+        description = "Returns workspace practice definitions, optionally filtered by review participation"
     )
     @ApiResponse(
         responseCode = "200",
@@ -79,21 +79,20 @@ public class PracticeCatalogController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<List<PracticeDTO>> listPractices(
         WorkspaceContext workspaceContext,
-        @RequestParam(name = "active", required = false) @Parameter(
-            description = "Filter by active state"
-        ) Boolean active
+        @RequestParam(name = "usedInNewReviews", required = false) @Parameter(
+            description = "Filter by whether new reviews include the practice"
+        ) Boolean usedInNewReviews
     ) {
         List<PracticeDTO> practices = presenter.presentPractices(
-            practiceService.listPractices(workspaceContext, active)
+            practiceService.listPractices(workspaceContext, usedInNewReviews)
         );
         return ResponseEntity.ok(practices);
     }
 
     @GetMapping("/learner")
     @Operation(
-        summary = "List active practices, learner-facing",
-        description = "Active practices projected for a developer: name, area, why-it-matters, what-good-looks-like." +
-            " The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO has no such field)."
+        summary = "List practices used in new reviews, learner-facing",
+        description = "Returns the learner-facing name, area, rationale, and example for practices used in new reviews"
     )
     @ApiResponse(
         responseCode = "200",
@@ -226,11 +225,11 @@ public class PracticeCatalogController {
         return ResponseEntity.ok(presenter.present(practice));
     }
 
-    @PatchMapping("/{practiceSlug}/active")
-    @Operation(summary = "Set practice active state")
+    @PatchMapping("/{practiceSlug}/used-in-new-reviews")
+    @Operation(summary = "Choose whether new reviews include a practice")
     @ApiResponse(
         responseCode = "200",
-        description = "Active state updated",
+        description = "Review participation updated",
         content = @Content(schema = @Schema(implementation = PracticeDTO.class))
     )
     @ApiResponse(
@@ -242,13 +241,17 @@ public class PracticeCatalogController {
         )
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_ACTIVE")
-    public ResponseEntity<PracticeDTO> setActive(
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_USAGE")
+    public ResponseEntity<PracticeDTO> setUsedInNewReviews(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
-        @Valid @RequestBody UpdatePracticeActiveRequestDTO request
+        @Valid @RequestBody UpdatePracticeUsageRequestDTO request
     ) {
-        Practice practice = practiceService.setActive(workspaceContext, practiceSlug, request.active());
+        Practice practice = practiceService.setUsedInNewReviews(
+            workspaceContext,
+            practiceSlug,
+            request.usedInNewReviews()
+        );
         return ResponseEntity.ok(presenter.present(practice));
     }
 

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -32,7 +33,7 @@ public record CreatePracticeRequestDTO(
     @Size(max = 10, message = "Trigger events must contain at most 10 entries")
     @ValidTriggerEvents
     @Schema(
-        description = "Domain events that trigger detection; empty for scheduled conversation reviews",
+        description = "Events that start a practice review; empty for scheduled conversation reviews",
         example = "[\"PullRequestCreated\", \"ReviewSubmitted\"]"
     )
     List<String> triggerEvents,
@@ -42,27 +43,27 @@ public record CreatePracticeRequestDTO(
     @Schema(description = "Practice evaluation criteria")
     String criteria,
 
-    @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
-    @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+    @Size(
+        max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
+        message = "Precompute script must be at most 100000 characters"
+    )
+    @Schema(description = "TypeScript/Bun static analysis run before automated assessment")
     String precomputeScript,
 
     @Valid
     @Schema(
-        description = "Versioned sources and quality required before this practice may be judged; " +
-            "omit to use the server baseline for the selected artifact"
+        description = "Versioned evidence required before Hephaestus may assess reviewed work; " +
+            "omit to use the recommended requirements for the selected work type"
     )
     @Nullable
-    PracticeEvidenceDeclaration evidence,
+    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
 
-    @Schema(
-        description = "Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.",
-        example = "PULL_REQUEST"
-    )
+    @Schema(description = "Type of reviewed work. Defaults to PULL_REQUEST when omitted.", example = "PULL_REQUEST")
     @Nullable
     WorkArtifact artifactType,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
-    @Schema(description = "Developer-facing rationale (learner layer); plain language, never the detection rubric")
+    @Schema(description = "Plain-language rationale shown to the developer")
     @Nullable
     String whyItMatters,
 

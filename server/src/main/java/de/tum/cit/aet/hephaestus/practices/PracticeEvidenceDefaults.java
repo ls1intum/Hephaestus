@@ -16,9 +16,9 @@ public class PracticeEvidenceDefaults {
         this.catalogs = catalogs;
     }
 
-    public PracticeEvidenceDeclaration forArtifact(WorkArtifact artifact) {
+    public PracticeAutomatedAssessmentPolicy forArtifact(WorkArtifact artifact) {
         return switch (artifact) {
-            case PULL_REQUEST -> declaration(
+            case PULL_REQUEST -> requirements(
                 "pull-request-review",
                 List.of(
                     requirement(
@@ -36,7 +36,7 @@ public class PracticeEvidenceDefaults {
                 "RUNTIME_BEHAVIOR_NOT_OBSERVED",
                 "Repository evidence does not establish behavior in a deployed runtime."
             );
-            case ISSUE -> declaration(
+            case ISSUE -> requirements(
                 "issue-review",
                 List.of(
                     requirement(
@@ -49,7 +49,7 @@ public class PracticeEvidenceDefaults {
                 "IMPLEMENTATION_NOT_OBSERVED",
                 "Issue evidence does not establish whether the described work was implemented correctly."
             );
-            case CONVERSATION_THREAD -> declaration(
+            case CONVERSATION_THREAD -> requirements(
                 "conversation-review",
                 List.of(
                     requirement(
@@ -65,24 +65,24 @@ public class PracticeEvidenceDefaults {
         };
     }
 
-    private PracticeEvidenceDeclaration declaration(
+    private PracticeAutomatedAssessmentPolicy requirements(
         String profile,
         List<PracticeEvidenceRequirement> required,
-        List<OptionalPracticeEvidenceRequirement> optional,
-        String blindSpotCode,
-        String blindSpotSummary
+        List<PracticeOptionalContextSource> optional,
+        String limitationCode,
+        String limitationDescription
     ) {
-        return new PracticeEvidenceDeclaration(
+        return new PracticeAutomatedAssessmentPolicy(
             catalogs.current().version(),
             new EvidenceProfileId(profile),
-            new PracticeDetectorCapability(
-                PracticeDetectorAssessmentMethod.SEMANTIC,
-                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            new PracticeAutomatedAssessment(
+                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             required,
             optional,
-            PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
-            List.of(new PracticeEvidenceBlindSpot(blindSpotCode, blindSpotSummary))
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+            List.of(new PracticeEvidenceLimitation(limitationCode, limitationDescription))
         );
     }
 
@@ -94,11 +94,7 @@ public class PracticeEvidenceDefaults {
         return new PracticeEvidenceRequirement(new SourceKind(sourceKind), completeness, freshness);
     }
 
-    private static OptionalPracticeEvidenceRequirement optionalRequirement(String sourceKind) {
-        return new OptionalPracticeEvidenceRequirement(
-            new SourceKind(sourceKind),
-            EvidenceCompletenessRequirement.ANY,
-            EvidenceFreshnessRequirement.ANY
-        );
+    private static PracticeOptionalContextSource optionalRequirement(String sourceKind) {
+        return new PracticeOptionalContextSource(new SourceKind(sourceKind));
     }
 }

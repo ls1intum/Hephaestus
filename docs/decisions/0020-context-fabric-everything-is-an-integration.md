@@ -8,7 +8,7 @@
 
 ## Context
 
-Practice detection reads projections of external systems: pull requests, issues, discussions, repository trees,
+Practice reviews read projections of external systems: pull requests, issues, discussions, repository trees,
 Slack threads, and Outline documents. Treating those inputs as anonymous files makes an empty result ambiguous and
 prevents an operator from reconstructing what a model was allowed to use.
 
@@ -19,18 +19,18 @@ system of record; filesystem projections are bounded, rebuildable cache entries.
 
 ### Versioned source contract
 
-Every input that may support a practice-detection judgment has a logical source kind in the versioned artifact-source
-catalog. The catalog defines authority, capture time, freshness, completeness, privacy class, supported missingness,
+Every input that may support a practice-review judgment has a logical source kind in the versioned artifact-source
+catalog. The catalog defines authority, capture time, freshness, completeness, privacy class, supported absence states,
 purpose, retention, erasure, and its governance decision. Evidence profiles close the set of source kinds available
 to each reviewed artifact type.
 
 A practice revision declares required and optional source kinds. The runtime records a full source manifest and a
-per-practice readiness report. If required evidence is unavailable, stale, incomplete, redacted, or denied, that
+per-automated-assessment readiness report. If required evidence is unavailable, stale, incomplete, redacted, or denied, that
 practice is marked not ready with typed evidence reasons. If no practice remains ready, the job completes with
 `INSUFFICIENT_EVIDENCE` without starting the detector; it never manufactures a semantic `NOT_APPLICABLE` result.
 
-The contract is scoped to practice detection. Mentor conversation context is governed by the mentor consent and
-integration contracts and cannot be cited as practice-detection evidence. If a mentor input is reused for detection,
+The contract applies to practice reviews. Mentor conversation context is governed by the mentor consent and
+integration contracts and cannot be cited as practice-review evidence. If a mentor input is reused for detection,
 it must first become a catalogued source kind. Contract tests reject any uncatalogued `EvidenceSource` provider.
 
 ### Filesystem layout
@@ -55,7 +55,7 @@ Unreadable manifests stop the sweep rather than risking deletion of live evidenc
 ### Governance and minimization
 
 A checked-in, unexpired engineering decision is necessary but not sufficient to collect a source. Each deployment
-also has a default-empty `hephaestus.evidence.authorized-source-uses` allowlist of explicit `source:audience` grants
+also has a default-empty `hephaestus.evidence.authorized-source-uses` allowlist of explicit `source:purpose` grants
 controlled by its data controller.
 Capture, feedback delivery, mentoring reuse, and operator evidence review check their respective grants. Removing a
 grant stops that use without widening or rewriting the remaining grants.
@@ -78,7 +78,7 @@ finding that cites a source outside its practice declaration.
 - Empty, missing, stale, partial, redacted, failed, and ablated inputs are distinguishable.
 - Retained job records preserve the exact contract, manifest, and readiness outcome for authorized operator audits;
   this ADR does not add a dedicated audit UI.
-- With no deployment authorization, practice detection declines rather than collecting data.
+- With no deployment authorization, Hephaestus skips practice reviews rather than collecting data.
 - Source-contract changes require explicit version migration and mark dependent claims stale.
 - The CAS and replay cache have bounded residual windows; immediate selective erasure requires reference-aware
   collection and remains a deployment approval consideration.

@@ -161,7 +161,7 @@ in `.env` and `docker compose up -d`. Each has its variable reference in
 (`AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together; the job
 queue itself runs on PostgreSQL, no NATS setup needed for this bundle), **and** a model that the
 workspace can actually run on. Setting that model up — registering a provider connection, testing it,
-pricing the model, sharing it, and binding it to the **practice detection** purpose — is
+pricing the model, sharing it, and binding it to the **practice reviews** purpose — is
 [Connect an AI Provider](./ai-providers), and nothing reviews anything until it is done. With the
 flags on but nothing bound, webhook-driven reviews are skipped with only a DEBUG log line, since an
 unbound workspace is a normal state and one line per event would be noise. The manual dev trigger

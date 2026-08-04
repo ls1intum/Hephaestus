@@ -8,7 +8,7 @@ import java.util.Objects;
 public record ArtifactSourceManifest(
     SourceContractVersion contractVersion,
     String catalogDigest,
-    EvidenceProfileId profileId,
+    EvidenceProfileId evidenceProfile,
     Instant capturedAt,
     List<SourceCapture> sources,
     List<EvidenceViewTransformation> viewTransformations
@@ -19,7 +19,7 @@ public record ArtifactSourceManifest(
         if (!catalogDigest.matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("Invalid catalog digest: " + catalogDigest);
         }
-        Objects.requireNonNull(profileId, "profileId");
+        Objects.requireNonNull(evidenceProfile, "evidenceProfile");
         Objects.requireNonNull(capturedAt, "capturedAt");
         sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
         if (sources.isEmpty()) {

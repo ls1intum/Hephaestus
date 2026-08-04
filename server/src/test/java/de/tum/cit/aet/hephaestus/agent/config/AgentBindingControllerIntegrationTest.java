@@ -58,7 +58,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_DETECTION")
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_REVIEW")
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
@@ -79,7 +79,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
             .jsonPath("$.length()")
             .isEqualTo(1)
             .jsonPath("$[0].purpose")
-            .isEqualTo("PRACTICE_DETECTION")
+            .isEqualTo("PRACTICE_REVIEW")
             .jsonPath("$[0].instanceModelId")
             .isEqualTo(model.getId())
             .jsonPath("$[0].ready")
@@ -147,7 +147,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_DETECTION")
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_REVIEW")
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
@@ -191,7 +191,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("instanceModelId", seedInstanceModel("binding-member-model").getId(), "enabled", true))
@@ -210,7 +210,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .delete()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -237,7 +237,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .delete()
-            .uri("/workspaces/{slug}/agents/{purpose}", other.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .uri("/workspaces/{slug}/agents/{purpose}", other.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()

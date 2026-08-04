@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeDetectionFingerprint;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
+import de.tum.cit.aet.hephaestus.practices.ReviewRuleFingerprint;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,7 +29,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
-import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -98,9 +97,9 @@ public class PracticeRevision {
     private String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "evidence_declaration", columnDefinition = "jsonb")
+    @Column(name = "automated_assessment_policy", columnDefinition = "jsonb")
     @ToString.Exclude
-    private @Nullable PracticeEvidenceDeclaration evidence;
+    private PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy;
 
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     @ToString.Exclude
@@ -125,8 +124,8 @@ public class PracticeRevision {
     @Column(name = "area_color", length = 32)
     private String areaColor;
 
-    @Column(name = "detection_fingerprint", length = 96)
-    private String detectionFingerprint;
+    @Column(name = "review_rule_fingerprint", length = 96)
+    private String reviewRuleFingerprint;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -143,7 +142,10 @@ public class PracticeRevision {
         this.triggerEvents = Objects.requireNonNull(practice.getTriggerEvents(), "practice.triggerEvents").deepCopy();
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
         this.precomputeScript = practice.getPrecomputeScript();
-        this.evidence = Objects.requireNonNull(practice.getEvidence(), "practice.evidence");
+        this.automatedAssessmentPolicy = Objects.requireNonNull(
+            practice.getAutomatedAssessmentPolicy(),
+            "practice.automatedAssessmentPolicy"
+        );
         this.whyItMatters = practice.getWhyItMatters();
         this.whatGoodLooksLike = practice.getWhatGoodLooksLike();
         PracticeArea area = practice.getArea();
@@ -154,30 +156,27 @@ public class PracticeRevision {
             this.areaIcon = area.getIcon();
             this.areaColor = area.getColor();
         }
-        this.detectionFingerprint = PracticeDetectionFingerprint.of(
+        this.reviewRuleFingerprint = ReviewRuleFingerprint.of(
             slug,
             name,
             artifactType,
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
-            evidence,
+            automatedAssessmentPolicy,
             areaSlug
         );
     }
 
-    public String computeDetectionFingerprint() {
-        if (evidence == null) {
-            throw new IllegalStateException("Practice revision has no artifact-source contract");
-        }
-        return PracticeDetectionFingerprint.of(
+    public String computeReviewRuleFingerprint() {
+        return ReviewRuleFingerprint.of(
             slug,
             name,
             artifactType,
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
-            evidence,
+            automatedAssessmentPolicy,
             areaSlug
         );
     }

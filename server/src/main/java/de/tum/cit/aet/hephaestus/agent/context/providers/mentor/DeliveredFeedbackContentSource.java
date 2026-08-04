@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -103,7 +103,11 @@ public class DeliveredFeedbackContentSource implements ContentSource {
                     observations
                         .stream()
                         .allMatch(observation ->
-                            visibilityPolicy.permits(workspaceId, observation, SourceUseAudience.PRACTICE_MENTORING)
+                            visibilityPolicy.permits(
+                                workspaceId,
+                                observation,
+                                SourceUsePurpose.CONVERSATIONAL_MENTORING
+                            )
                         )
                 );
             })

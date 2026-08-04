@@ -2,17 +2,14 @@ package de.tum.cit.aet.hephaestus.evidence;
 
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 public record SourceUseDecision(
     String id,
-    SourceKind source,
-    String purpose,
-    SourceUseMode mode,
+    SourceKind sourceKind,
+    SourceUsePurpose purpose,
     SourceUseBasis basis,
     SourceUseOutcome outcome,
-    Set<SourceUseAudience> audiences,
     @Nullable String modelProcessor,
     RetentionPolicy retentionPolicy,
     ErasurePolicy erasurePolicy,
@@ -23,15 +20,10 @@ public record SourceUseDecision(
 ) {
     public SourceUseDecision {
         id = requireText(id, "id");
-        Objects.requireNonNull(source, "source");
-        purpose = requireText(purpose, "purpose");
-        Objects.requireNonNull(mode, "mode");
+        Objects.requireNonNull(sourceKind, "sourceKind");
+        Objects.requireNonNull(purpose, "purpose");
         Objects.requireNonNull(basis, "basis");
         Objects.requireNonNull(outcome, "outcome");
-        audiences = Set.copyOf(Objects.requireNonNull(audiences, "audiences"));
-        if (audiences.isEmpty()) {
-            throw new IllegalArgumentException("Source-use decision requires at least one audience");
-        }
         if (modelProcessor != null && modelProcessor.isBlank()) {
             throw new IllegalArgumentException("modelProcessor must be null or non-blank");
         }
@@ -62,10 +54,10 @@ public record SourceUseDecision(
      * Whether this entry keeps product runtime use operational. A {@code true} result is an engineering gate,
      * never a controller or DPO approval.
      */
-    public boolean permitsProductUseAt(Instant instant, SourceUseAudience audience) {
+    public boolean permitsAt(Instant instant, SourceUsePurpose requestedPurpose) {
         Objects.requireNonNull(instant, "instant");
-        Objects.requireNonNull(audience, "audience");
-        if (mode != SourceUseMode.PRODUCT || !audiences.contains(audience) || instant.isBefore(recordedAt)) {
+        Objects.requireNonNull(requestedPurpose, "requestedPurpose");
+        if (purpose != requestedPurpose || instant.isBefore(recordedAt)) {
             return false;
         }
         if (basis == SourceUseBasis.ENGINEERING_BASELINE) {

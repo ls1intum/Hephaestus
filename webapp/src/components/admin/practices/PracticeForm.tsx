@@ -4,14 +4,14 @@ import type {
 	CreatePracticeRequest,
 	Practice,
 	PracticeArea,
-	PracticeEvidenceAuthoring,
+	PracticeEvidenceOptions,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
-import { PracticeEvidenceValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { PracticeAutomatedAssessmentValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
@@ -24,7 +24,7 @@ interface PracticeFormCreateProps {
 	areas: PracticeArea[];
 	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
 	isPending: boolean;
-	evidenceAuthoring: PracticeEvidenceAuthoring;
+	evidenceOptions: PracticeEvidenceOptions;
 	initialData?: never;
 }
 
@@ -35,7 +35,7 @@ interface PracticeFormEditProps {
 	areas: PracticeArea[];
 	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
 	isPending: boolean;
-	evidenceAuthoring: PracticeEvidenceAuthoring;
+	evidenceOptions: PracticeEvidenceOptions;
 }
 
 export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
@@ -58,12 +58,12 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 		...(practice.whyItMatters ? { whyItMatters: practice.whyItMatters } : {}),
 		...(practice.whatGoodLooksLike ? { whatGoodLooksLike: practice.whatGoodLooksLike } : {}),
 		...(practice.precomputeScript ? { precomputeScript: practice.precomputeScript } : {}),
-		evidence: practice.evidence,
+		automatedAssessmentPolicy: practice.automatedAssessmentPolicy,
 	};
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const { mode, workspaceSlug, areas, isPending, initialData, evidenceAuthoring } = props;
+	const { mode, workspaceSlug, areas, isPending, initialData, evidenceOptions } = props;
 	const cancelAction = (
 		<Link
 			to="/w/$workspaceSlug/admin/practices"
@@ -95,7 +95,7 @@ export function PracticeForm(props: PracticeFormProps) {
 				whyItMatters: definition.whyItMatters,
 				whatGoodLooksLike: definition.whatGoodLooksLike,
 				precomputeScript: definition.precomputeScript,
-				evidence: definition.evidence,
+				automatedAssessmentPolicy: definition.automatedAssessmentPolicy,
 				clear: clear.length > 0 ? clear : undefined,
 			},
 			areaSlug ?? null,
@@ -107,13 +107,16 @@ export function PracticeForm(props: PracticeFormProps) {
 				<Separator />
 				<section className="space-y-4">
 					<div>
-						<h2 className="text-lg font-semibold">Independent review</h2>
+						<h2 className="text-lg font-semibold">Automated assessment validation</h2>
 						<p className="text-sm text-muted-foreground">
-							The evidence rule above is the author's declaration. This status says whether someone
-							else has validated it.
+							The requirements above are the author's declaration. This status says whether an
+							independent evaluator has validated the exact practice definition; it does not
+							guarantee every finding is correct.
 						</p>
 					</div>
-					<PracticeEvidenceValidationSummary validation={initialData.evidenceValidation} />
+					<PracticeAutomatedAssessmentValidationSummary
+						validation={initialData.automatedAssessmentValidation}
+					/>
 				</section>
 				<Separator />
 				<section className="space-y-4">
@@ -142,7 +145,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
-					evidenceAuthoring={evidenceAuthoring}
+					evidenceOptions={evidenceOptions}
 					cancelAction={cancelAction}
 					onSubmit={submit}
 				/>
@@ -152,7 +155,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					initialData={asDefinitionValue(initialData)}
 					areas={areas}
 					isPending={isPending}
-					evidenceAuthoring={evidenceAuthoring}
+					evidenceOptions={evidenceOptions}
 					cancelAction={cancelAction}
 					afterFields={reviewResults}
 					onSubmit={submit}

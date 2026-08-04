@@ -17,8 +17,10 @@ public record CuratedPracticeDTO(
         return new CuratedPracticeDTO(
             entry.slug(),
             entry.position(),
-            CuratedPracticeDefinitionDTO.from(entry.effective()),
-            entry.changeKind() == CatalogChangeKind.NONE ? null : CuratedPracticeDefinitionDTO.from(entry.shipped()),
+            CuratedPracticeDefinitionDTO.from(entry.slug(), entry.effective()),
+            entry.changeKind() == CatalogChangeKind.NONE
+                ? null
+                : CuratedPracticeDefinitionDTO.from(entry.slug(), entry.shipped()),
             CatalogEntryStatusDTO.from(entry)
         );
     }

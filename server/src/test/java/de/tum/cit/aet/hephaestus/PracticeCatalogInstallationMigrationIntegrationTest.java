@@ -89,7 +89,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     private static void assertHistoricalFingerprintsVersioned() throws SQLException {
         assertThat(
             scalar(
-                "SELECT detection_fingerprint FROM practice_revision " +
+                "SELECT review_rule_fingerprint FROM practice_revision " +
                     "WHERE practice_id = 136301 ORDER BY revision_number DESC LIMIT 1"
             )
         ).isEqualTo("v1:" + "a".repeat(64));
@@ -192,7 +192,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         execute(
             """
             UPDATE practice_revision
-            SET detection_fingerprint = ('v2:' || repeat('b', 64))
+            SET review_rule_fingerprint = ('v2:' || repeat('b', 64))
             WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
             """
         );
@@ -202,7 +202,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
-                  AND detection_fingerprint = ('v2:' || repeat('b', 64))
+                  AND review_rule_fingerprint = ('v2:' || repeat('b', 64))
                 """
             )
         ).isEqualTo("1");
@@ -210,7 +210,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             execute(
                 """
                 UPDATE practice_revision
-                SET detection_fingerprint = ('v2:' || repeat('d', 64))
+                SET review_rule_fingerprint = ('v2:' || repeat('d', 64))
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
                 """
             )
@@ -237,8 +237,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .hasMessageContaining("practice current revision does not match its current projection");
         assertThatThrownBy(() ->
             execute(
-                "UPDATE practice SET evidence_declaration = " +
-                    "jsonb_set(evidence_declaration, '{profile}', '\"issue-review\"') WHERE id = 136301"
+                "UPDATE practice SET automated_assessment_policy = " +
+                    "jsonb_set(automated_assessment_policy, '{evidenceProfile}', '\"issue-review\"') WHERE id = 136301"
             )
         )
             .isInstanceOf(SQLException.class)
@@ -248,7 +248,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 """
                 INSERT INTO practice (
                     workspace_id, slug, name, applies_to, display_order, trigger_events,
-                    criteria, evidence_declaration, is_active, created_at
+                    criteria, automated_assessment_policy, used_in_new_reviews, created_at
                 ) VALUES (
                     136103, 'missing-current-revision', 'Missing revision', 'PULL_REQUEST', 3,
                     '[]'::jsonb, 'criteria', '{}'::jsonb, true, now()
@@ -269,7 +269,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
 
         assertThatThrownBy(() ->
             execute(
-                "UPDATE practice_revision SET evidence_declaration = '{}'::jsonb " +
+                "UPDATE practice_revision SET automated_assessment_policy = '{}'::jsonb " +
                     "WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)"
             )
         )
@@ -279,20 +279,20 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         execute(
             """
             UPDATE practice_revision
-            SET detection_fingerprint = ('v2:' || repeat('a', 64))
-            WHERE practice_id = 136301 AND slug IS NOT NULL AND detection_fingerprint IS NULL
+            SET review_rule_fingerprint = ('v2:' || repeat('a', 64))
+            WHERE practice_id = 136301 AND slug IS NOT NULL AND review_rule_fingerprint IS NULL
             """
         );
         assertThat(
             scalar(
                 "SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301" +
-                    " AND detection_fingerprint = ('v2:' || repeat('a', 64))"
+                    " AND review_rule_fingerprint = ('v2:' || repeat('a', 64))"
             )
         ).isEqualTo("1");
 
         assertThatThrownBy(() ->
             execute(
-                "UPDATE practice_revision SET detection_fingerprint = ('v2:' || repeat('b', 64))" +
+                "UPDATE practice_revision SET review_rule_fingerprint = ('v2:' || repeat('b', 64))" +
                     " WHERE practice_id = 136301 AND slug IS NOT NULL"
             )
         )
@@ -311,7 +311,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     slug, name, applies_to, trigger_events, precompute_script,
                     why_it_matters, what_good_looks_like,
                     area_slug, area_name, area_description, area_icon, area_color,
-                    detection_fingerprint, evidence_declaration
+                    review_rule_fingerprint, automated_assessment_policy
                 )
                 SELECT practice.id,
                        (SELECT max(revision_number) + 1 FROM practice_revision WHERE practice_id = practice.id),
@@ -330,7 +330,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                        area.icon,
                        area.color,
                        ('v2:' || repeat('a', 64)),
-                       practice.evidence_declaration
+                       practice.automated_assessment_policy
                 FROM practice
                 LEFT JOIN practice_area area ON area.id = practice.practice_area_id
                 WHERE practice.id = 136301
@@ -401,6 +401,27 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 """
             )
         ).isEqualTo("3");
+        assertThat(
+            scalar(
+                """
+                            SELECT count(*)::text
+                            FROM practice_revision
+                            WHERE practice_id IN (136301, 136302)
+                              AND automated_assessment_policy IS NOT NULL
+                              AND automated_assessment_policy ? 'sourceContractVersion'
+                              AND automated_assessment_policy ? 'evidenceProfile'
+                              AND automated_assessment_policy #>> '{automatedAssessment,mode}' = 'LANGUAGE_MODEL'
+                              AND automated_assessment_policy #>> '{automatedAssessment,evidenceSufficiency}' =
+                                  'SUFFICIENT_WHEN_REQUIREMENTS_MET'
+                              AND jsonb_typeof(automated_assessment_policy -> 'requiredEvidence') = 'array'
+                              AND jsonb_array_length(automated_assessment_policy -> 'requiredEvidence') > 0
+                              AND jsonb_typeof(automated_assessment_policy -> 'optionalContext') = 'array'
+                              AND NOT automated_assessment_policy ? 'profile'
+                              AND NOT automated_assessment_policy ? 'detectorCapability'
+                  AND NOT automated_assessment_policy ? 'optionalEvidence'
+                """
+            )
+        ).isEqualTo("1");
     }
 
     private static void assertEvidenceRevisionBackfill() throws SQLException {
@@ -411,8 +432,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 FROM practice practice
                 JOIN practice_revision revision ON revision.id = practice.current_revision_id
                 WHERE practice.id IN (136301, 136302)
-                  AND revision.evidence_declaration = practice.evidence_declaration
-                  AND revision.evidence_declaration IS NOT NULL
+                  AND revision.automated_assessment_policy = practice.automated_assessment_policy
+                  AND revision.automated_assessment_policy IS NOT NULL
                 """
             )
         ).isEqualTo("2");
@@ -422,7 +443,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE practice_id IN (136301, 136302)
-                  AND evidence_declaration IS NULL
+                  AND automated_assessment_policy IS NULL
                 """
             )
         ).isEqualTo("3");

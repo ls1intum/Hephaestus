@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -91,7 +91,7 @@ public class ObservationHistoryContentSource implements ContentSource {
 
         List<Observation> authorized = recent
             .stream()
-            .filter(o -> visibilityPolicy.permits(workspaceId, o, SourceUseAudience.PRACTICE_MENTORING))
+            .filter(o -> visibilityPolicy.permits(workspaceId, o, SourceUsePurpose.CONVERSATIONAL_MENTORING))
             .toList();
         Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(
             workspaceId,

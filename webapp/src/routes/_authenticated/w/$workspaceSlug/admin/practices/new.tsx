@@ -33,7 +33,7 @@ function CreatePracticeContainer() {
 	const areasQuery = useQuery({
 		...listAreasOptions({
 			path: { workspaceSlug },
-			query: { activeOnly: true },
+			query: { visibleInPracticeDashboardsOnly: true },
 		}),
 	});
 	const evidenceQuery = useQuery({
@@ -105,7 +105,7 @@ function CreatePracticeContainer() {
 			mode="create"
 			workspaceSlug={workspaceSlug}
 			areas={areasQuery.data}
-			evidenceAuthoring={evidenceQuery.data}
+			evidenceOptions={evidenceQuery.data}
 			onSubmit={handleSubmit}
 			isPending={createPractice.isPending}
 		/>

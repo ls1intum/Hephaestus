@@ -132,7 +132,7 @@ function ReviewSettingsContainer() {
 			<PracticeReviewSettingsForm
 				workspaceSlug={workspaceSlug}
 				model={{
-					binding: bindingsQuery.data?.find((binding) => binding.purpose === "PRACTICE_DETECTION"),
+					binding: bindingsQuery.data?.find((binding) => binding.purpose === "PRACTICE_REVIEW"),
 					isLoading: bindingsQuery.isLoading,
 					isError: bindingsQuery.isError,
 					onRetry: () => bindingsQuery.refetch(),

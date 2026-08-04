@@ -29,7 +29,10 @@ import lombok.ToString;
         name = "uk_practice_area_workspace_slug",
         columnNames = { "workspace_id", "slug" }
     ),
-    indexes = @Index(name = "idx_practice_area_workspace_active", columnList = "workspace_id, is_active")
+    indexes = @Index(
+        name = "idx_practice_area_workspace_dashboard_visibility",
+        columnList = "workspace_id, visible_in_practice_dashboards"
+    )
 )
 @Getter
 @Setter
@@ -80,9 +83,8 @@ public class PracticeArea {
     @Column(name = "color", length = 32)
     private String color;
 
-    /** Cohort-level toggle: which areas the dashboards surface. Independent of {@link Practice#isActive()}. */
-    @Column(name = "is_active", nullable = false)
-    private boolean active = true;
+    @Column(name = "visible_in_practice_dashboards", nullable = false)
+    private boolean visibleInPracticeDashboards = true;
 
     /** Admin dashboard ordering. */
     @Column(name = "display_order", nullable = false)

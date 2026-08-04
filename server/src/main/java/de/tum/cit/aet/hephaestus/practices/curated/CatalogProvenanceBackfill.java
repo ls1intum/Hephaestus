@@ -74,7 +74,7 @@ public class CatalogProvenanceBackfill {
                 .ifPresent(entry ->
                     transactionOperations.executeWithoutResult(ignored -> {
                         Practice managed = practiceRepository.findById(practice.getId()).orElseThrow();
-                        managed.setEvidence(entry.definition().evidence());
+                        managed.setAutomatedAssessmentPolicy(entry.definition().automatedAssessmentPolicy());
                         managed.setSourceCuratedFingerprint(entry.definition().provenanceFingerprint(entry.slug()));
                         revisionService.append(managed);
                     })
@@ -114,7 +114,7 @@ public class CatalogProvenanceBackfill {
 
     private void fingerprintMigratedRevisions(Long workspaceId) {
         for (PracticeRevision revision : revisionRepository.findDefinitionRevisionsMissingFingerprint(workspaceId)) {
-            revisionRepository.setDetectionFingerprint(revision.getId(), revision.computeDetectionFingerprint());
+            revisionRepository.setReviewRuleFingerprint(revision.getId(), revision.computeReviewRuleFingerprint());
         }
     }
 

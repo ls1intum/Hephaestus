@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
@@ -13,7 +14,7 @@ const areas = [
 	{
 		...mockAreas[0],
 		name: "Packaging work so reviewers can understand its purpose without reconstructing context",
-		active: false,
+		visibleInPracticeDashboards: false,
 	},
 	mockAreas[1],
 ];
@@ -56,16 +57,17 @@ const meta = {
 		workspaceSlug: "demo",
 		areas,
 		practices,
+		evidenceOptions: mockPracticeEvidenceOptions,
 		pending: idlePending,
 		focusFilter: "ALL",
 		onFocusFilterChange: fn(),
 		onCreateArea: fn(async () => true),
 		onRenameArea: fn(async () => true),
-		onToggleAreaActive: fn(),
+		onSetAreaDashboardVisibility: fn(),
 		onDeleteArea: fn(),
 		onReorderAreas: fn(),
 		onSetAreaVisual: fn(),
-		onSetPracticeActive: fn(),
+		onSetPracticeUsedInNewReviews: fn(),
 		onDeletePractice: fn(),
 		onPlacePractice: fn(),
 	},

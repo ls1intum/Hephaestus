@@ -88,7 +88,7 @@ export function OutlineCollectionsSection({
 				<CardHeader>
 					<IntegrationCardHeading>Mirrored collections</IntegrationCardHeading>
 					<CardDescription>
-						Documents in mirrored collections are kept in sync and reach practice detection as
+						Documents in mirrored collections are kept in sync and reach practice reviews as
 						context. Pausing a collection <strong>freezes syncing but keeps its documents</strong>
 						{"; "}removing it <strong>erases every mirrored document</strong> from Hephaestus.
 					</CardDescription>
@@ -149,7 +149,7 @@ export function OutlineCollectionsSection({
 								</EmptyMedia>
 								<EmptyTitle>No collections mirrored yet</EmptyTitle>
 								<EmptyDescription>
-									Pick the Outline collections whose documents should reach practice detection. Only
+									Pick the Outline collections whose documents should reach practice reviews. Only
 									what you select is read.
 								</EmptyDescription>
 							</EmptyHeader>

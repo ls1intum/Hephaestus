@@ -49,6 +49,7 @@ const sidebars: SidebarsConfig = {
       label: 'Practices & Feedback',
       items: [
         'practice-feedback-language',
+        'practice-assessment-glossary',
         'practice-catalogue',
         'practice-feedback-schema',
         'evaluation-provenance',

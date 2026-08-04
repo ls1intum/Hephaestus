@@ -125,7 +125,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("conv-delivery-test"));
         practice = new Practice();
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
-        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");

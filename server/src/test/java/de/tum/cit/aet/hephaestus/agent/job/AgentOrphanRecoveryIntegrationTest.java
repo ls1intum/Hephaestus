@@ -114,7 +114,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setEnabled(true);
         binding.setInstanceModel(instanceModel);
         agentBinding = agentBindingRepository.save(binding);
@@ -283,7 +283,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private UUID runningJobOwnedBy(String workerId, Instant startedAt, int retryCount) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(

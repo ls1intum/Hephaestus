@@ -232,7 +232,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setInstanceModel(model);
         binding.setEnabled(true);
         binding.setTimeoutSeconds(600);
@@ -255,7 +255,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(snapshot);

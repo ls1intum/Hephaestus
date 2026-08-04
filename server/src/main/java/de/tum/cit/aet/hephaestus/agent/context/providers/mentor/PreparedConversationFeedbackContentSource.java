@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.PreparedConversationFact;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -81,7 +81,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             var observation = observationRepository.findById(fact.getObservationId()).orElse(null);
             if (
                 observation == null ||
-                !visibilityPolicy.permits(workspaceId, observation, SourceUseAudience.PRACTICE_MENTORING)
+                !visibilityPolicy.permits(workspaceId, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)
             ) {
                 continue;
             }

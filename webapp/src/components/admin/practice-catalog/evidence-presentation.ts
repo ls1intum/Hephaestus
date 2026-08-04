@@ -1,29 +1,81 @@
-import type { PracticeEvidenceDeclaration } from "@/api/types.gen";
+import type {
+	PracticeAutomatedAssessmentPolicy,
+	PracticeEvidenceSourceOption,
+} from "@/api/types.gen";
 
-const SOURCE_LABELS: Record<string, string> = {
-	"scm.pull-request.core": "Pull request details",
-	"scm.pull-request.diff": "Code changes",
-	"scm.pull-request.comments": "Inline review comments",
-	"scm.repository.tree": "Repository files",
-	"scm.issue.core": "Issue details",
-	"scm.issue.comments": "Issue comments",
-	"slack.conversation.thread": "Slack thread",
-	"scm.linked-work-items": "Linked work items",
-	"scm.review-threads": "Review threads and decisions",
-	"scm.general-review-comments": "General review comments",
-	"workspace.project-inventory": "Related workspace work",
-	"outline.documents": "Referenced Outline documents",
+const ASSESSMENT_MODE_LABELS: Record<
+	PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"],
+	string
+> = {
+	LANGUAGE_MODEL: "Language model",
+	NONE: "No automated assessment",
 };
 
-export function evidenceSourceLabel(sourceKind: string) {
-	return SOURCE_LABELS[sourceKind] ?? sourceKind;
+const EVIDENCE_SUFFICIENCY_LABELS: Record<
+	PracticeAutomatedAssessmentPolicy["automatedAssessment"]["evidenceSufficiency"],
+	string
+> = {
+	SUFFICIENT_WHEN_REQUIREMENTS_MET: "Requirements are sufficient",
+	DECLARED_EVIDENCE_INSUFFICIENT: "Available evidence is not enough",
+	NONE: "No evidence check",
+};
+
+export function evidenceSourceLabel(
+	sourceKind: string,
+	sources: readonly PracticeEvidenceSourceOption[],
+) {
+	return (
+		sources.find((source) => source.sourceKind === sourceKind)?.displayName ?? "Unknown source"
+	);
 }
 
-export function evidenceQualityLabel(requirement: PracticeEvidenceDeclaration["required"][number]) {
+export function evidenceQualityLabel(
+	requirement: PracticeAutomatedAssessmentPolicy["requiredEvidence"][number],
+) {
 	if (requirement.completeness === "COMPLETE" && requirement.freshness === "CURRENT") {
 		return "Complete and current";
 	}
-	if (requirement.completeness === "COMPLETE") return "Complete; any age";
-	if (requirement.freshness === "CURRENT") return "Current; partial allowed";
-	return "Any available quality";
+	if (requirement.completeness === "COMPLETE") {
+		return "Complete; no freshness requirement";
+	}
+	if (requirement.freshness === "CURRENT") {
+		return "Current; partial or unknown completeness allowed";
+	}
+	return "Available; no completeness or freshness requirement";
+}
+
+export function assessmentModeLabel(
+	mode: PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"],
+) {
+	return ASSESSMENT_MODE_LABELS[mode];
+}
+
+export function evidenceSufficiencyLabel(
+	sufficiency: PracticeAutomatedAssessmentPolicy["automatedAssessment"]["evidenceSufficiency"],
+) {
+	return EVIDENCE_SUFFICIENCY_LABELS[sufficiency];
+}
+
+export function canAttemptAutomatedAssessment(
+	requirements: PracticeAutomatedAssessmentPolicy,
+	supportedModes: readonly PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"][],
+) {
+	return (
+		supportedModes.includes(requirements.automatedAssessment.mode) &&
+		requirements.automatedAssessment.evidenceSufficiency === "SUFFICIENT_WHEN_REQUIREMENTS_MET"
+	);
+}
+
+export function automatedAssessmentUnavailableLabel(
+	requirements: PracticeAutomatedAssessmentPolicy,
+	supportedModes: readonly PracticeAutomatedAssessmentPolicy["automatedAssessment"]["mode"][],
+) {
+	if (requirements.automatedAssessment.mode === "NONE") return "No automated assessment";
+	if (!supportedModes.includes(requirements.automatedAssessment.mode)) {
+		return "Assessment mode not supported";
+	}
+	if (requirements.automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
+		return "Additional context required";
+	}
+	return null;
 }

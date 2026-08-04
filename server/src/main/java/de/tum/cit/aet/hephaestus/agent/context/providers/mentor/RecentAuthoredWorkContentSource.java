@@ -27,7 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><b>Why this exists (the mentor must know the work, not just findings about it).</b> The other mentor
  * contexts describe the work only indirectly (findings, delivered feedback, counts), so a reference like "my
  * camera change" has no concrete anchor. This context supplies the inventory: the developer's own authored PRs
- * and issues — number, title, URL, state, size — drawn from the SAME tables practice detection uses, so the
+ * and issues — number, title, URL, state, size — drawn from the same tables practice reviews use, so the
  * mentor can name and link the real work and recognise what the conversation is about.
  *
  * <p>The work itself only (no diffs — those are fetched on demand for a specific artifact, not pre-mounted

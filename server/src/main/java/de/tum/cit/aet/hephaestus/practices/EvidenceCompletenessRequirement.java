@@ -2,5 +2,5 @@ package de.tum.cit.aet.hephaestus.practices;
 
 public enum EvidenceCompletenessRequirement {
     COMPLETE,
-    ANY,
+    NO_REQUIREMENT,
 }

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
-import de.tum.cit.aet.hephaestus.practices.EvaluationClaimStatus;
+import de.tum.cit.aet.hephaestus.practices.AssessmentClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -26,9 +26,9 @@ public record ReviewFindingDTO(
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Detector confidence", minimum = "0", maximum = "1") Float confidence,
+    @NonNull @Schema(description = "Finding confidence", minimum = "0", maximum = "1") Float confidence,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
-    @NonNull EvaluationClaimStatus claimStatus,
+    @NonNull AssessmentClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt,
     @NonNull
     @Schema(description = "Counts of linked messages by delivery state")
@@ -54,7 +54,10 @@ public record ReviewFindingDTO(
             row.getSeverity(),
             row.getConfidence(),
             row.getRecurrenceKey(),
-            EvaluationClaimStatus.of(row.getPracticeRevisionFingerprint(), row.getCurrentPracticeRevisionFingerprint()),
+            AssessmentClaimCurrentness.of(
+                row.getPracticeRevisionFingerprint(),
+                row.getCurrentPracticeRevisionFingerprint()
+            ),
             row.getObservedAt(),
             disposition == null ? ReviewFeedbackDispositionDTO.empty() : ReviewFeedbackDispositionDTO.from(disposition)
         );

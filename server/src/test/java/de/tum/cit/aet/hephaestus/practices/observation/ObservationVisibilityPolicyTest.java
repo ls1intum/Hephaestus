@@ -6,7 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
@@ -21,13 +21,13 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
     void permitsCurrentAuthorizedObservation() {
         EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
         Observation observation = observation("fingerprint", "fingerprint");
-        when(authorization.permits(7L, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(true);
+        when(authorization.permits(7L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(true);
 
         assertThat(
             new ObservationVisibilityPolicy(authorization).permits(
                 7L,
                 observation,
-                SourceUseAudience.PRACTICE_MENTORING
+                SourceUsePurpose.CONVERSATIONAL_MENTORING
             )
         ).isTrue();
     }
@@ -36,16 +36,16 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
     void rejectsCurrentObservationWhenAudienceAuthorizationIsWithdrawn() {
         EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
         Observation observation = observation("fingerprint", "fingerprint");
-        when(authorization.permits(7L, observation, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)).thenReturn(false);
+        when(authorization.permits(7L, observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)).thenReturn(false);
 
         assertThat(
             new ObservationVisibilityPolicy(authorization).permits(
                 7L,
                 observation,
-                SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
             )
         ).isFalse();
-        verify(authorization).permits(7L, observation, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS);
+        verify(authorization).permits(7L, observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
     }
 
     @Test
@@ -56,7 +56,7 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
             new ObservationVisibilityPolicy(authorization).permits(
                 7L,
                 observation("old", "current"),
-                SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
             )
         ).isFalse();
         verifyNoInteractions(authorization);
@@ -66,8 +66,8 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
         PracticeRevision evaluated = mock(PracticeRevision.class);
         PracticeRevision current = mock(PracticeRevision.class);
         Practice practice = mock(Practice.class);
-        when(evaluated.getDetectionFingerprint()).thenReturn(evaluatedFingerprint);
-        when(current.getDetectionFingerprint()).thenReturn(currentFingerprint);
+        when(evaluated.getReviewRuleFingerprint()).thenReturn(evaluatedFingerprint);
+        when(current.getReviewRuleFingerprint()).thenReturn(currentFingerprint);
         when(practice.getCurrentRevision()).thenReturn(current);
         return Observation.builder()
             .agentJobId(UUID.randomUUID())

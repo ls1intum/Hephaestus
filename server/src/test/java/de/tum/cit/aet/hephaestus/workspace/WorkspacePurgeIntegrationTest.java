@@ -766,7 +766,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             User owner = persistUser("conv-" + workspace.getId() + "-subject");
             Practice practice = new Practice();
             practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
-            practice.setEvidence(PracticeTestEvidence.conversationThread());
+            practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.conversationThread());
             practice.setWorkspace(workspace);
             practice.setSlug("conv-practice-" + workspace.getId());
             practice.setName("Conversation Practice");

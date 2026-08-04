@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/** Stable, contract-scoped identifier for one authority and missingness unit. */
+/** Stable, contract-scoped identifier for one logical source. */
 public record SourceKind(String value) implements Comparable<SourceKind> {
     private static final Pattern FORMAT = Pattern.compile("[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+");
 

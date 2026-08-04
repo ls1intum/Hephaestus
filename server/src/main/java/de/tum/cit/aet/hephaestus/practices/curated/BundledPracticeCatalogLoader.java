@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.io.IOException;
@@ -125,7 +125,7 @@ public class BundledPracticeCatalogLoader {
             triggerEvents,
             criteria,
             loadPrecomputeScript(slug),
-            evidence(objectMapper, catalog, node, slug),
+            automatedAssessmentPolicy(objectMapper, catalog, node, slug),
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
@@ -134,19 +134,21 @@ public class BundledPracticeCatalogLoader {
         return definition;
     }
 
-    private static PracticeEvidenceDeclaration evidence(
+    private static PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy(
         JsonMapper objectMapper,
         JsonNode catalog,
         JsonNode node,
         String slug
     ) {
-        String evidenceId = requiredText(node, "evidence");
-        JsonNode evidence = catalog.path("evidenceDeclarations").get(evidenceId);
-        if (evidence == null || !evidence.isObject()) {
-            throw new IllegalStateException("unknown bundled practice evidence declaration: " + evidenceId);
+        String automatedAssessmentPolicyId = requiredText(node, "automatedAssessmentPolicyId");
+        JsonNode automatedAssessmentPolicy = catalog.path("automatedAssessmentPolicy").get(automatedAssessmentPolicyId);
+        if (automatedAssessmentPolicy == null || !automatedAssessmentPolicy.isObject()) {
+            throw new IllegalStateException(
+                "unknown bundled practice automated-assessment policy: " + automatedAssessmentPolicyId
+            );
         }
         try {
-            return objectMapper.treeToValue(evidence, PracticeEvidenceDeclaration.class);
+            return objectMapper.treeToValue(automatedAssessmentPolicy, PracticeAutomatedAssessmentPolicy.class);
         } catch (RuntimeException exception) {
             throw new IllegalStateException("invalid bundled practice evidence: " + slug, exception);
         }

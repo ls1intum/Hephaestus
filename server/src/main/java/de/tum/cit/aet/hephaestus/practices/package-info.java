@@ -1,5 +1,5 @@
 /**
- * Code-health module — AI-driven practice detection and developer findings.
+ * Code-health module — AI-driven practice reviews and developer findings.
  *
  * <p>Owns the review gate ({@code review.PracticeReviewDetectionGate}) and persists results as
  * {@link de.tum.cit.aet.hephaestus.practices.model.Observation}. This module has no outbound

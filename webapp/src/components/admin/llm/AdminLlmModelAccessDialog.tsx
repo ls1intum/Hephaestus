@@ -155,7 +155,7 @@ function AdminLlmModelAccessDialogContent({
 						<AlertTriangle aria-hidden />
 						<AlertTitle>Access is reduced immediately</AlertTitle>
 						<AlertDescription>
-							Practice detection and Mentor stop in the workspaces you removed, until each of them
+							Practice reviews and Mentor stop in the workspaces you removed, until each of them
 							picks another model.
 						</AlertDescription>
 					</Alert>

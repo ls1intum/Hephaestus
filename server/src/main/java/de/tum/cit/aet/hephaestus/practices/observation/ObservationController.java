@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
@@ -133,7 +133,7 @@ public class ObservationController {
         boolean includeEvidence = evidenceAuthorization.permits(
             workspaceContext.id(),
             observation,
-            SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
         );
         return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredGuidance, includeEvidence));
     }

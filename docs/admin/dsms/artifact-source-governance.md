@@ -7,9 +7,10 @@ description: Approval, minimization, retention, and erasure gate for AI-readable
 
 # Artifact-source governance
 
-An artifact source is any file, mount, cache, database projection, or tool result that can expose project or
-personal data to an AI workflow. Code, configuration, documentation, and schema registration do not authorize
-collection. Approve each source use for its exact purpose before enabling it.
+An artifact source is a registered logical input that can supply project or personal data. Files, mounts, caches,
+database projections, and tool results are materializations or derived copies: each must map to a registered source
+and remain in the governance inventory. Code, configuration, documentation, and schema registration do not
+authorize collection. Approve each source use for its exact purpose before enabling it.
 
 The [artifact-source contract](../../contributor/artifact-source-contract) defines evidence semantics. This page
 defines the governance decision that permits collection, retention, processing, and disclosure.
@@ -26,8 +27,8 @@ defines the governance decision that permits collection, retention, processing, 
 5. **Separate responsibilities.** Workspace administrators select sources within the operator-approved envelope;
    they do not approve legal basis, processors, transfers, DPIA outcomes, or new data categories.
 6. **Propagate restrictions.** Derivations inherit the strictest audience, egress, region, retention, and erasure
-   rules of their dependencies. The runtime separately enforces `PRACTICE_DETECTION`,
-   `PRACTICE_FEEDBACK_RECIPIENTS`, `PRACTICE_MENTORING`, and `OPERATOR_QUALITY_ASSURANCE` at their boundaries.
+   rules of their dependencies. The runtime separately enforces `AUTOMATED_PRACTICE_ASSESSMENT`,
+   `PRACTICE_FEEDBACK_DELIVERY`, `CONVERSATIONAL_MENTORING`, and `OPERATOR_EVIDENCE_REVIEW` at their boundaries.
 7. **Erasure beats replay.** Erasure or expiry may make a case unreplayable. Retain only a non-content tombstone
    where an approved audit purpose requires one.
 8. **Fail closed on change.** Scope expansion remains disabled until every affected decision is approved.
@@ -41,18 +42,16 @@ defines the governance decision that permits collection, retention, processing, 
 | Processor and transfer | Controller or delegated privacy/procurement reviewer | DPA/AVV, role, region, subprocessors, transfer basis, retention and training terms |
 | Security and access | Security reviewer | Trust boundary, tenant isolation, injection and secret controls, audience policy, safe logging |
 | Retention and erasure | Data owner and integration maintainer | Expiry trigger, deletion owner, derived-data graph, export and erasure tests |
-| Runtime contract | Agent/runtime maintainer | Schema, authority, timing, completeness, missingness, and contract tests |
+| Runtime contract | Agent/runtime maintainer | Schema, authority, timing, completeness, absence states, and contract tests |
 
 A material change reopens the affected reviews. Runtime collection is also bounded by the deployment's
 `hephaestus.evidence.authorized-source-uses` allowlist. The allowlist is empty by default: the controller must
-explicitly authorize each `source:audience` grant before use. Wildcards are rejected. Removing a grant and restarting
+explicitly authorize each `source:purpose` grant before use. Wildcards are rejected. Removing a grant and restarting
 the server and workers is the emergency disable path; re-enablement follows the normal decision path.
 
 The runtime registry is
 [`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
-It is an engineering gate and contains only releasable decision summaries. Each record grants exactly one audience
-for one purpose; a source must reference separate records for detection, learner feedback, mentoring, and operator
-quality assurance:
+It is an engineering gate and contains only releasable decision summaries. Each record governs exactly one source-use purpose; a source references separate records for automated assessment, feedback delivery, Mentor context, and operator evidence review:
 
 - `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized
   product scope. It is not controller or DPO approval and cannot cover scope expansion.
@@ -85,8 +84,8 @@ sourceKind: example.logical-source
 sourceContractVersion: 1.0.0
 deploymentScope: tumaet-production
 
-purpose:
-  id: practice-detection
+sourceUse:
+  purpose: AUTOMATED_PRACTICE_ASSESSMENT
   consumers: [practice-slug]
   necessity: "Why a less intrusive source is insufficient"
   minimumScope: "Fields, query, event, window, ordering, and caps"
@@ -96,7 +95,7 @@ data:
   categories: [project-content, identifiers]
   incidentalSensitiveContent: "Controls for free text"
 access:
-  audiences: [PRACTICE_DETECTION]
+  permittedRoles: [practice-review-runtime]
   learnerDisclosure: "Permitted disclosure"
   tenantIsolation: "Enforcement and tests"
 processorEgress:
@@ -127,7 +126,7 @@ operations:
   healthSignal: "Low-cardinality metric and alert"
 verification:
   schemaTests: []
-  missingnessTests: []
+  absenceStateTests: []
   inventoryTests: []
   tenantTests: []
   retentionAndErasureTests: []
@@ -140,7 +139,7 @@ reviewBy: YYYY-MM-DD
 supersedes: null
 ```
 
-Create a separate record for each additional purpose and audience. Do not copy detection processor-egress terms into
+Create a separate record for each additional source-use purpose. Do not copy automated-assessment processor-egress terms into
 feedback or operator review records when those uses do not invoke a model.
 
 ## Retention and erasure
@@ -175,12 +174,12 @@ Before the deadline, that owner must review the source scopes, processors, reten
 record. Renewal creates a new contract version containing the new decision; published version directories are
 immutable. Migrate practice declarations and the runtime manifest reference to that version, run
 `pnpm run check:contracts`, and deploy. Never edit an existing version's dates. If renewal is denied or incomplete,
-remove the affected grants from `hephaestus.evidence.authorized-source-uses`; collection and disclosure then decline
-without a semantic judgment.
+remove the affected grants from `hephaestus.evidence.authorized-source-uses`; collection and disclosure then stop,
+and Hephaestus makes no automated assessment claim.
 
 ## Change checklist
 
-- [ ] Define a stable logical kind, authority, scope, timing, freshness, fidelity, caps, and missingness.
+- [ ] Define a stable logical kind, authority, scope, timing, freshness, fidelity, caps, and absence states.
 - [ ] Identify exact consumers and the least intrusive viable source.
 - [ ] Update the Art. 30 record and privacy notice before collection.
 - [ ] Record the DPIA determination and all required approvals.
@@ -192,7 +191,7 @@ without a semantic judgment.
 - [ ] Test every supported state, including valid empty evidence and applicable truncation or redaction.
 - [ ] Use low-cardinality health metrics without workspace, repository, person, URL, or digest labels.
 - [ ] Document the kill switch and operator remediation.
-- [ ] Mark affected semantic and observability claims stale.
+- [ ] Mark affected automated-assessment validation and operator-audit claims stale.
 - [ ] Link the approved decision from the source descriptor.
 
 The TUM deployment's current Art. 35 status and expansion restrictions are recorded in the

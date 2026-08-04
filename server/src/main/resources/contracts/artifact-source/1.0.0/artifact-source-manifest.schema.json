@@ -1,33 +1,39 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json",
+  "title": "Artifact source manifest",
+  "description": "Immutable record of the evidence captured, omitted, or withheld for one automated-assessment invocation.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "contractVersion",
     "catalogDigest",
-    "profileId",
+    "evidenceProfile",
     "capturedAt",
     "sources",
     "viewTransformations"
   ],
   "properties": {
     "contractVersion": {
-      "const": "1.0.0"
+      "const": "1.0.0",
+      "description": "Source contract used to interpret every source state in this manifest."
     },
     "catalogDigest": {
-      "const": "a9a10fb19e2c2ac4f7bb506ae82e8d27e13b432e6792d946e7e0c3fba82c8a0e"
+      "const": "80c589bbe5c2ba5b4907f30dee1d0ed4d217379d1c8d762fd5658e5bfc5770f3",
+      "description": "SHA-256 digest of the exact source catalog used by the runtime."
     },
-    "profileId": {
+    "evidenceProfile": {
       "enum": [
         "pull-request-review",
         "issue-review",
         "conversation-review"
-      ]
+      ],
+      "description": "Evidence profile selected for the reviewed work."
     },
     "capturedAt": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Time at which this invocation finished recording its source captures."
     },
     "sources": {
       "type": "array",
@@ -228,13 +234,15 @@
           "minContains": 0,
           "maxContains": 1
         }
-      ]
+      ],
+      "description": "One explicit capture result for each source considered by the invocation."
     },
     "viewTransformations": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/transformation"
-      }
+      },
+      "description": "Declared evaluation-only transformations applied to the evidence view; production requires this list to be empty."
     }
   },
   "$defs": {
@@ -261,7 +269,8 @@
             "scm.general-review-comments",
             "workspace.project-inventory",
             "outline.documents"
-          ]
+          ],
+          "description": "Logical source described by this capture."
         },
         "state": {
           "oneOf": [
@@ -334,14 +343,16 @@
                 }
               }
             }
-          ]
+          ],
+          "description": "Explicit available or absent result of collection."
         },
         "artifacts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/artifact"
           },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Materialized files attributable to this source; empty for an absent source."
         }
       },
       "allOf": [
@@ -407,7 +418,8 @@
             }
           }
         }
-      ]
+      ],
+      "description": "Capture result for one logical evidence source."
     },
     "facts": {
       "type": "object",
@@ -421,32 +433,37 @@
       "properties": {
         "capturedAt": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Time this source capture completed."
         },
         "sourceEffectiveAt": {
           "type": [
             "string",
             "null"
           ],
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Upstream time through which a mutable mirror is known to be current."
         },
         "observedAt": {
           "type": [
             "string",
             "null"
           ],
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Event or upstream observation time represented by the capture."
         },
         "immutableIdentity": {
           "type": [
             "string",
             "null"
           ],
-          "minLength": 1
+          "minLength": 1,
+          "description": "Pinned upstream identity when content is immutable."
         },
         "queryScope": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Human-readable scope actually queried for this capture."
         },
         "completenessBasis": {
           "enum": [
@@ -456,16 +473,19 @@
             "BOUNDED_SCOPE",
             "IMMUTABLE_OBJECT",
             "UNKNOWN"
-          ]
+          ],
+          "description": "Fact used to determine completeness."
         },
         "representationFidelity": {
           "enum": [
             "EXACT",
             "LOSSLESS_DERIVATION",
             "LOSSY_DERIVATION"
-          ]
+          ],
+          "description": "Whether the materialization is exact, lossless, or information-losing."
         }
-      }
+      },
+      "description": "Provenance and quality facts recorded for an available source."
     },
     "artifact": {
       "type": "object",
@@ -480,21 +500,26 @@
         "path": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\/$)[^\\u0000]+$"
+          "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\/$)[^\\u0000]+$",
+          "description": "Safe relative path of the materialized evidence file."
         },
         "mediaType": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Media type of the serialized artifact."
         },
         "sha256": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 digest of the exact artifact bytes."
         },
         "bytes": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Serialized artifact size in bytes."
         }
-      }
+      },
+      "description": "Digest-addressed materialization belonging to one source capture."
     },
     "transformation": {
       "type": "object",
@@ -506,11 +531,13 @@
       ],
       "properties": {
         "kind": {
-          "const": "ABLATION"
+          "const": "ABLATION",
+          "description": "Evaluation transformation type."
         },
         "planId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Stable identifier of the evaluation plan that requested the transformation."
         },
         "removedSources": {
           "type": "array",
@@ -519,21 +546,23 @@
           "items": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
-          }
+          },
+          "description": "Logical sources deliberately removed from the evaluation view."
         }
-      }
+      },
+      "description": "Deliberate evaluation transformation of an evidence view."
     }
   },
   "allOf": [
     {
       "if": {
         "properties": {
-          "profileId": {
+          "evidenceProfile": {
             "const": "pull-request-review"
           }
         },
         "required": [
-          "profileId"
+          "evidenceProfile"
         ],
         "type": "object"
       },
@@ -670,12 +699,12 @@
     {
       "if": {
         "properties": {
-          "profileId": {
+          "evidenceProfile": {
             "const": "issue-review"
           }
         },
         "required": [
-          "profileId"
+          "evidenceProfile"
         ],
         "type": "object"
       },
@@ -747,12 +776,12 @@
     {
       "if": {
         "properties": {
-          "profileId": {
+          "evidenceProfile": {
             "const": "conversation-review"
           }
         },
         "required": [
-          "profileId"
+          "evidenceProfile"
         ],
         "type": "object"
       },

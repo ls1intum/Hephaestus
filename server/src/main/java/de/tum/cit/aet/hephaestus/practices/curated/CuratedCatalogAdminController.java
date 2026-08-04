@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceAuthoringService;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceOptionsService;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaDTO;
@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeRequestDTO
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceAuthoringDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,16 +62,16 @@ public class CuratedCatalogAdminController {
 
     private final CuratedCatalogService service;
     private final PracticeEvidenceDefaults evidenceDefaults;
-    private final PracticeEvidenceAuthoringService evidenceAuthoringService;
+    private final PracticeEvidenceOptionsService evidenceOptionsService;
 
     @GetMapping("/evidence-options")
     @Operation(
-        summary = "Read practice evidence authoring options",
-        description = "Returns the current baseline and allowed evidence sources for each artifact type",
+        summary = "Read automated assessment evidence options",
+        description = "Returns recommended requirements and allowed evidence sources for each type of reviewed work",
         operationId = "adminGetPracticeEvidenceOptions"
     )
-    public ResponseEntity<PracticeEvidenceAuthoringDTO> evidenceOptions() {
-        return ResponseEntity.ok(evidenceAuthoringService.options());
+    public ResponseEntity<PracticeEvidenceOptionsDTO> evidenceOptions() {
+        return ResponseEntity.ok(evidenceOptionsService.options());
     }
 
     @GetMapping
@@ -456,7 +456,9 @@ public class CuratedCatalogAdminController {
 
     private PracticeDefinition definition(CuratedPracticeRequestDTO request) {
         var evidence =
-            request.evidence() == null ? evidenceDefaults.forArtifact(request.artifactType()) : request.evidence();
+            request.automatedAssessmentPolicy() == null
+                ? evidenceDefaults.forArtifact(request.artifactType())
+                : request.automatedAssessmentPolicy();
         return request.definition(evidence);
     }
 

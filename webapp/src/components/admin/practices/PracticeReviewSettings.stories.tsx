@@ -15,7 +15,7 @@ const settings: PracticeReviewSettingsData = {
 };
 
 const readyBinding: AgentBinding = {
-	purpose: "PRACTICE_DETECTION",
+	purpose: "PRACTICE_REVIEW",
 	enabled: true,
 	ready: true,
 	instanceModelId: 1,

@@ -232,7 +232,8 @@ function ReviewTimingCard({
 					<FieldContent>
 						<FieldLabel htmlFor="trigger-auto">Automatic reviews</FieldLabel>
 						<FieldDescription>
-							Start reviews from the GitHub or GitLab events selected on each active practice.
+							Start reviews from the GitHub or GitLab events selected on each practice used in new
+							reviews.
 						</FieldDescription>
 					</FieldContent>
 					<Switch

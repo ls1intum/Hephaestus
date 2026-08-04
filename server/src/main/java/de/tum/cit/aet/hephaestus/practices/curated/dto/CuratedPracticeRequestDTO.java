@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.dto.ValidTriggerEvents;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,14 +33,17 @@ public record CuratedPracticeRequestDTO(
     @NonNull
     String criteria,
 
-    @Size(max = 50000, message = "Precompute script must be at most 50000 characters")
+    @Size(
+        max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
+        message = "Precompute script must be at most 100000 characters"
+    )
     @Nullable
     String precomputeScript,
 
     @Valid
-    @Schema(description = "Evidence declaration; omit to use the server baseline for the selected artifact")
+    @Schema(description = "Evidence requirements; omit to use the recommended requirements for the selected work type")
     @Nullable
-    PracticeEvidenceDeclaration evidence,
+    PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy,
 
     @Size(max = 2000, message = "Why it matters must be at most 2000 characters") @Nullable String whyItMatters,
 
@@ -50,7 +53,7 @@ public record CuratedPracticeRequestDTO(
 
     @Size(max = 64, message = "Area slug must be at most 64 characters") @Nullable String areaSlug
 ) {
-    public PracticeDefinition definition(PracticeEvidenceDeclaration resolvedEvidence) {
+    public PracticeDefinition definition(PracticeAutomatedAssessmentPolicy resolvedEvidence) {
         return new PracticeDefinition(
             name,
             artifactType,

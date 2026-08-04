@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationQueryFilter;
@@ -97,7 +97,7 @@ class ReviewFindingQueryService {
         boolean includeEvidence = evidenceAuthorization.permits(
             workspaceId,
             observation,
-            SourceUseAudience.OPERATOR_QUALITY_ASSURANCE
+            SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
         );
         return ReviewFindingDetailDTO.from(observation, artifact, subject, feedback, includeEvidence);
     }

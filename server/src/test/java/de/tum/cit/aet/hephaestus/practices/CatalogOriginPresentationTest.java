@@ -8,8 +8,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
+import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
@@ -24,12 +26,21 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         CatalogOriginPresenter presenter = new CatalogOriginPresenter(service);
         Practice first = mock(Practice.class);
         Practice second = mock(Practice.class);
-        when(first.getEvidence()).thenReturn(PracticeTestEvidence.pullRequest());
-        when(second.getEvidence()).thenReturn(PracticeTestEvidence.pullRequest());
+        stubDefinition(first, "first");
+        stubDefinition(second, "second");
 
         presenter.presentPractices(List.of(first, second));
 
         verify(service).catalog();
+    }
+
+    private static void stubDefinition(Practice practice, String slug) {
+        when(practice.getSlug()).thenReturn(slug);
+        when(practice.getName()).thenReturn(slug);
+        when(practice.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        when(practice.getTriggerEvents()).thenReturn(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
+        when(practice.getCriteria()).thenReturn("Review the change");
+        when(practice.getAutomatedAssessmentPolicy()).thenReturn(PracticeTestEvidence.pullRequest());
     }
 
     @Test
@@ -54,7 +65,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
             service,
             presenter,
             mock(PracticeAreaService.class),
-            mock(PracticeEvidenceAuthoringService.class)
+            mock(PracticeEvidenceOptionsService.class)
         );
 
         controller.listPractices(context, null);

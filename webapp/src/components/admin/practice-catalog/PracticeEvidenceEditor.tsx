@@ -1,9 +1,9 @@
 import { ChevronRight, Info, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
-	PracticeEvidenceArtifactOptions,
-	PracticeEvidenceDeclaration,
+	PracticeAutomatedAssessmentPolicy,
 	PracticeEvidenceSourceOption,
+	PracticeWorkTypeEvidenceOptions,
 } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -18,53 +18,59 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { evidenceQualityLabel, evidenceSourceLabel } from "./evidence-presentation";
+import {
+	assessmentModeLabel,
+	canAttemptAutomatedAssessment,
+	evidenceQualityLabel,
+	evidenceSourceLabel,
+	evidenceSufficiencyLabel,
+} from "./evidence-presentation";
 
 type EvidenceRole = "NOT_USED" | "OPTIONAL" | "REQUIRED";
 
-type DetectorCapability = PracticeEvidenceDeclaration["detectorCapability"];
+type AutomatedAssessment = PracticeAutomatedAssessmentPolicy["automatedAssessment"];
 
-const ASSESSMENT_METHOD_OPTIONS: Array<{
-	value: DetectorCapability["assessmentMethod"];
+const ASSESSMENT_MODE_OPTIONS: Array<{
+	value: AutomatedAssessment["mode"];
 	label: string;
 	description: string;
 }> = [
 	{
-		value: "SEMANTIC",
-		label: "Declared semantic assessment",
-		description:
-			"The author expects Hephaestus to make a reasoned assessment from the configured sources.",
-	},
-	{
-		value: "MECHANICAL",
-		label: "Declared mechanical assessment",
-		description: "The author expects a deterministic rule to decide from the configured sources.",
+		value: "LANGUAGE_MODEL",
+		label: assessmentModeLabel("LANGUAGE_MODEL"),
+		description: "Hephaestus assesses the reviewed work using a language model.",
 	},
 	{
 		value: "NONE",
-		label: "Hephaestus cannot judge it",
-		description: "The configured integrations cannot support an automated judgment.",
+		label: assessmentModeLabel("NONE"),
+		description: "Hephaestus does not assess reviewed work against this practice.",
 	},
 ];
 
-const COVERAGE_OPTIONS: Array<{
-	value: Exclude<DetectorCapability["evidenceCoverage"], "NONE">;
+const SUFFICIENCY_OPTIONS: Array<{
+	value: Exclude<AutomatedAssessment["evidenceSufficiency"], "NONE">;
 	label: string;
 	description: string;
 }> = [
 	{
-		value: "DECLARED_REQUIREMENTS_SUFFICIENT",
-		label: "Enough whenever requirements pass",
-		description:
-			"The declared sources can support every automated judgment after their checks pass.",
+		value: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
+		label: evidenceSufficiencyLabel("SUFFICIENT_WHEN_REQUIREMENTS_MET"),
+		description: "Hephaestus may assess the reviewed work after every required source passes.",
 	},
 	{
-		value: "CONDITIONAL",
-		label: "Enough only in some cases",
-		description:
-			"Some cases need context outside these sources. Automated review currently declines this coverage.",
+		value: "DECLARED_EVIDENCE_INSUFFICIENT",
+		label: evidenceSufficiencyLabel("DECLARED_EVIDENCE_INSUFFICIENT"),
+		description: "Hephaestus skips this practice because the selected evidence is not enough.",
 	},
 ];
+
+const EVIDENCE_ROLE_OPTIONS = [
+	{ value: "REQUIRED", label: "Required" },
+	{ value: "OPTIONAL", label: "Optional context" },
+	{ value: "NOT_USED", label: "Not used" },
+] satisfies Array<{ value: EvidenceRole; label: string }>;
+
+const NO_EVIDENCE_CHECK_OPTION = [{ value: "NONE", label: "No evidence check" }];
 
 const PRIVACY_LABELS: Record<PracticeEvidenceSourceOption["privacyClass"], string> = {
 	PUBLIC: "Public",
@@ -73,70 +79,78 @@ const PRIVACY_LABELS: Record<PracticeEvidenceSourceOption["privacyClass"], strin
 	SENSITIVE_PERSONAL: "Sensitive personal data",
 };
 
-function roleOf(declaration: PracticeEvidenceDeclaration, sourceKind: string): EvidenceRole {
-	if (declaration.required.some((requirement) => requirement.sourceKind === sourceKind)) {
+function roleOf(requirements: PracticeAutomatedAssessmentPolicy, sourceKind: string): EvidenceRole {
+	if (requirements.requiredEvidence.some((requirement) => requirement.sourceKind === sourceKind)) {
 		return "REQUIRED";
 	}
-	if (declaration.optional.some((requirement) => requirement.sourceKind === sourceKind)) {
+	if (requirements.optionalContext.some((requirement) => requirement.sourceKind === sourceKind)) {
 		return "OPTIONAL";
 	}
 	return "NOT_USED";
 }
 
 function withRole(
-	declaration: PracticeEvidenceDeclaration,
+	requirements: PracticeAutomatedAssessmentPolicy,
 	source: PracticeEvidenceSourceOption,
 	role: EvidenceRole,
-): PracticeEvidenceDeclaration {
-	const required = declaration.required.filter(
+): PracticeAutomatedAssessmentPolicy {
+	const required = requirements.requiredEvidence.filter(
 		(requirement) => requirement.sourceKind !== source.sourceKind,
 	);
-	const optional = declaration.optional.filter(
+	const optional = requirements.optionalContext.filter(
 		(requirement) => requirement.sourceKind !== source.sourceKind,
 	);
 	if (role === "REQUIRED") {
 		required.push({
 			sourceKind: source.sourceKind,
-			completeness: source.supportsComplete ? "COMPLETE" : "ANY",
-			freshness: source.supportsCurrent ? "CURRENT" : "ANY",
+			completeness: source.supportsComplete ? "COMPLETE" : "NO_REQUIREMENT",
+			freshness: source.supportsCurrent ? "CURRENT" : "NO_REQUIREMENT",
 		});
 	}
 	if (role === "OPTIONAL") {
-		optional.push({ sourceKind: source.sourceKind, completeness: "ANY", freshness: "ANY" });
+		optional.push({ sourceKind: source.sourceKind });
 	}
-	return { ...declaration, required, optional };
+	return { ...requirements, requiredEvidence: required, optionalContext: optional };
 }
 
-function nextBlindSpotCode(declaration: PracticeEvidenceDeclaration) {
-	const used = new Set(declaration.blindSpots.map((blindSpot) => blindSpot.code));
-	let index = 1;
-	while (used.has(`LIMITATION_${index}`)) index += 1;
-	return `LIMITATION_${index}`;
+function newLimitationCode() {
+	return `LIMITATION_${crypto.randomUUID().replaceAll("-", "").toUpperCase()}`;
 }
 
-export function practiceEvidenceError(declaration: PracticeEvidenceDeclaration) {
-	const detectorAbsent = declaration.detectorCapability.assessmentMethod === "NONE";
-	if (detectorAbsent && (declaration.required.length > 0 || declaration.optional.length > 0)) {
-		return "A practice without automated detection cannot declare detector evidence.";
+export function practiceEvidenceError(requirements: PracticeAutomatedAssessmentPolicy) {
+	const noAutomatedAssessment = requirements.automatedAssessment.mode === "NONE";
+	if (
+		noAutomatedAssessment &&
+		(requirements.requiredEvidence.length > 0 ||
+			requirements.optionalContext.length > 0 ||
+			requirements.knownLimitations.length > 0)
+	) {
+		return "A practice without automated assessment cannot require evidence or declare evidence limitations.";
 	}
-	if (!detectorAbsent && declaration.required.length === 0) {
+	if (!noAutomatedAssessment && requirements.requiredEvidence.length === 0) {
 		return "Choose at least one required evidence source.";
 	}
-	for (const blindSpot of declaration.blindSpots) {
-		if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(blindSpot.code)) {
+	for (const limitation of requirements.knownLimitations) {
+		if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(limitation.code)) {
 			return "Limitation identifiers must use 3–64 uppercase letters, numbers, and underscores.";
 		}
-		if (!blindSpot.summary.trim() || blindSpot.summary.length > 500) {
+		if (!limitation.description.trim() || limitation.description.length > 500) {
 			return "Each limitation needs a description of 1–500 characters.";
 		}
+	}
+	if (
+		requirements.automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" &&
+		requirements.knownLimitations.length === 0
+	) {
+		return "Explain at least one limitation that requires additional context.";
 	}
 	return undefined;
 }
 
 export interface PracticeEvidenceEditorProps {
-	options: PracticeEvidenceArtifactOptions;
-	value: PracticeEvidenceDeclaration;
-	onChange: (value: PracticeEvidenceDeclaration) => void;
+	options: PracticeWorkTypeEvidenceOptions;
+	value: PracticeAutomatedAssessmentPolicy;
+	onChange: (value: PracticeAutomatedAssessmentPolicy) => void;
 	error?: string;
 	disabled?: boolean;
 }
@@ -148,62 +162,103 @@ export function PracticeEvidenceEditor({
 	error,
 	disabled = false,
 }: PracticeEvidenceEditorProps) {
-	const [open, setOpen] = useState(false);
-	const requiredSources = value.required.map((requirement) => ({
+	const [open, setOpen] = useState(Boolean(error));
+	const profileKey = `${value.sourceContractVersion}:${value.evidenceProfile}`;
+	const savedAutomatedRequirements = useRef<Map<string, PracticeAutomatedAssessmentPolicy>>(
+		new Map(value.automatedAssessment.mode === "NONE" ? [] : [[profileKey, value]]),
+	);
+	const addLimitationButton = useRef<HTMLButtonElement>(null);
+	useEffect(() => {
+		if (value.automatedAssessment.mode !== "NONE") {
+			savedAutomatedRequirements.current.set(profileKey, value);
+		}
+	}, [profileKey, value]);
+	useEffect(() => {
+		if (error) setOpen(true);
+	}, [error]);
+	const focusLimitation = (focusTarget: string) => {
+		requestAnimationFrame(() => {
+			if (focusTarget === "add") {
+				addLimitationButton.current?.focus();
+			} else {
+				document.getElementById(`practice-limitation-description-${focusTarget}`)?.focus();
+			}
+		});
+	};
+	const requiredSources = value.requiredEvidence.map((requirement) => ({
 		...requirement,
-		label: evidenceSourceLabel(requirement.sourceKind),
+		label: evidenceSourceLabel(requirement.sourceKind, options.allowedSources),
 	}));
-	const optionalSources = value.optional.map((requirement) =>
-		evidenceSourceLabel(requirement.sourceKind),
+	const optionalSources = value.optionalContext.map((requirement) =>
+		evidenceSourceLabel(requirement.sourceKind, options.allowedSources),
 	);
-	const assessmentMethod = ASSESSMENT_METHOD_OPTIONS.find(
-		(option) => option.value === value.detectorCapability.assessmentMethod,
+	const mode = ASSESSMENT_MODE_OPTIONS.find(
+		(option) => option.value === value.automatedAssessment.mode,
 	);
-	const evidenceCoverage = COVERAGE_OPTIONS.find(
-		(option) => option.value === value.detectorCapability.evidenceCoverage,
+	const assessmentModeOptions = ASSESSMENT_MODE_OPTIONS.filter(
+		(option) =>
+			option.value === "NONE" ||
+			options.supportedAutomatedAssessmentModes.includes(option.value) ||
+			value.automatedAssessment.mode === option.value,
 	);
-	const unavailableRequiredSources = value.required.filter((requirement) => {
-		const source = options.sources.find((item) => item.sourceKind === requirement.sourceKind);
-		return !source?.authorizedForDetection;
+	const evidenceSufficiency = SUFFICIENCY_OPTIONS.find(
+		(option) => option.value === value.automatedAssessment.evidenceSufficiency,
+	);
+	const unavailableRequiredSources = value.requiredEvidence.filter((requirement) => {
+		const source = options.allowedSources.find(
+			(item) => item.sourceKind === requirement.sourceKind,
+		);
+		return !source?.authorizedForAutomatedAssessment;
 	});
-	const detectorAbsent = value.detectorCapability.assessmentMethod === "NONE";
+	const noAutomatedAssessment = value.automatedAssessment.mode === "NONE";
+	const canAttemptAssessment = canAttemptAutomatedAssessment(
+		value,
+		options.supportedAutomatedAssessmentModes,
+	);
 
 	return (
-		<section className="space-y-4" aria-labelledby="practice-evidence-heading">
+		<section
+			className="space-y-4"
+			aria-labelledby="practice-evidence-heading"
+			aria-describedby={error ? "practice-evidence-error" : undefined}
+			aria-invalid={error ? true : undefined}
+		>
 			<div>
-				<h2 id="practice-evidence-heading" className="text-lg font-semibold" tabIndex={-1}>
-					Evidence needed
+				<h2
+					id="practice-evidence-heading"
+					className="text-lg font-semibold"
+					tabIndex={-1}
+					aria-describedby={error ? "practice-evidence-error" : undefined}
+				>
+					Evidence for automated assessment
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Define what Hephaestus must know before it is allowed to judge this practice.
+					Choose what Hephaestus must receive before it may assess reviewed work against this
+					practice.
 				</p>
 			</div>
 
-			<ol className="grid gap-3 text-sm sm:grid-cols-3">
-				<li className="rounded-lg border p-3">
-					<span className="font-medium">1. A review starts</span>
-					<p className="mt-1 text-muted-foreground">
-						A selected event or schedule creates a review.
-					</p>
-				</li>
-				<li className="rounded-lg border p-3">
-					<span className="font-medium">2. Evidence is checked</span>
-					<p className="mt-1 text-muted-foreground">
-						Required sources must meet this minimum quality.
-					</p>
-				</li>
-				<li className="rounded-lg border p-3">
-					<span className="font-medium">3. Judge or decline</span>
-					<p className="mt-1 text-muted-foreground">
-						Missing evidence skips this practice instead of asking AI to guess.
-					</p>
-				</li>
-			</ol>
+			{canAttemptAssessment && (
+				<ol className="grid gap-3 text-sm sm:grid-cols-3">
+					<li className="rounded-lg border p-3">
+						<span className="font-medium">1. A practice review starts</span>
+						<p className="mt-1 text-muted-foreground">A selected event or schedule starts it.</p>
+					</li>
+					<li className="rounded-lg border p-3">
+						<span className="font-medium">2. Required evidence is checked</span>
+						<p className="mt-1 text-muted-foreground">Every required source must pass.</p>
+					</li>
+					<li className="rounded-lg border p-3">
+						<span className="font-medium">3. Assess or skip</span>
+						<p className="mt-1 text-muted-foreground">Missing evidence never becomes a guess.</p>
+					</li>
+				</ol>
+			)}
 
 			<div className="rounded-lg border p-4 text-sm">
 				<div className="flex flex-wrap items-center justify-between gap-2">
-					<p className="font-medium">Current evidence rule</p>
-					<Badge variant="outline">Evidence rules v{value.sourceContractVersion}</Badge>
+					<p className="font-medium">Evidence requirements</p>
+					<Badge variant="outline">Source contract {value.sourceContractVersion}</Badge>
 				</div>
 				<div className="mt-3 grid gap-3 sm:grid-cols-2">
 					<div>
@@ -220,7 +275,7 @@ export function PracticeEvidenceEditor({
 							</ul>
 						) : (
 							<p className="mt-1 text-muted-foreground">
-								{detectorAbsent ? "No detector evidence required" : "No required source selected"}
+								{noAutomatedAssessment ? "No automated assessment" : "No required source selected"}
 							</p>
 						)}
 					</div>
@@ -232,37 +287,40 @@ export function PracticeEvidenceEditor({
 					</div>
 				</div>
 				<p className="mt-3 text-muted-foreground">
-					{assessmentMethod?.label}. {assessmentMethod?.description}
-					{evidenceCoverage && ` ${evidenceCoverage.label}.`}
+					{mode?.label}. {mode?.description}
+					{evidenceSufficiency && ` ${evidenceSufficiency.label}.`}
 				</p>
 				<p className="mt-2 text-muted-foreground">
-					This describes Hephaestus, not people. The practitioner, a peer, or a human mentor may
-					observe context that the connected systems cannot provide.
+					This setting only controls Hephaestus. Human assessment, if applicable, is a separate
+					process and is not collected.
 				</p>
 			</div>
 
-			{unavailableRequiredSources.length > 0 && (
+			{canAttemptAssessment && unavailableRequiredSources.length > 0 && (
 				<Alert variant="warning">
 					<TriangleAlert />
-					<AlertTitle>Required evidence is not enabled</AlertTitle>
+					<AlertTitle>Required evidence is not authorized</AlertTitle>
 					<AlertDescription>
-						An instance operator must enable{" "}
+						An instance operator must authorize{" "}
 						{unavailableRequiredSources
-							.map((source) => evidenceSourceLabel(source.sourceKind))
+							.map((source) => evidenceSourceLabel(source.sourceKind, options.allowedSources))
 							.join(", ")}{" "}
-						before this practice can be judged. Until then, reviews will decline it.
+						for automated assessment through the source-governance configuration. The workspace
+						integration must also provide them. Until then, Hephaestus skips this practice.
 					</AlertDescription>
 				</Alert>
 			)}
 
-			<Alert>
-				<Info />
-				<AlertTitle>Declaring a source does not collect or authorize it</AlertTitle>
-				<AlertDescription>
-					The workspace integration must provide it and the instance operator must allow it.
-					Hephaestus checks both on every review.
-				</AlertDescription>
-			</Alert>
+			{!noAutomatedAssessment && (
+				<Alert>
+					<Info />
+					<AlertTitle>Declaring a source does not collect or authorize it</AlertTitle>
+					<AlertDescription>
+						The instance operator must authorize it, the workspace integration must provide it, and
+						any model data transfer must be permitted. Hephaestus checks these separately.
+					</AlertDescription>
+				</Alert>
+			)}
 
 			<Collapsible open={open} onOpenChange={setOpen}>
 				<div className="flex flex-wrap items-center gap-2">
@@ -271,7 +329,7 @@ export function PracticeEvidenceEditor({
 						render={
 							<Button type="button" variant="outline" disabled={disabled}>
 								<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
-								Customize evidence
+								Edit evidence requirements
 							</Button>
 						}
 						className="group"
@@ -280,92 +338,107 @@ export function PracticeEvidenceEditor({
 						type="button"
 						variant="ghost"
 						disabled={disabled}
-						onClick={() => onChange(options.baseline)}
+						onClick={() => onChange(options.recommendedRequirements)}
 					>
 						<RotateCcw className="size-4" />
-						Use recommended rule
+						Use recommended requirements
 					</Button>
 				</div>
 				<CollapsibleContent className="mt-4 space-y-6">
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field>
-							<FieldLabel htmlFor="practice-detector-method">
-								How can Hephaestus assess this practice?
+							<FieldLabel htmlFor="practice-assessment-mode">
+								How should Hephaestus assess reviewed work?
 							</FieldLabel>
 							<Select
 								disabled={disabled}
-								value={value.detectorCapability.assessmentMethod}
-								onValueChange={(assessmentMethod) => {
-									if (assessmentMethod === "NONE") {
+								items={assessmentModeOptions}
+								value={value.automatedAssessment.mode}
+								onValueChange={(mode) => {
+									if (mode === "NONE") {
+										savedAutomatedRequirements.current.set(profileKey, value);
 										onChange({
 											...value,
-											detectorCapability: { assessmentMethod: "NONE", evidenceCoverage: "NONE" },
-											required: [],
-											optional: [],
+											automatedAssessment: { mode: "NONE", evidenceSufficiency: "NONE" },
+											requiredEvidence: [],
+											optionalContext: [],
+											knownLimitations: [],
 										});
 										return;
 									}
+									const restored =
+										savedAutomatedRequirements.current.get(profileKey) ??
+										options.recommendedRequirements;
 									onChange({
-										...value,
-										detectorCapability: {
-											assessmentMethod: assessmentMethod as Exclude<
-												DetectorCapability["assessmentMethod"],
-												"NONE"
-											>,
-											evidenceCoverage:
-												value.detectorCapability.evidenceCoverage === "NONE"
-													? "DECLARED_REQUIREMENTS_SUFFICIENT"
-													: value.detectorCapability.evidenceCoverage,
+										...restored,
+										automatedAssessment: {
+											mode: mode as Exclude<AutomatedAssessment["mode"], "NONE">,
+											evidenceSufficiency:
+												restored.automatedAssessment.evidenceSufficiency === "NONE"
+													? "SUFFICIENT_WHEN_REQUIREMENTS_MET"
+													: restored.automatedAssessment.evidenceSufficiency,
 										},
-										required:
-											value.required.length > 0 ? value.required : options.baseline.required,
-										optional:
-											value.required.length > 0 ? value.optional : options.baseline.optional,
 									});
 								}}
 							>
-								<SelectTrigger id="practice-detector-method">
+								<SelectTrigger
+									id="practice-assessment-mode"
+									aria-describedby="practice-assessment-mode-description"
+								>
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{ASSESSMENT_METHOD_OPTIONS.map((option) => (
-										<SelectItem key={option.value} value={option.value}>
+									{assessmentModeOptions.map((option) => (
+										<SelectItem
+											key={option.value}
+											value={option.value}
+											disabled={
+												option.value !== "NONE" &&
+												!options.supportedAutomatedAssessmentModes.includes(option.value)
+											}
+										>
 											{option.label}
 										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
-							<FieldDescription>{assessmentMethod?.description}</FieldDescription>
+							<FieldDescription id="practice-assessment-mode-description">
+								{mode?.description}
+							</FieldDescription>
 						</Field>
 
 						<Field>
-							<FieldLabel htmlFor="practice-detector-coverage">
+							<FieldLabel htmlFor="practice-evidence-sufficiency">
 								When evidence checks pass, is it enough?
 							</FieldLabel>
 							<Select
-								disabled={disabled || value.detectorCapability.assessmentMethod === "NONE"}
-								value={value.detectorCapability.evidenceCoverage}
-								onValueChange={(evidenceCoverage) =>
+								disabled={disabled || value.automatedAssessment.mode === "NONE"}
+								items={noAutomatedAssessment ? NO_EVIDENCE_CHECK_OPTION : SUFFICIENCY_OPTIONS}
+								value={value.automatedAssessment.evidenceSufficiency}
+								onValueChange={(evidenceSufficiency) =>
 									onChange({
 										...value,
-										detectorCapability: {
-											...value.detectorCapability,
-											evidenceCoverage: evidenceCoverage as Exclude<
-												DetectorCapability["evidenceCoverage"],
+										automatedAssessment: {
+											...value.automatedAssessment,
+											evidenceSufficiency: evidenceSufficiency as Exclude<
+												AutomatedAssessment["evidenceSufficiency"],
 												"NONE"
 											>,
 										},
 									})
 								}
 							>
-								<SelectTrigger id="practice-detector-coverage">
+								<SelectTrigger
+									id="practice-evidence-sufficiency"
+									aria-describedby="practice-evidence-sufficiency-description"
+								>
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{detectorAbsent ? (
-										<SelectItem value="NONE">Not applicable</SelectItem>
+									{noAutomatedAssessment ? (
+										<SelectItem value="NONE">No evidence check</SelectItem>
 									) : (
-										COVERAGE_OPTIONS.map((option) => (
+										SUFFICIENCY_OPTIONS.map((option) => (
 											<SelectItem key={option.value} value={option.value}>
 												{option.label}
 											</SelectItem>
@@ -373,17 +446,18 @@ export function PracticeEvidenceEditor({
 									)}
 								</SelectContent>
 							</Select>
-							<FieldDescription>
-								{value.detectorCapability.assessmentMethod === "NONE"
-									? "Not applicable without automated detection."
-									: evidenceCoverage?.description}
+							<FieldDescription id="practice-evidence-sufficiency-description">
+								{value.automatedAssessment.mode === "NONE"
+									? "No evidence check is needed without automated assessment."
+									: evidenceSufficiency?.description}
 							</FieldDescription>
 						</Field>
 					</div>
 					<FieldGroup className="gap-4">
-						{options.sources.map((source) => {
+						{options.allowedSources.map((source) => {
 							const role = roleOf(value, source.sourceKind);
-							const requirement = value.required.find(
+							const sourceLabel = source.displayName;
+							const requirement = value.requiredEvidence.find(
 								(item) => item.sourceKind === source.sourceKind,
 							);
 							return (
@@ -391,23 +465,24 @@ export function PracticeEvidenceEditor({
 									<div className="grid gap-3 sm:grid-cols-[1fr_12rem] sm:items-start">
 										<div>
 											<div className="flex flex-wrap items-center gap-2">
-												<p className="font-medium">{evidenceSourceLabel(source.sourceKind)}</p>
+												<p className="font-medium">{sourceLabel}</p>
 												<Badge variant="outline">{PRIVACY_LABELS[source.privacyClass]}</Badge>
 												{source.supportsEmpty && (
 													<Badge variant="outline">Empty can be valid</Badge>
 												)}
-												{!source.authorizedForDetection && (
-													<Badge variant="warning">Not enabled on this instance</Badge>
+												{!source.authorizedForAutomatedAssessment && (
+													<Badge variant="warning">Not authorized on this instance</Badge>
 												)}
 											</div>
 											<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>
 										</div>
 										<Field>
 											<FieldLabel htmlFor={`practice-evidence-${source.sourceKind}`}>
-												Use in this practice
+												Use in this practice <span className="sr-only">for {sourceLabel}</span>
 											</FieldLabel>
 											<Select
-												disabled={disabled || detectorAbsent}
+												disabled={disabled || noAutomatedAssessment}
+												items={EVIDENCE_ROLE_OPTIONS}
 												value={role}
 												onValueChange={(nextRole) =>
 													onChange(withRole(value, source, nextRole as EvidenceRole))
@@ -428,17 +503,26 @@ export function PracticeEvidenceEditor({
 										<div className="mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2">
 											<Field>
 												<FieldLabel htmlFor={`practice-completeness-${source.sourceKind}`}>
-													Minimum completeness
+													Minimum completeness <span className="sr-only">for {sourceLabel}</span>
 												</FieldLabel>
 												<Select
-													disabled={disabled || detectorAbsent}
+													disabled={disabled || noAutomatedAssessment}
+													items={[
+														...(source.supportsComplete
+															? [{ value: "COMPLETE", label: "Complete" }]
+															: []),
+														{ value: "NO_REQUIREMENT", label: "No completeness requirement" },
+													]}
 													value={requirement.completeness}
 													onValueChange={(completeness) =>
 														onChange({
 															...value,
-															required: value.required.map((item) =>
+															requiredEvidence: value.requiredEvidence.map((item) =>
 																item.sourceKind === source.sourceKind
-																	? { ...item, completeness: completeness as "ANY" | "COMPLETE" }
+																	? {
+																			...item,
+																			completeness: completeness as "NO_REQUIREMENT" | "COMPLETE",
+																		}
 																	: item,
 															),
 														})
@@ -451,23 +535,34 @@ export function PracticeEvidenceEditor({
 														{source.supportsComplete && (
 															<SelectItem value="COMPLETE">Complete</SelectItem>
 														)}
-														<SelectItem value="ANY">Partial allowed</SelectItem>
+														<SelectItem value="NO_REQUIREMENT">
+															No completeness requirement
+														</SelectItem>
 													</SelectContent>
 												</Select>
 											</Field>
 											<Field>
 												<FieldLabel htmlFor={`practice-freshness-${source.sourceKind}`}>
-													Minimum freshness
+													Minimum freshness <span className="sr-only">for {sourceLabel}</span>
 												</FieldLabel>
 												<Select
-													disabled={disabled || detectorAbsent}
+													disabled={disabled || noAutomatedAssessment}
+													items={[
+														...(source.supportsCurrent
+															? [{ value: "CURRENT", label: "Current" }]
+															: []),
+														{ value: "NO_REQUIREMENT", label: "No freshness requirement" },
+													]}
 													value={requirement.freshness}
 													onValueChange={(freshness) =>
 														onChange({
 															...value,
-															required: value.required.map((item) =>
+															requiredEvidence: value.requiredEvidence.map((item) =>
 																item.sourceKind === source.sourceKind
-																	? { ...item, freshness: freshness as "ANY" | "CURRENT" }
+																	? {
+																			...item,
+																			freshness: freshness as "NO_REQUIREMENT" | "CURRENT",
+																		}
 																	: item,
 															),
 														})
@@ -480,7 +575,7 @@ export function PracticeEvidenceEditor({
 														{source.supportsCurrent && (
 															<SelectItem value="CURRENT">Current</SelectItem>
 														)}
-														<SelectItem value="ANY">Any age</SelectItem>
+														<SelectItem value="NO_REQUIREMENT">No freshness requirement</SelectItem>
 													</SelectContent>
 												</Select>
 											</Field>
@@ -493,67 +588,81 @@ export function PracticeEvidenceEditor({
 
 					<div className="space-y-3">
 						<div>
-							<p className="font-medium">What this evidence cannot prove</p>
+							<p className="font-medium">What this evidence cannot support</p>
 							<p className="text-sm text-muted-foreground">
-								State what these sources still cannot prove, even when they are complete.
+								State which claims these sources cannot support, even when every requirement passes.
 							</p>
 						</div>
-						{value.blindSpots.map((blindSpot, index) => (
-							<div
-								key={`${blindSpot.code}-${index}`}
-								className="grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_auto]"
-							>
-								<Field>
-									<FieldLabel htmlFor={`practice-limitation-summary-${index}`}>
-										Description
-									</FieldLabel>
-									<Input
-										disabled={disabled}
-										id={`practice-limitation-summary-${index}`}
-										value={blindSpot.summary}
-										onChange={(event) =>
+						{value.knownLimitations.map((limitation, index) => {
+							const limitationId = limitation.code;
+							return (
+								<div
+									key={limitationId}
+									className="grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_auto]"
+								>
+									<Field>
+										<FieldLabel htmlFor={`practice-limitation-description-${limitationId}`}>
+											Description <span className="sr-only">for limitation {index + 1}</span>
+										</FieldLabel>
+										<Input
+											disabled={disabled || noAutomatedAssessment}
+											id={`practice-limitation-description-${limitationId}`}
+											value={limitation.description}
+											onChange={(event) =>
+												onChange({
+													...value,
+													knownLimitations: value.knownLimitations.map((item, itemIndex) =>
+														itemIndex === index
+															? { ...item, description: event.target.value }
+															: item,
+													),
+												})
+											}
+											maxLength={500}
+										/>
+									</Field>
+									<Button
+										type="button"
+										disabled={disabled || noAutomatedAssessment}
+										variant="ghost"
+										size="icon-sm"
+										className="self-end"
+										onClick={() => {
+											const remaining = value.knownLimitations.filter(
+												(_, itemIndex) => itemIndex !== index,
+											);
+											const focusTarget =
+												remaining[index]?.code ?? remaining[index - 1]?.code ?? "add";
 											onChange({
 												...value,
-												blindSpots: value.blindSpots.map((item, itemIndex) =>
-													itemIndex === index ? { ...item, summary: event.target.value } : item,
-												),
-											})
-										}
-										maxLength={500}
-									/>
-								</Field>
-								<Button
-									type="button"
-									disabled={disabled}
-									variant="ghost"
-									size="icon-sm"
-									className="self-end"
-									onClick={() =>
-										onChange({
-											...value,
-											blindSpots: value.blindSpots.filter((_, itemIndex) => itemIndex !== index),
-										})
-									}
-									aria-label={`Remove limitation ${blindSpot.code}`}
-								>
-									<Trash2 className="size-4" />
-								</Button>
-							</div>
-						))}
+												knownLimitations: remaining,
+											});
+											focusLimitation(focusTarget);
+										}}
+										aria-label={`Remove limitation ${index + 1}`}
+									>
+										<Trash2 className="size-4" />
+									</Button>
+								</div>
+							);
+						})}
 						<Button
+							ref={addLimitationButton}
 							type="button"
-							disabled={disabled}
+							disabled={disabled || noAutomatedAssessment}
 							variant="outline"
 							size="sm"
-							onClick={() =>
+							onClick={() => {
+								const limitationCode = newLimitationCode();
 								onChange({
 									...value,
-									blindSpots: [
-										...value.blindSpots,
-										{ code: nextBlindSpotCode(value), summary: "" },
+									knownLimitations: [
+										...value.knownLimitations,
+										{ code: limitationCode, description: "" },
 									],
-								})
-							}
+								});
+								focusLimitation(limitationCode);
+							}}
 						>
 							<Plus className="size-4" />
 							Add limitation
@@ -562,23 +671,23 @@ export function PracticeEvidenceEditor({
 				</CollapsibleContent>
 			</Collapsible>
 
-			{value.detectorCapability.assessmentMethod === "NONE" && (
+			{value.automatedAssessment.mode === "NONE" && (
 				<Alert variant="warning">
 					<TriangleAlert />
-					<AlertTitle>Hephaestus cannot judge this practice</AlertTitle>
+					<AlertTitle>No automated assessment</AlertTitle>
 					<AlertDescription>
-						It will be saved inactive and cannot be enabled for automated review. A person may still
-						assess it through a separate self, peer, or mentor process.
+						Hephaestus cannot use this practice in automated reviews. Human assessment, if
+						applicable, is a separate process and is not collected.
 					</AlertDescription>
 				</Alert>
 			)}
-			{value.detectorCapability.evidenceCoverage === "CONDITIONAL" && (
+			{value.automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" && (
 				<Alert variant="warning">
 					<TriangleAlert />
-					<AlertTitle>Conditional automated judgment is not supported yet</AlertTitle>
+					<AlertTitle>Declared evidence is insufficient</AlertTitle>
 					<AlertDescription>
-						The practice will be saved inactive. Hephaestus will not confuse missing human context
-						with an applicable or inapplicable result.
+						Hephaestus cannot use this practice in automated reviews. It skips the practice rather
+						than guessing without the context described in its known limitations.
 					</AlertDescription>
 				</Alert>
 			)}

@@ -1,12 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Practice, PracticeArea } from "@/api/types.gen";
+import type { Practice, PracticeArea, PracticeEvidenceOptions } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import {
 	WORK_ARTIFACT_FILTER_OPTIONS,
 	WORK_ARTIFACT_LABELS,
 } from "@/components/admin/practice-catalog/constants";
+import {
+	automatedAssessmentUnavailableLabel,
+	canAttemptAutomatedAssessment,
+} from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
@@ -64,16 +68,17 @@ export interface PracticeCatalogProps {
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	practices: Practice[];
+	evidenceOptions: PracticeEvidenceOptions;
 	pending: PracticeCatalogPendingState;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (f: FocusFilter) => void;
 	onCreateArea: (name: string) => Promise<boolean>;
 	onRenameArea: (slug: string, name: string) => Promise<boolean>;
-	onToggleAreaActive: (slug: string, active: boolean) => void;
+	onSetAreaDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
 	onDeleteArea: (slug: string) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
-	onSetPracticeActive: (slug: string, active: boolean) => void;
+	onSetPracticeUsedInNewReviews: (slug: string, usedInNewReviews: boolean) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
 }
@@ -87,16 +92,17 @@ export function PracticeCatalog({
 	workspaceSlug,
 	areas,
 	practices,
+	evidenceOptions,
 	pending,
 	focusFilter,
 	onFocusFilterChange,
 	onCreateArea,
 	onRenameArea,
-	onToggleAreaActive,
+	onSetAreaDashboardVisibility,
 	onDeleteArea,
 	onReorderAreas,
 	onSetAreaVisual,
-	onSetPracticeActive,
+	onSetPracticeUsedInNewReviews,
 	onDeletePractice,
 	onPlacePractice,
 }: PracticeCatalogProps) {
@@ -115,6 +121,9 @@ export function PracticeCatalog({
 						.map((practice) => practice.areaSlug)
 						.filter((slug): slug is string => Boolean(slug)),
 				);
+	const supportedModesFor = (practice: Practice) =>
+		evidenceOptions.workTypes.find((option) => option.artifactType === practice.artifactType)
+			?.supportedAutomatedAssessmentModes ?? [];
 
 	return (
 		<div className="space-y-4">
@@ -155,7 +164,9 @@ export function PracticeCatalog({
 				)}
 				renderAreaMeta={(area) => (
 					<>
-						{!area.active && <Badge variant="outline">Hidden from practice dashboards</Badge>}
+						{!area.visibleInPracticeDashboards && (
+							<Badge variant="outline">Hidden from practice dashboards</Badge>
+						)}
 						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
 					</>
 				)}
@@ -166,13 +177,14 @@ export function PracticeCatalog({
 						pending={pending.areaSlugs.has(area.slug)}
 						structurePending={pending.areaStructure}
 						onRename={() => setRenamingArea(area)}
-						onToggleActive={onToggleAreaActive}
+						onSetDashboardVisibility={onSetAreaDashboardVisibility}
 						onDelete={onDeleteArea}
 					/>
 				)}
 				renderEntryContent={(practice) => (
 					<PracticeRowDetails
 						practice={practice}
+						supportedModes={supportedModesFor(practice)}
 						title={
 							<Link
 								to="/w/$workspaceSlug/admin/practices/$practiceSlug"
@@ -187,15 +199,18 @@ export function PracticeCatalog({
 				renderEntryActions={(practice, move) => (
 					<PracticeActions
 						practice={practice}
+						supportedModes={supportedModesFor(practice)}
 						workspaceSlug={workspaceSlug}
 						areas={areas}
 						move={move}
 						pending={pending.practiceSlugs.has(practice.slug)}
-						onSetActive={onSetPracticeActive}
+						onSetUsedInNewReviews={onSetPracticeUsedInNewReviews}
 						onDelete={onDeletePractice}
 					/>
 				)}
-				renderEntryPreview={(practice) => <PracticeDragPreview practice={practice} />}
+				renderEntryPreview={(practice) => (
+					<PracticeDragPreview practice={practice} supportedModes={supportedModesFor(practice)} />
+				)}
 				getEmptyLabel={(areaSlug, total) => {
 					if (total > 0) return "No matching practices.";
 					return areaSlug === null ? "No unassigned practices." : "No practices in this area.";
@@ -304,7 +319,7 @@ function AreaActions({
 	pending,
 	structurePending,
 	onRename,
-	onToggleActive,
+	onSetDashboardVisibility,
 	onDelete,
 }: {
 	area: PracticeArea;
@@ -312,15 +327,17 @@ function AreaActions({
 	pending: boolean;
 	structurePending: boolean;
 	onRename: () => void;
-	onToggleActive: (slug: string, active: boolean) => void;
+	onSetDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
 	onDelete: (slug: string) => void;
 }) {
 	return (
 		<>
 			<Switch
 				className="hidden sm:inline-flex"
-				checked={area.active}
-				onCheckedChange={(active) => onToggleActive(area.slug, active)}
+				checked={area.visibleInPracticeDashboards}
+				onCheckedChange={(visibleInPracticeDashboards) =>
+					onSetDashboardVisibility(area.slug, visibleInPracticeDashboards)
+				}
 				disabled={pending}
 				aria-label={`Show ${area.name} on practice dashboards`}
 			/>
@@ -344,9 +361,11 @@ function AreaActions({
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						disabled={pending}
-						onClick={() => onToggleActive(area.slug, !area.active)}
+						onClick={() => onSetDashboardVisibility(area.slug, !area.visibleInPracticeDashboards)}
 					>
-						{area.active ? "Hide from practice dashboards" : "Show on practice dashboards"}
+						{area.visibleInPracticeDashboards
+							? "Hide from practice dashboards"
+							: "Show on practice dashboards"}
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
@@ -374,32 +393,37 @@ function AreaActions({
 
 function PracticeActions({
 	practice,
+	supportedModes,
 	workspaceSlug,
 	areas,
 	move,
 	pending,
-	onSetActive,
+	onSetUsedInNewReviews,
 	onDelete,
 }: {
 	practice: Practice;
+	supportedModes: readonly Practice["automatedAssessmentPolicy"]["automatedAssessment"]["mode"][];
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
 	pending: boolean;
-	onSetActive: (slug: string, active: boolean) => void;
+	onSetUsedInNewReviews: (slug: string, usedInNewReviews: boolean) => void;
 	onDelete: (practice: Practice) => void;
 }) {
-	const supportsAutomatedDetection =
-		practice.evidence.detectorCapability.assessmentMethod !== "NONE" &&
-		practice.evidence.detectorCapability.evidenceCoverage === "DECLARED_REQUIREMENTS_SUFFICIENT";
-	const activationDisabled = pending || (!practice.active && !supportsAutomatedDetection);
+	const canAssess = canAttemptAutomatedAssessment(
+		practice.automatedAssessmentPolicy,
+		supportedModes,
+	);
+	const usageChangeDisabled = pending || (!practice.usedInNewReviews && !canAssess);
 	return (
 		<>
 			<Switch
 				className="hidden sm:inline-flex"
-				checked={practice.active}
-				onCheckedChange={(active) => onSetActive(practice.slug, active)}
-				disabled={activationDisabled}
+				checked={practice.usedInNewReviews}
+				onCheckedChange={(usedInNewReviews) =>
+					onSetUsedInNewReviews(practice.slug, usedInNewReviews)
+				}
+				disabled={usageChangeDisabled}
 				aria-label={`Use ${practice.name} in new reviews`}
 			/>
 			<DropdownMenu>
@@ -427,10 +451,10 @@ function PracticeActions({
 						Edit practice
 					</DropdownMenuItem>
 					<DropdownMenuItem
-						disabled={activationDisabled}
-						onClick={() => onSetActive(practice.slug, !practice.active)}
+						disabled={usageChangeDisabled}
+						onClick={() => onSetUsedInNewReviews(practice.slug, !practice.usedInNewReviews)}
 					>
-						{practice.active ? "Stop using in new reviews" : "Use in new reviews"}
+						{practice.usedInNewReviews ? "Stop using in new reviews" : "Use in new reviews"}
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
@@ -535,24 +559,39 @@ function RenameAreaDialog({
 	);
 }
 
-function PracticeRowDetails({ practice, title }: { practice: Practice; title: ReactNode }) {
-	const detectorUnavailable =
-		practice.evidence.detectorCapability.assessmentMethod === "NONE" ||
-		practice.evidence.detectorCapability.evidenceCoverage === "CONDITIONAL";
+function PracticeRowDetails({
+	practice,
+	title,
+	supportedModes,
+}: {
+	practice: Practice;
+	title: ReactNode;
+	supportedModes: readonly Practice["automatedAssessmentPolicy"]["automatedAssessment"]["mode"][];
+}) {
+	const unavailableLabel = automatedAssessmentUnavailableLabel(
+		practice.automatedAssessmentPolicy,
+		supportedModes,
+	);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{WORK_ARTIFACT_LABELS[practice.artifactType]}</span>
-				{!practice.active && <Badge variant="outline">Not used in new reviews</Badge>}
-				{detectorUnavailable && <Badge variant="warning">Automated detection unavailable</Badge>}
+				{!practice.usedInNewReviews && <Badge variant="outline">Not used in new reviews</Badge>}
+				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</ItemDescription>
 		</ItemContent>
 	);
 }
 
-function PracticeDragPreview({ practice }: { practice: Practice }) {
+function PracticeDragPreview({
+	practice,
+	supportedModes,
+}: {
+	practice: Practice;
+	supportedModes: readonly Practice["automatedAssessmentPolicy"]["automatedAssessment"]["mode"][];
+}) {
 	return (
 		<Item
 			aria-hidden="true"
@@ -565,6 +604,7 @@ function PracticeDragPreview({ practice }: { practice: Practice }) {
 			</div>
 			<PracticeRowDetails
 				practice={practice}
+				supportedModes={supportedModes}
 				title={<span className="break-words">{practice.name}</span>}
 			/>
 		</Item>

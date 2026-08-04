@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessmentPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import jakarta.persistence.Column;
@@ -51,8 +51,8 @@ public class CuratedPracticeOverride {
     private @Nullable String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "evidence_declaration", columnDefinition = "jsonb")
-    private @Nullable PracticeEvidenceDeclaration evidence;
+    @Column(name = "automated_assessment_policy", columnDefinition = "jsonb")
+    private @Nullable PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy;
 
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     private @Nullable String whyItMatters;
@@ -89,7 +89,13 @@ public class CuratedPracticeOverride {
     }
 
     public @Nullable PracticeDefinition definition() {
-        if (name == null || artifactType == null || triggerEvents == null || criteria == null || evidence == null) {
+        if (
+            name == null ||
+            artifactType == null ||
+            triggerEvents == null ||
+            criteria == null ||
+            automatedAssessmentPolicy == null
+        ) {
             return null;
         }
         return new PracticeDefinition(
@@ -98,7 +104,7 @@ public class CuratedPracticeOverride {
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
-            evidence,
+            automatedAssessmentPolicy,
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
@@ -111,7 +117,7 @@ public class CuratedPracticeOverride {
         this.triggerEvents = definition.triggerEventsJson();
         this.criteria = definition.criteria();
         this.precomputeScript = definition.precomputeScript();
-        this.evidence = definition.evidence();
+        this.automatedAssessmentPolicy = definition.automatedAssessmentPolicy();
         this.whyItMatters = definition.whyItMatters();
         this.whatGoodLooksLike = definition.whatGoodLooksLike();
         this.areaSlug = definition.areaSlug();
@@ -125,7 +131,7 @@ public class CuratedPracticeOverride {
         this.triggerEvents = null;
         this.criteria = null;
         this.precomputeScript = null;
-        this.evidence = null;
+        this.automatedAssessmentPolicy = null;
         this.whyItMatters = null;
         this.whatGoodLooksLike = null;
         this.areaSlug = null;

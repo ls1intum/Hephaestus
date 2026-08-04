@@ -87,7 +87,7 @@ public class PracticeCatalogContentSource implements ContentSource {
 
         // Active practices only — the mentor should not talk about practices the workspace
         // has explicitly disabled.
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrue(workspaceId);
 
         ObjectNode root = objectMapper.createObjectNode();
         root.putObject("workspace").put("slug", workspace.getWorkspaceSlug());

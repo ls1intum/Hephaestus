@@ -184,7 +184,7 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
     private UUID staleRunningJob(tools.jackson.databind.JsonNode configSnapshot, AgentJob usage) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(configSnapshot);

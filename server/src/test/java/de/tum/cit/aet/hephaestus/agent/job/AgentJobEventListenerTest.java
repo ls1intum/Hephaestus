@@ -29,7 +29,7 @@ import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -744,7 +744,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         private record CollaborationFixture(
             AgentJobEventListener listener,
             UserRoleChecker userRoleChecker,
-            PracticeDetectionReadiness practiceDetectionReadiness,
+            PracticeReviewReadiness practiceDetectionReadiness,
             PracticeRepository practiceRepository,
             WorkspaceResolver workspaceResolver
         ) {
@@ -753,7 +753,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 PullRequestRepository pullRequestRepository
             ) {
                 var userRoleChecker = mock(UserRoleChecker.class);
-                var practiceDetectionReadiness = mock(PracticeDetectionReadiness.class);
+                var practiceDetectionReadiness = mock(PracticeReviewReadiness.class);
                 var practiceRepository = mock(PracticeRepository.class);
                 var workspaceResolver = mock(WorkspaceResolver.class);
                 var properties = new PracticeReviewProperties(true, true, false, 15, false, false);
@@ -807,8 +807,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             ArrayNode events = MAPPER.createArrayNode();
             events.add(TriggerEventNames.PULL_REQUEST_CREATED);
             practice.setTriggerEvents(events);
-            practice.setActive(true);
-            when(fixture.practiceRepository().findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
+            practice.setUsedInNewReviews(true);
+            when(fixture.practiceRepository().findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(
                 List.of(practice)
             );
 
@@ -839,8 +839,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             ArrayNode events = MAPPER.createArrayNode();
             events.add(TriggerEventNames.REVIEW_SUBMITTED);
             practice.setTriggerEvents(events);
-            practice.setActive(true);
-            when(fixture.practiceRepository().findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
+            practice.setUsedInNewReviews(true);
+            when(fixture.practiceRepository().findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(
                 List.of(practice)
             );
 

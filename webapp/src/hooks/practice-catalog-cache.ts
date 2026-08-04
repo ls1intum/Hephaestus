@@ -43,7 +43,9 @@ export function selectAreaPatch(
 	request: UpdatePracticeAreaRequest,
 ): UpdatePracticeAreaRequest {
 	return {
-		...("active" in request ? { active: area.active } : {}),
+		...(request.visibleInPracticeDashboards !== undefined
+			? { visibleInPracticeDashboards: area.visibleInPracticeDashboards }
+			: {}),
 		...("color" in request ? { color: area.color } : {}),
 		...("description" in request ? { description: area.description } : {}),
 		...("displayOrder" in request ? { displayOrder: area.displayOrder } : {}),
@@ -80,10 +82,10 @@ export function selectPracticePatch(
 	return {
 		...("artifactType" in request ? { artifactType: practice.artifactType } : {}),
 		...("criteria" in request ? { criteria: practice.criteria } : {}),
-		...("evidence" in request || "artifactType" in request
+		...("automatedAssessmentPolicy" in request || "artifactType" in request
 			? {
-					evidence: practice.evidence,
-					evidenceValidation: practice.evidenceValidation,
+					automatedAssessmentPolicy: practice.automatedAssessmentPolicy,
+					automatedAssessmentValidation: practice.automatedAssessmentValidation,
 				}
 			: {}),
 		...("name" in request ? { name: practice.name } : {}),

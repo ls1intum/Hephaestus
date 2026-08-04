@@ -38,7 +38,7 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         practice.setArtifactType(WorkArtifact.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria("Give specific feedback");
-        practice.setEvidence(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
         when(practiceRepository.findByIdForUpdate(42L)).thenReturn(Optional.of(practice));
         when(revisionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -66,42 +66,42 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         PracticeRevision appended = service.append(practice);
 
         assertThat(appended.getCriteria()).isEqualTo("Give specific feedback");
-        assertThat(appended.getDetectionFingerprint()).hasSize(67).startsWith("v2:");
+        assertThat(appended.getReviewRuleFingerprint()).hasSize(67).startsWith("v2:");
         assertThat(practice.getCurrentRevision()).isSameAs(appended);
     }
 
     @Test
-    void editingOnlyWhatPeopleReadLeavesTheDetectionFingerprintAlone() {
+    void editingOnlyWhatPeopleReadLeavesTheReviewRuleFingerprintAlone() {
         when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
-        String before = service.append(practice).getDetectionFingerprint();
+        String before = service.append(practice).getReviewRuleFingerprint();
 
         practice.setWhyItMatters("It shortens review cycles.");
 
-        assertThat(service.append(practice).getDetectionFingerprint()).isEqualTo(before);
+        assertThat(service.append(practice).getReviewRuleFingerprint()).isEqualTo(before);
     }
 
     @Test
     void editingTheDetectionCriteriaChangesTheFingerprint() {
         when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
-        String before = service.append(practice).getDetectionFingerprint();
+        String before = service.append(practice).getReviewRuleFingerprint();
 
         practice.setCriteria("Changed detector criteria");
 
-        assertThat(service.append(practice).getDetectionFingerprint()).isNotEqualTo(before);
+        assertThat(service.append(practice).getReviewRuleFingerprint()).isNotEqualTo(before);
     }
 
     @Test
     void editingTheEvidenceDeclarationChangesTheFingerprint() {
         when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
-        String before = service.append(practice).getDetectionFingerprint();
+        String before = service.append(practice).getReviewRuleFingerprint();
 
-        practice.setEvidence(
-            new PracticeEvidenceDeclaration(
-                practice.getEvidence().sourceContractVersion(),
-                practice.getEvidence().profile(),
-                new PracticeDetectorCapability(
-                    PracticeDetectorAssessmentMethod.SEMANTIC,
-                    PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+        practice.setAutomatedAssessmentPolicy(
+            new PracticeAutomatedAssessmentPolicy(
+                practice.getAutomatedAssessmentPolicy().sourceContractVersion(),
+                practice.getAutomatedAssessmentPolicy().evidenceProfile(),
+                new PracticeAutomatedAssessment(
+                    PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+                    PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
                 List.of(
                     new PracticeEvidenceRequirement(
@@ -111,11 +111,11 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
                     )
                 ),
                 List.of(),
-                PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
                 List.of()
             )
         );
 
-        assertThat(service.append(practice).getDetectionFingerprint()).isNotEqualTo(before);
+        assertThat(service.append(practice).getReviewRuleFingerprint()).isNotEqualTo(before);
     }
 }

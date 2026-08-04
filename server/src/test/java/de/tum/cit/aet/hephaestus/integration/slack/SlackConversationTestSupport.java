@@ -141,7 +141,7 @@ public final class SlackConversationTestSupport {
     public static Practice newPractice(PracticeRepository practiceRepository, Workspace workspace, String slugPrefix) {
         Practice practice = new Practice();
         practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
-        practice.setEvidence(PracticeTestEvidence.conversationThread());
+        practice.setAutomatedAssessmentPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug(slugPrefix + "-" + UUID.randomUUID());
         practice.setName("Test Practice");

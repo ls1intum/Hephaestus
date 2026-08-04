@@ -3,25 +3,26 @@ package de.tum.cit.aet.hephaestus.evidence;
 import java.util.Objects;
 import java.util.Set;
 
-/** Contract for one independently missing, fresh, complete, private, and ablatable source kind. */
+/** Versioned semantics for one logical evidence source. */
 public record ArtifactSourceContract(
     SourceKind kind,
+    String displayName,
     String description,
     String selectionScope,
     Set<String> artifactTypes,
     SourceAuthority authority,
-    CaptureTimeBasis captureTime,
+    CaptureTimeBasis captureTimeBasis,
     FreshnessPolicy freshnessPolicy,
     CompletenessPolicy completenessPolicy,
     PrivacyClass privacyClass,
-    Set<MissingnessKind> supportedMissingness,
-    String purpose,
+    Set<SourceAbsenceState> supportedAbsenceStates,
     RetentionPolicy retentionPolicy,
     ErasurePolicy erasurePolicy,
     Set<String> useDecisionIds
 ) {
     public ArtifactSourceContract {
         Objects.requireNonNull(kind, "kind");
+        displayName = requireText(displayName, "displayName", kind);
         description = requireText(description, "description", kind);
         selectionScope = requireText(selectionScope, "selectionScope", kind);
         artifactTypes = Set.copyOf(Objects.requireNonNull(artifactTypes, "artifactTypes"));
@@ -29,15 +30,14 @@ public record ArtifactSourceContract(
             throw new IllegalArgumentException("artifactTypes must contain non-blank values: " + kind);
         }
         Objects.requireNonNull(authority, "authority");
-        Objects.requireNonNull(captureTime, "captureTime");
+        Objects.requireNonNull(captureTimeBasis, "captureTimeBasis");
         Objects.requireNonNull(freshnessPolicy, "freshnessPolicy");
         Objects.requireNonNull(completenessPolicy, "completenessPolicy");
         Objects.requireNonNull(privacyClass, "privacyClass");
-        supportedMissingness = Set.copyOf(Objects.requireNonNull(supportedMissingness, "supportedMissingness"));
-        if (supportedMissingness.isEmpty()) {
-            throw new IllegalArgumentException("supportedMissingness must not be empty: " + kind);
+        supportedAbsenceStates = Set.copyOf(Objects.requireNonNull(supportedAbsenceStates, "supportedAbsenceStates"));
+        if (supportedAbsenceStates.isEmpty()) {
+            throw new IllegalArgumentException("supportedAbsenceStates must not be empty: " + kind);
         }
-        purpose = requireText(purpose, "purpose", kind);
         Objects.requireNonNull(retentionPolicy, "retentionPolicy");
         Objects.requireNonNull(erasurePolicy, "erasurePolicy");
         useDecisionIds = Set.copyOf(Objects.requireNonNull(useDecisionIds, "useDecisionIds"));

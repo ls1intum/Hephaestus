@@ -42,7 +42,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     @Test
     void rejectsUnknownEvidenceSource() {
-        PracticeEvidenceDeclaration declaration = declaration(
+        PracticeAutomatedAssessmentPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 new SourceKind("scm.pull-request.unknown"),
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -50,14 +50,14 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             )
         );
 
-        assertThatThrownBy(() -> validator.validate(definition(declaration)))
+        assertThatThrownBy(() -> validator.validate(definition(requirements)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Unknown source");
     }
 
     @Test
     void rejectsEvidenceOutsideSelectedProfile() {
-        PracticeEvidenceDeclaration declaration = declaration(
+        PracticeAutomatedAssessmentPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 OUTSIDE_PROFILE,
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -65,14 +65,14 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             )
         );
 
-        assertThatThrownBy(() -> validator.validate(definition(declaration)))
+        assertThatThrownBy(() -> validator.validate(definition(requirements)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Evidence source is not allowed by the selected profile");
     }
 
     @Test
     void rejectsImpossibleCompletenessRequirement() {
-        PracticeEvidenceDeclaration declaration = declaration(
+        PracticeAutomatedAssessmentPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 PARTIAL,
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -80,14 +80,14 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             )
         );
 
-        assertThatThrownBy(() -> validator.validate(definition(declaration)))
+        assertThatThrownBy(() -> validator.validate(definition(requirements)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Evidence source cannot satisfy COMPLETE requirements");
     }
 
     @Test
     void rejectsImpossibleFreshnessRequirement() {
-        PracticeEvidenceDeclaration declaration = declaration(
+        PracticeAutomatedAssessmentPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 TIMELESS,
                 EvidenceCompletenessRequirement.COMPLETE,
@@ -95,79 +95,36 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             )
         );
 
-        assertThatThrownBy(() -> validator.validate(definition(declaration)))
+        assertThatThrownBy(() -> validator.validate(definition(requirements)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Evidence source cannot satisfy CURRENT requirements");
     }
 
-    @Test
-    void rejectsSourceThatIsBothRequiredAndOptional() {
-        PracticeEvidenceRequirement requirement = new PracticeEvidenceRequirement(
-            DIFF,
-            EvidenceCompletenessRequirement.COMPLETE,
-            EvidenceFreshnessRequirement.CURRENT
-        );
-        OptionalPracticeEvidenceRequirement optionalRequirement = new OptionalPracticeEvidenceRequirement(
-            DIFF,
-            EvidenceCompletenessRequirement.ANY,
-            EvidenceFreshnessRequirement.ANY
-        );
-        PracticeEvidenceDeclaration declaration = new PracticeEvidenceDeclaration(
-            VERSION,
-            PROFILE,
-            new PracticeDetectorCapability(
-                PracticeDetectorAssessmentMethod.SEMANTIC,
-                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
-            ),
-            List.of(requirement),
-            List.of(optionalRequirement),
-            PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
-            List.of()
-        );
-
-        assertThatThrownBy(() -> validator.validate(definition(declaration)))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("An evidence source cannot be both required and optional");
-    }
-
-    @Test
-    void rejectsQualityConstraintsOnOptionalEvidence() {
-        assertThatThrownBy(() ->
-            new OptionalPracticeEvidenceRequirement(
-                new SourceKind("scm.pull-request.comments"),
-                EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.ANY
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Optional evidence must use ANY completeness and freshness");
-    }
-
-    private static PracticeDefinition definition(PracticeEvidenceDeclaration declaration) {
+    private static PracticeDefinition definition(PracticeAutomatedAssessmentPolicy requirements) {
         return new PracticeDefinition(
             "Focused review",
             WorkArtifact.PULL_REQUEST,
             List.of("PullRequestCreated"),
             "Assess the review",
             null,
-            declaration,
+            requirements,
             null,
             null,
             null
         );
     }
 
-    private static PracticeEvidenceDeclaration declaration(PracticeEvidenceRequirement requirement) {
-        return new PracticeEvidenceDeclaration(
+    private static PracticeAutomatedAssessmentPolicy requirements(PracticeEvidenceRequirement requirement) {
+        return new PracticeAutomatedAssessmentPolicy(
             VERSION,
             PROFILE,
-            new PracticeDetectorCapability(
-                PracticeDetectorAssessmentMethod.SEMANTIC,
-                PracticeDetectorEvidenceCoverage.DECLARED_REQUIREMENTS_SUFFICIENT
+            new PracticeAutomatedAssessment(
+                PracticeAutomatedAssessmentMode.LANGUAGE_MODEL,
+                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             List.of(requirement),
             List.of(),
-            PracticeEvidenceRefusal.DECLINE_SEMANTIC_JUDGMENT,
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
             List.of()
         );
     }

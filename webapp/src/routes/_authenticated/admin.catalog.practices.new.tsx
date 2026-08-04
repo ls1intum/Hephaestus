@@ -70,7 +70,7 @@ function NewCuratedPracticePage() {
 				name: area.definition.name,
 			}))}
 			isPending={createPractice.isPending}
-			evidenceAuthoring={evidenceQuery.data}
+			evidenceOptions={evidenceQuery.data}
 			onSubmit={({ slug, ...definition }: CuratedPracticeFormValue) =>
 				createPractice.mutate({ body: { slug, definition } })
 			}

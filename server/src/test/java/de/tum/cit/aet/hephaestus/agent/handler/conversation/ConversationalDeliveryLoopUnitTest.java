@@ -16,7 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
-import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -82,7 +82,13 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void authorizeEvidenceDelivery() {
         Observation observation = problem(null, null);
         lenient()
-            .when(visibilityPolicy.permits(anyLong(), any(Observation.class), eq(SourceUseAudience.PRACTICE_MENTORING)))
+            .when(
+                visibilityPolicy.permits(
+                    anyLong(),
+                    any(Observation.class),
+                    eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                )
+            )
             .thenReturn(true);
         lenient()
             .when(observationRepository.findByIdAndWorkspaceId(any(), anyLong()))
@@ -316,7 +322,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
         ).thenReturn(List.of(feedbackId));
         when(observationRepository.findByIdAndWorkspaceId(observationId, WS)).thenReturn(Optional.of(observation));
-        when(visibilityPolicy.permits(WS, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(false);
+        when(visibilityPolicy.permits(WS, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(false);
 
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(observationId));
 
