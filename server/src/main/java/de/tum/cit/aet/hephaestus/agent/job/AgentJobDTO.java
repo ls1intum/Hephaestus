@@ -19,6 +19,13 @@ public record AgentJobDTO(
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull
     @Schema(
+        description = "Why a COMPLETED run produced the findings it did. INSUFFICIENT_EVIDENCE means no model ran " +
+            "because required evidence was missing, unreadable, stale, or unauthorized — so no findings means " +
+            "nothing was assessed, not that nothing was wrong. JUDGED means the model ran against sufficient evidence."
+    )
+    ReviewRunOutcome reviewOutcome,
+    @NonNull
+    @Schema(
         description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)"
     )
     Object configSnapshot,
@@ -73,6 +80,7 @@ public record AgentJobDTO(
             ReviewRunTargetDTO.from(job),
             job.getMetadata(),
             job.getOutput(),
+            ReviewRunOutcome.fromJobOutput(job.getOutput()),
             redactInstanceBaseUrl(snapshot),
             snapshotString(snapshot, "upstreamModelId"),
             job.getExitCode(),

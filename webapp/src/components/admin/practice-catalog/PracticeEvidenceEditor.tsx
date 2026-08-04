@@ -81,8 +81,29 @@ function withRole(
 	return { ...requirements, requiredEvidence: required, optionalContext: optional };
 }
 
-function newLimitationCode() {
-	return `LIMITATION_${crypto.randomUUID().replaceAll("-", "").toUpperCase()}`;
+/**
+ * The server digests a limitation's code together with its text, and that digest decides whether a
+ * practice's independent validation is still current and whether a curated update changed review
+ * behaviour or only wording. A random code would make retyping the same sentence look like a new
+ * rule, so the code is derived from the text: identical wording always yields the identical code.
+ */
+function limitationCodeFor(description: string) {
+	const slug = description
+		.toUpperCase()
+		.replace(/[^A-Z0-9]+/g, "_")
+		.replace(/^_+|_+$/g, "")
+		.slice(0, 63);
+	return /^[A-Z][A-Z0-9_]{2,63}$/.test(slug) ? slug : `LIMITATION_${fnv1a(description)}`;
+}
+
+/** Deterministic, non-cryptographic fallback for text that cannot form a legal code. */
+function fnv1a(input: string) {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < input.length; index += 1) {
+		hash ^= input.charCodeAt(index);
+		hash = Math.imul(hash, 0x01000193) >>> 0;
+	}
+	return hash.toString(16).toUpperCase().padStart(8, "0");
 }
 
 function matchesRecommendedEvidence(
@@ -229,7 +250,7 @@ export function PracticeEvidenceEditor({
 					: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 			},
 			knownLimitations: needsLimitation
-				? [{ code: newLimitationCode(), description: "" }]
+				? [{ code: limitationCodeFor(""), description: "" }]
 				: restored.knownLimitations.filter((limitation) => limitation.description.trim()),
 		});
 	};
@@ -586,7 +607,9 @@ export function PracticeEvidenceEditor({
 								</p>
 							</div>
 							{value.knownLimitations.map((limitation, index) => {
-								const limitationId = limitation.code;
+								// Identity for markup is the row's position; the code is derived from the text and
+								// would change under the caret on every keystroke.
+								const limitationId = String(index);
 								return (
 									<div
 										key={limitationId}
@@ -605,7 +628,11 @@ export function PracticeEvidenceEditor({
 														...value,
 														knownLimitations: value.knownLimitations.map((item, itemIndex) =>
 															itemIndex === index
-																? { ...item, description: event.target.value }
+																? {
+																		...item,
+																		description: event.target.value,
+																		code: limitationCodeFor(event.target.value),
+																	}
 																: item,
 														),
 													})
@@ -624,7 +651,9 @@ export function PracticeEvidenceEditor({
 													(_, itemIndex) => itemIndex !== index,
 												);
 												const focusTarget =
-													remaining[index]?.code ?? remaining[index - 1]?.code ?? "add";
+													remaining.length === 0
+														? "add"
+														: String(Math.min(index, remaining.length - 1));
 												onChange({
 													...value,
 													knownLimitations: remaining,
@@ -645,15 +674,14 @@ export function PracticeEvidenceEditor({
 								variant="outline"
 								size="sm"
 								onClick={() => {
-									const limitationCode = newLimitationCode();
 									onChange({
 										...value,
 										knownLimitations: [
 											...value.knownLimitations,
-											{ code: limitationCode, description: "" },
+											{ code: limitationCodeFor(""), description: "" },
 										],
 									});
-									focusLimitation(limitationCode);
+									focusLimitation(String(value.knownLimitations.length));
 								}}
 							>
 								<Plus className="size-4" />

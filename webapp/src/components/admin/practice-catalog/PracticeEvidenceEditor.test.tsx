@@ -120,6 +120,30 @@ describe("PracticeEvidenceEditor", () => {
 		expect(screen.getByDisplayValue("Keep this edited limitation.")).toBeTruthy();
 	});
 
+	it("derives a stable limitation code from the text so retyping it is not a rule change", async () => {
+		const user = userEvent.setup();
+		function ControlledEditor() {
+			const [value, setValue] = useState<PracticeAutomatedReviewPolicy>({
+				...options.recommendedRequirements,
+				knownLimitations: [{ code: "LIMITATION_79DBDE7E", description: "" }],
+			});
+			return (
+				<>
+					<output data-testid="code">{value.knownLimitations[0]?.code}</output>
+					<PracticeEvidenceEditor options={options} value={value} onChange={setValue} />
+				</>
+			);
+		}
+		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
+		await user.click(screen.getByRole("button", { name: "Customize evidence" }));
+
+		await user.type(screen.getByLabelText(/Description/), "Runtime behavior not observed");
+
+		// A pure function of the text: identical wording always yields this code, so retyping the same
+		// limitation cannot look like a review-rule change to the policy digest.
+		expect(screen.getByTestId("code").textContent).toBe("RUNTIME_BEHAVIOR_NOT_OBSERVED");
+	});
+
 	it("explains that private conversation evidence needs a deliberate privacy decision", async () => {
 		const conversation = mockPracticeDefinitionOptions.workTypes[2];
 		await renderWithRouter(

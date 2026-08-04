@@ -74,6 +74,36 @@ export const CompletedWithMixedOutput: Story = {
 	},
 };
 
+/**
+ * A run that declined for want of evidence completes successfully and produces no findings — exactly
+ * like a clean review. The empty state must say so, or a refusal reads as a clean bill of health.
+ */
+export const DeclinedForInsufficientEvidence: Story = {
+	parameters: {
+		msw: {
+			handlers: handlers(
+				{
+					...mockJobCompleted,
+					id: "job-insufficient-evidence",
+					reviewOutcome: "INSUFFICIENT_EVIDENCE",
+				},
+				[],
+				[],
+				0,
+			),
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(await canvas.findAllByText("Nothing was assessed")).toHaveLength(2);
+		await expect(canvas.queryByText("No findings were recorded")).toBeNull();
+		await expect(canvas.queryByText("No messages")).toBeNull();
+		await expect(
+			await canvas.findAllByText(/required evidence was missing, unreadable, out of date/),
+		).not.toHaveLength(0);
+	},
+};
+
 export const InProgressWithoutOutput: Story = {
 	args: { jobId: mockJobRunning.id },
 	parameters: {

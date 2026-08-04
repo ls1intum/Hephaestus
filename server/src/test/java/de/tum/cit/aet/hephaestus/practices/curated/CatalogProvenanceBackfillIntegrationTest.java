@@ -126,6 +126,42 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         return catalogService.catalog().practice(SHIPPED_SLUG).orElseThrow().effective();
     }
 
+    @Test
+    void fingerprintsAnUpgradedInstallCarryingAPreContractRevision() {
+        // An instance upgraded across the contract migration keeps its first-generation revisions, whose
+        // automated_review_policy the migration left null. Those rows must not enter the fingerprint pass:
+        // digesting a null policy aborts the whole workspace, leaving every review claim UNVERIFIABLE.
+        seedLegacyWorkspace(matching, shipped().criteria(), true);
+        transactionOperations.executeWithoutResult(ignored ->
+            jdbcTemplate.update(
+                """
+                INSERT INTO practice_revision (
+                    practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
+                    automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
+                )
+                SELECT id, 0, slug, name, applies_to, trigger_events, criteria,
+                       NULL, 'Reviewers need context', ?, NULL, now()
+                FROM practice WHERE workspace_id = ?
+                """,
+                shipped().areaSlug(),
+                matching.getId()
+            )
+        );
+
+        backfill.run();
+
+        Integer stillMissing = jdbcTemplate.queryForObject(
+            """
+            SELECT count(*) FROM practice_revision r JOIN practice p ON p.id = r.practice_id
+            WHERE p.workspace_id = ? AND r.automated_review_policy IS NOT NULL
+              AND r.review_rule_fingerprint IS NULL
+            """,
+            Integer.class,
+            matching.getId()
+        );
+        assertThat(stillMissing).isZero();
+    }
+
     private void seedLegacyWorkspace(Workspace workspace, String criteria, boolean provenancePending) {
         PracticeDefinition shipped = shipped();
         seedLegacyWorkspace(workspace, criteria, provenancePending, shipped.automatedReviewPolicy(), null);

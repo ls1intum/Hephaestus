@@ -336,6 +336,24 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
+        void unreadableDiff_abortsInsteadOfStoringAnEmptyOne() {
+            stubGit();
+            lenient()
+                .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
+                .thenReturn(List.of());
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(new String[] { "main", "abc123def456" });
+            lenient().when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456")).thenReturn(null);
+            // null is what an unresolved object, an I/O error, or the 20 MiB cap looks like.
+            when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456")).thenReturn(null);
+
+            assertThatThrownBy(() -> provider.capture(request(sampleMetadata()), java.util.Set.of(DIFF)))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("Diff could not be read");
+        }
+
+        @Test
         void headVerifiedButRangeUnresolvable_abortsWithJobPreparationException() {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());

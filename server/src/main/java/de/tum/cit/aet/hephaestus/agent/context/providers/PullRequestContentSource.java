@@ -416,7 +416,23 @@ public class PullRequestContentSource implements EvidenceSource {
             }
             String diffStat = gitDiffOperations.diffStat(repoPath, range[0], range[1]);
             String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
-            if (diff != null && !diff.isBlank()) {
+            // A null diff is a failed read — an unresolved object, an I/O error, or the size cap — and
+            // must never be stored as an empty one. The contract forbids PARTIAL here, so an unreadable
+            // diff has to surface as a collection error; storing zero bytes would report EMPTY+COMPLETE
+            // and invite the model to review a change it cannot see.
+            if (diff == null) {
+                throw new JobPreparationException(
+                    "Diff could not be read for range=" +
+                        range[0] +
+                        ".." +
+                        range[1] +
+                        ", headSha=" +
+                        headSha +
+                        ", repoId=" +
+                        repositoryId
+                );
+            }
+            if (!diff.isBlank()) {
                 String annotatedDiff = GitDiffOperations.annotateDiffWithLineNumbers(diff);
                 files.put(OUTPUT_PREFIX + "diff.patch", annotatedDiff.getBytes(StandardCharsets.UTF_8));
                 if (diffStat != null) {

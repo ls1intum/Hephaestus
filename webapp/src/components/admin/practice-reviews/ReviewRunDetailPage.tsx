@@ -216,6 +216,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 					workspaceSlug={workspaceSlug}
 					scope={{ agentJobId: jobId }}
 					context="review"
+					outcome={job.reviewOutcome}
 					feedback={
 						feedbackQuery.isLoading
 							? { status: "loading" }

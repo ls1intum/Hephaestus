@@ -6774,6 +6774,16 @@ components:
           type: integer
           format: int32
           description: Number of retry attempts
+        reviewOutcome:
+          type: string
+          description: "Why a COMPLETED run produced the findings it did. INSUFFICIENT_EVIDENCE\
+            \ means no model ran because required evidence was missing, unreadable,\
+            \ stale, or unauthorized — so no findings means nothing was assessed,\
+            \ not that nothing was wrong. JUDGED means the model ran against sufficient\
+            \ evidence."
+          enum:
+          - JUDGED
+          - INSUFFICIENT_EVIDENCE
         startedAt:
           type: string
           format: date-time
@@ -6798,6 +6808,7 @@ components:
       - id
       - jobType
       - retryCount
+      - reviewOutcome
       - status
       - target
     AssignRoleRequest:

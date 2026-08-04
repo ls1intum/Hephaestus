@@ -28,6 +28,7 @@ public interface PracticeRevisionRepository
         SELECT DISTINCT r.practice.workspace.id FROM PracticeRevision r
         WHERE r.slug IS NOT NULL
           AND r.reviewRuleFingerprint IS NULL
+          AND r.automatedReviewPolicy IS NOT NULL
         ORDER BY r.practice.workspace.id
         """
     )
@@ -39,6 +40,7 @@ public interface PracticeRevisionRepository
         WHERE r.practice.workspace.id = :workspaceId
           AND r.slug IS NOT NULL
           AND r.reviewRuleFingerprint IS NULL
+          AND r.automatedReviewPolicy IS NOT NULL
         ORDER BY r.id
         """
     )

@@ -1,10 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon, ScanSearchIcon } from "lucide-react";
 import { useId } from "react";
-import type { ReviewFeedback, ReviewFinding } from "@/api/types.gen";
+import type { AgentJob, ReviewFeedback, ReviewFinding } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import {
 	Item,
 	ItemContent,
@@ -24,6 +30,9 @@ export type ReviewSectionState<T> =
 	| { status: "pending" }
 	| { status: "ready"; items: T[]; total: number };
 
+const INSUFFICIENT_EVIDENCE_EXPLANATION =
+	"Hephaestus declined this review because required evidence was missing, unreadable, out of date, or not authorized. This is not a clean result — nothing was checked.";
+
 export interface ReviewOutputScope {
 	agentJobId?: string;
 	artifactType?: NonNullable<ReviewFeedback["artifact"]>["type"];
@@ -36,6 +45,11 @@ export interface ReviewOutputSectionsProps {
 	context: "review" | "target";
 	feedback: ReviewSectionState<ReviewFeedback>;
 	findings: ReviewSectionState<ReviewFinding>;
+	/**
+	 * Distinguishes "looked and found nothing" from "declined to look". Omitted by aggregate views,
+	 * which span several runs and so have no single outcome.
+	 */
+	outcome?: AgentJob["reviewOutcome"];
 }
 
 export function ReviewOutputSections({
@@ -44,6 +58,7 @@ export function ReviewOutputSections({
 	context,
 	feedback,
 	findings,
+	outcome,
 }: ReviewOutputSectionsProps) {
 	return (
 		<>
@@ -52,12 +67,14 @@ export function ReviewOutputSections({
 				scope={scope}
 				context={context}
 				state={findings}
+				outcome={outcome}
 			/>
 			<FeedbackSection
 				workspaceSlug={workspaceSlug}
 				scope={scope}
 				context={context}
 				state={feedback}
+				outcome={outcome}
 			/>
 		</>
 	);
@@ -68,7 +85,9 @@ function FeedbackSection({
 	scope,
 	context,
 	state,
+	outcome,
 }: {
+	outcome?: AgentJob["reviewOutcome"];
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
 	context: "review" | "target";
@@ -105,7 +124,12 @@ function FeedbackSection({
 						<EmptyMedia variant="icon">
 							<MessageSquareTextIcon />
 						</EmptyMedia>
-						<EmptyTitle>No messages</EmptyTitle>
+						<EmptyTitle>
+							{outcome === "INSUFFICIENT_EVIDENCE" ? "Nothing was assessed" : "No messages"}
+						</EmptyTitle>
+						{outcome === "INSUFFICIENT_EVIDENCE" && (
+							<EmptyDescription>{INSUFFICIENT_EVIDENCE_EXPLANATION}</EmptyDescription>
+						)}
 					</EmptyHeader>
 				</Empty>
 			) : (
@@ -159,7 +183,9 @@ function FindingsSection({
 	scope,
 	context,
 	state,
+	outcome,
 }: {
+	outcome?: AgentJob["reviewOutcome"];
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
 	context: "review" | "target";
@@ -196,7 +222,14 @@ function FindingsSection({
 						<EmptyMedia variant="icon">
 							<ScanSearchIcon />
 						</EmptyMedia>
-						<EmptyTitle>No findings were recorded</EmptyTitle>
+						<EmptyTitle>
+							{outcome === "INSUFFICIENT_EVIDENCE"
+								? "Nothing was assessed"
+								: "No findings were recorded"}
+						</EmptyTitle>
+						{outcome === "INSUFFICIENT_EVIDENCE" && (
+							<EmptyDescription>{INSUFFICIENT_EVIDENCE_EXPLANATION}</EmptyDescription>
+						)}
 					</EmptyHeader>
 				</Empty>
 			) : (
