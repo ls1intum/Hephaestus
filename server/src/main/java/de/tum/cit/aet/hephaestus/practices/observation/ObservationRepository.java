@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -30,10 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Findings scoped through Practice.workspace relationship")
 public interface ObservationRepository extends JpaRepository<Observation, UUID> {
-    /**
-     * Finds a practice finding by ID, scoped to a specific workspace.
-     * Used to validate that a finding belongs to the caller's workspace before allowing operations on it.
-     */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query("SELECT f FROM Observation f JOIN f.practice p WHERE f.id = :id AND p.workspace.id = :workspaceId")
     Optional<Observation> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
@@ -243,6 +241,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
      * with count projections in Hibernate.
      */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         value = """
         SELECT f FROM Observation f
@@ -331,6 +330,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * <p>Ownership is enforced in the query (not in Java) to avoid lazy-load
      * fragility and to keep the auth check atomic with the fetch.
      */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         """
         SELECT f FROM Observation f
@@ -349,6 +349,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /**
      * All findings for a specific pull request within a workspace.
      */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         """
         SELECT f FROM Observation f

@@ -17,8 +17,10 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@Transactional
 public class ConversationalDeliveryReconciler {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationalDeliveryReconciler.class);
@@ -57,7 +59,9 @@ public class ConversationalDeliveryReconciler {
             if (feedbackIds.isEmpty()) {
                 continue;
             }
-            Observation observation = observationRepository.findById(observationId).orElse(null);
+            Observation observation = observationRepository
+                .findByIdAndWorkspaceId(observationId, workspaceId)
+                .orElse(null);
             if (
                 observation == null ||
                 !visibilityPolicy.permits(workspaceId, observation, SourceUseAudience.PRACTICE_MENTORING)

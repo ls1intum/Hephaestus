@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -13,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepositor
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -37,6 +39,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String BASE_URI = "/workspaces/{workspaceSlug}/practices/observations";
+    private static final String DIFF_EVIDENCE_JSON =
+        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\",\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -46,6 +50,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -78,6 +85,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         agentJob.setWorkspace(workspace);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+        agentJob.setEvidenceSnapshot(OBJECT_MAPPER.valueToTree(Map.of("manifest", Map.of("contractVersion", "1.0.0"))));
         agentJob = agentJobRepository.save(agentJob);
     }
 
@@ -90,7 +98,10 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         practice.setCriteria("Description for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice.setActive(true);
-        return practiceRepository.save(practice);
+        practice = practiceRepository.saveAndFlush(practice);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+        practice.setCurrentRevision(revision);
+        return practiceRepository.saveAndFlush(practice);
     }
 
     private UUID insertFinding(
@@ -110,7 +121,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             "key-" + id,
             agentJob.getId(),
             practice.getId(),
-            null, // practiceRevisionId
+            practice.getCurrentRevision().getId(),
             artifactType,
             artifactId,
             user.getId(),
@@ -119,7 +130,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             assessmentFor(presence),
             severity,
             confidence,
-            null,
+            DIFF_EVIDENCE_JSON,
             "Test reasoning for " + title,
             null,
             detectedAt
@@ -132,11 +143,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         return "PRESENT".equals(presence) ? "GOOD" : "BAD";
     }
 
-    /**
-     * Persist a DELIVERED {@link Feedback} unit carrying {@code body} and bind it to {@code findingId}. This is
-     * the developer's advice source (ADR 0021: the finding itself carries no advice), so the detail/reflection
-     * surfaces read guidance from here.
-     */
+    /** Binds delivered guidance because observations do not own advice. */
     private void deliverFeedbackFor(UUID findingId, String body, Instant createdAt) {
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
@@ -763,7 +770,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         void shouldReturnEvidenceWhenPresent() {
             UUID findingId = UUID.randomUUID();
             String evidenceJson =
-                "{\"citations\":[{\"sourceKind\":\"scm.repository.tree\",\"artifactPath\":\"inputs/sources/scm/repo/README.md\",\"path\":\"README.md\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\",\"quoteRedacted\":false}]}";
+                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"README.md\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\",\"quoteRedacted\":false}]}";
             observationRepository.insertIfAbsent(
                 findingId,
                 "key-" + findingId,
@@ -1093,9 +1100,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @DisplayName("returns per-practice reflection cards with the standing/toWorkOn/strengths shape")
         void shouldReturnReflectionCards() {
             Instant now = Instant.now();
-            // A confident BAD on one practice (a problem to work on) and a GOOD on another (a strength) — exercise
-            // the controller boundary: Jackson serialization of the Standing enum and the nested ReflectionItemDTO
-            // lists, plus the 200 array shape. The BAD is confidence 0.9 (≥ the quarantine floor) so it surfaces.
             insertFinding(
                 practiceA,
                 developer,
@@ -1117,7 +1121,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                // Cards lead with what needs attention, so the DEVELOPING (BAD) practice sorts before the STRENGTH one.
                 .jsonPath("$.length()")
                 .isEqualTo(2)
                 .jsonPath("$[0].slug")

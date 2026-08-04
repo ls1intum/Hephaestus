@@ -84,7 +84,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient()
             .when(visibilityPolicy.permits(anyLong(), any(Observation.class), eq(SourceUseAudience.PRACTICE_MENTORING)))
             .thenReturn(true);
-        lenient().when(observationRepository.findById(any())).thenReturn(Optional.of(observation));
+        lenient()
+            .when(observationRepository.findByIdAndWorkspaceId(any(), anyLong()))
+            .thenReturn(Optional.of(observation));
     }
 
     private FeedbackChannelRouter router() {
@@ -313,7 +315,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
         ).thenReturn(List.of(feedbackId));
-        when(observationRepository.findById(observationId)).thenReturn(Optional.of(observation));
+        when(observationRepository.findByIdAndWorkspaceId(observationId, WS)).thenReturn(Optional.of(observation));
         when(visibilityPolicy.permits(WS, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(false);
 
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(observationId));
@@ -349,7 +351,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
         ).thenReturn(List.of(fidA));
         Observation obs = problem(null, "rk-delivered");
-        when(observationRepository.findById(a)).thenReturn(Optional.of(obs));
+        when(observationRepository.findByIdAndWorkspaceId(a, WS)).thenReturn(Optional.of(obs));
         when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-delivered")).thenReturn(
             true
         );
@@ -368,7 +370,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
         ).thenReturn(List.of(fidA));
         Observation obs = problem(null, "rk-fresh");
-        when(observationRepository.findById(a)).thenReturn(Optional.of(obs));
+        when(observationRepository.findByIdAndWorkspaceId(a, WS)).thenReturn(Optional.of(obs));
         when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-fresh")).thenReturn(false);
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
         when(feedbackRepository.getReferenceById(fidA)).thenReturn(mock(Feedback.class));

@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -33,6 +34,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -51,12 +53,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Real-Postgres, stub-Pi (no live Slack) proof of the conversational delivery loop: two jobs prepare body-null
- * CONVERSATION units; three simulated {@code link_finding} events flip exactly one to DELIVERED (one-per-turn) and
- * bind a CONVERSATION_TURN placement; a re-run is a no-op; a clock-advanced sweep expires the remaining PREPARED
- * units to CONVERSATION_EXPIRED. It also pins the prospective Silent Mode suppression transition. Deterministic.
- */
 class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OM = new ObjectMapper();
@@ -87,6 +83,9 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -125,14 +124,17 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         );
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("conv-delivery-test"));
         practice = new Practice();
-        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
-        practice.setEvidence(PracticeTestEvidence.conversationThread());
+        practice.setArtifactType(WorkArtifact.PULL_REQUEST);
+        practice.setEvidence(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
         practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
-        practice = practiceRepository.save(practice);
+        practice = practiceRepository.saveAndFlush(practice);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+        practice.setCurrentRevision(revision);
+        practice = practiceRepository.saveAndFlush(practice);
         IdentityProvider provider = identityProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseGet(() ->
@@ -283,6 +285,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         job.setWorkspace(workspace);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
+        job.setEvidenceSnapshot(OM.readTree("{\"manifest\":{\"contractVersion\":\"1.0.0\"}}"));
         return agentJobRepository.save(job);
     }
 
@@ -293,7 +296,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
             occurrenceKey,
             job.getId(),
             practice.getId(),
-            null,
+            practice.getCurrentRevision().getId(),
             "PULL_REQUEST",
             42L,
             recipient.getId(),
@@ -302,7 +305,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
             "BAD",
             "MAJOR",
             0.8f,
-            null,
+            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/metadata.json\",\"path\":\"metadata.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             null,
             null,
             Instant.now()
