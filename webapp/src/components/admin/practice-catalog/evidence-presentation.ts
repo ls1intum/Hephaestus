@@ -1,20 +1,5 @@
 import type { PracticeAutomatedReviewPolicy, PracticeEvidenceSourceOption } from "@/api/types.gen";
 
-const REVIEW_MODE_LABELS: Record<PracticeAutomatedReviewPolicy["automatedReview"]["mode"], string> =
-	{
-		LANGUAGE_MODEL: "Language model",
-		NONE: "No automated review",
-	};
-
-const EVIDENCE_SUFFICIENCY_LABELS: Record<
-	PracticeAutomatedReviewPolicy["automatedReview"]["evidenceSufficiency"],
-	string
-> = {
-	SUFFICIENT_WHEN_REQUIREMENTS_MET: "Requirements are sufficient",
-	DECLARED_EVIDENCE_INSUFFICIENT: "Available evidence is not enough",
-	NONE: "No evidence check",
-};
-
 export function evidenceSourceLabel(
 	sourceKind: string,
 	sources: readonly PracticeEvidenceSourceOption[],
@@ -39,16 +24,6 @@ export function evidenceQualityLabel(
 	return "Available; no completeness or freshness requirement";
 }
 
-export function reviewModeLabel(mode: PracticeAutomatedReviewPolicy["automatedReview"]["mode"]) {
-	return REVIEW_MODE_LABELS[mode];
-}
-
-export function evidenceSufficiencyLabel(
-	sufficiency: PracticeAutomatedReviewPolicy["automatedReview"]["evidenceSufficiency"],
-) {
-	return EVIDENCE_SUFFICIENCY_LABELS[sufficiency];
-}
-
 export function canAttemptAutomatedReview(
 	requirements: PracticeAutomatedReviewPolicy,
 	supportedModes: readonly PracticeAutomatedReviewPolicy["automatedReview"]["mode"][],
@@ -63,22 +38,22 @@ export function automatedReviewUnavailableLabel(
 	requirements: PracticeAutomatedReviewPolicy,
 	supportedModes: readonly PracticeAutomatedReviewPolicy["automatedReview"]["mode"][],
 ) {
-	if (requirements.automatedReview.mode === "NONE") return "No automated review";
+	if (requirements.automatedReview.mode === "NONE") return "Practice guidance only";
 	if (!supportedModes.includes(requirements.automatedReview.mode)) {
-		return "Review mode not supported";
+		return "AI support unavailable";
 	}
 	if (requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
-		return "Additional context required";
+		return "Human context needed";
 	}
 	return null;
 }
 
-export function automatedReviewStatusLabel(
+export function mentoringSupportLabel(
 	automatedReview: PracticeAutomatedReviewPolicy["automatedReview"],
 ) {
-	if (automatedReview.mode === "NONE") return "No automated review";
+	if (automatedReview.mode === "NONE") return "Practice guidance only";
 	if (automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
-		return "Additional context required";
+		return "Human context needed";
 	}
-	return null;
+	return "AI-supported mentoring";
 }

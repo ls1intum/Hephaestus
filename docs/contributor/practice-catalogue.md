@@ -20,7 +20,7 @@ it propagates:
 | Decision | Hephaestus defaults | Instance catalog | Workspace practices |
 | --- | --- | --- | --- |
 | Name, work type, criteria, and guidance | maintained in the repository | inherited or customized by an instance administrator | copied at workspace creation, then owned by the workspace |
-| Automated review and required evidence | selected by `automatedReviewPolicyId`; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
+| AI-supported mentoring and required evidence | selected by `automatedReviewPolicyId`; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
 | Included in new workspaces | default is included | instance administrator can include or exclude | not applicable after installation |
 | Used in new reviews | not a repository setting | not a curated-catalog setting | workspace administrator controls it; unavailable automation cannot be enabled |
 | Area and order | JSON array order | inherited or changed with drag-and-drop or move actions | copied, then independently managed |
@@ -29,13 +29,20 @@ This is a one-way lifecycle: a repository update can update an uncustomized inst
 an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
 definition or an existing workspace.
 
-## Human review without Hephaestus
+## Choose who can review the practice
 
-A practice can still be useful when a developer, peer, or human mentor can review it but Hephaestus
-cannot. Set **How should Hephaestus review this practice?** to **No automated review**. The
-practice keeps its criteria and guidance, but has no automated-review triggers, evidence requirements,
-or precompute script. Instance administrators can include it in the catalog for new workspaces;
-workspace administrators cannot enable it for automated reviews.
+The practice form starts with one product choice instead of separate model and evidence-sufficiency
+settings:
+
+- **AI-supported mentoring** lets Hephaestus review connected work after every required source passes.
+- **Human context needed** records that connected work is not enough. Hephaestus skips the practice,
+  while a developer, peer, or mentor may still review it from context the system does not collect.
+- **Practice guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
+
+Each reviewed-work type starts with recommended evidence. Most authors should keep it. **Customize
+evidence** reveals source roles, minimum completeness and freshness, privacy classes, and known
+limitations for practices that genuinely need a different rule. Selecting a source never authorizes
+collection; instance governance and workspace integrations remain separate gates.
 
 For example, “Explain the reasoning behind a difficult trade-off” may be reviewable in a mentoring
 conversation that is not available through an authorized integration. Its criteria remain a useful

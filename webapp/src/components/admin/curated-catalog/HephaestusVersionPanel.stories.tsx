@@ -75,8 +75,8 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("Starts a review when")).toBeVisible();
 		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
-		await expect(canvas.getByText("Evidence requirements")).toBeVisible();
-		await expect(canvas.getByText("Language model")).toBeVisible();
+		await expect(canvas.getByText("Mentoring support and evidence")).toBeVisible();
+		expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
 		await expect(canvas.getByText("Not independently validated")).toBeVisible();
 		await expect(

@@ -448,8 +448,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								Review criteria *
 							</FieldLabel>
 							<FieldDescription id="practice-criteria-description">
-								Rules for reviewing this practice. Hephaestus uses them when automated review is
-								enabled. Supports Markdown.
+								Rules for reviewing this practice. Hephaestus uses them for AI-supported mentoring.
+								Supports Markdown.
 							</FieldDescription>
 							<Textarea
 								id="practice-criteria"
@@ -534,7 +534,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								aria-invalid={Boolean(triggerError)}
 								aria-describedby={`practice-trigger-description${triggerError ? " practice-trigger-error" : ""}`}
 							>
-								<FieldLegend className="text-lg">Start an automated review when… *</FieldLegend>
+								<FieldLegend className="text-lg">Offer AI-supported mentoring when… *</FieldLegend>
 								<FieldDescription id="practice-trigger-description">
 									Choose one or more events.
 								</FieldDescription>

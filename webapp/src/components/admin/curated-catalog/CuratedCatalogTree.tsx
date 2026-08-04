@@ -3,7 +3,7 @@ import { GripVertical, MoreHorizontal } from "lucide-react";
 import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
 import { WORK_ARTIFACT_LABELS } from "@/components/admin/practice-catalog/constants";
-import { automatedReviewStatusLabel } from "@/components/admin/practice-catalog/evidence-presentation";
+import { mentoringSupportLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
@@ -237,7 +237,7 @@ function AreaActions({
 function PracticeDetails({ practice }: { practice: TreePractice }) {
 	const parentUnavailable =
 		Boolean(practice.missingAreaSlug) || (practice.status.offered && !practice.effectivelyOffered);
-	const reviewStatus = automatedReviewStatusLabel(practice.automatedReview);
+	const reviewStatus = mentoringSupportLabel(practice.automatedReview);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">

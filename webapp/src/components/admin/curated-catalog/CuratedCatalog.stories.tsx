@@ -146,11 +146,11 @@ type Story = StoryObj<typeof meta>;
 
 export const Everything: Story = {};
 
-export const ReviewLimitsAreVisible: Story = {
+export const MentoringLimitsAreVisible: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No automated review")).toBeVisible();
-		await expect(canvas.getByText("Additional context required")).toBeVisible();
+		await expect(canvas.getByText("Practice guidance only")).toBeVisible();
+		await expect(canvas.getByText("Human context needed")).toBeVisible();
 	},
 };
 

@@ -107,7 +107,7 @@ export function PracticeForm(props: PracticeFormProps) {
 				<Separator />
 				<section className="space-y-4">
 					<div>
-						<h2 className="text-lg font-semibold">Automated review validation</h2>
+						<h2 className="text-lg font-semibold">AI mentoring validation</h2>
 						<p className="text-sm text-muted-foreground">
 							The requirements above are the author's declaration. This status says whether an
 							independent evaluator has validated the exact practice definition; it does not

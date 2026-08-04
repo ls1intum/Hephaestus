@@ -9,13 +9,12 @@ import { cn } from "@/lib/utils";
 import {
 	evidenceQualityLabel,
 	evidenceSourceLabel,
-	evidenceSufficiencyLabel,
-	reviewModeLabel,
+	mentoringSupportLabel,
 } from "./evidence-presentation";
 
 const VALIDATION_LABELS: Record<PracticeAutomatedReviewValidation["status"], string> = {
 	AUTHOR_DECLARED: "Not independently validated",
-	INDEPENDENTLY_VALIDATED: "Automated review independently validated",
+	INDEPENDENTLY_VALIDATED: "AI mentoring independently validated",
 	STALE: "Validation is stale",
 	SUPERSEDED: "Validation is superseded",
 };
@@ -136,21 +135,11 @@ export function PracticeEvidenceSummary({
 	return (
 		<dl className={cn("grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2", className)}>
 			<div>
-				<dt className="font-medium">Source contract</dt>
+				<dt className="font-medium">Mentoring support</dt>
 				<dd className="text-muted-foreground">
-					Version {policy.sourceContractVersion} · {workTypeLabel}
-				</dd>
-			</div>
-			<div>
-				<dt className="font-medium">Automated review</dt>
-				<dd className="text-muted-foreground">
-					{reviewModeLabel(policy.automatedReview.mode)}
-					<span className="block">
-						{evidenceSufficiencyLabel(policy.automatedReview.evidenceSufficiency)}
-					</span>
+					{mentoringSupportLabel(policy.automatedReview)}
 					<span className="mt-1 block text-xs">
-						This setting only controls Hephaestus. Human review, if applicable, is a separate
-						process and is not collected.
+						Developers, peers, and mentors may use context that Hephaestus cannot access.
 					</span>
 				</dd>
 			</div>
@@ -171,7 +160,7 @@ export function PracticeEvidenceSummary({
 				<dd className="text-muted-foreground">Skip this practice rather than guess</dd>
 			</div>
 			<div>
-				<dt className="font-medium">Automated review validation</dt>
+				<dt className="font-medium">AI mentoring validation</dt>
 				<dd>
 					<PracticeAutomatedReviewValidationSummary validation={validation} />
 				</dd>
@@ -188,6 +177,17 @@ export function PracticeEvidenceSummary({
 					</dd>
 				</div>
 			)}
+			<div className="sm:col-span-2">
+				<dt className="sr-only">Technical evidence contract</dt>
+				<dd>
+					<details className="text-muted-foreground">
+						<summary className="cursor-pointer">Technical evidence contract</summary>
+						<p className="mt-1">
+							Source contract {policy.sourceContractVersion} · {workTypeLabel}
+						</p>
+					</details>
+				</dd>
+			</div>
 		</dl>
 	);
 }

@@ -6,7 +6,7 @@ import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 const pullRequestOptions = mockPracticeEvidenceOptions.workTypes[0];
 
 const meta = {
-	title: "Workspace admin/Practices/Evidence editor",
+	title: "Workspace admin/Practices/AI mentoring",
 	component: PracticeEvidenceEditor,
 	args: {
 		options: pullRequestOptions,
@@ -20,16 +20,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const RecommendedRule: Story = {};
+export const RecommendedSetup: Story = {};
 
 export const Customizing: Story = {
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Configure automated review" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
 		await expect(canvas.getByText("Code changes")).toBeVisible();
-		await expect(
-			canvas.getByLabelText("How should Hephaestus review this practice?"),
-		).toBeVisible();
+		await expect(canvas.getByText("Connected evidence")).toBeVisible();
 	},
 };
 

@@ -61,7 +61,7 @@ const PRACTICE_FIELDS = {
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Precompute script",
-	automatedReviewPolicy: "Evidence requirements",
+	automatedReviewPolicy: "Mentoring support and evidence",
 } satisfies Record<Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation">, string>;
 
 function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {

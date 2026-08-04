@@ -1,15 +1,19 @@
 # Practice review glossary
 
-This glossary is the canonical language for the versioned evidence contract and automated review. Use the
-same concept name for these concepts in UI copy, API fields, Java types, database columns, tests, and documentation. The broader
-[practice feedback language](./practice-feedback-language.md) remains canonical for findings and feedback.
+This glossary is the canonical language for AI-supported practice mentoring and the versioned evidence contract.
+Use product terms in human-facing copy and the corresponding machine terms in contracts; do not invent synonyms.
+The broader [practice feedback language](./practice-feedback-language.md) remains canonical for findings and feedback.
 
 ## Product terms
 
 | Term | Plain meaning | Do not use for this concept |
 | --- | --- | --- |
-| **Practice review** | The end-to-end product flow that gathers evidence, reviews configured practices, records findings, and may deliver feedback. | practice detection, scan |
-| **Automated review** | Hephaestus reviews work against one practice. | detection, detector capability, judgment |
+| **AI-supported practice mentoring** | The product experience in which Hephaestus uses connected work to offer practice-focused guidance while leaving room for self, peer, and human mentor context. It is support, not grading or a replacement for a person. | autonomous mentoring, performance scoring |
+| **Practice review** | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may produce findings. | practice detection, scan, mentoring relationship |
+| **Automated review** | The technical capability that lets Hephaestus perform a practice review. Prefer **AI-supported mentoring** in author-facing UI. | detection, detector capability, judgment |
+| **AI-supported mentoring** | Hephaestus may review connected work and offer guidance when every required source is ready. | AI mentor, guaranteed feedback |
+| **Human context needed** | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review, and Hephaestus skips it. | unobservable, not applicable |
+| **Practice guidance only** | Keep the practice's criteria and guidance without asking Hephaestus to review it. | invalid practice, human-only |
 | **Finding detection** | The internal step that turns an automated review into candidate findings. Use this only for that pipeline step, not for the product flow or a practice's overall review support. | practice review, automated review policy |
 | **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
 | **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
@@ -38,6 +42,10 @@ same concept name for these concepts in UI copy, API fields, Java types, databas
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
 review is accurate. Independent validation records provenance separately.
 
+“Mentoring” describes the product goal, not an anthropomorphic claim. Hephaestus does not know a developer's
+intent, private conversations, runtime conditions, or learning needs unless an authorized source explicitly
+provides that context. A finding is bounded feedback about observed work, not a grade, diagnosis, or ground truth.
+
 ## Who may review
 
 Review is relational: it has a reviewer, reviewed work, a practice, a procedure, evidence, and a time. Do not
@@ -45,7 +53,7 @@ label a practice as universally observable or unobservable.
 
 | Reviewer | Current system support |
 | --- | --- |
-| **Hephaestus** | Modeled by `automatedReview` and governed evidence requirements. |
+| **Hephaestus** | Modeled by `automatedReview` and governed evidence requirements. It can only use authorized, connected evidence. |
 | **Developer** | A self-review may be possible for a specific practice; Hephaestus does not collect it. |
 | **Peer** | A peer review may be possible from team context; Hephaestus does not collect it. |
 | **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it. |
@@ -81,12 +89,12 @@ than one ground truth. A statement that a person *could* observe something must 
 | Claim currentness | `claimCurrentness` | `ReviewClaimCurrentness` | derived API value |
 | Review-rule fingerprint | `reviewRuleFingerprint` | `ReviewRuleFingerprint` | `review_rule_fingerprint` |
 
-The contract uses stable uppercase values. UI copy translates them into plain language:
+The contract uses stable uppercase values. Author-facing UI combines the implementation fields into one
+mentoring choice:
 
-- `LANGUAGE_MODEL` → **Language model**
-- `NONE` → **No automated review**
-- `SUFFICIENT_WHEN_REQUIREMENTS_MET` → **Requirements are sufficient**
-- `DECLARED_EVIDENCE_INSUFFICIENT` → **Available evidence is not enough**
+- `LANGUAGE_MODEL` + `SUFFICIENT_WHEN_REQUIREMENTS_MET` → **AI-supported mentoring**
+- `LANGUAGE_MODEL` + `DECLARED_EVIDENCE_INSUFFICIENT` → **Human context needed**
+- `NONE` + `NONE` → **Practice guidance only**
 - `SKIP_AUTOMATED_REVIEW` → **Skip automated review**
 
 ## Source states
@@ -103,16 +111,17 @@ Keep availability, content, completeness, freshness, and collection outcome sepa
 
 ## Lifecycle
 
-1. A practice author defines the practice and its evidence requirements.
-2. An instance operator authorizes each source and product use through a reviewed governance decision.
-3. A workspace integration makes authorized sources available.
-4. A workspace administrator chooses whether the practice is used in new reviews.
-5. Each review captures evidence and records explicit source states.
-6. Source readiness checks decide whether every required source meets its requirements.
-7. Hephaestus reviews the work or records that the practice was skipped.
-8. Findings retain the exact practice revision, source contract, and evidence provenance.
-9. Practice or source-contract changes can mark earlier claims stale.
-10. Automated review validation remains separate from source authorization, use in new reviews, and per-run readiness.
+1. A practice author chooses **AI-supported mentoring**, **Human context needed**, or **Practice guidance only**.
+2. For AI-supported mentoring, recommended evidence is applied automatically; an author customizes it only when the practice needs different evidence or limitations.
+3. An instance operator authorizes each source and product use through a reviewed governance decision.
+4. A workspace integration makes authorized sources available.
+5. A workspace administrator chooses whether the practice is used in new reviews.
+6. Each review captures evidence and records explicit source states.
+7. Source readiness checks decide whether every required source meets its requirements.
+8. Hephaestus reviews the work or records that the practice was skipped.
+9. Findings retain the exact practice revision, source contract, and evidence provenance.
+10. Practice or source-contract changes can mark earlier claims stale.
+11. Automated review validation remains separate from source authorization, use in new reviews, and per-run readiness.
 
 ## Writing rules
 
@@ -121,6 +130,7 @@ Keep availability, content, completeness, freshness, and collection outcome sepa
 3. Use provider terms when known: **pull request**, **merge request**, **issue**, or **Slack thread**.
 4. Put stable reason codes in machine fields and plain explanations in UI messages.
 5. Prefer short names only when they remain unambiguous.
+6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
 
 These rules follow [Digital.gov plain-language guidance](https://digital.gov/guides/plain-language), Nielsen
 Norman Group’s [match between the system and the real world](https://www.nngroup.com/articles/ten-usability-heuristics/#toc-2-match-between-the-system-and-the-real-world-2),
@@ -134,3 +144,8 @@ recommends documenting knowledge limits and designing for safe failure. The cont
 [JSON Schema's annotation model](https://json-schema.org/understanding-json-schema/reference/annotations) so machine
 schemas carry human definitions, and uses explicit absence reasons in the same spirit as
 [HL7 Data Absent Reason](https://terminology.hl7.org/6.5.0/CodeSystem-data-absent-reason.html).
+The authoring UI follows the research-backed
+[Guidelines for Human-AI Interaction](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/)
+by making capabilities and limits clear, and uses progressive disclosure in line with the
+[GOV.UK Details guidance](https://design-system.service.gov.uk/components/details/) so technical evidence controls
+remain available without dominating the common path.

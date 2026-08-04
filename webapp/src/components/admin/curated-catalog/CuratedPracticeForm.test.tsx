@@ -141,11 +141,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
-		await user.click(
-			screen.getByRole("combobox", { name: "How should Hephaestus review this practice?" }),
-		);
-		await user.click(await screen.findByRole("option", { name: "No automated review" }));
+		await user.click(screen.getByRole("radio", { name: /Practice guidance only/ }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).toHaveBeenCalledWith(
@@ -159,7 +155,7 @@ describe("CuratedPracticeForm", () => {
 				}),
 			}),
 		);
-		expect(screen.queryByText("Start an automated review when… *")).toBeNull();
+		expect(screen.queryByText("Offer AI-supported mentoring when… *")).toBeNull();
 		expect(screen.queryByRole("button", { name: "Precompute script" })).toBeNull();
 	});
 
@@ -177,7 +173,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Configure automated review" }));
+		await user.click(screen.getByRole("button", { name: "Customize evidence" }));
 		await user.click(screen.getByRole("button", { name: "Add limitation" }));
 		const limitationDescription = screen.getByRole("textbox", {
 			name: "Description for limitation 2",
