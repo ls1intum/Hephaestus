@@ -5,6 +5,7 @@ import {
 	adminCreateCuratedPracticeMutation,
 	adminGetCuratedCatalogOptions,
 	adminGetCuratedCatalogQueryKey,
+	adminGetPracticeEvidenceOptionsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import {
 	CuratedPracticeForm,
@@ -25,6 +26,7 @@ function NewCuratedPracticePage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
 	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
+	const evidenceQuery = useQuery({ ...adminGetPracticeEvidenceOptionsOptions() });
 	const createPractice = useMutation({
 		...adminCreateCuratedPracticeMutation(),
 		onSuccess: () => {
@@ -36,7 +38,7 @@ function NewCuratedPracticePage() {
 			toast.error("Couldn't create the practice", { description: problemDetailOf(error) }),
 	});
 
-	if (catalogQuery.isPending) {
+	if (catalogQuery.isPending || evidenceQuery.isPending) {
 		return (
 			<PageLayout>
 				<div className="flex h-64 items-center justify-center">
@@ -45,13 +47,16 @@ function NewCuratedPracticePage() {
 			</PageLayout>
 		);
 	}
-	if (catalogQuery.isError) {
+	if (catalogQuery.isError || evidenceQuery.isError) {
 		return (
 			<PageLayout>
 				<QueryErrorAlert
-					error={catalogQuery.error}
-					title="Couldn't load the areas"
-					onRetry={() => catalogQuery.refetch()}
+					error={catalogQuery.error ?? evidenceQuery.error}
+					title="Couldn't load the practice editor"
+					onRetry={() => {
+						catalogQuery.refetch();
+						evidenceQuery.refetch();
+					}}
 				/>
 			</PageLayout>
 		);
@@ -65,6 +70,7 @@ function NewCuratedPracticePage() {
 				name: area.definition.name,
 			}))}
 			isPending={createPractice.isPending}
+			evidenceAuthoring={evidenceQuery.data}
 			onSubmit={({ slug, ...definition }: CuratedPracticeFormValue) =>
 				createPractice.mutate({ body: { slug, definition } })
 			}

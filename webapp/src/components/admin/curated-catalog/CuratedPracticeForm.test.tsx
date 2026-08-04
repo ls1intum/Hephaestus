@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
 	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeEvidenceAuthoring,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
@@ -14,7 +15,13 @@ vi.mock("@/components/shared/CodeEditor", () => ({
 describe("CuratedPracticeForm", () => {
 	it("associates validation messages with invalid fields", async () => {
 		await renderWithRouter(
-			<CuratedPracticeForm mode="create" areas={[]} isPending={false} onSubmit={vi.fn()} />,
+			<CuratedPracticeForm
+				mode="create"
+				areas={[]}
+				evidenceAuthoring={mockPracticeEvidenceAuthoring}
+				isPending={false}
+				onSubmit={vi.fn()}
+			/>,
 			"/admin/catalog/new",
 		);
 
@@ -30,7 +37,13 @@ describe("CuratedPracticeForm", () => {
 
 	it("asks before discarding an edited draft", async () => {
 		await renderWithRouter(
-			<CuratedPracticeForm mode="create" areas={[]} isPending={false} onSubmit={vi.fn()} />,
+			<CuratedPracticeForm
+				mode="create"
+				areas={[]}
+				evidenceAuthoring={mockPracticeEvidenceAuthoring}
+				isPending={false}
+				onSubmit={vi.fn()}
+			/>,
 			"/admin/catalog/new",
 		);
 
@@ -49,7 +62,13 @@ describe("CuratedPracticeForm", () => {
 
 	it("keeps the draft when the discard prompt is dismissed with Escape", async () => {
 		await renderWithRouter(
-			<CuratedPracticeForm mode="create" areas={[]} isPending={false} onSubmit={vi.fn()} />,
+			<CuratedPracticeForm
+				mode="create"
+				areas={[]}
+				evidenceAuthoring={mockPracticeEvidenceAuthoring}
+				isPending={false}
+				onSubmit={vi.fn()}
+			/>,
 			"/admin/catalog/new",
 		);
 
@@ -70,6 +89,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="edit"
 				areas={[]}
+				evidenceAuthoring={mockPracticeEvidenceAuthoring}
 				initialData={{
 					slug: "clear-pr-description",
 					name: "Write a clear pull request description",

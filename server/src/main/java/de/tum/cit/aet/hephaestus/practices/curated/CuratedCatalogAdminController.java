@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceAuthoringService;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
@@ -19,6 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeRequestDTO
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceAuthoringDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -60,6 +62,17 @@ public class CuratedCatalogAdminController {
 
     private final CuratedCatalogService service;
     private final PracticeEvidenceDefaults evidenceDefaults;
+    private final PracticeEvidenceAuthoringService evidenceAuthoringService;
+
+    @GetMapping("/evidence-options")
+    @Operation(
+        summary = "Read practice evidence authoring options",
+        description = "Returns the current baseline and allowed evidence sources for each artifact type",
+        operationId = "adminGetPracticeEvidenceOptions"
+    )
+    public ResponseEntity<PracticeEvidenceAuthoringDTO> evidenceOptions() {
+        return ResponseEntity.ok(evidenceAuthoringService.options());
+    }
 
     @GetMapping
     @Operation(

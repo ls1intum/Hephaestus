@@ -4,6 +4,7 @@ import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import {
 	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeEvidenceAuthoring,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
@@ -64,6 +65,11 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 		...overrides,
 	};
 	server.use(http.get("*/admin/practice-catalog", () => HttpResponse.json(catalog)));
+	server.use(
+		http.get("*/admin/practice-catalog/evidence-options", () =>
+			HttpResponse.json(mockPracticeEvidenceAuthoring),
+		),
+	);
 	return catalog;
 }
 
@@ -627,9 +633,9 @@ describe("instance catalog routes", () => {
 	});
 
 	it.each([
-		["unchanged", false, true],
-		["changed", true, false],
-	] as const)("%s artifact sends the correct evidence update", async (_label, changeArtifact, includesEvidence) => {
+		["unchanged", false, mockPullRequestEvidence],
+		["changed", true, mockPracticeEvidenceAuthoring.artifacts[2].baseline],
+	] as const)("%s artifact sends the visible evidence rule", async (_label, changeArtifact, expectedEvidence) => {
 		mockCatalog();
 		let requestBody: Record<string, unknown> | undefined;
 		server.use(
@@ -661,10 +667,6 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(() => expect(requestBody).toBeDefined());
-		if (includesEvidence) {
-			expect(requestBody?.evidence).toEqual(mockPullRequestEvidence);
-		} else {
-			expect(requestBody).not.toHaveProperty("evidence");
-		}
+		expect(requestBody?.evidence).toEqual(expectedEvidence);
 	});
 });

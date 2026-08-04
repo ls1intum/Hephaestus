@@ -1,6 +1,11 @@
 import { useBlocker } from "@tanstack/react-router";
 import { ChevronRight, RotateCcw, TriangleAlert } from "lucide-react";
 import { useState } from "react";
+import type {
+	PracticeEvidenceArtifactOptions,
+	PracticeEvidenceAuthoring,
+	PracticeEvidenceDeclaration,
+} from "@/api/types.gen";
 import {
 	FOCUS_ARTIFACT_OPTIONS,
 	generateSlug,
@@ -9,6 +14,10 @@ import {
 	triggerEventsForFocus,
 	type WorkArtifact,
 } from "@/components/admin/practice-catalog/constants";
+import {
+	PracticeEvidenceEditor,
+	practiceEvidenceError,
+} from "@/components/admin/practice-catalog/PracticeEvidenceEditor";
 import { CodeEditor } from "@/components/shared/CodeEditor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -62,6 +71,7 @@ export interface PracticeDefinitionValue {
 	whyItMatters?: string;
 	whatGoodLooksLike?: string;
 	precomputeScript?: string;
+	evidence: PracticeEvidenceDeclaration;
 }
 
 interface PracticeDefinitionFormBaseProps {
@@ -72,6 +82,7 @@ interface PracticeDefinitionFormBaseProps {
 	afterFields?: React.ReactNode;
 	cancelAction: React.ReactNode;
 	onSubmit: (value: PracticeDefinitionValue) => void;
+	evidenceAuthoring: PracticeEvidenceAuthoring;
 }
 
 interface PracticeDefinitionFormCreateProps extends PracticeDefinitionFormBaseProps {
@@ -98,19 +109,34 @@ interface FormState {
 	whyItMatters: string;
 	whatGoodLooksLike: string;
 	precomputeScript: string;
+	evidence: PracticeEvidenceDeclaration;
 }
 
-function initialState(initialData?: PracticeDefinitionValue): FormState {
+function optionsForArtifact(
+	authoring: PracticeEvidenceAuthoring,
+	artifactType: WorkArtifact,
+): PracticeEvidenceArtifactOptions {
+	const options = authoring.artifacts.find((item) => item.artifactType === artifactType);
+	if (!options) throw new Error(`Missing evidence authoring options for ${artifactType}`);
+	return options;
+}
+
+function initialState(
+	evidenceAuthoring: PracticeEvidenceAuthoring,
+	initialData?: PracticeDefinitionValue,
+): FormState {
+	const artifactType = initialData?.artifactType ?? "PULL_REQUEST";
 	return {
 		name: initialData?.name ?? "",
 		slug: initialData?.slug ?? "",
-		artifactType: initialData?.artifactType ?? "PULL_REQUEST",
+		artifactType,
 		areaSlug: initialData?.areaSlug ?? NO_AREA,
 		triggerEvents: [...(initialData?.triggerEvents ?? [])],
 		criteria: initialData?.criteria ?? "",
 		whyItMatters: initialData?.whyItMatters ?? "",
 		whatGoodLooksLike: initialData?.whatGoodLooksLike ?? "",
 		precomputeScript: initialData?.precomputeScript ?? "",
+		evidence: initialData?.evidence ?? optionsForArtifact(evidenceAuthoring, artifactType).baseline,
 	};
 }
 
@@ -124,12 +150,14 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		afterFields,
 		cancelAction,
 		initialData,
+		evidenceAuthoring,
 	} = props;
 	const formDisabled = isPending || disabled;
-	const [form, setForm] = useState<FormState>(() => initialState(initialData));
+	const [form, setForm] = useState<FormState>(() => initialState(evidenceAuthoring, initialData));
 	const [submitted, setSubmitted] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
-	const isDirty = JSON.stringify(form) !== JSON.stringify(initialState(initialData));
+	const isDirty =
+		JSON.stringify(form) !== JSON.stringify(initialState(evidenceAuthoring, initialData));
 	const blocker = useBlocker({
 		shouldBlockFn: () => isDirty,
 		enableBeforeUnload: isDirty,
@@ -171,11 +199,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		submitted && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
 			: undefined;
+	const evidenceError = practiceEvidenceError(form.evidence);
 
 	const valid =
 		form.name.trim().length >= 3 &&
 		form.criteria.trim().length >= 3 &&
 		(form.artifactType === "CONVERSATION_THREAD" || form.triggerEvents.length > 0) &&
+		!evidenceError &&
 		(mode === "edit" || isValidSlug(form.slug));
 
 	const handleSubmit = (event: React.FormEvent) => {
@@ -189,7 +219,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						? "practice-slug"
 						: form.artifactType !== "CONVERSATION_THREAD" && form.triggerEvents.length === 0
 							? `practice-trigger-${TRIGGER_EVENTS_BY_FOCUS[form.artifactType][0]?.value}`
-							: "practice-criteria";
+							: evidenceError
+								? "practice-evidence-heading"
+								: "practice-criteria";
 			requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
 			return;
 		}
@@ -206,11 +238,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
 				: {}),
 			...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
+			evidence: form.evidence,
 		});
 	};
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);
 	const artifactChanged = mode === "edit" && initialData.artifactType !== form.artifactType;
+	const evidenceOptions = optionsForArtifact(evidenceAuthoring, form.artifactType);
 
 	return (
 		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
@@ -319,6 +353,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 												return {
 													...previous,
 													artifactType,
+													evidence: optionsForArtifact(evidenceAuthoring, artifactType).baseline,
 													triggerEvents: previous.triggerEvents.filter((event) =>
 														allowed.includes(event),
 													),
@@ -389,8 +424,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								<TriangleAlert />
 								<AlertTitle>Evidence requirements will change</AlertTitle>
 								<AlertDescription>
-									Changing the reviewed artifact replaces this practice’s evidence requirements with
-									the default contract for the new artifact.
+									Changing the reviewed artifact has reset the evidence rule to the recommended
+									starting point for the new artifact. Review it below before saving.
 								</AlertDescription>
 							</Alert>
 						)}
@@ -432,6 +467,16 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							<Separator />
 						</>
 					)}
+
+					<PracticeEvidenceEditor
+						options={evidenceOptions}
+						value={form.evidence}
+						disabled={formDisabled}
+						onChange={(evidence) => setForm((previous) => ({ ...previous, evidence }))}
+						error={submitted ? evidenceError : undefined}
+					/>
+
+					<Separator />
 
 					<section>
 						<Field data-invalid={criteriaError ? "true" : undefined}>

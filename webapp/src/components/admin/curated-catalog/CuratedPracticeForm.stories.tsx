@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import {
 	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeEvidenceAuthoring,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
@@ -42,6 +43,7 @@ const meta = {
 	},
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
+	args: { evidenceAuthoring: mockPracticeEvidenceAuthoring },
 } satisfies Meta<typeof CuratedPracticeForm>;
 
 export default meta;

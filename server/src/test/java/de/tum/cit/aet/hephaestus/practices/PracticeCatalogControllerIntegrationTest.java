@@ -138,6 +138,27 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return TestAuthUtils.withCsrf(TestAuthUtils.fetchCsrfToken(webTestClient));
     }
 
+    @Test
+    @WithAdminUser
+    void workspaceAdminCanReadEvidenceAuthoringOptions() {
+        ensureAdminMembership(workspace);
+
+        webTestClient
+            .get()
+            .uri(BASE_URI + "/evidence-options", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.artifacts[0].artifactType")
+            .isEqualTo("PULL_REQUEST")
+            .jsonPath("$.artifacts[0].baseline.required[1].sourceKind")
+            .isEqualTo("scm.pull-request.diff")
+            .jsonPath("$.artifacts[0].sources[0].description")
+            .isNotEmpty();
+    }
+
     @Nested
     class ListPractices {
 

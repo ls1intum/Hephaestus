@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceAuthoringDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
@@ -52,6 +53,18 @@ public class PracticeCatalogController {
     private final PracticeService practiceService;
     private final CatalogOriginPresenter presenter;
     private final PracticeAreaService areaService;
+    private final PracticeEvidenceAuthoringService evidenceAuthoringService;
+
+    @GetMapping("/evidence-options")
+    @Operation(
+        summary = "Read practice evidence authoring options",
+        description = "Returns the current baseline and allowed evidence sources for each artifact type",
+        operationId = "getPracticeEvidenceOptions"
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<PracticeEvidenceAuthoringDTO> evidenceOptions() {
+        return ResponseEntity.ok(evidenceAuthoringService.options());
+    }
 
     @GetMapping
     @Operation(

@@ -1,12 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import type { CatalogEntryStatus, CuratedPracticeDefinition } from "@/api/types.gen";
+import type {
+	CatalogEntryStatus,
+	CuratedPracticeDefinition,
+	PracticeEvidenceAuthoring,
+} from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
-import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { PracticeEvidenceValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -44,6 +48,7 @@ interface CuratedPracticeFormBaseProps {
 	isKeepPending?: boolean;
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
+	evidenceAuthoring: PracticeEvidenceAuthoring;
 }
 
 interface CuratedPracticeFormCreateProps extends CuratedPracticeFormBaseProps {
@@ -73,6 +78,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		isKeepPending = false,
 		onUseHephaestusVersion,
 		initialData,
+		evidenceAuthoring,
 		onKeepCurrentDefinition,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
@@ -175,6 +181,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
+					evidenceAuthoring={evidenceAuthoring}
 					disabled={formDisabled}
 					cancelAction={cancelAction}
 					onSubmit={props.onSubmit}
@@ -185,6 +192,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					initialData={initialData}
 					areas={areas}
 					isPending={isPending}
+					evidenceAuthoring={evidenceAuthoring}
 					disabled={formDisabled}
 					isSubmitDisabled={conflict || isResetPending || isKeepPending}
 					cancelAction={cancelAction}
@@ -193,16 +201,13 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 							<Separator />
 							<section className="space-y-4">
 								<div>
-									<h2 className="text-lg font-semibold">Saved evidence contract</h2>
+									<h2 className="text-lg font-semibold">Independent review</h2>
 									<p className="text-sm text-muted-foreground">
-										The declared inputs and limits used to decide whether this practice can be
-										assessed.
+										The evidence rule above is the author's declaration. This status says whether
+										someone else has validated it.
 									</p>
 								</div>
-								<PracticeEvidenceSummary
-									declaration={initialData.evidence}
-									validation={initialData.evidenceValidation}
-								/>
+								<PracticeEvidenceValidationSummary validation={initialData.evidenceValidation} />
 							</section>
 						</>
 					}

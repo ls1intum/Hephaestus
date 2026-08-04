@@ -2711,6 +2711,35 @@ export type PracticeEvidenceValidation = {
 };
 
 /**
+ * An evidence source that a practice may require or use as optional context
+ */
+export type PracticeEvidenceSourceOption = {
+    authorizedForDetection?: boolean;
+    description: string;
+    privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
+    sourceKind: string;
+    supportsComplete?: boolean;
+    supportsCurrent?: boolean;
+    supportsEmpty?: boolean;
+};
+
+/**
+ * Server-supported options for authoring practice evidence requirements
+ */
+export type PracticeEvidenceAuthoring = {
+    artifacts: Array<PracticeEvidenceArtifactOptions>;
+};
+
+/**
+ * Evidence choices and recommended rule for one work artifact
+ */
+export type PracticeEvidenceArtifactOptions = {
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    baseline: PracticeEvidenceDeclaration;
+    sources: Array<PracticeEvidenceSourceOption>;
+};
+
+/**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
@@ -5668,6 +5697,22 @@ export type AdminUpdateCuratedAreaStatusResponses = {
 
 export type AdminUpdateCuratedAreaStatusResponse = AdminUpdateCuratedAreaStatusResponses[keyof AdminUpdateCuratedAreaStatusResponses];
 
+export type AdminGetPracticeEvidenceOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/evidence-options';
+};
+
+export type AdminGetPracticeEvidenceOptionsResponses = {
+    /**
+     * OK
+     */
+    200: PracticeEvidenceAuthoring;
+};
+
+export type AdminGetPracticeEvidenceOptionsResponse = AdminGetPracticeEvidenceOptionsResponses[keyof AdminGetPracticeEvidenceOptionsResponses];
+
 export type AdminResetCuratedCatalogOrderData = {
     body?: never;
     headers: {
@@ -8409,6 +8454,27 @@ export type CreatePracticeResponses = {
 };
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
+
+export type GetPracticeEvidenceOptionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/evidence-options';
+};
+
+export type GetPracticeEvidenceOptionsResponses = {
+    /**
+     * OK
+     */
+    200: PracticeEvidenceAuthoring;
+};
+
+export type GetPracticeEvidenceOptionsResponse = GetPracticeEvidenceOptionsResponses[keyof GetPracticeEvidenceOptionsResponses];
 
 export type GetEngagementData = {
     body?: never;

@@ -2,6 +2,7 @@ import type { PracticeEvidenceDeclaration, PracticeEvidenceValidation } from "@/
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { evidenceQualityLabel, evidenceSourceLabel } from "./evidence-presentation";
 
 const VALIDATION_LABELS: Record<PracticeEvidenceValidation["status"], string> = {
 	AUTHOR_DECLARED: "Not independently validated",
@@ -20,29 +21,11 @@ const VALIDATION_VARIANTS: Record<
 	SUPERSEDED: "warning",
 };
 
-const UNSATISFIED_LABELS: Record<PracticeEvidenceDeclaration["onUnsatisfied"], string> = {
-	DECLINE_SEMANTIC_JUDGMENT: "Decline the semantic judgment",
-};
-
 const OBSERVABILITY_LABELS: Record<PracticeEvidenceDeclaration["observability"], string> = {
-	MECHANICAL: "Mechanical",
-	SEMANTIC: "Semantic",
-	CONDITIONALLY_OBSERVABLE: "Conditionally observable",
-	UNOBSERVABLE: "Unobservable",
-};
-
-type EvidenceRequirement =
-	| PracticeEvidenceDeclaration["required"][number]
-	| PracticeEvidenceDeclaration["optional"][number];
-
-const COMPLETENESS_LABELS: Record<EvidenceRequirement["completeness"], string> = {
-	COMPLETE: "Complete",
-	ANY: "Any completeness",
-};
-
-const FRESHNESS_LABELS: Record<EvidenceRequirement["freshness"], string> = {
-	CURRENT: "Current",
-	ANY: "Any freshness",
+	MECHANICAL: "Mechanically checkable",
+	SEMANTIC: "Meaning requires judgment",
+	CONDITIONALLY_OBSERVABLE: "Only observable in some cases",
+	UNOBSERVABLE: "Not observable",
 };
 
 function Requirements({
@@ -55,12 +38,11 @@ function Requirements({
 		<ul className="space-y-1">
 			{requirements.map((requirement) => (
 				<li key={requirement.sourceKind}>
-					<code className="break-all">{requirement.sourceKind}</code>
-					<span className="text-muted-foreground">
-						{" "}
-						({COMPLETENESS_LABELS[requirement.completeness]},{" "}
-						{FRESHNESS_LABELS[requirement.freshness]})
-					</span>
+					<span>{evidenceSourceLabel(requirement.sourceKind)}</span>
+					<span className="text-muted-foreground"> · {evidenceQualityLabel(requirement)}</span>
+					<code className="block break-all text-xs text-muted-foreground">
+						{requirement.sourceKind}
+					</code>
 				</li>
 			))}
 		</ul>
@@ -73,6 +55,35 @@ export interface PracticeEvidenceSummaryProps {
 	className?: string;
 }
 
+export interface PracticeEvidenceValidationSummaryProps {
+	validation: PracticeEvidenceValidation;
+}
+
+export function PracticeEvidenceValidationSummary({
+	validation,
+}: PracticeEvidenceValidationSummaryProps) {
+	return (
+		<div className="space-y-1 text-sm">
+			<Badge variant={VALIDATION_VARIANTS[validation.status]}>
+				{VALIDATION_LABELS[validation.status]}
+			</Badge>
+			{validation.validator && (
+				<p className="text-muted-foreground">
+					{validation.validator}
+					{validation.validationReference && <> · {validation.validationReference}</>}
+				</p>
+			)}
+			{validation.status !== "AUTHOR_DECLARED" && (
+				<p className="text-muted-foreground">
+					Checked against source contract {validation.sourceContractVersion} and declaration{" "}
+					<code className="break-all">{validation.declarationDigest}</code> · validated{" "}
+					<RelativeTime value={validation.validatedAt} fallback="at an unknown time" />
+				</p>
+			)}
+		</div>
+	);
+}
+
 export function PracticeEvidenceSummary({
 	declaration,
 	validation,
@@ -81,13 +92,13 @@ export function PracticeEvidenceSummary({
 	return (
 		<dl className={cn("grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2", className)}>
 			<div>
-				<dt className="font-medium">Contract</dt>
+				<dt className="font-medium">Source rules</dt>
 				<dd className="text-muted-foreground">
-					{declaration.sourceContractVersion} · {declaration.profile}
+					Version {declaration.sourceContractVersion} · {declaration.profile}
 				</dd>
 			</div>
 			<div>
-				<dt className="font-medium">Author-declared observability</dt>
+				<dt className="font-medium">How it can be judged</dt>
 				<dd className="text-muted-foreground">{OBSERVABILITY_LABELS[declaration.observability]}</dd>
 			</div>
 			<div>
@@ -103,44 +114,22 @@ export function PracticeEvidenceSummary({
 				</dd>
 			</div>
 			<div>
-				<dt className="font-medium">When requirements are not met</dt>
-				<dd className="text-muted-foreground">{UNSATISFIED_LABELS[declaration.onUnsatisfied]}</dd>
+				<dt className="font-medium">When required evidence is missing</dt>
+				<dd className="text-muted-foreground">Skip this practice rather than guess</dd>
 			</div>
 			<div>
 				<dt className="font-medium">Independent validation</dt>
-				<dd className="space-y-1">
-					<Badge variant={VALIDATION_VARIANTS[validation.status]}>
-						{VALIDATION_LABELS[validation.status]}
-					</Badge>
-					{validation.validator && (
-						<p className="text-muted-foreground">
-							{validation.validator}
-							{validation.validationReference && (
-								<>
-									{" · "}
-									<span className="break-all">{validation.validationReference}</span>
-								</>
-							)}
-						</p>
-					)}
-					{validation.status !== "AUTHOR_DECLARED" && (
-						<p className="text-muted-foreground">
-							Contract {validation.sourceContractVersion} · declaration{" "}
-							<code className="break-all">{validation.declarationDigest}</code> · validated{" "}
-							<RelativeTime value={validation.validatedAt} fallback="at an unknown time" />
-						</p>
-					)}
+				<dd>
+					<PracticeEvidenceValidationSummary validation={validation} />
 				</dd>
 			</div>
 			{declaration.blindSpots.length > 0 && (
 				<div className="sm:col-span-2">
-					<dt className="font-medium">Declared blind spots</dt>
+					<dt className="font-medium">What the evidence cannot prove</dt>
 					<dd>
 						<ul className="space-y-1">
 							{declaration.blindSpots.map((blindSpot) => (
-								<li key={blindSpot.code}>
-									<code className="break-all">{blindSpot.code}</code>: {blindSpot.summary}
-								</li>
+								<li key={blindSpot.code}>{blindSpot.summary}</li>
 							))}
 						</ul>
 					</dd>

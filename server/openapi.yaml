@@ -1104,6 +1104,21 @@ paths:
       summary: "Exclude an area from new workspaces, or include it again"
       tags:
       - Admin Practice Catalog
+  /admin/practice-catalog/evidence-options:
+    get:
+      description: Returns the current baseline and allowed evidence sources for each
+        artifact type
+      operationId: adminGetPracticeEvidenceOptions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeEvidenceAuthoring"
+          description: OK
+      summary: Read practice evidence authoring options
+      tags:
+      - Admin Practice Catalog
   /admin/practice-catalog/order:
     delete:
       operationId: adminResetCuratedCatalogOrder
@@ -4251,6 +4266,29 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Practice slug already exists in this workspace
       summary: Create a new practice definition
+      tags:
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/evidence-options:
+    get:
+      description: Returns the current baseline and allowed evidence sources for each
+        artifact type
+      operationId: getPracticeEvidenceOptions
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeEvidenceAuthoring"
+          description: OK
+      summary: Read practice evidence authoring options
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/feedback/engagement:
@@ -9719,6 +9757,36 @@ components:
       - id
       - name
       - slug
+    PracticeEvidenceArtifactOptions:
+      type: object
+      description: Evidence choices and recommended rule for one work artifact
+      properties:
+        artifactType:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+        baseline:
+          $ref: "#/components/schemas/PracticeEvidenceDeclaration"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceSourceOption"
+      required:
+      - artifactType
+      - baseline
+      - sources
+    PracticeEvidenceAuthoring:
+      type: object
+      description: Server-supported options for authoring practice evidence requirements
+      properties:
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceArtifactOptions"
+      required:
+      - artifacts
     PracticeEvidenceBlindSpot:
       type: object
       description: Author-declared limitation that remains when required evidence
@@ -9794,6 +9862,34 @@ components:
       required:
       - completeness
       - freshness
+      - sourceKind
+    PracticeEvidenceSourceOption:
+      type: object
+      description: An evidence source that a practice may require or use as optional
+        context
+      properties:
+        authorizedForDetection:
+          type: boolean
+        description:
+          type: string
+        privacyClass:
+          type: string
+          enum:
+          - PUBLIC
+          - INTERNAL
+          - PERSONAL
+          - SENSITIVE_PERSONAL
+        sourceKind:
+          type: string
+        supportsComplete:
+          type: boolean
+        supportsCurrent:
+          type: boolean
+        supportsEmpty:
+          type: boolean
+      required:
+      - description
+      - privacyClass
       - sourceKind
     PracticeEvidenceValidation:
       type: object

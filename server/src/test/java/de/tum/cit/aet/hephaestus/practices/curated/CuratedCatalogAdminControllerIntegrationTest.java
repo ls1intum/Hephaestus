@@ -86,6 +86,22 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     @Test
+    void appAdminCanReadEvidenceAuthoringOptions() {
+        webTestClient
+            .get()
+            .uri(CATALOG + "/evidence-options")
+            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.artifacts[2].artifactType")
+            .isEqualTo("CONVERSATION_THREAD")
+            .jsonPath("$.artifacts[2].baseline.required[0].sourceKind")
+            .isEqualTo("slack.conversation.thread");
+    }
+
+    @Test
     void anEditIsTheOnlyThingThatGetsStored() {
         CuratedPracticeDTO before = getPractice();
 

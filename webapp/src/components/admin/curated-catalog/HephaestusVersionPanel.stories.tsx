@@ -73,10 +73,13 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("Starts a review when")).toBeVisible();
 		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
-		await expect(canvas.getByText("Author-declared observability")).toBeVisible();
+		await expect(canvas.getByText("How it can be judged")).toBeVisible();
+		await expect(canvas.getByText("Meaning requires judgment")).toBeVisible();
 		await expect(canvas.getByText("scm.pull-request.core")).toBeVisible();
 		await expect(canvas.getByText("Not independently validated")).toBeVisible();
-		await expect(canvas.getByText(/RUNTIME_BEHAVIOR_NOT_OBSERVED/)).toBeVisible();
+		await expect(
+			canvas.getByText("Repository evidence does not establish behavior in a deployed runtime."),
+		).toBeVisible();
 		await expect(canvas.queryByText("PullRequestCreated")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("button", { name: "Keep saved version" })).toBeVisible();
 	},

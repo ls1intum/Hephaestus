@@ -3,6 +3,7 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { toast } from "sonner";
 import {
 	createPracticeMutation,
+	getPracticeEvidenceOptionsOptions,
 	listAreasOptions,
 	listPracticesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
@@ -34,6 +35,9 @@ function CreatePracticeContainer() {
 			path: { workspaceSlug },
 			query: { activeOnly: true },
 		}),
+	});
+	const evidenceQuery = useQuery({
+		...getPracticeEvidenceOptionsOptions({ path: { workspaceSlug } }),
 	});
 
 	const practicesQueryKey = listPracticesQueryKey({ path: { workspaceSlug } });
@@ -70,7 +74,7 @@ function CreatePracticeContainer() {
 		}
 	};
 
-	if (areasQuery.isPending) {
+	if (areasQuery.isPending || evidenceQuery.isPending) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
 				<div className="flex h-64 max-w-3xl items-center justify-center">
@@ -79,14 +83,17 @@ function CreatePracticeContainer() {
 			</PracticeFormShell>
 		);
 	}
-	if (areasQuery.isError) {
+	if (areasQuery.isError || evidenceQuery.isError) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
 				<div className="max-w-3xl">
 					<QueryErrorAlert
-						error={areasQuery.error}
-						title="Couldn't load practice areas"
-						onRetry={() => areasQuery.refetch()}
+						error={areasQuery.error ?? evidenceQuery.error}
+						title="Couldn't load the practice editor"
+						onRetry={() => {
+							areasQuery.refetch();
+							evidenceQuery.refetch();
+						}}
 					/>
 				</div>
 			</PracticeFormShell>
@@ -98,6 +105,7 @@ function CreatePracticeContainer() {
 			mode="create"
 			workspaceSlug={workspaceSlug}
 			areas={areasQuery.data}
+			evidenceAuthoring={evidenceQuery.data}
 			onSubmit={handleSubmit}
 			isPending={createPractice.isPending}
 		/>

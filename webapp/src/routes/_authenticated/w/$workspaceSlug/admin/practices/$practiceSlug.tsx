@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+	getPracticeEvidenceOptionsOptions,
 	getPracticeOptions,
 	getPracticeQueryKey,
 	listAreasOptions,
@@ -54,6 +55,9 @@ function EditPracticeContainer() {
 			query: { activeOnly: true },
 		}),
 	});
+	const evidenceQuery = useQuery({
+		...getPracticeEvidenceOptionsOptions({ path: { workspaceSlug } }),
+	});
 
 	const updatePractice = useMutation({
 		...updatePracticeMutation(),
@@ -92,7 +96,7 @@ function EditPracticeContainer() {
 		}
 	};
 
-	if (practiceQuery.isPending || areasQuery.isPending) {
+	if (practiceQuery.isPending || areasQuery.isPending || evidenceQuery.isPending) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
 				<div className="flex h-64 max-w-3xl items-center justify-center">
@@ -101,16 +105,17 @@ function EditPracticeContainer() {
 			</PracticeFormShell>
 		);
 	}
-	if (practiceQuery.isError || areasQuery.isError) {
+	if (practiceQuery.isError || areasQuery.isError || evidenceQuery.isError) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
 				<div className="max-w-3xl">
 					<QueryErrorAlert
-						error={practiceQuery.error ?? areasQuery.error}
+						error={practiceQuery.error ?? areasQuery.error ?? evidenceQuery.error}
 						title="Couldn't load the practice"
 						onRetry={() => {
 							practiceQuery.refetch();
 							areasQuery.refetch();
+							evidenceQuery.refetch();
 						}}
 					/>
 				</div>
@@ -124,6 +129,7 @@ function EditPracticeContainer() {
 			workspaceSlug={workspaceSlug}
 			initialData={practiceQuery.data}
 			areas={areasQuery.data}
+			evidenceAuthoring={evidenceQuery.data}
 			onSubmit={handleSubmit}
 			isPending={updatePractice.isPending}
 		/>

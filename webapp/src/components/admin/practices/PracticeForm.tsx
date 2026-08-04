@@ -4,13 +4,14 @@ import type {
 	CreatePracticeRequest,
 	Practice,
 	PracticeArea,
+	PracticeEvidenceAuthoring,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
-import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { PracticeEvidenceValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface PracticeFormCreateProps {
 	areas: PracticeArea[];
 	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
 	isPending: boolean;
+	evidenceAuthoring: PracticeEvidenceAuthoring;
 	initialData?: never;
 }
 
@@ -33,6 +35,7 @@ interface PracticeFormEditProps {
 	areas: PracticeArea[];
 	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
 	isPending: boolean;
+	evidenceAuthoring: PracticeEvidenceAuthoring;
 }
 
 export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
@@ -55,11 +58,12 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 		...(practice.whyItMatters ? { whyItMatters: practice.whyItMatters } : {}),
 		...(practice.whatGoodLooksLike ? { whatGoodLooksLike: practice.whatGoodLooksLike } : {}),
 		...(practice.precomputeScript ? { precomputeScript: practice.precomputeScript } : {}),
+		evidence: practice.evidence,
 	};
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const { mode, workspaceSlug, areas, isPending, initialData } = props;
+	const { mode, workspaceSlug, areas, isPending, initialData, evidenceAuthoring } = props;
 	const cancelAction = (
 		<Link
 			to="/w/$workspaceSlug/admin/practices"
@@ -91,6 +95,7 @@ export function PracticeForm(props: PracticeFormProps) {
 				whyItMatters: definition.whyItMatters,
 				whatGoodLooksLike: definition.whatGoodLooksLike,
 				precomputeScript: definition.precomputeScript,
+				evidence: definition.evidence,
 				clear: clear.length > 0 ? clear : undefined,
 			},
 			areaSlug ?? null,
@@ -102,15 +107,13 @@ export function PracticeForm(props: PracticeFormProps) {
 				<Separator />
 				<section className="space-y-4">
 					<div>
-						<h2 className="text-lg font-semibold">Saved evidence contract</h2>
+						<h2 className="text-lg font-semibold">Independent review</h2>
 						<p className="text-sm text-muted-foreground">
-							The declared inputs and limits used to decide whether this practice can be assessed.
+							The evidence rule above is the author's declaration. This status says whether someone
+							else has validated it.
 						</p>
 					</div>
-					<PracticeEvidenceSummary
-						declaration={initialData.evidence}
-						validation={initialData.evidenceValidation}
-					/>
+					<PracticeEvidenceValidationSummary validation={initialData.evidenceValidation} />
 				</section>
 				<Separator />
 				<section className="space-y-4">
@@ -139,6 +142,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
+					evidenceAuthoring={evidenceAuthoring}
 					cancelAction={cancelAction}
 					onSubmit={submit}
 				/>
@@ -148,6 +152,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					initialData={asDefinitionValue(initialData)}
 					areas={areas}
 					isPending={isPending}
+					evidenceAuthoring={evidenceAuthoring}
 					cancelAction={cancelAction}
 					afterFields={reviewResults}
 					onSubmit={submit}
