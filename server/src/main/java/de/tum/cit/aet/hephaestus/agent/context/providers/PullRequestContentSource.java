@@ -42,22 +42,8 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises the PR-review workspace context under {@code inputs/context/}:
- * <ul>
- *   <li>{@code metadata.json} — PR metadata, enriched from DB, plus commit log</li>
- *   <li>{@code comments.json} — review comments (most recent 500)</li>
- *   <li>{@code diff.patch} — annotated unified diff via {@link GitDiffOperations}</li>
- *   <li>{@code diff_stat.txt} — {@code git diff --stat} output</li>
- *   <li>{@code diff_summary.md} — per-file diff chunks for single-pass AI consumption</li>
- * </ul>
- *
- * <p>The diff source is required. A resolved range with no changes is captured as valid empty evidence;
- * failure to resolve the range is a collection error.
- */
 @Component
 @Order(100)
 public class PullRequestContentSource implements EvidenceSource {
@@ -82,7 +68,6 @@ public class PullRequestContentSource implements EvidenceSource {
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestContentSource.class);
 
-    /** Maximum number of review comments included in context. Most recent are kept on truncation. */
     static final int MAX_COMMENTS = 500;
 
     /** Captures the b-side path of a git diff header — robust against renames and paths containing " b/". */
@@ -133,7 +118,7 @@ public class PullRequestContentSource implements EvidenceSource {
     @Override
     public void prepareCapture(ContextRequest request, Set<SourceKind> selectedKinds) {
         if (!(request instanceof ContextRequest.PracticeReviewRequest practiceReview)) return;
-        if (!(selectedKinds.contains(CORE) || selectedKinds.contains(DIFF))) return;
+        if (!selectedKinds.contains(DIFF)) return;
         JsonNode metadata = practiceReview.job().getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) return;
         long repositoryId = requireLong(metadata, "repository_id");
@@ -172,9 +157,8 @@ public class PullRequestContentSource implements EvidenceSource {
         Map<SourceKind, java.time.Instant> observedAt = new HashMap<>();
         Map<SourceKind, SourceContentState> contentStates = new HashMap<>();
 
-        boolean needsGit = selectedKinds.contains(CORE) || selectedKinds.contains(DIFF);
         boolean headVerified = false;
-        if (needsGit) {
+        if (selectedKinds.contains(DIFF)) {
             ensureRepositoryAvailable(repositoryId);
             String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
             headVerified =
@@ -302,7 +286,6 @@ public class PullRequestContentSource implements EvidenceSource {
 
     private void storeMetadata(Map<String, byte[]> files, @Nullable PullRequest pullRequest, JsonNode metadata) {
         ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequest, metadata);
-        addCommitLog(pullRequestMetadata, metadata);
         try {
             files.put(
                 OUTPUT_PREFIX + "metadata.json",
@@ -401,46 +384,6 @@ public class PullRequestContentSource implements EvidenceSource {
 
     private record CommentCapture(List<PullRequestReviewComment> comments, boolean complete) {}
 
-    private void addCommitLog(ObjectNode metadata, JsonNode jobMetadata) {
-        String sourceBranch = jobMetadata.has("source_branch") ? jobMetadata.get("source_branch").asString() : null;
-        String targetBranch = jobMetadata.has("target_branch") ? jobMetadata.get("target_branch").asString() : null;
-        long repositoryId = requireLong(jobMetadata, "repository_id");
-
-        if (sourceBranch == null || targetBranch == null) return;
-
-        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-        String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asString() : null;
-
-        String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
-        String logOutput = range != null ? gitDiffOperations.shortLog(repoPath, range[0], range[1]) : null;
-
-        if (logOutput == null || logOutput.isBlank()) {
-            log.debug("No commit log available for MR, skipping commit injection");
-            return;
-        }
-
-        ArrayNode commits = objectMapper.createArrayNode();
-        int count = 0;
-        for (String line : logOutput.split("\n")) {
-            if (line.isBlank()) continue;
-            if (count >= 50) break;
-            String[] parts = line.split("\t", 2);
-            if (parts.length < 2) continue;
-            ObjectNode commit = objectMapper.createObjectNode();
-            commit.put("sha", parts[0]);
-            commit.put("message", parts[1]);
-            commits.add(commit);
-            count++;
-        }
-
-        if (!commits.isEmpty()) {
-            metadata.set("commits", commits);
-            log.debug("Injected {} commit messages into metadata", commits.size());
-        }
-    }
-
-    // Diff
-
     private void computeAndStoreDiff(
         Map<String, byte[]> files,
         long repositoryId,
@@ -510,7 +453,6 @@ public class PullRequestContentSource implements EvidenceSource {
         }
     }
 
-    /** Pure transformation: build the per-file diff summary from {@code diff.patch}. */
     void computeAndStoreDiffSummary(Map<String, byte[]> files) {
         byte[] diffBytes = files.get(OUTPUT_PREFIX + "diff.patch");
         if (diffBytes == null) {
@@ -536,9 +478,7 @@ public class PullRequestContentSource implements EvidenceSource {
                 }
                 currentChunk = new StringBuilder();
                 Matcher m = DIFF_GIT_HEADER.matcher(effectiveLine);
-                // On a malformed/unusual header the captured path is unavailable; fall back to the raw
-                // header line, but sanitize it first — it is rendered verbatim into a markdown table cell
-                // and a section heading, so a stray pipe/backtick would corrupt the table the agent reads.
+                // A malformed header remains attacker-controlled; escape it before rendering Markdown.
                 currentPath = m.matches() ? m.group(1) : sanitizePathCell(effectiveLine);
             }
             currentChunk.append(line).append('\n');
@@ -576,11 +516,6 @@ public class PullRequestContentSource implements EvidenceSource {
         log.info("Diff summary: {} files, {} bytes", filePaths.size(), summaryBytes.length);
     }
 
-    /**
-     * Sanitizes a fallback (unparseable) diff-header path before it is placed into the markdown summary's
-     * table cell and section heading: strips the {@code diff --git } prefix and removes pipe/backtick
-     * characters that would break the markdown table the agent consumes.
-     */
     private static String sanitizePathCell(String rawHeader) {
         String stripped = rawHeader.startsWith("diff --git ") ? rawHeader.substring("diff --git ".length()) : rawHeader;
         return stripped.replace("|", "").replace("`", "").trim();

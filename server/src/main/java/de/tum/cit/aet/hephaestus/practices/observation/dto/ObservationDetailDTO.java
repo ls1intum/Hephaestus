@@ -8,11 +8,9 @@ import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Detail-view DTO for a single practice observation. Includes guidance, reasoning,
@@ -33,11 +31,7 @@ public record ObservationDetailDTO(
     @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
-    @Nullable
-    @Schema(
-        description = "Structured evidence: {\"locations\":[{\"path\",\"startLine\",\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
-    )
-    Map<String, Object> evidence,
+    @Nullable ObservationEvidenceDTO evidence,
     @Nullable @Schema(description = "AI reasoning behind the observation") String reasoning,
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
@@ -48,7 +42,7 @@ public record ObservationDetailDTO(
     public static ObservationDetailDTO from(
         Observation observation,
         @Nullable String deliveredGuidance,
-        tools.jackson.databind.ObjectMapper mapper
+        boolean includeEvidence
     ) {
         var practice = observation.getPractice();
         return new ObservationDetailDTO(
@@ -62,22 +56,11 @@ public record ObservationDetailDTO(
             observation.getAssessment(),
             observation.getSeverity(),
             observation.getConfidence(),
-            toMap(observation.getEvidence(), mapper),
+            includeEvidence ? ObservationEvidenceDTO.from(observation.getEvidence()) : null,
             observation.getReasoning(),
             deliveredGuidance,
             EvaluationClaimStatus.of(observation.getPracticeRevision(), practice),
             observation.getObservedAt()
         );
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> toMap(JsonNode node, tools.jackson.databind.ObjectMapper mapper) {
-        // evidence is free-form jsonb: a non-object payload (array, scalar, null) cannot be coerced to a
-        // Map and would otherwise make convertValue throw, turning a valid stored observation into a 500.
-        // Only object-shaped evidence maps; anything else surfaces as an absent evidence map.
-        if (node == null || !node.isObject()) {
-            return null;
-        }
-        return mapper.convertValue(node, Map.class);
     }
 }

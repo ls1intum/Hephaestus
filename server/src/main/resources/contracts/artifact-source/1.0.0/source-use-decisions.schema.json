@@ -24,7 +24,7 @@
           "mode",
           "basis",
           "outcome",
-          "audience",
+          "audiences",
           "retentionPolicy",
           "erasurePolicy",
           "recordedAt"
@@ -39,8 +39,12 @@
             "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
           },
           "purpose": {
-            "type": "string",
-            "minLength": 1
+            "enum": [
+              "practice-detection",
+              "practice-feedback",
+              "practice-mentoring",
+              "operator-quality-assurance"
+            ]
           },
           "mode": {
             "enum": [
@@ -61,9 +65,18 @@
               "DENIED"
             ]
           },
-          "audience": {
-            "type": "string",
-            "minLength": 1
+          "audiences": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "PRACTICE_DETECTION",
+                "PRACTICE_FEEDBACK_RECIPIENTS",
+                "PRACTICE_MENTORING",
+                "OPERATOR_QUALITY_ASSURANCE"
+              ]
+            }
           },
           "modelProcessor": {
             "type": [

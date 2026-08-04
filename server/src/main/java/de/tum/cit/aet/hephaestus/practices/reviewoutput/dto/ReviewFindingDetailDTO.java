@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationEvidenceDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -27,7 +28,7 @@ public record ReviewFindingDetailDTO(
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "Detector confidence", minimum = "0", maximum = "1") Float confidence,
-    Object evidence,
+    ObservationEvidenceDTO evidence,
     String reasoning,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
     @NonNull EvaluationClaimStatus claimStatus,
@@ -38,7 +39,8 @@ public record ReviewFindingDetailDTO(
         Observation observation,
         ReviewArtifactDTO artifact,
         ReviewSubjectDTO subject,
-        List<ReviewBoundFeedbackDTO> feedback
+        List<ReviewBoundFeedbackDTO> feedback,
+        boolean includeEvidence
     ) {
         var practice = observation.getPractice();
         var revision = observation.getPracticeRevision();
@@ -56,7 +58,7 @@ public record ReviewFindingDetailDTO(
             observation.getAssessment(),
             observation.getSeverity(),
             observation.getConfidence(),
-            observation.getEvidence(),
+            includeEvidence ? ObservationEvidenceDTO.from(observation.getEvidence()) : null,
             observation.getReasoning(),
             observation.getRecurrenceKey(),
             EvaluationClaimStatus.of(revision, practice),

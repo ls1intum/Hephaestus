@@ -31,38 +31,45 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // Evidence builders
-
     private JsonNode buildEvidence(List<LocationSpec> locations, List<String> snippets) {
         ObjectNode evidence = objectMapper.createObjectNode();
         if (locations != null && !locations.isEmpty()) {
-            ArrayNode locArr = evidence.putArray("locations");
+            ArrayNode citations = evidence.putArray("citations");
             for (LocationSpec loc : locations) {
-                ObjectNode locNode = objectMapper.createObjectNode();
-                locNode.put("path", loc.path);
-                locNode.put("startLine", loc.startLine);
-                if (loc.endLine != null) {
-                    locNode.put("endLine", loc.endLine);
+                ObjectNode citation = citations.addObject();
+                citation.put("sourceKind", loc.sourceKind);
+                citation.put(
+                    "artifactPath",
+                    loc.sourceKind.equals("scm.pull-request.diff")
+                        ? "inputs/context/diff.patch"
+                        : "inputs/context/metadata.json"
+                );
+                citation.put("path", loc.path);
+                if (loc.sourceKind.equals("scm.pull-request.diff")) {
+                    citation.put("side", "NEW");
                 }
-                locArr.add(locNode);
-            }
-        }
-        if (snippets != null && !snippets.isEmpty()) {
-            ArrayNode snipArr = evidence.putArray("snippets");
-            for (String s : snippets) {
-                snipArr.add(s);
+                citation.put("startLine", loc.startLine);
+                if (loc.endLine != null) {
+                    citation.put("endLine", loc.endLine);
+                }
+                if (snippets != null && !snippets.isEmpty()) {
+                    citation.put("quote", snippets.get(Math.min(citations.size() - 1, snippets.size() - 1)));
+                }
+                citation.put("quoteRedacted", false);
             }
         }
         return evidence;
     }
 
-    private record LocationSpec(String path, int startLine, Integer endLine) {
+    private record LocationSpec(String path, int startLine, Integer endLine, String sourceKind) {
         LocationSpec(String path, int startLine) {
-            this(path, startLine, null);
+            this(path, startLine, null, "scm.pull-request.diff");
+        }
+
+        LocationSpec(String path, int startLine, String sourceKind) {
+            this(path, startLine, null, sourceKind);
         }
     }
-
-    // Finding builders
 
     private ValidatedFinding positiveFinding(String slug) {
         return new ValidatedFinding(
@@ -105,8 +112,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     private static String humanizeTitle(String slug) {
         return slug.replace('-', ' ').substring(0, 1).toUpperCase() + slug.replace('-', ' ').substring(1);
     }
-
-    // Realistic findings used across tests
 
     private List<ValidatedFinding> mixedFindings() {
         List<ValidatedFinding> findings = new ArrayList<>();
@@ -879,7 +884,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "issue-has-checkable-outcome",
             "Missing checkable outcome",
             Severity.MINOR,
-            List.of(new LocationSpec("metadata.json", 2)),
+            List.of(new LocationSpec("metadata.json", 2, "scm.issue.core")),
             null,
             "The issue does not state any acceptance criteria a maintainer could verify against.",
             "Add a short checklist of done conditions, e.g. a `- [ ]` list of observable outcomes."
@@ -967,7 +972,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "issue-has-checkable-outcome",
                 "Missing checkable outcome",
                 Severity.MINOR,
-                List.of(new LocationSpec("metadata.json", 2)),
+                List.of(new LocationSpec("metadata.json", 2, "scm.issue.core")),
                 null,
                 "No acceptance criteria are stated.",
                 "Add a done checklist."
@@ -976,7 +981,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "issue-states-an-actionable-problem",
                 "Missing actionable problem",
                 Severity.MINOR,
-                List.of(new LocationSpec("metadata.json", 2)),
+                List.of(new LocationSpec("metadata.json", 2, "scm.issue.core")),
                 null,
                 "The description does not frame a concrete problem.",
                 "State the who/what/why."
@@ -1033,7 +1038,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "mr-description-quality",
             "PR description lacks clear motivation",
             Severity.MAJOR,
-            List.of(new LocationSpec("metadata.json", 2)),
+            List.of(new LocationSpec("metadata.json", 2, "scm.pull-request.core")),
             List.of(
                 "#39: use Logger and package\", \"body\" : \"#39: use Logger and package ## Description - use logger"
             ),
@@ -1052,6 +1057,29 @@ class DeliveryComposerTest extends BaseUnitTest {
         // The student still receives the actual lesson (reasoning + guidance).
         assertThat(dc.mrNote()).contains("does not explain why the change is needed");
         assertThat(dc.mrNote()).contains("Add a short Why paragraph");
+    }
+
+    @Test
+    void compose_repositoryMetadataFileKeepsCodeLocation() {
+        ValidatedFinding finding = negativeFinding(
+            "code-hygiene",
+            "Repository metadata needs validation",
+            Severity.MINOR,
+            List.of(new LocationSpec("metadata.json", 7)),
+            List.of("\"enabled\": true"),
+            "The repository configuration is not validated.",
+            "Validate the field before using it."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(finding), WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes())
+            .singleElement()
+            .satisfies(note -> {
+                assertThat(note.filePath()).isEqualTo("metadata.json");
+                assertThat(note.startLine()).isEqualTo(7);
+            });
     }
 
     // --- Cross-context follow-up fixes (F3 repo-strip, F4 epic dedup, F5 subordinate positive) ---
@@ -2137,7 +2165,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "issue-states-an-actionable-problem",
             "Vague problem statement",
             Severity.MINOR,
-            List.of(new LocationSpec("metadata.json", 1)),
+            List.of(new LocationSpec("metadata.json", 1, "scm.issue.core")),
             List.of("\"title\": \"do stuff\""),
             "The issue does not state a concrete problem.",
             "State the problem as <one sentence>."

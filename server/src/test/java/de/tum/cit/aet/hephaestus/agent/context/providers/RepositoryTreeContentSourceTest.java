@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
@@ -73,6 +74,23 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         )
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("commit_sha");
+    }
+
+    @Test
+    void shouldReportOperationalGitFailureAsCollectionError() {
+        AgentJob job = job(17L, "0123456789012345678901234567890123456789");
+        when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
+        when(
+            gitRepositoryManager.readTreeSnapshot(
+                17L,
+                "0123456789012345678901234567890123456789",
+                RepositoryTreeContentSource.MAX_TOTAL_BYTES
+            )
+        ).thenThrow(new GitRepositoryManager.GitOperationException("unreadable commit", new java.io.IOException()));
+
+        assertThatThrownBy(() -> source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds()))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasMessageContaining("Could not capture repository tree");
     }
 
     private static AgentJob job(long repositoryId, String commitSha) {

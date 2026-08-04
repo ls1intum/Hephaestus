@@ -101,7 +101,6 @@ const FETCH_CONTEXT_ALLOWED = new Set([
     "inputs/context/user.json",
     "inputs/context/practice_catalog.json",
     "inputs/context/findings_history.json",
-    "inputs/context/practice_standing.json",
     "inputs/context/delivered_feedback.json",
     "inputs/context/recent_authored_work.json",
     "inputs/context/slack_conversations.json",

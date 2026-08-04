@@ -37,6 +37,27 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         @Param("ordinal") int ordinal
     );
 
+    @Query(
+        """
+        SELECT fo.feedback.id AS feedbackId, fo.observation AS observation
+        FROM FeedbackObservation fo
+        JOIN fo.observation.practice practice
+        LEFT JOIN fo.observation.practiceRevision
+        LEFT JOIN practice.currentRevision
+        WHERE fo.feedback.workspaceId = :workspaceId
+          AND fo.feedback.id IN :feedbackIds
+        """
+    )
+    List<FeedbackObservationVisibility> findForVisibility(
+        @Param("workspaceId") Long workspaceId,
+        @Param("feedbackIds") Collection<UUID> feedbackIds
+    );
+
+    interface FeedbackObservationVisibility {
+        UUID getFeedbackId();
+        de.tum.cit.aet.hephaestus.practices.model.Observation getObservation();
+    }
+
     /**
      * Observation ids already bound to a SUPPRESSED unit of this job (reaction suppression writes its
      * {@code REACTED_*} units before the DELIVERED unit is recorded). The DELIVERED binding excludes

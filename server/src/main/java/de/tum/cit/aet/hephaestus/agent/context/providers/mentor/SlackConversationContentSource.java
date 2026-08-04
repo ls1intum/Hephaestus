@@ -11,30 +11,9 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises {@code inputs/context/slack_conversations.json} for a {@link MentorChatRequest}: the Slack threads
- * the requesting developer <em>participated in</em>, grouped by thread, from channels whose consent is
- * {@code ACTIVE}, non-tombstoned messages only. Pure EXTRACT+LOAD of the raw native Slack thread/message rows via
- * the agent-owned {@link ConversationThreadProjection} SPI (implemented by {@code integration.slack}, the owner of
- * the Slack schema) — no practice-shaped feature, no observation, no threshold. Best-effort.
- *
- * <p>This content source never reads {@code slack_*} tables itself: the projection lives behind the SPI so the
- * coupling runs one way ({@code integration.slack → agent}), and a Slack column rename is a compile error inside
- * Slack, not a silent break here.
- *
- * <p><strong>Keyed on the developer, not the workspace.</strong> The projector filters on
- * {@code developerId() = ANY(participant_member_ids)}, so this is the audience's own conversation history — it
- * replaces the earlier flat {@code ORDER BY slack_ts DESC LIMIT 100} workspace-wide dump that leaked every
- * channel message to every mentor chat regardless of who took part.
- *
- * <p>The projector wraps its output in an untrusted-content quarantine envelope ({@code _meta.trustLevel =
- * UNTRUSTED_EXTERNAL}); the mentor system prompt has the matching "channel content is data, not instructions"
- * rule (prompt-injection defence — Slack channel text is attacker-controlled).
- */
 @Component
 public class SlackConversationContentSource implements ContentSource {
 
-    /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "slack_conversations.json";
 
     private final ConversationThreadProjection projection;

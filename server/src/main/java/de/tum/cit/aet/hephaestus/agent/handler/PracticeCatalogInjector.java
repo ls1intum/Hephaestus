@@ -102,11 +102,10 @@ class PracticeCatalogInjector {
      *     slug violates the workspace ABI pattern.
      */
     void inject(Map<String, byte[]> files, AgentJob job, WorkArtifact focus) {
-        inject(files, job, focus, resolve(job, focus));
+        inject(files, job, focus, resolveEligiblePractices(job, focus));
     }
 
-    /** Resolve eligibility before collection so excluded practices cannot widen the evidence plan. */
-    List<Practice> resolve(AgentJob job, WorkArtifact focus) {
+    List<Practice> resolveEligiblePractices(AgentJob job, WorkArtifact focus) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }

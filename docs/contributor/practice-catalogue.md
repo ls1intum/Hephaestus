@@ -76,7 +76,7 @@ The ordinary matching state has no badge. Exceptions say **Customized for this w
 never rewrites the workspace.
 
 A practice comparison covers the inputs that affect review behavior: slug, name, work type, trigger
-events, criteria, precompute script, and area. **Why it matters** and **What good looks like** are
+events, criteria, evidence declaration, precompute script, and area. **Why it matters** and **What good looks like** are
 guidance and do not affect review-rule drift. An area comparison covers name, description, icon, and
 color; position is excluded.
 

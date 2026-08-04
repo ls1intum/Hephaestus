@@ -24,12 +24,26 @@ const UNSATISFIED_LABELS: Record<PracticeEvidenceDeclaration["onUnsatisfied"], s
 	DECLINE_SEMANTIC_JUDGMENT: "Decline the semantic judgment",
 };
 
-function words(token: string): string {
-	return token
-		.replace(/_/g, " ")
-		.toLowerCase()
-		.replace(/^./, (letter) => letter.toUpperCase());
-}
+const OBSERVABILITY_LABELS: Record<PracticeEvidenceDeclaration["observability"], string> = {
+	MECHANICAL: "Mechanical",
+	SEMANTIC: "Semantic",
+	CONDITIONALLY_OBSERVABLE: "Conditionally observable",
+	UNOBSERVABLE: "Unobservable",
+};
+
+type EvidenceRequirement =
+	| PracticeEvidenceDeclaration["required"][number]
+	| PracticeEvidenceDeclaration["optional"][number];
+
+const COMPLETENESS_LABELS: Record<EvidenceRequirement["completeness"], string> = {
+	COMPLETE: "Complete",
+	ANY: "Any completeness",
+};
+
+const FRESHNESS_LABELS: Record<EvidenceRequirement["freshness"], string> = {
+	CURRENT: "Current",
+	ANY: "Any freshness",
+};
 
 function Requirements({
 	requirements,
@@ -44,7 +58,8 @@ function Requirements({
 					<code className="break-all">{requirement.sourceKind}</code>
 					<span className="text-muted-foreground">
 						{" "}
-						({words(requirement.completeness)}, {words(requirement.freshness)})
+						({COMPLETENESS_LABELS[requirement.completeness]},{" "}
+						{FRESHNESS_LABELS[requirement.freshness]})
 					</span>
 				</li>
 			))}
@@ -73,7 +88,7 @@ export function PracticeEvidenceSummary({
 			</div>
 			<div>
 				<dt className="font-medium">Author-declared observability</dt>
-				<dd className="text-muted-foreground">{words(declaration.observability)}</dd>
+				<dd className="text-muted-foreground">{OBSERVABILITY_LABELS[declaration.observability]}</dd>
 			</div>
 			<div>
 				<dt className="font-medium">Required evidence</dt>

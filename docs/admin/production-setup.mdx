@@ -134,9 +134,15 @@ Outline is a documentation content source: a workspace admin connects one Outlin
 **Settings → Integrations** with the wiki's base URL and an API key, then registers the collections to
 mirror. The key is encrypted at rest in the `connection` table.
 
+There is no default Outline operator. Before enabling the integration, record the exact origin's legal role,
+hosting region, transfer basis, retention terms, and AVV status in the
+[processor checklist](./dsms/processor-checklist.md). A workspace administrator cannot approve a new operator by
+entering its URL.
+
 | Variable | Purpose |
 | --- | --- |
 | `HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` | Enables the Outline beans (connect, sync, webhook, content projection). Every Outline bean is gated on it and defaults to **off**, so an unset flag means the integration is entirely absent — no admin surface, no sync, no webhook verification. |
+| `HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS` | Comma-separated, publicly routable HTTPS origins approved by the instance operator, for example `https://wiki.example.com`. Values must contain no path, query, fragment, credentials, or private/site-local address; any invalid entry fails startup. Empty by default. The server, worker, and webhook roles must receive the same value and be restarted after it changes. Removing an origin then blocks connections, API sync, webhook collection, evidence projection, and identity linking for it. The existing mirror remains until the workspace disconnects the integration. |
 | `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com`. **Required whenever `OUTLINE_OAUTH_CLIENT_ID` is set** — Outline is self-hosted, so there is no default origin. Blank or invalid, the provider seed is skipped and the reason is logged at `ERROR` naming the offending variable (the app still boots; the linking button is simply never there). |
 | `OUTLINE_OAUTH_CLIENT_ID` | Outline OAuth app client ID (redirect `https://<host>/api/login/oauth2/code/outline`) |
 | `OUTLINE_OAUTH_CLIENT_SECRET` | Outline OAuth app client secret |
@@ -148,8 +154,8 @@ it to each with the same value:
 - **application-server** — connect/admin API, collection registration, the reconcile scheduler, and the
   webhook-subscription registrar.
 - **application-worker** — the agent context is assembled on the worker, and the Outline content source
-  carries no runtime-role gate. Without the flag there, reviews and mentor turns run with a context that
-  silently contains no wiki documents.
+  carries no runtime-role gate. Without the flag there, reviews requiring wiki evidence decline and mentor
+  turns omit wiki context.
 - **webhook-server** — without the flag no Outline signature verifier is registered, so the receiver
   answers `501` to every delivery on `POST /webhooks/outline`. Outline counts those as failures and
   **auto-disables the subscription after 25 of them**.
@@ -223,9 +229,16 @@ Practice review is not enabled by a single flag. The following settings must be 
 | `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
 | `AGENT_ENABLED` | Enables the PostgreSQL-backed agent job queue and executor |
 | `GIT_CHECKOUT_ENABLED` | Enables local repository checkout used to materialize declared evidence |
-| `HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS` | Comma-separated deployment allowlist of source kinds. Empty by default; use `*` only after the controller has approved every source in the selected contract. |
+| `HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES` | Comma-separated `source:audience` deployment grants, for example `scm.pull-request.diff:PRACTICE_DETECTION`. Detection, learner feedback, mentoring, and operator QA are separately authorized. Empty by default; wildcards are rejected. Server and worker roles must receive the same value and be restarted after changes. |
+| `HEPHAESTUS_FABRIC_ROOT` | Container mount point for repository checkouts, replay metadata, and content-addressed evidence. The reference Compose stack mounts its `git-repos` volume at `/data/git-repos`. A custom split or multi-host deployment must mount the same durable read-write filesystem on every server and worker, with cross-process file locks, atomic rename, and appropriate access controls. |
+| `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | Age after which replay directories and unreferenced evidence blobs become eligible for collection (default `30`). |
 | `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
 | `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
+
+Grant only the uses the deployment exposes. Without `PRACTICE_DETECTION`, affected practices decline before a model
+request. Without `PRACTICE_FEEDBACK_RECIPIENTS`, findings using the source are not persisted or delivered and its
+citations are omitted from contributor APIs. Without `PRACTICE_MENTORING`, those observations are excluded from
+mentor context. Without `OPERATOR_QUALITY_ASSURANCE`, workspace-admin finding details omit their citations.
 
 The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by `AGENT_ENABLED`. Keep that capability and Docker access on the application server because interactive mentor sandboxes are request-affine and run there; a dedicated `application-worker` adds capacity for queued practice reviews. When `AGENT_ENABLED` is also true, any worker-capable replica may claim those PostgreSQL jobs. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
 
@@ -244,7 +257,7 @@ The agent job queue (`agent_job`, polled by `AgentJobExecutor`) exposes its own 
 
 The queue-health gauges are sampled every 30s; timers and counters are recorded inline. None run on a request path.
 
-**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row and its durable evidence snapshot. Replay directories and unreferenced CAS blobs use `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` (default `30`, positive integer). Tighten these only against the deployment's approved retention policy.
+**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row and its durable evidence snapshot. Replay directories and unreferenced CAS blobs use `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` (default `30`, positive integer). Tighten these only against the deployment's approved retention policy. Treat `HEPHAESTUS_FABRIC_ROOT` as sensitive storage: restrict host access, include it in erasure operations, and monitor successful garbage-collection sweeps.
 
 ### Rollout tiers
 
@@ -366,7 +379,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 
 **Backfill behavior:** After recent sync completes, backfill works backwards from the highest issue number, syncing in small batches. It pauses when rate limits drop below the threshold and resumes on the next cycle. Progress is checkpointed per repository.
 
-**Disconnecting erases the mirror.** Disconnecting a workspace's GitHub, GitLab, Slack, or Outline connection — and purging a workspace — hard-deletes the data mirrored through it, keeping only the operational sync history. It is irreversible and reconnecting performs a fresh initial sync. See the erasure triggers in the [record of processing](./dsms/record-of-processing.md).
+**Disconnecting erases the active mirror.** Disconnecting a workspace's GitHub, GitLab, Slack, or Outline connection — and purging a workspace — hard-deletes its active PostgreSQL mirror. Materialized diagnostic output, replay/CAS artifacts, and broker messages expire under their documented bounded retention windows. The operation is irreversible, and reconnecting performs a fresh initial sync. See the erasure triggers in the [record of processing](./dsms/record-of-processing.md).
 
 ## Deployment steps (reference stack)
 

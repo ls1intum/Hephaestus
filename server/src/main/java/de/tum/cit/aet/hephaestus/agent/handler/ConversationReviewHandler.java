@@ -123,7 +123,10 @@ public class ConversationReviewHandler implements JobTypeHandler {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
-        List<Practice> practices = practiceCatalogInjector.resolve(job, WorkArtifact.CONVERSATION_THREAD);
+        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(
+            job,
+            WorkArtifact.CONVERSATION_THREAD
+        );
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.ConversationReviewRequest(job),
             EvidencePlan.compile(practices)

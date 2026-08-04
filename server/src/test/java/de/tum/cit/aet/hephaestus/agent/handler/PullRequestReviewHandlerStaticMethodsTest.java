@@ -24,14 +24,14 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
 
         private PracticeDetectionResultParser.ValidatedFinding makeFinding(String slug, List<String> filePaths) {
             ObjectNode evidence = objectMapper.createObjectNode();
-            ArrayNode locations = objectMapper.createArrayNode();
+            ArrayNode citations = objectMapper.createArrayNode();
             for (String path : filePaths) {
-                ObjectNode loc = objectMapper.createObjectNode();
-                loc.put("path", path);
-                loc.put("startLine", 1);
-                locations.add(loc);
+                ObjectNode citation = objectMapper.createObjectNode();
+                citation.put("path", path);
+                citation.put("startLine", 1);
+                citations.add(citation);
             }
-            evidence.set("locations", locations);
+            evidence.set("citations", citations);
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "Test Title",

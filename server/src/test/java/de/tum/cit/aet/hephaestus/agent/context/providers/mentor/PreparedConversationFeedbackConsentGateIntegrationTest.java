@@ -11,10 +11,12 @@ import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
@@ -30,14 +32,6 @@ import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Real-Postgres proof of the fail-closed consent gate + untrusted quarantine on the derived-feedback content
- * source. A PREPARED CONVERSATION fact whose source Slack channel is no longer ACTIVE (PAUSED / REVOKED) is NOT
- * surfaced by {@link PreparedConversationFeedbackContentSource}, while an ACTIVE one is — the same
- * {@code consent_state = 'ACTIVE'} gate the raw {@code SlackConversationProjector} applies. A CONVERSATION unit
- * derived from a non-Slack artifact (a PR) is surfaced unconditionally: the gate applies only to the
- * Slack-content-bearing CONVERSATION_THREAD facts. Deterministic.
- */
 class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGateIntegrationTest {
 
     @Autowired
@@ -57,6 +51,9 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -85,7 +82,10 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
         practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
-        practice = practiceRepository.save(practice);
+        practice = practiceRepository.saveAndFlush(practice);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+        practice.setCurrentRevision(revision);
+        practice = practiceRepository.saveAndFlush(practice);
     }
 
     @Test
@@ -101,7 +101,6 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         saveConversationObservation(job, "occ-revoked", revokedThreadId);
         prepareFor(job);
 
-        // Repository returns all three PREPARED facts — the gate is enforced by the content source, not the query.
         assertThat(
             feedbackObservationRepository.findPreparedConversationFactsForRecipient(
                 workspace.getId(),
@@ -112,10 +111,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
         JsonNode root = contribute();
 
-        // Untrusted-content quarantine envelope (matches SlackConversationProjector).
         assertThat(root.get("_meta").get("trustLevel").asString()).isEqualTo("UNTRUSTED_EXTERNAL");
 
-        // Only the ACTIVE-channel fact survives the fail-closed gate.
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
         assertThat(arr.get(0).get("findingId").asString()).isEqualTo(activeObs.getId().toString());
@@ -125,11 +122,15 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     }
 
     @Test
-    @DisplayName("gate scope: a CONVERSATION unit derived from a non-Slack (PR) artifact is surfaced unconditionally")
+    @DisplayName("Slack consent does not suppress an otherwise-authorized pull-request observation")
     void nonSlackArtifactFactAlwaysSurfaces() {
+        practice.setArtifactType(WorkArtifact.PULL_REQUEST);
+        practice.setEvidence(PracticeTestEvidence.pullRequest());
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 2));
+        practice.setCurrentRevision(revision);
+        practice = practiceRepository.saveAndFlush(practice);
+
         AgentJob job = newJob();
-        // A PR-derived observation with no inline anchor is routed to the CONVERSATION channel too; it carries no
-        // Slack content, so the consent gate must NOT filter it (there is no monitored channel at all here).
         Observation prObs = savePullRequestObservation(job, "occ-pr", 4242L);
         prepareFor(job);
 
@@ -170,7 +171,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
             occurrenceKey,
             job.getId(),
             practice.getId(),
-            null,
+            practice.getCurrentRevision().getId(),
             artifactType,
             artifactId,
             recipient.getId(),
@@ -179,7 +180,9 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
             "BAD",
             "MAJOR",
             0.8f,
-            null,
+            artifactType.equals("CONVERSATION_THREAD")
+                ? "{\"citations\":[{\"sourceKind\":\"slack.conversation.thread\",\"artifactPath\":\"inputs/context/thread.json\",\"path\":\"Slack thread\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}"
+                : "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/pull-request.json\",\"path\":\"pull-request.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             null,
             null,
             Instant.now()

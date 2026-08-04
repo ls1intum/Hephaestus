@@ -119,10 +119,9 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         root.put("threadTs", threadTs);
 
         ArrayNode messages = root.putArray("messages");
-        appendThreadMessages(workspaceId, new ThreadKey(channelId, null, threadTs, 0), messages);
+        boolean truncated = appendThreadMessages(workspaceId, new ThreadKey(channelId, null, threadTs, 0), messages);
         root.put("messageCount", messages.size());
-        // A full page is conservatively partial because the query does not fetch a total count.
-        root.put("truncated", messages.size() >= MAX_MESSAGES_PER_THREAD);
+        root.put("truncated", truncated);
         return root;
     }
 
@@ -157,14 +156,15 @@ public class SlackConversationProjector implements ConversationThreadProjection 
      * channel paused or revoked between enqueue and execution: a non-ACTIVE channel yields zero messages,
      * atomically with the read.
      */
-    private void appendThreadMessages(long workspaceId, ThreadKey key, ArrayNode messages) {
+    private boolean appendThreadMessages(long workspaceId, ThreadKey key, ArrayNode messages) {
         List<SlackThreadMessageRow> rows = messageRepository.findThreadMessages(
             workspaceId,
             key.channelId(),
             key.threadTs(),
-            PageRequest.of(0, MAX_MESSAGES_PER_THREAD)
+            PageRequest.of(0, MAX_MESSAGES_PER_THREAD + 1)
         );
-        for (SlackThreadMessageRow row : rows) {
+        for (int index = 0; index < Math.min(rows.size(), MAX_MESSAGES_PER_THREAD); index++) {
+            SlackThreadMessageRow row = rows.get(index);
             ObjectNode node = messages.addObject();
             node.put("ts", row.slackTs());
             node.put("author", row.authorSlackUserId());
@@ -182,5 +182,6 @@ public class SlackConversationProjector implements ConversationThreadProjection 
                 node.put("edited", true);
             }
         }
+        return rows.size() > MAX_MESSAGES_PER_THREAD;
     }
 }

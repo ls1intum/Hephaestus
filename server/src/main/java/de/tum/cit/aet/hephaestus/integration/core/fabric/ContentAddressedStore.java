@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -24,23 +23,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Content-addressed blob store (ADR 0020) — the connector-agnostic generalisation of the git clone:
- * a git pack, a diff export, a Slack archive and an Outline doc are all just blobs keyed by the
- * sha-256 of their bytes. Blobs are immutable and deduplicated. Live job manifests protect referenced
- * blobs; garbage collection removes only unreferenced blobs beyond the retention window.
- *
- * <p>On-disk layout under {@link FabricLayout#casRoot()}: {@code {ab}/{rest}} (git-style two-char
- * fan-out to keep directories small). Writes are build-on-miss and atomic (temp file + atomic move),
- * serialised per blob by a striped lock so a concurrent double-write cannot tear a blob. Garbage
- * collection is mark-and-sweep ({@link #sweep(Set)}) against the set of blobs still referenced by live
- * job manifests — the same reconciler shape ADR 0020 adopts from Backstage.
+ * Immutable, deduplicated SHA-256 blob store. Blobs use two-character fan-out below
+ * {@link FabricLayout#casRoot()}, and live job manifests protect referenced blobs from collection.
  */
 @Component
 public class ContentAddressedStore {
 
     private static final Logger log = LoggerFactory.getLogger(ContentAddressedStore.class);
 
-    /** Number of stripes for per-blob write locks. Bounded → no unbounded lock map. */
     private static final int LOCK_STRIPES = 64;
 
     private final FabricLayout layout;
@@ -55,9 +45,7 @@ public class ContentAddressedStore {
     }
 
     /**
-     * Store {@code content}, returning its sha-256 hex digest. Idempotent: a blob already present is
-     * not rewritten (build-on-miss). The write is atomic, so a reader either sees the whole blob or
-     * nothing.
+     * Stores {@code content} atomically and returns its SHA-256 digest. Reusing a blob refreshes its retention age.
      */
     public String put(byte[] content) {
         String sha = sha256(content);
@@ -77,7 +65,7 @@ public class ContentAddressedStore {
             }
             Files.write(temp, content);
             moveAtomically(temp, blob);
-            temp = null; // moved into place — nothing to clean up
+            temp = null;
             return sha;
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write CAS blob " + sha, e);
@@ -113,17 +101,10 @@ public class ContentAddressedStore {
         }
     }
 
-    /** True iff a blob with this sha-256 is present. */
     public boolean exists(String sha) {
         return Files.exists(pathFor(sha));
     }
 
-    /**
-     * The on-disk path a blob occupies (whether or not it currently exists):
-     * {@code cas/sha256/{first-2-hex}/{remaining-hex}}. The {@code sha256/} segment pins the digest
-     * algorithm in the path (OCI image-layout / Bazel REAPI convention) so a future hash migration
-     * (BLAKE3, …) is non-breaking and self-describing — the one thing Git's layout got wrong.
-     */
     public Path pathFor(String sha) {
         validateSha(sha);
         return layout.casRoot().resolve("sha256").resolve(sha.substring(0, 2)).resolve(sha.substring(2));
@@ -177,12 +158,6 @@ public class ContentAddressedStore {
         }
     }
 
-    /**
-     * Second cheap pass: delete the {@code {ab}} fan-out directories left empty after the blob delete pass,
-     * so the store does not accrue up to 256 empty two-char directories that every future sweep still walks.
-     * Best-effort — a non-empty dir (a Files.delete of a populated directory throws) or a delete failure is
-     * skipped silently; a re-created dir on the next put() is harmless.
-     */
     private void pruneEmptyFanoutDirs(Path casRoot) {
         Path sha256Root = casRoot.resolve("sha256");
         if (!Files.isDirectory(sha256Root)) {
@@ -206,13 +181,7 @@ public class ContentAddressedStore {
     }
 
     private static void moveAtomically(Path source, Path target) throws IOException {
-        try {
-            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-            // A racing writer may have created the target between our exists() check and the move;
-            // the blob is immutable, so either landing is byte-identical. Fall back to a plain move.
-            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-        }
+        Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private BlobLock lockBlob(String sha) {

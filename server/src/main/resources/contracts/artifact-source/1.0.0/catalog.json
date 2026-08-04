@@ -29,7 +29,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-pull-request-core"
+      "useDecisionIds": [
+        "use-scm-pull-request-core-detection",
+        "use-scm-pull-request-core-feedback",
+        "use-scm-pull-request-core-mentoring",
+        "use-scm-pull-request-core-operator-qa"
+      ]
     },
     {
       "kind": "scm.pull-request.diff",
@@ -58,7 +63,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-pull-request-diff"
+      "useDecisionIds": [
+        "use-scm-pull-request-diff-detection",
+        "use-scm-pull-request-diff-feedback",
+        "use-scm-pull-request-diff-mentoring",
+        "use-scm-pull-request-diff-operator-qa"
+      ]
     },
     {
       "kind": "scm.pull-request.comments",
@@ -87,7 +97,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-pull-request-comments"
+      "useDecisionIds": [
+        "use-scm-pull-request-comments-detection",
+        "use-scm-pull-request-comments-feedback",
+        "use-scm-pull-request-comments-mentoring",
+        "use-scm-pull-request-comments-operator-qa"
+      ]
     },
     {
       "kind": "scm.repository.tree",
@@ -116,7 +131,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-repository-tree"
+      "useDecisionIds": [
+        "use-scm-repository-tree-detection",
+        "use-scm-repository-tree-feedback",
+        "use-scm-repository-tree-mentoring",
+        "use-scm-repository-tree-operator-qa"
+      ]
     },
     {
       "kind": "scm.issue.core",
@@ -146,7 +166,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-issue-core"
+      "useDecisionIds": [
+        "use-scm-issue-core-detection",
+        "use-scm-issue-core-feedback",
+        "use-scm-issue-core-mentoring",
+        "use-scm-issue-core-operator-qa"
+      ]
     },
     {
       "kind": "scm.issue.comments",
@@ -175,7 +200,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-issue-comments"
+      "useDecisionIds": [
+        "use-scm-issue-comments-detection",
+        "use-scm-issue-comments-feedback",
+        "use-scm-issue-comments-mentoring",
+        "use-scm-issue-comments-operator-qa"
+      ]
     },
     {
       "kind": "slack.conversation.thread",
@@ -204,7 +234,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-slack-conversation-thread"
+      "useDecisionIds": [
+        "use-slack-conversation-thread-detection",
+        "use-slack-conversation-thread-feedback",
+        "use-slack-conversation-thread-mentoring",
+        "use-slack-conversation-thread-operator-qa"
+      ]
     },
     {
       "kind": "scm.linked-work-items",
@@ -233,7 +268,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-linked-work-items"
+      "useDecisionIds": [
+        "use-scm-linked-work-items-detection",
+        "use-scm-linked-work-items-feedback",
+        "use-scm-linked-work-items-mentoring",
+        "use-scm-linked-work-items-operator-qa"
+      ]
     },
     {
       "kind": "scm.review-threads",
@@ -262,7 +302,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-review-threads"
+      "useDecisionIds": [
+        "use-scm-review-threads-detection",
+        "use-scm-review-threads-feedback",
+        "use-scm-review-threads-mentoring",
+        "use-scm-review-threads-operator-qa"
+      ]
     },
     {
       "kind": "scm.general-review-comments",
@@ -291,7 +336,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-scm-general-review-comments"
+      "useDecisionIds": [
+        "use-scm-general-review-comments-detection",
+        "use-scm-general-review-comments-feedback",
+        "use-scm-general-review-comments-mentoring",
+        "use-scm-general-review-comments-operator-qa"
+      ]
     },
     {
       "kind": "workspace.project-inventory",
@@ -322,7 +372,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-workspace-project-inventory"
+      "useDecisionIds": [
+        "use-workspace-project-inventory-detection",
+        "use-workspace-project-inventory-feedback",
+        "use-workspace-project-inventory-mentoring",
+        "use-workspace-project-inventory-operator-qa"
+      ]
     },
     {
       "kind": "outline.documents",
@@ -352,7 +407,12 @@
       "purpose": "practice-detection",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionId": "use-outline-documents"
+      "useDecisionIds": [
+        "use-outline-documents-detection",
+        "use-outline-documents-feedback",
+        "use-outline-documents-mentoring",
+        "use-outline-documents-operator-qa"
+      ]
     }
   ],
   "profiles": [

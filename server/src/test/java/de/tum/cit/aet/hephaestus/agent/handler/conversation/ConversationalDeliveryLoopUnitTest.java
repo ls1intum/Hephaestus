@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -14,7 +15,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -36,6 +39,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -71,6 +75,18 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private OutboundEgressGuard egressGuard;
 
+    @Mock
+    private ObservationVisibilityPolicy visibilityPolicy;
+
+    @BeforeEach
+    void authorizeEvidenceDelivery() {
+        Observation observation = problem(null, null);
+        lenient()
+            .when(visibilityPolicy.permits(anyLong(), any(Observation.class), eq(SourceUseAudience.PRACTICE_MENTORING)))
+            .thenReturn(true);
+        lenient().when(observationRepository.findById(any())).thenReturn(Optional.of(observation));
+    }
+
     private FeedbackChannelRouter router() {
         return new FeedbackChannelRouter(feedbackRepository);
     }
@@ -92,7 +108,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             feedbackRepository,
             feedbackObservationRepository,
             feedbackPlacementRepository,
-            observationRepository
+            observationRepository,
+            visibilityPolicy
         );
     }
 
@@ -111,6 +128,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     private enum ObsKind {
         PROBLEM_NO_ANCHOR,
         PROBLEM_FILE_ANCHOR,
+        PROBLEM_NON_DIFF_LOCATION,
         STRENGTH,
         NOT_APPLICABLE,
         ALREADY_DELIVERED,
@@ -123,6 +141,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             arguments(ObsKind.STRENGTH, false, ConversationRoutingDecision.NOT_DELIVERABLE),
             arguments(ObsKind.NOT_APPLICABLE, false, ConversationRoutingDecision.NOT_DELIVERABLE),
             arguments(ObsKind.PROBLEM_FILE_ANCHOR, false, ConversationRoutingDecision.HAS_INLINE_ANCHOR),
+            arguments(ObsKind.PROBLEM_NON_DIFF_LOCATION, false, ConversationRoutingDecision.ADMIT),
             arguments(ObsKind.ALREADY_DELIVERED, false, ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT)
         );
     }
@@ -135,7 +154,20 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             case PROBLEM_NO_ANCHOR -> problem(null, null);
             case PROBLEM_FILE_ANCHOR -> {
                 ObjectNode evidence = MAPPER.createObjectNode();
-                evidence.putArray("locations").addObject().put("path", "src/Main.java");
+                evidence
+                    .putArray("citations")
+                    .addObject()
+                    .put("sourceKind", "scm.pull-request.diff")
+                    .put("path", "src/Main.java");
+                yield problem(evidence, null);
+            }
+            case PROBLEM_NON_DIFF_LOCATION -> {
+                ObjectNode evidence = MAPPER.createObjectNode();
+                evidence
+                    .putArray("citations")
+                    .addObject()
+                    .put("sourceKind", "scm.pull-request.core")
+                    .put("path", "pull-request.json");
                 yield problem(evidence, null);
             }
             case STRENGTH -> strength();
@@ -274,6 +306,23 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     @Test
+    void reconcilerWithholdsPreparedFeedbackAfterAuthorizationWithdrawal() {
+        UUID observationId = UUID.randomUUID();
+        UUID feedbackId = UUID.randomUUID();
+        Observation observation = problem(null, null);
+        when(
+            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
+        ).thenReturn(List.of(feedbackId));
+        when(observationRepository.findById(observationId)).thenReturn(Optional.of(observation));
+        when(visibilityPolicy.permits(WS, observation, SourceUseAudience.PRACTICE_MENTORING)).thenReturn(false);
+
+        int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(observationId));
+
+        assertThat(flips).isZero();
+        verify(feedbackRepository, never()).markConversationDelivered(any(), any());
+    }
+
+    @Test
     void silentModeSuppressesOnePreparedUnitWithoutPlacement() {
         UUID observationId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
@@ -313,7 +362,6 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     @Test
     void reconcilerStillFlips_whenLocusHasKeyButWasNotDeliveredInContext() {
-        // The guard must only suppress when the locus WAS delivered in-context; otherwise the flip proceeds.
         UUID a = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
         when(

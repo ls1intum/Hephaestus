@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceFreshness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
@@ -29,7 +30,6 @@ import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeObservability;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -126,10 +126,6 @@ public class ContextManifestBuilder {
         }
     }
 
-    /**
-     * Finalize source capture before model execution. Failure is fatal: a semantic result without a
-     * trustworthy source manifest is not auditable and must never be produced.
-     */
     public ArtifactSourceManifest augment(
         Map<String, byte[]> files,
         Map<String, SourceKind> pathKinds,
@@ -183,25 +179,8 @@ public class ContextManifestBuilder {
         }
     }
 
-    public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices) {
-        return assessPractices(manifest, practices).readyPractices();
-    }
-
     boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind) {
-        return catalogs.isSourceUsePermitted(version, kind);
-    }
-
-    public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices, String jobId) {
-        return readyPractices(manifest, practices, jobId, clock.instant());
-    }
-
-    public List<Practice> readyPractices(
-        ArtifactSourceManifest manifest,
-        List<Practice> practices,
-        String jobId,
-        Instant temporalAnchor
-    ) {
-        return prepareReadiness(manifest, practices, jobId, temporalAnchor).readyPractices();
+        return catalogs.isSourceUsePermitted(version, kind, SourceUseAudience.PRACTICE_DETECTION);
     }
 
     public PreparedReadiness prepareReadiness(
@@ -566,16 +545,12 @@ public class ContextManifestBuilder {
         Path temporary = Files.createTempFile(dir, fileName, ".tmp");
         try {
             Files.write(temporary, bytes);
-            try {
-                Files.move(
-                    temporary,
-                    dir.resolve(fileName),
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING
-                );
-            } catch (AtomicMoveNotSupportedException ignored) {
-                Files.move(temporary, dir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
-            }
+            Files.move(
+                temporary,
+                dir.resolve(fileName),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            );
         } finally {
             Files.deleteIfExists(temporary);
         }

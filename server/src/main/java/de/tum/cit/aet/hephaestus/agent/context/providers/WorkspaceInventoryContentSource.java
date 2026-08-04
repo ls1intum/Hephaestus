@@ -28,11 +28,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Produces a bounded SQL-backed issue and pull-request index without full bodies. Artifact reviews exclude
- * the focal item; conversation reviews aggregate the workspace. A {@code truncated} result makes absence
- * inconclusive.
- */
 @Component
 @Order(210)
 public class WorkspaceInventoryContentSource implements EvidenceSource {
@@ -83,7 +78,6 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         );
     }
 
-    /** Cross-context enrichment: never abort the job if the inventory cannot be built. */
     @Override
     public boolean required() {
         return false;

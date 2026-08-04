@@ -178,14 +178,20 @@ public class ConnectionService {
         }
         ConnectionRepository.OutlineSubscriptionProjection match = matches.getFirst();
         String secret = match.getSigningSecret();
-        if (secret == null || secret.isBlank() || match.getWorkspaceId() == null) {
+        String serverUrl = match.getServerUrl();
+        if (
+            secret == null ||
+            secret.isBlank() ||
+            serverUrl == null ||
+            serverUrl.isBlank() ||
+            match.getWorkspaceId() == null
+        ) {
             return Optional.empty();
         }
-        return Optional.of(new OutlineSubscription(match.getWorkspaceId(), secret));
+        return Optional.of(new OutlineSubscription(match.getWorkspaceId(), serverUrl, secret));
     }
 
-    /** The workspace a change-notification subscription belongs to and its signing secret. */
-    public record OutlineSubscription(long workspaceId, String signingSecret) {}
+    public record OutlineSubscription(long workspaceId, String serverUrl, String signingSecret) {}
 
     /**
      * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,

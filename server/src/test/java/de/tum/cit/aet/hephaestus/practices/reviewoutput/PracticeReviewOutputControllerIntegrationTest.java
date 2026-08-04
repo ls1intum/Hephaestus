@@ -175,7 +175,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             assessment,
             severity,
             confidence,
-            "{\"locations\":[{\"path\":\"src/Main.java\",\"startLine\":42,\"endLine\":50}]}",
+            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":50,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             "Reasoning for " + title,
             "recurrence-" + title,
             observedAt
@@ -637,7 +637,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             );
 
             getOk(FINDINGS + "/{id}", workspace.getWorkspaceSlug(), id)
-                .jsonPath("$.evidence.locations[0].path")
+                .jsonPath("$.evidence.citations[0].path")
                 .isEqualTo("src/Main.java")
                 .jsonPath("$.reasoning")
                 .isEqualTo("Reasoning for Detailed")

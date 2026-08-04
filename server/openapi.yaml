@@ -8155,6 +8155,38 @@ components:
       - practiceName
       - practiceSlug
       - totalObservations
+    EvidenceCitation:
+      type: object
+      description: A verified quote and its exact source location
+      properties:
+        artifactPath:
+          type: string
+        endLine:
+          type: integer
+          format: int32
+        path:
+          type: string
+        quote:
+          type: string
+        quoteRedacted:
+          type: boolean
+        side:
+          type: string
+          enum:
+          - OLD
+          - NEW
+        sourceKind:
+          type: string
+        startLine:
+          type: integer
+          format: int32
+      required:
+      - artifactPath
+      - endLine
+      - path
+      - quoteRedacted
+      - sourceKind
+      - startLine
     ExportCreated:
       type: object
       description: Acknowledgement returned when a data export is requested.
@@ -9042,10 +9074,7 @@ components:
           format: float
           description: AI confidence score (0.0–1.0)
         evidence:
-          type: object
-          additionalProperties: {}
-          description: "Structured evidence: {\"locations\":[{\"path\",\"startLine\"\
-            ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
+          $ref: "#/components/schemas/ObservationEvidence"
         guidance:
           type: string
           description: What to do — the delivered feedback for this observation (null
@@ -9096,6 +9125,18 @@ components:
       - practiceSlug
       - presence
       - title
+    ObservationEvidence:
+      type: object
+      description: "Verified, source-bound evidence for an observation"
+      properties:
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceCitation"
+        detector:
+          type: string
+      required:
+      - citations
     ObservationList:
       type: object
       description: Practice observation summary for list views
@@ -11069,7 +11110,8 @@ components:
           description: Detector confidence
           maximum: 1
           minimum: 0
-        evidence: {}
+        evidence:
+          $ref: "#/components/schemas/ObservationEvidence"
         feedback:
           type: array
           description: "Linked feedback, newest first"

@@ -16,7 +16,6 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Guards cross-practice slug references embedded in catalogue criteria. */
 class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
 
     private static final Pattern SLUG_SHAPED = Pattern.compile("\\b[a-z]+(?:-[a-z]+){2,}\\b");

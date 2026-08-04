@@ -1,5 +1,3 @@
-// Keep finding normalization aligned with PracticeDetectionResultParser.
-
 export function normalizeDiffNote(note) {
     if (!note || typeof note !== "object") throw new Error("diff note must be an object");
     const filePath = String(note.filePath ?? "").trim();
@@ -30,6 +28,8 @@ export function normalizeEvidence(evidence) {
         if (!path) throw new Error("evidence citation path is required");
         if (sourceKind === "scm.pull-request.diff" && !["OLD", "NEW"].includes(side))
             throw new Error("diff evidence citation side must be OLD or NEW");
+        if (sourceKind !== "scm.pull-request.diff" && side !== null)
+            throw new Error("non-diff evidence citation must not specify side");
         if (!Number.isInteger(startLine) || startLine <= 0)
             throw new Error("evidence citation startLine must be a positive integer");
         if (!Number.isInteger(endLine) || endLine < startLine)
@@ -37,18 +37,11 @@ export function normalizeEvidence(evidence) {
         if (!quote) throw new Error("evidence citation quote is required");
         return { sourceKind, artifactPath, path, ...(side == null ? {} : { side }), startLine, endLine, quote };
     });
-    const sourceKinds = [...new Set(citations.map((citation) => citation.sourceKind))].sort();
-    const locations = citations.map(({ path, startLine, endLine }) => ({ path, startLine, endLine }));
-    const snippets = citations.map((citation) => citation.quote);
-    return { citations, sourceKinds, locations, snippets };
+    return { citations };
 }
 
 export function normalizeFinding(finding) {
     if (!finding || typeof finding !== "object") throw new Error("finding must be an object");
-    // Normalize exactly as the Java consumer PracticeDetectionResultParser does before validating:
-    // slug is lower-cased with underscores -> hyphens, and the three enums are upper-cased. Otherwise a
-    // lowercase enum / underscored slug the parser would accept is rejected (or mis-deduped) at this
-    // tool boundary, silently losing the finding.
     const practiceSlug = String(finding.practiceSlug ?? "")
         .trim()
         .toLowerCase()
@@ -85,15 +78,26 @@ export function normalizeFinding(finding) {
     const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
         ? finding.suggestedDiffNotes.map(normalizeDiffNote)
         : [];
-    const out = { practiceSlug, title, presence, severity, confidence, evidence, reasoning, guidance, suggestedDiffNotes };
+    const out = {
+        practiceSlug,
+        title,
+        presence,
+        severity,
+        confidence,
+        evidence,
+        reasoning,
+        guidance,
+        suggestedDiffNotes,
+    };
     if (!isNa) out.assessment = assessment;
     return out;
 }
 
 export function dedupeKeyForFinding(finding) {
-    // Dedupe key: practice + title + locations.
-    const locs = finding.evidence.locations.map((l) => `${l.path}:${l.startLine}-${l.endLine}`).join(",");
-    return `${finding.practiceSlug}|${finding.title}|${locs}`;
+    const citations = finding.evidence.citations
+        .map((citation) => `${citation.path}:${citation.startLine}-${citation.endLine}`)
+        .join(",");
+    return `${finding.practiceSlug}|${finding.title}|${citations}`;
 }
 
 export function validateEvidenceSources(finding, allowedSources, availableSources, artifactSources = new Map()) {

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.client;
 
-import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineApiKey;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineAuth;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
@@ -30,25 +30,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-/**
- * Thin client for the Outline API. Outline is RPC-over-POST: every call is
- * {@code POST {serverUrl}/api/<resource>.<action>} with a JSON request body and a bearer token, answering
- * with the uniform {@link OutlineEnvelope} wrapper around a vendor model.
- *
- * <p><b>Spec-driven models, hand-written transport.</b> The response payloads are the vendor models generated
- * from Outline's maintained OpenAPI spec ({@code integration.outline.client.model}); this class hand-writes
- * only transport policy. Request bodies stay explicit {@link Map}s here — they are few, stable, and should
- * fail loud — while every response type is a generated model, so a field Outline renames surfaces as a
- * compile break the next time the vendored spec is refreshed rather than a silent {@code null}.
- *
- * <p>The server URL is admin-supplied, so every request goes through the SSRF-guarded, tolerant-decoding
- * {@code outlineWebClient} ({@link OutlineClientConfig}) and is validated up front with
- * {@link ServerUrlValidator}. Calls run through the {@code outlineRestApi} circuit breaker wrapped in the
- * {@code outlineRestApiRetry} decorator (retries 5xx/transport/429 with bounded backoff, honoring
- * {@code Retry-After}); a 429 that survives surfaces as {@link OutlineRateLimitedException} so the sync pauses
- * and resumes next cycle. Rate-limit headers are captured by the WebClient's exchange filter into
- * {@link OutlineRateLimitTracker}, independent of this retry path.
- */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineApiClient {
@@ -56,10 +37,8 @@ public class OutlineApiClient {
     private static final Logger log = LoggerFactory.getLogger(OutlineApiClient.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
-    /** Outline caps list pages at 100 rows; the max keeps a full pass cheapest in calls. */
     private static final int PAGE_LIMIT = 100;
 
-    /** Guards against a malformed {@code pagination} block looping forever. */
     private static final int MAX_PAGES = 1000;
 
     // Envelope shapes, one per call. Explicit ParameterizedTypeReferences because the {data,pagination}
@@ -89,16 +68,19 @@ public class OutlineApiClient {
     private final WebClient webClient;
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
+    private final OutlineOriginPolicy originPolicy;
 
     @Autowired
     public OutlineApiClient(
         @Qualifier("outlineRestApiCircuitBreaker") CircuitBreaker circuitBreaker,
         @Qualifier("outlineRestApiRetry") Retry retry,
-        @Qualifier("outlineWebClient") WebClient webClient
+        @Qualifier("outlineWebClient") WebClient webClient,
+        OutlineOriginPolicy originPolicy
     ) {
         this.webClient = webClient;
         this.circuitBreaker = circuitBreaker;
         this.retry = retry;
+        this.originPolicy = originPolicy;
     }
 
     /** Identity from Outline's {@code auth.info}. The team id is stable per instance and becomes the Connection's instance key. */
@@ -507,8 +489,9 @@ public class OutlineApiClient {
         }
         String trimmed = serverUrl.trim();
         String normalized = trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
-        // Throws IllegalArgumentException on a private/loopback/metadata target; the connect flow maps that to 400.
-        ServerUrlValidator.validate(normalized);
+        if (!originPolicy.allows(normalized)) {
+            throw new OutlineApiException("Outline origin is not approved by the instance operator");
+        }
         return normalized;
     }
 }

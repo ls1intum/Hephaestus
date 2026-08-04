@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
@@ -35,6 +36,7 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -155,7 +157,7 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
         String createdAtRaw
     ) {
         when(connectionService.findOutlineSubscription(subscriptionId)).thenReturn(
-            Optional.of(new OutlineSubscription(WORKSPACE_ID, "secret"))
+            Optional.of(new OutlineSubscription(WORKSPACE_ID, "https://wiki.example.com", "secret"))
         );
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient()
@@ -166,7 +168,8 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
             connectionService,
             syncScheduler,
             documentEventRepository,
-            MAPPER
+            MAPPER,
+            new OutlineOriginPolicy(Set.of("https://wiki.example.com"))
         );
 
         // Route the fixture bytes exactly as they arrive off the wire — the handler only trusts

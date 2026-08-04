@@ -762,7 +762,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @WithUser
         void shouldReturnEvidenceWhenPresent() {
             UUID findingId = UUID.randomUUID();
-            String evidenceJson = "{\"locations\":[{\"file\":\"README.md\",\"line\":42}]}";
+            String evidenceJson =
+                "{\"citations\":[{\"sourceKind\":\"scm.repository.tree\",\"artifactPath\":\"inputs/sources/scm/repo/README.md\",\"path\":\"README.md\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\",\"quoteRedacted\":false}]}";
             observationRepository.insertIfAbsent(
                 findingId,
                 "key-" + findingId,
@@ -793,9 +794,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.evidence")
                 .isNotEmpty()
-                .jsonPath("$.evidence.locations[0].file")
+                .jsonPath("$.evidence.citations[0].path")
                 .isEqualTo("README.md")
-                .jsonPath("$.evidence.locations[0].line")
+                .jsonPath("$.evidence.citations[0].startLine")
                 .isEqualTo(42);
         }
 

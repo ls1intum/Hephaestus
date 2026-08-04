@@ -80,30 +80,6 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 
-    private static final Set<String> ALLOWED_INTERNAL_CONTEXT_PATHS = Set.of(
-        ContentSource.OUTPUT_PREFIX + "metadata.json",
-        ContentSource.OUTPUT_PREFIX + "diff.patch",
-        ContentSource.OUTPUT_PREFIX + "diff_summary.md",
-        ContentSource.OUTPUT_PREFIX + "comments.json",
-        ContentSource.OUTPUT_PREFIX + "linked_work_items.json",
-        ContentSource.OUTPUT_PREFIX + "review_threads.json",
-        ContentSource.OUTPUT_PREFIX + "general_comments.json"
-    );
-
-    private static final Set<String> METADATA_LEVEL_PRACTICES = Set.of(
-        "scope-one-reviewable-change",
-        "describe-what-and-why",
-        "ready-and-traceable-handoff",
-        "commit-subjects-explain-each-change",
-        "engaging-with-inline-review-comments",
-        // Reviewer-side review practices ground in the review-decision/thread-state context file
-        // (review_threads.json) or comments.json — never a diff line of the change under review.
-        "reviews-substantively-with-understanding",
-        "leaves-useful-specific-review-comments",
-        "reviews-respectfully-asks-rather-than-demands",
-        "honours-linked-issue-acceptance-criteria"
-    );
-
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
 
     private final JsonMapper objectMapper;
@@ -207,7 +183,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
 
-        List<Practice> practices = practiceCatalogInjector.resolve(job, WorkArtifact.PULL_REQUEST);
+        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, WorkArtifact.PULL_REQUEST);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.PracticeReviewRequest(job),
             EvidencePlan.compile(practices)
@@ -338,8 +314,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (!secretFindings.isEmpty()) {
             Set<String> scannerLocations = secretFindings
                 .stream()
-                .flatMap(f -> f.evidence().path("locations").valueStream())
-                .map(location -> location.path("path").asString() + ":" + location.path("startLine").asInt())
+                .flatMap(f -> f.evidence().path("citations").valueStream())
+                .map(citation -> citation.path("path").asString() + ":" + citation.path("startLine").asInt())
                 .collect(java.util.stream.Collectors.toSet());
             scopedFindings.removeIf(
                 finding ->
@@ -347,11 +323,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                     finding.evidence() != null &&
                     finding
                         .evidence()
-                        .path("locations")
+                        .path("citations")
                         .valueStream()
-                        .anyMatch(location ->
+                        .anyMatch(citation ->
                             scannerLocations.contains(
-                                location.path("path").asString() + ":" + location.path("startLine").asInt()
+                                citation.path("path").asString() + ":" + citation.path("startLine").asInt()
                             )
                         )
             );
@@ -502,7 +478,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private PracticeDetectionResultParser.ValidatedFinding toSecretFinding(SecretDiffScanner.SecretHit hit) {
         ObjectNode evidence = objectMapper.createObjectNode();
         evidence.put("detector", "secret-diff-scanner");
-        evidence.putArray("sourceKinds").add("scm.pull-request.diff");
         ArrayNode citations = evidence.putArray("citations");
         ObjectNode citation = citations.addObject();
         citation.put("sourceKind", "scm.pull-request.diff");
@@ -512,12 +487,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         citation.put("startLine", hit.newLine());
         citation.put("endLine", hit.newLine());
         citation.put("quoteSha256", ProvenanceDigest.sha256Hex(hit.addedLine().getBytes(StandardCharsets.UTF_8)));
-        ArrayNode locations = evidence.putArray("locations");
-        ObjectNode location = locations.addObject();
-        location.put("path", hit.path());
-        location.put("startLine", hit.newLine());
-        ArrayNode snippets = evidence.putArray("snippets");
-        snippets.add("Secret value redacted");
+        citation.put("quoteRedacted", true);
 
         boolean lowSignal = secretDiffScanner.isLowSignalPath(hit.path());
         Severity severity = lowSignal ? Severity.MINOR : Severity.MAJOR;
@@ -585,9 +555,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return paths;
     }
 
-    /**
-     * Filter findings to only include those whose evidence locations reference files in the diff.
-     */
     static List<PracticeDetectionResultParser.ValidatedFinding> filterByDiffScope(
         List<PracticeDetectionResultParser.ValidatedFinding> findings,
         Set<String> diffFiles
@@ -595,24 +562,27 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (diffFiles.isEmpty()) return findings;
         List<PracticeDetectionResultParser.ValidatedFinding> filtered = new ArrayList<>();
         for (var finding : findings) {
-            // Process/metadata-level practices are not diff-anchored — never drop them on a location mismatch.
-            if (METADATA_LEVEL_PRACTICES.contains(finding.practiceSlug())) {
-                filtered.add(finding);
-                continue;
-            }
             JsonNode evidence = finding.evidence();
             if (evidence == null || evidence.isNull() || evidence.isMissingNode()) {
                 filtered.add(finding);
                 continue;
             }
-            JsonNode locations = evidence.get("locations");
-            if (locations == null || !locations.isArray() || locations.isEmpty()) {
+            JsonNode citations = evidence.get("citations");
+            if (citations == null || !citations.isArray() || citations.isEmpty()) {
                 filtered.add(finding);
                 continue;
             }
             boolean hasInScopeLocation = false;
-            for (JsonNode loc : locations) {
-                JsonNode pathNode = loc.get("path");
+            for (JsonNode citation : citations) {
+                String sourceKind = citation.path("sourceKind").asString();
+                if (sourceKind.isBlank()) {
+                    continue;
+                }
+                if (!"scm.pull-request.diff".equals(sourceKind)) {
+                    hasInScopeLocation = true;
+                    break;
+                }
+                JsonNode pathNode = citation.get("path");
                 if (pathNode == null || pathNode.isNull() || pathNode.isMissingNode()) {
                     continue;
                 }
@@ -620,13 +590,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
-                // The agent cites files it read under the repo mount as "inputs/sources/scm/repo/<path>" (ADR 0020),
-                // but diff-stat paths are repo-relative ("<path>"). Strip the mount prefix so a code finding
-                // on a genuinely-changed file is not dropped on a cosmetic path mismatch.
                 String repoRelative = path.startsWith(SandboxLayout.REPO_MOUNT_RELATIVE)
                     ? path.substring(SandboxLayout.REPO_MOUNT_RELATIVE.length())
                     : path;
-                if (diffFiles.contains(path) || diffFiles.contains(repoRelative) || isInternalContextPath(path)) {
+                if (diffFiles.contains(path) || diffFiles.contains(repoRelative)) {
                     hasInScopeLocation = true;
                     break;
                 }
@@ -634,13 +601,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             if (hasInScopeLocation) {
                 filtered.add(finding);
             } else {
-                log.info("Filtered out-of-scope finding: slug={}, paths={}", finding.practiceSlug(), locations);
+                log.info("Filtered out-of-scope finding: slug={}, citations={}", finding.practiceSlug(), citations);
             }
         }
         return filtered;
-    }
-
-    private static boolean isInternalContextPath(String path) {
-        return ALLOWED_INTERNAL_CONTEXT_PATHS.contains(path);
     }
 }

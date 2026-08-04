@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseBasis;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseOutcome;
 import java.io.IOException;
@@ -26,13 +27,13 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "3ee0ecd611114c0543208598fe20af834c32f2f08827eed5afcafff323e09600";
+        "a9a10fb19e2c2ac4f7bb506ae82e8d27e13b432e6792d946e7e0c3fba82c8a0e";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     @Test
     void shouldLoadCurrentCatalogAndGovernanceDecisions() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC());
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "");
 
         assertThat(registry.current().version()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(registry.catalogDigest()).isEqualTo(VERSION_1_CATALOG_SHA256);
@@ -55,7 +56,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
     @Test
     void shouldRejectUnknownVersionKindAndProfile() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC());
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "");
 
         assertThatIllegalArgumentException().isThrownBy(() ->
             registry.requireSource(new SourceContractVersion("2.0.0"), new SourceKind("scm.repository.tree"))
@@ -93,20 +94,22 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             assertThat(decision.reviewer()).isNotBlank();
             assertThat(decision.decidedAt()).isNotNull();
             assertThat(decision.expiresAt()).isNotNull();
-            assertThat(decision.permitsProductUseAt(Instant.parse("2026-08-03T12:00:00Z"))).isTrue();
+            SourceUseAudience audience = decision.audiences().iterator().next();
+            assertThat(decision.permitsProductUseAt(Instant.parse("2026-08-03T12:00:00Z"), audience)).isTrue();
         });
     }
 
     @Test
     void shouldKeepEngineeringBaselineFrozenToPreExistingSources() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC());
+        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC(), "");
 
         assertThat(registry.current().sources())
             .filteredOn(source ->
-                registry
-                    .requireUseDecision(registry.current().version(), source.useDecisionId())
-                    .basis()
-                    .equals(SourceUseBasis.ENGINEERING_BASELINE)
+                source
+                    .useDecisionIds()
+                    .stream()
+                    .map(id -> registry.requireUseDecision(registry.current().version(), id))
+                    .allMatch(decision -> decision.basis().equals(SourceUseBasis.ENGINEERING_BASELINE))
             )
             .extracting(source -> source.kind().value())
             .containsExactlyInAnyOrder(
@@ -139,11 +142,19 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     void shouldRecheckApprovalExpiryWhenASourceIsRequested() {
         Clock clock = mock(Clock.class);
         when(clock.instant()).thenReturn(Instant.parse("2026-08-03T12:00:00Z"));
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, clock);
+        var registry = new ClasspathArtifactSourceCatalogRegistry(
+            objectMapper,
+            clock,
+            "scm.pull-request.diff:PRACTICE_DETECTION"
+        );
         when(clock.instant()).thenReturn(Instant.parse("2027-08-03T00:00:00Z"));
 
         assertThat(
-            registry.isSourceUsePermitted(new SourceContractVersion("1.0.0"), new SourceKind("scm.pull-request.diff"))
+            registry.isSourceUsePermitted(
+                new SourceContractVersion("1.0.0"),
+                new SourceKind("scm.pull-request.diff"),
+                SourceUseAudience.PRACTICE_DETECTION
+            )
         ).isFalse();
     }
 
@@ -153,23 +164,68 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var authorized = new ClasspathArtifactSourceCatalogRegistry(
             objectMapper,
             Clock.systemUTC(),
-            "scm.pull-request.diff"
+            "scm.pull-request.diff:PRACTICE_DETECTION,scm.pull-request.diff:PRACTICE_FEEDBACK_RECIPIENTS"
         );
         var version = new SourceContractVersion("1.0.0");
         var diff = new SourceKind("scm.pull-request.diff");
 
-        assertThat(denied.isSourceUsePermitted(version, diff)).isFalse();
-        assertThat(authorized.isSourceUsePermitted(version, diff)).isTrue();
-        assertThat(authorized.isSourceUsePermitted(version, new SourceKind("scm.pull-request.core"))).isFalse();
+        assertThat(denied.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_DETECTION)).isFalse();
+        assertThat(authorized.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_DETECTION)).isTrue();
+        assertThat(
+            authorized.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+        ).isTrue();
+        assertThat(authorized.isSourceUsePermitted(version, diff, SourceUseAudience.PRACTICE_MENTORING)).isFalse();
+        assertThat(
+            authorized.isSourceUsePermitted(
+                version,
+                new SourceKind("scm.pull-request.core"),
+                SourceUseAudience.PRACTICE_DETECTION
+            )
+        ).isFalse();
+    }
+
+    @Test
+    void shouldEnforceEachApprovedAudience() throws IOException {
+        JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
+        var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root);
+        var detection = decisions.get("use-scm-pull-request-core-detection");
+        var feedback = decisions.get("use-scm-pull-request-core-feedback");
+
+        assertThat(
+            detection.permitsProductUseAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUseAudience.PRACTICE_DETECTION)
+        ).isTrue();
+        assertThat(
+            detection.permitsProductUseAt(
+                Instant.parse("2026-08-03T12:00:00Z"),
+                SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+            )
+        ).isFalse();
+        assertThat(
+            feedback.permitsProductUseAt(
+                Instant.parse("2026-08-03T12:00:00Z"),
+                SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+            )
+        ).isTrue();
     }
 
     @Test
     void shouldRejectUnknownDeploymentAuthorization() {
         assertThatIllegalStateException()
             .isThrownBy(() ->
-                new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "scm.unknown")
+                new ClasspathArtifactSourceCatalogRegistry(
+                    objectMapper,
+                    Clock.systemUTC(),
+                    "scm.unknown:PRACTICE_DETECTION"
+                )
             )
             .withMessageContaining("Unknown authorized artifact source");
+    }
+
+    @Test
+    void shouldRejectWildcardDeploymentAuthorization() {
+        assertThatIllegalStateException()
+            .isThrownBy(() -> new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "*"))
+            .withMessageContaining("Wildcard");
     }
 
     @Test
@@ -188,7 +244,9 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
         ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
         assertThat(decisions.values()).anySatisfy(expired ->
-            assertThat(expired.permitsProductUseAt(Instant.parse("2027-08-03T00:00:00Z"))).isFalse()
+            assertThat(
+                expired.permitsProductUseAt(Instant.parse("2027-08-03T00:00:00Z"), SourceUseAudience.PRACTICE_DETECTION)
+            ).isFalse()
         );
     }
 
@@ -202,7 +260,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
             )
         );
-        decisions.remove("use-scm-repository-tree");
+        decisions.remove("use-scm-repository-tree-detection");
 
         assertThatIllegalStateException()
             .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))

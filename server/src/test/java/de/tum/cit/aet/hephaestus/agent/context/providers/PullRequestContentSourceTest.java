@@ -67,6 +67,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     private ScmTokenSource scmTokenSource;
 
     private static final Long WORKSPACE_ID = 99L;
+    private static final SourceKind CORE = new SourceKind("scm.pull-request.core");
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
     private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
 
@@ -148,6 +149,16 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
     @Nested
     class MetadataAndComments {
+
+        @Test
+        void capturesCoreWithoutARepositoryClone() {
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+
+            EvidenceContribution contribution = provider.capture(request(sampleMetadata()), java.util.Set.of(CORE));
+
+            assertThat(contribution.files()).containsKey("inputs/context/metadata.json");
+            verifyNoInteractions(gitRepositoryManager);
+        }
 
         @Test
         void writesMetadataJson() throws Exception {

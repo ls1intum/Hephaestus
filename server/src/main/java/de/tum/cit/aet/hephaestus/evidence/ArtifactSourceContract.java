@@ -18,7 +18,7 @@ public record ArtifactSourceContract(
     String purpose,
     RetentionPolicy retentionPolicy,
     ErasurePolicy erasurePolicy,
-    String useDecisionId
+    Set<String> useDecisionIds
 ) {
     public ArtifactSourceContract {
         Objects.requireNonNull(kind, "kind");
@@ -40,7 +40,10 @@ public record ArtifactSourceContract(
         purpose = requireText(purpose, "purpose", kind);
         Objects.requireNonNull(retentionPolicy, "retentionPolicy");
         Objects.requireNonNull(erasurePolicy, "erasurePolicy");
-        useDecisionId = requireText(useDecisionId, "useDecisionId", kind);
+        useDecisionIds = Set.copyOf(Objects.requireNonNull(useDecisionIds, "useDecisionIds"));
+        if (useDecisionIds.isEmpty() || useDecisionIds.stream().anyMatch(value -> value == null || value.isBlank())) {
+            throw new IllegalArgumentException("useDecisionIds must contain non-blank values: " + kind);
+        }
     }
 
     public boolean appliesTo(String artifactType) {

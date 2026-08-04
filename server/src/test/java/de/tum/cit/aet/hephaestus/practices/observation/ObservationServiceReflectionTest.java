@@ -3,8 +3,12 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -52,6 +56,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ObservationVisibilityPolicy visibilityPolicy;
+
     @InjectMocks
     private ObservationService observationService;
 
@@ -60,6 +67,15 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         User user = new User();
         user.setId(USER_ID);
         when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
+        lenient()
+            .when(
+                visibilityPolicy.permits(
+                    eq(WORKSPACE_ID),
+                    any(Observation.class),
+                    eq(SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+                )
+            )
+            .thenReturn(true);
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
@@ -102,6 +118,26 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         practice.setName("Handling failure robustly");
         practice.setCriteria("ordinary criteria"); // not a defect-detector
         return practice;
+    }
+
+    @Test
+    void withholdsObservationRejectedByFeedbackVisibilityPolicy() {
+        Practice practice = practice("robust-error-handling");
+        Observation observation = bad(practice, Severity.MAJOR);
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(observation));
+        when(
+            visibilityPolicy.permits(WORKSPACE_ID, observation, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+        ).thenReturn(false);
+
+        assertThat(observationService.getReflection(WORKSPACE_ID)).isEmpty();
+        verifyNoInteractions(feedbackObservationRepository);
     }
 
     @Test

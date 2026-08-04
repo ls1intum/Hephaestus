@@ -68,11 +68,6 @@ public class FeedbackChannelRouter {
         return ConversationRoutingDecision.ADMIT;
     }
 
-    /**
-     * A natural inline anchor exists when the observation can be posted as a diff note: a PR observation whose
-     * evidence carries at least one location with a non-blank file path. Issue observations (no diff) and PR
-     * observations with no file location have no natural inline home and are candidates for the conversation.
-     */
     private static boolean hasNaturalInlineAnchor(Observation observation) {
         if (!observation.getArtifactType().hasInlineLane()) {
             return false;
@@ -81,11 +76,15 @@ public class FeedbackChannelRouter {
         if (evidence == null) {
             return false;
         }
-        JsonNode locations = evidence.path("locations");
-        if (!locations.isArray() || locations.isEmpty()) {
+        JsonNode citations = evidence.path("citations");
+        if (!citations.isArray() || citations.isEmpty()) {
             return false;
         }
-        JsonNode path = locations.get(0).path("path");
-        return path.isTextual() && !path.asString().isBlank();
+        for (JsonNode citation : citations) {
+            if ("scm.pull-request.diff".equals(citation.path("sourceKind").asString())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -25,15 +25,8 @@ public final class SandboxLayout {
     /** Workspace-relative prefix for the read-only input subtree (the only region the path-guard whitelists). */
     public static final String INPUTS_PREFIX = "inputs/";
 
-    /**
-     * Workspace-relative prefix for connector-owned source materialisations. The SCM checkout mounts at
-     * {@code inputs/sources/scm/repo}; other connectors use a peer namespace.
-     */
     public static final String SOURCES_PREFIX = INPUTS_PREFIX + "sources/";
 
-    /**
-     * Workspace-relative mount prefix for a connector's source ({@code inputs/sources/<id>/}).
-     */
     public static String sourceMount(String originId) {
         return SOURCES_PREFIX + originId + "/";
     }
@@ -54,9 +47,6 @@ public final class SandboxLayout {
     /** Workspace-relative prefix every {@link de.tum.cit.aet.hephaestus.agent.context.ContentSource} must write under. */
     public static final String CONTEXT_PREFIX = INPUTS_PREFIX + "context/";
 
-    /**
-     * Workspace-relative path of the manifest indexing projected context files and their provenance.
-     */
     public static final String MANIFEST_PATH = INPUTS_PREFIX + "manifest.json";
 
     /** Workspace-relative prefix for per-practice catalog files (index, criteria). */

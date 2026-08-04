@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
@@ -12,6 +13,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.json.JsonMapper;
@@ -31,7 +33,8 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
         return new OutlineWebhookSecretSource(
             connectionService,
             new EncryptedStringConverter(),
-            JsonMapper.builder().build()
+            JsonMapper.builder().build(),
+            new OutlineOriginPolicy(Set.of("https://wiki.example.com"))
         );
     }
 
@@ -52,13 +55,22 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
     @Test
     void getSecret_returnsStoredSecretBytesForResolvedSubscription() {
         when(connectionService.findOutlineSubscription("sub-b")).thenReturn(
-            Optional.of(new OutlineSubscription(2L, "secret-b"))
+            Optional.of(new OutlineSubscription(2L, "https://wiki.example.com", "secret-b"))
         );
 
         Optional<byte[]> secret = secretSource().getSecret(lookup("sub-b"));
 
         assertThat(secret).isPresent();
         assertThat(secret.get()).isEqualTo("secret-b".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void getSecret_isEmptyWhenOriginApprovalWasRemoved() {
+        when(connectionService.findOutlineSubscription("sub-b")).thenReturn(
+            Optional.of(new OutlineSubscription(2L, "https://removed.example.com", "secret-b"))
+        );
+
+        assertThat(secretSource().getSecret(lookup("sub-b"))).isEmpty();
     }
 
     @Test

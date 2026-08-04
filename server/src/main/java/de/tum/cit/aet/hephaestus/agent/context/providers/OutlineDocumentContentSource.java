@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises a workspace's mirrored Outline documents into the sandbox context — a pure extract+load of raw doc
  * rows through the agent-owned {@link DocumentProjection} SPI, so this source never reads {@code outline_document}
- * itself and the coupling runs one way. Best-effort.
+ * itself and the coupling runs one way.
  *
  * <p>Mentor chat emits one {@code outline_docs.json}; review emits a {@code .md} tree under
  * {@code inputs/context/outline/}. Both are telescoped, never the whole corpus.

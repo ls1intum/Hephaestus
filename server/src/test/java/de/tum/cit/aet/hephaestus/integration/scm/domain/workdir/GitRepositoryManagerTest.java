@@ -57,7 +57,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     private GitRepositoryManager createManager(boolean enabled) {
-        GitRepositoryProperties properties = new GitRepositoryProperties(storagePath.toString(), enabled);
+        GitRepositoryProperties properties = new GitRepositoryProperties(enabled);
         return new GitRepositoryManager(properties, lockManager, new FabricLayout(storagePath.toString()));
     }
 
@@ -483,14 +483,14 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldFallBackToHeadForNonExistentBranch() throws Exception {
+        void shouldReturnNullForNonExistentBranch() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
                 String result = manager.resolveDefaultBranchHead(1L, "nonexistent-branch");
 
-                assertThat(result).isNotNull();
+                assertThat(result).isNull();
             }
         }
 
@@ -505,13 +505,13 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    class ReadFilesAtCommit {
+    class ReadTreeSnapshot {
 
         @Test
         void shouldReturnEmptyMapWhenNotEnabled() {
             manager = createManager(false);
 
-            Map<String, byte[]> result = manager.readFilesAtCommit(1L, "abc123", 50L * 1024 * 1024);
+            Map<String, byte[]> result = manager.readTreeSnapshot(1L, "abc123", 50L * 1024 * 1024).files();
 
             assertThat(result).isEmpty();
         }
@@ -523,7 +523,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 String headSha = sourceGit.log().call().iterator().next().getName();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
-                Map<String, byte[]> files = manager.readFilesAtCommit(1L, headSha, 50L * 1024 * 1024);
+                Map<String, byte[]> files = manager.readTreeSnapshot(1L, headSha, 50L * 1024 * 1024).files();
 
                 assertThat(files).containsKey("README.md");
                 assertThat(new String(files.get("README.md"), StandardCharsets.UTF_8)).isEqualTo("# Test Repository\n");
@@ -561,7 +561,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                Map<String, byte[]> filesAtFirst = manager.readFilesAtCommit(1L, firstSha, 50L * 1024 * 1024);
+                Map<String, byte[]> filesAtFirst = manager.readTreeSnapshot(1L, firstSha, 50L * 1024 * 1024).files();
                 assertThat(filesAtFirst).containsKey("README.md");
                 assertThat(filesAtFirst).doesNotContainKey("file2.txt");
             }
@@ -585,7 +585,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
                 // Set max to 500 bytes — README.md (18 bytes) fits, large.txt (1000 bytes) is over the limit.
-                Map<String, byte[]> files = manager.readFilesAtCommit(1L, sha, 500);
+                Map<String, byte[]> files = manager.readTreeSnapshot(1L, sha, 500).files();
                 long totalSize = files
                     .values()
                     .stream()
@@ -606,7 +606,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
                 assertThatThrownBy(() ->
-                    manager.readFilesAtCommit(1L, "0000000000000000000000000000000000000000", 50L * 1024 * 1024)
+                    manager.readTreeSnapshot(1L, "0000000000000000000000000000000000000000", 50L * 1024 * 1024)
                 )
                     .isInstanceOf(GitRepositoryManager.GitOperationException.class)
                     .hasMessageContaining("Failed to read files at commit");

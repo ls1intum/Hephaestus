@@ -104,6 +104,9 @@ public final class ServerUrlValidator {
         if (path != null && !path.isEmpty() && !"/".equals(path)) {
             throw new IllegalArgumentException("Server URL must be a base URL without path segments");
         }
+        if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
+            throw new IllegalArgumentException("Server URL must not contain a query or fragment");
+        }
 
         // If the hostname looks like an IP address, validate its range
         validateIpRangeIfApplicable(host);

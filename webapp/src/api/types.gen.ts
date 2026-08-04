@@ -1800,7 +1800,7 @@ export type ReviewFindingDetail = {
      * Detector confidence
      */
     confidence: number;
-    evidence?: unknown;
+    evidence?: ObservationEvidence;
     /**
      * Linked feedback, newest first
      */
@@ -1851,6 +1851,28 @@ export type ReviewBoundFeedback = {
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+};
+
+/**
+ * A verified quote and its exact source location
+ */
+export type EvidenceCitation = {
+    artifactPath: string;
+    endLine: number;
+    path: string;
+    quote?: string;
+    quoteRedacted: boolean;
+    side?: 'OLD' | 'NEW';
+    sourceKind: string;
+    startLine: number;
+};
+
+/**
+ * Verified, source-bound evidence for an observation
+ */
+export type ObservationEvidence = {
+    citations: Array<EvidenceCitation>;
+    detector?: string;
 };
 
 export type ReviewArtifact = {
@@ -3318,12 +3340,7 @@ export type ObservationDetail = {
      * AI confidence score (0.0–1.0)
      */
     confidence: number;
-    /**
-     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
-     */
-    evidence?: {
-        [key: string]: unknown;
-    };
+    evidence?: ObservationEvidence;
     /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */

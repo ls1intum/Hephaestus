@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,9 +85,23 @@ const validateReadinessSemantics = (value, label) => {
 	}
 };
 
+const catalogDigests = new Map();
+
 const validateContractVersion = async (version) => {
 	const versionDir = path.join(contractsRoot, version);
-	const catalog = await readJson(path.join(versionDir, "catalog.json"));
+	const catalogBytes = await readFile(path.join(versionDir, "catalog.json"));
+	const catalog = JSON.parse(catalogBytes);
+	const catalogDigest = createHash("sha256").update(catalogBytes).digest("hex");
+	for (const schemaFile of [
+		"artifact-source-manifest.schema.json",
+		"practice-readiness-report.schema.json",
+	]) {
+		const schema = await readJson(path.join(versionDir, schemaFile));
+		if (schema.properties.catalogDigest.const !== catalogDigest) {
+			throw new Error(`${version}/${schemaFile} does not pin the catalog digest`);
+		}
+	}
+	catalogDigests.set(version, catalogDigest);
 	const decisionCatalog = await readJson(path.join(versionDir, "source-use-decisions.json"));
 	validate(
 		`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/artifact-source-catalog.schema.json`,
@@ -114,17 +129,30 @@ const validateContractVersion = async (version) => {
 			}
 		}
 	}
+	const purposeByAudience = new Map([
+		["PRACTICE_DETECTION", "practice-detection"],
+		["PRACTICE_FEEDBACK_RECIPIENTS", "practice-feedback"],
+		["PRACTICE_MENTORING", "practice-mentoring"],
+		["OPERATOR_QUALITY_ASSURANCE", "operator-quality-assurance"],
+	]);
 	for (const source of catalog.sources) {
-		const decision = decisions.get(source.useDecisionId);
-		if (!decision) throw new Error(`${version} source '${source.kind}' references unknown decision '${source.useDecisionId}'`);
-		for (const property of ["source", "purpose", "retentionPolicy", "erasurePolicy"]) {
-			const expected = property === "source" ? source.kind : source[property];
-			if (decision[property] !== expected) {
-				throw new Error(`${version} decision '${decision.id}' does not match source '${source.kind}' property '${property}'`);
+		const covered = new Set();
+		for (const decisionId of source.useDecisionIds) {
+			const decision = decisions.get(decisionId);
+			if (!decision) throw new Error(`${version} source '${source.kind}' references unknown decision '${decisionId}'`);
+			if (decision.source !== source.kind || decision.retentionPolicy !== source.retentionPolicy || decision.erasurePolicy !== source.erasurePolicy) {
+				throw new Error(`${version} decision '${decision.id}' does not match source '${source.kind}'`);
 			}
+			if (decision.audiences.length !== 1) throw new Error(`${version} decision '${decision.id}' must grant one audience`);
+			const audience = decision.audiences[0];
+			if (covered.has(audience) || decision.purpose !== purposeByAudience.get(audience)) {
+				throw new Error(`${version} decision '${decision.id}' has an invalid audience-purpose grant`);
+			}
+			covered.add(audience);
 		}
+		if (covered.size !== purposeByAudience.size) throw new Error(`${version} source '${source.kind}' lacks a product audience decision`);
 	}
-	const referencedDecisions = new Set(catalog.sources.map((source) => source.useDecisionId));
+	const referencedDecisions = new Set(catalog.sources.flatMap((source) => source.useDecisionIds));
 	for (const decision of decisionCatalog.decisions) {
 		if (!referencedDecisions.has(decision.id)) {
 			throw new Error(`${version} decision '${decision.id}' is not referenced by a source`);
@@ -137,6 +165,7 @@ const catalogs = new Map();
 for (const version of contractVersions) catalogs.set(version, await validateContractVersion(version));
 
 const sourceCatalog = catalogs.get("1.0.0");
+const sourceCatalogDigest = catalogDigests.get("1.0.0");
 const practiceCatalog = await readJson(
 	path.join(root, "server/src/main/resources/practices/default-catalog.json"),
 );
@@ -222,7 +251,7 @@ const manifestSchema =
 	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json";
 const manifest = {
 	contractVersion: "1.0.0",
-	catalogDigest: "3ee0ecd611114c0543208598fe20af834c32f2f08827eed5afcafff323e09600",
+	catalogDigest: sourceCatalogDigest,
 	profileId: "pull-request-review",
 	capturedAt: "2026-08-03T00:00:00Z",
 	sources: profiles.get("pull-request-review").allowedSources.map((kind) => ({
@@ -289,7 +318,7 @@ const assessment = {
 };
 const readiness = {
 	contractVersion: "1.0.0",
-	catalogDigest: "3ee0ecd611114c0543208598fe20af834c32f2f08827eed5afcafff323e09600",
+	catalogDigest: sourceCatalogDigest,
 	profileId: "pull-request-review",
 	manifestCapturedAt: "2026-08-03T00:00:00Z",
 	decidedAt: "2026-08-03T00:00:00Z",

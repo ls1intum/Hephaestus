@@ -108,7 +108,7 @@ hephaestus:
     # must be set on application-server, application-worker (the agent context is assembled
     # there) and webhook-server (which otherwise answers 501 to every delivery).
     # OUTLINE_OAUTH_* additionally seeds the link-only login provider; OUTLINE_OAUTH_BASE_URL is
-    # required whenever OUTLINE_OAUTH_CLIENT_ID is set (a blank base URL skips the seed with a WARN).
+    # required whenever OUTLINE_OAUTH_CLIENT_ID is set (a blank base URL logs an ERROR and skips the seed).
     # Everything binds from env in the base application.yml — Outline needs no prod-only override.
     # ═══════════════════════════════════════════════════════════════════════════
     integration:
@@ -160,9 +160,6 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # Sandbox, the agent job queue (PostgreSQL-backed), git checkout, and LLM proxy are
     # configured via env vars in compose.app.yaml. Defaults come from base application.yml.
-    # The only prod-specific overrides go here (storage path for git repos).
-    git:
-        storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
 
     # See docs/admin/agent-image-digests.md.
     agent:

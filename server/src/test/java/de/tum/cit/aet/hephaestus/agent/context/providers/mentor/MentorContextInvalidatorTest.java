@@ -14,8 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -54,12 +52,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     Cache workspaceCache;
 
     @Mock
-    Cache findingsCache;
-
-    @Mock
-    Cache standingCache;
-
-    @Mock
     Cache authoredWorkCache;
 
     @InjectMocks
@@ -69,8 +61,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     void setUp() {
         when(cacheManager.getCache("mentor_user_context")).thenReturn(userCache);
         when(cacheManager.getCache("mentor_workspace_context")).thenReturn(workspaceCache);
-        when(cacheManager.getCache("mentor_findings_context")).thenReturn(findingsCache);
-        when(cacheManager.getCache("mentor_practice_standing_context")).thenReturn(standingCache);
         when(cacheManager.getCache("mentor_authored_work_context")).thenReturn(authoredWorkCache);
     }
 
@@ -82,26 +72,7 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
 
         verify(userCache).evict(eq("7:9"));
         verify(workspaceCache).evict(eq("7:9"));
-        verify(findingsCache).evict(eq("7:9"));
-        verify(standingCache).evict(eq("7:9"));
-        // The authored-work context is in the per-user eviction set.
         verify(authoredWorkCache).evict(eq("7:9"));
-    }
-
-    @Test
-    void practiceDetectionCompletedEvictsFindingsAndStandingForDeveloper() {
-        // A completed detection run wrote new observations → the findings + standing contexts must be
-        // evicted for the evaluated developer. SCM-only caches stay untouched (this is not an SCM event).
-        invalidator.onPracticeDetectionCompleted(
-            new PracticeDetectionCompletedEvent(UUID.randomUUID(), 7L, WorkArtifact.PULL_REQUEST, 42L, 9L, 3, 0, true)
-        );
-
-        verify(findingsCache).evict(eq("7:9"));
-        verify(standingCache).evict(eq("7:9"));
-        // The user / workspace / authored-work contexts are SCM-driven, not detection-driven — untouched here.
-        verify(userCache, never()).evict(ArgumentMatchers.any());
-        verify(workspaceCache, never()).evict(ArgumentMatchers.any());
-        verify(authoredWorkCache, never()).evict(ArgumentMatchers.any());
     }
 
     @Test
@@ -131,10 +102,7 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
 
         verify(userCache).evict(eq("7:9"));
         verify(workspaceCache).evict(eq("7:9"));
-        verify(findingsCache).evict(eq("7:9"));
     }
-
-    // Event builders
 
     private static ScmDomainEvent.PullRequestUpdated buildPrUpdated(long repoId, Long authorId, Long mergedById) {
         ScmEventPayload.PullRequestData pr = new ScmEventPayload.PullRequestData(

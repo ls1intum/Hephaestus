@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceDeliveryAuthorization;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
@@ -29,7 +31,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Read-only REST API for practice observations.
@@ -46,7 +47,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class ObservationController {
 
     private final ObservationService observationService;
-    private final JsonMapper objectMapper;
+    private final EvidenceDeliveryAuthorization evidenceAuthorization;
 
     @GetMapping
     @Operation(
@@ -129,7 +130,12 @@ public class ObservationController {
     ) {
         var observation = observationService.getObservation(workspaceContext.id(), observationId);
         String deliveredGuidance = observationService.getDeliveredGuidance(observationId).orElse(null);
-        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredGuidance, objectMapper));
+        boolean includeEvidence = evidenceAuthorization.permits(
+            workspaceContext.id(),
+            observation,
+            SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+        );
+        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredGuidance, includeEvidence));
     }
 
     @GetMapping("/pull-request/{prId}")

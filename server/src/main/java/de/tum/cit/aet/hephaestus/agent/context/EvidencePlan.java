@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Exact, minimized evidence selection compiled before any provider is called. */
 public record EvidencePlan(
     SourceContractVersion contractVersion,
     EvidenceProfileId profileId,

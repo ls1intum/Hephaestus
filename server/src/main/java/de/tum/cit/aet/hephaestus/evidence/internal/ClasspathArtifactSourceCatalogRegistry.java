@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.evidence.RetentionPolicy;
 import de.tum.cit.aet.hephaestus.evidence.SourceAuthority;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseBasis;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseDecision;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseMode;
@@ -38,7 +39,6 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -53,22 +53,16 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     static final SourceContractVersion CURRENT_VERSION = new SourceContractVersion("1.0.0");
     static final String CATALOG_RESOURCE = "contracts/artifact-source/1.0.0/catalog.json";
     static final String USE_DECISIONS_RESOURCE = "contracts/artifact-source/1.0.0/source-use-decisions.json";
-
     private final ArtifactSourceCatalog catalog;
     private final String catalogDigest;
     private final Map<String, SourceUseDecision> useDecisions;
-    private final Set<SourceKind> authorizedSources;
+    private final Set<SourceUseGrant> authorizedUses;
     private final Clock clock;
 
-    public ClasspathArtifactSourceCatalogRegistry(JsonMapper objectMapper, Clock clock) {
-        this(objectMapper, clock, "*");
-    }
-
-    @Autowired
     public ClasspathArtifactSourceCatalogRegistry(
         JsonMapper objectMapper,
         Clock clock,
-        @Value("${hephaestus.evidence.authorized-source-kinds:}") String authorizedSourceKinds
+        @Value("${hephaestus.evidence.authorized-source-uses:}") String authorizedSourceUses
     ) {
         this.clock = clock;
         byte[] catalogBytes = readBytes(CATALOG_RESOURCE);
@@ -76,7 +70,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         this.catalogDigest = sha256(catalogBytes);
         this.useDecisions = parseUseDecisions(read(objectMapper, USE_DECISIONS_RESOURCE));
         validateUseDecisions(catalog, useDecisions);
-        this.authorizedSources = parseAuthorizedSources(catalog, authorizedSourceKinds);
+        this.authorizedUses = parseAuthorizedUses(catalog, authorizedSourceUses);
         useDecisions
             .values()
             .stream()
@@ -117,11 +111,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     }
 
     @Override
-    public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind) {
+    public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUseAudience audience) {
         ArtifactSourceContract contract = requireSource(version, kind);
         return (
-            authorizedSources.contains(kind) &&
-            requireUseDecision(version, contract.useDecisionId()).permitsProductUseAt(clock.instant())
+            authorizedUses.contains(new SourceUseGrant(kind, audience)) &&
+            contract
+                .useDecisionIds()
+                .stream()
+                .map(id -> requireUseDecision(version, id))
+                .anyMatch(decision -> decision.permitsProductUseAt(clock.instant(), audience))
         );
     }
 
@@ -163,27 +161,36 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         }
     }
 
-    private static Set<SourceKind> parseAuthorizedSources(ArtifactSourceCatalog catalog, String configured) {
+    private static Set<SourceUseGrant> parseAuthorizedUses(ArtifactSourceCatalog catalog, String configured) {
         if (configured.isBlank()) {
             return Set.of();
         }
-        if ("*".equals(configured.trim())) {
-            return catalog
-                .sources()
-                .stream()
-                .map(ArtifactSourceContract::kind)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        if (java.util.Arrays.stream(configured.split(",")).anyMatch(value -> value.trim().equals("*"))) {
+            throw new IllegalStateException("Wildcard artifact-source authorization is not supported");
         }
-        Set<SourceKind> authorized = new HashSet<>();
+        Set<SourceUseGrant> authorized = new HashSet<>();
         for (String value : configured.split(",")) {
-            SourceKind kind = new SourceKind(value.trim());
-            if (catalog.source(kind).isEmpty()) {
-                throw new IllegalStateException("Unknown authorized artifact source: " + kind);
+            String[] parts = value.trim().split(":", -1);
+            if (parts.length != 2) {
+                throw new IllegalStateException("Artifact-source authorization must use source:audience syntax");
             }
-            authorized.add(kind);
+            try {
+                SourceKind kind = new SourceKind(parts[0]);
+                SourceUseAudience audience = SourceUseAudience.valueOf(parts[1]);
+                if (catalog.source(kind).isEmpty()) {
+                    throw new IllegalStateException("Unknown authorized artifact source: " + kind);
+                }
+                authorized.add(new SourceUseGrant(kind, audience));
+            } catch (IllegalStateException exception) {
+                throw exception;
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalStateException("Invalid artifact-source authorization: " + value.trim(), exception);
+            }
         }
         return Set.copyOf(authorized);
     }
+
+    private record SourceUseGrant(SourceKind source, SourceUseAudience audience) {}
 
     static ArtifactSourceCatalog parse(JsonNode root) {
         requireObject(root, "catalog");
@@ -222,7 +229,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 "purpose",
                 "retentionPolicy",
                 "erasurePolicy",
-                "useDecisionId"
+                "useDecisionIds"
             ),
             "source"
         );
@@ -265,7 +272,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 "retention policy"
             ),
             enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", kind.toString()), "erasure policy"),
-            requiredText(node, "useDecisionId", kind.toString())
+            textSet(node, "useDecisionIds", kind.toString())
         );
     }
 
@@ -305,7 +312,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                     "mode",
                     "basis",
                     "outcome",
-                    "audience",
+                    "audiences",
                     "modelProcessor",
                     "retentionPolicy",
                     "erasurePolicy",
@@ -324,7 +331,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 enumValue(SourceUseMode.class, requiredText(node, "mode", id), "source-use mode"),
                 enumValue(SourceUseBasis.class, requiredText(node, "basis", id), "source-use basis"),
                 enumValue(SourceUseOutcome.class, requiredText(node, "outcome", id), "source-use outcome"),
-                requiredText(node, "audience", id),
+                enumSet(SourceUseAudience.class, node, "audiences", id),
                 optionalText(node, "modelProcessor", id),
                 enumValue(RetentionPolicy.class, requiredText(node, "retentionPolicy", id), "retention policy"),
                 enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", id), "erasure policy"),
@@ -344,33 +351,50 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         Set<String> referencedDecisionIds = catalog
             .sources()
             .stream()
-            .map(ArtifactSourceContract::useDecisionId)
+            .flatMap(source -> source.useDecisionIds().stream())
             .collect(java.util.stream.Collectors.toUnmodifiableSet());
         if (!decisions.keySet().equals(referencedDecisionIds)) {
             throw new IllegalStateException("Source-use decisions must match the catalog exactly");
         }
         for (ArtifactSourceContract source : catalog.sources()) {
-            SourceUseDecision decision = decisions.get(source.useDecisionId());
-            if (decision == null) {
-                throw new IllegalStateException("Missing source-use decision: " + source.useDecisionId());
+            java.util.EnumSet<SourceUseAudience> covered = java.util.EnumSet.noneOf(SourceUseAudience.class);
+            for (String decisionId : source.useDecisionIds()) {
+                SourceUseDecision decision = decisions.get(decisionId);
+                if (!decision.source().equals(source.kind())) {
+                    throw new IllegalStateException("Source-use decision kind does not match: " + decisionId);
+                }
+                if (decision.audiences().size() != 1) {
+                    throw new IllegalStateException("Source-use decision must grant one audience: " + decisionId);
+                }
+                SourceUseAudience audience = decision.audiences().iterator().next();
+                if (!decision.purpose().equals(purposeFor(audience))) {
+                    throw new IllegalStateException("Source-use decision purpose does not match: " + decisionId);
+                }
+                if (!covered.add(audience)) {
+                    throw new IllegalStateException("Duplicate source-use audience decision: " + decisionId);
+                }
+                if (
+                    !decision.retentionPolicy().equals(source.retentionPolicy()) ||
+                    !decision.erasurePolicy().equals(source.erasurePolicy())
+                ) {
+                    throw new IllegalStateException("Source-use decision lifecycle does not match: " + decisionId);
+                }
             }
-            if (!decision.source().equals(source.kind())) {
-                throw new IllegalStateException("Source-use decision kind does not match: " + source.useDecisionId());
-            }
-            if (!decision.purpose().equals(source.purpose())) {
+            if (!covered.equals(java.util.EnumSet.allOf(SourceUseAudience.class))) {
                 throw new IllegalStateException(
-                    "Source-use decision purpose does not match: " + source.useDecisionId()
-                );
-            }
-            if (
-                !decision.retentionPolicy().equals(source.retentionPolicy()) ||
-                !decision.erasurePolicy().equals(source.erasurePolicy())
-            ) {
-                throw new IllegalStateException(
-                    "Source-use decision lifecycle does not match: " + source.useDecisionId()
+                    "Source-use decisions do not cover every product audience: " + source.kind()
                 );
             }
         }
+    }
+
+    private static String purposeFor(SourceUseAudience audience) {
+        return switch (audience) {
+            case PRACTICE_DETECTION -> "practice-detection";
+            case PRACTICE_FEEDBACK_RECIPIENTS -> "practice-feedback";
+            case PRACTICE_MENTORING -> "practice-mentoring";
+            case OPERATOR_QUALITY_ASSURANCE -> "operator-quality-assurance";
+        };
     }
 
     private static JsonNode read(JsonMapper objectMapper, String resource) {

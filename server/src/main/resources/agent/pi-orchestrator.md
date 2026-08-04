@@ -153,9 +153,9 @@ default. They sit ON TOP of the presence/assessment contract and the COHERENCE R
    If ANY quoted line carrying the symbol contains a rationale signal — or you cannot even enumerate the
    lines — then the rationale is present: emit `PRESENT, GOOD` (or, if a genuinely significant decision is
    named but its trade-off is thin, at most `PRESENT, BAD` MINOR), NEVER an `ABSENT, BAD` MAJOR.
-   **Hard precondition for the BAD.** You may emit the `ABSENT/BAD` MAJOR ONLY IF your `evidence.snippets`
-   array contains the verbatim body line(s) that name the decision, AND none of those quoted lines carries a
-   reason-connective OR a stated purpose/role/trade-off. If you cannot put such a quote in `evidence.snippets`
+   **Hard precondition for the BAD.** You may emit the `ABSENT/BAD` MAJOR ONLY IF your
+   `evidence.citations[].quote` contains the verbatim body line(s) that name the decision, AND none of those
+   quoted lines carries a reason-connective OR a stated purpose/role/trade-off. If you cannot cite such a quote
    — because the only lines naming the decision DO state its purpose — you are forbidden from emitting the
    BAD; emit `PRESENT, GOOD`. Concretely: for a body that says
    "`ARConfigurationFactory`: single source of truth for the world-tracking config (prefers `.smoothedSceneDepth`,
@@ -225,10 +225,10 @@ default. They sit ON TOP of the presence/assessment contract and the COHERENCE R
    stdout traces is currently set too high; do not wave them past as intentional logging.
 
 6. **NO FILE LOCUS ON NON-ANCHORED FINDINGS.**
-   ISSUE findings have NO file path — `evidence.locations` MUST be empty (`[]`); never synthesize
-   `metadata.json:1` or any file anchor for an issue. For review-craft findings on conversation-tab/general
-   comments (no `position`), `evidence.locations` MUST also be empty. Only emit an `evidence.location` whose
-   `path` and line are literally present in the diff (a changed `+`/`-` line) or in the comment's `position`.
+   ISSUE and unpositioned review-comment findings still require an exact citation, but their developer-facing
+   `path` names the issue or comment object, not a fabricated source file. `artifactPath` names the serialized
+   context artifact and the line range locates the exact quote inside it. Only diff citations may use a source-file
+   `path`, `OLD`/`NEW` side, or `suggestedDiffNotes` anchor.
 
 7. **AUDITABLE NA ON SECURITY SURFACES (validates-and-escapes-untrusted-input, avoids-insecure-defaults-and-over-broad-permissions).**
    When you abstain (`NOT_APPLICABLE`) over a diff that DOES contain a sink-shaped or config-shaped line
@@ -241,7 +241,7 @@ default. They sit ON TOP of the presence/assessment contract and the COHERENCE R
    security claim you make anywhere).** Any claim that a security setting was added, removed, hardened,
    tightened, or is otherwise no-longer-a-risk — or that a risk is absent because something *mitigates*
    it — MUST quote the exact `+`/`-` diff line that adds or removes that setting, verbatim in
-   `evidence.snippets`. If you cannot quote such a line, you MUST DROP the claim entirely; you may not
+   `evidence.citations[].quote`. If you cannot quote such a line, you MUST DROP the claim entirely; you may not
    keep it as an exonerating rationale. **Absence of an insecure setting is NOT the same as having
    removed one** — "the diff does not enable a permissive ATS / does not disable TLS / does not grant a
    broad scope" is a clean baseline, not a hardening act, and must never be cited as the reason a security

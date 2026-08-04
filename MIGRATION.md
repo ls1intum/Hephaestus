@@ -69,10 +69,21 @@ Entries exist only for releases that need operator action. Everything else is in
 
 **Affected**: deployments that enable practice review.
 
-Set `HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS` to the comma-separated source kinds approved for the deployment.
-Leaving it empty is safe: review jobs decline without collecting evidence or making a semantic judgment. Use `*`
-only when the controller has approved every source in the active contract. Remove a kind and restart the server and
-workers to stop new collection and delayed delivery from that source.
+Set `HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES` to comma-separated `source:audience` grants, for example
+`scm.pull-request.diff:PRACTICE_DETECTION`. Grant detection, learner feedback, mentoring, and operator QA separately.
+Leaving it empty is safe: review jobs decline without collecting evidence or making a semantic judgment. Wildcards
+are rejected so upgrades cannot silently authorize new sources or uses. Remove a grant and restart the server and
+workers to stop that use.
+
+#### 🔴 Outline connections require approved origins
+
+**Affected**: deployments that enable the Outline integration.
+
+Set `HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS` to the comma-separated HTTPS origins whose operator role,
+region, transfer basis, retention, and AVV status have been reviewed. An empty list blocks Outline connections,
+sync, webhook collection, evidence projection, and identity linking. Set the same value on server, worker, and
+webhook roles and restart all three. Disconnect connections for removed origins; remove all grants for
+`outline.documents` until residual mirrored data has been erased.
 
 #### 🔴 Untouched instances start with Silent Mode engaged
 
@@ -124,14 +135,8 @@ version first and keep its startup log to hand.
 
 1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`,
    `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, and every `AGENT_DEFAULT_CONFIG_*` variable from your
-   deployment. None of them is read any more and none of them is an error, so nothing breaks if you
-   leave one behind — but nothing reliably reminds you either. Do this by grepping your own
-   configuration; do not wait for the startup log to tell you. The boot-time "`… is set but no longer
-   read`" warning only fires for a variable that reaches the JVM's own environment under its
-   `HEPHAESTUS_`-prefixed name, and the shipped Compose files no longer pass any of these into the
-   container — a stale line in `docker/.env` is therefore invisible to the application and draws no
-   warning. On a deployment that sets container environment directly (Kubernetes, systemd), the first
-   three do warn; `AGENT_DEFAULT_CONFIG_*` never does.
+   deployment. They are no longer read. Remove them by grepping your deployment configuration rather
+   than relying on startup diagnostics.
 2. Register your OpenAI-compatible endpoint(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's Administration → AI models). Each page tests the connection before you save it, so you learn the endpoint answers without waiting for a review to fail.
 3. **Review and re-enable each workspace's carried-over AI configuration.** The upgrade copies every
    agent configuration that was in use — endpoint, model name, encrypted API key, timeout,
@@ -184,7 +189,7 @@ version first and keep its startup log to hand.
 
 1. Set `AGENT_ENABLED=true` (replacing `AGENT_NATS_ENABLED=true`) on **every** role that needs to submit, execute, or recover jobs — not just the role that claims and runs them. In a split-pod deployment that means **both** `application-server` (submits jobs from PR/issue events and runs the orphan-recovery sweep — both gate on this same flag, independent of the worker role) **and** `application-worker` (claims and executes them, additionally gated on the worker role); `docker/compose.app.yaml` already sets the same `AGENT_ENABLED` value on both services. In the monolith, set it once. No profile turns it on for you: a pod you do not set it on claims nothing — including a `worker`-profile pod you start outside the shipped Compose files, which in earlier releases turned itself on.
 2. Confirm the flag actually took, on each side. Once the upgraded server is up, the `agent.queue.depth`, `agent.queue.oldest_age_seconds` and `agent.queue.running` metrics exist; if `AGENT_ENABLED` never reached that pod they are absent altogether rather than reading zero — which is the difference between "the queue is idle" and "the queue was never switched on". For the worker side, open a pull request and watch `agent.queue.oldest_age_seconds`: it should rise and fall. An age that only ever climbs means the server is submitting and no worker is claiming.
-3. Remove `AGENT_NATS_ENABLED`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment. None is read any more and none is an error — any of them still set names itself at boot with a "`… is set but no longer read`" warning. Leave `NATS_SERVER` alone: it is still live for webhook and sync ingest.
+3. Remove `AGENT_NATS_ENABLED`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment. They are no longer read. Leave `NATS_SERVER` alone: it is still live for webhook and sync ingest.
 4. Optional cleanup, after the upgraded instance has run long enough that you are not rolling back: the `AGENT` JetStream stream is no longer read from or written to. Delete it with `nats stream rm AGENT` if you want to reclaim its storage; leaving it in place is harmless.
 5. Do not remove NATS itself or `NATS_ENABLED` — webhook ingest and SCM/Slack sync still require it.
 

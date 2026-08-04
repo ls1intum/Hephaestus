@@ -247,9 +247,10 @@ services:
       # Inbound change notifications land on the shared-infra webhook-server, which needs the flag too
       # but no secret: Outline's webhook secret is per-subscription and stored on the connection row.
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
+      HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:-}
       # Link-only login provider (Slack-style account linking, never a sign-in button). BASE_URL is
       # REQUIRED whenever CLIENT_ID is set — Outline is self-hosted, so there is no default origin, and
-      # a blank/invalid value makes LoginProviderService skip the seed with only a WARN. The callback is
+      # a blank/invalid value makes LoginProviderService log an ERROR and skip the seed. The callback is
       # built from the API request's own origin plus HEPHAESTUS_AUTH_API_BASE_PATH, which is cleared
       # here — so it is https://<appserver-fqdn>/login/oauth2/code/outline, with NO /api segment (unlike
       # production). Outline matches redirect URIs exactly, so a per-PR host needs its own OAuth app.
@@ -260,10 +261,10 @@ services:
       # Feature flag; application.yml reads this exact name (see docker/compose.app.yaml).
       PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
-      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS:-}
+      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES:-}
+      HEPHAESTUS_FABRIC_ROOT: /data/git-repos
       HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
-      GIT_STORAGE_PATH: /data/git-repos
       # There is no separate worker container: hephaestus.runtime.worker.enabled defaults to true,
       # so this pod runs the worker role in-process and executes agent runs itself. That needs the
       # host Docker daemon — hence the docker.sock mount below.

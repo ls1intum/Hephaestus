@@ -18,11 +18,13 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Val
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -68,6 +70,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
 
     @Mock
+    private SlackThreadRepository slackThreadRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
@@ -93,13 +98,14 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             observationRepository,
             pullRequestRepository,
             issueRepository,
+            slackThreadRepository,
             eventPublisher,
             objectMapper,
             cas,
             sourceCatalogs
         );
 
-        lenient().when(sourceCatalogs.isSourceUsePermitted(any(), any())).thenReturn(true);
+        lenient().when(sourceCatalogs.isSourceUsePermitted(any(), any(), any())).thenReturn(true);
 
         Workspace workspace = new Workspace();
         ReflectionTestUtils.setField(workspace, "id", 1L);
@@ -208,9 +214,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             .put("startLine", 10)
             .put("endLine", 10)
             .put("quote", "+ insecure();");
-        evidence.putArray("sourceKinds").add("scm.pull-request.diff");
-        evidence.putArray("locations");
-        evidence.putArray("snippets");
         return new ValidatedFinding(
             slug,
             "Test finding",
@@ -254,12 +257,36 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void rejectsDiffCitationWithoutSide() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) finding.evidence().withArray("citations").get(0)).remove("side");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("invalid evidence citation");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        void rejectsNonDiffCitationWithSide() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ObjectNode citation = (ObjectNode) finding.evidence().withArray("citations").get(0);
+            citation.put("sourceKind", "scm.pull-request.core");
+            citation.put("artifactPath", "inputs/context/pull_request.json");
+            citation.put("path", "pull_request.json");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("invalid evidence citation");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
         void rejectsSourcesOutsideThePracticeDeclaration() {
             ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
-            ((ObjectNode) ((ObjectNode) finding.evidence()).withArray("citations").get(0)).put(
-                "sourceKind",
-                "scm.repository.tree"
-            );
+            ObjectNode citation = (ObjectNode) finding.evidence().withArray("citations").get(0);
+            citation.put("sourceKind", "scm.repository.tree");
+            citation.remove("side");
 
             assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
                 .isInstanceOf(JobDeliveryException.class)
@@ -269,7 +296,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void rejectsASourceWithdrawnAfterCapture() {
-            when(sourceCatalogs.isSourceUsePermitted(any(), any())).thenReturn(false);
+            when(
+                sourceCatalogs.isSourceUsePermitted(any(), any(), eq(SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS))
+            ).thenReturn(false);
 
             assertThatThrownBy(() ->
                 service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)))
@@ -277,13 +306,18 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("authorization was withdrawn");
             verifyNoInteractions(observationRepository);
+            verify(sourceCatalogs).isSourceUsePermitted(
+                any(),
+                any(),
+                eq(SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+            );
         }
 
         @Test
         void rejectsAnUncitedSourceWithdrawnAfterCapture() {
-            when(sourceCatalogs.isSourceUsePermitted(any(), eq(new SourceKind("scm.pull-request.core")))).thenReturn(
-                false
-            );
+            when(
+                sourceCatalogs.isSourceUsePermitted(any(), eq(new SourceKind("scm.pull-request.core")), any())
+            ).thenReturn(false);
 
             assertThatThrownBy(() ->
                 service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)))
@@ -527,6 +561,22 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("does not match the live target");
             verifyNoInteractions(observationRepository, eventPublisher);
+        }
+
+        @Test
+        void conversationTargetMustMatchTheLiveWorkspaceThreadAndParticipant() {
+            ObjectNode metadata = objectMapper.createObjectNode();
+            metadata.put("artifact_type", WorkArtifact.CONVERSATION_THREAD.name());
+            metadata.put("slack_thread_id", 77L);
+            metadata.put("slack_channel_id", "C123");
+            metadata.put("slack_thread_ts", "1700000000.100000");
+            metadata.put("about_user_id", 789L);
+            testJob.setMetadata(metadata);
+
+            assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "resolveTarget", testJob, metadata))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("no longer authorized");
+            verify(slackThreadRepository).existsDeliverableThread(77L, 1L, "C123", "1700000000.100000", 789L);
         }
     }
 

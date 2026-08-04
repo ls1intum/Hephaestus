@@ -187,12 +187,13 @@ services:
       # NOT a secret: Outline's webhook secret is per-subscription, minted by OutlineWebhookRegistrar
       # and stored encrypted on the connection row (unlike Slack's one global signing secret).
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
+      HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:-}
       # Link-only login provider (Slack-style): attaches a member's Outline identity to their
       # Hephaestus account so mirrored documents can be attributed; it is never a sign-in button.
       # Independent of the flag above and of the per-workspace API key. Callback:
       # https://<host>/api/login/oauth2/code/outline. BASE_URL is REQUIRED whenever CLIENT_ID is set —
       # Outline is self-hosted, so there is no default origin, and a blank/invalid value makes
-      # LoginProviderService skip the seed with only a WARN (no boot failure, no linking button).
+      # LoginProviderService logs an ERROR and skips the seed (no boot failure, no linking button).
       OUTLINE_OAUTH_BASE_URL: ${OUTLINE_OAUTH_BASE_URL:-}
       OUTLINE_OAUTH_DISPLAY_NAME: ${OUTLINE_OAUTH_DISPLAY_NAME:-Outline}
       OUTLINE_OAUTH_CLIENT_ID: ${OUTLINE_OAUTH_CLIENT_ID:-}
@@ -219,21 +220,9 @@ services:
       # Agent job queue (practice review). The queue runs on PostgreSQL — no NATS involved. NATS
       # stays required elsewhere on this pod for webhook-driven sync consumption (NATS_ENABLED above).
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
-      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS:-}
+      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES:-}
+      HEPHAESTUS_FABRIC_ROOT: /data/git-repos
       HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
-      # ── Retired. Nothing reads these; they are forwarded for ONE release so a stale line in your
-      # docker/.env is visible. A .env entry is a Compose interpolation input, not container
-      # environment: without this block the JVM never sees it and DeprecatedEnvVarStartupWarner
-      # cannot name it. Unset, each resolves to "" and the warner treats blank as absent — set to
-      # anything and you get one WARN at boot per var, on this pod only (deliberately: the other
-      # pods would just repeat it). DELETE this block, and the matching entries in
-      # DeprecatedEnvVarStartupWarner, in the release after the one that retired them.
-      HEPHAESTUS_WORKER_LLM_BASE_URL: ${HEPHAESTUS_WORKER_LLM_BASE_URL:-}
-      HEPHAESTUS_WORKER_LLM_API_KEY: ${HEPHAESTUS_WORKER_LLM_API_KEY:-}
-      HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:-}
-      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-}
-      AGENT_NATS_MAX_ACK_PENDING: ${AGENT_NATS_MAX_ACK_PENDING:-}
-      AGENT_NATS_FETCH_BATCH_SIZE: ${AGENT_NATS_FETCH_BATCH_SIZE:-}
       # Instance-wide LLM knobs. Providers, models, prices and credentials are NOT here — they are
       # runtime catalog data an instance admin registers in the UI. These three are the deploy-time
       # facts that cannot be.
@@ -249,7 +238,6 @@ services:
       HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK: ${HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK:-false}
       # Git checkout (bind-mount repos into agent containers)
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
-      GIT_STORAGE_PATH: /data/git-repos
       # Practice review gate (auto-trigger is now a per-workspace setting)
       PRACTICE_REVIEW_RUN_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       PRACTICE_REVIEW_SKIP_DRAFTS: ${PRACTICE_REVIEW_SKIP_DRAFTS:-true}
@@ -345,7 +333,8 @@ services:
       # Agent job queue (practice review). The queue runs on PostgreSQL — this pod needs no NATS at
       # all (it runs no sync/webhook role), so no NATS_SERVER is set here.
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
-      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_KINDS:-}
+      HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES: ${HEPHAESTUS_EVIDENCE_AUTHORIZED_SOURCE_USES:-}
+      HEPHAESTUS_FABRIC_ROOT: /data/git-repos
       HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
@@ -377,9 +366,11 @@ services:
       # #prepareInputFiles → WorkspaceContextBuilder), and OutlineDocumentContentSource carries only
       # the integration gate — no runtime-role gate. Without this flag the source bean is absent here
       # and every review/mentor run silently ships a context with no wiki documents. It reads the
-      # mirrored rows from Postgres, so it needs no Outline URL, key or OAuth client of its own.
+      # mirrored rows from Postgres, so it needs no Outline API credential or OAuth client. It does
+      # need the same operator-approved origin allowlist as the server and webhook roles.
       # Keep in lockstep with application-server's value.
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
+      HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:-}
       # Slack, like Outline, ships role-agnostic slack.enabled-gated beans (mentor, ingest, credential
       # provider, NATS subscription provider) that the worker's shared JPA/context layer instantiates.
       # Wire it to the worker exactly like Outline so both integrations load identically here.

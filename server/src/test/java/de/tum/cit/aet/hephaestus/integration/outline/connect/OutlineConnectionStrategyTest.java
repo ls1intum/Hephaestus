@@ -6,11 +6,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectInitiation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.InitiateRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
@@ -18,7 +20,9 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
@@ -45,7 +49,8 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
             webhookRegistrar,
             outlineDocumentRepository,
             outlineCollectionRepository,
-            outlineDocumentEventRepository
+            outlineDocumentEventRepository,
+            new OutlineOriginPolicy(Set.of("https://app.getoutline.com"))
         );
     }
 
@@ -76,6 +81,17 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
         assertThatThrownBy(() -> strategy().initiate(request(Map.of("server_url", "https://app.getoutline.com"))))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("token");
+    }
+
+    @Test
+    void initiate_rejectsAnOriginOutsideTheOperatorAllowlist() {
+        assertThatThrownBy(() ->
+            strategy().initiate(request(Map.of("server_url", "https://outline.example.com", "token", "tok-123")))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("not approved");
+
+        verifyNoInteractions(outlineApiClient);
     }
 
     @Test

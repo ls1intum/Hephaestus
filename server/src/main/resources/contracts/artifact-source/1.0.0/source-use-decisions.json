@@ -2,13 +2,15 @@
   "contractVersion": "1.0.0",
   "decisions": [
     {
-      "id": "use-scm-pull-request-core",
+      "id": "use-scm-pull-request-core-detection",
       "source": "scm.pull-request.core",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -18,13 +20,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-pull-request-diff",
+      "id": "use-scm-pull-request-core-feedback",
+      "source": "scm.pull-request.core",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-core-mentoring",
+      "source": "scm.pull-request.core",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-core-operator-qa",
+      "source": "scm.pull-request.core",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-diff-detection",
       "source": "scm.pull-request.diff",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -34,13 +92,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-pull-request-comments",
+      "id": "use-scm-pull-request-diff-feedback",
+      "source": "scm.pull-request.diff",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-diff-mentoring",
+      "source": "scm.pull-request.diff",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-diff-operator-qa",
+      "source": "scm.pull-request.diff",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-comments-detection",
       "source": "scm.pull-request.comments",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -50,13 +164,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-repository-tree",
+      "id": "use-scm-pull-request-comments-feedback",
+      "source": "scm.pull-request.comments",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-comments-mentoring",
+      "source": "scm.pull-request.comments",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-pull-request-comments-operator-qa",
+      "source": "scm.pull-request.comments",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-repository-tree-detection",
       "source": "scm.repository.tree",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -66,13 +236,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-issue-core",
+      "id": "use-scm-repository-tree-feedback",
+      "source": "scm.repository.tree",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-repository-tree-mentoring",
+      "source": "scm.repository.tree",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-repository-tree-operator-qa",
+      "source": "scm.repository.tree",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-issue-core-detection",
       "source": "scm.issue.core",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -82,13 +308,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-issue-comments",
+      "id": "use-scm-issue-core-feedback",
+      "source": "scm.issue.core",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-issue-core-mentoring",
+      "source": "scm.issue.core",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-issue-core-operator-qa",
+      "source": "scm.issue.core",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-issue-comments-detection",
       "source": "scm.issue.comments",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -98,13 +380,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-slack-conversation-thread",
+      "id": "use-scm-issue-comments-feedback",
+      "source": "scm.issue.comments",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-issue-comments-mentoring",
+      "source": "scm.issue.comments",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-issue-comments-operator-qa",
+      "source": "scm.issue.comments",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-slack-conversation-thread-detection",
       "source": "slack.conversation.thread",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -114,13 +452,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-linked-work-items",
+      "id": "use-slack-conversation-thread-feedback",
+      "source": "slack.conversation.thread",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-slack-conversation-thread-mentoring",
+      "source": "slack.conversation.thread",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-slack-conversation-thread-operator-qa",
+      "source": "slack.conversation.thread",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-linked-work-items-detection",
       "source": "scm.linked-work-items",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -130,13 +524,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-review-threads",
+      "id": "use-scm-linked-work-items-feedback",
+      "source": "scm.linked-work-items",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-linked-work-items-mentoring",
+      "source": "scm.linked-work-items",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-linked-work-items-operator-qa",
+      "source": "scm.linked-work-items",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-review-threads-detection",
       "source": "scm.review-threads",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -146,13 +596,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-scm-general-review-comments",
+      "id": "use-scm-review-threads-feedback",
+      "source": "scm.review-threads",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-review-threads-mentoring",
+      "source": "scm.review-threads",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-review-threads-operator-qa",
+      "source": "scm.review-threads",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-general-review-comments-detection",
       "source": "scm.general-review-comments",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -162,13 +668,69 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-workspace-project-inventory",
+      "id": "use-scm-general-review-comments-feedback",
+      "source": "scm.general-review-comments",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-general-review-comments-mentoring",
+      "source": "scm.general-review-comments",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-scm-general-review-comments-operator-qa",
+      "source": "scm.general-review-comments",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-workspace-project-inventory-detection",
       "source": "workspace.project-inventory",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -178,14 +740,124 @@
       "expiresAt": "2027-08-03T00:00:00Z"
     },
     {
-      "id": "use-outline-documents",
+      "id": "use-workspace-project-inventory-feedback",
+      "source": "workspace.project-inventory",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-workspace-project-inventory-mentoring",
+      "source": "workspace.project-inventory",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-workspace-project-inventory-operator-qa",
+      "source": "workspace.project-inventory",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-outline-documents-detection",
       "source": "outline.documents",
       "purpose": "practice-detection",
       "mode": "PRODUCT",
       "basis": "ENGINEERING_BASELINE",
       "outcome": "ENGINEERING_APPROVED",
-      "audience": "practice-detector",
+      "audiences": [
+        "PRACTICE_DETECTION"
+      ],
       "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-outline-documents-feedback",
+      "source": "outline.documents",
+      "purpose": "practice-feedback",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_FEEDBACK_RECIPIENTS"
+      ],
+      "modelProcessor": null,
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-outline-documents-mentoring",
+      "source": "outline.documents",
+      "purpose": "practice-mentoring",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "PRACTICE_MENTORING"
+      ],
+      "modelProcessor": "workspace-configured-llm",
+      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+      "recordedAt": "2026-08-03T00:00:00Z",
+      "reviewer": "Hephaestus maintainers (PR #1444)",
+      "decidedAt": "2026-08-03T00:00:00Z",
+      "expiresAt": "2027-08-03T00:00:00Z"
+    },
+    {
+      "id": "use-outline-documents-operator-qa",
+      "source": "outline.documents",
+      "purpose": "operator-quality-assurance",
+      "mode": "PRODUCT",
+      "basis": "ENGINEERING_BASELINE",
+      "outcome": "ENGINEERING_APPROVED",
+      "audiences": [
+        "OPERATOR_QUALITY_ASSURANCE"
+      ],
+      "modelProcessor": null,
       "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
       "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
       "recordedAt": "2026-08-03T00:00:00Z",

@@ -54,7 +54,7 @@ class MentorContextKeysRunnerMirrorTest {
         String prompt = Files.readString(SYSTEM_PROMPT, StandardCharsets.UTF_8);
         String perTurnInputSection = prompt.substring(
             prompt.indexOf("## Per-turn input"),
-            prompt.indexOf("### Reading `inputs/context/practice_standing.json`")
+            prompt.indexOf("## When to use tools")
         );
 
         assertThat(MentorContextKeys.ALLOWED_OUTPUT_KEYS).allSatisfy(key ->

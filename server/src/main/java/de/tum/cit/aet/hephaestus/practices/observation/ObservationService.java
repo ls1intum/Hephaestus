@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.agent.context.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -52,6 +54,7 @@ public class ObservationService {
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final UserRepository userRepository;
+    private final ObservationVisibilityPolicy visibilityPolicy;
 
     /**
      * Paginated findings for the current user in a workspace, with optional filters.
@@ -135,12 +138,13 @@ public class ObservationService {
         // latest-run-deduped within a 90-day window (so cardinality is bounded by a developer's distinct
         // latest-run findings, not their full history), and the per-practice caps below do the real trimming —
         // so every practice with at least one actionable finding gets a card regardless of overall volume.
-        List<Observation> observations = observationRepository.findRecentByDeveloperAndWorkspace(
-            currentUser.get().getId(),
-            workspaceId,
-            since,
-            Pageable.unpaged()
-        );
+        List<Observation> observations = observationRepository
+            .findRecentByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId, since, Pageable.unpaged())
+            .stream()
+            .filter(observation ->
+                visibilityPolicy.permits(workspaceId, observation, SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS)
+            )
+            .toList();
 
         // Advice lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the
         // observation-id → delivered-body map ONCE for every observation on this surface so each card's items can

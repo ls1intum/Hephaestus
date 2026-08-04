@@ -16,6 +16,36 @@ import {
 	severityBadgeVariant,
 } from "./review-format";
 
+type NonCurrentClaimStatus = Exclude<ReviewFinding["claimStatus"], "CURRENT">;
+
+const CLAIM_STATUS_CONFIG = {
+	STALE: {
+		badge: "Outdated result",
+		badgeVariant: "warning",
+		Icon: ClockAlert,
+		title: "This result is outdated",
+		description:
+			"The practice definition has changed since this result was produced. Keep it as history, not as a current assessment.",
+	},
+	UNVERIFIABLE: {
+		badge: "Claim validity unknown",
+		badgeVariant: "outline",
+		Icon: CircleHelp,
+		title: "This claim cannot be verified",
+		description:
+			"The provenance needed to compare this result with the current practice is unavailable. Do not treat it as a current assessment.",
+	},
+} as const satisfies Record<
+	NonCurrentClaimStatus,
+	{
+		badge: string;
+		badgeVariant: "warning" | "outline";
+		Icon: typeof ClockAlert;
+		title: string;
+		description: string;
+	}
+>;
+
 export function FeedbackStateBadge({ state }: { state: ReviewFeedback["deliveryState"] }) {
 	return <Badge variant={deliveryStateBadgeVariant(state)}>{DELIVERY_STATE_LABELS[state]}</Badge>;
 }
@@ -45,26 +75,18 @@ export function FindingAssessmentBadge({ finding }: { finding: FindingAssessment
 
 export function ClaimStatusBadge({ status }: { status: ReviewFinding["claimStatus"] }) {
 	if (status === "CURRENT") return null;
-	return (
-		<Badge variant={status === "STALE" ? "warning" : "outline"}>
-			{status === "STALE" ? "Outdated result" : "Claim validity unknown"}
-		</Badge>
-	);
+	const config = CLAIM_STATUS_CONFIG[status];
+	return <Badge variant={config.badgeVariant}>{config.badge}</Badge>;
 }
 
 export function ClaimStatusAlert({ status }: { status: ReviewFinding["claimStatus"] }) {
 	if (status === "CURRENT") return null;
-	const stale = status === "STALE";
-	const Icon = stale ? ClockAlert : CircleHelp;
+	const { Icon, title, description } = CLAIM_STATUS_CONFIG[status];
 	return (
 		<Alert variant="warning">
 			<Icon />
-			<AlertTitle>{stale ? "This result is outdated" : "This claim cannot be verified"}</AlertTitle>
-			<AlertDescription>
-				{stale
-					? "The practice definition has changed since this result was produced. Keep it as history, not as a current assessment."
-					: "The provenance needed to compare this result with the current practice is unavailable. Do not treat it as a current assessment."}
-			</AlertDescription>
+			<AlertTitle>{title}</AlertTitle>
+			<AlertDescription>{description}</AlertDescription>
 		</Alert>
 	);
 }

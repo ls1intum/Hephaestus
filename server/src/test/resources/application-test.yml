@@ -61,7 +61,8 @@ hephaestus:
         worker:
             enabled: false
     evidence:
-        authorized-source-kinds: "*"
+        authorized-source-uses: >-
+            scm.pull-request.core:PRACTICE_DETECTION,scm.pull-request.core:PRACTICE_FEEDBACK_RECIPIENTS,scm.pull-request.core:PRACTICE_MENTORING,scm.pull-request.core:OPERATOR_QUALITY_ASSURANCE,scm.pull-request.diff:PRACTICE_DETECTION,scm.pull-request.diff:PRACTICE_FEEDBACK_RECIPIENTS,scm.pull-request.diff:PRACTICE_MENTORING,scm.pull-request.diff:OPERATOR_QUALITY_ASSURANCE,scm.pull-request.comments:PRACTICE_DETECTION,scm.pull-request.comments:PRACTICE_FEEDBACK_RECIPIENTS,scm.pull-request.comments:PRACTICE_MENTORING,scm.pull-request.comments:OPERATOR_QUALITY_ASSURANCE,scm.repository.tree:PRACTICE_DETECTION,scm.repository.tree:PRACTICE_FEEDBACK_RECIPIENTS,scm.repository.tree:PRACTICE_MENTORING,scm.repository.tree:OPERATOR_QUALITY_ASSURANCE,scm.issue.core:PRACTICE_DETECTION,scm.issue.core:PRACTICE_FEEDBACK_RECIPIENTS,scm.issue.core:PRACTICE_MENTORING,scm.issue.core:OPERATOR_QUALITY_ASSURANCE,scm.issue.comments:PRACTICE_DETECTION,scm.issue.comments:PRACTICE_FEEDBACK_RECIPIENTS,scm.issue.comments:PRACTICE_MENTORING,scm.issue.comments:OPERATOR_QUALITY_ASSURANCE,slack.conversation.thread:PRACTICE_DETECTION,slack.conversation.thread:PRACTICE_FEEDBACK_RECIPIENTS,slack.conversation.thread:PRACTICE_MENTORING,slack.conversation.thread:OPERATOR_QUALITY_ASSURANCE,scm.linked-work-items:PRACTICE_DETECTION,scm.linked-work-items:PRACTICE_FEEDBACK_RECIPIENTS,scm.linked-work-items:PRACTICE_MENTORING,scm.linked-work-items:OPERATOR_QUALITY_ASSURANCE,scm.review-threads:PRACTICE_DETECTION,scm.review-threads:PRACTICE_FEEDBACK_RECIPIENTS,scm.review-threads:PRACTICE_MENTORING,scm.review-threads:OPERATOR_QUALITY_ASSURANCE,scm.general-review-comments:PRACTICE_DETECTION,scm.general-review-comments:PRACTICE_FEEDBACK_RECIPIENTS,scm.general-review-comments:PRACTICE_MENTORING,scm.general-review-comments:OPERATOR_QUALITY_ASSURANCE,workspace.project-inventory:PRACTICE_DETECTION,workspace.project-inventory:PRACTICE_FEEDBACK_RECIPIENTS,workspace.project-inventory:PRACTICE_MENTORING,workspace.project-inventory:OPERATOR_QUALITY_ASSURANCE,outline.documents:PRACTICE_DETECTION,outline.documents:PRACTICE_FEEDBACK_RECIPIENTS,outline.documents:PRACTICE_MENTORING,outline.documents:OPERATOR_QUALITY_ASSURANCE
     # Loud enforcement under test: any unguarded scoped-table query throws.
     # Production runs in 'log' mode for the staging canary period; this override
     # ensures tenancy bugs surface in CI rather than being masked.
@@ -107,9 +108,10 @@ hephaestus:
             server: nats://localhost:4222
             replay-timeframe-days: 1
             durable-consumer-name: test-consumer
+    fabric:
+        root: /tmp/hephaestus-test-git-repos
     git:
         enabled: false
-        storage-path: /tmp/hephaestus-test-git-repos
     practice-review:
         cooldown-minutes: 0
 

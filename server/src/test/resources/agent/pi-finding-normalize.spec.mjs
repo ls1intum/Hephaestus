@@ -1,5 +1,3 @@
-// Keep the sandbox output boundary aligned with the Java consumer.
-
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
@@ -81,6 +79,16 @@ test("citation requires an exact artifact path and quote", () => {
     assert.throws(() => normalizeFinding(missingQuote), /quote is required/);
 });
 
+test("citation side is present exactly for pull-request diffs", () => {
+    const missingDiffSide = baseFinding();
+    delete missingDiffSide.evidence.citations[0].side;
+    assert.throws(() => normalizeFinding(missingDiffSide), /side must be OLD or NEW/);
+
+    const nonDiffSide = baseFinding();
+    nonDiffSide.evidence.citations[0].sourceKind = "scm.pull-request.core";
+    assert.throws(() => normalizeFinding(nonDiffSide), /must not specify side/);
+});
+
 test("evidence sources must be declared and available", () => {
     const finding = normalizeFinding(baseFinding());
     assert.doesNotThrow(() =>
@@ -113,7 +121,8 @@ test("evidence sources must be declared and available", () => {
 
 test("diff citations bind the quote to the claimed file and line", () => {
     const citation = normalizeFinding(baseFinding()).evidence.citations[0];
-    const diff = "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
+    const diff =
+        "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
     assert.equal(citationMatchesArtifact(citation, diff), true);
     assert.equal(citationMatchesArtifact({ ...citation, path: "src/Other.java" }, diff), false);
     assert.equal(citationMatchesArtifact({ ...citation, startLine: 11 }, diff), false);

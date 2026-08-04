@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
@@ -119,6 +121,17 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldAuthorizeCaptureForTheDetectionAudience() {
+        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
+        ContextManifestBuilder target = new ContextManifestBuilder(cas, layout, mapper, catalogs, Clock.systemUTC());
+        SourceContractVersion version = new SourceContractVersion("1.0.0");
+
+        target.isSourceUsePermitted(version, DIFF);
+
+        verify(catalogs).isSourceUsePermitted(version, DIFF, SourceUseAudience.PRACTICE_DETECTION);
+    }
+
+    @Test
     void shouldRepresentAWhollyWithheldSourceAsRedactedWithoutLeakingArtifacts() {
         Map<String, byte[]> files = new LinkedHashMap<>();
 
@@ -146,7 +159,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     void shouldDeclineWhenRequiredEvidenceIsStale() {
         var manifest = coreManifest(builder, "job-stale", Instant.EPOCH);
 
-        assertThat(builder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")))).isEmpty();
+        assertThat(
+            builder.assessPractices(manifest, List.of(practiceRequiring(CORE, "pr-core"))).readyPractices()
+        ).isEmpty();
     }
 
     @Test
@@ -155,7 +170,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         ContextManifestBuilder replayBuilder = builderAt(NOW.plusSeconds(301));
 
-        assertThat(replayBuilder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")))).isEmpty();
+        assertThat(
+            replayBuilder.assessPractices(manifest, List.of(practiceRequiring(CORE, "pr-core"))).readyPractices()
+        ).isEmpty();
     }
 
     @Test
@@ -163,7 +180,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-refused", Instant.EPOCH);
 
         assertThat(
-            builder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")), "job-refused")
+            builder
+                .prepareReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")), "job-refused", NOW)
+                .readyPractices()
         ).isEmpty();
         JsonNode report = mapper.readTree(
             layout.jobDir("job-refused").resolve("practice-readiness-report.json").toFile()
@@ -181,7 +200,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         var manifest = builder.augment(files, Map.of(), "job-empty", plan(Set.of(COMMENTS)), metadata(COMMENTS, NOW));
         Practice practice = practiceRequiringComments();
 
-        assertThat(builder.readyPractices(manifest, List.of(practice))).containsExactly(practice);
+        assertThat(builder.assessPractices(manifest, List.of(practice)).readyPractices()).containsExactly(practice);
     }
 
     @Test
@@ -212,7 +231,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             manifest.viewTransformations()
         );
 
-        assertThatThrownBy(() -> builder.readyPractices(changedContract, List.of(practiceRequiringComments())))
+        assertThatThrownBy(() -> builder.assessPractices(changedContract, List.of(practiceRequiringComments())))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("exact source contract");
     }
@@ -237,7 +256,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
         Practice practice = practiceRequiring(CONVERSATION, "conversation");
 
-        assertThat(builder.readyPractices(manifest, List.of(practice))).containsExactly(practice);
+        assertThat(builder.assessPractices(manifest, List.of(practice)).readyPractices()).containsExactly(practice);
     }
 
     @Test
@@ -247,7 +266,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         Practice practice = practiceRequiring(CORE, "pr-core");
         assertThat(
-            laterBuilder.readyPractices(manifest, List.of(practice), "job-future-watermark", NOW)
+            laterBuilder.prepareReadiness(manifest, List.of(practice), "job-future-watermark", NOW).readyPractices()
         ).containsExactly(practice);
     }
 
@@ -255,7 +274,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     void shouldRejectMirrorWatermarkAfterCaptureTime() {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-invalid-watermark", NOW.plusSeconds(60));
 
-        assertThat(builder.readyPractices(manifest, List.of(practiceRequiring(CORE, "pr-core")))).isEmpty();
+        assertThat(
+            builder.assessPractices(manifest, List.of(practiceRequiring(CORE, "pr-core"))).readyPractices()
+        ).isEmpty();
     }
 
     @Test
@@ -272,9 +293,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
         Practice practice = practiceRequiring(CORE, "pr-core");
 
-        assertThat(delayedBuilder.readyPractices(manifest, List.of(practice), "job-delayed", NOW)).containsExactly(
-            practice
-        );
+        assertThat(
+            delayedBuilder.prepareReadiness(manifest, List.of(practice), "job-delayed", NOW).readyPractices()
+        ).containsExactly(practice);
         JsonNode assessment = mapper
             .readTree(layout.jobDir("job-delayed").resolve("practice-readiness-report.json").toFile())
             .path("decisions")
@@ -325,7 +346,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldRejectGeneratedMissingnessForbiddenByTheSourceContract() {
-        var realCatalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC());
+        var realCatalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC(), "");
         ArtifactSourceContract diff = realCatalogs.requireSource(plan(Set.of(DIFF)).contractVersion(), DIFF);
         ArtifactSourceContract restrictedDiff = new ArtifactSourceContract(
             diff.kind(),
@@ -341,7 +362,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             diff.purpose(),
             diff.retentionPolicy(),
             diff.erasurePolicy(),
-            diff.useDecisionId()
+            diff.useDecisionIds()
         );
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
         when(catalogs.requireProfile(any(), any())).thenAnswer(invocation ->
@@ -383,7 +404,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         assertThatThrownBy(() ->
-            builder.readyPractices(manifest, List.of(practiceRequiring(CONVERSATION, "conversation")))
+            builder.assessPractices(manifest, List.of(practiceRequiring(CONVERSATION, "conversation")))
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("does not match manifest");
@@ -479,7 +500,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             cas,
             layout,
             mapper,
-            new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
+            new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC(), ""),
             Clock.fixed(instant, java.time.ZoneOffset.UTC)
         );
     }

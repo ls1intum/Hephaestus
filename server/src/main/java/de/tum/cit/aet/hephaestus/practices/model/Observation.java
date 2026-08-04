@@ -203,21 +203,6 @@ public class Observation {
     @Column(name = "confidence", nullable = false)
     private Float confidence;
 
-    /**
-     * Structured evidence supporting the observation. Recommended shape:
-     *
-     * <pre>{@code
-     * {
-     *   "locations": [{"path": "src/Main.java", "startLine": 42, "endLine": 50}],
-     *   "snippets": ["try { ... } catch (Exception e) {}"],
-     *   "references": ["https://example.com/best-practices"]
-     * }
-     * }</pre>
-     *
-     * <p>Location data lives here (not as top-level columns) because many practices
-     * (PR description quality, review thoroughness) have no file location, and
-     * multi-location findings need arrays.
-     */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evidence", columnDefinition = "jsonb")
     private JsonNode evidence;

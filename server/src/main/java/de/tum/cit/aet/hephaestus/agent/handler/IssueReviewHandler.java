@@ -119,7 +119,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
-        List<Practice> practices = practiceCatalogInjector.resolve(job, WorkArtifact.ISSUE);
+        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, WorkArtifact.ISSUE);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.IssueReviewRequest(job),
             EvidencePlan.compile(practices)
@@ -171,7 +171,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json, and " +
             "inputs/context/project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then " +
             "evaluate each practice in inputs/practices/ against the issue and persist every justified finding via the " +
-            "report_finding tool. Evidence locations should reference the issue thread/metadata, not source files. " +
+            "report_finding tool. Evidence citations should reference the issue thread/metadata, not source files. " +
             "Follow " +
             SandboxLayout.ORCHESTRATOR_PATH +
             " for the finding schema and rules.";

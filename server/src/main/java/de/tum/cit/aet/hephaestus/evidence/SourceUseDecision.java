@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.evidence;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
-/** Machine registration of a source-use basis. It is not, by itself, legal authorization. */
 public record SourceUseDecision(
     String id,
     SourceKind source,
@@ -12,7 +12,7 @@ public record SourceUseDecision(
     SourceUseMode mode,
     SourceUseBasis basis,
     SourceUseOutcome outcome,
-    String audience,
+    Set<SourceUseAudience> audiences,
     @Nullable String modelProcessor,
     RetentionPolicy retentionPolicy,
     ErasurePolicy erasurePolicy,
@@ -28,7 +28,10 @@ public record SourceUseDecision(
         Objects.requireNonNull(mode, "mode");
         Objects.requireNonNull(basis, "basis");
         Objects.requireNonNull(outcome, "outcome");
-        audience = requireText(audience, "audience");
+        audiences = Set.copyOf(Objects.requireNonNull(audiences, "audiences"));
+        if (audiences.isEmpty()) {
+            throw new IllegalArgumentException("Source-use decision requires at least one audience");
+        }
         if (modelProcessor != null && modelProcessor.isBlank()) {
             throw new IllegalArgumentException("modelProcessor must be null or non-blank");
         }
@@ -59,9 +62,10 @@ public record SourceUseDecision(
      * Whether this entry keeps product runtime use operational. A {@code true} result is an engineering gate,
      * never a controller or DPO approval.
      */
-    public boolean permitsProductUseAt(Instant instant) {
+    public boolean permitsProductUseAt(Instant instant, SourceUseAudience audience) {
         Objects.requireNonNull(instant, "instant");
-        if (mode != SourceUseMode.PRODUCT || instant.isBefore(recordedAt)) {
+        Objects.requireNonNull(audience, "audience");
+        if (mode != SourceUseMode.PRODUCT || !audiences.contains(audience) || instant.isBefore(recordedAt)) {
             return false;
         }
         if (basis == SourceUseBasis.ENGINEERING_BASELINE) {

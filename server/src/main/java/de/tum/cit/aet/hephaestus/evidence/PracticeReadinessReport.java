@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-/** Audit record proving which practices were admitted or refused before model execution. */
 public record PracticeReadinessReport(
     SourceContractVersion contractVersion,
     String catalogDigest,

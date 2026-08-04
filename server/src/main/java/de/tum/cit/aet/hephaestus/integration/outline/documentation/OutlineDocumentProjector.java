@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.documentation;
 
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -65,23 +66,27 @@ public class OutlineDocumentProjector implements DocumentProjection {
     private final ConnectionService connectionService;
     private final OutlineIdentityResolver identityResolver;
     private final OutlineDocumentSelector documentSelector;
+    private final OutlineOriginPolicy originPolicy;
 
     public OutlineDocumentProjector(
         OutlineDocumentRepository documentRepository,
         OutlineCollectionRepository collectionRepository,
         ConnectionService connectionService,
         OutlineIdentityResolver identityResolver,
-        OutlineDocumentSelector documentSelector
+        OutlineDocumentSelector documentSelector,
+        OutlineOriginPolicy originPolicy
     ) {
         this.documentRepository = documentRepository;
         this.collectionRepository = collectionRepository;
         this.connectionService = connectionService;
         this.identityResolver = identityResolver;
         this.documentSelector = documentSelector;
+        this.originPolicy = originPolicy;
     }
 
     @Override
     public List<ProjectedDocument> documentsForWorkspace(long workspaceId) {
+        if (!isOriginApproved(workspaceId)) return List.of();
         AuthorContext authors = authorContext(workspaceId);
         Map<String, String> collectionNames = collectionNames(workspaceId);
         return documentRepository
@@ -93,6 +98,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
 
     @Override
     public List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs) {
+        if (!isOriginApproved(workspaceId)) return List.of();
         if (documentRefs == null || documentRefs.isEmpty()) {
             return List.of();
         }
@@ -136,6 +142,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
 
     @Override
     public List<ProjectedDocument> searchDocuments(long workspaceId, String queryText, int limit) {
+        if (!isOriginApproved(workspaceId)) return List.of();
         List<OutlineDocument> hits = documentSelector.select(workspaceId, queryText, limit);
         if (hits.isEmpty()) {
             return List.of();
@@ -159,6 +166,15 @@ public class OutlineDocumentProjector implements DocumentProjection {
             references.add(matcher.group());
         }
         return references;
+    }
+
+    private boolean isOriginApproved(long workspaceId) {
+        return connectionService
+            .findActiveOutlineConfig(workspaceId)
+            .map(ConnectionConfig.OutlineConfig::serverUrl)
+            .filter(url -> url != null && !url.isBlank())
+            .filter(originPolicy::allows)
+            .isPresent();
     }
 
     /** Maps a mirrored row to the agent view; a tombstoned/evicted document serves a null body. */

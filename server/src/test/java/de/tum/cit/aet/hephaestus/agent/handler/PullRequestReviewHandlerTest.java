@@ -432,41 +432,44 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingInDiff() {
-            var finding = finding("fatal-error-crash", Presence.ABSENT, "Sources/View.swift");
+            var finding = finding(Presence.ABSENT, "scm.pull-request.diff", "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
-        void keepsFindingBackedByMetadata() {
-            var finding = finding("describe-what-and-why", Presence.ABSENT, "inputs/context/metadata.json");
+        void keepsFindingBackedByNonDiffSource() {
+            var finding = finding(Presence.ABSENT, "scm.pull-request.core", "body");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
-        void filtersFindingBackedByNonWhitelistedInternal() {
-            var finding = finding("review-noise", Presence.ABSENT, "inputs/context/private_notes.json");
+        void filtersFindingWithoutSourceIdentity() {
+            var finding = finding(Presence.ABSENT, "", "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
         @Test
         void filtersFindingOutsideDiff() {
-            var finding = finding("view-logic-separation", Presence.ABSENT, "Sources/Other.swift");
+            var finding = finding(Presence.ABSENT, "scm.pull-request.diff", "Sources/Other.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Presence presence, String path) {
-            // Assessment mapping: PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
+        private PracticeDetectionResultParser.ValidatedFinding finding(
+            Presence presence,
+            String sourceKind,
+            String path
+        ) {
             Assessment assessment = switch (presence) {
                 case PRESENT -> Assessment.GOOD;
                 case ABSENT -> Assessment.BAD;
                 case NOT_APPLICABLE -> null;
             };
             return new PracticeDetectionResultParser.ValidatedFinding(
-                slug,
+                "fatal-error-crash",
                 "title",
                 presence,
                 assessment,
@@ -475,8 +478,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 objectMapper
                     .createObjectNode()
                     .set(
-                        "locations",
-                        objectMapper.createArrayNode().add(objectMapper.createObjectNode().put("path", path))
+                        "citations",
+                        objectMapper
+                            .createArrayNode()
+                            .add(objectMapper.createObjectNode().put("sourceKind", sourceKind).put("path", path))
                     ),
                 null,
                 null,
@@ -563,7 +568,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     "severity": "CRITICAL",
                     "confidence": 0.99,
                     "reasoning": "A live API key is committed.",
-                    "evidence": { "locations": [{ "path": "Sources/Config.swift", "startLine": 3 }] }
+                    "evidence": { "citations": [{ "path": "Sources/Config.swift", "startLine": 3 }] }
                   }]
                 }
                 """;
@@ -638,7 +643,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     "confidence": 0.9,
                     "reasoning": "The error branch is swallowed.",
                     "guidance": "Surface the error.",
-                    "evidence": { "locations": [{ "path": "Sources/NotInDiff.swift", "startLine": 3 }] }
+                    "evidence": { "citations": [{ "path": "Sources/NotInDiff.swift", "startLine": 3 }] }
                   }]
                 }
                 """;
@@ -714,9 +719,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         @SuppressWarnings("unchecked")
         void stampsDeliveryObservationFingerprintOntoComposedDiffNote() {
-            // An ABSENT/BAD (gap) finding with a code location synthesizes an inline diff note. The key deliver()
-            // persisted must be threaded onto that note (not recomputed), so the composed DeliveryContent the
-            // handler hands to FeedbackDeliveryService carries it. Fails against a no-op (key would be null).
             String rawOutput = """
                 {
                   "findings": [{
@@ -728,7 +730,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     "confidence": 0.9,
                     "reasoning": "The error branch is swallowed.",
                     "guidance": "Surface the error to the caller.",
-                    "evidence": { "locations": [{ "path": "Sources/Auth.swift", "startLine": 12 }] }
+                    "evidence": { "citations": [{
+                      "sourceKind": "scm.pull-request.diff",
+                      "artifactPath": "inputs/context/diff.patch",
+                      "path": "Sources/Auth.swift",
+                      "side": "NEW",
+                      "startLine": 12,
+                      "endLine": 12,
+                      "quote": "throw error",
+                      "quoteRedacted": false
+                    }] }
                   }]
                 }
                 """;
@@ -736,9 +747,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             ObjectNode output = objectMapper.createObjectNode();
             output.put("rawOutput", rawOutput);
             job.setOutput(output);
+            stubDiff(
+                "diff --git a/Sources/Auth.swift b/Sources/Auth.swift\n" +
+                    "--- a/Sources/Auth.swift\n" +
+                    "+++ b/Sources/Auth.swift\n" +
+                    "@@ -11,0 +12 @@\n" +
+                    "+throw error\n"
+            );
 
-            // Stub deliver() to return the SAME identity-keyed map the real service would: key every finding
-            // it received with a deterministic correlation key derived from the instance the handler passed.
             when(deliveryService.deliver(eq(job), any())).thenAnswer(invocation -> {
                 List<PracticeDetectionResultParser.ValidatedFinding> received = invocation.getArgument(1);
                 Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keys =

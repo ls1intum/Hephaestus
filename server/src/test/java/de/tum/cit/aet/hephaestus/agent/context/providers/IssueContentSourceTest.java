@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
@@ -300,6 +301,16 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(
                 provider.capture(request(sampleMetadata()), Set.of(COMMENTS)).completeness().get(COMMENTS)
             ).isEqualTo(SourceCompleteness.PARTIAL);
+        }
+
+        @Test
+        void captureReadsIssueAndCommentsOnce() {
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(richIssue()));
+
+            provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
+
+            verify(issueRepository).findByIdWithRepository(ISSUE_ID);
+            verify(issueCommentRepository).findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any());
         }
     }
 

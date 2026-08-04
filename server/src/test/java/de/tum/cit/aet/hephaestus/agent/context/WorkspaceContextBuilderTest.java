@@ -240,7 +240,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 new ContentAddressedStore(layout),
                 layout,
                 mapper,
-                new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
+                new ClasspathArtifactSourceCatalogRegistry(
+                    mapper,
+                    java.time.Clock.systemUTC(),
+                    "scm.pull-request.comments:PRACTICE_DETECTION"
+                ),
                 Clock.systemUTC()
             );
             var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
@@ -306,7 +310,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 new ContentAddressedStore(layout),
                 layout,
                 mapper,
-                new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
+                new ClasspathArtifactSourceCatalogRegistry(
+                    mapper,
+                    Clock.systemUTC(),
+                    "scm.pull-request.diff:PRACTICE_DETECTION"
+                ),
                 Clock.systemUTC()
             );
             var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);

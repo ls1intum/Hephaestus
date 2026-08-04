@@ -318,16 +318,14 @@ hephaestus:
             - ${APPLICATION_HOST_URL:http://localhost:4200}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # LOCAL GIT REPOSITORY STORAGE
+    # CONTEXT FABRIC AND LOCAL GIT CHECKOUT
     # ═══════════════════════════════════════════════════════════════════════════
-    # When enabled, repositories are cloned as bare git repos for file-level
-    # commit analysis. The Pi agent reads these repos directly inside the sandbox.
+    fabric:
+        root: ${HEPHAESTUS_FABRIC_ROOT:/data/git-repos}
+        gc-retention-days: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:30}
+
     git:
-        # Whether local git checkout is enabled (default: false)
         enabled: ${GIT_CHECKOUT_ENABLED:false}
-        # Base path for bare git repositories
-        # Each repo stored at: {storage-path}/{repositoryId}.git
-        storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
 
     webapp:
         url: ${HEPHAESTUS_WEBAPP_URL:${APPLICATION_HOST_URL:http://localhost:4200}}
@@ -633,6 +631,7 @@ hephaestus:
             # Master switch for the Outline documentation integration (install, sync, content projection).
             # Off by default; a workspace admin still installs per-workspace with a base URL + token.
             enabled: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:false}
+            allowed-origins: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:}
             sync:
                 # Reconcile schedule for the per-workspace document mirror (default every six hours).
                 cron: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_CRON:0 0 */6 * * *}

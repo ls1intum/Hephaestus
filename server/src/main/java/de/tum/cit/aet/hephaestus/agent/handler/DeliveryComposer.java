@@ -1,11 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.ANALYSIS_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.CONTEXT_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PI_AGENT_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRACTICES_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_OUT_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_PREFIX;
 import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.REPO_MOUNT_RELATIVE;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
@@ -141,16 +135,6 @@ class DeliveryComposer {
     private static String repoRelative(String path) {
         return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
     }
-
-    /** Paths that are internal workspace artifacts, not student code. */
-    private static final List<String> INTERNAL_PATH_PREFIXES = List.of(
-        CONTEXT_PREFIX,
-        PRACTICES_PREFIX,
-        ANALYSIS_PREFIX,
-        PI_AGENT_PREFIX,
-        PRECOMPUTE_PREFIX,
-        PRECOMPUTE_OUT_PREFIX
-    );
 
     /** A finding is a problem when its detector-resolved assessment is {@link Assessment#BAD} (ADR 0022). */
     private static boolean isProblem(ValidatedFinding f) {
@@ -787,7 +771,7 @@ class DeliveryComposer {
             return false;
         }
         String location = extractPrimaryLocation(f);
-        return location == null || isInternalPath(location);
+        return location == null;
     }
 
     /**
@@ -947,7 +931,7 @@ class DeliveryComposer {
         sb.append("**").append(severityEmoji(f.severity())).append(" ").append(f.title()).append("**");
         if (withLocation) {
             String location = extractPrimaryLocation(f);
-            if (location != null && !isInternalPath(location)) {
+            if (location != null) {
                 sb.append(" · `").append(location).append("`");
             }
         }
@@ -973,7 +957,7 @@ class DeliveryComposer {
             // material disagreement; trusting the diff"), the verbatim quote would leak it past the
             // reasoning sanitizer — so suppress the quote entirely when it carries grader mechanics.
             if (snippet != null && !containsGraderMechanics(snippet)) {
-                boolean hasCodeLocation = location != null && !isInternalPath(location);
+                boolean hasCodeLocation = location != null;
                 if (hasCodeLocation) {
                     // Real code reference → fenced code block. This echo is high-value (shows the offending line).
                     sb.append("You wrote:\n");
@@ -1071,20 +1055,6 @@ class DeliveryComposer {
         }
     }
 
-    /** Check if a path is an internal workspace artifact (not student code). */
-    private static boolean isInternalPath(String location) {
-        // Strip line number suffix for comparison
-        String path = location.contains(":") ? location.substring(0, location.lastIndexOf(':')) : location;
-        // The synthetic context envelope is cited both as the full inputs/context/metadata.json (caught
-        // by the prefix) and, once the agent strips the prefix, as a bare "metadata.json". Neither is a
-        // real repo file a student should see referenced — issue findings in particular only ever point
-        // here, so this also clears the meaningless "metadata.json:2" location off issue notes.
-        if (path.equals("metadata.json") || path.endsWith("/metadata.json")) {
-            return true;
-        }
-        return INTERNAL_PATH_PREFIXES.stream().anyMatch(path::startsWith);
-    }
-
     private static final Map<String, String> EXT_TO_LANG = Map.ofEntries(
         Map.entry("swift", "swift"),
         Map.entry("kt", "kotlin"),
@@ -1137,10 +1107,12 @@ class DeliveryComposer {
     private static String extractPrimaryLocation(ValidatedFinding f) {
         JsonNode evidence = f.evidence();
         if (evidence == null || evidence.isNull()) return null;
-        JsonNode locations = evidence.get("locations");
-        if (locations == null || !locations.isArray() || locations.isEmpty()) return null;
-        JsonNode first = locations.get(0);
+        JsonNode citations = evidence.get("citations");
+        if (citations == null || !citations.isArray() || citations.isEmpty()) return null;
+        JsonNode first = citations.get(0);
         if (!first.isObject()) return null;
+        String sourceKind = first.path("sourceKind").asString();
+        if (!sourceKind.equals("scm.pull-request.diff") && !sourceKind.equals("scm.repository.tree")) return null;
         JsonNode pathNode = first.get("path");
         if (pathNode == null || !pathNode.isString()) return null;
         String path = repoRelative(pathNode.asString());
@@ -1155,13 +1127,11 @@ class DeliveryComposer {
     private static String extractPrimarySnippet(ValidatedFinding f) {
         JsonNode evidence = f.evidence();
         if (evidence == null || evidence.isNull()) return null;
-        JsonNode snippets = evidence.get("snippets");
-        if (snippets == null || !snippets.isArray() || snippets.isEmpty()) return null;
-        JsonNode first = snippets.get(0);
-        // Jackson 3 asString() throws on a container node; an off-contract object/array snippet must not abort
-        // the whole job's delivery. Only a textual scalar yields a snippet.
-        if (first == null || !first.isString()) return null;
-        String snippet = first.asString();
+        JsonNode citations = evidence.get("citations");
+        if (citations == null || !citations.isArray() || citations.isEmpty()) return null;
+        JsonNode quote = citations.get(0).get("quote");
+        if (quote == null || !quote.isString()) return null;
+        String snippet = quote.asString();
         return (snippet != null && !snippet.isBlank()) ? snippet.strip() : null;
     }
 
@@ -1223,29 +1193,26 @@ class DeliveryComposer {
                 continue;
             }
 
-            // Fallback: synthesize from evidence.locations[0]
             JsonNode evidence = f.evidence();
             if (evidence == null || evidence.isNull()) continue;
-            JsonNode locations = evidence.get("locations");
-            if (locations == null || !locations.isArray() || locations.isEmpty()) continue;
+            JsonNode citations = evidence.get("citations");
+            if (citations == null || !citations.isArray() || citations.isEmpty()) continue;
 
-            JsonNode loc = locations.get(0);
-            if (!loc.isObject()) continue;
-            JsonNode pathNode = loc.get("path");
-            JsonNode startLineNode = loc.get("startLine");
+            JsonNode citation = citations.get(0);
+            if (!citation.isObject()) continue;
+            JsonNode pathNode = citation.get("path");
+            JsonNode startLineNode = citation.get("startLine");
             if (pathNode == null || !pathNode.isString()) continue;
             if (startLineNode == null || !startLineNode.isNumber()) continue;
             int startLine = startLineNode.asInt();
             if (startLine <= 0) continue;
 
-            // GROUNDING GUARD (M1): same drop on the synthesized branch — an ungrounded evidence.location
-            // never becomes an inline anchor. The finding keeps its full summary line.
             if (!grounding.anchorIsGrounded(pathNode.asString(), extractPrimarySnippet(f))) {
                 continue;
             }
 
             Integer endLine = null;
-            JsonNode endLineNode = loc.get("endLine");
+            JsonNode endLineNode = citation.get("endLine");
             if (endLineNode != null && endLineNode.isNumber() && endLineNode.asInt() >= startLine) {
                 endLine = endLineNode.asInt();
             }

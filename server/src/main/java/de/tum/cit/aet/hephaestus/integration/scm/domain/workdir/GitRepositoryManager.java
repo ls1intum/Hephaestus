@@ -42,17 +42,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 
-/**
- * Manages local git repository clones for file-level commit analysis.
- * <p>
- * Repositories are stored as full clones at {storagePath}/{repositoryId}
- * This approach:
- * <ul>
- *   <li>Supports worktree-based operations for coding agents</li>
- *   <li>Allows sandboxed agents to read files directly from the working tree</li>
- *   <li>Maintains all branches via {@code setCloneAllBranches(true)}</li>
- * </ul>
- */
 @Slf4j
 @Service
 @EnableConfigurationProperties(GitRepositoryProperties.class)
@@ -60,7 +49,6 @@ public class GitRepositoryManager {
 
     private static final int MAX_TREE_FILES = 20_000;
 
-    /** Connector namespace for SCM checkouts in the fabric {@code sources/} tree. */
     private static final String SCM_CONNECTOR = "scm";
 
     private final GitRepositoryProperties properties;
@@ -87,31 +75,17 @@ public class GitRepositoryManager {
         }
     }
 
-    /**
-     * Check if local git checkout is enabled.
-     */
     public boolean isEnabled() {
         return properties.enabled();
     }
 
-    /**
-     * Get the local path for a repository clone — the SCM connector's bulk artifact in the Context
-     * Fabric (ADR 0020). Path format: {@code {fabric.root}/sources/scm/{repositoryId}}. A clone is a
-     * rebuildable cache, so the move from the flat {@code {root}/{repositoryId}} layout needs no
-     * data migration: a stale-or-absent clone is simply re-fetched at this path on first use.
-     */
     public Path getRepositoryPath(Long repositoryId) {
         return fabricLayout.source(SCM_CONNECTOR, repositoryId.toString());
     }
 
-    /**
-     * Check if a repository is already cloned locally.
-     * Supports both full clones (.git subdirectory) and bare clones (HEAD at root).
-     */
     public boolean isRepositoryCloned(Long repositoryId) {
         Path repoPath = getRepositoryPath(repositoryId);
-        // Working-tree clones store HEAD under .git; bare clones store it at the root.
-        return Files.exists(repoPath.resolve(".git").resolve("HEAD")) || Files.exists(repoPath.resolve("HEAD"));
+        return Files.exists(repoPath.resolve(".git").resolve("HEAD"));
     }
 
     /**
@@ -169,15 +143,6 @@ public class GitRepositoryManager {
         lockManager.removeLock(repositoryId);
     }
 
-    /**
-     * Ensure repository is cloned/fetched. Returns path to bare repo.
-     * Called by push webhook handler.
-     *
-     * @param repositoryId the repository database ID
-     * @param cloneUrl the git clone URL (https://github.com/owner/repo.git)
-     * @param token the authentication token (for private repos)
-     * @return path to the local repository
-     */
     public Path ensureRepository(Long repositoryId, String cloneUrl, @Nullable String token) {
         if (!properties.enabled()) {
             throw new IllegalStateException("Git local checkout is not enabled");
@@ -301,18 +266,6 @@ public class GitRepositoryManager {
         });
     }
 
-    /**
-     * Resolves the HEAD SHA of the default branch from a local clone.
-     * <p>
-     * In clones created with {@code --clone-all-branches}, remote refs are
-     * stored at {@code refs/remotes/origin/<branch>}. This method resolves
-     * the ObjectId for that ref and returns its SHA-1 hex string.
-     * Also checks {@code refs/heads/<branch>} and {@code HEAD} as fallbacks.
-     *
-     * @param repositoryId  the repository database ID
-     * @param defaultBranch the default branch name (e.g. "main")
-     * @return the HEAD SHA hex string, or null if the ref cannot be resolved
-     */
     @Nullable
     public String resolveDefaultBranchHead(Long repositoryId, String defaultBranch) {
         if (!properties.enabled()) {
@@ -324,22 +277,8 @@ public class GitRepositoryManager {
             try (Git git = Git.open(repoPath.toFile())) {
                 Repository repo = git.getRepository();
 
-                // Try refs/remotes/origin/<branch> first (bare clone with remotes)
                 String ref = "refs/remotes/origin/" + defaultBranch;
                 ObjectId objectId = repo.resolve(ref);
-                if (objectId != null) {
-                    return objectId.getName();
-                }
-
-                // Fallback: try refs/heads/<branch> (some bare clones store heads directly)
-                ref = "refs/heads/" + defaultBranch;
-                objectId = repo.resolve(ref);
-                if (objectId != null) {
-                    return objectId.getName();
-                }
-
-                // Last resort: try HEAD
-                objectId = repo.resolve("HEAD");
                 if (objectId != null) {
                     return objectId.getName();
                 }
@@ -755,26 +694,6 @@ public class GitRepositoryManager {
         };
     }
 
-    /**
-     * Read all files from a commit's tree via JGit {@link TreeWalk}.
-     *
-     * <p>Walks the commit tree recursively, collecting file contents into a map suitable for
-     * {@code SandboxWorkspaceManager.injectFiles()}. Individual files larger than 10 MB are
-     * skipped. Collection stops when {@code maxTotalBytes} is reached.
-     *
-     * <p>Reads from the git object store, not the working directory — guarantees an exact
-     * snapshot at the given commit regardless of working tree state.
-     *
-     * @param repositoryId  the repository database ID
-     * @param commitSha     the commit SHA to read from
-     * @param maxTotalBytes maximum total bytes to collect (files beyond this limit are skipped)
-     * @return map of relative file paths to contents
-     * @throws GitOperationException if the commit cannot be resolved or an I/O error occurs
-     */
-    public Map<String, byte[]> readFilesAtCommit(Long repositoryId, String commitSha, long maxTotalBytes) {
-        return readTreeSnapshot(repositoryId, commitSha, maxTotalBytes).files();
-    }
-
     /** Reads a bounded commit tree without dereferencing symlinks or submodules across the source boundary. */
     public GitTreeSnapshot readTreeSnapshot(Long repositoryId, String commitSha, long maxTotalBytes) {
         if (!properties.enabled()) {
@@ -907,19 +826,6 @@ public class GitRepositoryManager {
         }
     }
 
-    /**
-     * Generate a unified diff between two refs (branches or commits).
-     *
-     * <p>Produces standard unified diff output suitable for code review. Resolves refs
-     * using the same fallback chain as {@link #resolveDefaultBranchHead}:
-     * {@code refs/remotes/origin/<ref>} → {@code refs/heads/<ref>} → raw SHA.
-     *
-     * @param repositoryId the repository database ID
-     * @param baseRef      the base ref (target branch or commit SHA)
-     * @param headRef      the head ref (source branch or commit SHA)
-     * @return unified diff text, or empty string if refs cannot be resolved
-     * @throws GitOperationException if an I/O error occurs computing the diff
-     */
     public String generateUnifiedDiff(Long repositoryId, String baseRef, String headRef) {
         if (!properties.enabled()) {
             return "";

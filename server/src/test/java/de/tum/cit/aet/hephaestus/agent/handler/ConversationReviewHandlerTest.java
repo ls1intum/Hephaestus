@@ -148,7 +148,9 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             var revision = new PracticeRevision();
             ReflectionTestUtils.setField(revision, "id", 12L);
             practice.setCurrentRevision(revision);
-            when(practiceCatalogInjector.resolve(job, WorkArtifact.CONVERSATION_THREAD)).thenReturn(List.of(practice));
+            when(practiceCatalogInjector.resolveEligiblePractices(job, WorkArtifact.CONVERSATION_THREAD)).thenReturn(
+                List.of(practice)
+            );
             when(workspaceContextBuilder.prepare(any(), any())).thenReturn(
                 new PreparedEvidence(
                     Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes()),

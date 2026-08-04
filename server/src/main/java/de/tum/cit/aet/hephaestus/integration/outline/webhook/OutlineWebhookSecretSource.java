@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
@@ -30,15 +31,18 @@ public class OutlineWebhookSecretSource implements WebhookSecretSource {
     private final ConnectionService connectionService;
     private final EncryptedStringConverter secretCipher;
     private final ObjectMapper objectMapper;
+    private final OutlineOriginPolicy originPolicy;
 
     public OutlineWebhookSecretSource(
         ConnectionService connectionService,
         EncryptedStringConverter secretCipher,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        OutlineOriginPolicy originPolicy
     ) {
         this.connectionService = connectionService;
         this.secretCipher = secretCipher;
         this.objectMapper = objectMapper;
+        this.originPolicy = originPolicy;
     }
 
     @Override
@@ -59,6 +63,7 @@ public class OutlineWebhookSecretSource implements WebhookSecretSource {
         }
         return connectionService
             .findOutlineSubscription(subscriptionId)
+            .filter(subscription -> originPolicy.allows(subscription.serverUrl()))
             .map(sub -> secretCipher.convertToEntityAttribute(sub.signingSecret()).getBytes(StandardCharsets.UTF_8));
     }
 

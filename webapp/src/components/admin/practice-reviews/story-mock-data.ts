@@ -128,17 +128,19 @@ export const reviewFindingDetail: ReviewFindingDetail = {
 	claimStatus: "CURRENT",
 	confidence: improvementFinding.confidence,
 	evidence: {
-		locations: [
+		citations: [
 			{
+				sourceKind: "scm.pull-request.diff",
+				artifactPath: "inputs/context/diff.patch",
 				path: "webapp/src/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId.tsx",
+				side: "NEW",
 				startLine: 1,
-				endLine: 42,
+				endLine: 1,
+				quote:
+					"const routeName = 'detection-output-that-is-much-longer-than-the-available-mobile-viewport';",
+				quoteRedacted: false,
 			},
 		],
-		snippets: [
-			"const routeName = 'detection-output-that-is-much-longer-than-the-available-mobile-viewport';",
-		],
-		references: ["https://react.dev/learn/passing-props-to-a-component"],
 	},
 	feedback: [
 		{

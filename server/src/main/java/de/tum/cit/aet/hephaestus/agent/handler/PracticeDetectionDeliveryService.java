@@ -7,11 +7,13 @@ import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDeclaration;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -56,6 +58,7 @@ public class PracticeDetectionDeliveryService {
     private final ObservationRepository observationRepository;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
+    private final SlackThreadRepository slackThreadRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final ContentAddressedStore cas;
@@ -66,6 +69,7 @@ public class PracticeDetectionDeliveryService {
         ObservationRepository observationRepository,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
+        SlackThreadRepository slackThreadRepository,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper,
         ContentAddressedStore cas,
@@ -75,6 +79,7 @@ public class PracticeDetectionDeliveryService {
         this.observationRepository = observationRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
+        this.slackThreadRepository = slackThreadRepository;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
         this.cas = cas;
@@ -102,7 +107,13 @@ public class PracticeDetectionDeliveryService {
 
         EvidenceBoundary evidenceBoundary = evidenceBoundary(job);
         for (SourceKind kind : evidenceBoundary.availableSources()) {
-            if (!sourceCatalogs.isSourceUsePermitted(evidenceBoundary.contractVersion(), kind)) {
+            if (
+                !sourceCatalogs.isSourceUsePermitted(
+                    evidenceBoundary.contractVersion(),
+                    kind,
+                    SourceUseAudience.PRACTICE_FEEDBACK_RECIPIENTS
+                )
+            ) {
                 throw new JobDeliveryException(
                     "Evidence source authorization was withdrawn before delivery: source=" +
                         kind +
@@ -277,6 +288,7 @@ public class PracticeDetectionDeliveryService {
                 !path.isTextual() ||
                 ("scm.pull-request.diff".equals(sourceKind.asText()) &&
                     (!side.isTextual() || !("OLD".equals(side.asText()) || "NEW".equals(side.asText())))) ||
+                (!"scm.pull-request.diff".equals(sourceKind.asText()) && !side.isMissingNode()) ||
                 !startLine.isIntegralNumber() ||
                 startLine.asInt() < 1 ||
                 (!endLine.isMissingNode() && (!endLine.isIntegralNumber() || endLine.asInt() < startLine.asInt())) ||
@@ -592,7 +604,24 @@ public class PracticeDetectionDeliveryService {
             if (aboutUserNode == null || aboutUserNode.isNull() || !aboutUserNode.isNumber()) {
                 throw new JobDeliveryException("Missing about_user_id in job metadata: jobId=" + job.getId());
             }
-            return new Target(WorkArtifact.CONVERSATION_THREAD, threadIdNode.asLong(), aboutUserNode.asLong());
+            String channelId = requiredMetadataText(metadata, "slack_channel_id", job);
+            String threadTs = requiredMetadataText(metadata, "slack_thread_ts", job);
+            long threadId = threadIdNode.asLong();
+            long aboutUserId = aboutUserNode.asLong();
+            if (
+                !slackThreadRepository.existsDeliverableThread(
+                    threadId,
+                    job.getWorkspace().getId(),
+                    channelId,
+                    threadTs,
+                    aboutUserId
+                )
+            ) {
+                throw new JobDeliveryException(
+                    "Conversation target is no longer authorized or does not match the job: jobId=" + job.getId()
+                );
+            }
+            return new Target(WorkArtifact.CONVERSATION_THREAD, threadId, aboutUserId);
         }
         if (WorkArtifact.ISSUE.name().equals(artifactType)) {
             JsonNode issueIdNode = metadata.get("issue_id");
@@ -632,27 +661,29 @@ public class PracticeDetectionDeliveryService {
         return new Target(WorkArtifact.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
     }
 
+    private static String requiredMetadataText(JsonNode metadata, String field, AgentJob job) {
+        String value = metadata.path(field).asString();
+        if (value.isBlank()) {
+            throw new JobDeliveryException("Missing " + field + " in job metadata: jobId=" + job.getId());
+        }
+        return value;
+    }
+
     private static void requireMatchingArtifact(Issue artifact, JsonNode metadata, String numberKey, AgentJob job) {
         if (!PracticeFeedbackDeliveryPolicy.matchesArtifact(artifact, metadata, numberKey)) {
             throw new JobDeliveryException("Artifact metadata does not match the live target: jobId=" + job.getId());
         }
     }
 
-    /**
-     * The file path of a finding's first evidence location, or {@code null} when it has none (a metadata
-     * practice like PR-description quality). Feeds {@link ObservationFingerprint} — the PATH only, never a line
-     * number, so a finding that survives a few lines moving keeps one cross-run identity. Package-private so
-     * {@code ReactionSuppressionFilter} recomputes the same locus the SAME way.
-     */
     static String firstLocationPath(JsonNode evidence) {
         if (evidence == null || evidence.isNull()) {
             return null;
         }
-        JsonNode locations = evidence.get("locations");
-        if (locations == null || !locations.isArray() || locations.isEmpty()) {
+        JsonNode citations = evidence.get("citations");
+        if (citations == null || !citations.isArray() || citations.isEmpty()) {
             return null;
         }
-        JsonNode first = locations.get(0);
+        JsonNode first = citations.get(0);
         if (first == null || !first.isObject()) {
             return null;
         }

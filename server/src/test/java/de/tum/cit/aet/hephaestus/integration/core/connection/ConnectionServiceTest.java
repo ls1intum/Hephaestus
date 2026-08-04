@@ -502,6 +502,11 @@ class ConnectionServiceTest extends BaseUnitTest {
                 }
 
                 @Override
+                public String getServerUrl() {
+                    return "https://wiki.example.com";
+                }
+
+                @Override
                 public String getSigningSecret() {
                     return secret;
                 }
@@ -518,6 +523,7 @@ class ConnectionServiceTest extends BaseUnitTest {
 
             assertThat(resolved).isPresent();
             assertThat(resolved.get().workspaceId()).isEqualTo(2L);
+            assertThat(resolved.get().serverUrl()).isEqualTo("https://wiki.example.com");
             assertThat(resolved.get().signingSecret()).isEqualTo("secret-b");
         }
 

@@ -27,7 +27,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Captures bounded review decisions, thread-resolution state, and merge state without comment bodies. */
 @Component
 @Order(200)
 public class ReviewThreadContentSource implements EvidenceSource {

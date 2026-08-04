@@ -50,6 +50,7 @@ services:
       # encrypted on the connection row) and is read back through JPA, not from the environment.
       # Keep in lockstep with application-server's value.
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
+      HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:-}
       # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
       # supplies it (an unset var fails the boot at placeholder resolution).
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.provider;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
@@ -26,6 +27,7 @@ public class LoginProviderClientRegistrationRepository
 {
 
     private final LoginProviderRepository loginProviderRepository;
+    private final OutlineOriginPolicy outlineOriginPolicy;
 
     /**
      * {@code redirect_uri} template. {@code {baseUrl}} expands per request to the public origin (scheme
@@ -41,9 +43,11 @@ public class LoginProviderClientRegistrationRepository
 
     public LoginProviderClientRegistrationRepository(
         LoginProviderRepository loginProviderRepository,
-        String apiBasePath
+        String apiBasePath,
+        OutlineOriginPolicy outlineOriginPolicy
     ) {
         this.loginProviderRepository = loginProviderRepository;
+        this.outlineOriginPolicy = outlineOriginPolicy;
         this.callbackTemplate = "{baseUrl}" + apiBasePath + "/login/oauth2/code/{registrationId}";
     }
 
@@ -56,6 +60,7 @@ public class LoginProviderClientRegistrationRepository
         return loginProviderRepository
             .findByRegistrationId(registrationId)
             .filter(LoginProvider::isEnabled)
+            .filter(this::isApproved)
             .map(this::toRegistration)
             .map(reg -> {
                 cache.put(registrationId, reg);
@@ -79,8 +84,16 @@ public class LoginProviderClientRegistrationRepository
         return loginProviderRepository
             .findByEnabledTrueOrderByDisplayNameAsc()
             .stream()
+            .filter(this::isApproved)
             .map(this::toRegistration)
             .toList();
+    }
+
+    private boolean isApproved(LoginProvider provider) {
+        return (
+            provider.getType() != LoginProvider.ProviderType.OUTLINE ||
+            outlineOriginPolicy.allows(provider.getBaseUrl())
+        );
     }
 
     private ClientRegistration toRegistration(LoginProvider provider) {

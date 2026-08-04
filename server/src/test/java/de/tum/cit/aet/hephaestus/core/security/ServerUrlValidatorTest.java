@@ -270,6 +270,14 @@ class ServerUrlValidatorTest extends BaseUnitTest {
                 .hasMessageContaining("path");
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = { "https://gitlab.example.com?next=internal", "https://gitlab.example.com#fragment" })
+        void rejectsQueryAndFragment(String url) {
+            assertThatThrownBy(() -> ServerUrlValidator.validate(url))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("query or fragment");
+        }
+
         @Test
         void rejectsBlankUrl() {
             assertThatThrownBy(() -> ServerUrlValidator.validate(""))
@@ -312,7 +320,6 @@ class ServerUrlValidatorTest extends BaseUnitTest {
 
         @Test
         void acceptsUrlWithTrailingSlash() {
-            // Trailing slash makes path = "/", which is allowed
             assertThatCode(() -> ServerUrlValidator.validate("https://gitlab.example.com/")).doesNotThrowAnyException();
         }
 

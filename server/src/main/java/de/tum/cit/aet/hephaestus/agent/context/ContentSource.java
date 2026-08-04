@@ -25,6 +25,5 @@ public interface ContentSource {
         return path.startsWith(OUTPUT_PREFIX);
     }
 
-    /** Materialise workspace-relative paths and bytes into {@code files}. */
     void contribute(ContextRequest request, Map<String, byte[]> files);
 }

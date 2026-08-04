@@ -19,14 +19,15 @@ defines the governance decision that permits collection, retention, processing, 
 1. **Default deny.** Approval must cover the source, purpose, audience, processor, region, and retention policy.
 2. **Necessity before benefit.** Name the capability that requires the source and why a less intrusive source is
    insufficient. Accuracy, convenience, and possible reuse are not purposes.
-3. **Collect on demand.** Collect only the union required by eligible practice revisions. Stop collection when no
+3. **Collect on demand.** Collect only the union declared by eligible practice revisions. Stop collection when no
    approved consumer remains.
 4. **Separate purposes.** Product feedback, mentoring, operator quality assurance, and research evaluation require
    separate decisions. Product use does not authorize evaluation retention or ablation.
 5. **Separate responsibilities.** Workspace administrators select sources within the operator-approved envelope;
    they do not approve legal basis, processors, transfers, DPIA outcomes, or new data categories.
 6. **Propagate restrictions.** Derivations inherit the strictest audience, egress, region, retention, and erasure
-   rules of their dependencies.
+   rules of their dependencies. The runtime separately enforces `PRACTICE_DETECTION`,
+   `PRACTICE_FEEDBACK_RECIPIENTS`, `PRACTICE_MENTORING`, and `OPERATOR_QUALITY_ASSURANCE` at their boundaries.
 7. **Erasure beats replay.** Erasure or expiry may make a case unreplayable. Retain only a non-content tombstone
    where an approved audit purpose requires one.
 8. **Fail closed on change.** Scope expansion remains disabled until every affected decision is approved.
@@ -43,30 +44,32 @@ defines the governance decision that permits collection, retention, processing, 
 | Runtime contract | Agent/runtime maintainer | Schema, authority, timing, completeness, missingness, and contract tests |
 
 A material change reopens the affected reviews. Runtime collection is also bounded by the deployment's
-`hephaestus.evidence.authorized-source-kinds` allowlist. The allowlist is empty by default: the controller must
-explicitly authorize each source kind before enabling practice detection. Removing a kind and restarting the server
-and workers is the emergency disable path; re-enablement follows the normal decision path.
+`hephaestus.evidence.authorized-source-uses` allowlist. The allowlist is empty by default: the controller must
+explicitly authorize each `source:audience` grant before use. Wildcards are rejected. Removing a grant and restarting
+the server and workers is the emergency disable path; re-enablement follows the normal decision path.
 
 The runtime registry is
 [`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
-It is an engineering gate and contains only a releasable decision summary:
+It is an engineering gate and contains only releasable decision summaries. Each record grants exactly one audience
+for one purpose; a source must reference separate records for detection, learner feedback, mentoring, and operator
+quality assurance:
 
 - `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized
   product scope. It is not controller or DPO approval and cannot cover scope expansion.
 - `CONTROLLER_DECISION` requires a reviewer, decision time, expiry, and decided outcome. Only an unexpired
   `APPROVED` decision passes when that basis is used.
 
-Neither the registry nor CI can establish a legal basis, certify a DPIA, or replace the controller's record. The
-checked-in decision is necessary but never sufficient: collection and delivery require both an unexpired engineering
-decision and the deployment-scoped allowlist.
+Neither the registry nor CI can establish a legal basis, certify a DPIA, or replace the controller's record. Every
+use requires both its unexpired engineering decision and matching deployment grant.
 
 `AGENT_EVIDENCE_RETENTION` is a layered policy. Diagnostic job output uses
 `hephaestus.agent.payload-retention` (14 days by default); the job row and its durable manifest/readiness snapshot use
 `hephaestus.agent.row-retention` (90 days); replay directories and unreferenced CAS blobs use
-`hephaestus.fabric.gc-retention-days` (30 days). `WORKSPACE_AND_PERSON_ERASURE` is a governance obligation,
-not proof that every copy supports immediate selective deletion. Workspace purge removes agent SQL rows, while job
-replay directories and CAS blobs currently expire through the configured retention sweep. A production controller
-decision must explicitly accept that bounded residual window or require reference-aware immediate deletion first.
+`hephaestus.fabric.gc-retention-days` (30 days). Replay directories and unreferenced CAS blobs become eligible for
+collection at that age and are removed by a subsequent successful sweep. `WORKSPACE_AND_PERSON_ERASURE` is a
+governance obligation, not proof that every copy supports immediate selective deletion. Workspace purge removes agent
+SQL rows, while replay directories and CAS blobs follow the retention sweep. A production controller decision must
+explicitly accept that bounded residual window or require reference-aware immediate deletion first.
 Person and channel requests use the source-specific paths in the processor checklist; any uncovered derived copy
 blocks approval. The runtime and schemas use closed policy identifiers so a source cannot omit this decision.
 
@@ -93,7 +96,7 @@ data:
   categories: [project-content, identifiers]
   incidentalSensitiveContent: "Controls for free text"
 access:
-  audiences: [detector]
+  audiences: [PRACTICE_DETECTION]
   learnerDisclosure: "Permitted disclosure"
   tenantIsolation: "Enforcement and tests"
 processorEgress:
@@ -137,6 +140,9 @@ reviewBy: YYYY-MM-DD
 supersedes: null
 ```
 
+Create a separate record for each additional purpose and audience. Do not copy detection processor-egress terms into
+feedback or operator review records when those uses do not invoke a model.
+
 ## Retention and erasure
 
 Deletion must traverse every content-bearing copy and derived record. A deleted database row is insufficient if
@@ -160,15 +166,16 @@ source/workspace/person erasure paths are implemented and tested.
 ## Approval renewal
 
 The shipped decisions expire on the date recorded in
-`contracts/artifact-source/1.0.0/source-use-decisions.json`. The application fails closed after expiry. Instance
-operators should alert when `artifact_source_governance_expiry_seconds` falls below 30 days and assign the alert
-to the instance privacy/governance owner.
+`contracts/artifact-source/1.0.0/source-use-decisions.json`. Every governed use fails closed after expiry. Instance
+operators should alert when
+`artifact_source_governance_expiry_seconds` falls below 30 days and assign the alert to the instance
+privacy/governance owner.
 
 Before the deadline, that owner must review the source scopes, processors, retention, erasure coverage, and DPIA
 record. Renewal creates a new contract version containing the new decision; published version directories are
 immutable. Migrate practice declarations and the runtime manifest reference to that version, run
 `pnpm run check:contracts`, and deploy. Never edit an existing version's dates. If renewal is denied or incomplete,
-remove the affected kinds from `hephaestus.evidence.authorized-source-kinds`; collection and delivery then decline
+remove the affected grants from `hephaestus.evidence.authorized-source-uses`; collection and disclosure then decline
 without a semantic judgment.
 
 ## Change checklist

@@ -7,10 +7,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** High-precision secret scan over added diff lines, independent of model output. */
 final class SecretDiffScanner {
 
-    /** A single detected secret on an added diff line. */
     record SecretHit(String path, int newLine, String addedLine, String ruleId, String matchedToken) {}
 
     /** {@code @@ -a,b +c,d @@} — capture the new-side start line. */

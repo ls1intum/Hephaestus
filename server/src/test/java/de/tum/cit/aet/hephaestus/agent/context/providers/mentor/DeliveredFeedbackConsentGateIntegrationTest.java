@@ -5,12 +5,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,19 +30,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.CacheManager;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Real-Postgres proof of the fail-closed consent gate + untrusted quarantine on {@code delivered_feedback.json}
- * ({@link DeliveredFeedbackContentSource}). A DELIVERED CONVERSATION_THREAD feedback unit whose source Slack channel
- * is no longer ACTIVE (PAUSED / REVOKED) has its body withheld, while an ACTIVE one is surfaced — the same
- * {@code consent_state = 'ACTIVE'} gate the raw {@code SlackConversationProjector} applies. The critical
- * no-regression assertion: PR/ISSUE-derived feedback is ALWAYS surfaced regardless of Slack consent (the gate
- * touches ONLY CONVERSATION_THREAD units), and a PR/issue-only payload carries NO {@code _meta} envelope.
- * Deterministic.
- */
 class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGateIntegrationTest {
 
     @Autowired
@@ -43,22 +42,40 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private CacheManager cacheManager;
+    private FeedbackObservationRepository feedbackObservationRepository;
+
+    @Autowired
+    private ObservationRepository observationRepository;
+
+    @Autowired
+    private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     private AgentJob job;
+    private Practice practice;
     private int nextPosition;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        var cache = cacheManager.getCache("mentor_delivered_feedback_context");
-        if (cache != null) {
-            cache.clear();
-        }
         setUpWorkspaceAndRecipient("delivered-consent-gate-test");
+        practice = new Practice();
+        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        practice.setEvidence(PracticeTestEvidence.conversationThread());
+        practice.setWorkspace(workspace);
+        practice.setSlug("test-practice");
+        practice.setName("Test Practice");
+        practice.setCriteria("Test description");
+        practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+        practice = practiceRepository.saveAndFlush(practice);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+        practice.setCurrentRevision(revision);
+        practice = practiceRepository.saveAndFlush(practice);
         job = newJob();
         nextPosition = 0;
     }
@@ -73,34 +90,30 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         saveDelivered(WorkArtifact.CONVERSATION_THREAD, activeThreadId, FeedbackChannel.CONVERSATION, "active-body");
         saveDelivered(WorkArtifact.CONVERSATION_THREAD, pausedThreadId, FeedbackChannel.CONVERSATION, "paused-body");
         saveDelivered(WorkArtifact.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
-        // A PR-derived DELIVERED unit must ALWAYS pass through, regardless of any Slack consent state.
         saveDelivered(WorkArtifact.PULL_REQUEST, 4242L, FeedbackChannel.IN_CONTEXT, "pr-body");
 
         JsonNode root = contribute();
 
-        // Untrusted-content quarantine envelope is present because a Slack-derived body survived the gate.
         assertThat(root.get("_meta").get("trustLevel").asString()).isEqualTo("UNTRUSTED_EXTERNAL");
 
         List<String> bodies = bodies(root);
-        // ACTIVE conversation body + PR body survive; PAUSED and REVOKED are withheld (fail-closed).
         assertThat(bodies).containsExactlyInAnyOrder("active-body", "pr-body");
     }
 
     @Test
-    @DisplayName("no-regression: PR/ISSUE feedback always surfaces with NO envelope even under zero Slack consent")
+    @DisplayName("Slack consent does not suppress otherwise-authorized PR/issue feedback")
     void prIssueOnlyPayloadPassesThroughWithoutEnvelope() {
         saveDelivered(WorkArtifact.PULL_REQUEST, 555L, FeedbackChannel.IN_CONTEXT, "pr-body");
         saveDelivered(WorkArtifact.ISSUE, 777L, FeedbackChannel.IN_CONTEXT, "issue-body");
 
         JsonNode root = contribute();
 
-        // A PR/issue-only payload keeps its trusted shape: NO untrusted envelope is added.
         assertThat(root.has("_meta")).isFalse();
         assertThat(bodies(root)).containsExactlyInAnyOrder("pr-body", "issue-body");
     }
 
     @Test
-    @DisplayName("no-regression: a PR body surfaces even when the ONLY conversation body is REVOKED")
+    @DisplayName("revoked conversation feedback does not suppress authorized PR feedback")
     void prSurvivesWhenAllConversationRevoked() {
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
         saveDelivered(WorkArtifact.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
@@ -131,7 +144,27 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
 
     private void saveDelivered(WorkArtifact artifactType, long artifactId, FeedbackChannel channel, String body) {
         Instant now = Instant.now();
-        feedbackRepository.save(
+        UUID observationId = UUID.randomUUID();
+        observationRepository.insertIfAbsent(
+            observationId,
+            "observation-" + nextPosition,
+            job.getId(),
+            practice.getId(),
+            practice.getCurrentRevision().getId(),
+            artifactType.name(),
+            artifactId,
+            recipient.getId(),
+            "Observation title",
+            "ABSENT",
+            "BAD",
+            "MAJOR",
+            0.8f,
+            evidence(artifactType),
+            null,
+            null,
+            now
+        );
+        Feedback feedback = feedbackRepository.save(
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
@@ -148,5 +181,16 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
                 .deliveredAt(now)
                 .build()
         );
+        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
+    }
+
+    private static String evidence(WorkArtifact artifactType) {
+        String sourceKind =
+            artifactType == WorkArtifact.CONVERSATION_THREAD ? "slack.conversation.thread" : "scm.pull-request.core";
+        return """
+        {"citations":[{"sourceKind":"%s","artifactPath":"inputs/context/source.json",\
+        "path":"source.json","startLine":1,"endLine":1,"quote":"evidence",\
+        "quoteRedacted":false}]}
+        """.formatted(sourceKind);
     }
 }

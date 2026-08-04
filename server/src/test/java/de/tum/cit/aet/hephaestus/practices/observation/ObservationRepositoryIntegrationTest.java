@@ -26,7 +26,6 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
@@ -572,122 +571,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class AreaStandingCorroborationTests {
-
-        /**
-         * The native COUNT(DISTINCT artifact_id) / MAX(confidence) the standing floor (P4) keys on must be
-         * computed correctly against real Postgres — a unit test mocks the row, so the SQL itself is only
-         * exercised here. Two distinct PRs flagged BAD on the same area → distinctTargets=2; the max
-         * confidence across the group is surfaced for the quarantine floor.
-         */
-        @Test
-        @DisplayName("area-standing row carries COUNT(DISTINCT target) and MAX(confidence) for the P4 floor")
-        void areaStandingExposesDistinctTargetsAndMaxConfidence() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("robust-error-handling");
-            area.setName("Handling failure robustly");
-            area = practiceAreaRepository.save(area);
-            practice.setArea(area);
-            practice = practiceRepository.save(practice);
-
-            Instant since = Instant.parse("2026-01-01T00:00:00Z");
-            // Same BAD/MAJOR gap on two distinct PRs (artifact 10 and 11), differing confidence.
-            insertAreaFinding("as-1", 10L, "ABSENT", "BAD", "MAJOR", 0.4f, Instant.parse("2026-03-20T10:00:00Z"));
-            insertAreaFinding("as-2", 11L, "ABSENT", "BAD", "MAJOR", 0.7f, Instant.parse("2026-03-21T10:00:00Z"));
-
-            List<AreaStandingRow> rows = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                since,
-                since
-            );
-
-            AreaStandingRow bad = rows
-                .stream()
-                .filter(r -> r.getAssessment() == Assessment.BAD)
-                .findFirst()
-                .orElseThrow();
-            assertThat(bad.getCount()).isEqualTo(2L);
-            assertThat(bad.getDistinctTargets()).isEqualTo(2L);
-            assertThat(bad.getMaxConfidence()).isEqualTo(0.7f);
-        }
-
-        /**
-         * Pins the recent-window arithmetic: {@code recentCount} comes from a separate {@code :recentSince}
-         * bind, so it must count only findings at-or-after that cutoff while {@code count} spans the whole
-         * {@code :since} look-back. With {@code recentSince} strictly later than {@code since} and one of two
-         * findings falling before it, recentCount must be 1 while count is 2 — a regression that reused
-         * {@code :since} for the SUM (or dropped the :recentSince bind) would make recentCount == count and be
-         * caught here. The mentor standing floor (P4) keys on this distinction.
-         */
-        @Test
-        @DisplayName("area-standing recentCount counts only the recent window, not the full look-back")
-        void areaStandingRecentCountHonoursSeparateRecentSince() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("robust-error-handling");
-            area.setName("Handling failure robustly");
-            area = practiceAreaRepository.save(area);
-            practice.setArea(area);
-            practice = practiceRepository.save(practice);
-
-            Instant since = Instant.parse("2026-01-01T00:00:00Z");
-            Instant recentSince = Instant.parse("2026-03-15T00:00:00Z");
-            // One BAD before the recent window (still inside the full look-back) and one inside it, on two
-            // distinct targets.
-            insertAreaFinding("rc-old", 20L, "ABSENT", "BAD", "MAJOR", 0.5f, Instant.parse("2026-02-01T10:00:00Z"));
-            insertAreaFinding("rc-new", 21L, "ABSENT", "BAD", "MAJOR", 0.6f, Instant.parse("2026-03-20T10:00:00Z"));
-
-            List<AreaStandingRow> rows = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                since,
-                recentSince
-            );
-
-            AreaStandingRow bad = rows
-                .stream()
-                .filter(r -> r.getAssessment() == Assessment.BAD)
-                .findFirst()
-                .orElseThrow();
-            assertThat(bad.getCount()).isEqualTo(2L);
-            assertThat(bad.getRecentCount()).isEqualTo(1L); // only rc-new is at/after recentSince
-            assertThat(bad.getDistinctTargets()).isEqualTo(2L);
-        }
-
-        private void insertAreaFinding(
-            String key,
-            long artifactId,
-            String presence,
-            String assessment,
-            String severity,
-            float confidence,
-            Instant at
-        ) {
-            observationRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                key,
-                agentJob.getId(),
-                practice.getId(),
-                null,
-                "PULL_REQUEST",
-                artifactId,
-                aboutUser.getId(),
-                "Area standing finding",
-                presence,
-                assessment,
-                severity,
-                confidence,
-                null,
-                null,
-                null,
-                at
-            );
-        }
-    }
-
-    @Nested
     class LatestRunTiebreakTests {
 
         private AgentJob anotherJob() {
@@ -783,15 +666,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(presences).hasSize(1);
             assertThat(presences.get(0).getPresence()).isEqualTo(Presence.PRESENT);
             assertThat(presences.get(0).getCount()).isEqualTo(1L);
-
-            List<AreaStandingRow> standing = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                Instant.parse("2026-01-01T00:00:00Z"),
-                Instant.parse("2026-01-01T00:00:00Z")
-            );
-            assertThat(standing).hasSize(1);
-            assertThat(standing.get(0).getCount()).isEqualTo(1L);
         }
 
         @Test
@@ -888,16 +762,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
             assertThat(presences).hasSize(1);
             assertThat(presences.get(0).getCount()).isEqualTo(1L);
-
-            List<AreaStandingRow> standing = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                since,
-                since
-            );
-            assertThat(standing).hasSize(1);
-            assertThat(standing.get(0).getCount()).isEqualTo(1L);
-            assertThat(standing.get(0).getDistinctTargets()).isEqualTo(1L);
         }
 
         private void insertBad(String key, long artifactId, Instant at) {

@@ -25,16 +25,11 @@ import tools.jackson.databind.json.JsonMapper;
  * best-effort: it first prunes per-job replay directories older than the retention window, then sweeps
  * blobs that are both unreferenced and older than that same window. The age barrier protects captures
  * that have written a blob but have not yet published their manifest.
- *
- * <p>Mirrors the established {@code @Scheduled} sweepers (ExportRetentionSweeper, AccountHardDeleteSweeper),
- * including their {@link ConditionalOnServerRole} gate so the bean only exists on the server role rather than
- * relying incidentally on {@code @EnableScheduling} placement to keep {@link #collect()} from firing off-role.
  */
 @ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic(
-    "The fabric cache (content-addressed blob store + job-replay dirs) is shared across all workspaces " +
-        "by design — like the git clone it generalises — so GC operates globally with no per-workspace iteration."
+    "Content-addressed blobs and job replay directories are shared storage regions, so retention runs globally."
 )
 public class FabricGarbageCollector {
 
@@ -75,7 +70,6 @@ public class FabricGarbageCollector {
         }
     }
 
-    /** Delete {@code jobs/{jobId}} directories last modified before {@code cutoff}. Returns the count removed. */
     int pruneExpiredJobs(Instant cutoff) {
         Path jobsRoot = layout.jobsRoot();
         if (!Files.isDirectory(jobsRoot)) {
@@ -99,7 +93,6 @@ public class FabricGarbageCollector {
         return pruned;
     }
 
-    /** Collect every {@code sha256} referenced by a surviving job manifest under {@code jobs/}. */
     Set<String> referencedShas() {
         return scanReferences().shas();
     }

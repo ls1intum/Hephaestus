@@ -75,16 +75,8 @@ public class WorkspaceContextBuilder {
         );
     }
 
-    /** @return insertion-ordered workspace-relative paths and bytes */
     public Map<String, byte[]> build(ContextRequest request) {
         return buildWithoutManifest(request);
-    }
-
-    public Map<String, byte[]> build(ContextRequest request, @Nullable EvidencePlan evidencePlan) {
-        if (evidencePlan == null) {
-            return buildWithoutManifest(request);
-        }
-        return prepare(request, evidencePlan).files();
     }
 
     public PreparedEvidence prepare(ContextRequest request, EvidencePlan evidencePlan) {
@@ -108,32 +100,6 @@ public class WorkspaceContextBuilder {
                 .timer(METRIC_BUILD + ".duration", Tags.of("kind", request.getClass().getSimpleName()))
                 .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
         }
-    }
-
-    public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices) {
-        if (manifestBuilder == null) {
-            throw new IllegalStateException("Evidence readiness requires a manifest builder");
-        }
-        return manifestBuilder.readyPractices(manifest, practices);
-    }
-
-    public List<Practice> readyPractices(ArtifactSourceManifest manifest, List<Practice> practices, String jobId) {
-        if (manifestBuilder == null) {
-            throw new IllegalStateException("Evidence readiness requires a manifest builder");
-        }
-        return manifestBuilder.readyPractices(manifest, practices, jobId);
-    }
-
-    public List<Practice> readyPractices(
-        ArtifactSourceManifest manifest,
-        List<Practice> practices,
-        String jobId,
-        Instant temporalAnchor
-    ) {
-        if (manifestBuilder == null) {
-            throw new IllegalStateException("Evidence readiness requires a manifest builder");
-        }
-        return manifestBuilder.readyPractices(manifest, practices, jobId, temporalAnchor);
     }
 
     public ContextManifestBuilder.PreparedReadiness prepareReadiness(
@@ -170,7 +136,6 @@ public class WorkspaceContextBuilder {
         }
     }
 
-    /** Map a repository id to one of {@link #LOCK_STRIPES} locks. */
     private ReentrantLock stripeFor(Long repoKey) {
         int idx = Math.floorMod(repoKey.hashCode(), LOCK_STRIPES);
         return repoLockStripes[idx];
@@ -274,7 +239,6 @@ public class WorkspaceContextBuilder {
             }
             contributed++;
         }
-        // Manifest (ADR 0020) only for job-backed review flows; mentor chat has its own context surface.
         ArtifactSourceManifest manifest = null;
         if (manifestBuilder != null && evidencePlan != null) {
             AgentJob job = reviewJob(request);

@@ -226,8 +226,8 @@ class PracticeRunnerLiveLlmTest {
                 .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
             double confidence = finding.path("confidence").asDouble(-1.0);
             assertThat(confidence).as(tag + ".confidence in [0,1]").isBetween(0.0, 1.0);
-            assertThat(finding.path("evidence").path("locations").isArray())
-                .as(tag + ".evidence.locations is an array")
+            assertThat(finding.path("evidence").path("citations").isArray())
+                .as(tag + ".evidence.citations is an array")
                 .isTrue();
         }
 

@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceDeliveryAuthorization;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.evidence.SourceUseAudience;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationQueryFilter;
@@ -32,6 +34,7 @@ class ReviewFindingQueryService {
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final ReviewSubjectResolver subjectResolver;
     private final ReviewArtifactResolver artifactResolver;
+    private final EvidenceDeliveryAuthorization evidenceAuthorization;
 
     @Transactional(readOnly = true)
     Page<ReviewFindingDTO> list(
@@ -91,6 +94,11 @@ class ReviewFindingQueryService {
             observation.getArtifactId()
         );
         var artifact = artifactResolver.resolve(workspaceId, List.of(artifactKey)).get(artifactKey);
-        return ReviewFindingDetailDTO.from(observation, artifact, subject, feedback);
+        boolean includeEvidence = evidenceAuthorization.permits(
+            workspaceId,
+            observation,
+            SourceUseAudience.OPERATOR_QUALITY_ASSURANCE
+        );
+        return ReviewFindingDetailDTO.from(observation, artifact, subject, feedback, includeEvidence);
     }
 }

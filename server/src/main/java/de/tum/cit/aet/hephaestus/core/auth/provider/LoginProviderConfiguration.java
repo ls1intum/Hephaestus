@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,8 +19,13 @@ public class LoginProviderConfiguration {
     @Bean
     public LoginProviderClientRegistrationRepository loginProviderClientRegistrationRepository(
         LoginProviderRepository loginProviderRepository,
-        AuthProperties authProperties
+        AuthProperties authProperties,
+        OutlineOriginPolicy outlineOriginPolicy
     ) {
-        return new LoginProviderClientRegistrationRepository(loginProviderRepository, authProperties.apiBasePath());
+        return new LoginProviderClientRegistrationRepository(
+            loginProviderRepository,
+            authProperties.apiBasePath(),
+            outlineOriginPolicy
+        );
     }
 }

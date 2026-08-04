@@ -1,102 +1,72 @@
-export interface FindingEvidenceProps {
-	evidence: unknown;
-}
+import type { EvidenceCitation, ObservationEvidence } from "@/api/types.gen";
+import { Badge } from "@/components/ui/badge";
 
-interface EvidenceLocation {
-	path?: string;
-	startLine?: number;
-	endLine?: number;
+const citationSideLabels = {
+	OLD: "old side",
+	NEW: "new side",
+} satisfies Record<NonNullable<EvidenceCitation["side"]>, string>;
+
+export interface FindingEvidenceProps {
+	evidence: ObservationEvidence | null | undefined;
 }
 
 export function FindingEvidence({ evidence }: FindingEvidenceProps) {
-	if (typeof evidence === "string" && evidence.trim()) {
-		return <p className="whitespace-pre-wrap text-sm">{evidence}</p>;
+	if (!evidence) {
+		return <p className="text-sm text-muted-foreground">No evidence was recorded.</p>;
 	}
-	if (!isRecord(evidence) || Object.keys(evidence).length === 0) {
-		return <p className="text-sm text-muted-foreground">No structured evidence was recorded.</p>;
-	}
-
-	const locations = asLocations(evidence.locations);
-	const snippets = asStrings(evidence.snippets);
-	const references = asStrings(evidence.references);
-	if (locations.length + snippets.length + references.length === 0) {
-		return (
-			<p className="text-sm text-muted-foreground">Evidence is available in Technical details.</p>
-		);
-	}
+	const sourceKinds = [...new Set(evidence.citations.map((citation) => citation.sourceKind))];
 
 	return (
 		<div className="space-y-4">
-			{locations.length > 0 && (
-				<div>
-					<h4 className="text-sm font-medium">Locations</h4>
-					<ul className="mt-1 space-y-1">
-						{locations.map((location, index) => (
-							<li
-								key={`${location.path ?? "location"}-${index}`}
-								className="font-mono text-xs break-words"
-							>
-								{locationLabel(location)}
-							</li>
-						))}
-					</ul>
-				</div>
-			)}
-			{snippets.length > 0 && (
-				<div className="space-y-2">
-					<h4 className="text-sm font-medium">Excerpts</h4>
-					{snippets.map((snippet, index) => (
-						<pre
-							key={`${snippet.slice(0, 24)}-${index}`}
-							className="overflow-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap"
-						>
-							{snippet}
-						</pre>
+			<div>
+				<h4 className="text-sm font-medium">Sources</h4>
+				<div className="mt-2 flex flex-wrap gap-2">
+					{sourceKinds.map((sourceKind) => (
+						<Badge key={sourceKind} variant="outline" className="font-mono">
+							{sourceKind}
+						</Badge>
 					))}
 				</div>
-			)}
-			{references.length > 0 && (
-				<div>
-					<h4 className="text-sm font-medium">References</h4>
-					<ul className="mt-1 space-y-1 text-sm">
-						{references.map((reference) => (
-							<li key={reference} className="break-words">
-								{reference}
-							</li>
-						))}
-					</ul>
-				</div>
-			)}
+			</div>
+			<div>
+				<h4 className="text-sm font-medium">Citations</h4>
+				<ul className="mt-2 space-y-3">
+					{evidence.citations.map((citation, index) => (
+						<li key={`${citationKey(citation)}:${index}`} className="rounded-md border p-3">
+							<p className="font-mono text-xs break-words">{citationLabel(citation)}</p>
+							<p className="mt-1 text-xs text-muted-foreground break-words">
+								{citation.sourceKind} · {citation.artifactPath}
+							</p>
+							{citation.quoteRedacted ? (
+								<p className="mt-3 text-sm text-muted-foreground">Quote redacted.</p>
+							) : (
+								<pre className="mt-3 overflow-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap">
+									{citation.quote}
+								</pre>
+							)}
+						</li>
+					))}
+				</ul>
+			</div>
 		</div>
 	);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
+function citationKey(citation: EvidenceCitation): string {
+	return [
+		citation.sourceKind,
+		citation.artifactPath,
+		citation.path,
+		citation.side,
+		citation.startLine,
+		citation.endLine,
+	].join(":");
 }
 
-function asLocations(value: unknown): EvidenceLocation[] {
-	if (!Array.isArray(value)) return [];
-	return value.filter(
-		(entry): entry is EvidenceLocation =>
-			isRecord(entry) &&
-			(typeof entry.path === "string" ||
-				typeof entry.startLine === "number" ||
-				typeof entry.endLine === "number"),
-	);
-}
-
-function asStrings(value: unknown): string[] {
-	return Array.isArray(value)
-		? value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
-		: [];
-}
-
-function locationLabel(location: EvidenceLocation): string {
-	const path = location.path ?? "Unknown file";
-	if (location.startLine == null) return path;
-	if (location.endLine == null || location.endLine === location.startLine) {
-		return `${path}:${location.startLine}`;
-	}
-	return `${path}:${location.startLine}–${location.endLine}`;
+function citationLabel(citation: EvidenceCitation): string {
+	const lineRange =
+		citation.startLine === citation.endLine
+			? `${citation.startLine}`
+			: `${citation.startLine}–${citation.endLine}`;
+	return `${citation.path}:${lineRange}${citation.side ? ` (${citationSideLabels[citation.side]})` : ""}`;
 }

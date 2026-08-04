@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
@@ -56,19 +57,22 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     private final OutlineDocumentRepository outlineDocumentRepository;
     private final OutlineCollectionRepository outlineCollectionRepository;
     private final OutlineDocumentEventRepository outlineDocumentEventRepository;
+    private final OutlineOriginPolicy originPolicy;
 
     public OutlineConnectionStrategy(
         OutlineApiClient outlineApiClient,
         OutlineWebhookRegistrar webhookRegistrar,
         OutlineDocumentRepository outlineDocumentRepository,
         OutlineCollectionRepository outlineCollectionRepository,
-        OutlineDocumentEventRepository outlineDocumentEventRepository
+        OutlineDocumentEventRepository outlineDocumentEventRepository,
+        OutlineOriginPolicy originPolicy
     ) {
         this.outlineApiClient = outlineApiClient;
         this.webhookRegistrar = webhookRegistrar;
         this.outlineDocumentRepository = outlineDocumentRepository;
         this.outlineCollectionRepository = outlineCollectionRepository;
         this.outlineDocumentEventRepository = outlineDocumentEventRepository;
+        this.originPolicy = originPolicy;
     }
 
     @Override
@@ -85,6 +89,9 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
         String serverUrl = userInput.get(INPUT_SERVER_URL);
         if (serverUrl == null || serverUrl.isBlank()) {
             throw new IllegalArgumentException("Missing required field: '" + INPUT_SERVER_URL + "'");
+        }
+        if (!originPolicy.allows(serverUrl)) {
+            throw new IllegalArgumentException("Outline origin is not approved by the instance operator");
         }
         String token = userInput.get(INPUT_TOKEN);
         if (token == null || token.isBlank()) {

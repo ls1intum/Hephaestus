@@ -26,8 +26,8 @@ to each reviewed artifact type.
 
 A practice revision declares required and optional source kinds. The runtime records a full source manifest and a
 per-practice readiness report. If required evidence is unavailable, stale, incomplete, redacted, or denied, that
-practice receives an `INSUFFICIENT_EVIDENCE` readiness outcome; the detector does not manufacture a semantic
-`NOT_APPLICABLE` result.
+practice is marked not ready with typed evidence reasons. If no practice remains ready, the job completes with
+`INSUFFICIENT_EVIDENCE` without starting the detector; it never manufactures a semantic `NOT_APPLICABLE` result.
 
 The contract is scoped to practice detection. Mentor conversation context is governed by the mentor consent and
 integration contracts and cannot be cited as practice-detection evidence. If a mentor input is reused for detection,
@@ -55,9 +55,10 @@ Unreadable manifests stop the sweep rather than risking deletion of live evidenc
 ### Governance and minimization
 
 A checked-in, unexpired engineering decision is necessary but not sufficient to collect a source. Each deployment
-also has a default-empty `hephaestus.evidence.authorized-source-kinds` allowlist controlled by its data controller.
-Both capture and delivery check the gate. Removing a kind prevents new collection and prevents delayed delivery from
-using a withdrawn source.
+also has a default-empty `hephaestus.evidence.authorized-source-uses` allowlist of explicit `source:audience` grants
+controlled by its data controller.
+Capture, feedback delivery, mentoring reuse, and operator evidence review check their respective grants. Removing a
+grant stops that use without widening or rewriting the remaining grants.
 
 Adding or widening a source requires an updated source descriptor, profile inventory, governance decision,
 retention/erasure coverage, and contract tests. Accuracy benefit alone is not authorization. Published contract

@@ -31,10 +31,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Captures issue references from a pull request, its branch, and its first 50 pinned commit subjects.
- * The contribution is partial when an input is unavailable, capped, or cannot be resolved.
- */
 @Component
 @Order(200)
 public class LinkedWorkItemContentSource implements EvidenceSource {

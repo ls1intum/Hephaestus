@@ -68,6 +68,7 @@ overlay's value where the overlay pins one, otherwise the base default.
 | `hephaestus.git.enabled` | false | false | false | env default |
 | `hephaestus.sync.nats.enabled` | false | **false** | **true** | env default / profile overlay |
 | `hephaestus.agent.enabled` | false | false | false | env default |
+| `hephaestus.integration.outline.allowed-origins` | empty | empty | empty | env default |
 | Needs user-auth wiring | yes | no | no | role gating |
 
 Bolded cells are pinned by that role's profile overlay and are not the base default. Reading the
@@ -75,9 +76,14 @@ three `runtime.*` rows down a column gives that pod's role set: the `worker` ove
 and webhook roles off, the `webhook` overlay turns server and worker off, and the monolith (no
 overlay) runs all three.
 
-Four rows are **not** role-differentiated — they are instance-wide defaults, shown per role only
+Outline origin approval is enforced independently by all three roles: the server controls connections and sync,
+the worker projects evidence, and the webhook role accepts change events. Supply the same allowlist to every role
+and restart all three after a change; the reference Compose files wire this automatically.
+
+Five rows are **not** role-differentiated — they are instance-wide defaults, shown per role only
 because operators ask per role: `init-default` is `false` in the `prod` profile for every role, and
-`git.enabled` (`GIT_CHECKOUT_ENABLED`), `agent.enabled` (`AGENT_ENABLED`) and `Needs user-auth wiring`
+`git.enabled` (`GIT_CHECKOUT_ENABLED`), `agent.enabled` (`AGENT_ENABLED`),
+`integration.outline.allowed-origins`, and `Needs user-auth wiring`
 are unaffected by which overlay is active. The two env-var flags in particular default `false` on
 **every** role until the operator sets the variable — no profile turns work on for you. There is no
 `hephaestus.sandbox.enabled`: that flag was

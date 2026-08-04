@@ -93,10 +93,7 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
-    void get_returnsEmpty_whenBlobVanishedAfterTheExistsCheck() throws Exception {
-        // The documented "no longer present" branch: a blob deleted out-of-band (sweep racing a read) must
-        // read back as empty, not throw UncheckedIOException(NoSuchFileException). Deleting the file directly
-        // models the post-exists()/pre-read TOCTOU window.
+    void get_returnsEmptyForMissingBlob() throws Exception {
         String sha = cas.put("ephemeral".getBytes(StandardCharsets.UTF_8));
         java.nio.file.Files.delete(cas.pathFor(sha));
 
@@ -104,21 +101,18 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
-    void sweep_prunesEmptyedFanoutDirectories() {
-        // After the only blob in a {ab} fan-out dir is swept, the now-empty directory must be removed too,
-        // so the store does not accrue empty two-char dirs that every future sweep keeps walking.
+    void sweep_prunesEmptyFanoutDirectories() {
         String drop = cas.put("solo".getBytes(StandardCharsets.UTF_8));
         Path fanout = cas.pathFor(drop).getParent();
         assertThat(fanout).exists();
 
-        cas.sweep(Set.of()); // nothing live → the blob and then its empty fan-out dir are removed
+        cas.sweep(Set.of());
 
         assertThat(fanout).as("an emptied fan-out dir is pruned").doesNotExist();
     }
 
     @Test
     void sweep_keepsFanoutDirectoryThatStillHoldsALiveBlob() {
-        // The prune pass must only delete EMPTY fan-out dirs — a dir still holding a referenced blob stays.
         String keep = cas.put("retained".getBytes(StandardCharsets.UTF_8));
         Path fanout = cas.pathFor(keep).getParent();
 
@@ -129,13 +123,9 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
-    void put_succeedsAfterFanoutDirWasPruned() throws Exception {
-        // Models the put/prune race outcome: a concurrent sweep's pruneEmptyFanoutDirs deletes the {ab}
-        // fan-out dir while a put() is mid-flight. After the dir is gone, put() must still land the blob
-        // (re-create the parent + retry createTempFile) rather than fail with UncheckedIOException.
+    void put_recreatesMissingFanoutDirectory() throws Exception {
         String sha = cas.put("racy".getBytes(StandardCharsets.UTF_8));
         Path fanout = cas.pathFor(sha).getParent();
-        // Empty the fan-out dir and remove it, exactly as the prune pass would after sweeping its last blob.
         java.nio.file.Files.delete(cas.pathFor(sha));
         java.nio.file.Files.delete(fanout);
         assertThat(fanout).doesNotExist();

@@ -261,9 +261,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             .put("startLine", 10)
             .put("endLine", 10)
             .put("quote", "+ insecure();");
-        evidence.putArray("sourceKinds").add("scm.pull-request.diff");
-        evidence.putArray("locations");
-        evidence.putArray("snippets");
         return evidence;
     }
 

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import java.util.ArrayList;
@@ -72,25 +73,28 @@ public class LoginProviderService {
     private final AuthProperties authProperties;
     private final AuthEventLogger authEventLogger;
     private final ObjectMapper objectMapper;
+    private final OutlineOriginPolicy outlineOriginPolicy;
 
     public LoginProviderService(
         LoginProviderRepository repository,
         LoginProviderClientRegistrationRepository registrationCache,
         AuthProperties authProperties,
         AuthEventLogger authEventLogger,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        OutlineOriginPolicy outlineOriginPolicy
     ) {
         this.repository = repository;
         this.registrationCache = registrationCache;
         this.authProperties = authProperties;
         this.authEventLogger = authEventLogger;
         this.objectMapper = objectMapper;
+        this.outlineOriginPolicy = outlineOriginPolicy;
     }
 
     /** Enabled providers for the login page / discovery, stable order. */
     @Transactional(readOnly = true)
     public List<LoginProvider> listEnabled() {
-        return repository.findByEnabledTrueOrderByDisplayNameAsc();
+        return repository.findByEnabledTrueOrderByDisplayNameAsc().stream().filter(this::isApproved).toList();
     }
 
     /** All providers (incl. disabled) for the admin UI, stable order. */
@@ -106,7 +110,10 @@ public class LoginProviderService {
      */
     @Transactional(readOnly = true)
     public java.util.Optional<LoginProvider> findEnabled(String registrationId) {
-        return repository.findByRegistrationId(registrationId).filter(LoginProvider::isEnabled);
+        return repository
+            .findByRegistrationId(registrationId)
+            .filter(LoginProvider::isEnabled)
+            .filter(this::isApproved);
     }
 
     @Transactional(readOnly = true)
@@ -372,7 +379,7 @@ public class LoginProviderService {
      * github.com endpoints). For GitLab and Outline (self-hosted instances), validate the supplied
      * base URL (HTTPS + SSRF guard).
      */
-    private static String resolveBaseUrl(LoginProvider.ProviderType type, @Nullable String baseUrl) {
+    private String resolveBaseUrl(LoginProvider.ProviderType type, @Nullable String baseUrl) {
         if (type == LoginProvider.ProviderType.GITHUB) {
             return GITHUB_COM;
         }
@@ -386,7 +393,20 @@ public class LoginProviderService {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid base URL: " + e.getMessage());
         }
+        if (type == LoginProvider.ProviderType.OUTLINE && !outlineOriginPolicy.allows(value)) {
+            throw new ResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                "Outline origin is not approved by the instance operator"
+            );
+        }
         return value;
+    }
+
+    private boolean isApproved(LoginProvider provider) {
+        return (
+            provider.getType() != LoginProvider.ProviderType.OUTLINE ||
+            outlineOriginPolicy.allows(provider.getBaseUrl())
+        );
     }
 
     private static String resolveScopes(LoginProvider.ProviderType type, @Nullable String scopes) {

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.retry.Retry;
@@ -56,7 +57,8 @@ class OutlineApiClientTokenDescriptionTest extends BaseUnitTest {
         return new OutlineApiClient(
             CircuitBreaker.ofDefaults("outlineRestApi"),
             Retry.ofDefaults("outlineRestApi"),
-            WebClient.builder().exchangeFunction(exchange).build()
+            WebClient.builder().exchangeFunction(exchange).build(),
+            new OutlineOriginPolicy(java.util.Set.of("https://wiki.example.com"))
         );
     }
 

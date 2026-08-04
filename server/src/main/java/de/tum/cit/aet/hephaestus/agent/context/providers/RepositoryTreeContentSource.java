@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -94,6 +95,10 @@ public class RepositoryTreeContentSource implements EvidenceSource {
                 "Repository not cloned: repoId=" + repositoryId + ", jobId=" + review.job().getId()
             );
         }
-        return gitRepositoryManager.readTreeSnapshot(repositoryId, commitSha, MAX_TOTAL_BYTES);
+        try {
+            return gitRepositoryManager.readTreeSnapshot(repositoryId, commitSha, MAX_TOTAL_BYTES);
+        } catch (GitRepositoryManager.GitOperationException e) {
+            throw new EvidenceCollectionException("Could not capture repository tree at " + commitSha, e);
+        }
     }
 }

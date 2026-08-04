@@ -179,6 +179,31 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("thread truncation is reported only when messages exist beyond the projection limit")
+    void reportsExactTruncation() {
+        assertProjectedTruncation(100, false);
+        assertProjectedTruncation(101, true);
+    }
+
+    private void assertProjectedTruncation(int messageCount, boolean expected) {
+        long ws = newWorkspace();
+        long baseSecond = Instant.now().getEpochSecond() - 1200;
+        String rootTs = baseSecond + ".000000";
+        String lastTs = baseSecond + "." + String.format("%06d", messageCount - 1);
+        seedChannel(ws, "C1", "ACTIVE");
+        seedThread(ws, "C1", rootTs, lastTs, messageCount, "{100}");
+        for (int i = 0; i < messageCount; i++) {
+            String ts = baseSecond + "." + String.format("%06d", i);
+            seedMessage(ws, "C1", ts, i == 0 ? null : rootTs);
+        }
+
+        ObjectNode payload = projector.buildThreadPayload(ws, "C1", rootTs);
+
+        assertThat(payload.get("messages")).hasSize(100);
+        assertThat(payload.get("truncated").asBoolean()).isEqualTo(expected);
+    }
+
+    @Test
     @DisplayName("consent gate is atomic with the read: a revoked/paused channel yields an EMPTY detection projection")
     void projectsNothingWhenChannelConsentIsNotActive() {
         long baseSecond = Instant.now().getEpochSecond() - 1200;

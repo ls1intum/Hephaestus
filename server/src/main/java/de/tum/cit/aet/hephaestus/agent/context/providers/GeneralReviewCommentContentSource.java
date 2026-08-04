@@ -22,7 +22,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Captures position-less pull-request discussion while excluding Hephaestus-authored comments. */
 @Component
 @Order(210)
 public class GeneralReviewCommentContentSource implements EvidenceSource {

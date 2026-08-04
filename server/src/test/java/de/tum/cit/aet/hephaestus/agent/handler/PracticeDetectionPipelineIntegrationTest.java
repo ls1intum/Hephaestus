@@ -62,7 +62,6 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Exercises parsing, persistence, and feedback delivery against PostgreSQL. */
 @RecordApplicationEvents
 class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -30,13 +31,26 @@ class ReflectionItemDTOTest extends BaseUnitTest {
             .build();
     }
 
+    private static String citation(String path, int line) {
+        return citation(path, line, "scm.pull-request.diff");
+    }
+
+    private static String citation(String path, int line, String sourceKind) {
+        String artifactPath = sourceKind.equals("scm.pull-request.diff")
+            ? "inputs/context/diff.patch"
+            : "inputs/context/metadata.json";
+        String side = sourceKind.equals("scm.pull-request.diff") ? ",\"side\":\"NEW\"" : "";
+        return """
+        {"citations":[{"sourceKind":"%s",\
+        "artifactPath":"%s","path":"%s"%s,\
+        "startLine":%d,"endLine":%d,"quote":"line","quoteRedacted":false}]}
+        """.formatted(sourceKind, artifactPath, path, side, line, line);
+    }
+
     @Test
     @DisplayName("a real source location renders as path:line")
     void realSourceLocation() {
-        var item = ReflectionItemDTO.from(
-            finding("{\"locations\":[{\"path\":\"client/App/Services/AR/FrameRecorder.swift\",\"startLine\":212}]}"),
-            null
-        );
+        var item = ReflectionItemDTO.from(finding(citation("client/App/Services/AR/FrameRecorder.swift", 212)), null);
         assertThat(item.locator()).isEqualTo("client/App/Services/AR/FrameRecorder.swift:212");
     }
 
@@ -44,47 +58,31 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     @DisplayName("an agent-internal context file is NOT leaked as a locator")
     void internalContextPathSuppressed() {
         assertThat(
-            ReflectionItemDTO.from(
-                finding("{\"locations\":[{\"path\":\"inputs/context/test_presence.json\",\"startLine\":1}]}"),
-                null
-            ).locator()
+            ReflectionItemDTO.from(finding(citation("test_presence.json", 1, "scm.pull-request.core")), null).locator()
         ).isNull();
         assertThat(
-            ReflectionItemDTO.from(
-                finding("{\"locations\":[{\"path\":\"context/target/review_threads.json\",\"startLine\":1}]}"),
-                null
-            ).locator()
+            ReflectionItemDTO.from(finding(citation("review_threads.json", 1, "scm.pull-request.core")), null).locator()
         ).isNull();
         assertThat(
-            ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"metadata.json\"}]}"), null).locator()
+            ReflectionItemDTO.from(finding(citation("metadata.json", 1, "scm.pull-request.core")), null).locator()
         ).isNull();
     }
 
     @Test
-    @DisplayName("C2: a genuine repo file under the inputs/sources/scm/repo mount is repo-relativized, not suppressed")
-    void repoMountedUserCodeIsRepoRelativeNotInternal() {
-        // Real user code mounted under inputs/sources/scm/repo/ must have the mount prefix stripped FIRST,
-        // so the path renders openable rather than being misclassified as internal "inputs/" plumbing.
-        var item = ReflectionItemDTO.from(
-            finding(
-                "{\"locations\":[{\"path\":\"inputs/sources/scm/repo/client/App/Services/AR/FrameRecorder.swift\",\"startLine\":212}]}"
-            ),
-            null
-        );
-        assertThat(item.locator()).isEqualTo("client/App/Services/AR/FrameRecorder.swift:212");
+    @DisplayName("a repository file named metadata.json remains a valid code locator")
+    void repositoryMetadataFileIsNotMistakenForInternalContext() {
+        var item = ReflectionItemDTO.from(finding(citation("metadata.json", 12)), null);
+        assertThat(item.locator()).isEqualTo("metadata.json:12");
     }
 
     @Test
     @DisplayName("C2: inputs/practices and the input manifest stay suppressed as internal plumbing")
     void practicesAndManifestStillSuppressed() {
         assertThat(
-            ReflectionItemDTO.from(
-                finding("{\"locations\":[{\"path\":\"inputs/practices/index.json\",\"startLine\":1}]}"),
-                null
-            ).locator()
+            ReflectionItemDTO.from(finding(citation("index.json", 1, "scm.pull-request.core")), null).locator()
         ).isNull();
         assertThat(
-            ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"inputs/manifest.json\"}]}"), null).locator()
+            ReflectionItemDTO.from(finding(citation("manifest.json", 1, "scm.pull-request.core")), null).locator()
         ).isNull();
     }
 
@@ -92,21 +90,14 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     @DisplayName("no evidence / no location → no locator (not an error)")
     void noLocation() {
         assertThat(ReflectionItemDTO.from(finding(null), null).locator()).isNull();
-        assertThat(ReflectionItemDTO.from(finding("{\"snippets\":[\"x\"]}"), null).locator()).isNull();
-        assertThat(ReflectionItemDTO.from(finding("{\"locations\":[]}"), null).locator()).isNull();
-    }
-
-    @Test
-    @DisplayName("path with no startLine renders as the bare path")
-    void pathWithoutLine() {
-        var item = ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"README.md\"}]}"), null);
-        assertThat(item.locator()).isEqualTo("README.md");
+        assertThatThrownBy(() -> ReflectionItemDTO.from(finding("{\"citations\":[]}"), null)).isInstanceOf(
+            IllegalArgumentException.class
+        );
     }
 
     @Test
     @DisplayName("guidance is the delivered feedback body passed in — null when nothing was delivered")
     void guidanceComesFromDeliveredBody() {
-        // ADR 0021: the finding carries no advice; guidance is the delivered Feedback body, supplied by the caller.
         assertThat(ReflectionItemDTO.from(finding(null), "Add a unit test for evaluateDistance.").guidance()).isEqualTo(
             "Add a unit test for evaluateDistance."
         );
