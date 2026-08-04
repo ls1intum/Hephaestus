@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -55,7 +56,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
 
     interface FeedbackObservationVisibility {
         UUID getFeedbackId();
-        de.tum.cit.aet.hephaestus.practices.model.Observation getObservation();
+        Observation getObservation();
     }
 
     /**
