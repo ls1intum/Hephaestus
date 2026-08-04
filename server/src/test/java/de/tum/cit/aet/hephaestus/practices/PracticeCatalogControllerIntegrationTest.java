@@ -138,12 +138,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         CreatePracticeRequestDTO request,
         PracticeAutomatedAssessmentPolicy evidence
     ) {
+        boolean automatedAssessment = evidence.automatedAssessment().mode() != PracticeAutomatedAssessmentMode.NONE;
         return new CreatePracticeRequestDTO(
             request.slug(),
             request.name(),
-            request.triggerEvents(),
+            automatedAssessment ? request.triggerEvents() : List.of(),
             request.criteria(),
-            request.precomputeScript(),
+            automatedAssessment ? request.precomputeScript() : null,
             evidence,
             request.artifactType(),
             request.whyItMatters(),
@@ -972,6 +973,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.usedInNewReviews()).isFalse();
+            assertThat(result.triggerEvents()).isEmpty();
             assertThat(
                 practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), practice.getSlug())

@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hephaestus.aet.cit.tum.de/schemas/practices/default-catalog.schema.json",
+  "title": "Bundled practice catalog",
+  "description": "Repository-managed practice definitions installed into the curated instance catalog.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "criteriaPreambles",
+    "automatedAssessmentPolicy",
+    "areas"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Schema used by editors and CI to validate this catalog.",
+      "const": "./default-catalog.schema.json"
+    },
+    "criteriaPreambles": {
+      "description": "Shared assessment instructions keyed by reviewed work type or a named specialization.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "automatedAssessmentPolicy": {
+      "description": "Reusable automated-assessment setups referenced by practices in this catalog.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+      },
+      "additionalProperties": {
+        "$ref": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-assessment-policy.schema.json"
+      }
+    },
+    "areas": {
+      "description": "Ordered practice areas; array order is the bundled display order.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/area"
+      }
+    }
+  },
+  "$defs": {
+    "area": {
+      "description": "A named group of related practices.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slug",
+        "name",
+        "practices"
+      ],
+      "properties": {
+        "slug": {
+          "description": "Stable area identifier used for provenance and URLs.",
+          "$ref": "#/$defs/slug"
+        },
+        "name": {
+          "description": "Human-facing area name.",
+          "$ref": "#/$defs/name"
+        },
+        "description": {
+          "description": "Optional explanation of the area's purpose.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "icon": {
+          "description": "Optional icon name supported by the admin interface.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "color": {
+          "description": "Optional color name supported by the admin interface.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "practices": {
+          "description": "Ordered practices in this area; array order is the bundled display order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/practice"
+          }
+        }
+      }
+    },
+    "practice": {
+      "description": "One bundled engineering-practice definition.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slug",
+        "name",
+        "artifactType",
+        "triggerEvents",
+        "automatedAssessmentPolicyId",
+        "criteria"
+      ],
+      "properties": {
+        "slug": {
+          "description": "Stable practice identifier used for provenance, findings, and URLs.",
+          "$ref": "#/$defs/slug"
+        },
+        "name": {
+          "description": "Human-facing practice name.",
+          "$ref": "#/$defs/name"
+        },
+        "artifactType": {
+          "description": "Type of work against which the practice is assessed.",
+          "enum": [
+            "PULL_REQUEST",
+            "ISSUE",
+            "CONVERSATION_THREAD"
+          ]
+        },
+        "triggerEvents": {
+          "description": "Events that start automated assessment; empty when assessment is not event-driven.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "automatedAssessmentPolicyId": {
+          "description": "Identifier of the automated-assessment setup used by this practice.",
+          "$ref": "#/$defs/policyId"
+        },
+        "precomputeScript": {
+          "description": "Optional classpath resource containing TypeScript that prepares structured review context.",
+          "type": "string",
+          "pattern": "^practices/precompute/[a-z0-9]+(?:-[a-z0-9]+)*\\.ts$"
+        },
+        "preamble": {
+          "description": "Optional named criteria preamble; defaults to the reviewed work type.",
+          "type": "string",
+          "minLength": 1
+        },
+        "criteria": {
+          "description": "Markdown rules used by any assessor and by Hephaestus when automated assessment is enabled.",
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 50000
+        },
+        "whyItMatters": {
+          "description": "Optional developer guidance explaining the value of the practice.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "whatGoodLooksLike": {
+          "description": "Optional developer guidance giving a concrete positive example.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      }
+    },
+    "slug": {
+      "description": "Lowercase, hyphen-separated stable identifier.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 3,
+      "maxLength": 64
+    },
+    "policyId": {
+      "description": "Lowercase, hyphen-separated automated-assessment setup identifier.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "name": {
+      "description": "Short human-facing label.",
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    }
+  }
+}

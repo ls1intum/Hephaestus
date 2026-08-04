@@ -82,7 +82,9 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .jsonPath("$.summary.editedHere")
             .isEqualTo(0)
             .jsonPath("$.practices[0].status.state")
-            .isEqualTo("FROM_HEPHAESTUS");
+            .isEqualTo("FROM_HEPHAESTUS")
+            .jsonPath("$.practices[0].automatedAssessment.mode")
+            .isEqualTo("LANGUAGE_MODEL");
     }
 
     @Test

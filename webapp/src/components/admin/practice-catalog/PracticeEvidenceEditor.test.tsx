@@ -22,7 +22,7 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Edit evidence requirements" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
 		await user.click(
 			screen.getByRole("combobox", {
 				name: "Use in this practice for Inline review comments",
@@ -69,7 +69,7 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Edit evidence requirements" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
 		await user.click(
 			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
 		);
@@ -88,7 +88,7 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Edit evidence requirements" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
 		expect(
 			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
 		).toHaveProperty("textContent", expect.stringContaining("Language model"));
@@ -149,7 +149,7 @@ describe("PracticeEvidenceEditor", () => {
 		}
 		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
 
-		await user.click(screen.getByRole("button", { name: "Edit evidence requirements" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
 		await user.click(
 			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
 		);
@@ -211,7 +211,7 @@ describe("PracticeEvidenceEditor", () => {
 		}
 		await renderWithRouter(<ProfileEditor />, "/admin/practices/new");
 
-		await user.click(screen.getByRole("button", { name: "Edit evidence requirements" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
 		await user.click(
 			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
 		);
@@ -244,7 +244,7 @@ describe("PracticeEvidenceEditor", () => {
 			);
 		}
 		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
-		const evidenceGroup = screen.getByRole("region", { name: "Evidence for automated assessment" });
+		const evidenceGroup = screen.getByRole("region", { name: "Automated assessment" });
 		expect(evidenceGroup.getAttribute("aria-invalid")).toBe("true");
 		expect(evidenceGroup.getAttribute("aria-describedby")).toBe("practice-evidence-error");
 

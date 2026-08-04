@@ -124,7 +124,7 @@ public class BundledPracticeCatalogLoader {
             artifactType,
             triggerEvents,
             criteria,
-            loadPrecomputeScript(slug),
+            loadPrecomputeScript(node, slug),
             automatedAssessmentPolicy(objectMapper, catalog, node, slug),
             whyItMatters,
             whatGoodLooksLike,
@@ -154,10 +154,14 @@ public class BundledPracticeCatalogLoader {
         }
     }
 
-    private static @Nullable String loadPrecomputeScript(String slug) {
-        var resource = new ClassPathResource("practices/precompute/" + slug + ".ts");
-        if (!resource.exists()) {
+    private static @Nullable String loadPrecomputeScript(JsonNode node, String slug) {
+        String resourcePath = text(node, "precomputeScript");
+        if (resourcePath == null) {
             return null;
+        }
+        var resource = new ClassPathResource(resourcePath);
+        if (!resource.exists()) {
+            throw new IllegalStateException("bundled precompute script does not exist: " + resourcePath);
         }
         try (InputStream input = resource.getInputStream()) {
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);

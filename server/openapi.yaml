@@ -8100,6 +8100,8 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        automatedAssessment:
+          $ref: "#/components/schemas/PracticeAutomatedAssessment"
         effectivelyOffered:
           type: boolean
         name:
@@ -8113,6 +8115,7 @@ components:
           $ref: "#/components/schemas/CatalogEntryStatus"
       required:
       - artifactType
+      - automatedAssessment
       - effectivelyOffered
       - name
       - position

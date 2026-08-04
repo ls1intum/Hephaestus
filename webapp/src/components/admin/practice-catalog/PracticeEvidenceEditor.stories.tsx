@@ -24,7 +24,7 @@ export const RecommendedRule: Story = {};
 
 export const Customizing: Story = {
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Edit evidence requirements" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Configure automated assessment" }));
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
 		await expect(canvas.getByText("Code changes")).toBeVisible();
 		await expect(

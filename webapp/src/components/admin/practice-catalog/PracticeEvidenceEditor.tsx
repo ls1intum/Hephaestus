@@ -230,11 +230,10 @@ export function PracticeEvidenceEditor({
 					tabIndex={-1}
 					aria-describedby={error ? "practice-evidence-error" : undefined}
 				>
-					Evidence for automated assessment
+					Automated assessment
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Choose what Hephaestus must receive before it may assess reviewed work against this
-					practice.
+					Choose whether Hephaestus may assess this practice and what evidence it needs.
 				</p>
 			</div>
 
@@ -329,7 +328,7 @@ export function PracticeEvidenceEditor({
 						render={
 							<Button type="button" variant="outline" disabled={disabled}>
 								<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
-								Edit evidence requirements
+								Configure automated assessment
 							</Button>
 						}
 						className="group"
@@ -341,7 +340,7 @@ export function PracticeEvidenceEditor({
 						onClick={() => onChange(options.recommendedRequirements)}
 					>
 						<RotateCcw className="size-4" />
-						Use recommended requirements
+						Use recommended setup
 					</Button>
 				</div>
 				<CollapsibleContent className="mt-4 space-y-6">

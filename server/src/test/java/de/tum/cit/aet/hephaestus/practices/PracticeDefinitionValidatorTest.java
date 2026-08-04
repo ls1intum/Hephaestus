@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
@@ -100,13 +101,46 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             .hasMessage("Evidence source cannot satisfy CURRENT requirements");
     }
 
+    @Test
+    void acceptsHumanAssessmentOnlyPracticeWithoutAutomatedInputs() {
+        assertThatCode(() ->
+            validator.validate(definition(List.of(), null, withoutAutomatedAssessment()))
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsReviewTriggersWithoutAutomatedAssessment() {
+        assertThatThrownBy(() ->
+            validator.validate(definition(List.of("PullRequestCreated"), null, withoutAutomatedAssessment()))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A practice without automated assessment cannot define events that start a review");
+    }
+
+    @Test
+    void rejectsPrecomputeScriptWithoutAutomatedAssessment() {
+        assertThatThrownBy(() ->
+            validator.validate(definition(List.of(), "export default {}", withoutAutomatedAssessment()))
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A practice without automated assessment cannot define a precompute script");
+    }
+
     private static PracticeDefinition definition(PracticeAutomatedAssessmentPolicy requirements) {
+        return definition(List.of("PullRequestCreated"), null, requirements);
+    }
+
+    private static PracticeDefinition definition(
+        List<String> triggerEvents,
+        String precomputeScript,
+        PracticeAutomatedAssessmentPolicy requirements
+    ) {
         return new PracticeDefinition(
             "Focused review",
             WorkArtifact.PULL_REQUEST,
-            List.of("PullRequestCreated"),
+            triggerEvents,
             "Assess the review",
-            null,
+            precomputeScript,
             requirements,
             null,
             null,
@@ -123,6 +157,18 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             List.of(requirement),
+            List.of(),
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
+            List.of()
+        );
+    }
+
+    private static PracticeAutomatedAssessmentPolicy withoutAutomatedAssessment() {
+        return new PracticeAutomatedAssessmentPolicy(
+            VERSION,
+            PROFILE,
+            new PracticeAutomatedAssessment(PracticeAutomatedAssessmentMode.NONE, PracticeEvidenceSufficiency.NONE),
+            List.of(),
             List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_ASSESSMENT,
             List.of()

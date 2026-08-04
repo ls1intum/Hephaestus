@@ -56,6 +56,7 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 				slug: "describe-what-and-why",
 				name: practiceDefinition.name,
 				artifactType: "PULL_REQUEST",
+				automatedAssessment: mockPullRequestEvidence.automatedAssessment,
 				areaSlug: "packaging",
 				position: 0,
 				effectivelyOffered: true,

@@ -14,6 +14,34 @@ The effective catalog combines three scopes:
 | Instance catalog | bundled defaults plus sparse database overrides | instance administrators | defines what new workspaces receive |
 | Workspace practices | independent database copies | workspace administrators | defines reviews in one workspace |
 
+The same definition fields are used at all three scopes. What changes is who owns the value and when
+it propagates:
+
+| Decision | Hephaestus defaults | Instance catalog | Workspace practices |
+| --- | --- | --- | --- |
+| Name, work type, criteria, and guidance | maintained in the repository | inherited or customized by an instance administrator | copied at workspace creation, then owned by the workspace |
+| Automated assessment and required evidence | selected by `automatedAssessmentPolicyId`; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
+| Included in new workspaces | default is included | instance administrator can include or exclude | not applicable after installation |
+| Used in new reviews | not a repository setting | not a curated-catalog setting | workspace administrator controls it; unavailable automation cannot be enabled |
+| Area and order | JSON array order | inherited or changed with drag-and-drop or move actions | copied, then independently managed |
+
+This is a one-way lifecycle: a repository update can update an uncustomized instance definition, and
+an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
+definition or an existing workspace.
+
+## Human assessment without Hephaestus
+
+A practice can still be useful when a developer, peer, or human mentor can assess it but Hephaestus
+cannot. Set **How should Hephaestus assess reviewed work?** to **No automated assessment**. The
+practice keeps its criteria and guidance, but has no automated-review triggers, evidence requirements,
+or precompute script. Instance administrators can include it in the catalog for new workspaces;
+workspace administrators cannot enable it for automated reviews.
+
+For example, “Explain the reasoning behind a difficult trade-off” may be assessable in a mentoring
+conversation that is not available through an authorized integration. Its criteria remain a useful
+human rubric. Hephaestus must not infer the conversation or produce a review finding from unrelated
+repository data.
+
 The instance tables store only decisions that differ from the bundled catalog: a customized
 definition, inclusion policy, accepted bundled digest, or position. No override row means the
 bundled definition and order apply. See
@@ -124,8 +152,9 @@ standard as an experiment or a convention as a proven outcome.
 4. Validate every source against the applicable evidence profile and confirm its governance decision permits the product
    purpose, audience, processor egress, and retention. A new source follows the
    [artifact-source governance gate](../admin/dsms/artifact-source-governance).
-5. Update `server/src/main/resources/practices/default-catalog.json`; its Git history is the bundled
-   version history.
+5. Update `server/src/main/resources/practices/default-catalog.json`; its adjacent JSON Schema provides
+   editor completion and CI validation, and Git history is the bundled version history. Reference any
+   precompute script explicitly; unreferenced scripts fail validation.
 6. Add or update focused automated-assessment tests, including required-source skipping and valid-empty evidence.
 7. Review the admin presentation and a representative delivered message.
 

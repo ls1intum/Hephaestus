@@ -79,3 +79,13 @@ export function automatedAssessmentUnavailableLabel(
 	}
 	return null;
 }
+
+export function automatedAssessmentStatusLabel(
+	automatedAssessment: PracticeAutomatedAssessmentPolicy["automatedAssessment"],
+) {
+	if (automatedAssessment.mode === "NONE") return "No automated assessment";
+	if (automatedAssessment.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
+		return "Additional context required";
+	}
+	return null;
+}

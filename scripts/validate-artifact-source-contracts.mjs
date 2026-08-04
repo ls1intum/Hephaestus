@@ -60,6 +60,14 @@ for (const version of contractVersions) {
 	}
 }
 
+const defaultCatalogSchemaPath = path.join(
+	root,
+	"server/src/main/resources/practices/default-catalog.schema.json",
+);
+const defaultCatalogSchema = await readJson(defaultCatalogSchemaPath);
+validateSchemaDocumentation(defaultCatalogSchema, "practices/default-catalog.schema.json");
+ajv.addSchema(defaultCatalogSchema);
+
 const validate = (schemaId, value, label) => {
 	if (!ajv.validate(schemaId, value)) {
 		throw new Error(`${label} violates ${schemaId}: ${ajv.errorsText(ajv.errors)}`);
@@ -205,8 +213,116 @@ const sourceCatalogDigest = catalogDigests.get("1.0.0");
 const practiceCatalog = await readJson(
 	path.join(root, "server/src/main/resources/practices/default-catalog.json"),
 );
+validate(defaultCatalogSchema.$id, practiceCatalog, "practices/default-catalog.json");
 const sources = new Map(sourceCatalog.sources.map((source) => [source.kind, source]));
 const profiles = new Map(sourceCatalog.profiles.map((profile) => [profile.id, profile]));
+
+const triggerEventsByArtifactType = {
+	PULL_REQUEST: new Set([
+		"PullRequestCreated",
+		"PullRequestReady",
+		"PullRequestSynchronized",
+		"ReviewSubmitted",
+		"PullRequestMerged",
+		"PullRequestClosed",
+	]),
+	ISSUE: new Set(["IssueCreated", "IssueLabeled", "IssueClosed"]),
+	CONVERSATION_THREAD: new Set(),
+};
+const precomputeResourcePrefix = "practices/precompute/";
+const precomputeScripts = new Set(
+	(await readdir(path.join(root, "server/src/main/resources/practices/precompute")))
+		.filter((file) => file.endsWith(".ts"))
+		.map((file) => precomputeResourcePrefix + file),
+);
+
+const validatePracticeCatalogSemantics = () => {
+	const areaSlugs = new Set();
+	const practiceSlugs = new Set();
+	const referencedPolicies = new Set();
+	const referencedPrecomputeScripts = new Set();
+	for (const area of practiceCatalog.areas) {
+		if (areaSlugs.has(area.slug)) throw new Error(`default-catalog.json duplicates area '${area.slug}'`);
+		areaSlugs.add(area.slug);
+		for (const practice of area.practices) {
+			if (practiceSlugs.has(practice.slug)) {
+				throw new Error(`default-catalog.json duplicates practice '${practice.slug}'`);
+			}
+			practiceSlugs.add(practice.slug);
+			const policy = practiceCatalog.automatedAssessmentPolicy[practice.automatedAssessmentPolicyId];
+			if (!policy) {
+				throw new Error(
+					`default-catalog.json practice '${practice.slug}' references unknown automated-assessment setup '${practice.automatedAssessmentPolicyId}'`,
+				);
+			}
+			referencedPolicies.add(practice.automatedAssessmentPolicyId);
+			const profile = profiles.get(policy.evidenceProfile);
+			if (profile?.artifactType !== practice.artifactType) {
+				throw new Error(
+					`default-catalog.json practice '${practice.slug}' uses evidence for '${profile?.artifactType ?? "an unknown work type"}'`,
+				);
+			}
+			const preamble = practice.preamble ?? practice.artifactType;
+			if (!practiceCatalog.criteriaPreambles[preamble]) {
+				throw new Error(`default-catalog.json practice '${practice.slug}' references unknown preamble '${preamble}'`);
+			}
+			const allowedTriggers = triggerEventsByArtifactType[practice.artifactType];
+			const incompatibleTrigger = practice.triggerEvents.find((event) => !allowedTriggers.has(event));
+			if (incompatibleTrigger) {
+				throw new Error(
+					`default-catalog.json practice '${practice.slug}' uses incompatible trigger '${incompatibleTrigger}'`,
+				);
+			}
+			const automatedAssessment = policy.automatedAssessment.mode !== "NONE";
+			if (!automatedAssessment && practice.triggerEvents.length > 0) {
+				throw new Error(
+					`default-catalog.json practice '${practice.slug}' starts reviews without automated assessment`,
+				);
+			}
+			if (
+				automatedAssessment &&
+				practice.artifactType !== "CONVERSATION_THREAD" &&
+				practice.triggerEvents.length === 0
+			) {
+				throw new Error(`default-catalog.json practice '${practice.slug}' has no review trigger`);
+			}
+			if (practice.precomputeScript) {
+				const expectedPath = `${precomputeResourcePrefix}${practice.slug}.ts`;
+				if (practice.precomputeScript !== expectedPath) {
+					throw new Error(
+						`default-catalog.json practice '${practice.slug}' must use precompute script '${expectedPath}'`,
+					);
+				}
+				if (!precomputeScripts.has(practice.precomputeScript)) {
+					throw new Error(
+						`default-catalog.json practice '${practice.slug}' references missing precompute script '${practice.precomputeScript}'`,
+					);
+				}
+				if (!automatedAssessment) {
+					throw new Error(
+						`default-catalog.json practice '${practice.slug}' precomputes without automated assessment`,
+					);
+				}
+				referencedPrecomputeScripts.add(practice.precomputeScript);
+			}
+		}
+	}
+	if (practiceSlugs.size === 0) {
+		throw new Error("default-catalog.json must define at least one practice");
+	}
+	for (const policyId of Object.keys(practiceCatalog.automatedAssessmentPolicy)) {
+		if (!referencedPolicies.has(policyId)) {
+			throw new Error(`default-catalog.json automated-assessment setup '${policyId}' is unused`);
+		}
+	}
+	for (const script of precomputeScripts) {
+		if (!referencedPrecomputeScripts.has(script)) {
+			throw new Error(`precompute script '${script}' is not declared by a bundled practice`);
+		}
+	}
+};
+
+validatePracticeCatalogSemantics();
 
 const validateEvidenceSemantics = (requirements, label) => {
 	const profile = profiles.get(requirements.evidenceProfile);

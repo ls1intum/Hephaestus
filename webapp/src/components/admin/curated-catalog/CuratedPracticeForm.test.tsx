@@ -141,7 +141,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Edit evidence requirements" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
 		await user.click(
 			screen.getByRole("combobox", { name: "How should Hephaestus assess reviewed work?" }),
 		);
@@ -150,6 +150,7 @@ describe("CuratedPracticeForm", () => {
 
 		expect(onSubmit).toHaveBeenCalledWith(
 			expect.objectContaining({
+				triggerEvents: [],
 				automatedAssessmentPolicy: expect.objectContaining({
 					automatedAssessment: { mode: "NONE", evidenceSufficiency: "NONE" },
 					requiredEvidence: [],
@@ -158,6 +159,8 @@ describe("CuratedPracticeForm", () => {
 				}),
 			}),
 		);
+		expect(screen.queryByText("Start an automated review when… *")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Precompute script" })).toBeNull();
 	});
 
 	it("keeps evidence drafts when the reviewed work type changes", async () => {
@@ -174,7 +177,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("button", { name: "Edit evidence requirements" }));
+		await user.click(screen.getByRole("button", { name: "Configure automated assessment" }));
 		await user.click(screen.getByRole("button", { name: "Add limitation" }));
 		const limitationDescription = screen.getByRole("textbox", {
 			name: "Description for limitation 2",

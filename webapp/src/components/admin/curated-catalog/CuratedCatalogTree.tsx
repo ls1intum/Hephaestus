@@ -3,6 +3,7 @@ import { GripVertical, MoreHorizontal } from "lucide-react";
 import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
 import { WORK_ARTIFACT_LABELS } from "@/components/admin/practice-catalog/constants";
+import { automatedAssessmentStatusLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
@@ -236,6 +237,7 @@ function AreaActions({
 function PracticeDetails({ practice }: { practice: TreePractice }) {
 	const parentUnavailable =
 		Boolean(practice.missingAreaSlug) || (practice.status.offered && !practice.effectivelyOffered);
+	const assessmentStatus = automatedAssessmentStatusLabel(practice.automatedAssessment);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">
@@ -251,6 +253,7 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 			</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{WORK_ARTIFACT_LABELS[practice.artifactType]}</span>
+				{assessmentStatus && <Badge variant="warning">{assessmentStatus}</Badge>}
 				{parentUnavailable && (
 					<Badge variant="outline">
 						{practice.missingAreaSlug

@@ -241,21 +241,32 @@ public class PracticeService {
         Set<ClearablePracticeField> fieldsToClear = request.clear() == null ? Set.of() : request.clear();
         WorkArtifact artifactType =
             request.artifactType() == null ? beforeDefinition.artifactType() : request.artifactType();
-        PracticeDefinition afterDefinition = new PracticeDefinition(
-            request.name() == null ? beforeDefinition.name() : request.name(),
-            artifactType,
-            request.triggerEvents() == null ? beforeDefinition.triggerEvents() : request.triggerEvents(),
-            request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
-            patch(
-                beforeDefinition.precomputeScript(),
-                request.precomputeScript(),
-                fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
-            ),
+        PracticeAutomatedAssessmentPolicy automatedAssessmentPolicy =
             request.automatedAssessmentPolicy() != null
                 ? request.automatedAssessmentPolicy()
                 : artifactType == beforeDefinition.artifactType()
                     ? beforeDefinition.automatedAssessmentPolicy()
-                    : evidenceDefaults.forArtifact(artifactType),
+                    : evidenceDefaults.forArtifact(artifactType);
+        boolean removesAutomatedAssessment =
+            request.automatedAssessmentPolicy() != null &&
+            !automatedAssessmentPolicy.automatedAssessment().canAttemptAutomatedAssessment();
+        PracticeDefinition afterDefinition = new PracticeDefinition(
+            request.name() == null ? beforeDefinition.name() : request.name(),
+            artifactType,
+            request.triggerEvents() == null
+                ? removesAutomatedAssessment
+                    ? List.of()
+                    : beforeDefinition.triggerEvents()
+                : request.triggerEvents(),
+            request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
+            removesAutomatedAssessment && request.precomputeScript() == null
+                ? null
+                : patch(
+                      beforeDefinition.precomputeScript(),
+                      request.precomputeScript(),
+                      fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
+                  ),
+            automatedAssessmentPolicy,
             patch(
                 beforeDefinition.whyItMatters(),
                 request.whyItMatters(),

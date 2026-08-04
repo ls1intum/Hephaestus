@@ -15,6 +15,11 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 	...overrides,
 });
 
+const automatedAssessment: CuratedPracticeSummary["automatedAssessment"] = {
+	mode: "LANGUAGE_MODEL",
+	evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
+};
+
 const areas: CuratedArea[] = [
 	{
 		slug: "review-ready-work",
@@ -47,6 +52,7 @@ const practices: CuratedPracticeSummary[] = [
 		position: 0,
 		name: "Keep a change to one concern",
 		artifactType: "PULL_REQUEST",
+		automatedAssessment,
 		areaSlug: "review-ready-work",
 		effectivelyOffered: true,
 		status: status(),
@@ -56,6 +62,7 @@ const practices: CuratedPracticeSummary[] = [
 		position: 1,
 		name: "Say what changed and why",
 		artifactType: "PULL_REQUEST",
+		automatedAssessment,
 		areaSlug: "review-ready-work",
 		effectivelyOffered: true,
 		status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
@@ -65,6 +72,7 @@ const practices: CuratedPracticeSummary[] = [
 		position: 2,
 		name: "Respond to each review comment",
 		artifactType: "PULL_REQUEST",
+		automatedAssessment,
 		areaSlug: "review-ready-work",
 		effectivelyOffered: true,
 		status: status({ state: "UPDATE_WAITING", changeKind: "WORDING" }),
@@ -74,6 +82,7 @@ const practices: CuratedPracticeSummary[] = [
 		position: 0,
 		name: "Write the release note with the change",
 		artifactType: "PULL_REQUEST",
+		automatedAssessment: { mode: "NONE", evidenceSufficiency: "NONE" },
 		areaSlug: "house-rules",
 		effectivelyOffered: true,
 		status: status({ state: "YOURS" }),
@@ -83,6 +92,10 @@ const practices: CuratedPracticeSummary[] = [
 		position: 0,
 		name: "Link the issue the change closes",
 		artifactType: "ISSUE",
+		automatedAssessment: {
+			mode: "LANGUAGE_MODEL",
+			evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
+		},
 		effectivelyOffered: true,
 		status: status({ state: "NO_LONGER_SHIPPED" }),
 	},
@@ -91,6 +104,7 @@ const practices: CuratedPracticeSummary[] = [
 		position: 0,
 		name: "Outlived the area it was filed under",
 		artifactType: "PULL_REQUEST",
+		automatedAssessment,
 		areaSlug: "an-area-hephaestus-stopped-shipping",
 		effectivelyOffered: false,
 		status: status({ state: "NO_LONGER_SHIPPED", offered: false }),
@@ -131,6 +145,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Everything: Story = {};
+
+export const AssessmentLimitsAreVisible: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("No automated assessment")).toBeVisible();
+		await expect(canvas.getByText("Additional context required")).toBeVisible();
+	},
+};
 
 export const CustomOrder: Story = {
 	args: { customOrder: true },

@@ -4098,6 +4098,7 @@ export type CurrentUserView = {
 export type CuratedPracticeSummary = {
     areaSlug?: string;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    automatedAssessment: PracticeAutomatedAssessment;
     effectivelyOffered: boolean;
     name: string;
     position: number;

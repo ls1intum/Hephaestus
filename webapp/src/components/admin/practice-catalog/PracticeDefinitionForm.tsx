@@ -162,6 +162,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	});
 	const [submitted, setSubmitted] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
+	const hasAutomatedAssessment = form.automatedAssessmentPolicy.automatedAssessment.mode !== "NONE";
 	const isDirty =
 		JSON.stringify(form) !== JSON.stringify(initialState(evidenceOptions, initialData));
 	const blocker = useBlocker({
@@ -199,7 +200,10 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			? "Use 3–64 lowercase letters, numbers, and single hyphens."
 			: undefined;
 	const triggerError =
-		submitted && form.artifactType !== "CONVERSATION_THREAD" && form.triggerEvents.length === 0
+		submitted &&
+		hasAutomatedAssessment &&
+		form.artifactType !== "CONVERSATION_THREAD" &&
+		form.triggerEvents.length === 0
 			? "Select at least one trigger event"
 			: undefined;
 	const criteriaError =
@@ -211,7 +215,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const valid =
 		form.name.trim().length >= 3 &&
 		form.criteria.trim().length >= 3 &&
-		(form.artifactType === "CONVERSATION_THREAD" || form.triggerEvents.length > 0) &&
+		(!hasAutomatedAssessment ||
+			form.artifactType === "CONVERSATION_THREAD" ||
+			form.triggerEvents.length > 0) &&
 		!evidenceError &&
 		(mode === "edit" || isValidSlug(form.slug));
 
@@ -224,7 +230,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					? "practice-name"
 					: mode === "create" && !isValidSlug(form.slug)
 						? "practice-slug"
-						: form.artifactType !== "CONVERSATION_THREAD" && form.triggerEvents.length === 0
+						: hasAutomatedAssessment &&
+								form.artifactType !== "CONVERSATION_THREAD" &&
+								form.triggerEvents.length === 0
 							? `practice-trigger-${TRIGGER_EVENTS_BY_FOCUS[form.artifactType][0]?.value}`
 							: evidenceError
 								? "practice-evidence-heading"
@@ -237,14 +245,16 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			slug: form.slug,
 			name: form.name.trim(),
 			artifactType: form.artifactType,
-			triggerEvents: form.triggerEvents,
+			triggerEvents: hasAutomatedAssessment ? form.triggerEvents : [],
 			criteria: form.criteria.trim(),
 			...(form.areaSlug === NO_AREA ? {} : { areaSlug: form.areaSlug }),
 			...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
 			...(form.whatGoodLooksLike.trim()
 				? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
 				: {}),
-			...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
+			...(hasAutomatedAssessment && form.precomputeScript.trim()
+				? { precomputeScript: form.precomputeScript.trim() }
+				: {}),
 			automatedAssessmentPolicy: form.automatedAssessmentPolicy,
 		});
 	};
@@ -284,7 +294,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					</p>
 
 					<section className="space-y-4">
-						<h2 className="text-lg font-semibold">General</h2>
+						<h2 className="text-lg font-semibold">Practice details</h2>
 						<FieldGroup className="gap-4">
 							<Field data-invalid={nameError ? "true" : undefined}>
 								<FieldLabel htmlFor="practice-name">Name *</FieldLabel>
@@ -432,63 +442,14 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 					<Separator />
 
-					{form.artifactType !== "CONVERSATION_THREAD" && (
-						<>
-							<FieldSet
-								data-invalid={triggerError ? "true" : undefined}
-								aria-invalid={Boolean(triggerError)}
-								aria-describedby={`practice-trigger-description${triggerError ? " practice-trigger-error" : ""}`}
-							>
-								<FieldLegend className="text-lg">Start a review when… *</FieldLegend>
-								<FieldDescription id="practice-trigger-description">
-									Choose one or more events.
-								</FieldDescription>
-								<FieldGroup data-slot="checkbox-group" className="grid gap-3 sm:grid-cols-2">
-									{TRIGGER_EVENTS_BY_FOCUS[form.artifactType].map((option) => (
-										<FieldLabel
-											key={option.value}
-											htmlFor={`practice-trigger-${option.value}`}
-											className="flex cursor-pointer items-center gap-2 text-sm font-normal"
-										>
-											<Checkbox
-												id={`practice-trigger-${option.value}`}
-												checked={form.triggerEvents.includes(option.value)}
-												onCheckedChange={(checked) => toggleTrigger(option.value, checked === true)}
-											/>
-											{option.label}
-										</FieldLabel>
-									))}
-								</FieldGroup>
-								{triggerError && (
-									<FieldError id="practice-trigger-error">{triggerError}</FieldError>
-								)}
-							</FieldSet>
-							<Separator />
-						</>
-					)}
-
-					<PracticeEvidenceEditor
-						options={selectedEvidenceOptions}
-						value={form.automatedAssessmentPolicy}
-						disabled={formDisabled}
-						onChange={(automatedAssessmentPolicy) =>
-							setForm((previous) => {
-								evidenceDrafts.current[previous.artifactType] = automatedAssessmentPolicy;
-								return { ...previous, automatedAssessmentPolicy };
-							})
-						}
-						error={submitted ? evidenceError : undefined}
-					/>
-
-					<Separator />
-
 					<section>
 						<Field data-invalid={criteriaError ? "true" : undefined}>
 							<FieldLabel htmlFor="practice-criteria" className="text-lg font-semibold">
 								Evaluation criteria *
 							</FieldLabel>
 							<FieldDescription id="practice-criteria-description">
-								Instructions Hephaestus uses to assess this practice. Supports Markdown.
+								Rules for assessing this practice. Hephaestus uses them when automated assessment is
+								enabled. Supports Markdown.
 							</FieldDescription>
 							<Textarea
 								id="practice-criteria"
@@ -551,36 +512,88 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 					<Separator />
 
-					<Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-						<CollapsibleTrigger
-							render={
-								<Button
-									type="button"
-									variant="ghost"
-									className="group -ml-3 text-lg font-semibold disabled:opacity-100"
-								/>
-							}
-						>
-							<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
-							Precompute script
-						</CollapsibleTrigger>
-						<CollapsibleContent className="mt-4 space-y-4">
-							<p className="text-sm text-muted-foreground">
-								Optional TypeScript that runs static analysis before a review and provides
-								structured context.
-							</p>
-							<CodeEditor
-								value={form.precomputeScript}
-								onChange={(value) =>
-									setForm((previous) => ({ ...previous, precomputeScript: value }))
+					<PracticeEvidenceEditor
+						options={selectedEvidenceOptions}
+						value={form.automatedAssessmentPolicy}
+						disabled={formDisabled}
+						onChange={(automatedAssessmentPolicy) =>
+							setForm((previous) => {
+								evidenceDrafts.current[previous.artifactType] = automatedAssessmentPolicy;
+								return { ...previous, automatedAssessmentPolicy };
+							})
+						}
+						error={submitted ? evidenceError : undefined}
+					/>
+
+					<Separator />
+
+					{hasAutomatedAssessment && form.artifactType !== "CONVERSATION_THREAD" && (
+						<>
+							<FieldSet
+								data-invalid={triggerError ? "true" : undefined}
+								aria-invalid={Boolean(triggerError)}
+								aria-describedby={`practice-trigger-description${triggerError ? " practice-trigger-error" : ""}`}
+							>
+								<FieldLegend className="text-lg">Start an automated review when… *</FieldLegend>
+								<FieldDescription id="practice-trigger-description">
+									Choose one or more events.
+								</FieldDescription>
+								<FieldGroup data-slot="checkbox-group" className="grid gap-3 sm:grid-cols-2">
+									{TRIGGER_EVENTS_BY_FOCUS[form.artifactType].map((option) => (
+										<FieldLabel
+											key={option.value}
+											htmlFor={`practice-trigger-${option.value}`}
+											className="flex cursor-pointer items-center gap-2 text-sm font-normal"
+										>
+											<Checkbox
+												id={`practice-trigger-${option.value}`}
+												checked={form.triggerEvents.includes(option.value)}
+												onCheckedChange={(checked) => toggleTrigger(option.value, checked === true)}
+											/>
+											{option.label}
+										</FieldLabel>
+									))}
+								</FieldGroup>
+								{triggerError && (
+									<FieldError id="practice-trigger-error">{triggerError}</FieldError>
+								)}
+							</FieldSet>
+							<Separator />
+						</>
+					)}
+
+					{hasAutomatedAssessment && (
+						<Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+							<CollapsibleTrigger
+								render={
+									<Button
+										type="button"
+										variant="ghost"
+										className="group -ml-3 text-lg font-semibold disabled:opacity-100"
+									/>
 								}
-								language="typescript"
-								ariaLabel="Precompute script"
-								className="h-[400px]"
-								readOnly={formDisabled}
-							/>
-						</CollapsibleContent>
-					</Collapsible>
+							>
+								<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
+								Precompute script
+							</CollapsibleTrigger>
+							<CollapsibleContent className="mt-4 space-y-4">
+								<p className="text-sm text-muted-foreground">
+									Optional TypeScript that runs static analysis before a review and provides
+									structured context.
+								</p>
+								<CodeEditor
+									value={form.precomputeScript}
+									onChange={(value) =>
+										setForm((previous) => ({ ...previous, precomputeScript: value }))
+									}
+									language="typescript"
+									ariaLabel="Precompute script"
+									className="h-[400px]"
+									readOnly={formDisabled}
+								/>
+							</CollapsibleContent>
+						</Collapsible>
+					)}
 
 					{afterFields}
 				</div>

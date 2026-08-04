@@ -23,12 +23,16 @@ public final class PracticeDefinitionValidator {
     }
 
     public void validate(PracticeDefinition definition) {
-        validate(
-            definition.artifactType(),
-            definition.triggerEvents(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike()
-        );
+        boolean automatedAssessment =
+            definition.automatedAssessmentPolicy().automatedAssessment().mode() != PracticeAutomatedAssessmentMode.NONE;
+        validateTriggers(definition.artifactType(), definition.triggerEvents(), automatedAssessment);
+        if (!automatedAssessment && definition.precomputeScript() != null) {
+            throw new IllegalArgumentException(
+                "A practice without automated assessment cannot define a precompute script"
+            );
+        }
+        rejectDetectorVocabulary("Why it matters", definition.whyItMatters());
+        rejectDetectorVocabulary("What good looks like", definition.whatGoodLooksLike());
         validateEvidence(definition.artifactType(), definition.automatedAssessmentPolicy());
     }
 
@@ -38,17 +42,26 @@ public final class PracticeDefinitionValidator {
         @Nullable String whyItMatters,
         @Nullable String whatGoodLooksLike
     ) {
-        validateTriggers(artifactType, triggerEvents);
+        validateTriggers(artifactType, triggerEvents, true);
         rejectDetectorVocabulary("Why it matters", whyItMatters);
         rejectDetectorVocabulary("What good looks like", whatGoodLooksLike);
     }
 
-    private static void validateTriggers(WorkArtifact artifactType, List<String> triggerEvents) {
+    private static void validateTriggers(
+        WorkArtifact artifactType,
+        List<String> triggerEvents,
+        boolean automatedAssessment
+    ) {
         if (new HashSet<>(triggerEvents).size() != triggerEvents.size()) {
             throw new IllegalArgumentException("Trigger events must not contain duplicates");
         }
+        if (!automatedAssessment && !triggerEvents.isEmpty()) {
+            throw new IllegalArgumentException(
+                "A practice without automated assessment cannot define events that start a review"
+            );
+        }
         Set<String> allowed = TriggerEventCatalog.eligibleFor(artifactType);
-        if (artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
+        if (automatedAssessment && artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
             throw new IllegalArgumentException("Choose at least one event that starts a review");
         }
         List<String> incompatible = triggerEvents

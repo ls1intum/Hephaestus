@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedAssessment;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -10,6 +11,7 @@ public record CuratedPracticeSummaryDTO(
     @NonNull String slug,
     @NonNull String name,
     @NonNull WorkArtifact artifactType,
+    @NonNull PracticeAutomatedAssessment automatedAssessment,
     @Nullable String areaSlug,
     @NonNull Integer position,
     @NonNull Boolean effectivelyOffered,
@@ -20,6 +22,7 @@ public record CuratedPracticeSummaryDTO(
             entry.slug(),
             entry.effective().name(),
             entry.effective().artifactType(),
+            entry.effective().automatedAssessmentPolicy().automatedAssessment(),
             entry.effective().areaSlug(),
             entry.position(),
             effectivelyOffered,
