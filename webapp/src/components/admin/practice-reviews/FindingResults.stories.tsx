@@ -73,7 +73,7 @@ export const LongContent: Story = {
 		await expectNoPageOverflow();
 	},
 };
-export const OutdatedResult: Story = {
+export const OlderReviewRules: Story = {
 	args: {
 		state: {
 			status: "ready",
@@ -84,7 +84,7 @@ export const OutdatedResult: Story = {
 		const result = within(canvasElement).getByRole("link", {
 			name: /The controller delegates review queries/,
 		});
-		await expect(within(result).getByText("Outdated result")).toBeVisible();
+		await expect(within(result).getByText("Uses older review rules")).toBeVisible();
 	},
 };
 export const Loading: Story = {
