@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import {
 	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeEvidenceOptions,
+	mockPracticeDefinitionOptions,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
@@ -43,7 +43,7 @@ const meta = {
 	},
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
-	args: { evidenceOptions: mockPracticeEvidenceOptions },
+	args: { definitionOptions: mockPracticeDefinitionOptions },
 } satisfies Meta<typeof CuratedPracticeForm>;
 
 export default meta;
@@ -140,7 +140,7 @@ export const ValidationErrors: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
 		await expect(canvas.getByText("Name must be at least 3 characters")).toBeVisible();
-		await expect(canvas.getByText("Select at least one trigger event")).toBeVisible();
+		await expect(canvas.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("textbox", { name: /Name/ })).toHaveAttribute(
 			"aria-describedby",
 			"practice-name-error",

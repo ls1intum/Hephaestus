@@ -2700,13 +2700,23 @@ export type ProbeLlmConnectionRequest = {
 };
 
 /**
- * Evidence choices and recommended requirements for one type of reviewed work
+ * Review timing, evidence choices, and recommended requirements for one type of reviewed work
  */
-export type PracticeWorkTypeEvidenceOptions = {
+export type PracticeWorkTypeDefinitionOptions = {
     allowedSources: Array<PracticeEvidenceSourceOption>;
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     recommendedRequirements: PracticeAutomatedReviewPolicy;
     supportedAutomatedReviewModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
+    triggerEvents: Array<PracticeTriggerEventOption>;
+};
+
+/**
+ * An event that can start an automated practice review
+ */
+export type PracticeTriggerEventOption = {
+    displayName: string;
+    event: string;
+    recommended: boolean;
 };
 
 /**
@@ -2762,10 +2772,10 @@ export type PracticeReviewSettings = {
 };
 
 /**
- * Evidence options for each type of reviewed work
+ * Available and recommended authoring choices for each type of reviewed work
  */
-export type PracticeEvidenceOptions = {
-    workTypes: Array<PracticeWorkTypeEvidenceOptions>;
+export type PracticeDefinitionOptions = {
+    workTypes: Array<PracticeWorkTypeDefinitionOptions>;
 };
 
 /**
@@ -5765,21 +5775,21 @@ export type AdminUpdateCuratedAreaStatusResponses = {
 
 export type AdminUpdateCuratedAreaStatusResponse = AdminUpdateCuratedAreaStatusResponses[keyof AdminUpdateCuratedAreaStatusResponses];
 
-export type AdminGetPracticeEvidenceOptionsData = {
+export type AdminGetPracticeDefinitionOptionsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/admin/practice-catalog/evidence-options';
+    url: '/admin/practice-catalog/definition-options';
 };
 
-export type AdminGetPracticeEvidenceOptionsResponses = {
+export type AdminGetPracticeDefinitionOptionsResponses = {
     /**
      * OK
      */
-    200: PracticeEvidenceOptions;
+    200: PracticeDefinitionOptions;
 };
 
-export type AdminGetPracticeEvidenceOptionsResponse = AdminGetPracticeEvidenceOptionsResponses[keyof AdminGetPracticeEvidenceOptionsResponses];
+export type AdminGetPracticeDefinitionOptionsResponse = AdminGetPracticeDefinitionOptionsResponses[keyof AdminGetPracticeDefinitionOptionsResponses];
 
 export type AdminResetCuratedCatalogOrderData = {
     body?: never;
@@ -8523,7 +8533,7 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
-export type GetPracticeEvidenceOptionsData = {
+export type GetPracticeDefinitionOptionsData = {
     body?: never;
     path: {
         /**
@@ -8532,17 +8542,17 @@ export type GetPracticeEvidenceOptionsData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/evidence-options';
+    url: '/workspaces/{workspaceSlug}/practices/definition-options';
 };
 
-export type GetPracticeEvidenceOptionsResponses = {
+export type GetPracticeDefinitionOptionsResponses = {
     /**
      * OK
      */
-    200: PracticeEvidenceOptions;
+    200: PracticeDefinitionOptions;
 };
 
-export type GetPracticeEvidenceOptionsResponse = GetPracticeEvidenceOptionsResponses[keyof GetPracticeEvidenceOptionsResponses];
+export type GetPracticeDefinitionOptionsResponse = GetPracticeDefinitionOptionsResponses[keyof GetPracticeDefinitionOptionsResponses];
 
 export type GetEngagementData = {
     body?: never;

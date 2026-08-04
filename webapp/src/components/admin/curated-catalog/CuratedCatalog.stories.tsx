@@ -149,8 +149,8 @@ export const Everything: Story = {};
 export const MentoringLimitsAreVisible: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Practice guidance only")).toBeVisible();
-		await expect(canvas.getByText("Human context needed")).toBeVisible();
+		await expect(canvas.getByText("Guidance only")).toBeVisible();
+		await expect(canvas.getByText("Human review needed")).toBeVisible();
 	},
 };
 

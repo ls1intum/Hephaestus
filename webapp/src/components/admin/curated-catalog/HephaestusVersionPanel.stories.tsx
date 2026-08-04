@@ -3,7 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeEvidenceOptions,
+	mockPracticeDefinitionOptions,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
@@ -36,7 +36,7 @@ const meta = {
 		status: status(),
 		isResetPending: false,
 		disabled: false,
-		evidenceOptions: mockPracticeEvidenceOptions,
+		definitionOptions: mockPracticeDefinitionOptions,
 		onUseHephaestusVersion: fn(),
 		onKeepCurrentDefinition: fn(),
 	},

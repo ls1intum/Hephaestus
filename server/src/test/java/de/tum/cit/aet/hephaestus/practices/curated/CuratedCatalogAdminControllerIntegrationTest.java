@@ -91,7 +91,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     void appAdminCanReadEvidenceAuthoringOptions() {
         webTestClient
             .get()
-            .uri(CATALOG + "/evidence-options")
+            .uri(CATALOG + "/definition-options")
             .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
             .exchange()
             .expectStatus()

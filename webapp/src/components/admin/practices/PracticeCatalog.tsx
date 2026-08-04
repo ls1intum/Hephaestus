@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Practice, PracticeArea, PracticeEvidenceOptions } from "@/api/types.gen";
+import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import {
 	WORK_ARTIFACT_FILTER_OPTIONS,
@@ -68,7 +68,7 @@ export interface PracticeCatalogProps {
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	practices: Practice[];
-	evidenceOptions: PracticeEvidenceOptions;
+	definitionOptions: PracticeDefinitionOptions;
 	pending: PracticeCatalogPendingState;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (f: FocusFilter) => void;
@@ -92,7 +92,7 @@ export function PracticeCatalog({
 	workspaceSlug,
 	areas,
 	practices,
-	evidenceOptions,
+	definitionOptions,
 	pending,
 	focusFilter,
 	onFocusFilterChange,
@@ -122,7 +122,7 @@ export function PracticeCatalog({
 						.filter((slug): slug is string => Boolean(slug)),
 				);
 	const supportedModesFor = (practice: Practice) =>
-		evidenceOptions.workTypes.find((option) => option.artifactType === practice.artifactType)
+		definitionOptions.workTypes.find((option) => option.artifactType === practice.artifactType)
 			?.supportedAutomatedReviewModes ?? [];
 
 	return (

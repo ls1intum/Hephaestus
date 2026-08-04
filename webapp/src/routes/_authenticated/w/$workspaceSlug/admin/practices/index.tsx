@@ -3,7 +3,7 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import {
-	getPracticeEvidenceOptionsOptions,
+	getPracticeDefinitionOptionsOptions,
 	listAreasOptions,
 	listPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -53,8 +53,8 @@ function PracticeCatalogRoute() {
 	const practicesQuery = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
 	});
-	const evidenceOptionsQuery = useQuery({
-		...getPracticeEvidenceOptionsOptions({ path: { workspaceSlug } }),
+	const definitionOptionsQuery = useQuery({
+		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
 	});
 
 	return (
@@ -64,18 +64,18 @@ function PracticeCatalogRoute() {
 				title="Practices"
 				description="Choose the practices Hephaestus uses for new reviews in this workspace. Changes affect only this workspace."
 			/>
-			{areasQuery.isPending || practicesQuery.isPending || evidenceOptionsQuery.isPending ? (
+			{areasQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending ? (
 				<div className="flex h-64 items-center justify-center">
 					<Spinner className="size-8" />
 				</div>
-			) : areasQuery.isError || practicesQuery.isError || evidenceOptionsQuery.isError ? (
+			) : areasQuery.isError || practicesQuery.isError || definitionOptionsQuery.isError ? (
 				<QueryErrorAlert
-					error={areasQuery.error ?? practicesQuery.error ?? evidenceOptionsQuery.error}
+					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load practices"
 					onRetry={() => {
 						areasQuery.refetch();
 						practicesQuery.refetch();
-						evidenceOptionsQuery.refetch();
+						definitionOptionsQuery.refetch();
 					}}
 				/>
 			) : (
@@ -83,7 +83,7 @@ function PracticeCatalogRoute() {
 					workspaceSlug={workspaceSlug}
 					areas={areasQuery.data}
 					practices={practicesQuery.data}
-					evidenceOptions={evidenceOptionsQuery.data}
+					definitionOptions={definitionOptionsQuery.data}
 					pending={{
 						areaSlugs: catalog.pendingAreaSlugs,
 						practiceSlugs: catalog.pendingPracticeSlugs,

@@ -22,7 +22,7 @@ class PracticeAutomatedReviewTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldAttemptOnlySupportedLanguageModelAssessment() {
+    void shouldAttemptOnlySupportedLanguageModelReview() {
         assertThat(
             new PracticeAutomatedReview(
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,

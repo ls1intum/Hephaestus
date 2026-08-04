@@ -4,12 +4,10 @@ import type {
 	CatalogEntryStatus,
 	CuratedAreaRequest,
 	CuratedPracticeDefinition,
-	PracticeEvidenceOptions,
+	PracticeDefinitionOptions,
+	PracticeTriggerEventOption,
 } from "@/api/types.gen";
-import {
-	FOCUS_ARTIFACT_OPTIONS,
-	TRIGGER_EVENTS_BY_FOCUS,
-} from "@/components/admin/practice-catalog/constants";
+import { FOCUS_ARTIFACT_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -40,7 +38,7 @@ export type HephaestusVersionPanelProps = HephaestusVersionPanelBaseProps &
 		| {
 				kind: "practice";
 				shipped?: CuratedPracticeDefinition;
-				evidenceOptions: PracticeEvidenceOptions;
+				definitionOptions: PracticeDefinitionOptions;
 		  }
 		| { kind: "area"; shipped?: CuratedAreaRequest }
 	);
@@ -54,13 +52,13 @@ const AREA_FIELDS = {
 
 const PRACTICE_FIELDS = {
 	name: "Name",
-	artifactType: "Evaluates",
+	artifactType: "Work reviewed",
 	areaSlug: "Area",
 	triggerEvents: "Starts a review when",
-	criteria: "Review criteria",
+	criteria: "What to look for",
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
-	precomputeScript: "Precompute script",
+	precomputeScript: "Static analysis",
 	automatedReviewPolicy: "Mentoring support and evidence",
 } satisfies Record<Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation">, string>;
 
@@ -79,8 +77,8 @@ function words(token: string): string {
 function displayValue(
 	field: string,
 	value: unknown,
-	shipped: ShippedDefinition,
 	areaNames: Readonly<Record<string, string>>,
+	triggerEvents: readonly PracticeTriggerEventOption[] = [],
 ): string {
 	if (value === null || value === undefined || value === "") {
 		return field === "areaSlug" ? "Unassigned" : "Not set";
@@ -94,14 +92,11 @@ function displayValue(
 		);
 	}
 	if (field === "triggerEvents" && Array.isArray(value)) {
-		const artifact = shipped.artifactType;
-		const options =
-			typeof artifact === "string" && artifact in TRIGGER_EVENTS_BY_FOCUS
-				? TRIGGER_EVENTS_BY_FOCUS[artifact as keyof typeof TRIGGER_EVENTS_BY_FOCUS]
-				: [];
 		return value
 			.map(
-				(event) => options.find((option) => option.value === event)?.label ?? words(String(event)),
+				(event) =>
+					triggerEvents.find((option) => option.event === event)?.displayName ??
+					words(String(event)),
 			)
 			.join("\n");
 	}
@@ -126,9 +121,9 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 	} = props;
 	const shippedDefinition: ShippedDefinition | undefined = shipped;
 	const shippedPractice = props.kind === "practice" ? props.shipped : undefined;
-	const shippedEvidenceOptions =
+	const shippedDefinitionOptions =
 		props.kind === "practice" && shippedPractice
-			? props.evidenceOptions.workTypes.find(
+			? props.definitionOptions.workTypes.find(
 					(option) => option.artifactType === shippedPractice.artifactType,
 				)
 			: undefined;
@@ -183,11 +178,11 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 												)}
 											>
 												{field === "automatedReviewPolicy" && shippedPractice ? (
-													shippedEvidenceOptions ? (
+													shippedDefinitionOptions ? (
 														<PracticeEvidenceSummary
 															policy={shippedPractice.automatedReviewPolicy}
 															validation={shippedPractice.automatedReviewValidation}
-															sources={shippedEvidenceOptions.allowedSources}
+															sources={shippedDefinitionOptions.allowedSources}
 															workTypeLabel={
 																FOCUS_ARTIFACT_OPTIONS.find(
 																	(option) => option.value === shippedPractice.artifactType,
@@ -201,8 +196,8 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 													displayValue(
 														field,
 														shippedDefinition[field],
-														shippedDefinition,
 														areaNames,
+														shippedDefinitionOptions?.triggerEvents,
 													)
 												)}
 											</dd>

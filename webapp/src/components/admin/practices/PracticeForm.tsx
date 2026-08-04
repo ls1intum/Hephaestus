@@ -4,7 +4,7 @@ import type {
 	CreatePracticeRequest,
 	Practice,
 	PracticeArea,
-	PracticeEvidenceOptions,
+	PracticeDefinitionOptions,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import {
@@ -24,7 +24,7 @@ interface PracticeFormCreateProps {
 	areas: PracticeArea[];
 	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
 	isPending: boolean;
-	evidenceOptions: PracticeEvidenceOptions;
+	definitionOptions: PracticeDefinitionOptions;
 	initialData?: never;
 }
 
@@ -35,7 +35,7 @@ interface PracticeFormEditProps {
 	areas: PracticeArea[];
 	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
 	isPending: boolean;
-	evidenceOptions: PracticeEvidenceOptions;
+	definitionOptions: PracticeDefinitionOptions;
 }
 
 export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
@@ -63,7 +63,7 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const { mode, workspaceSlug, areas, isPending, initialData, evidenceOptions } = props;
+	const { mode, workspaceSlug, areas, isPending, initialData, definitionOptions } = props;
 	const cancelAction = (
 		<Link
 			to="/w/$workspaceSlug/admin/practices"
@@ -145,7 +145,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
-					evidenceOptions={evidenceOptions}
+					definitionOptions={definitionOptions}
 					cancelAction={cancelAction}
 					onSubmit={submit}
 				/>
@@ -155,7 +155,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					initialData={asDefinitionValue(initialData)}
 					areas={areas}
 					isPending={isPending}
-					evidenceOptions={evidenceOptions}
+					definitionOptions={definitionOptions}
 					cancelAction={cancelAction}
 					afterFields={reviewResults}
 					onSubmit={submit}
@@ -187,8 +187,8 @@ export function PracticeFormShell({
 				title={mode === "create" ? "Create practice" : `Edit: ${practiceName ?? "practice"}`}
 				description={
 					mode === "create"
-						? "Define what Hephaestus should look for in reviewed work."
-						: "Update how this practice evaluates reviewed work."
+						? "Define a way of working and choose how Hephaestus should support it."
+						: "Update the practice guidance and review support."
 				}
 			/>
 			{children}

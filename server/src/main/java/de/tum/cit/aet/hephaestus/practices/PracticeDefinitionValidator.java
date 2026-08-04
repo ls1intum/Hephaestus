@@ -23,43 +23,34 @@ public final class PracticeDefinitionValidator {
     }
 
     public void validate(PracticeDefinition definition) {
-        boolean automatedReview =
-            definition.automatedReviewPolicy().automatedReview().mode() != PracticeAutomatedReviewMode.NONE;
-        validateTriggers(definition.artifactType(), definition.triggerEvents(), automatedReview);
-        if (!automatedReview && definition.precomputeScript() != null) {
-            throw new IllegalArgumentException("A practice without automated review cannot define a precompute script");
+        boolean canRunAutomatedReview = definition
+            .automatedReviewPolicy()
+            .automatedReview()
+            .canAttemptAutomatedReview();
+        validateTriggers(definition.artifactType(), definition.triggerEvents(), canRunAutomatedReview);
+        if (!canRunAutomatedReview && definition.precomputeScript() != null) {
+            throw new IllegalArgumentException("A practice Hephaestus cannot review cannot define a precompute script");
         }
         rejectDetectorVocabulary("Why it matters", definition.whyItMatters());
         rejectDetectorVocabulary("What good looks like", definition.whatGoodLooksLike());
         validateEvidence(definition.artifactType(), definition.automatedReviewPolicy());
     }
 
-    public static void validate(
-        WorkArtifact artifactType,
-        List<String> triggerEvents,
-        @Nullable String whyItMatters,
-        @Nullable String whatGoodLooksLike
-    ) {
-        validateTriggers(artifactType, triggerEvents, true);
-        rejectDetectorVocabulary("Why it matters", whyItMatters);
-        rejectDetectorVocabulary("What good looks like", whatGoodLooksLike);
-    }
-
     private static void validateTriggers(
         WorkArtifact artifactType,
         List<String> triggerEvents,
-        boolean automatedReview
+        boolean canRunAutomatedReview
     ) {
         if (new HashSet<>(triggerEvents).size() != triggerEvents.size()) {
             throw new IllegalArgumentException("Trigger events must not contain duplicates");
         }
-        if (!automatedReview && !triggerEvents.isEmpty()) {
+        if (!canRunAutomatedReview && !triggerEvents.isEmpty()) {
             throw new IllegalArgumentException(
-                "A practice without automated review cannot define events that start a review"
+                "A practice Hephaestus cannot review cannot define events that start a review"
             );
         }
         Set<String> allowed = TriggerEventCatalog.eligibleFor(artifactType);
-        if (automatedReview && artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
+        if (canRunAutomatedReview && artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
             throw new IllegalArgumentException("Choose at least one event that starts a review");
         }
         List<String> incompatible = triggerEvents

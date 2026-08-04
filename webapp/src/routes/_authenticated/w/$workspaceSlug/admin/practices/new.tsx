@@ -3,7 +3,7 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { toast } from "sonner";
 import {
 	createPracticeMutation,
-	getPracticeEvidenceOptionsOptions,
+	getPracticeDefinitionOptionsOptions,
 	listAreasOptions,
 	listPracticesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
@@ -36,8 +36,8 @@ function CreatePracticeContainer() {
 			query: { visibleInPracticeDashboardsOnly: true },
 		}),
 	});
-	const evidenceQuery = useQuery({
-		...getPracticeEvidenceOptionsOptions({ path: { workspaceSlug } }),
+	const definitionOptionsQuery = useQuery({
+		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
 	});
 
 	const practicesQueryKey = listPracticesQueryKey({ path: { workspaceSlug } });
@@ -74,7 +74,7 @@ function CreatePracticeContainer() {
 		}
 	};
 
-	if (areasQuery.isPending || evidenceQuery.isPending) {
+	if (areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
 				<div className="flex h-64 max-w-3xl items-center justify-center">
@@ -83,16 +83,16 @@ function CreatePracticeContainer() {
 			</PracticeFormShell>
 		);
 	}
-	if (areasQuery.isError || evidenceQuery.isError) {
+	if (areasQuery.isError || definitionOptionsQuery.isError) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
 				<div className="max-w-3xl">
 					<QueryErrorAlert
-						error={areasQuery.error ?? evidenceQuery.error}
+						error={areasQuery.error ?? definitionOptionsQuery.error}
 						title="Couldn't load the practice editor"
 						onRetry={() => {
 							areasQuery.refetch();
-							evidenceQuery.refetch();
+							definitionOptionsQuery.refetch();
 						}}
 					/>
 				</div>
@@ -105,7 +105,7 @@ function CreatePracticeContainer() {
 			mode="create"
 			workspaceSlug={workspaceSlug}
 			areas={areasQuery.data}
-			evidenceOptions={evidenceQuery.data}
+			definitionOptions={definitionOptionsQuery.data}
 			onSubmit={handleSubmit}
 			isPending={createPractice.isPending}
 		/>

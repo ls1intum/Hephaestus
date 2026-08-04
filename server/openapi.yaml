@@ -1105,19 +1105,19 @@ paths:
       summary: "Exclude an area from new workspaces, or include it again"
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/evidence-options:
+  /admin/practice-catalog/definition-options:
     get:
-      description: Returns recommended requirements and allowed evidence sources for
-        each type of reviewed work
-      operationId: adminGetPracticeEvidenceOptions
+      description: "Returns available review events, recommended requirements, and\
+        \ allowed evidence sources by work type"
+      operationId: adminGetPracticeDefinitionOptions
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PracticeEvidenceOptions"
+                $ref: "#/components/schemas/PracticeDefinitionOptions"
           description: OK
-      summary: Read automated review evidence options
+      summary: Read practice definition options
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/order:
@@ -4270,11 +4270,11 @@ paths:
       summary: Create a new practice definition
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/evidence-options:
+  /workspaces/{workspaceSlug}/practices/definition-options:
     get:
-      description: Returns recommended requirements and allowed evidence sources for
-        each type of reviewed work
-      operationId: getPracticeEvidenceOptions
+      description: "Returns available review events, recommended requirements, and\
+        \ allowed evidence sources by work type"
+      operationId: getPracticeDefinitionOptions
       parameters:
       - description: Workspace slug
         in: path
@@ -4288,9 +4288,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PracticeEvidenceOptions"
+                $ref: "#/components/schemas/PracticeDefinitionOptions"
           description: OK
-      summary: Read automated review evidence options
+      summary: Read practice definition options
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/feedback/engagement:
@@ -9850,6 +9850,17 @@ components:
       - reviewRuleFingerprint
       - sourceContractVersion
       - status
+    PracticeDefinitionOptions:
+      type: object
+      description: Available and recommended authoring choices for each type of reviewed
+        work
+      properties:
+        workTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeWorkTypeDefinitionOptions"
+      required:
+      - workTypes
     PracticeEvidenceLimitation:
       type: object
       description: Known claim that the selected evidence cannot support even when
@@ -9869,16 +9880,6 @@ components:
       required:
       - code
       - description
-    PracticeEvidenceOptions:
-      type: object
-      description: Evidence options for each type of reviewed work
-      properties:
-        workTypes:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeWorkTypeEvidenceOptions"
-      required:
-      - workTypes
     PracticeEvidenceRequirement:
       type: object
       description: Source and minimum capture quality required by a practice
@@ -9979,10 +9980,24 @@ components:
       - deliverToMerged
       - runForAllUsers
       - skipDrafts
-    PracticeWorkTypeEvidenceOptions:
+    PracticeTriggerEventOption:
       type: object
-      description: Evidence choices and recommended requirements for one type of reviewed
-        work
+      description: An event that can start an automated practice review
+      properties:
+        displayName:
+          type: string
+        event:
+          type: string
+        recommended:
+          type: boolean
+      required:
+      - displayName
+      - event
+      - recommended
+    PracticeWorkTypeDefinitionOptions:
+      type: object
+      description: "Review timing, evidence choices, and recommended requirements\
+        \ for one type of reviewed work"
       properties:
         allowedSources:
           type: array
@@ -10005,11 +10020,16 @@ components:
             enum:
             - LANGUAGE_MODEL
             - NONE
+        triggerEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeTriggerEventOption"
       required:
       - allowedSources
       - artifactType
       - recommendedRequirements
       - supportedAutomatedReviewModes
+      - triggerEvents
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential

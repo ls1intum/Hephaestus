@@ -12,8 +12,8 @@ The broader [practice feedback language](./practice-feedback-language.md) remain
 | **Practice review** | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may produce findings. | practice detection, scan, mentoring relationship |
 | **Automated review** | The technical capability that lets Hephaestus perform a practice review. Prefer **AI-supported mentoring** in author-facing UI. | detection, detector capability, judgment |
 | **AI-supported mentoring** | Hephaestus may review connected work and offer guidance when every required source is ready. | AI mentor, guaranteed feedback |
-| **Human context needed** | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review, and Hephaestus skips it. | unobservable, not applicable |
-| **Practice guidance only** | Keep the practice's criteria and guidance without asking Hephaestus to review it. | invalid practice, human-only |
+| **Human review needed** | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review outside the current product, and Hephaestus skips it. | human context needed, unobservable, not applicable |
+| **Guidance only** | Keep the practice's criteria and guidance without asking Hephaestus to review it. | practice guidance only, invalid practice, human-only |
 | **Finding detection** | The internal step that turns an automated review into candidate findings. Use this only for that pipeline step, not for the product flow or a practice's overall review support. | practice review, automated review policy |
 | **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
 | **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
@@ -93,8 +93,8 @@ The contract uses stable uppercase values. Author-facing UI combines the impleme
 mentoring choice:
 
 - `LANGUAGE_MODEL` + `SUFFICIENT_WHEN_REQUIREMENTS_MET` → **AI-supported mentoring**
-- `LANGUAGE_MODEL` + `DECLARED_EVIDENCE_INSUFFICIENT` → **Human context needed**
-- `NONE` + `NONE` → **Practice guidance only**
+- `LANGUAGE_MODEL` + `DECLARED_EVIDENCE_INSUFFICIENT` → **Human review needed**
+- `NONE` + `NONE` → **Guidance only**
 - `SKIP_AUTOMATED_REVIEW` → **Skip automated review**
 
 ## Source states
@@ -111,17 +111,18 @@ Keep availability, content, completeness, freshness, and collection outcome sepa
 
 ## Lifecycle
 
-1. A practice author chooses **AI-supported mentoring**, **Human context needed**, or **Practice guidance only**.
+1. A practice author chooses **AI-supported mentoring**, **Human review needed**, or **Guidance only**.
 2. For AI-supported mentoring, recommended evidence is applied automatically; an author customizes it only when the practice needs different evidence or limitations.
-3. An instance operator authorizes each source and product use through a reviewed governance decision.
-4. A workspace integration makes authorized sources available.
-5. A workspace administrator chooses whether the practice is used in new reviews.
-6. Each review captures evidence and records explicit source states.
-7. Source readiness checks decide whether every required source meets its requirements.
-8. Hephaestus reviews the work or records that the practice was skipped.
-9. Findings retain the exact practice revision, source contract, and evidence provenance.
-10. Practice or source-contract changes can mark earlier claims stale.
-11. Automated review validation remains separate from source authorization, use in new reviews, and per-run readiness.
+3. Only AI-supported mentoring schedules review events or runs static analysis. The other choices never start an automated review.
+4. An instance operator authorizes each source and product use through a reviewed governance decision.
+5. A workspace integration makes authorized sources available.
+6. A workspace administrator chooses whether the practice is used in new reviews.
+7. Each review captures evidence and records explicit source states.
+8. Source readiness checks decide whether every required source meets its requirements.
+9. Hephaestus reviews the work or records that the practice was skipped.
+10. Findings retain the exact practice revision, source contract, and evidence provenance.
+11. Practice or source-contract changes can mark earlier claims stale.
+12. Automated review validation remains separate from source authorization, use in new reviews, and per-run readiness.
 
 ## Writing rules
 

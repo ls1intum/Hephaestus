@@ -4,7 +4,7 @@ import { useState } from "react";
 import type {
 	CatalogEntryStatus,
 	CuratedPracticeDefinition,
-	PracticeEvidenceOptions,
+	PracticeDefinitionOptions,
 } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
@@ -48,7 +48,7 @@ interface CuratedPracticeFormBaseProps {
 	isKeepPending?: boolean;
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
-	evidenceOptions: PracticeEvidenceOptions;
+	definitionOptions: PracticeDefinitionOptions;
 }
 
 interface CuratedPracticeFormCreateProps extends CuratedPracticeFormBaseProps {
@@ -78,7 +78,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		isKeepPending = false,
 		onUseHephaestusVersion,
 		initialData,
-		evidenceOptions,
+		definitionOptions,
 		onKeepCurrentDefinition,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
@@ -149,7 +149,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					status={initialData.status}
 					kind="practice"
 					shipped={initialData.shipped}
-					evidenceOptions={evidenceOptions}
+					definitionOptions={definitionOptions}
 					areaNames={Object.fromEntries(areas.map((area) => [area.slug, area.name]))}
 					isResetPending={isResetPending}
 					isKeepPending={isKeepPending}
@@ -182,7 +182,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
-					evidenceOptions={evidenceOptions}
+					definitionOptions={definitionOptions}
 					disabled={formDisabled}
 					cancelAction={cancelAction}
 					onSubmit={props.onSubmit}
@@ -193,7 +193,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					initialData={initialData}
 					areas={areas}
 					isPending={isPending}
-					evidenceOptions={evidenceOptions}
+					definitionOptions={definitionOptions}
 					disabled={formDisabled}
 					isSubmitDisabled={conflict || isResetPending || isKeepPending}
 					cancelAction={cancelAction}

@@ -30,11 +30,18 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     @Test
     void rejectsDuplicateTriggerEvents() {
         assertThatThrownBy(() ->
-            PracticeDefinitionValidator.validate(
-                WorkArtifact.PULL_REQUEST,
-                List.of("PullRequestCreated", "PullRequestCreated"),
-                null,
-                null
+            validator.validate(
+                definition(
+                    List.of("PullRequestCreated", "PullRequestCreated"),
+                    null,
+                    requirements(
+                        new PracticeEvidenceRequirement(
+                            DIFF,
+                            EvidenceCompletenessRequirement.COMPLETE,
+                            EvidenceFreshnessRequirement.CURRENT
+                        )
+                    )
+                )
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -102,10 +109,22 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     }
 
     @Test
-    void acceptsHumanAssessmentOnlyPracticeWithoutAutomatedInputs() {
+    void acceptsGuidanceOnlyPracticeWithoutAutomatedInputs() {
         assertThatCode(() ->
             validator.validate(definition(List.of(), null, withoutAutomatedReview()))
         ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsHumanReviewPracticeWithoutAutomatedInputs() {
+        assertThatCode(() -> validator.validate(definition(List.of(), null, humanReview()))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsAutomatedInputsForHumanReviewPractice() {
+        assertThatThrownBy(() -> validator.validate(definition(List.of("PullRequestCreated"), null, humanReview())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A practice Hephaestus cannot review cannot define events that start a review");
     }
 
     @Test
@@ -114,7 +133,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             validator.validate(definition(List.of("PullRequestCreated"), null, withoutAutomatedReview()))
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A practice without automated review cannot define events that start a review");
+            .hasMessage("A practice Hephaestus cannot review cannot define events that start a review");
     }
 
     @Test
@@ -123,7 +142,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             validator.validate(definition(List.of(), "export default {}", withoutAutomatedReview()))
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A practice without automated review cannot define a precompute script");
+            .hasMessage("A practice Hephaestus cannot review cannot define a precompute script");
     }
 
     private static PracticeDefinition definition(PracticeAutomatedReviewPolicy requirements) {
@@ -172,6 +191,27 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of()
+        );
+    }
+
+    private static PracticeAutomatedReviewPolicy humanReview() {
+        return new PracticeAutomatedReviewPolicy(
+            VERSION,
+            PROFILE,
+            new PracticeAutomatedReview(
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
+            ),
+            List.of(
+                new PracticeEvidenceRequirement(
+                    DIFF,
+                    EvidenceCompletenessRequirement.COMPLETE,
+                    EvidenceFreshnessRequirement.CURRENT
+                )
+            ),
+            List.of(),
+            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+            List.of(new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice."))
         );
     }
 }

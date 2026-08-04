@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceOptionsDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeUsageRequestDTO;
@@ -53,17 +53,17 @@ public class PracticeCatalogController {
     private final PracticeService practiceService;
     private final CatalogOriginPresenter presenter;
     private final PracticeAreaService areaService;
-    private final PracticeEvidenceOptionsService evidenceOptionsService;
+    private final PracticeDefinitionOptionsService definitionOptionsService;
 
-    @GetMapping("/evidence-options")
+    @GetMapping("/definition-options")
     @Operation(
-        summary = "Read automated review evidence options",
-        description = "Returns recommended requirements and allowed evidence sources for each type of reviewed work",
-        operationId = "getPracticeEvidenceOptions"
+        summary = "Read practice definition options",
+        description = "Returns available review events, recommended requirements, and allowed evidence sources by work type",
+        operationId = "getPracticeDefinitionOptions"
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeEvidenceOptionsDTO> evidenceOptions(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(evidenceOptionsService.options());
+    public ResponseEntity<PracticeDefinitionOptionsDTO> definitionOptions(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(definitionOptionsService.options());
     }
 
     @GetMapping

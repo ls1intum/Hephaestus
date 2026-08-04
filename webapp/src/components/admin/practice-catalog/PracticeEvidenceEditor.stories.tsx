@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
-import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 
-const pullRequestOptions = mockPracticeEvidenceOptions.workTypes[0];
+const pullRequestOptions = mockPracticeDefinitionOptions.workTypes[0];
 
 const meta = {
 	title: "Workspace admin/Practices/AI mentoring",

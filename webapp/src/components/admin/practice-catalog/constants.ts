@@ -2,29 +2,6 @@ import type { Practice } from "@/api/types.gen";
 
 export type WorkArtifact = NonNullable<Practice["artifactType"]>;
 
-export const TRIGGER_EVENTS_BY_FOCUS: Record<
-	WorkArtifact,
-	ReadonlyArray<{ value: string; label: string }>
-> = {
-	PULL_REQUEST: [
-		{ value: "PullRequestCreated", label: "Pull or merge request is opened" },
-		{ value: "PullRequestReady", label: "Marked ready for review" },
-		{ value: "PullRequestSynchronized", label: "New commits are pushed" },
-		{ value: "ReviewSubmitted", label: "A review is submitted" },
-		{ value: "PullRequestMerged", label: "Pull or merge request is merged" },
-	],
-	ISSUE: [
-		{ value: "IssueCreated", label: "Issue is opened" },
-		{ value: "IssueLabeled", label: "Issue is labeled" },
-		{ value: "IssueClosed", label: "Issue is closed" },
-	],
-	CONVERSATION_THREAD: [],
-};
-
-export function triggerEventsForFocus(focus: WorkArtifact): string[] {
-	return TRIGGER_EVENTS_BY_FOCUS[focus].map((e) => e.value);
-}
-
 export const WORK_ARTIFACT_LABELS = {
 	PULL_REQUEST: "Pull or merge request",
 	ISSUE: "Issue",

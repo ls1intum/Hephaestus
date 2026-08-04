@@ -8,11 +8,11 @@ import {
 	adminGetCuratedCatalogQueryKey,
 	adminGetCuratedPracticeOptions,
 	adminGetCuratedPracticeQueryKey,
-	adminGetPracticeEvidenceOptionsOptions,
+	adminGetPracticeDefinitionOptionsOptions,
 	adminKeepCuratedPracticeMutation,
 	adminUpdateCuratedPracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { CuratedArea, CuratedPractice, PracticeEvidenceOptions } from "@/api/types.gen";
+import type { CuratedArea, CuratedPractice, PracticeDefinitionOptions } from "@/api/types.gen";
 import {
 	CuratedPracticeForm,
 	type CuratedPracticeFormValue,
@@ -34,9 +34,9 @@ function EditCuratedPracticePage() {
 		...adminGetCuratedPracticeOptions({ path: { slug: practiceSlug } }),
 	});
 	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
-	const evidenceQuery = useQuery({ ...adminGetPracticeEvidenceOptionsOptions() });
+	const definitionOptionsQuery = useQuery({ ...adminGetPracticeDefinitionOptionsOptions() });
 
-	if (practiceQuery.isPending || catalogQuery.isPending || evidenceQuery.isPending) {
+	if (practiceQuery.isPending || catalogQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PageLayout>
 				<div className="flex h-64 items-center justify-center">
@@ -45,16 +45,16 @@ function EditCuratedPracticePage() {
 			</PageLayout>
 		);
 	}
-	if (practiceQuery.isError || catalogQuery.isError || evidenceQuery.isError) {
+	if (practiceQuery.isError || catalogQuery.isError || definitionOptionsQuery.isError) {
 		return (
 			<PageLayout>
 				<QueryErrorAlert
-					error={practiceQuery.error ?? catalogQuery.error ?? evidenceQuery.error}
+					error={practiceQuery.error ?? catalogQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load the practice"
 					onRetry={() => {
 						practiceQuery.refetch();
 						catalogQuery.refetch();
-						evidenceQuery.refetch();
+						definitionOptionsQuery.refetch();
 					}}
 				/>
 			</PageLayout>
@@ -67,7 +67,7 @@ function EditCuratedPracticePage() {
 			practiceSlug={practiceSlug}
 			initialPractice={practiceQuery.data}
 			areas={catalogQuery.data.areas}
-			evidenceOptions={evidenceQuery.data}
+			definitionOptions={definitionOptionsQuery.data}
 		/>
 	);
 }
@@ -76,14 +76,14 @@ interface LoadedEditCuratedPracticePageProps {
 	practiceSlug: string;
 	initialPractice: CuratedPractice;
 	areas: CuratedArea[];
-	evidenceOptions: PracticeEvidenceOptions;
+	definitionOptions: PracticeDefinitionOptions;
 }
 
 function LoadedEditCuratedPracticePage({
 	practiceSlug,
 	initialPractice,
 	areas,
-	evidenceOptions,
+	definitionOptions,
 }: LoadedEditCuratedPracticePageProps) {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
@@ -190,7 +190,7 @@ function LoadedEditCuratedPracticePage({
 				shipped: basePractice.shipped,
 			}}
 			areas={areas.map((area) => ({ slug: area.slug, name: area.definition.name }))}
-			evidenceOptions={evidenceOptions}
+			definitionOptions={definitionOptions}
 			isPending={updatePractice.isPending}
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}

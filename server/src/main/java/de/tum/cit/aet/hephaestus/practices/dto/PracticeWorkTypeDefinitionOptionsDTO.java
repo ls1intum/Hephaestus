@@ -7,9 +7,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "Evidence choices and recommended requirements for one type of reviewed work")
-public record PracticeWorkTypeEvidenceOptionsDTO(
+@Schema(description = "Review timing, evidence choices, and recommended requirements for one type of reviewed work")
+public record PracticeWorkTypeDefinitionOptionsDTO(
     @NonNull WorkArtifact artifactType,
+    @NonNull List<PracticeTriggerEventOptionDTO> triggerEvents,
     @NonNull PracticeAutomatedReviewPolicy recommendedRequirements,
     @NonNull List<PracticeAutomatedReviewMode> supportedAutomatedReviewModes,
     @NonNull List<PracticeEvidenceSourceOptionDTO> allowedSources

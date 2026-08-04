@@ -29,25 +29,67 @@ This is a one-way lifecycle: a repository update can update an uncustomized inst
 an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
 definition or an existing workspace.
 
-## Choose who can review the practice
+| Stakeholder | Primary task | Deliberately not their task |
+| --- | --- | --- |
+| Practice author | Define the habit, guidance, and responsible mentoring support | Authorize collection or certify review accuracy |
+| Instance administrator | Curate the defaults offered to new workspaces | Rewrite existing workspace practices |
+| Workspace administrator | Adapt practices and choose which are used in new reviews | Authorize a new data source for the instance |
+| Instance operator | Approve source purposes, privacy, retention, and erasure coverage | Decide that connected evidence proves a practice |
+| Developer, peer, or mentor | Use findings and available human context in a review | Supply hidden context to Hephaestus implicitly |
+
+## Authoring experience
+
+The practice editor follows the decisions an author can make confidently:
+
+1. **Practice** — give one observable habit a short, action-oriented name, choose the work it
+   applies to, and optionally group it in an area.
+2. **Review guidance** — describe what to look for, why it matters, and one concrete example.
+3. **How Hephaestus can help** — choose AI-supported mentoring, human review, or guidance only.
+
+The generated identifier, review timing, and optional static-analysis script are under **Technical
+settings**. New practices start with review events that fit the selected work type. Authors only
+change those defaults when the practice genuinely needs different timing. This keeps runtime
+plumbing out of the common path without hiding it from expert authors.
+The definition-options API supplies both available and recommended events, so the editor and runtime
+cannot silently disagree about valid review timing.
+
+Write **What to look for** as a review boundary, not as a personality or a score. Define one
+observable habit, the signals that demonstrate it, and the cases where a reviewer should stay
+silent. Do not require intent, private context, runtime behavior, or any other fact outside the
+selected work and evidence boundary.
+
+## Choose how Hephaestus can help
 
 The practice form starts with one product choice instead of separate model and evidence-sufficiency
 settings:
 
 - **AI-supported mentoring** lets Hephaestus review connected work after every required source passes.
-- **Human context needed** records that connected work is not enough. Hephaestus skips the practice,
+- **Human review needed** records that connected work is not enough. Hephaestus skips the practice,
   while a developer, peer, or mentor may still review it from context the system does not collect.
-- **Practice guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
+  Because Hephaestus will not run a review, this choice has no review events or static-analysis script.
+- **Guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
 
 Each reviewed-work type starts with recommended evidence. Most authors should keep it. **Customize
 evidence** reveals source roles, minimum completeness and freshness, privacy classes, and known
 limitations for practices that genuinely need a different rule. Selecting a source never authorizes
 collection; instance governance and workspace integrations remain separate gates.
 
-For example, “Explain the reasoning behind a difficult trade-off” may be reviewable in a mentoring
-conversation that is not available through an authorized integration. Its criteria remain a useful
-human rubric. Hephaestus must not infer the conversation or produce a review finding from unrelated
-repository data.
+### Example: explain what changed and why
+
+| Field | Definition |
+| --- | --- |
+| Name | Explain what changed and why |
+| Review this kind of work | Pull or merge request |
+| What to look for | Look for a description that explains the behavior change and why. Stay silent for automated dependency updates. |
+| Why it matters | Reviewers can judge a change faster when they understand its purpose. |
+| What good looks like | “This changes retry behavior so temporary network failures no longer end the sync.” |
+| Hephaestus support | AI-supported mentoring with the recommended review timing and evidence |
+
+The author does not choose source-contract identifiers or runtime states in this common path. If the
+required pull-request details or diff are missing, incomplete, or outdated, Hephaestus skips the
+practice instead of inventing a finding. A more contextual practice, such as whether a developer
+understood a trade-off discussed privately with a mentor, should use **Human review needed** and name
+that missing context.
 
 The instance tables store only decisions that differ from the bundled catalog: a customized
 definition, inclusion policy, accepted bundled digest, or position. No override row means the

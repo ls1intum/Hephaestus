@@ -1,7 +1,7 @@
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeAutomatedReviewValidation,
-	PracticeEvidenceOptions,
+	PracticeDefinitionOptions,
 } from "@/api/types.gen";
 
 export const mockAuthorDeclaredEvidenceValidation = {
@@ -78,10 +78,34 @@ const mockConversationEvidence = {
 	],
 } satisfies PracticeAutomatedReviewPolicy;
 
-export const mockPracticeEvidenceOptions = {
+export const mockPracticeDefinitionOptions = {
 	workTypes: [
 		{
 			artifactType: "PULL_REQUEST",
+			triggerEvents: [
+				{
+					event: "PullRequestCreated",
+					displayName: "Pull or merge request is opened",
+					recommended: true,
+				},
+				{ event: "PullRequestReady", displayName: "Marked ready for review", recommended: true },
+				{
+					event: "PullRequestSynchronized",
+					displayName: "New commits are pushed",
+					recommended: true,
+				},
+				{ event: "ReviewSubmitted", displayName: "A review is submitted", recommended: false },
+				{
+					event: "PullRequestMerged",
+					displayName: "Pull or merge request is merged",
+					recommended: false,
+				},
+				{
+					event: "PullRequestClosed",
+					displayName: "Pull or merge request is closed without merging",
+					recommended: false,
+				},
+			],
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedRequirements: mockPullRequestEvidence,
 			allowedSources: [
@@ -119,6 +143,11 @@ export const mockPracticeEvidenceOptions = {
 		},
 		{
 			artifactType: "ISSUE",
+			triggerEvents: [
+				{ event: "IssueCreated", displayName: "Issue is opened", recommended: true },
+				{ event: "IssueLabeled", displayName: "Issue is labeled", recommended: true },
+				{ event: "IssueClosed", displayName: "Issue is closed", recommended: false },
+			],
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedRequirements: mockIssueEvidence,
 			allowedSources: [
@@ -146,6 +175,7 @@ export const mockPracticeEvidenceOptions = {
 		},
 		{
 			artifactType: "CONVERSATION_THREAD",
+			triggerEvents: [],
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedRequirements: mockConversationEvidence,
 			allowedSources: [
@@ -162,4 +192,4 @@ export const mockPracticeEvidenceOptions = {
 			],
 		},
 	],
-} satisfies PracticeEvidenceOptions;
+} satisfies PracticeDefinitionOptions;

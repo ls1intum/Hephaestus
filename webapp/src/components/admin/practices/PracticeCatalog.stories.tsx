@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
-import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
@@ -57,7 +57,7 @@ const meta = {
 		workspaceSlug: "demo",
 		areas,
 		practices,
-		evidenceOptions: mockPracticeEvidenceOptions,
+		definitionOptions: mockPracticeDefinitionOptions,
 		pending: idlePending,
 		focusFilter: "ALL",
 		onFocusFilterChange: fn(),

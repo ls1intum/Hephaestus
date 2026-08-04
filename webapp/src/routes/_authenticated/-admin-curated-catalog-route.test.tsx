@@ -4,7 +4,7 @@ import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import {
 	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeEvidenceOptions,
+	mockPracticeDefinitionOptions,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
@@ -67,8 +67,8 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 	};
 	server.use(http.get("*/admin/practice-catalog", () => HttpResponse.json(catalog)));
 	server.use(
-		http.get("*/admin/practice-catalog/evidence-options", () =>
-			HttpResponse.json(mockPracticeEvidenceOptions),
+		http.get("*/admin/practice-catalog/definition-options", () =>
+			HttpResponse.json(mockPracticeDefinitionOptions),
 		),
 	);
 	return catalog;
@@ -635,7 +635,7 @@ describe("instance catalog routes", () => {
 
 	it.each([
 		["unchanged", false, mockPullRequestEvidence],
-		["changed", true, mockPracticeEvidenceOptions.workTypes[2].recommendedRequirements],
+		["changed", true, mockPracticeDefinitionOptions.workTypes[2].recommendedRequirements],
 	] as const)("%s artifact sends the visible evidence rule", async (_label, changeArtifact, expectedEvidence) => {
 		mockCatalog();
 		let requestBody: Record<string, unknown> | undefined;
@@ -661,7 +661,7 @@ describe("instance catalog routes", () => {
 		await screen.findByRole("button", { name: "Save changes" }, ROUTE_RENDER_WAIT);
 		if (changeArtifact) {
 			const user = userEvent.setup();
-			await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
+			await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
 			await user.click(await screen.findByRole("option", { name: "Conversation" }));
 		}
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));

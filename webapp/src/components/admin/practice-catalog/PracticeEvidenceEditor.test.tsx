@@ -3,11 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { PracticeAutomatedReviewPolicy } from "@/api/types.gen";
-import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
 import { PracticeEvidenceEditor, practiceEvidenceError } from "./PracticeEvidenceEditor";
 
-const options = mockPracticeEvidenceOptions.workTypes[0];
+const options = mockPracticeDefinitionOptions.workTypes[0];
 
 describe("PracticeEvidenceEditor", () => {
 	it("starts with a simple mentoring choice and progressively reveals evidence controls", async () => {
@@ -25,7 +25,8 @@ describe("PracticeEvidenceEditor", () => {
 		expect(
 			screen.getByRole("radio", { name: /AI-supported mentoring/ }).getAttribute("aria-checked"),
 		).toBe("true");
-		expect(screen.queryByText("Pull request details")).toBeNull();
+		expect(screen.queryByRole("combobox", { name: /Use in this practice/ })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Use recommended evidence" })).toBeNull();
 
 		await user.click(screen.getByRole("button", { name: "Customize evidence" }));
 		await user.click(
@@ -62,15 +63,40 @@ describe("PracticeEvidenceEditor", () => {
 		}
 		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
 
-		await user.click(screen.getByRole("radio", { name: /Human context needed/ }));
+		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
 		expect(screen.getByTestId("policy").textContent).toBe(
 			"LANGUAGE_MODEL:DECLARED_EVIDENCE_INSUFFICIENT",
 		);
-		expect(screen.getByText(/not enough for AI guidance/)).toBeTruthy();
+		expect(screen.getByText(/does not have enough context/)).toBeTruthy();
 
-		await user.click(screen.getByRole("radio", { name: /Practice guidance only/ }));
+		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
 		expect(screen.getByTestId("policy").textContent).toBe("NONE:NONE");
 		expect(screen.queryByRole("button", { name: "Customize evidence" })).toBeNull();
+	});
+
+	it("does not leave an empty human-review reason after returning to AI support", async () => {
+		const user = userEvent.setup();
+		function ControlledEditor() {
+			const [value, setValue] = useState<PracticeAutomatedReviewPolicy>({
+				...options.recommendedRequirements,
+				knownLimitations: [],
+			});
+			return (
+				<>
+					<output data-testid="limitation-count">{value.knownLimitations.length}</output>
+					<PracticeEvidenceEditor options={options} value={value} onChange={setValue} />
+				</>
+			);
+		}
+		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
+
+		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
+		expect(screen.getByRole("textbox", { name: /Why is human review needed/ })).toBeTruthy();
+		expect(screen.getByTestId("limitation-count").textContent).toBe("1");
+
+		await user.click(screen.getByRole("radio", { name: /AI-supported mentoring/ }));
+		expect(screen.queryByRole("textbox", { name: /Why is human review needed/ })).toBeNull();
+		expect(screen.getByTestId("limitation-count").textContent).toBe("0");
 	});
 
 	it("restores evidence customization after switching to guidance only", async () => {
@@ -87,7 +113,7 @@ describe("PracticeEvidenceEditor", () => {
 		}
 		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
 
-		await user.click(screen.getByRole("radio", { name: /Practice guidance only/ }));
+		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
 		await user.click(screen.getByRole("radio", { name: /AI-supported mentoring/ }));
 		await user.click(screen.getByRole("button", { name: "Customize evidence" }));
 
@@ -95,7 +121,7 @@ describe("PracticeEvidenceEditor", () => {
 	});
 
 	it("explains when an operator must authorize required evidence", async () => {
-		const conversation = mockPracticeEvidenceOptions.workTypes[2];
+		const conversation = mockPracticeDefinitionOptions.workTypes[2];
 		await renderWithRouter(
 			<PracticeEvidenceEditor
 				options={conversation}
@@ -107,6 +133,24 @@ describe("PracticeEvidenceEditor", () => {
 
 		expect(screen.getByText("Required evidence is not authorized")).toBeTruthy();
 		expect(screen.getByText(/An instance operator must authorize Slack thread/)).toBeTruthy();
+	});
+
+	it("still allows human review when AI support is unavailable", async () => {
+		await renderWithRouter(
+			<PracticeEvidenceEditor
+				options={{ ...options, supportedAutomatedReviewModes: [] }}
+				value={options.recommendedRequirements}
+				onChange={vi.fn()}
+			/>,
+			"/admin/practices/new",
+		);
+
+		expect(
+			screen.getByRole("radio", { name: /AI-supported mentoring/ }).getAttribute("data-disabled"),
+		).not.toBeNull();
+		expect(
+			screen.getByRole("radio", { name: /Human review needed/ }).getAttribute("data-disabled"),
+		).toBeNull();
 	});
 
 	it("rejects invalid evidence rules", () => {
@@ -142,7 +186,7 @@ describe("PracticeEvidenceEditor", () => {
 		}
 		await renderWithRouter(<ControlledEditor />, "/admin/practices/new");
 		const evidenceGroup = screen.getByRole("region", {
-			name: "AI-supported practice mentoring",
+			name: "How Hephaestus can help",
 		});
 		expect(evidenceGroup.getAttribute("aria-invalid")).toBe("true");
 		expect(evidenceGroup.getAttribute("aria-describedby")).toBe("practice-evidence-error");

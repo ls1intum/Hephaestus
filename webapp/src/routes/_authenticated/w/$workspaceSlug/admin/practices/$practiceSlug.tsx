@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-	getPracticeEvidenceOptionsOptions,
+	getPracticeDefinitionOptionsOptions,
 	getPracticeOptions,
 	getPracticeQueryKey,
 	listAreasOptions,
@@ -55,8 +55,8 @@ function EditPracticeContainer() {
 			query: { visibleInPracticeDashboardsOnly: true },
 		}),
 	});
-	const evidenceQuery = useQuery({
-		...getPracticeEvidenceOptionsOptions({ path: { workspaceSlug } }),
+	const definitionOptionsQuery = useQuery({
+		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
 	});
 
 	const updatePractice = useMutation({
@@ -96,7 +96,7 @@ function EditPracticeContainer() {
 		}
 	};
 
-	if (practiceQuery.isPending || areasQuery.isPending || evidenceQuery.isPending) {
+	if (practiceQuery.isPending || areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
 				<div className="flex h-64 max-w-3xl items-center justify-center">
@@ -105,17 +105,17 @@ function EditPracticeContainer() {
 			</PracticeFormShell>
 		);
 	}
-	if (practiceQuery.isError || areasQuery.isError || evidenceQuery.isError) {
+	if (practiceQuery.isError || areasQuery.isError || definitionOptionsQuery.isError) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
 				<div className="max-w-3xl">
 					<QueryErrorAlert
-						error={practiceQuery.error ?? areasQuery.error ?? evidenceQuery.error}
+						error={practiceQuery.error ?? areasQuery.error ?? definitionOptionsQuery.error}
 						title="Couldn't load the practice"
 						onRetry={() => {
 							practiceQuery.refetch();
 							areasQuery.refetch();
-							evidenceQuery.refetch();
+							definitionOptionsQuery.refetch();
 						}}
 					/>
 				</div>
@@ -129,7 +129,7 @@ function EditPracticeContainer() {
 			workspaceSlug={workspaceSlug}
 			initialData={practiceQuery.data}
 			areas={areasQuery.data}
-			evidenceOptions={evidenceQuery.data}
+			definitionOptions={definitionOptionsQuery.data}
 			onSubmit={handleSubmit}
 			isPending={updatePractice.isPending}
 		/>

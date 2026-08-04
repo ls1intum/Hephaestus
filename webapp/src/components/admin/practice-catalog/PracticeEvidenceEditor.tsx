@@ -1,9 +1,10 @@
+import deepEqual from "fast-deep-equal";
 import { ChevronRight, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeEvidenceSourceOption,
-	PracticeWorkTypeEvidenceOptions,
+	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +92,33 @@ function newLimitationCode() {
 	return `LIMITATION_${crypto.randomUUID().replaceAll("-", "").toUpperCase()}`;
 }
 
+function matchesRecommendedEvidence(
+	value: PracticeAutomatedReviewPolicy,
+	recommended: PracticeAutomatedReviewPolicy,
+) {
+	return (
+		value.sourceContractVersion === recommended.sourceContractVersion &&
+		value.evidenceProfile === recommended.evidenceProfile &&
+		value.whenEvidenceIsInsufficient === recommended.whenEvidenceIsInsufficient &&
+		deepEqual(value.requiredEvidence, recommended.requiredEvidence) &&
+		deepEqual(value.optionalContext, recommended.optionalContext)
+	);
+}
+
+function humanReviewReasonIsMissing(requirements: PracticeAutomatedReviewPolicy) {
+	return (
+		requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" &&
+		requirements.knownLimitations[0] !== undefined &&
+		!requirements.knownLimitations[0].description.trim()
+	);
+}
+
+export function practiceEvidenceErrorTarget(requirements: PracticeAutomatedReviewPolicy) {
+	return humanReviewReasonIsMissing(requirements)
+		? "practice-human-review-reason"
+		: "practice-evidence-heading";
+}
+
 export function practiceEvidenceError(requirements: PracticeAutomatedReviewPolicy) {
 	const noAutomatedReview = requirements.automatedReview.mode === "NONE";
 	if (
@@ -99,7 +127,7 @@ export function practiceEvidenceError(requirements: PracticeAutomatedReviewPolic
 			requirements.optionalContext.length > 0 ||
 			requirements.knownLimitations.length > 0)
 	) {
-		return "Practice guidance only cannot require evidence or declare evidence limitations.";
+		return "Guidance only cannot require evidence or declare evidence limitations.";
 	}
 	if (!noAutomatedReview && requirements.requiredEvidence.length === 0) {
 		return "Choose at least one required evidence source.";
@@ -122,7 +150,7 @@ export function practiceEvidenceError(requirements: PracticeAutomatedReviewPolic
 }
 
 export interface PracticeEvidenceEditorProps {
-	options: PracticeWorkTypeEvidenceOptions;
+	options: PracticeWorkTypeDefinitionOptions;
 	value: PracticeAutomatedReviewPolicy;
 	onChange: (value: PracticeAutomatedReviewPolicy) => void;
 	error?: string;
@@ -148,8 +176,8 @@ export function PracticeEvidenceEditor({
 		}
 	}, [profileKey, value]);
 	useEffect(() => {
-		if (error) setOpen(true);
-	}, [error]);
+		if (error && !humanReviewReasonIsMissing(value)) setOpen(true);
+	}, [error, value]);
 	const focusLimitation = (focusTarget: string) => {
 		requestAnimationFrame(() => {
 			if (focusTarget === "add") {
@@ -176,6 +204,12 @@ export function PracticeEvidenceEditor({
 	});
 	const noAutomatedReview = value.automatedReview.mode === "NONE";
 	const canAttemptReview = mentoringSupport === "AI_SUPPORTED" && supportsAiReview;
+	const humanReviewReasonMissing = humanReviewReasonIsMissing(value);
+	const showHumanReviewReasonError = Boolean(error) && humanReviewReasonMissing;
+	const usesRecommendedEvidence = matchesRecommendedEvidence(
+		value,
+		options.recommendedRequirements,
+	);
 	const updateMentoringSupport = (next: MentoringSupport) => {
 		if (next === "GUIDANCE_ONLY") {
 			if (!noAutomatedReview) savedAutomatedRequirements.current.set(profileKey, value);
@@ -192,6 +226,7 @@ export function PracticeEvidenceEditor({
 			? (savedAutomatedRequirements.current.get(profileKey) ?? options.recommendedRequirements)
 			: value;
 		const needsHumanContext = next === "HUMAN_CONTEXT_REQUIRED";
+		const needsLimitation = needsHumanContext && restored.knownLimitations.length === 0;
 		onChange({
 			...restored,
 			automatedReview: {
@@ -200,12 +235,10 @@ export function PracticeEvidenceEditor({
 					? "DECLARED_EVIDENCE_INSUFFICIENT"
 					: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 			},
-			knownLimitations:
-				needsHumanContext && restored.knownLimitations.length === 0
-					? [{ code: newLimitationCode(), description: "" }]
-					: restored.knownLimitations,
+			knownLimitations: needsLimitation
+				? [{ code: newLimitationCode(), description: "" }]
+				: restored.knownLimitations.filter((limitation) => limitation.description.trim()),
 		});
-		if (needsHumanContext) setOpen(true);
 	};
 
 	return (
@@ -222,11 +255,11 @@ export function PracticeEvidenceEditor({
 					tabIndex={-1}
 					aria-describedby={error ? "practice-evidence-error" : undefined}
 				>
-					AI-supported practice mentoring
+					How Hephaestus can help
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Choose how Hephaestus supports this practice. People may use context that Hephaestus
-					cannot access.
+					Choose the responsible level of support. This does not limit what a developer, peer, or
+					human mentor can observe.
 				</p>
 			</div>
 
@@ -255,25 +288,25 @@ export function PracticeEvidenceEditor({
 					</Field>
 				</FieldLabel>
 				<FieldLabel htmlFor="practice-mentoring-human-context">
-					<Field orientation="horizontal" data-disabled={disabled || !supportsAiReview}>
+					<Field orientation="horizontal" data-disabled={disabled}>
 						<FieldContent>
-							<FieldTitle>Human context needed</FieldTitle>
+							<FieldTitle>Human review needed</FieldTitle>
 							<FieldDescription>
-								Connected work is not enough for responsible AI guidance. Keep the practice for
-								self, peer, or mentor review.
+								Connected work cannot support a responsible conclusion. Hephaestus steps back so a
+								developer, peer, or mentor can review it.
 							</FieldDescription>
 						</FieldContent>
 						<RadioGroupItem
 							id="practice-mentoring-human-context"
 							value="HUMAN_CONTEXT_REQUIRED"
-							disabled={disabled || !supportsAiReview}
+							disabled={disabled}
 						/>
 					</Field>
 				</FieldLabel>
 				<FieldLabel htmlFor="practice-mentoring-guidance-only">
 					<Field orientation="horizontal" data-disabled={disabled}>
 						<FieldContent>
-							<FieldTitle>Practice guidance only</FieldTitle>
+							<FieldTitle>Guidance only</FieldTitle>
 							<FieldDescription>
 								Keep the criteria and guidance without asking Hephaestus to review this practice.
 							</FieldDescription>
@@ -287,16 +320,41 @@ export function PracticeEvidenceEditor({
 				</FieldLabel>
 			</RadioGroup>
 
+			{mentoringSupport === "HUMAN_CONTEXT_REQUIRED" && value.knownLimitations[0] && (
+				<Field data-invalid={showHumanReviewReasonError || undefined}>
+					<FieldLabel htmlFor="practice-human-review-reason">
+						Why is human review needed? *
+					</FieldLabel>
+					<Input
+						id="practice-human-review-reason"
+						disabled={disabled}
+						value={value.knownLimitations[0].description}
+						onChange={(event) =>
+							onChange({
+								...value,
+								knownLimitations: value.knownLimitations.map((limitation, index) =>
+									index === 0 ? { ...limitation, description: event.target.value } : limitation,
+								),
+							})
+						}
+						maxLength={500}
+						aria-invalid={showHumanReviewReasonError || undefined}
+						aria-describedby="practice-human-review-reason-description"
+					/>
+					<FieldDescription id="practice-human-review-reason-description">
+						Name the context a person may have that the connected work cannot provide.
+					</FieldDescription>
+				</Field>
+			)}
+
 			{!noAutomatedReview && (
 				<div className="rounded-lg border p-4 text-sm">
-					<p className="font-medium">Evidence Hephaestus can use</p>
-					<div className="mt-3 grid gap-3 sm:grid-cols-2">
-						<div>
-							<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-								Required
-							</p>
+					<p className="font-medium">Evidence boundary</p>
+					<dl className="mt-3 grid gap-3 sm:grid-cols-[9rem_1fr]">
+						<dt className="font-medium text-muted-foreground">Must have</dt>
+						<dd>
 							{requiredSources.length > 0 ? (
-								<ul className="mt-1 space-y-1">
+								<ul className="space-y-1">
 									{requiredSources.map((source) => (
 										<li key={source.sourceKind}>
 											{source.label} · {evidenceQualityLabel(source)}
@@ -304,20 +362,30 @@ export function PracticeEvidenceEditor({
 									))}
 								</ul>
 							) : (
-								<p className="mt-1 text-muted-foreground">No required source selected</p>
+								<span className="text-muted-foreground">No required source selected</span>
 							)}
-						</div>
-						<div>
-							<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-								Optional context
-							</p>
-							<p className="mt-1">{optionalSources.join(", ") || "None"}</p>
-						</div>
-					</div>
+						</dd>
+						<dt className="font-medium text-muted-foreground">May also use</dt>
+						<dd>{optionalSources.join(", ") || "None"}</dd>
+						<dt className="font-medium text-muted-foreground">Cannot establish</dt>
+						<dd>
+							{value.knownLimitations.length > 0 ? (
+								<ul className="space-y-1">
+									{value.knownLimitations.map((limitation) => (
+										<li key={limitation.code}>
+											{limitation.description || "A limitation still needs a description"}
+										</li>
+									))}
+								</ul>
+							) : (
+								<span className="text-muted-foreground">No limitation documented</span>
+							)}
+						</dd>
+					</dl>
 					<p className="mt-3 text-muted-foreground">
 						{mentoringSupport === "AI_SUPPORTED"
 							? "Hephaestus checks every required source before reviewing. Missing, incomplete, or outdated evidence makes it skip this practice instead of guessing."
-							: "These sources document what Hephaestus can access, but they are not enough for AI guidance. Hephaestus skips this practice."}
+							: "Even when these sources are ready, Hephaestus does not have enough context. It skips this practice."}
 					</p>
 				</div>
 			)}
@@ -350,20 +418,23 @@ export function PracticeEvidenceEditor({
 							}
 							className="group"
 						/>
-						<Button
-							type="button"
-							variant="ghost"
-							disabled={disabled}
-							onClick={() =>
-								onChange({
-									...options.recommendedRequirements,
-									automatedReview: value.automatedReview,
-								})
-							}
-						>
-							<RotateCcw className="size-4" />
-							Use recommended evidence
-						</Button>
+						{!usesRecommendedEvidence && (
+							<Button
+								type="button"
+								variant="ghost"
+								disabled={disabled}
+								onClick={() =>
+									onChange({
+										...options.recommendedRequirements,
+										automatedReview: value.automatedReview,
+										knownLimitations: value.knownLimitations,
+									})
+								}
+							>
+								<RotateCcw className="size-4" />
+								Use recommended evidence
+							</Button>
+						)}
 					</div>
 					<CollapsibleContent className="mt-4 space-y-6">
 						<div>

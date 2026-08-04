@@ -38,12 +38,12 @@ export function automatedReviewUnavailableLabel(
 	requirements: PracticeAutomatedReviewPolicy,
 	supportedModes: readonly PracticeAutomatedReviewPolicy["automatedReview"]["mode"][],
 ) {
-	if (requirements.automatedReview.mode === "NONE") return "Practice guidance only";
+	if (requirements.automatedReview.mode === "NONE") return "Guidance only";
+	if (requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
+		return "Human review needed";
+	}
 	if (!supportedModes.includes(requirements.automatedReview.mode)) {
 		return "AI support unavailable";
-	}
-	if (requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
-		return "Human context needed";
 	}
 	return null;
 }
@@ -51,9 +51,9 @@ export function automatedReviewUnavailableLabel(
 export function mentoringSupportLabel(
 	automatedReview: PracticeAutomatedReviewPolicy["automatedReview"],
 ) {
-	if (automatedReview.mode === "NONE") return "Practice guidance only";
+	if (automatedReview.mode === "NONE") return "Guidance only";
 	if (automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
-		return "Human context needed";
+		return "Human review needed";
 	}
 	return "AI-supported mentoring";
 }

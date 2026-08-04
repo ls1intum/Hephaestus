@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { mockPracticeEvidenceOptions } from "@/mocks/fixtures/practice";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
@@ -32,8 +32,8 @@ describe("practice catalog route", () => {
 			),
 			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/practices/evidence-options", () =>
-				HttpResponse.json(mockPracticeEvidenceOptions),
+			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
+				HttpResponse.json(mockPracticeDefinitionOptions),
 			),
 		);
 
@@ -50,8 +50,8 @@ describe("practice catalog route", () => {
 			),
 			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/practices/evidence-options", () =>
-				HttpResponse.json(mockPracticeEvidenceOptions),
+			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
+				HttpResponse.json(mockPracticeDefinitionOptions),
 			),
 		);
 

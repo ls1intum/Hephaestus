@@ -176,7 +176,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         webTestClient
             .get()
-            .uri(BASE_URI + "/evidence-options", workspace.getWorkspaceSlug())
+            .uri(BASE_URI + "/definition-options", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()

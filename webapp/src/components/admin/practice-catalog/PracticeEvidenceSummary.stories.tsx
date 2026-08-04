@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { mockPracticeEvidenceOptions, mockPullRequestEvidence } from "@/mocks/fixtures/practice";
+import { mockPracticeDefinitionOptions, mockPullRequestEvidence } from "@/mocks/fixtures/practice";
 import { PracticeEvidenceSummary } from "./PracticeEvidenceSummary";
 
 const meta = {
@@ -7,7 +7,7 @@ const meta = {
 	component: PracticeEvidenceSummary,
 	args: {
 		policy: mockPullRequestEvidence,
-		sources: mockPracticeEvidenceOptions.workTypes[0].allowedSources,
+		sources: mockPracticeDefinitionOptions.workTypes[0].allowedSources,
 		workTypeLabel: "Pull or merge request",
 		validation: {
 			status: "STALE",

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
 	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeEvidenceOptions,
+	mockPracticeDefinitionOptions,
 	mockPullRequestEvidence,
 } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
@@ -35,7 +35,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="create"
 				areas={[]}
-				evidenceOptions={mockPracticeEvidenceOptions}
+				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
 				onSubmit={vi.fn()}
 			/>,
@@ -47,9 +47,10 @@ describe("CuratedPracticeForm", () => {
 		expect(name.getAttribute("aria-invalid")).toBe("true");
 		expect(name.getAttribute("aria-describedby")).toBe("practice-name-error");
 		expect(
-			screen.getByRole("textbox", { name: /Review criteria/ }).getAttribute("aria-describedby"),
+			screen.getByRole("textbox", { name: /What to look for/ }).getAttribute("aria-describedby"),
 		).toBe("practice-criteria-description practice-criteria-error");
-		expect(screen.getByText("Select at least one trigger event")).toBeTruthy();
+		expect(screen.queryByText("Select at least one trigger event")).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Identifier" })).toBeNull();
 	});
 
 	it("asks before discarding an edited draft", async () => {
@@ -57,7 +58,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="create"
 				areas={[]}
-				evidenceOptions={mockPracticeEvidenceOptions}
+				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
 				onSubmit={vi.fn()}
 			/>,
@@ -82,7 +83,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="create"
 				areas={[]}
-				evidenceOptions={mockPracticeEvidenceOptions}
+				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
 				onSubmit={vi.fn()}
 			/>,
@@ -106,7 +107,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="edit"
 				areas={[]}
-				evidenceOptions={mockPracticeEvidenceOptions}
+				definitionOptions={mockPracticeDefinitionOptions}
 				initialData={initialData}
 				isPending={false}
 				conflict
@@ -133,7 +134,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="edit"
 				areas={[]}
-				evidenceOptions={mockPracticeEvidenceOptions}
+				definitionOptions={mockPracticeDefinitionOptions}
 				initialData={initialData}
 				isPending={false}
 				onSubmit={onSubmit}
@@ -141,7 +142,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("radio", { name: /Practice guidance only/ }));
+		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).toHaveBeenCalledWith(
@@ -155,8 +156,49 @@ describe("CuratedPracticeForm", () => {
 				}),
 			}),
 		);
-		expect(screen.queryByText("Offer AI-supported mentoring when… *")).toBeNull();
-		expect(screen.queryByRole("button", { name: "Precompute script" })).toBeNull();
+		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
+		expect(screen.queryByText("Run mentoring when *")).toBeNull();
+		expect(screen.queryByText("Static analysis")).toBeNull();
+	});
+
+	it("does not schedule mentoring when a practice needs human review", async () => {
+		const user = userEvent.setup();
+		const onSubmit = vi.fn();
+		await renderWithRouter(
+			<CuratedPracticeForm
+				mode="edit"
+				areas={[]}
+				definitionOptions={mockPracticeDefinitionOptions}
+				initialData={{ ...initialData, precomputeScript: "export default {};" }}
+				isPending={false}
+				onSubmit={onSubmit}
+			/>,
+			"/admin/catalog/practices/clear-pr-description",
+		);
+
+		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
+		await user.type(
+			screen.getByRole("textbox", { name: /Why is human review needed/ }),
+			"A mentor must discuss the developer's reasoning.",
+		);
+		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
+		expect(screen.queryByText("Run mentoring when *")).toBeNull();
+		expect(screen.queryByText("Static analysis")).toBeNull();
+
+		await user.click(screen.getByRole("button", { name: "Save changes" }));
+		const submitted = onSubmit.mock.calls[0]?.[0];
+		expect(submitted?.precomputeScript).toBeUndefined();
+		expect(onSubmit).toHaveBeenCalledWith(
+			expect.objectContaining({
+				triggerEvents: [],
+				automatedReviewPolicy: expect.objectContaining({
+					automatedReview: {
+						mode: "LANGUAGE_MODEL",
+						evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
+					},
+				}),
+			}),
+		);
 	});
 
 	it("keeps evidence drafts when the reviewed work type changes", async () => {
@@ -165,7 +207,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="edit"
 				areas={[]}
-				evidenceOptions={mockPracticeEvidenceOptions}
+				definitionOptions={mockPracticeDefinitionOptions}
 				initialData={initialData}
 				isPending={false}
 				onSubmit={vi.fn()}
@@ -180,12 +222,40 @@ describe("CuratedPracticeForm", () => {
 		});
 		if (!limitationDescription) throw new Error("New limitation description was not rendered");
 		await user.type(limitationDescription, "Keep this limitation");
-		await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
+		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
 		await user.click(await screen.findByRole("option", { name: "Issue" }));
-		await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
+		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
 		await user.click(await screen.findByRole("option", { name: /Pull or merge request/ }));
 
 		expect(screen.getByDisplayValue("Keep this limitation")).toBeTruthy();
+	});
+
+	it("keeps the mentoring choice when the reviewed work type changes", async () => {
+		const user = userEvent.setup();
+		await renderWithRouter(
+			<CuratedPracticeForm
+				mode="edit"
+				areas={[]}
+				definitionOptions={mockPracticeDefinitionOptions}
+				initialData={initialData}
+				isPending={false}
+				onSubmit={vi.fn()}
+			/>,
+			"/admin/catalog/practices/clear-pr-description",
+		);
+
+		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
+		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
+		await user.click(await screen.findByRole("option", { name: "Issue" }));
+		expect(screen.getByRole("radio", { name: /Guidance only/ }).getAttribute("aria-checked")).toBe(
+			"true",
+		);
+
+		await user.click(screen.getByRole("radio", { name: /AI-supported mentoring/ }));
+		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
+		expect(
+			screen.getByRole("checkbox", { name: "Issue is opened" }).getAttribute("aria-checked"),
+		).toBe("true");
 	});
 
 	it("keeps trigger drafts separate by reviewed work type", async () => {
@@ -194,7 +264,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="edit"
 				areas={[]}
-				evidenceOptions={mockPracticeEvidenceOptions}
+				definitionOptions={mockPracticeDefinitionOptions}
 				initialData={initialData}
 				isPending={false}
 				onSubmit={vi.fn()}
@@ -202,20 +272,21 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
+		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
 		await user.click(await screen.findByRole("option", { name: "Issue" }));
-		await user.click(screen.getByRole("checkbox", { name: "Issue is labeled" }));
-		await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
+		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
+		await user.click(screen.getByRole("checkbox", { name: "Issue is closed" }));
+		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
 		await user.click(await screen.findByRole("option", { name: /Pull or merge request/ }));
 		expect(
 			screen
 				.getByRole("checkbox", { name: "Pull or merge request is opened" })
 				.getAttribute("aria-checked"),
 		).toBe("true");
-		await user.click(screen.getByRole("combobox", { name: "Evaluates" }));
+		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
 		await user.click(await screen.findByRole("option", { name: "Issue" }));
 		expect(
-			screen.getByRole("checkbox", { name: "Issue is labeled" }).getAttribute("aria-checked"),
+			screen.getByRole("checkbox", { name: "Issue is closed" }).getAttribute("aria-checked"),
 		).toBe("true");
 	});
 });

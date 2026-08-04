@@ -65,7 +65,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
             service,
             presenter,
             mock(PracticeAreaService.class),
-            mock(PracticeEvidenceOptionsService.class)
+            mock(PracticeDefinitionOptionsService.class)
         );
 
         controller.listPractices(context, null);
