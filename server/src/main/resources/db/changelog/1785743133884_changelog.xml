@@ -462,12 +462,11 @@
         <comment>Name practice usage audit events by the setting they change.</comment>
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
-            UPDATE config_audit_event SET entity_type = 'PRACTICE_USAGE' WHERE entity_type = 'PRACTICE_ACTIVE';
             ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
                 CHECK (entity_type IN (
                     'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
                     'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
-                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_USAGE',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE', 'PRACTICE_USAGE',
                     'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
                     'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
                     'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
@@ -476,18 +475,26 @@
         ]]></sql>
         <rollback>
             <sql splitStatements="false"><![CDATA[
-                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
-                UPDATE config_audit_event SET entity_type = 'PRACTICE_ACTIVE' WHERE entity_type = 'PRACTICE_USAGE';
-                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
-                    CHECK (entity_type IN (
-                        'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
-                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
-                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
-                        'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
-                        'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
-                        'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
-                        'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
-                    ));
+                DO $rollback$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM config_audit_event WHERE entity_type = 'PRACTICE_USAGE') THEN
+                        RAISE WARNING 'The audit entity-type constraint remains widened because append-only history contains PRACTICE_USAGE rows';
+                        RETURN;
+                    END IF;
+
+                    ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                    ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                        CHECK (entity_type IN (
+                            'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                            'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                            'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                            'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                            'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                            'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                            'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                        ));
+                END
+                $rollback$;
             ]]></sql>
         </rollback>
     </changeSet>
@@ -515,21 +522,6 @@
         <sql splitStatements="false"><![CDATA[
             UPDATE workspace_agent_binding SET purpose = 'PRACTICE_REVIEW' WHERE purpose = 'PRACTICE_DETECTION';
             UPDATE agent_job SET purpose = 'PRACTICE_REVIEW' WHERE purpose = 'PRACTICE_DETECTION';
-            UPDATE config_audit_event
-               SET entity_id = CASE WHEN entity_id = 'PRACTICE_DETECTION' THEN 'PRACTICE_REVIEW' ELSE entity_id END,
-                   old_value = CASE
-                       WHEN old_value->>'purpose' = 'PRACTICE_DETECTION'
-                       THEN jsonb_set(old_value, '{purpose}', '"PRACTICE_REVIEW"')
-                       ELSE old_value
-                   END,
-                   new_value = CASE
-                       WHEN new_value->>'purpose' = 'PRACTICE_DETECTION'
-                       THEN jsonb_set(new_value, '{purpose}', '"PRACTICE_REVIEW"')
-                       ELSE new_value
-                   END
-             WHERE entity_id = 'PRACTICE_DETECTION'
-                OR old_value->>'purpose' = 'PRACTICE_DETECTION'
-                OR new_value->>'purpose' = 'PRACTICE_DETECTION';
         ]]></sql>
         <rollback>
             <sql splitStatements="false"><![CDATA[
@@ -553,26 +545,6 @@
                         WHERE purpose = 'PRACTICE_REVIEW';
                     END IF;
 
-                    IF to_regclass('config_audit_event') IS NOT NULL THEN
-                        UPDATE config_audit_event
-                           SET entity_id = CASE
-                                   WHEN entity_id = 'PRACTICE_REVIEW' THEN 'PRACTICE_DETECTION'
-                                   ELSE entity_id
-                               END,
-                               old_value = CASE
-                                   WHEN old_value->>'purpose' = 'PRACTICE_REVIEW'
-                                   THEN jsonb_set(old_value, '{purpose}', '"PRACTICE_DETECTION"')
-                                   ELSE old_value
-                               END,
-                               new_value = CASE
-                                   WHEN new_value->>'purpose' = 'PRACTICE_REVIEW'
-                                   THEN jsonb_set(new_value, '{purpose}', '"PRACTICE_DETECTION"')
-                                   ELSE new_value
-                               END
-                         WHERE entity_id = 'PRACTICE_REVIEW'
-                            OR old_value->>'purpose' = 'PRACTICE_REVIEW'
-                            OR new_value->>'purpose' = 'PRACTICE_REVIEW';
-                    END IF;
                 END
                 $rollback$;
             ]]></sql>

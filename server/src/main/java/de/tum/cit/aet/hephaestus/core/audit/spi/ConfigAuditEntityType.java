@@ -37,7 +37,9 @@ public enum ConfigAuditEntityType {
     /** Whether the workspace is publicly viewable. */
     WORKSPACE_VISIBILITY,
 
-    /** A practice being activated or deactivated, which gates whether it is reviewed at all. */
+    /** Historical only — the earlier spelling of {@link #PRACTICE_USAGE}. */
+    PRACTICE_ACTIVE,
+    /** Whether a practice is used in new reviews. */
     PRACTICE_USAGE,
     /** A practice's review definition, excluding its active state and catalog placement. */
     PRACTICE_DEFINITION,

@@ -68,12 +68,14 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             "UPDATE practice SET source_curated_slug = 'second-practice', " +
                 "source_curated_fingerprint = repeat('c', 64) WHERE id = 136302"
         );
+        seedLegacyAuditVocabulary();
         try (Liquibase liquibase = liquibase()) {
             liquibase.update(contexts());
         }
 
         assertMarkerRepair();
         assertHistoricalFingerprintsVersioned();
+        assertAuditHistoryPreserved();
         assertEmptyCatalogBootstrap();
         assertWorkspaceRevisionBackfill();
         assertEvidenceRevisionBackfill();
@@ -84,6 +86,41 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         assertRevisionImmutability();
         appendValidCurrentRevision();
         assertRollbackAndReapply();
+    }
+
+    private static void seedLegacyAuditVocabulary() throws SQLException {
+        execute(
+            """
+            INSERT INTO config_audit_event (
+                occurred_at, workspace_id, actor_kind, entity_type, entity_id,
+                action, changed_keys, old_value, new_value
+            ) VALUES (
+                now(), 136103, 'SYSTEM', 'PRACTICE_ACTIVE', '136301',
+                'UPDATED', ARRAY['active'], '{"active":false}'::jsonb, '{"active":true}'::jsonb
+            ), (
+                now(), 136103, 'SYSTEM', 'AGENT_BINDING', 'PRACTICE_DETECTION',
+                'UPDATED', ARRAY['purpose'], '{"purpose":"PRACTICE_DETECTION"}'::jsonb,
+                '{"purpose":"PRACTICE_DETECTION"}'::jsonb
+            )
+            """
+        );
+    }
+
+    private static void assertAuditHistoryPreserved() throws SQLException {
+        assertThat(
+            scalar("SELECT count(*)::text FROM config_audit_event WHERE entity_type = 'PRACTICE_ACTIVE'")
+        ).isEqualTo("1");
+        assertThat(
+            scalar(
+                """
+                SELECT count(*)::text
+                FROM config_audit_event
+                WHERE entity_id = 'PRACTICE_DETECTION'
+                  AND old_value->>'purpose' = 'PRACTICE_DETECTION'
+                  AND new_value->>'purpose' = 'PRACTICE_DETECTION'
+                """
+            )
+        ).isEqualTo("1");
     }
 
     private static void assertHistoricalFingerprintsVersioned() throws SQLException {

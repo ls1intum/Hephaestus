@@ -10,6 +10,7 @@ type ActorKind = NonNullable<ConfigAuditEntryView["actorKind"]>;
 const RENAMED_ENTITY_TYPE_LABELS = {
 	AGENT_CONFIG: "Agent config",
 	AI_CONFIG_BINDING: "AI binding",
+	PRACTICE_ACTIVE: "Practice review participation",
 	WORKSPACE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_BYO_LLM_BUDGET: "Own-provider AI cap",
 } satisfies Partial<Record<EntityType, string>>;

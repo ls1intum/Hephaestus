@@ -357,6 +357,7 @@ paths:
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
+            - PRACTICE_ACTIVE
             - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_AREA
@@ -2324,6 +2325,7 @@ paths:
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
+            - PRACTICE_ACTIVE
             - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_AREA
@@ -7135,6 +7137,7 @@ components:
           - WORKSPACE_STATUS
           - WORKSPACE_TOKEN
           - WORKSPACE_VISIBILITY
+          - PRACTICE_ACTIVE
           - PRACTICE_USAGE
           - PRACTICE_DEFINITION
           - PRACTICE_AREA
