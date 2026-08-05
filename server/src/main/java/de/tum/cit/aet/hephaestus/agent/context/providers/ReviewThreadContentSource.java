@@ -47,7 +47,7 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
     static final String FILE_NAME = "review_threads.json";
 
-    static final int MAX_THREADS = 40;
+    static final int MAX_THREADS = 200;
 
     static final int MAX_DECISIONS = 30;
 

@@ -257,7 +257,12 @@ public class ContextManifestBuilder {
         return new PreparedEvidence(files, restricted);
     }
 
-    public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
+    /**
+     * Convenience for callers judging evidence as of now. A replay reproducing a past decision must
+     * pass that decision's anchor instead: defaulting to the current instant would re-date the
+     * question and can flip a verdict that was correct when it was made.
+     */
+    public AutomatedReviewReadinessResult checkAutomatedReviewReadinessAsOfNow(
         ArtifactSourceManifest manifest,
         List<Practice> practices
     ) {
@@ -273,11 +278,21 @@ public class ContextManifestBuilder {
         if (!manifest.viewTransformations().isEmpty()) {
             throw new IllegalArgumentException("Ablated evidence views are not valid for product readiness");
         }
+        // A manifest recorded under a contract this runtime no longer ships is unreplayable, not
+        // invalid: the decision it recorded was correct when it was made, and the evidence is still
+        // exactly what was seen. Refusing to re-derive a verdict is right; crashing is not, and it is
+        // what would meet a replay of anything older than the newest catalog.
         if (
             !catalogs.current().version().equals(manifest.contractVersion()) ||
             !catalogs.catalogDigest().equals(manifest.catalogDigest())
         ) {
-            throw new IllegalArgumentException("Manifest does not reference the runtime's exact source contract");
+            throw new UnreplayableEvidenceException(
+                "Manifest references source contract " +
+                    manifest.contractVersion() +
+                    " (digest " +
+                    manifest.catalogDigest() +
+                    "), which this runtime no longer ships"
+            );
         }
         Set<SourceKind> expectedKinds = catalogs
             .requireProfile(manifest.contractVersion(), manifest.evidenceProfile())
@@ -342,9 +357,13 @@ public class ContextManifestBuilder {
                     requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
                     completeness != SourceCompleteness.COMPLETE
                 ) reasons.add(SourceReadinessReason.SOURCE_INCOMPLETE);
+                // Only demonstrated staleness refuses. UNKNOWN means the available watermarks cannot
+                // answer the question — the ordinary case for a backfill, a replay, or a source with
+                // no watermark — and "I cannot tell" is not evidence that the copy is wrong. Treating
+                // the two alike is the same category error as reading a refusal as a clean result.
                 if (
                     requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
-                    freshness != SourceFreshness.CURRENT
+                    freshness == SourceFreshness.STALE
                 ) reasons.add(SourceReadinessReason.SOURCE_NOT_CURRENT);
                 if (
                     requirement.content() == EvidenceContentRequirement.NON_EMPTY &&
@@ -387,16 +406,7 @@ public class ContextManifestBuilder {
         if (policy.mode() == FreshnessMode.PINNED_IDENTITY) {
             return capture.facts().immutableIdentity() != null ? SourceFreshness.CURRENT : SourceFreshness.UNKNOWN;
         }
-        if (policy.mode() == FreshnessMode.MAX_AGE) {
-            Instant observed = capture.facts().observedAt();
-            if (observed == null || observed.isAfter(capturedAt)) return SourceFreshness.UNKNOWN;
-            return observed.plusSeconds(policy.maxAgeSeconds()).isBefore(temporalAnchor)
-                ? SourceFreshness.STALE
-                : SourceFreshness.CURRENT;
-        }
-        Instant eventTime = capture.facts().sourceEffectiveAt();
-        if (eventTime == null || eventTime.isAfter(capturedAt)) return SourceFreshness.UNKNOWN;
-        return eventTime.isAfter(temporalAnchor) ? SourceFreshness.UNKNOWN : SourceFreshness.CURRENT;
+        throw new IllegalStateException("Unhandled freshness mode: " + policy.mode());
     }
 
     private SourceCapture capture(

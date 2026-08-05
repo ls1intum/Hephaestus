@@ -84,9 +84,9 @@ and reject unknown kinds.
 
 The constraints with direct authoring consequences are:
 
-- Pull-request and issue comments, linked work items, review threads, general review comments, project inventory,
-  and Outline documents expose no `CURRENT` claim. Their mirrors do not carry source-specific synchronization
-  watermarks, so a practice can require them only with freshness `NO_REQUIREMENT`.
+- Only sources pinned to an immutable upstream identity — the pull-request diff and the repository tree —
+  expose a `CURRENT` claim. Every mirrored source, including the pull-request and issue records themselves,
+  can be required only with freshness `NO_REQUIREMENT`.
 - Outline documents cannot satisfy `COMPLETE`.
 - Pull-request and issue core records cannot be logically empty. Other `1.0.0` sources may be validly empty.
 - An available pull-request diff is pinned and complete; it may be empty but is never partial.
@@ -142,13 +142,31 @@ Only `AVAILABLE` has:
 Logical content is independent of serialized bytes: a JSON file containing `[]` represents an `EMPTY` source.
 Field-level redaction remains an available, usually partial source; whole-source redaction uses `REDACTED`.
 
-Freshness is a readiness result, not a mutable capture fact. The runtime evaluates the recorded watermark against the
-job's submission time under the pinned freshness policy, recording the later check time separately. A delayed
-queue therefore does not invalidate evidence that covered the requested snapshot. A manual request still refuses a
-mirror whose watermark was already too old when submitted. The runtime must not substitute query time for a missing
-upstream watermark. `NOT_APPLICABLE` means that the contract offers no currentness claim,
-so authoring validation rejects a `CURRENT` requirement. `NO_REQUIREMENT` accepts the absence of such a claim; it does not
-assert that the data is current.
+Freshness is a readiness result, not a mutable capture fact, and only demonstrated staleness refuses. `UNKNOWN`
+— the runtime cannot tell — is not a refusal, because "I cannot establish this" is not evidence that the copy is
+wrong. `NOT_APPLICABLE` means the contract offers no currentness claim at all, so authoring validation rejects a
+`CURRENT` requirement on such a source; `NO_REQUIREMENT` accepts the absence of a claim without asserting that the
+data is current.
+
+There is deliberately no age-based freshness mode. An age needs a watermark recording when a copy was last
+*verified* against upstream, and the mirror records only when a row was last *written* — and rows are written only
+when something changed. An age computed from that answers "how long since this changed", which is close to the
+opposite of the question: it reports a quiet, correctly-mirrored pull request as stale while reporting a
+just-edited one as fresh. The earlier five-minute window therefore refused every backfilled review, every replay,
+and every review of a repository that had simply been quiet, while never once firing on evidence that was actually
+wrong.
+
+Reintroducing an age mode has a prerequisite: the sync must record a verified-as-of watermark, advanced by a
+reconciliation pass that confirms nothing changed. That pass is exactly an HTTP `304`, which
+[RFC 9111 §4.3.4](https://www.rfc-editor.org/rfc/rfc9111.html) says refreshes a stored response without altering
+it. Until that watermark exists, a currentness guarantee on a mirrored source would be a claim the system cannot
+substantiate.
+
+Because a replay re-derives a verdict from recorded evidence, readiness is a pure function of the manifest, the
+practices, the anchor, and the contract. A replay passes the recorded anchor; passing the current instant instead
+would re-date the question and can flip a verdict that was correct when it was made. A manifest captured under a
+contract version the runtime no longer ships is *unreplayable* rather than invalid — the decision it recorded
+stands, and only the ability to re-derive it is gone.
 
 Deliberate ablation is an evaluation transformation, not natural absence. Production rejects every transformed
 view. The manifest can record evaluation transformations, but this contract version does not apply or authorize

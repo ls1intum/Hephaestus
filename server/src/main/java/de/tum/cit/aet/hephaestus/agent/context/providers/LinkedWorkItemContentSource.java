@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -53,9 +54,9 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
 
     static final int MAX_ITEMS = 8;
 
-    static final int EXCERPT_CHARS = 600;
+    static final int EXCERPT_CHARS = 2000;
 
-    private static final int MAX_COMMITS_SCANNED = 50;
+    private static final int MAX_COMMITS_SCANNED = 500;
 
     /**
      * Closing-keyword reference, e.g. {@code closes #42} / {@code Fixes #7}. Case-insensitive.
@@ -156,13 +157,18 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
             complete &= collectFromCommits(m, repositoryId, sourceBranch, refs);
 
             ArrayNode items = objectMapper.createArrayNode();
+            List<Integer> unresolved = new ArrayList<>();
             int examined = 0;
             for (Map.Entry<Integer, Boolean> entry : refs.numbers.entrySet()) {
                 if (examined++ >= MAX_ITEMS) break;
                 int number = entry.getKey();
                 Optional<Issue> resolved = issueRepository.findByRepositoryIdAndNumber(repositoryId, number);
                 if (resolved.isEmpty()) {
-                    complete = false;
+                    // A "#123" that names an issue in another repository or an external tracker is not
+                    // a hole in our enumeration of the references — we found it, and it points
+                    // somewhere we do not mirror. Reporting that as incompleteness disabled the linked
+                    // work-item practices permanently on any branch named "<issue>-slug".
+                    unresolved.add(number);
                     continue;
                 }
                 items.add(toItem(resolved.get(), entry.getValue()));
@@ -178,6 +184,11 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 from.add(source);
             }
             root.set("resolvedFrom", from);
+            // Stated, not inferred: the model must be able to tell "this PR links nothing" from
+            // "this PR links #123, which lives somewhere we do not mirror".
+            ArrayNode unresolvedRefs = objectMapper.createArrayNode();
+            unresolved.forEach(unresolvedRefs::add);
+            root.set("unresolvedReferences", unresolvedRefs);
 
             Map<String, byte[]> files = Map.of(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
             log.info("Linked work items: wrote {} item(s), resolvedFrom={}", items.size(), refs.resolvedFrom);

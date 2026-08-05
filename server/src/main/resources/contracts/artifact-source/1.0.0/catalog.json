@@ -1,456 +1,454 @@
 {
-  "version": "1.0.0",
-  "sources": [
-    {
-      "kind": "scm.pull-request.core",
-      "displayName": "Pull request details",
-      "description": "Pull request metadata and commit subjects for the reviewed pull request.",
-      "selectionScope": "One pull request pinned by job metadata; core fields plus the available commit-subject list.",
-      "artifactTypes": [
-        "PULL_REQUEST"
-      ],
-      "authority": "SYNCHRONIZED_MIRROR",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "MAX_AGE",
-        "maxAgeSeconds": 300
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": false
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-pull-request-core-automated-review",
-        "use-scm-pull-request-core-feedback-delivery",
-        "use-scm-pull-request-core-mentor-context",
-        "use-scm-pull-request-core-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.pull-request.diff",
-      "displayName": "Code changes",
-      "description": "Annotated unified diff and deterministic summaries for the reviewed pull request.",
-      "selectionScope": "The merge-base-to-pinned-head diff for one pull request, capped at 20 MiB; collection fails closed if the range cannot be resolved or exceeds the cap.",
-      "artifactTypes": [
-        "PULL_REQUEST"
-      ],
-      "authority": "DETERMINISTIC_DERIVATION",
-      "captureTimeBasis": "PINNED_IMMUTABLE_IDENTITY",
-      "freshness": {
-        "mode": "PINNED_IDENTITY"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": false,
-        "supportsEmpty": true
-      },
-      "privacyClass": "INTERNAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-pull-request-diff-automated-review",
-        "use-scm-pull-request-diff-feedback-delivery",
-        "use-scm-pull-request-diff-mentor-context",
-        "use-scm-pull-request-diff-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.pull-request.comments",
-      "displayName": "Inline review comments",
-      "description": "Inline pull-request review comments mirrored by the application.",
-      "selectionScope": "The 500 most recent inline comments for one pull request; older comments are omitted and the source is PARTIAL when more exist.",
-      "artifactTypes": [
-        "PULL_REQUEST"
-      ],
-      "authority": "SYNCHRONIZED_MIRROR",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "NOT_APPLICABLE"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-pull-request-comments-automated-review",
-        "use-scm-pull-request-comments-feedback-delivery",
-        "use-scm-pull-request-comments-mentor-context",
-        "use-scm-pull-request-comments-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.repository.tree",
-      "displayName": "Repository files",
-      "description": "Pinned repository files used only as surrounding code context.",
-      "selectionScope": "Up to 20,000 regular files and 50 MiB at the pinned commit; files over 10 MiB, symlinks, submodules, unsafe paths, and unsupported Git modes are excluded and make the source PARTIAL.",
-      "artifactTypes": [
-        "PULL_REQUEST"
-      ],
-      "authority": "UPSTREAM_SNAPSHOT",
-      "captureTimeBasis": "PINNED_IMMUTABLE_IDENTITY",
-      "freshness": {
-        "mode": "PINNED_IDENTITY"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "INTERNAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-repository-tree-automated-review",
-        "use-scm-repository-tree-feedback-delivery",
-        "use-scm-repository-tree-mentor-context",
-        "use-scm-repository-tree-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.issue.core",
-      "displayName": "Issue details",
-      "description": "Issue metadata and rendered description for the reviewed issue.",
-      "selectionScope": "One issue selected by job metadata, including its mirrored fields, labels, assignees, and description.",
-      "artifactTypes": [
-        "ISSUE"
-      ],
-      "authority": "SYNCHRONIZED_MIRROR",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "MAX_AGE",
-        "maxAgeSeconds": 300
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": false
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-issue-core-automated-review",
-        "use-scm-issue-core-feedback-delivery",
-        "use-scm-issue-core-mentor-context",
-        "use-scm-issue-core-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.issue.comments",
-      "displayName": "Issue comments",
-      "description": "Issue discussion comments mirrored by the application.",
-      "selectionScope": "The 200 most recent comments for one issue; older comments are omitted and the source is PARTIAL when more exist.",
-      "artifactTypes": [
-        "ISSUE"
-      ],
-      "authority": "SYNCHRONIZED_MIRROR",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "NOT_APPLICABLE"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-issue-comments-automated-review",
-        "use-scm-issue-comments-feedback-delivery",
-        "use-scm-issue-comments-mentor-context",
-        "use-scm-issue-comments-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "slack.conversation.thread",
-      "displayName": "Slack thread",
-      "description": "Ordered human messages from one Slack conversation thread.",
-      "selectionScope": "One job-selected Slack thread after system and bot messages are excluded; every retained message is emitted in chronological order.",
-      "artifactTypes": [
-        "CONVERSATION_THREAD"
-      ],
-      "authority": "SYNCHRONIZED_MIRROR",
-      "captureTimeBasis": "EVENT_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "EVENT_TIME"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "SENSITIVE_PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-slack-conversation-thread-automated-review",
-        "use-slack-conversation-thread-feedback-delivery",
-        "use-slack-conversation-thread-mentor-context",
-        "use-slack-conversation-thread-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.linked-work-items",
-      "displayName": "Linked work items",
-      "description": "Bounded issue summaries explicitly linked from a pull request.",
-      "selectionScope": "At most 8 issues resolved from closing references, branch text, and the 50 scanned commit subjects; unresolved or additional references make the source PARTIAL.",
-      "artifactTypes": [
-        "PULL_REQUEST"
-      ],
-      "authority": "LOSSY_DERIVATION",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "NOT_APPLICABLE"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-linked-work-items-automated-review",
-        "use-scm-linked-work-items-feedback-delivery",
-        "use-scm-linked-work-items-mentor-context",
-        "use-scm-linked-work-items-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.review-threads",
-      "displayName": "Review threads and decisions",
-      "description": "Review decisions and resolvable discussion threads for one pull request.",
-      "selectionScope": "At most 40 review threads and 30 review decisions for the reviewed pull request; excess records make the source PARTIAL.",
-      "artifactTypes": [
-        "PULL_REQUEST"
-      ],
-      "authority": "SYNCHRONIZED_MIRROR",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "NOT_APPLICABLE"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-review-threads-automated-review",
-        "use-scm-review-threads-feedback-delivery",
-        "use-scm-review-threads-mentor-context",
-        "use-scm-review-threads-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "scm.general-review-comments",
-      "displayName": "General review comments",
-      "description": "Non-inline review comments for one pull request.",
-      "selectionScope": "At most 200 general review comments associated with the reviewed pull request; excess records make the source PARTIAL.",
-      "artifactTypes": [
-        "PULL_REQUEST"
-      ],
-      "authority": "SYNCHRONIZED_MIRROR",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "NOT_APPLICABLE"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-scm-general-review-comments-automated-review",
-        "use-scm-general-review-comments-feedback-delivery",
-        "use-scm-general-review-comments-mentor-context",
-        "use-scm-general-review-comments-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "workspace.project-inventory",
-      "displayName": "Related workspace work",
-      "description": "Bounded neighboring issue and pull-request inventory for the workspace.",
-      "selectionScope": "Up to 200 issues and 200 pull requests across at most 25 visible repositories, excluding the reviewed work item; exceeded bounds make the source PARTIAL.",
-      "artifactTypes": [
-        "PULL_REQUEST",
-        "ISSUE",
-        "CONVERSATION_THREAD"
-      ],
-      "authority": "LOSSY_DERIVATION",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "NOT_APPLICABLE"
-      },
-      "completeness": {
-        "supportsComplete": true,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-workspace-project-inventory-automated-review",
-        "use-workspace-project-inventory-feedback-delivery",
-        "use-workspace-project-inventory-mentor-context",
-        "use-workspace-project-inventory-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    },
-    {
-      "kind": "outline.documents",
-      "displayName": "Referenced Outline documents",
-      "description": "Outline documents explicitly referenced by the reviewed work.",
-      "selectionScope": "Only referenced or matched documents, with at most 15 documents and 24 bounded query terms; inaccessible or excess documents make the source PARTIAL.",
-      "artifactTypes": [
-        "PULL_REQUEST",
-        "ISSUE"
-      ],
-      "authority": "LOSSY_DERIVATION",
-      "captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
-      "freshness": {
-        "mode": "NOT_APPLICABLE"
-      },
-      "completeness": {
-        "supportsComplete": false,
-        "supportsPartial": true,
-        "supportsEmpty": true
-      },
-      "privacyClass": "PERSONAL",
-      "retentionPolicy": "AGENT_EVIDENCE_RETENTION",
-      "erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
-      "useDecisionIds": [
-        "use-outline-documents-automated-review",
-        "use-outline-documents-feedback-delivery",
-        "use-outline-documents-mentor-context",
-        "use-outline-documents-operator-review"
-      ],
-      "supportedAbsenceStates": [
-        "NOT_COLLECTED",
-        "UNAVAILABLE",
-        "REDACTED",
-        "COLLECTION_ERROR"
-      ]
-    }
-  ],
-  "profiles": [
-    {
-      "id": "pull-request-review",
-      "version": "1.0.0",
-      "artifactType": "PULL_REQUEST",
-      "allowedSources": [
-        "scm.pull-request.core",
-        "scm.pull-request.diff",
-        "scm.pull-request.comments",
-        "scm.repository.tree",
-        "scm.linked-work-items",
-        "scm.review-threads",
-        "scm.general-review-comments",
-        "workspace.project-inventory",
-        "outline.documents"
-      ]
-    },
-    {
-      "id": "issue-review",
-      "version": "1.0.0",
-      "artifactType": "ISSUE",
-      "allowedSources": [
-        "scm.issue.core",
-        "scm.issue.comments",
-        "workspace.project-inventory",
-        "outline.documents"
-      ]
-    },
-    {
-      "id": "conversation-review",
-      "version": "1.0.0",
-      "artifactType": "CONVERSATION_THREAD",
-      "allowedSources": [
-        "slack.conversation.thread",
-        "workspace.project-inventory"
-      ]
-    }
-  ]
+	"version": "1.0.0",
+	"sources": [
+		{
+			"kind": "scm.pull-request.core",
+			"displayName": "Pull request details",
+			"description": "The pull request itself: its title, description, author, branches, state, labels, and the subject lines of its commits.",
+			"selectionScope": "One pull request, chosen by the job, with its own fields and the commit subjects available for it.",
+			"artifactTypes": [
+				"PULL_REQUEST"
+			],
+			"authority": "SYNCHRONIZED_MIRROR",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": false
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-pull-request-core-automated-review",
+				"use-scm-pull-request-core-feedback-delivery",
+				"use-scm-pull-request-core-mentor-context",
+				"use-scm-pull-request-core-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.pull-request.diff",
+			"displayName": "Code changes",
+			"description": "The code the pull request changes, as a unified diff annotated with line numbers.",
+			"selectionScope": "The merge-base-to-head diff for one pull request at the exact commit under review, up to 20 MiB. A diff that cannot be read is reported as a collection error, never as an empty one.",
+			"artifactTypes": [
+				"PULL_REQUEST"
+			],
+			"authority": "DETERMINISTIC_DERIVATION",
+			"captureTimeBasis": "PINNED_IMMUTABLE_IDENTITY",
+			"freshness": {
+				"mode": "PINNED_IDENTITY"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": false,
+				"supportsEmpty": true
+			},
+			"privacyClass": "INTERNAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-pull-request-diff-automated-review",
+				"use-scm-pull-request-diff-feedback-delivery",
+				"use-scm-pull-request-diff-mentor-context",
+				"use-scm-pull-request-diff-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.pull-request.comments",
+			"displayName": "Inline review comments",
+			"description": "Review comments left on specific lines of the pull request.",
+			"selectionScope": "Up to the 500 most recent inline comments on one pull request, newest first. Beyond that the capture reports itself partial rather than claiming to be the whole conversation.",
+			"artifactTypes": [
+				"PULL_REQUEST"
+			],
+			"authority": "SYNCHRONIZED_MIRROR",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-pull-request-comments-automated-review",
+				"use-scm-pull-request-comments-feedback-delivery",
+				"use-scm-pull-request-comments-mentor-context",
+				"use-scm-pull-request-comments-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.repository.tree",
+			"displayName": "Repository files",
+			"description": "Files from the rest of the repository, for reading the change in context. Never judged on their own.",
+			"selectionScope": "The repository at the exact commit under review: up to 20,000 files and 50 MiB. Files over 10 MiB, symlinks, submodules, and paths outside the tree are left out, and the capture reports itself partial.",
+			"artifactTypes": [
+				"PULL_REQUEST"
+			],
+			"authority": "UPSTREAM_SNAPSHOT",
+			"captureTimeBasis": "PINNED_IMMUTABLE_IDENTITY",
+			"freshness": {
+				"mode": "PINNED_IDENTITY"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "INTERNAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-repository-tree-automated-review",
+				"use-scm-repository-tree-feedback-delivery",
+				"use-scm-repository-tree-mentor-context",
+				"use-scm-repository-tree-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.issue.core",
+			"displayName": "Issue details",
+			"description": "The issue itself: its title, description, author, state, labels, and assignees.",
+			"selectionScope": "One issue, chosen by the job, with its own fields and its rendered description.",
+			"artifactTypes": [
+				"ISSUE"
+			],
+			"authority": "SYNCHRONIZED_MIRROR",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": false
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-issue-core-automated-review",
+				"use-scm-issue-core-feedback-delivery",
+				"use-scm-issue-core-mentor-context",
+				"use-scm-issue-core-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.issue.comments",
+			"displayName": "Issue comments",
+			"description": "The discussion on the issue.",
+			"selectionScope": "Up to the 200 most recent comments on one issue, newest first. Beyond that the capture reports itself partial.",
+			"artifactTypes": [
+				"ISSUE"
+			],
+			"authority": "SYNCHRONIZED_MIRROR",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-issue-comments-automated-review",
+				"use-scm-issue-comments-feedback-delivery",
+				"use-scm-issue-comments-mentor-context",
+				"use-scm-issue-comments-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "slack.conversation.thread",
+			"displayName": "Slack thread",
+			"description": "One Slack thread, in the order it was written. Read only from channels whose members have agreed to it.",
+			"selectionScope": "One thread, chosen by the job, with system and bot messages removed and the remaining messages in chronological order. A thread whose channel has not agreed, or which no longer exists, is reported as withheld rather than as an empty conversation.",
+			"artifactTypes": [
+				"CONVERSATION_THREAD"
+			],
+			"authority": "SYNCHRONIZED_MIRROR",
+			"captureTimeBasis": "EVENT_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "SENSITIVE_PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-slack-conversation-thread-automated-review",
+				"use-slack-conversation-thread-feedback-delivery",
+				"use-slack-conversation-thread-mentor-context",
+				"use-slack-conversation-thread-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.linked-work-items",
+			"displayName": "Linked work items",
+			"description": "Issues this pull request says it addresses, found in its description, branch name, and commit subjects.",
+			"selectionScope": "Up to 8 issues resolved from closing references, the branch name, and up to 500 commit subjects. References pointing outside this repository are listed as unresolved rather than treated as missing evidence.",
+			"artifactTypes": [
+				"PULL_REQUEST"
+			],
+			"authority": "LOSSY_DERIVATION",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-linked-work-items-automated-review",
+				"use-scm-linked-work-items-feedback-delivery",
+				"use-scm-linked-work-items-mentor-context",
+				"use-scm-linked-work-items-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.review-threads",
+			"displayName": "Review threads and decisions",
+			"description": "Review conversations on the pull request and whether they were resolved, plus each reviewer's verdict.",
+			"selectionScope": "Up to 200 review threads and 30 review decisions for one pull request. Beyond that the capture reports itself partial.",
+			"artifactTypes": [
+				"PULL_REQUEST"
+			],
+			"authority": "SYNCHRONIZED_MIRROR",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-review-threads-automated-review",
+				"use-scm-review-threads-feedback-delivery",
+				"use-scm-review-threads-mentor-context",
+				"use-scm-review-threads-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "scm.general-review-comments",
+			"displayName": "General review comments",
+			"description": "Review comments about the pull request as a whole, rather than about a particular line.",
+			"selectionScope": "Up to 200 general review comments on one pull request. Beyond that the capture reports itself partial.",
+			"artifactTypes": [
+				"PULL_REQUEST"
+			],
+			"authority": "SYNCHRONIZED_MIRROR",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-scm-general-review-comments-automated-review",
+				"use-scm-general-review-comments-feedback-delivery",
+				"use-scm-general-review-comments-mentor-context",
+				"use-scm-general-review-comments-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "workspace.project-inventory",
+			"displayName": "Related workspace work",
+			"description": "Other work in the same workspace, so a change can be seen against what else is going on.",
+			"selectionScope": "Up to 200 issues and 200 pull requests across at most 25 visible repositories, excluding the work under review. Beyond that the capture reports itself partial.",
+			"artifactTypes": [
+				"PULL_REQUEST",
+				"ISSUE",
+				"CONVERSATION_THREAD"
+			],
+			"authority": "LOSSY_DERIVATION",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-workspace-project-inventory-automated-review",
+				"use-workspace-project-inventory-feedback-delivery",
+				"use-workspace-project-inventory-mentor-context",
+				"use-workspace-project-inventory-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
+			"kind": "outline.documents",
+			"displayName": "Referenced Outline documents",
+			"description": "Wiki pages the reviewed work refers to.",
+			"selectionScope": "Only documents referenced by the work or matched to it, at most 15. Retrieval cannot prove it found everything relevant, so this source is never complete.",
+			"artifactTypes": [
+				"PULL_REQUEST",
+				"ISSUE"
+			],
+			"authority": "LOSSY_DERIVATION",
+			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"freshness": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": false,
+				"supportsPartial": true,
+				"supportsEmpty": true
+			},
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-outline-documents-automated-review",
+				"use-outline-documents-feedback-delivery",
+				"use-outline-documents-mentor-context",
+				"use-outline-documents-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		}
+	],
+	"profiles": [
+		{
+			"id": "pull-request-review",
+			"version": "1.0.0",
+			"artifactType": "PULL_REQUEST",
+			"allowedSources": [
+				"scm.pull-request.core",
+				"scm.pull-request.diff",
+				"scm.pull-request.comments",
+				"scm.repository.tree",
+				"scm.linked-work-items",
+				"scm.review-threads",
+				"scm.general-review-comments",
+				"workspace.project-inventory",
+				"outline.documents"
+			]
+		},
+		{
+			"id": "issue-review",
+			"version": "1.0.0",
+			"artifactType": "ISSUE",
+			"allowedSources": [
+				"scm.issue.core",
+				"scm.issue.comments",
+				"workspace.project-inventory",
+				"outline.documents"
+			]
+		},
+		{
+			"id": "conversation-review",
+			"version": "1.0.0",
+			"artifactType": "CONVERSATION_THREAD",
+			"allowedSources": [
+				"slack.conversation.thread",
+				"workspace.project-inventory"
+			]
+		}
+	]
 }

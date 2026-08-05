@@ -256,13 +256,12 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         );
         SourceKind kind = new SourceKind(requiredText(node, "kind", "source"));
         JsonNode freshness = requiredObject(node, "freshness", kind.toString());
-        rejectUnknown(freshness, Set.of("mode", "maxAgeSeconds"), "freshness " + kind);
+        rejectUnknown(freshness, Set.of("mode"), "freshness " + kind);
         FreshnessMode freshnessMode = enumValue(
             FreshnessMode.class,
             requiredText(freshness, "mode", "freshness " + kind),
             "freshness mode"
         );
-        Long maxAgeSeconds = optionalPositiveLong(freshness, "maxAgeSeconds", "freshness " + kind);
 
         JsonNode completeness = requiredObject(node, "completeness", kind.toString());
         rejectUnknown(
@@ -279,7 +278,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             textSet(node, "artifactTypes", kind.toString()),
             enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
             enumValue(CaptureTimeBasis.class, requiredText(node, "captureTimeBasis", kind.toString()), "capture time"),
-            new FreshnessPolicy(freshnessMode, maxAgeSeconds),
+            new FreshnessPolicy(freshnessMode),
             new CompletenessPolicy(
                 requiredBoolean(completeness, "supportsComplete", kind.toString()),
                 requiredBoolean(completeness, "supportsPartial", kind.toString()),

@@ -203,7 +203,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void excerptIsCappedAt600Chars() throws Exception {
+    void excerptIsCappedAtTheConfiguredWindow() throws Exception {
         PullRequest pr = new PullRequest();
         pr.setBody("Fixes #5");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -216,7 +216,9 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         provider.contribute(request(sampleMetadata()), files);
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
-        assertThat(root.get("workItems").get(0).get("bodyExcerpt").asString()).hasSize(600);
+        assertThat(root.get("workItems").get(0).get("bodyExcerpt").asString()).hasSize(
+            LinkedWorkItemContentSource.EXCERPT_CHARS
+        );
     }
 
     @Test
@@ -341,7 +343,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
             List.of(),
             List.of()
         );
-        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 51)).thenReturn(List.of(commit));
+        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 501)).thenReturn(List.of(commit));
         when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 77)).thenReturn(
             Optional.of(issue(77, "Crash on launch", "criteria"))
         );
@@ -371,7 +373,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         when(gitDiffOperations.resolveDiffRange(repoPath, "main", "feature/plain", "abc123def456")).thenReturn(
             new String[] { "base", "head" }
         );
-        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 51)).thenReturn(List.of());
+        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 501)).thenReturn(List.of());
 
         ObjectNode metadata = sampleMetadata();
         metadata.put("source_branch", "feature/plain");
@@ -413,8 +415,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
             List.of(),
             List.of()
         );
-        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 51)).thenReturn(
-            java.util.Collections.nCopies(51, commit)
+        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 501)).thenReturn(
+            java.util.Collections.nCopies(501, commit)
         );
 
         ObjectNode metadata = sampleMetadata();

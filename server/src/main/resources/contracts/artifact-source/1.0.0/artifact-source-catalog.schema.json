@@ -1,264 +1,243 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json",
-  "title": "Artifact source catalog",
-  "description": "Versioned definitions of the evidence sources and evidence profiles supported by Hephaestus.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "version",
-    "sources",
-    "profiles"
-  ],
-  "properties": {
-    "version": {
-      "const": "1.0.0",
-      "description": "Source-contract version that fixes the meaning of every entry in this catalog."
-    },
-    "sources": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/source"
-      },
-      "description": "Logical evidence sources with stable identifiers and governed capture semantics."
-    },
-    "profiles": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/profile"
-      },
-      "description": "Allowed evidence sources for each type of reviewed work."
-    }
-  },
-  "$defs": {
-    "sourceKind": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$",
-      "description": "Stable machine identifier for one logical evidence source."
-    },
-    "source": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "displayName",
-        "description",
-        "selectionScope",
-        "artifactTypes",
-        "authority",
-        "captureTimeBasis",
-        "freshness",
-        "completeness",
-        "privacyClass",
-        "supportedAbsenceStates",
-        "retentionPolicy",
-        "erasurePolicy",
-        "useDecisionIds"
-      ],
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/sourceKind",
-          "description": "Stable machine identifier for this logical evidence source."
-        },
-        "displayName": {
-          "description": "Human-readable source name for authoring and operator interfaces.",
-          "type": "string",
-          "minLength": 1
-        },
-        "description": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Plain-language summary of the source content."
-        },
-        "selectionScope": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Exact object, fields, limits, ordering, and exclusions captured by this source."
-        },
-        "artifactTypes": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "enum": [
-              "PULL_REQUEST",
-              "ISSUE",
-              "CONVERSATION_THREAD"
-            ]
-          },
-          "description": "Types of reviewed work for which this source is meaningful."
-        },
-        "authority": {
-          "enum": [
-            "UPSTREAM_SNAPSHOT",
-            "SYNCHRONIZED_MIRROR",
-            "DETERMINISTIC_DERIVATION",
-            "LOSSY_DERIVATION"
-          ],
-          "description": "Relationship between the captured representation and its origin."
-        },
-        "captureTimeBasis": {
-          "enum": [
-            "EVENT_TIME_SNAPSHOT",
-            "COLLECTION_TIME_SNAPSHOT",
-            "PINNED_IMMUTABLE_IDENTITY"
-          ],
-          "description": "Time basis attached to each capture."
-        },
-        "freshness": {
-          "$ref": "#/$defs/freshness",
-          "description": "Policy used to evaluate whether a capture is current enough."
-        },
-        "completeness": {
-          "$ref": "#/$defs/completeness",
-          "description": "Completeness and valid-empty states the source can represent."
-        },
-        "privacyClass": {
-          "enum": [
-            "PUBLIC",
-            "INTERNAL",
-            "PERSONAL",
-            "SENSITIVE_PERSONAL"
-          ],
-          "description": "Minimum privacy risk class of the source content."
-        },
-        "retentionPolicy": {
-          "const": "AGENT_EVIDENCE_RETENTION",
-          "description": "Closed retention policy governing captured evidence."
-        },
-        "erasurePolicy": {
-          "const": "WORKSPACE_AND_PERSON_ERASURE",
-          "description": "Closed erasure policy governing source and derived content."
-        },
-        "useDecisionIds": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": "Purpose-specific governance decisions that cover this source."
-        },
-        "supportedAbsenceStates": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "enum": [
-              "NOT_COLLECTED",
-              "UNAVAILABLE",
-              "REDACTED",
-              "COLLECTION_ERROR"
-            ]
-          },
-          "description": "Non-available outcomes the runtime can represent for this source."
-        }
-      },
-      "description": "Authority, capture, quality, privacy, retention, erasure, and absence semantics for one evidence source."
-    },
-    "freshness": {
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "mode",
-            "maxAgeSeconds"
-          ],
-          "properties": {
-            "mode": {
-              "const": "MAX_AGE"
-            },
-            "maxAgeSeconds": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "mode"
-          ],
-          "properties": {
-            "mode": {
-              "enum": [
-                "PINNED_IDENTITY",
-                "EVENT_TIME",
-                "NOT_APPLICABLE"
-              ]
-            }
-          }
-        }
-      ],
-      "description": "How the runtime can determine whether captured evidence is current enough."
-    },
-    "completeness": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "supportsComplete",
-        "supportsPartial",
-        "supportsEmpty"
-      ],
-      "properties": {
-        "supportsComplete": {
-          "type": "boolean",
-          "description": "Whether the runtime can establish complete capture of the selected scope."
-        },
-        "supportsPartial": {
-          "type": "boolean",
-          "description": "Whether bounded or truncated capture is supported."
-        },
-        "supportsEmpty": {
-          "type": "boolean",
-          "description": "Whether a successful complete capture may legitimately contain no logical items."
-        }
-      },
-      "description": "Which completeness and valid-empty states this source can represent."
-    },
-    "profile": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "version",
-        "artifactType",
-        "allowedSources"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
-          "description": "Stable machine identifier for this evidence profile."
-        },
-        "version": {
-          "const": "1.0.0",
-          "description": "Source contract that defines this profile."
-        },
-        "artifactType": {
-          "enum": [
-            "PULL_REQUEST",
-            "ISSUE",
-            "CONVERSATION_THREAD"
-          ],
-          "description": "Type of reviewed work governed by this profile."
-        },
-        "allowedSources": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sourceKind"
-          },
-          "description": "Source kinds a practice for this work type may reference."
-        }
-      },
-      "description": "The source allow-list for one type of reviewed work."
-    }
-  }
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json",
+	"title": "Artifact source catalog",
+	"description": "Versioned definitions of the evidence sources and evidence profiles supported by Hephaestus.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"version",
+		"sources",
+		"profiles"
+	],
+	"properties": {
+		"version": {
+			"const": "1.0.0",
+			"description": "Source-contract version that fixes the meaning of every entry in this catalog."
+		},
+		"sources": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"$ref": "#/$defs/source"
+			},
+			"description": "Logical evidence sources with stable identifiers and governed capture semantics."
+		},
+		"profiles": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"$ref": "#/$defs/profile"
+			},
+			"description": "Allowed evidence sources for each type of reviewed work."
+		}
+	},
+	"$defs": {
+		"sourceKind": {
+			"type": "string",
+			"pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$",
+			"description": "Stable machine identifier for one logical evidence source."
+		},
+		"source": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"kind",
+				"displayName",
+				"description",
+				"selectionScope",
+				"artifactTypes",
+				"authority",
+				"captureTimeBasis",
+				"freshness",
+				"completeness",
+				"privacyClass",
+				"supportedAbsenceStates",
+				"retentionPolicy",
+				"erasurePolicy",
+				"useDecisionIds"
+			],
+			"properties": {
+				"kind": {
+					"$ref": "#/$defs/sourceKind",
+					"description": "Stable machine identifier for this logical evidence source."
+				},
+				"displayName": {
+					"description": "Human-readable source name for authoring and operator interfaces.",
+					"type": "string",
+					"minLength": 1
+				},
+				"description": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Plain-language summary of the source content."
+				},
+				"selectionScope": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Exact object, fields, limits, ordering, and exclusions captured by this source."
+				},
+				"artifactTypes": {
+					"type": "array",
+					"minItems": 1,
+					"uniqueItems": true,
+					"items": {
+						"enum": [
+							"PULL_REQUEST",
+							"ISSUE",
+							"CONVERSATION_THREAD"
+						]
+					},
+					"description": "Types of reviewed work for which this source is meaningful."
+				},
+				"authority": {
+					"enum": [
+						"UPSTREAM_SNAPSHOT",
+						"SYNCHRONIZED_MIRROR",
+						"DETERMINISTIC_DERIVATION",
+						"LOSSY_DERIVATION"
+					],
+					"description": "Relationship between the captured representation and its origin."
+				},
+				"captureTimeBasis": {
+					"enum": [
+						"EVENT_TIME_SNAPSHOT",
+						"COLLECTION_TIME_SNAPSHOT",
+						"PINNED_IMMUTABLE_IDENTITY"
+					],
+					"description": "Time basis attached to each capture."
+				},
+				"freshness": {
+					"$ref": "#/$defs/freshness",
+					"description": "Policy used to evaluate whether a capture is current enough."
+				},
+				"completeness": {
+					"$ref": "#/$defs/completeness",
+					"description": "Completeness and valid-empty states the source can represent."
+				},
+				"privacyClass": {
+					"enum": [
+						"PUBLIC",
+						"INTERNAL",
+						"PERSONAL",
+						"SENSITIVE_PERSONAL"
+					],
+					"description": "Minimum privacy risk class of the source content."
+				},
+				"retentionPolicy": {
+					"const": "AGENT_EVIDENCE_RETENTION",
+					"description": "Closed retention policy governing captured evidence."
+				},
+				"erasurePolicy": {
+					"const": "WORKSPACE_AND_PERSON_ERASURE",
+					"description": "Closed erasure policy governing source and derived content."
+				},
+				"useDecisionIds": {
+					"type": "array",
+					"minItems": 1,
+					"uniqueItems": true,
+					"items": {
+						"type": "string",
+						"minLength": 1
+					},
+					"description": "Purpose-specific governance decisions that cover this source."
+				},
+				"supportedAbsenceStates": {
+					"type": "array",
+					"minItems": 1,
+					"uniqueItems": true,
+					"items": {
+						"enum": [
+							"NOT_COLLECTED",
+							"UNAVAILABLE",
+							"REDACTED",
+							"COLLECTION_ERROR"
+						]
+					},
+					"description": "Non-available outcomes the runtime can represent for this source."
+				}
+			},
+			"description": "Authority, capture, quality, privacy, retention, erasure, and absence semantics for one evidence source."
+		},
+		"freshness": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"mode"
+			],
+			"properties": {
+				"mode": {
+					"enum": [
+						"PINNED_IDENTITY",
+						"NOT_APPLICABLE"
+					],
+					"description": "PINNED_IDENTITY: the capture is anchored to an immutable upstream identity and cannot drift. NOT_APPLICABLE: nothing available can demonstrate currentness, so no practice may require it."
+				}
+			},
+			"description": "Whether the runtime can demonstrate that captured evidence is current."
+		},
+		"completeness": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"supportsComplete",
+				"supportsPartial",
+				"supportsEmpty"
+			],
+			"properties": {
+				"supportsComplete": {
+					"type": "boolean",
+					"description": "Whether the runtime can establish complete capture of the selected scope."
+				},
+				"supportsPartial": {
+					"type": "boolean",
+					"description": "Whether bounded or truncated capture is supported."
+				},
+				"supportsEmpty": {
+					"type": "boolean",
+					"description": "Whether a successful complete capture may legitimately contain no logical items."
+				}
+			},
+			"description": "Which completeness and valid-empty states this source can represent."
+		},
+		"profile": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"id",
+				"version",
+				"artifactType",
+				"allowedSources"
+			],
+			"properties": {
+				"id": {
+					"type": "string",
+					"pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+					"description": "Stable machine identifier for this evidence profile."
+				},
+				"version": {
+					"const": "1.0.0",
+					"description": "Source contract that defines this profile."
+				},
+				"artifactType": {
+					"enum": [
+						"PULL_REQUEST",
+						"ISSUE",
+						"CONVERSATION_THREAD"
+					],
+					"description": "Type of reviewed work governed by this profile."
+				},
+				"allowedSources": {
+					"type": "array",
+					"minItems": 1,
+					"uniqueItems": true,
+					"items": {
+						"$ref": "#/$defs/sourceKind"
+					},
+					"description": "Source kinds a practice for this work type may reference."
+				}
+			},
+			"description": "The source allow-list for one type of reviewed work."
+		}
+	}
 }

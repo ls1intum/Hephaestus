@@ -14,7 +14,7 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.pull-request.diff",
@@ -43,7 +43,7 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				}
 			],
 			"optionalContext": [],
@@ -66,7 +66,7 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.pull-request.diff",
@@ -76,7 +76,7 @@
 				},
 				{
 					"sourceKind": "scm.linked-work-items",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
@@ -100,11 +100,11 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.review-threads",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
@@ -127,7 +127,7 @@
 			"requiredEvidence": [
 				{
 					"sourceKind": "scm.review-threads",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
@@ -151,11 +151,11 @@
 				{
 					"sourceKind": "scm.issue.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.issue.comments",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
@@ -179,7 +179,7 @@
 				{
 					"sourceKind": "scm.issue.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				}
 			],
 			"optionalContext": [],
@@ -202,7 +202,7 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.pull-request.diff",
@@ -212,12 +212,12 @@
 				},
 				{
 					"sourceKind": "scm.pull-request.comments",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.general-review-comments",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
@@ -241,16 +241,16 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.pull-request.comments",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.general-review-comments",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
@@ -274,7 +274,7 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.pull-request.diff",
@@ -284,17 +284,17 @@
 				},
 				{
 					"sourceKind": "scm.pull-request.comments",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.general-review-comments",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.review-threads",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
@@ -342,7 +342,7 @@
 				{
 					"sourceKind": "scm.pull-request.core",
 					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"freshness": "NO_REQUIREMENT"
 				},
 				{
 					"sourceKind": "scm.pull-request.diff",
@@ -352,7 +352,7 @@
 				},
 				{
 					"sourceKind": "scm.linked-work-items",
-					"completeness": "COMPLETE",
+					"completeness": "NO_REQUIREMENT",
 					"freshness": "NO_REQUIREMENT"
 				},
 				{
@@ -380,8 +380,8 @@
 			"requiredEvidence": [
 				{
 					"sourceKind": "slack.conversation.thread",
-					"completeness": "COMPLETE",
-					"freshness": "CURRENT"
+					"completeness": "NO_REQUIREMENT",
+					"freshness": "NO_REQUIREMENT"
 				}
 			],
 			"optionalContext": [],

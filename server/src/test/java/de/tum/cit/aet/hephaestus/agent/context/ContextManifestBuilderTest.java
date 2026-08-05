@@ -165,14 +165,17 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldDeclineWhenRequiredEvidenceIsStale() {
-        var manifest = coreManifest(builder, "job-stale", Instant.EPOCH);
+    void shouldNotDeclineOnAMirrorWhoseCurrentnessIsUnprovable() {
+        // A pull request nobody has touched in months is not stale evidence — it is a quiet pull
+        // request, correctly mirrored. The old gate read the mirror's change-stamp as a check-stamp
+        // and refused exactly this case, which is every backfilled review and every quiet repository.
+        var manifest = coreManifest(builder, "job-quiet", Instant.EPOCH);
 
         assertThat(
             builder
-                .checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")))
+                .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiring(CORE, "pr-core")))
                 .readyPractices()
-        ).isEmpty();
+        ).hasSize(1);
     }
 
     @Test
@@ -221,7 +224,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             )
         );
 
-        AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadiness(
+        AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadinessAsOfNow(
             manifest,
             List.of(demandsSubstance)
         );
@@ -233,7 +236,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         // The same empty capture is still reviewable for a practice that did not ask for substance.
         assertThat(
             builder
-                .checkAutomatedReviewReadiness(
+                .checkAutomatedReviewReadinessAsOfNow(
                     manifest,
                     List.of(practiceRequiring(DIFF, "any-capture-will-do", EvidenceFreshnessRequirement.CURRENT))
                 )
@@ -283,7 +286,10 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 )
             );
 
-            AutomatedReviewReadinessResult result = builder.checkAutomatedReviewReadiness(manifest, List.of(practice));
+            AutomatedReviewReadinessResult result = builder.checkAutomatedReviewReadinessAsOfNow(
+                manifest,
+                List.of(practice)
+            );
             assertThat(result.readyPractices()).isEmpty();
             assertThat(result.decisions().getFirst().reasonCodes()).containsExactly(expectedReasons.get(index));
             if (assessmentAbsent) {
@@ -297,27 +303,48 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldReassessFreshnessAtReplayTime() {
-        ArtifactSourceManifest manifest = coreManifest(builder, "job-replay", NOW);
-
-        ContextManifestBuilder replayBuilder = builderAt(NOW.plusSeconds(301));
+    void shouldReviewWorkThatHasNotChangedUpstreamInMonths() {
+        // The case that refused on the live deployment: a merge request mirrored in July, reviewed in
+        // August, with a reconciliation in between that correctly wrote nothing because nothing had
+        // changed. Nothing about it is stale — it is simply quiet — and the whole backfill and replay
+        // story depends on this being reviewable.
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-quiet-mirror", NOW.minusSeconds(14 * 86_400));
 
         assertThat(
-            replayBuilder
-                .checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")))
+            builder
+                .checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")), NOW)
                 .readyPractices()
-        ).isEmpty();
+        ).hasSize(1);
+    }
+
+    @Test
+    void shouldReachTheSameVerdictWhenReplayed() {
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-replay", NOW);
+        List<Practice> practices = List.of(practiceRequiring(CORE, "pr-core"));
+
+        var original = builder.checkAutomatedReviewReadiness(manifest, practices, NOW);
+        // Months later, against the recorded evidence and the recorded anchor. A replay that can
+        // reach a different verdict from the same inputs is not a replay.
+        var replayed = builderAt(NOW.plusSeconds(90 * 86_400)).checkAutomatedReviewReadiness(manifest, practices, NOW);
+
+        assertThat(replayed.readyPractices()).hasSameElementsAs(original.readyPractices());
+        assertThat(replayed.decisions().getFirst().ready()).isEqualTo(original.decisions().getFirst().ready());
+        assertThat(replayed.decisions().getFirst().reasonCodes()).isEqualTo(
+            original.decisions().getFirst().reasonCodes()
+        );
     }
 
     @Test
     void shouldPersistEvidenceRefusalsAsTypedDecisions() {
-        ArtifactSourceManifest manifest = coreManifest(builder, "job-refused", Instant.EPOCH);
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-refused", NOW);
 
         assertThat(
             builder
                 .prepareAutomatedReviewReadiness(
                     manifest,
-                    List.of(practiceRequiring(CORE, "pr-core")),
+                    // The manifest holds the pull-request record but not its comments, so this
+                    // practice's required source is demonstrably absent.
+                    List.of(practiceRequiringComments()),
                     "job-refused",
                     NOW
                 )
@@ -329,7 +356,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         JsonNode decision = report.path("decisions").get(0);
         assertThat(decision.path("ready").asBoolean()).isFalse();
         assertThat(decision.path("sourceChecks").get(0).path("reasonCodes").get(0).asString()).isEqualTo(
-            "SOURCE_NOT_CURRENT"
+            "SOURCE_NOT_AVAILABLE"
         );
     }
 
@@ -339,9 +366,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         var manifest = builder.augment(files, Map.of(), "job-empty", plan(Set.of(COMMENTS)), metadata(COMMENTS, NOW));
         Practice practice = practiceRequiringComments();
 
-        assertThat(builder.checkAutomatedReviewReadiness(manifest, List.of(practice)).readyPractices()).containsExactly(
-            practice
-        );
+        assertThat(
+            builder.checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practice)).readyPractices()
+        ).containsExactly(practice);
     }
 
     @Test
@@ -373,14 +400,14 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         assertThatThrownBy(() ->
-            builder.checkAutomatedReviewReadiness(changedContract, List.of(practiceRequiringComments()))
+            builder.checkAutomatedReviewReadinessAsOfNow(changedContract, List.of(practiceRequiringComments()))
         )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("exact source contract");
+            .isInstanceOf(UnreplayableEvidenceException.class)
+            .hasMessageContaining("no longer ships");
     }
 
     @Test
-    void shouldAssessEventTimeWithoutRequiringAnObservedAtWatermark() {
+    void shouldReviewAConversationWithoutAFreshnessWatermark() {
         Map<String, byte[]> files = new LinkedHashMap<>();
         Instant eventTime = NOW.minusSeconds(1);
         ArtifactSourceManifest manifest = builder.augment(
@@ -399,9 +426,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
         Practice practice = practiceRequiring(CONVERSATION, "conversation");
 
-        assertThat(builder.checkAutomatedReviewReadiness(manifest, List.of(practice)).readyPractices()).containsExactly(
-            practice
-        );
+        assertThat(
+            builder.checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practice)).readyPractices()
+        ).containsExactly(practice);
     }
 
     @Test
@@ -418,14 +445,17 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectMirrorWatermarkAfterCaptureTime() {
+    void shouldNotRefuseWhenCurrentnessCannotBeDemonstrated() {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-invalid-watermark", NOW.plusSeconds(60));
 
+        // Nothing here can show the copy is behind: the mirror records when a row last changed, not
+        // when it was last checked. Refusing on that is refusing for a reason we cannot establish,
+        // which is what made every backfilled and every quiet-repository review fail.
         assertThat(
             builder
-                .checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")))
+                .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiring(CORE, "pr-core")))
                 .readyPractices()
-        ).isEmpty();
+        ).hasSize(1);
     }
 
     @Test
@@ -555,7 +585,10 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         assertThatThrownBy(() ->
-            builder.checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CONVERSATION, "conversation")))
+            builder.checkAutomatedReviewReadinessAsOfNow(
+                manifest,
+                List.of(practiceRequiring(CONVERSATION, "conversation"))
+            )
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("does not match manifest");
@@ -578,7 +611,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         assertThatThrownBy(() ->
-            builder.checkAutomatedReviewReadiness(incomplete, List.of(practiceRequiring(CORE, "pr-core")))
+            builder.checkAutomatedReviewReadinessAsOfNow(incomplete, List.of(practiceRequiring(CORE, "pr-core")))
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("do not match its evidence profile");
