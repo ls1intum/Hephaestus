@@ -632,4 +632,50 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-13">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.automated_review_policy is not present">
+            <columnExists tableName="practice" columnName="automated_review_policy"/>
+        </preConditions>
+        <comment>Offer the repository tree as optional context to practices that review a diff.</comment>
+        <sql splitStatements="false"><![CDATA[
+            -- A practice that reviews a diff can only judge the changed lines it was given; the code a
+            -- changed line calls into lives elsewhere in the repository. Listing the tree as optional
+            -- context lets the reviewing agent open that code and cite it, and cannot make a practice
+            -- unreviewable, because an optional source never gates readiness. Practices installed
+            -- before this changeset keep their own copy of the policy, so the catalog change alone
+            -- would never reach them.
+            ALTER TABLE practice DISABLE TRIGGER practice_requires_current_revision_projection;
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+
+            UPDATE practice p
+            SET automated_review_policy = jsonb_set(
+                p.automated_review_policy,
+                '{optionalContext}',
+                coalesce(p.automated_review_policy->'optionalContext', '[]'::jsonb)
+                    || '[{"sourceKind": "scm.repository.tree"}]'::jsonb
+            )
+            WHERE p.automated_review_policy @> '{"requiredEvidence": [{"sourceKind": "scm.pull-request.diff"}]}'
+              AND NOT p.automated_review_policy @> '{"optionalContext": [{"sourceKind": "scm.repository.tree"}]}';
+
+            UPDATE practice_revision v
+            SET automated_review_policy = jsonb_set(
+                    v.automated_review_policy,
+                    '{optionalContext}',
+                    coalesce(v.automated_review_policy->'optionalContext', '[]'::jsonb)
+                        || '[{"sourceKind": "scm.repository.tree"}]'::jsonb
+                ),
+                -- The review rules changed, so the recorded fingerprint no longer describes them.
+                review_rule_fingerprint = NULL
+            WHERE v.automated_review_policy IS NOT NULL
+              AND v.automated_review_policy @> '{"requiredEvidence": [{"sourceKind": "scm.pull-request.diff"}]}'
+              AND NOT v.automated_review_policy @> '{"optionalContext": [{"sourceKind": "scm.repository.tree"}]}';
+
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+            ALTER TABLE practice ENABLE TRIGGER practice_requires_current_revision_projection;
+        ]]></sql>
+        <rollback>
+            <comment>Removing the source again would not restore the superseded fingerprints.</comment>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

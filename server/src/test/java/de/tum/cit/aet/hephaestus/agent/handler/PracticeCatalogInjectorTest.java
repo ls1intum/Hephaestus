@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -195,6 +197,45 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         // Only the populated precompute script is written; the blank one is skipped.
         assertThat(files).containsKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/authoring.ts");
         assertThat(files).doesNotContainKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/retrospective.ts");
+    }
+
+    @Test
+    @DisplayName("staged criteria tell the model which claims the evidence cannot support")
+    void injectAppendsKnownLimitationsToCriteria() {
+        Practice limited = practice("authoring", "PullRequestCreated");
+        PracticeAutomatedReviewPolicy policy = limited.getAutomatedReviewPolicy();
+        limited.setAutomatedReviewPolicy(
+            new PracticeAutomatedReviewPolicy(
+                policy.sourceContractVersion(),
+                policy.evidenceProfile(),
+                policy.automatedReview(),
+                policy.requiredEvidence(),
+                policy.optionalContext(),
+                policy.whenEvidenceIsInsufficient(),
+                List.of(
+                    new PracticeEvidenceLimitation(
+                        "RUNTIME_BEHAVIOR_NOT_OBSERVED",
+                        "Repository evidence does not establish behavior in a deployed runtime."
+                    )
+                )
+            )
+        );
+        Practice unlimited = practice("retrospective", "PullRequestCreated");
+        when(
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+        ).thenReturn(List.of(limited, unlimited));
+        Map<String, byte[]> files = new HashMap<>();
+
+        injector.inject(files, job(null), WorkArtifact.PULL_REQUEST);
+
+        String staged = new String(files.get(md("authoring")), StandardCharsets.UTF_8);
+        assertThat(staged)
+            .contains("criteria for authoring")
+            .contains("## What this evidence cannot show")
+            .contains("Repository evidence does not establish behavior in a deployed runtime.");
+        assertThat(new String(files.get(md("retrospective")), StandardCharsets.UTF_8)).doesNotContain(
+            "## What this evidence cannot show"
+        );
     }
 
     @Test

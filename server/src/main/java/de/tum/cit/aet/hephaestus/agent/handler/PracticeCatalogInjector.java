@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -181,7 +182,7 @@ class PracticeCatalogInjector {
 
         StringBuilder bundle = new StringBuilder();
         for (Practice p : practices) {
-            String criteria = p.getCriteria();
+            String criteria = p.getCriteria() + renderKnownLimitations(p);
             files.put(SandboxLayout.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
             bundle.append("# ").append(p.getSlug()).append("\n\n").append(criteria).append("\n\n---\n\n");
         }
@@ -212,6 +213,27 @@ class PracticeCatalogInjector {
             workspaceId,
             job.getId()
         );
+    }
+
+    /**
+     * The claims this practice's evidence cannot support, appended to its criteria.
+     *
+     * <p>A limitation is the author's statement that even a fully satisfied evidence requirement leaves
+     * a specific claim out of reach — that a diff cannot show how the code behaves once deployed, say.
+     * Recorded on the policy but withheld from the model, it constrains nobody: the model still reaches
+     * the conclusion the author knew the evidence could not carry.
+     */
+    private static String renderKnownLimitations(Practice p) {
+        List<PracticeEvidenceLimitation> limitations = p.getAutomatedReviewPolicy().knownLimitations();
+        if (limitations.isEmpty()) {
+            return "";
+        }
+        StringBuilder section = new StringBuilder("\n\n## What this evidence cannot show\n\n");
+        section.append("Do not make these claims for this practice, however plausible they look:\n\n");
+        for (PracticeEvidenceLimitation limitation : limitations) {
+            section.append("- ").append(limitation.description()).append("\n");
+        }
+        return section.toString();
     }
 
     /** The lifecycle trigger event stored on the job by the handler, or {@code null} if absent. */

@@ -178,8 +178,10 @@ The [practice review glossary](./practice-review-glossary.mdx) defines the canon
 terms. Evidence requirements pin one source-contract version and evidence profile, then list required evidence and
 optional context. Required sources must satisfy their completeness and freshness requirements. Optional context never controls review readiness and has no completeness or freshness fields.
 
-The contract deliberately has no arbitrary expression language and cannot require `NON_EMPTY`. A successful query
-that returns no items is valid evidence when the source contract allows empty content.
+The contract deliberately has no arbitrary expression language. Content is a single choice between
+`NO_REQUIREMENT` and `NON_EMPTY`, and only sources the catalog allows to be empty accept the latter: a successful
+query that returns no items is valid evidence for a practice that can be reviewed from it, and unusable for one
+that cannot.
 
 ```json
 {
@@ -210,6 +212,17 @@ that returns no items is valid evidence when the source contract allows empty co
 Validation rejects unknown versions or source kinds, sources outside the evidence profile, impossible quality
 requirements, incompatible reviewed-work types, incoherent review settings, duplicate sources, and a source
 listed as both required evidence and optional context.
+
+`knownLimitations` records the claims the selected evidence cannot support even when every requirement passes.
+The runtime appends them to the criteria it stages for the reviewing model, because a limitation the author records
+and then withholds constrains nobody: the model still reaches the conclusion the author knew the evidence could not
+carry.
+
+The bundled catalog lists `scm.repository.tree` as optional context on every practice that requires the
+pull-request diff. A diff shows the changed lines and not the code they call into, so a reviewer restricted to it
+either guesses at the surrounding contract or abstains. The tree is optional rather than required deliberately: a
+deployment that keeps no working copy, or a repository not yet mirrored, loses the surrounding code and still gets
+the review.
 
 `automatedReview` is explicitly relative to Hephaestus, the pinned source contract, the evidence profile, and
 the governed integrations. It does not claim that a practice is universally observable. A developer, peer, or human mentor may have different context for a particular practice. This contract makes no claim that human review is always possible.

@@ -23,7 +23,11 @@
 					"content": "NON_EMPTY"
 				}
 			],
-			"optionalContext": [],
+			"optionalContext": [
+     {
+       "sourceKind": "scm.repository.tree"
+     }
+   ],
 			"whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
 			"knownLimitations": [
 				{
@@ -80,7 +84,11 @@
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
-			"optionalContext": [],
+			"optionalContext": [
+     {
+       "sourceKind": "scm.repository.tree"
+     }
+   ],
 			"whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
 			"knownLimitations": [
 				{
@@ -221,7 +229,11 @@
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
-			"optionalContext": [],
+			"optionalContext": [
+     {
+       "sourceKind": "scm.repository.tree"
+     }
+   ],
 			"whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
 			"knownLimitations": [
 				{
@@ -298,7 +310,11 @@
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
-			"optionalContext": [],
+			"optionalContext": [
+     {
+       "sourceKind": "scm.repository.tree"
+     }
+   ],
 			"whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
 			"knownLimitations": [
 				{
@@ -322,7 +338,11 @@
 					"content": "NON_EMPTY"
 				}
 			],
-			"optionalContext": [],
+			"optionalContext": [
+     {
+       "sourceKind": "scm.repository.tree"
+     }
+   ],
 			"whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
 			"knownLimitations": [
 				{
@@ -361,7 +381,11 @@
 					"freshness": "NO_REQUIREMENT"
 				}
 			],
-			"optionalContext": [],
+			"optionalContext": [
+     {
+       "sourceKind": "scm.repository.tree"
+     }
+   ],
 			"whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
 			"knownLimitations": [
 				{

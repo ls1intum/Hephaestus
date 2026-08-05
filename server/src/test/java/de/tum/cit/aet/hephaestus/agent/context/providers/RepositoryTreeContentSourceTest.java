@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -9,6 +10,9 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -79,6 +83,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
     @Test
     void shouldReportOperationalGitFailureAsCollectionError() {
         AgentJob job = job(17L, "0123456789012345678901234567890123456789");
+        when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
         when(
             gitRepositoryManager.readTreeSnapshot(
@@ -91,6 +96,39 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         assertThatThrownBy(() -> source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds()))
             .isInstanceOf(EvidenceCollectionException.class)
             .hasMessageContaining("Could not capture repository tree");
+    }
+
+    @Test
+    void shouldReportDisabledCheckoutAsNotCollectedRatherThanFailing() {
+        AgentJob job = job(17L, "0123456789012345678901234567890123456789");
+        when(gitRepositoryManager.isEnabled()).thenReturn(false);
+
+        var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
+
+        assertThat(contribution.files()).isEmpty();
+        assertThat(contribution.stateOverrides()).containsExactly(
+            entry(
+                new SourceKind("scm.repository.tree"),
+                new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED)
+            )
+        );
+    }
+
+    @Test
+    void shouldReportAnUnclonedRepositoryAsUnavailableRatherThanFailing() {
+        AgentJob job = job(17L, "0123456789012345678901234567890123456789");
+        when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(false);
+
+        var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
+
+        assertThat(contribution.files()).isEmpty();
+        assertThat(contribution.stateOverrides()).containsExactly(
+            entry(
+                new SourceKind("scm.repository.tree"),
+                new SourceCaptureState.Unavailable(SourceAbsenceReason.PINNED_HEAD_MISSING)
+            )
+        );
     }
 
     private static AgentJob job(long repositoryId, String commitSha) {

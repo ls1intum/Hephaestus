@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryMan
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -40,7 +41,15 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         return KIND;
     }
 
-    static final long MAX_TOTAL_BYTES = 50L * 1024 * 1024;
+    /**
+     * The tree's share of the sandbox input budget.
+     *
+     * <p>Held below {@code SandboxWorkspaceManager.MAX_INPUT_BYTES} so the tree cannot consume the whole
+     * of it. Sized to the budget, a tree that filled it would leave nothing for the diff and the
+     * conversation and fail the job outright — for an optional source, whose absence is supposed to cost
+     * only context. Exceeding this bound truncates the tree and reports the capture as partial instead.
+     */
+    static final long MAX_TOTAL_BYTES = 32L * 1024 * 1024;
 
     private final GitRepositoryManager gitRepositoryManager;
 
@@ -66,6 +75,14 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         if (!selectedKinds.contains(KIND)) {
             return new EvidenceContribution(Map.of(), Map.of());
         }
+        // The tree is optional context for every practice that selects it, and a deployment that keeps
+        // no working copy is a supported configuration rather than a fault. Throwing here would record
+        // a provider failure and emit a warning on every run of such a deployment, so report the
+        // absence for what it is.
+        SourceCaptureState absence = absenceState(request);
+        if (absence != null) {
+            return absent(absence);
+        }
         GitRepositoryManager.GitTreeSnapshot snapshot = snapshot(request);
         Map<String, byte[]> files = new java.util.LinkedHashMap<>();
         snapshot.files().forEach((path, bytes) -> files.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, bytes));
@@ -76,21 +93,44 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         // string that freshness assessment accepts as a pinned identity, reporting a tree that was
         // never read as current. Report the source as not collected instead.
         if (snapshot.treeSha() == null) {
-            return new EvidenceContribution(
-                files,
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Map.of(KIND, new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED))
-            );
+            return absent(new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED));
         }
         return new EvidenceContribution(
             files,
             Map.of(KIND, completeness),
             Map.of(KIND, snapshot.commitSha() + ":" + snapshot.treeSha())
         );
+    }
+
+    private static EvidenceContribution absent(SourceCaptureState state) {
+        return new EvidenceContribution(
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            Map.of(KIND, state)
+        );
+    }
+
+    /** Why no tree can be read for this request, or {@code null} when one can. */
+    @Nullable
+    private SourceCaptureState absenceState(ContextRequest request) {
+        if (!gitRepositoryManager.isEnabled()) {
+            return new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED);
+        }
+        if (!(request instanceof ContextRequest.PracticeReviewRequest review)) {
+            return null;
+        }
+        JsonNode metadata = review.job().getMetadata();
+        if (metadata == null || !metadata.path("repository_id").isNumber()) {
+            return null;
+        }
+        if (gitRepositoryManager.isRepositoryCloned(metadata.path("repository_id").asLong())) {
+            return null;
+        }
+        return new SourceCaptureState.Unavailable(SourceAbsenceReason.PINNED_HEAD_MISSING);
     }
 
     private GitRepositoryManager.GitTreeSnapshot snapshot(ContextRequest request) {

@@ -20,7 +20,7 @@ public enum SourceAbsenceReason {
     NO_PROVIDER,
     /** {@code UNAVAILABLE}: the collector reported empty for a source whose contract forbids empty. */
     EMPTY_NOT_VALID,
-    /** {@code UNAVAILABLE}: the pinned commit the capture is anchored to is gone from the mirror. */
+    /** {@code UNAVAILABLE}: the pinned commit the capture is anchored to is not in the mirror, up to and including the case where the repository has no working copy at all. */
     PINNED_HEAD_MISSING,
     /** {@code UNAVAILABLE}: the requested conversation or artifact does not exist upstream. */
     NOT_FOUND,

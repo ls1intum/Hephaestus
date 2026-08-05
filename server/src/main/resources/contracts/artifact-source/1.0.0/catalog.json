@@ -107,7 +107,7 @@
 			"kind": "scm.repository.tree",
 			"displayName": "Repository files",
 			"description": "Files from elsewhere in the repository, supplied as context for reading the change. Not reviewed on their own.",
-			"selectionScope": "The repository at the reviewed commit: up to 20,000 files and 50 MiB. Files above 10 MiB, symbolic links, submodules, and paths outside the tree are excluded, and the capture is reported as PARTIAL.",
+			"selectionScope": "The repository at the reviewed commit: up to 20,000 files and 32 MiB. Files above 10 MiB, symbolic links, submodules, and paths outside the tree are excluded, and the capture is reported as PARTIAL.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],

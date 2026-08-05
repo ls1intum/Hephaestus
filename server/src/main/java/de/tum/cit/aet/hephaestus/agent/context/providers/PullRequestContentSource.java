@@ -522,10 +522,10 @@ public class PullRequestContentSource implements EvidenceSource {
                 .append(" |\n");
         }
 
-        for (int i = 0; i < filePaths.size(); i++) {
-            summary.append("\n---\n\n### ").append(i + 1).append(". ").append(filePaths.get(i)).append("\n\n");
-            summary.append("```diff\n").append(fileDiffs.get(i)).append("```\n");
-        }
+        // Deliberately an index and nothing more. Appending each file's diff here repeated the whole
+        // of diff.patch, so a large change entered the model's context twice — and the copy here has
+        // no [L<n>] line markers, making it the worse of the two to quote from.
+        summary.append("\nThe change itself is in `diff.patch`, annotated with line numbers for citation.\n");
 
         byte[] summaryBytes = summary.toString().getBytes(StandardCharsets.UTF_8);
         files.put(OUTPUT_PREFIX + "diff_summary.md", summaryBytes);
