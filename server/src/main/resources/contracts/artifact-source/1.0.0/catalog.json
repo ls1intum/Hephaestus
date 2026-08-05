@@ -10,7 +10,6 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -44,7 +43,6 @@
 				"PULL_REQUEST"
 			],
 			"authority": "DETERMINISTIC_DERIVATION",
-			"captureTimeBasis": "PINNED_IMMUTABLE_IDENTITY",
 			"freshness": {
 				"mode": "PINNED_IDENTITY"
 			},
@@ -78,7 +76,6 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -112,7 +109,6 @@
 				"PULL_REQUEST"
 			],
 			"authority": "UPSTREAM_SNAPSHOT",
-			"captureTimeBasis": "PINNED_IMMUTABLE_IDENTITY",
 			"freshness": {
 				"mode": "PINNED_IDENTITY"
 			},
@@ -146,7 +142,6 @@
 				"ISSUE"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -180,7 +175,6 @@
 				"ISSUE"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -214,7 +208,6 @@
 				"CONVERSATION_THREAD"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"captureTimeBasis": "EVENT_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -243,17 +236,16 @@
 			"kind": "scm.linked-work-items",
 			"displayName": "Linked work items",
 			"description": "Issues the pull request states it addresses, resolved from its description, branch name, and commit subjects.",
-			"selectionScope": "Up to 8 issues resolved from closing references, the branch name, and up to 500 commit subjects. References to work outside this repository are reported as unresolved rather than as incomplete evidence.",
+			"selectionScope": "Up to 8 issues resolved from closing references, the branch name, and up to 500 commit subjects. Resolution cannot establish that it found every link the work actually has, so this source is never reported as COMPLETE. References to work outside this repository are reported as unresolved rather than as incomplete evidence.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
 			"authority": "LOSSY_DERIVATION",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
-				"supportsComplete": true,
+				"supportsComplete": false,
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
@@ -282,7 +274,6 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -316,7 +307,6 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -351,8 +341,7 @@
 				"ISSUE",
 				"CONVERSATION_THREAD"
 			],
-			"authority": "LOSSY_DERIVATION",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
+			"authority": "DETERMINISTIC_DERIVATION",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},
@@ -387,7 +376,6 @@
 				"ISSUE"
 			],
 			"authority": "LOSSY_DERIVATION",
-			"captureTimeBasis": "COLLECTION_TIME_SNAPSHOT",
 			"freshness": {
 				"mode": "NOT_APPLICABLE"
 			},

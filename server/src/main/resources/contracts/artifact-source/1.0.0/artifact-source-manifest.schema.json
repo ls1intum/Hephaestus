@@ -10,8 +10,7 @@
 		"catalogDigest",
 		"evidenceProfile",
 		"capturedAt",
-		"sources",
-		"viewTransformations"
+		"sources"
 	],
 	"properties": {
 		"contractVersion": {
@@ -19,7 +18,7 @@
 			"description": "Source contract used to interpret every source state in this manifest."
 		},
 		"catalogDigest": {
-			"const": "e1bdc7aeb05e6ec19f08a4e8551bd289a1bab98805ef3324949093622d3e3e09",
+			"const": "1eb78d03cdaccde55bfe1940e28b4d89029dc94a80a507045600725cf2e2350c",
 			"description": "SHA-256 digest of the exact source catalog used by the runtime."
 		},
 		"evidenceProfile": {
@@ -236,13 +235,6 @@
 				}
 			],
 			"description": "One explicit capture result for each source considered by the invocation."
-		},
-		"viewTransformations": {
-			"type": "array",
-			"items": {
-				"$ref": "#/$defs/transformation"
-			},
-			"description": "Declared evaluation-only transformations applied to the evidence view; production requires this list to be empty."
 		}
 	},
 	"$defs": {
@@ -447,10 +439,7 @@
 			"type": "object",
 			"additionalProperties": false,
 			"required": [
-				"capturedAt",
-				"queryScope",
-				"completenessBasis",
-				"representationFidelity"
+				"capturedAt"
 			],
 			"properties": {
 				"capturedAt": {
@@ -481,33 +470,9 @@
 					],
 					"minLength": 1,
 					"description": "Pinned upstream identity when content is immutable."
-				},
-				"queryScope": {
-					"type": "string",
-					"minLength": 1,
-					"description": "Human-readable scope actually queried for this capture."
-				},
-				"completenessBasis": {
-					"enum": [
-						"CURSOR_EXHAUSTED",
-						"KNOWN_TOTAL",
-						"LIMIT_EXCEEDED",
-						"BOUNDED_SCOPE",
-						"IMMUTABLE_OBJECT",
-						"UNKNOWN"
-					],
-					"description": "Fact used to determine completeness."
-				},
-				"representationFidelity": {
-					"enum": [
-						"EXACT",
-						"LOSSLESS_DERIVATION",
-						"LOSSY_DERIVATION"
-					],
-					"description": "Whether the materialization is exact, lossless, or information-losing."
 				}
 			},
-			"description": "Provenance and quality facts recorded for an available source."
+			"description": "What is true of this capture and could not be known before it ran. Anything derivable from the catalog this manifest pins by digest is deliberately absent."
 		},
 		"artifact": {
 			"type": "object",
@@ -542,37 +507,6 @@
 				}
 			},
 			"description": "Digest-addressed materialization belonging to one source capture."
-		},
-		"transformation": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": [
-				"kind",
-				"planId",
-				"removedSources"
-			],
-			"properties": {
-				"kind": {
-					"const": "ABLATION",
-					"description": "Evaluation transformation type."
-				},
-				"planId": {
-					"type": "string",
-					"minLength": 1,
-					"description": "Stable identifier of the evaluation plan that requested the transformation."
-				},
-				"removedSources": {
-					"type": "array",
-					"minItems": 1,
-					"uniqueItems": true,
-					"items": {
-						"type": "string",
-						"pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
-					},
-					"description": "Logical sources deliberately removed from the evaluation view."
-				}
-			},
-			"description": "Deliberate evaluation transformation of an evidence view."
 		}
 	},
 	"allOf": [

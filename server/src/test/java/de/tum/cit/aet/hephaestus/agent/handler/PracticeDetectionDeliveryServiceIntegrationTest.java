@@ -195,10 +195,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             .put("completeness", "COMPLETE")
             .putObject("facts")
             .put("capturedAt", "2026-08-03T00:00:00Z")
-            .put("immutableIdentity", "abc123")
-            .put("queryScope", "merge-base-to-head diff")
-            .put("completenessBasis", "IMMUTABLE_OBJECT")
-            .put("representationFidelity", "EXACT");
+            .put("immutableIdentity", "abc123");
         byte[] diff =
             "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n".getBytes(
                 StandardCharsets.UTF_8

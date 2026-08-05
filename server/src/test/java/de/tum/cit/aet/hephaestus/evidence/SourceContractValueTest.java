@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -35,24 +36,8 @@ class SourceContractValueTest {
     @Test
     void shouldRoundTripCaptureFactsWithUnknownWatermark() throws Exception {
         Instant capturedAt = Instant.parse("2026-08-03T10:00:00Z");
-        SourceCaptureFacts unknownWatermark = new SourceCaptureFacts(
-            capturedAt,
-            null,
-            null,
-            null,
-            "bounded database projection",
-            CompletenessBasis.BOUNDED_SCOPE,
-            RepresentationFidelity.LOSSY_DERIVATION
-        );
-        SourceCaptureFacts observedAtCapture = new SourceCaptureFacts(
-            capturedAt,
-            null,
-            capturedAt,
-            null,
-            "bounded database projection",
-            CompletenessBasis.BOUNDED_SCOPE,
-            RepresentationFidelity.LOSSY_DERIVATION
-        );
+        SourceCaptureFacts unknownWatermark = new SourceCaptureFacts(capturedAt, null, null, null);
+        SourceCaptureFacts observedAtCapture = new SourceCaptureFacts(capturedAt, null, capturedAt, null);
 
         String json = objectMapper.writeValueAsString(unknownWatermark);
 
@@ -84,6 +69,41 @@ class SourceContractValueTest {
     }
 
     @Test
+    void aMirrorCannotPinAnIdentityAndALossyDerivationCannotReportComplete() {
+        assertThatIllegalArgumentException()
+            .isThrownBy(() -> source(SourceAuthority.SYNCHRONIZED_MIRROR, FreshnessMode.PINNED_IDENTITY, false))
+            .withMessageContaining("can pin an identity");
+        assertThatIllegalArgumentException()
+            .isThrownBy(() -> source(SourceAuthority.LOSSY_DERIVATION, FreshnessMode.NOT_APPLICABLE, true))
+            .withMessageContaining("cannot report COMPLETE");
+
+        assertThat(source(SourceAuthority.UPSTREAM_SNAPSHOT, FreshnessMode.PINNED_IDENTITY, true)).isNotNull();
+        assertThat(source(SourceAuthority.LOSSY_DERIVATION, FreshnessMode.NOT_APPLICABLE, false)).isNotNull();
+    }
+
+    private static ArtifactSourceContract source(
+        SourceAuthority authority,
+        FreshnessMode freshness,
+        boolean supportsComplete
+    ) {
+        return new ArtifactSourceContract(
+            new SourceKind("scm.example.source"),
+            "Example",
+            "An example source.",
+            "Everything in scope.",
+            Set.of("PULL_REQUEST"),
+            authority,
+            new FreshnessPolicy(freshness),
+            new CompletenessPolicy(supportsComplete, true, true),
+            PrivacyClass.INTERNAL,
+            Set.of(SourceAbsenceState.NOT_COLLECTED),
+            RetentionPolicy.AGENT_EVIDENCE_RETENTION,
+            ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
+            Set.of("use-example")
+        );
+    }
+
+    @Test
     void shouldRejectEmptyManifestAndReadinessCollections() {
         Instant now = Instant.parse("2026-08-03T10:00:00Z");
 
@@ -93,7 +113,6 @@ class SourceContractValueTest {
                 "a".repeat(64),
                 new EvidenceProfileId("pull-request-review"),
                 now,
-                List.of(),
                 List.of()
             )
         );
@@ -161,15 +180,7 @@ class SourceContractValueTest {
                 new SourceCaptureState.Available(
                     SourceContentState.NON_EMPTY,
                     SourceCompleteness.COMPLETE,
-                    new SourceCaptureFacts(
-                        Instant.parse("2026-08-03T10:00:00Z"),
-                        null,
-                        null,
-                        null,
-                        "one pull request",
-                        CompletenessBasis.IMMUTABLE_OBJECT,
-                        RepresentationFidelity.EXACT
-                    )
+                    new SourceCaptureFacts(Instant.parse("2026-08-03T10:00:00Z"), null, null, null)
                 ),
                 List.of(first, second)
             )

@@ -11,7 +11,6 @@ public record ArtifactSourceContract(
     String selectionScope,
     Set<String> artifactTypes,
     SourceAuthority authority,
-    CaptureTimeBasis captureTimeBasis,
     FreshnessPolicy freshnessPolicy,
     CompletenessPolicy completenessPolicy,
     PrivacyClass privacyClass,
@@ -30,9 +29,25 @@ public record ArtifactSourceContract(
             throw new IllegalArgumentException("artifactTypes must contain non-blank values: " + kind);
         }
         Objects.requireNonNull(authority, "authority");
-        Objects.requireNonNull(captureTimeBasis, "captureTimeBasis");
         Objects.requireNonNull(freshnessPolicy, "freshnessPolicy");
         Objects.requireNonNull(completenessPolicy, "completenessPolicy");
+        // Only a source read straight from upstream, or derived from one without discarding anything,
+        // can be anchored to an identity that cannot change under it. A mirror reflects upstream state
+        // that moves independently, so calling its capture pinned would report a copy that has since
+        // drifted as demonstrably current.
+        if (
+            freshnessPolicy.mode() == FreshnessMode.PINNED_IDENTITY &&
+            authority != SourceAuthority.UPSTREAM_SNAPSHOT &&
+            authority != SourceAuthority.DETERMINISTIC_DERIVATION
+        ) {
+            throw new IllegalArgumentException("Only an upstream or lossless source can pin an identity: " + kind);
+        }
+        // A lossy derivation is a bounded summary of its subject, not the subject. Reporting one as
+        // COMPLETE would answer "is all of it here?" with a yes that is true of the summary and false
+        // of what a practice author asked about.
+        if (authority == SourceAuthority.LOSSY_DERIVATION && completenessPolicy.supportsComplete()) {
+            throw new IllegalArgumentException("A lossy derivation cannot report COMPLETE: " + kind);
+        }
         Objects.requireNonNull(privacyClass, "privacyClass");
         supportedAbsenceStates = Set.copyOf(Objects.requireNonNull(supportedAbsenceStates, "supportedAbsenceStates"));
         if (supportedAbsenceStates.isEmpty()) {

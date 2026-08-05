@@ -48,7 +48,6 @@
 				"selectionScope",
 				"artifactTypes",
 				"authority",
-				"captureTimeBasis",
 				"freshness",
 				"completeness",
 				"privacyClass",
@@ -98,14 +97,6 @@
 						"LOSSY_DERIVATION"
 					],
 					"description": "Relationship between the captured representation and its origin."
-				},
-				"captureTimeBasis": {
-					"enum": [
-						"EVENT_TIME_SNAPSHOT",
-						"COLLECTION_TIME_SNAPSHOT",
-						"PINNED_IMMUTABLE_IDENTITY"
-					],
-					"description": "Time basis attached to each capture."
 				},
 				"freshness": {
 					"$ref": "#/$defs/freshness",

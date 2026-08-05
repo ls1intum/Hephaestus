@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.evidence.internal;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
-import de.tum.cit.aet.hephaestus.evidence.CaptureTimeBasis;
 import de.tum.cit.aet.hephaestus.evidence.CompletenessPolicy;
 import de.tum.cit.aet.hephaestus.evidence.ErasurePolicy;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
@@ -243,7 +242,6 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 "selectionScope",
                 "artifactTypes",
                 "authority",
-                "captureTimeBasis",
                 "freshness",
                 "completeness",
                 "privacyClass",
@@ -277,7 +275,6 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             requiredText(node, "selectionScope", kind.toString()),
             textSet(node, "artifactTypes", kind.toString()),
             enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
-            enumValue(CaptureTimeBasis.class, requiredText(node, "captureTimeBasis", kind.toString()), "capture time"),
             new FreshnessPolicy(freshnessMode),
             new CompletenessPolicy(
                 requiredBoolean(completeness, "supportsComplete", kind.toString()),

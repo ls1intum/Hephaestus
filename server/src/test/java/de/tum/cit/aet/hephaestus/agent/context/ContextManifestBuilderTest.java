@@ -394,8 +394,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             "0".repeat(64),
             manifest.evidenceProfile(),
             manifest.capturedAt(),
-            manifest.sources(),
-            manifest.viewTransformations()
+            manifest.sources()
         );
 
         assertThatThrownBy(() ->
@@ -535,7 +534,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             diff.selectionScope(),
             diff.artifactTypes(),
             diff.authority(),
-            diff.captureTimeBasis(),
             diff.freshnessPolicy(),
             diff.completenessPolicy(),
             diff.privacyClass(),
@@ -605,8 +603,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 .sources()
                 .stream()
                 .filter(source -> !source.kind().equals(COMMENTS))
-                .toList(),
-            manifest.viewTransformations()
+                .toList()
         );
 
         assertThatThrownBy(() ->

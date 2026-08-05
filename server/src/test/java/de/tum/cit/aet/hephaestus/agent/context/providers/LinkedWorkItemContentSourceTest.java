@@ -361,7 +361,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void completeEmptyCaptureRequiresExhaustiveCommitScan() throws Exception {
+    void anExhaustiveScanFindingNothingIsStillNotComplete() throws Exception {
         PullRequest pr = new PullRequest();
         pr.setBody("No issue references.");
         pr.setHeadRefName("feature/plain");
@@ -379,7 +379,11 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         metadata.put("source_branch", "feature/plain");
         var captured = provider.capture(request(metadata), provider.sourceKinds());
 
-        assertThat(captured.completeness()).containsValue(SourceCompleteness.COMPLETE);
+        // The scan reached the end of the commit range and found no reference, which is as exhaustive
+        // as this source gets — and still does not establish that the work links to nothing, because
+        // a link the author never wrote in the description, the branch name or a commit subject is
+        // invisible to it. EMPTY says what was found; PARTIAL says what that finding can support.
+        assertThat(captured.completeness()).containsValue(SourceCompleteness.PARTIAL);
         assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
         assertThat(
             objectMapper.readTree(captured.files().get(LinkedWorkItemContentSource.OUTPUT_FILE)).path("workItems")
@@ -387,7 +391,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void commitScanPastTheLimitIsPartial() {
+    void aTruncatedCommitScanIsAlsoPartial() {
         PullRequest pr = new PullRequest();
         pr.setBody("No issue references.");
         pr.setHeadRefName("feature/plain");

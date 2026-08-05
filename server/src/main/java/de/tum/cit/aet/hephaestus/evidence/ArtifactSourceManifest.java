@@ -10,8 +10,7 @@ public record ArtifactSourceManifest(
     String catalogDigest,
     EvidenceProfileId evidenceProfile,
     Instant capturedAt,
-    List<SourceCapture> sources,
-    List<EvidenceViewTransformation> viewTransformations
+    List<SourceCapture> sources
 ) {
     public ArtifactSourceManifest {
         Objects.requireNonNull(contractVersion, "contractVersion");
@@ -25,7 +24,6 @@ public record ArtifactSourceManifest(
         if (sources.isEmpty()) {
             throw new IllegalArgumentException("sources must not be empty");
         }
-        viewTransformations = List.copyOf(Objects.requireNonNull(viewTransformations, "viewTransformations"));
         var kinds = new HashSet<SourceKind>();
         for (SourceCapture source : sources) {
             if (!kinds.add(source.kind())) {

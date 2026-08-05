@@ -99,10 +99,12 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     @Test
     void rejectsImpossibleFreshnessRequirement() {
+        // Completeness is left unrequired so the freshness rule is what fails: this source is a lossy
+        // derivation and cannot satisfy COMPLETE either, and that check runs first.
         PracticeAutomatedReviewPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
                 TIMELESS,
-                EvidenceCompletenessRequirement.COMPLETE,
+                EvidenceCompletenessRequirement.NO_REQUIREMENT,
                 EvidenceFreshnessRequirement.CURRENT,
                 EvidenceContentRequirement.NO_REQUIREMENT
             )

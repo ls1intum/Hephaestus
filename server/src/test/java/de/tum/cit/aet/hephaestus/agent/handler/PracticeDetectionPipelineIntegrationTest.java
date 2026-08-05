@@ -300,13 +300,11 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             .put("content", "NON_EMPTY")
             .put("completeness", "COMPLETE")
             .putObject("facts")
-            .put("capturedAt", "2026-08-03T00:00:00Z")
-            .put("queryScope", "integration-test fixture")
-            .put("representationFidelity", "EXACT");
+            .put("capturedAt", "2026-08-03T00:00:00Z");
         if ("scm.pull-request.diff".equals(source.path("kind").asString())) {
-            facts.put("immutableIdentity", "pipelinesha").put("completenessBasis", "IMMUTABLE_OBJECT");
+            facts.put("immutableIdentity", "pipelinesha");
         } else {
-            facts.put("sourceEffectiveAt", "2026-08-03T00:00:00Z").put("completenessBasis", "KNOWN_TOTAL");
+            facts.put("sourceEffectiveAt", "2026-08-03T00:00:00Z");
         }
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
         source

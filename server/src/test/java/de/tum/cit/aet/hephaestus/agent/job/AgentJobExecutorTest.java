@@ -663,8 +663,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                         new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED),
                         List.of()
                     )
-                ),
-                List.of()
+                )
             );
             SourceReadinessCheck assessment = new SourceReadinessCheck(
                 source,

@@ -7,10 +7,7 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
-import de.tum.cit.aet.hephaestus.evidence.CompletenessBasis;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceViewTransformation;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
-import de.tum.cit.aet.hephaestus.evidence.RepresentationFidelity;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
@@ -172,8 +169,7 @@ public class ContextManifestBuilder {
             catalogs.catalogDigest(),
             plan.evidenceProfile(),
             capturedAt,
-            captures,
-            List.<EvidenceViewTransformation>of()
+            captures
         );
         try {
             byte[] internalBytes = objectMapper.writeValueAsBytes(manifest);
@@ -250,8 +246,7 @@ public class ContextManifestBuilder {
             prepared.manifest().catalogDigest(),
             prepared.manifest().evidenceProfile(),
             prepared.manifest().capturedAt(),
-            sources,
-            prepared.manifest().viewTransformations()
+            sources
         );
         files.put(SandboxLayout.MANIFEST_PATH, objectMapper.writeValueAsBytes(restricted));
         return new PreparedEvidence(files, restricted);
@@ -275,9 +270,6 @@ public class ContextManifestBuilder {
         Instant temporalAnchor
     ) {
         Objects.requireNonNull(temporalAnchor, "temporalAnchor");
-        if (!manifest.viewTransformations().isEmpty()) {
-            throw new IllegalArgumentException("Ablated evidence views are not valid for product readiness");
-        }
         // A manifest recorded under a source contract this runtime no longer ships is unreplayable
         // rather than invalid: the recorded decision remains correct for the evidence it was made on.
         // Declining to re-derive a readiness result is correct; failing as though the evidence were
@@ -467,10 +459,7 @@ public class ContextManifestBuilder {
             capturedAt,
             sourceEffectiveAt.get(kind),
             observedAt.get(kind),
-            immutableIdentities.get(kind),
-            contract.selectionScope(),
-            completenessBasis(completeness, contract),
-            fidelity(contract.authority())
+            immutableIdentities.get(kind)
         );
         return new SourceCapture(kind, new SourceCaptureState.Available(content, completeness, facts), artifacts);
     }
@@ -574,30 +563,6 @@ public class ContextManifestBuilder {
         } finally {
             Files.deleteIfExists(temporary);
         }
-    }
-
-    private static CompletenessBasis completenessBasis(
-        SourceCompleteness completeness,
-        ArtifactSourceContract contract
-    ) {
-        if (completeness == SourceCompleteness.UNKNOWN) {
-            return CompletenessBasis.UNKNOWN;
-        }
-        if (completeness == SourceCompleteness.PARTIAL) {
-            return CompletenessBasis.BOUNDED_SCOPE;
-        }
-        return switch (contract.captureTimeBasis()) {
-            case PINNED_IMMUTABLE_IDENTITY -> CompletenessBasis.IMMUTABLE_OBJECT;
-            default -> CompletenessBasis.BOUNDED_SCOPE;
-        };
-    }
-
-    private static RepresentationFidelity fidelity(SourceAuthority authority) {
-        return switch (authority) {
-            case UPSTREAM_SNAPSHOT, SYNCHRONIZED_MIRROR -> RepresentationFidelity.EXACT;
-            case DETERMINISTIC_DERIVATION -> RepresentationFidelity.LOSSLESS_DERIVATION;
-            case LOSSY_DERIVATION -> RepresentationFidelity.LOSSY_DERIVATION;
-        };
     }
 
     private static String mediaType(String path) {

@@ -19,7 +19,7 @@ validation of automated review has separate provenance and status.
 
 The contract separates three identities:
 
-1. **Source catalog:** logical source kinds and their authority, timing, freshness, completeness, privacy, and
+1. **Source catalog:** logical source kinds and their authority, freshness, completeness, privacy, and
    absence-state semantics.
 2. **Evidence profile:** the source allow-list for one type of reviewed work and runtime purpose.
 3. **Capture manifest:** the state, provenance facts, and materialized artifacts for one invocation.
@@ -86,8 +86,13 @@ The constraints with direct authoring consequences are:
 
 - Only sources pinned to an immutable upstream identity — the pull-request diff and the repository tree —
   expose a `CURRENT` claim. Every mirrored source, including the pull-request and issue records themselves,
-  can be required only with freshness `NO_REQUIREMENT`.
-- Outline documents cannot satisfy `COMPLETE`.
+  can be required only with freshness `NO_REQUIREMENT`. A source's `authority` decides whether it may pin at
+  all: a `SYNCHRONIZED_MIRROR` reflects upstream state that moves independently of the capture, so calling one
+  pinned would let a copy that has since drifted satisfy a `CURRENT` requirement.
+- A `LOSSY_DERIVATION` cannot satisfy `COMPLETE`. It is a bounded summary of its subject rather than the
+  subject, so it cannot answer "is all of it here?" — which is exactly what an author requiring completeness is
+  asking. Outline documents and linked work items are both retrieved by heuristics that cannot establish they
+  found everything, and neither reports `COMPLETE`.
 - Pull-request and issue core records cannot be logically empty. Other `1.0.0` sources may be validly empty.
 - An available pull-request diff is pinned and complete; it may be empty but is never partial.
 
@@ -137,7 +142,13 @@ Only `AVAILABLE` has:
 - logical content: `EMPTY` or `NON_EMPTY`;
 - completeness: `COMPLETE`, `PARTIAL`, or `UNKNOWN`;
 - capture and optional source times or immutable identity;
-- query scope, completeness basis, fidelity, and artifacts.
+- artifacts.
+
+Capture facts hold only what could not be known before the capture ran. A manifest pins the exact catalog by
+digest, so restating a source's selection scope, its representation fidelity, or the basis on which it may claim
+completeness would copy a constant into every capture of every run — values that can then drift out of agreement
+with the catalog they were copied from, leaving a reader to decide which to believe. Each is derivable from the
+pinned catalog and is deliberately absent.
 
 Logical content is independent of serialized bytes: a JSON file containing `[]` represents an `EMPTY` source.
 Field-level redaction remains an available, usually partial source; whole-source redaction uses `REDACTED`.
@@ -167,10 +178,6 @@ which is what makes a replay reproducible. A replay supplies the recorded anchor
 would evaluate the evidence against a different moment and can change a result that was correct when it was first
 produced. A manifest captured under a contract version the runtime no longer ships is *unreplayable* rather than
 invalid: the recorded result stands, and only the ability to re-derive it is unavailable.
-
-Deliberate ablation is an evaluation transformation, not natural absence. Production rejects every transformed
-view. The manifest can record evaluation transformations, but this contract version does not apply or authorize
-them; an evaluation runtime must define and validate its own dependency-aware view before enabling ablation.
 
 ## Practice automated-review policy
 

@@ -142,7 +142,6 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
 
             PullRequest pullRequest =
                 pullRequestId == null ? null : pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
-            boolean complete = pullRequest != null;
 
             String body = pullRequest != null ? pullRequest.getBody() : null;
             String sourceBranch = firstNonBlank(
@@ -154,7 +153,7 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
 
             collectFromText(body, refs, "body");
             collectFromBranch(sourceBranch, refs);
-            complete &= collectFromCommits(m, repositoryId, sourceBranch, refs);
+            collectFromCommits(m, repositoryId, sourceBranch, refs);
 
             ArrayNode items = objectMapper.createArrayNode();
             List<Integer> unresolved = new ArrayList<>();
@@ -174,7 +173,6 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 items.add(toItem(resolved.get(), entry.getValue()));
             }
             boolean truncated = refs.numbers.size() > MAX_ITEMS;
-            complete &= !truncated;
 
             ObjectNode root = objectMapper.createObjectNode();
             root.set("workItems", items);
@@ -194,7 +192,11 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
             log.info("Linked work items: wrote {} item(s), resolvedFrom={}", items.size(), refs.resolvedFrom);
             return new EvidenceContribution(
                 files,
-                Map.of(KIND, complete ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL),
+                // Always partial. Links are resolved by scanning the description, the branch name and
+                // commit subjects, and no scan of those can establish that the work has no further
+                // link it never mentioned. Reporting COMPLETE would answer a question this source
+                // cannot answer, and a practice requiring completeness would then run on it.
+                Map.of(KIND, SourceCompleteness.PARTIAL),
                 Map.of(),
                 Map.of(),
                 Map.of(),
@@ -306,21 +308,21 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         }
     }
 
-    private boolean collectFromCommits(JsonNode metadata, long repositoryId, String sourceBranch, Refs refs) {
+    private void collectFromCommits(JsonNode metadata, long repositoryId, String sourceBranch, Refs refs) {
         if (!gitRepositoryManager.isEnabled() || !gitRepositoryManager.isRepositoryCloned(repositoryId)) {
-            return false;
+            return;
         }
         String targetBranch = MetaJson.optString(metadata, "target_branch");
         String headSha = MetaJson.optString(metadata, "commit_sha");
         if (sourceBranch == null || sourceBranch.isBlank() || targetBranch == null || headSha == null) {
-            return false;
+            return;
         }
 
         try {
             var repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
             String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
-                return false;
+                return;
             }
             List<GitRepositoryManager.CommitInfo> ahead = gitRepositoryManager.walkCommits(
                 repositoryId,
@@ -328,7 +330,6 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 range[1],
                 MAX_COMMITS_SCANNED + 1
             );
-            boolean complete = ahead.size() <= MAX_COMMITS_SCANNED;
             for (GitRepositoryManager.CommitInfo commit : ahead.stream().limit(MAX_COMMITS_SCANNED).toList()) {
                 String subject = commit.message();
                 if (subject == null || subject.isBlank()) {
@@ -336,10 +337,8 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 }
                 collectFromText(subject, refs, "commits");
             }
-            return complete;
         } catch (Exception e) {
             log.debug("Commit-subject scan for linked work items skipped: {}", e.getMessage());
-            return false;
         }
     }
 

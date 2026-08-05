@@ -133,6 +133,31 @@ const validateReadinessSemantics = (value, label) => {
 
 const catalogDigests = new Map();
 
+/**
+ * What a source's authority forbids it from claiming.
+ *
+ * Extracted so both rules can be exercised against a deliberately broken source below: a guard whose
+ * failure path is never run is indistinguishable from one that cannot fail.
+ */
+function assertSourceAuthorityInvariants(version, source) {
+	// Only a source read straight from upstream, or derived from one without discarding anything, can
+	// be anchored to an identity that cannot change under it. A mirror reflects upstream state that
+	// moves independently of the capture, so calling it pinned would let a copy that has since drifted
+	// satisfy a CURRENT requirement.
+	if (
+		source.freshness.mode === "PINNED_IDENTITY" &&
+		source.authority !== "UPSTREAM_SNAPSHOT" &&
+		source.authority !== "DETERMINISTIC_DERIVATION"
+	) {
+		throw new Error(`${version} source '${source.kind}' pins an identity it cannot pin (${source.authority})`);
+	}
+	// A lossy derivation is a bounded summary of its subject, not the subject, so it cannot answer "is
+	// all of it here?" — and a practice author who requires COMPLETE is asking exactly that.
+	if (source.authority === "LOSSY_DERIVATION" && source.completeness.supportsComplete) {
+		throw new Error(`${version} source '${source.kind}' is a lossy derivation and cannot report COMPLETE`);
+	}
+}
+
 const validateContractVersion = async (version) => {
 	const versionDir = path.join(contractsRoot, version);
 	const catalogBytes = await readFile(path.join(versionDir, "catalog.json"));
@@ -175,6 +200,7 @@ const validateContractVersion = async (version) => {
 			}
 		}
 	}
+	for (const source of catalog.sources) assertSourceAuthorityInvariants(version, source);
 	const sourceUsePurposes = new Set([
 		"AUTOMATED_PRACTICE_REVIEW",
 		"PRACTICE_FEEDBACK_DELIVERY",
@@ -478,15 +504,12 @@ const manifest = {
 						completeness: "COMPLETE",
 						facts: {
 							capturedAt: "2026-08-03T00:00:00Z",
-							queryScope: "one pinned diff",
-							completenessBasis: "IMMUTABLE_OBJECT",
-							representationFidelity: "EXACT",
+							immutableIdentity: "0123456789abcdef0123456789abcdef01234567",
 						},
 					}
 				: { availability: "NOT_COLLECTED", reasonCode: "MINIMIZED" },
 		artifacts: [],
 	})),
-	viewTransformations: [],
 };
 validate(manifestSchema, manifest, "valid manifest fixture");
 validateManifestSemantics(manifest, "valid manifest fixture");
@@ -595,4 +618,24 @@ try {
 	throw new Error("readiness semantic validator accepted inconsistent decision times");
 } catch (error) {
 	if (!String(error).includes("different decision time")) throw error;
+}
+
+for (const [label, broken, expected] of [
+	[
+		"a mirror claiming a pinned identity",
+		{ kind: "x.mirror", authority: "SYNCHRONIZED_MIRROR", freshness: { mode: "PINNED_IDENTITY" }, completeness: { supportsComplete: false } },
+		"pins an identity it cannot pin",
+	],
+	[
+		"a lossy derivation claiming completeness",
+		{ kind: "x.lossy", authority: "LOSSY_DERIVATION", freshness: { mode: "NOT_APPLICABLE" }, completeness: { supportsComplete: true } },
+		"cannot report COMPLETE",
+	],
+]) {
+	try {
+		assertSourceAuthorityInvariants("1.0.0", broken);
+		throw new Error(`source invariants accepted ${label}`);
+	} catch (error) {
+		if (!String(error).includes(expected)) throw error;
+	}
 }
