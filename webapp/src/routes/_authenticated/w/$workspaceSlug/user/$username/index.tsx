@@ -3,8 +3,10 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { z } from "zod";
 import {
 	getActivityMonitorOptions,
+	getPracticeAreaStatusesOptions,
 	getUserProfileOptions,
 	getWorkspaceOptions,
+	listAreasOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { ProfilePage } from "@/components/profile/ProfilePage";
@@ -115,6 +117,24 @@ function UserProfile() {
 
 	const currUserIsDashboardUser = isCurrentUser(username);
 
+	// Practice-area status is a self-view: the endpoint derives the CALLER's standing, so only
+	// fetch (and render) it when the profile being viewed is the logged-in user's own.
+	const areasQuery = useQuery({
+		...listAreasOptions({ path: { workspaceSlug }, query: { activeOnly: true } }),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const practiceAreas = areasQuery.data ?? [];
+	const areaStatusesQuery = useQuery({
+		...getPracticeAreaStatusesOptions({
+			path: { workspaceSlug },
+		}),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const areaStatuses = Object.fromEntries(
+		(areaStatusesQuery.data ?? []).map((status) => [status.areaSlug, status]),
+	);
+
+	// Query for user profile data
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
 			path: { workspaceSlug, login: username },
@@ -197,6 +217,20 @@ function UserProfile() {
 			achievementsEnabled={achievementsEnabled === true}
 			progressionEnabled={progressionEnabled === true}
 			leaguesEnabled={leaguesEnabled === true}
+			practiceAreaStatus={
+				currUserIsDashboardUser
+					? {
+							areas: practiceAreas,
+							statuses: areaStatuses,
+							isLoading: areasQuery.isPending || areaStatusesQuery.isPending,
+							error: areasQuery.error ?? areaStatusesQuery.error ?? undefined,
+							onRetry: () => {
+								if (areasQuery.isError) areasQuery.refetch();
+								if (areaStatusesQuery.isError) areaStatusesQuery.refetch();
+							},
+						}
+					: undefined
+			}
 		/>
 	);
 }

@@ -1,10 +1,5 @@
 import { Check, Search } from "lucide-react";
 import { useId, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
 import {
 	areaSeed,
 	COLOR_KEYS,
@@ -14,7 +9,12 @@ import {
 	iconLabel,
 	iconSearchText,
 	PILL,
-} from "./area-visuals";
+} from "@/components/shared/area-visuals";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 
 export interface AreaVisualPickerProps {
 	id?: string;
