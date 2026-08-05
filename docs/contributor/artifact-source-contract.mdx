@@ -142,31 +142,31 @@ Only `AVAILABLE` has:
 Logical content is independent of serialized bytes: a JSON file containing `[]` represents an `EMPTY` source.
 Field-level redaction remains an available, usually partial source; whole-source redaction uses `REDACTED`.
 
-Freshness is a readiness result, not a mutable capture fact, and only demonstrated staleness refuses. `UNKNOWN`
-— the runtime cannot tell — is not a refusal, because "I cannot establish this" is not evidence that the copy is
-wrong. `NOT_APPLICABLE` means the contract offers no currentness claim at all, so authoring validation rejects a
-`CURRENT` requirement on such a source; `NO_REQUIREMENT` accepts the absence of a claim without asserting that the
-data is current.
+Freshness is a readiness result rather than a mutable capture fact, and only demonstrated staleness skips
+automated review. `UNKNOWN` records that the runtime cannot establish currentness, which is not evidence that the
+copy is out of date. `NOT_APPLICABLE` records that the contract offers no currentness claim for the source at all,
+so authoring validation rejects a `CURRENT` requirement on it; `NO_REQUIREMENT` accepts the absence of a claim
+without asserting that the data is current.
 
-There is deliberately no age-based freshness mode. An age needs a watermark recording when a copy was last
-*verified* against upstream, and the mirror records only when a row was last *written* — and rows are written only
-when something changed. An age computed from that answers "how long since this changed", which is close to the
-opposite of the question: it reports a quiet, correctly-mirrored pull request as stale while reporting a
-just-edited one as fresh. The earlier five-minute window therefore refused every backfilled review, every replay,
-and every review of a repository that had simply been quiet, while never once firing on evidence that was actually
-wrong.
+There is deliberately no age-based freshness mode. An age threshold requires a watermark recording when a copy was
+last *verified* against upstream. The mirror records only when a row was last *written*, and rows are written only
+when the upstream record changed, so an age derived from it measures time since the last upstream modification.
+Applied as a freshness test, that reports a correctly mirrored record which has not changed recently as stale, and
+a record modified moments ago as current. The five-minute window used previously therefore skipped automated
+review for every backfilled review, every replay, and every review of an established repository, without
+identifying a single case of genuinely out-of-date evidence.
 
-Reintroducing an age mode has a prerequisite: the sync must record a verified-as-of watermark, advanced by a
-reconciliation pass that confirms nothing changed. That pass is exactly an HTTP `304`, which
-[RFC 9111 §4.3.4](https://www.rfc-editor.org/rfc/rfc9111.html) says refreshes a stored response without altering
-it. Until that watermark exists, a currentness guarantee on a mirrored source would be a claim the system cannot
-substantiate.
+Adding an age-based mode has a prerequisite: the synchronization layer must record a verified-as-of watermark,
+advanced by a reconciliation pass that confirms a record is unchanged. Such a pass is the equivalent of an HTTP
+`304`, which [RFC 9111 §4.3.4](https://www.rfc-editor.org/rfc/rfc9111.html) defines as refreshing a stored
+response without altering it. Until that watermark exists, a currentness guarantee on a mirrored source would be a
+claim the system cannot substantiate.
 
-Because a replay re-derives a verdict from recorded evidence, readiness is a pure function of the manifest, the
-practices, the anchor, and the contract. A replay passes the recorded anchor; passing the current instant instead
-would re-date the question and can flip a verdict that was correct when it was made. A manifest captured under a
-contract version the runtime no longer ships is *unreplayable* rather than invalid — the decision it recorded
-stands, and only the ability to re-derive it is gone.
+Review readiness is a pure function of the manifest, the practices, the temporal anchor, and the source contract,
+which is what makes a replay reproducible. A replay supplies the recorded anchor; supplying the current instant
+would evaluate the evidence against a different moment and can change a result that was correct when it was first
+produced. A manifest captured under a contract version the runtime no longer ships is *unreplayable* rather than
+invalid: the recorded result stands, and only the ability to re-derive it is unavailable.
 
 Deliberate ablation is an evaluation transformation, not natural absence. Production rejects every transformed
 view. The manifest can record evaluation transformations, but this contract version does not apply or authorize

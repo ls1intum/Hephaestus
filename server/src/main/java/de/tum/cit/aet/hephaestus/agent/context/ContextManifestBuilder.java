@@ -278,10 +278,10 @@ public class ContextManifestBuilder {
         if (!manifest.viewTransformations().isEmpty()) {
             throw new IllegalArgumentException("Ablated evidence views are not valid for product readiness");
         }
-        // A manifest recorded under a contract this runtime no longer ships is unreplayable, not
-        // invalid: the decision it recorded was correct when it was made, and the evidence is still
-        // exactly what was seen. Refusing to re-derive a verdict is right; crashing is not, and it is
-        // what would meet a replay of anything older than the newest catalog.
+        // A manifest recorded under a source contract this runtime no longer ships is unreplayable
+        // rather than invalid: the recorded decision remains correct for the evidence it was made on.
+        // Declining to re-derive a readiness result is correct; failing as though the evidence were
+        // malformed is not.
         if (
             !catalogs.current().version().equals(manifest.contractVersion()) ||
             !catalogs.catalogDigest().equals(manifest.catalogDigest())
@@ -357,10 +357,10 @@ public class ContextManifestBuilder {
                     requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
                     completeness != SourceCompleteness.COMPLETE
                 ) reasons.add(SourceReadinessReason.SOURCE_INCOMPLETE);
-                // Only demonstrated staleness refuses. UNKNOWN means the available watermarks cannot
-                // answer the question — the ordinary case for a backfill, a replay, or a source with
-                // no watermark — and "I cannot tell" is not evidence that the copy is wrong. Treating
-                // the two alike is the same category error as reading a refusal as a clean result.
+                // Only demonstrated staleness skips the practice. UNKNOWN means the available
+                // watermarks cannot establish currentness, which is the ordinary case for a backfill,
+                // a replay, or a source with no watermark. An unanswerable question is not evidence
+                // that the copy is out of date.
                 if (
                     requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
                     freshness == SourceFreshness.STALE

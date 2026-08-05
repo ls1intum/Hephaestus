@@ -68,7 +68,7 @@ const issueTarget: AgentJob["target"] = {
 export const mockJobCompleted: AgentJob = {
 	id: "job-completed-1",
 	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: pullRequestTarget,
 	status: "COMPLETED",
 	model: "gpt-5.4-mini",
@@ -90,7 +90,7 @@ export const mockJobCompleted: AgentJob = {
 export const mockJobRunning: AgentJob = {
 	id: "job-running-1",
 	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: pullRequestTarget,
 	status: "RUNNING",
 	model: "openai/gpt-oss-120b",
@@ -104,7 +104,7 @@ export const mockJobRunning: AgentJob = {
 export const mockJobFailedDelivery: AgentJob = {
 	id: "job-failed-delivery-1",
 	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: pullRequestTarget,
 	status: "COMPLETED",
 	model: "gpt-5.4-mini",
@@ -125,7 +125,7 @@ export const mockJobFailedDelivery: AgentJob = {
 export const mockJobQueued: AgentJob = {
 	id: "job-queued-1",
 	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: pullRequestTarget,
 	status: "QUEUED",
 	model: "gpt-5.4-mini",
@@ -140,7 +140,7 @@ export const mockJobQueued: AgentJob = {
 export const mockJobHeldOnBudget: AgentJob = {
 	id: "job-held-budget-1",
 	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: pullRequestTarget,
 	status: "QUEUED",
 	model: "gpt-5.4-nano",
@@ -155,7 +155,7 @@ export const mockJobHeldOnBudget: AgentJob = {
 export const mockJobHeldForUnknownReason: AgentJob = {
 	id: "job-held-unknown-1",
 	jobType: "ISSUE_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: issueTarget,
 	status: "QUEUED",
 	model: "gpt-5.4-nano",
@@ -170,7 +170,7 @@ export const mockJobHeldForUnknownReason: AgentJob = {
 export const mockJobBackingOff: AgentJob = {
 	id: "job-backoff-1",
 	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: pullRequestTarget,
 	status: "QUEUED",
 	model: "openai/gpt-oss-20b",
@@ -184,7 +184,7 @@ export const mockJobBackingOff: AgentJob = {
 export const mockJobTimedOut: AgentJob = {
 	id: "job-timed-out-1",
 	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "JUDGED",
+	reviewOutcome: "REVIEWED",
 	target: pullRequestTarget,
 	status: "TIMED_OUT",
 	model: "openai/gpt-oss-120b",

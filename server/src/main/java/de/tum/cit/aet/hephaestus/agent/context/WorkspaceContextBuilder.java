@@ -300,12 +300,13 @@ public class WorkspaceContextBuilder {
             try {
                 contribution = source.capture(request, Set.of(kind));
             } catch (RuntimeException e) {
-                // Isolation is the point of collecting per source: a datastore hiccup inside one
-                // collector must cost that source, not the whole review. Recording the error is
-                // fail-closed anyway — readiness refuses any practice that required this source —
-                // whereas letting it escape aborted every other source that had already succeeded.
-                // Only the collector's own failures are absorbed here; the checks below police the
-                // contribution against its contract and must stay loud.
+                // Sources are captured independently so that one failing collector costs only its
+                // own source. Recording a collection error remains conservative: review readiness
+                // skips any practice that required this source. Allowing the exception to propagate
+                // would instead discard every source already captured for this job.
+                //
+                // Only failures raised by the collector are absorbed here. The checks below validate
+                // the contribution against its contract and must continue to propagate.
                 stateOverrides.put(kind, new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE));
                 meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
                 log.warn(

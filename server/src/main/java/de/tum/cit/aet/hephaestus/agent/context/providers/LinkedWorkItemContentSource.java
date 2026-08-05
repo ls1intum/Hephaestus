@@ -164,10 +164,10 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 int number = entry.getKey();
                 Optional<Issue> resolved = issueRepository.findByRepositoryIdAndNumber(repositoryId, number);
                 if (resolved.isEmpty()) {
-                    // A "#123" that names an issue in another repository or an external tracker is not
-                    // a hole in our enumeration of the references — we found it, and it points
-                    // somewhere we do not mirror. Reporting that as incompleteness disabled the linked
-                    // work-item practices permanently on any branch named "<issue>-slug".
+                    // A reference naming an issue in another repository or an external tracker is
+                    // not a gap in the enumeration: it was found, and it points to work this
+                    // repository does not mirror. Reporting it as incomplete evidence permanently
+                    // skipped the linked-work-item practices for any branch named "<issue>-slug".
                     unresolved.add(number);
                     continue;
                 }
@@ -184,8 +184,8 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 from.add(source);
             }
             root.set("resolvedFrom", from);
-            // Stated, not inferred: the model must be able to tell "this PR links nothing" from
-            // "this PR links #123, which lives somewhere we do not mirror".
+            // Reported explicitly so that a pull request linking no work is distinguishable from
+            // one linking work this repository does not mirror.
             ArrayNode unresolvedRefs = objectMapper.createArrayNode();
             unresolved.forEach(unresolvedRefs::add);
             root.set("unresolvedReferences", unresolvedRefs);

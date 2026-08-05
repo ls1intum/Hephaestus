@@ -72,9 +72,9 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         SourceCompleteness completeness = snapshot.complete()
             ? SourceCompleteness.COMPLETE
             : SourceCompleteness.PARTIAL;
-        // With checkout switched off the snapshot carries no tree, and "<sha>:null" is a non-null
-        // string that freshness assessment reads as a pinned identity — reporting a tree that was
-        // never read as current. Say the source is unavailable instead.
+        // With checkout disabled the snapshot carries no tree, and "<sha>:null" is a non-null
+        // string that freshness assessment accepts as a pinned identity, reporting a tree that was
+        // never read as current. Report the source as not collected instead.
         if (snapshot.treeSha() == null) {
             return new EvidenceContribution(
                 files,

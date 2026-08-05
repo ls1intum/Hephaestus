@@ -235,8 +235,9 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
 
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode repoNames = root.putArray("repositories");
-        // Only the scanned repositories were searched. Listing all of them would show a name with no
-        // artifacts beside it, which reads as "this repository is empty" rather than "not looked at".
+        // Only the scanned repositories were searched. Listing the others would show a repository
+        // name with no work items beside it, which reads as an empty repository rather than an
+        // unsearched one.
         for (Repository repo : scanned) {
             if (repo.getNameWithOwner() != null) {
                 repoNames.add(repo.getNameWithOwner());

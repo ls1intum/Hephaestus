@@ -27,7 +27,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "509fc3c71360238c7417da1c5512fa5c240eb4196a7769dc1ef6feb2bc4fd77c";
+        "af8dd3fea79eca677db9ba00b92b8e8ea6f5f254bb747a5d961076f7ca12aa07";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -156,7 +156,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     }
 
     @Test
-    void shouldPermitReviewedEverydaySourcesWithoutOperatorConfiguration() {
+    void shouldPermitNonSensitiveSourcesWithoutOperatorConfiguration() {
         var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC(), "");
         var version = new SourceContractVersion("1.0.0");
 

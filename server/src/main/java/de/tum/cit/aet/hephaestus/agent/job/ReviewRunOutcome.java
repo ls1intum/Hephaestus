@@ -3,28 +3,28 @@ package de.tum.cit.aet.hephaestus.agent.job;
 /**
  * Why a run that reached {@link AgentJobStatus#COMPLETED} produced the findings it did.
  *
- * <p>A run that declines for want of evidence completes successfully — nothing failed — so status
- * alone cannot separate it from a run that looked and found nothing. Without that separation a
- * refusal reads to a developer as a clean bill of health, which is the one reading an abstention
- * exists to prevent.
+ * <p>A run that skips automated review for insufficient evidence completes successfully, because
+ * nothing failed. Status alone therefore cannot distinguish it from a run that assessed the work and
+ * produced no findings. Without that distinction a skipped review is indistinguishable from a clean
+ * result, which is precisely the reading an abstention exists to prevent.
  */
 public enum ReviewRunOutcome {
-    /** The model ran against sufficient evidence. Absence of findings means none were found. */
-    JUDGED,
+    /** Automated review ran against sufficient evidence; no findings means none were identified. */
+    REVIEWED,
     /**
-     * Required evidence was missing, unreadable, stale, or unauthorized, so no model ran. Absence of
-     * findings means nothing was assessed.
+     * Required evidence was missing, unreadable, out of date, or unauthorized, so no model ran and no
+     * practice was assessed.
      */
     INSUFFICIENT_EVIDENCE;
 
     static final String OUTPUT_FIELD = "outcome";
 
-    /** Reads the outcome an executor recorded on {@code agent_job.output}; defaults to {@link #JUDGED}. */
+    /** Reads the outcome an executor recorded on {@code agent_job.output}; defaults to {@link #REVIEWED}. */
     static ReviewRunOutcome fromJobOutput(tools.jackson.databind.JsonNode output) {
         if (output == null || !output.has(OUTPUT_FIELD)) {
-            return JUDGED;
+            return REVIEWED;
         }
         String value = output.get(OUTPUT_FIELD).asString(null);
-        return INSUFFICIENT_EVIDENCE.name().equals(value) ? INSUFFICIENT_EVIDENCE : JUDGED;
+        return INSUFFICIENT_EVIDENCE.name().equals(value) ? INSUFFICIENT_EVIDENCE : REVIEWED;
     }
 }

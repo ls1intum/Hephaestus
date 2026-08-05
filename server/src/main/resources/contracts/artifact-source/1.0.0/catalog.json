@@ -4,8 +4,8 @@
 		{
 			"kind": "scm.pull-request.core",
 			"displayName": "Pull request details",
-			"description": "The pull request itself: its title, description, author, branches, state, labels, and the subject lines of its commits.",
-			"selectionScope": "One pull request, chosen by the job, with its own fields and the commit subjects available for it.",
+			"description": "The pull request record: title, description, author, branches, state, labels, and commit subjects.",
+			"selectionScope": "One pull request, selected by the job, with its own fields and the commit subjects available for it.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -38,8 +38,8 @@
 		{
 			"kind": "scm.pull-request.diff",
 			"displayName": "Code changes",
-			"description": "The code the pull request changes, as a unified diff annotated with line numbers.",
-			"selectionScope": "The merge-base-to-head diff for one pull request at the exact commit under review, up to 20 MiB. A diff that cannot be read is reported as a collection error, never as an empty one.",
+			"description": "The code changes the pull request introduces, as a unified diff annotated with line numbers.",
+			"selectionScope": "The merge-base-to-head diff for one pull request at the reviewed commit, up to 20 MiB. A diff that cannot be read is recorded as a collection error rather than as an empty diff.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -73,7 +73,7 @@
 			"kind": "scm.pull-request.comments",
 			"displayName": "Inline review comments",
 			"description": "Review comments left on specific lines of the pull request.",
-			"selectionScope": "Up to the 500 most recent inline comments on one pull request, newest first. Beyond that the capture reports itself partial rather than claiming to be the whole conversation.",
+			"selectionScope": "Up to the 500 most recent inline comments on one pull request, most recent first. Beyond that limit the capture is reported as PARTIAL.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -106,8 +106,8 @@
 		{
 			"kind": "scm.repository.tree",
 			"displayName": "Repository files",
-			"description": "Files from the rest of the repository, for reading the change in context. Never judged on their own.",
-			"selectionScope": "The repository at the exact commit under review: up to 20,000 files and 50 MiB. Files over 10 MiB, symlinks, submodules, and paths outside the tree are left out, and the capture reports itself partial.",
+			"description": "Files from elsewhere in the repository, supplied as context for reading the change. Not reviewed on their own.",
+			"selectionScope": "The repository at the reviewed commit: up to 20,000 files and 50 MiB. Files above 10 MiB, symbolic links, submodules, and paths outside the tree are excluded, and the capture is reported as PARTIAL.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -140,8 +140,8 @@
 		{
 			"kind": "scm.issue.core",
 			"displayName": "Issue details",
-			"description": "The issue itself: its title, description, author, state, labels, and assignees.",
-			"selectionScope": "One issue, chosen by the job, with its own fields and its rendered description.",
+			"description": "The issue record: title, description, author, state, labels, and assignees.",
+			"selectionScope": "One issue, selected by the job, with its own fields and its rendered description.",
 			"artifactTypes": [
 				"ISSUE"
 			],
@@ -174,8 +174,8 @@
 		{
 			"kind": "scm.issue.comments",
 			"displayName": "Issue comments",
-			"description": "The discussion on the issue.",
-			"selectionScope": "Up to the 200 most recent comments on one issue, newest first. Beyond that the capture reports itself partial.",
+			"description": "The discussion recorded on the issue.",
+			"selectionScope": "Up to the 200 most recent comments on one issue, most recent first. Beyond that limit the capture is reported as PARTIAL.",
 			"artifactTypes": [
 				"ISSUE"
 			],
@@ -208,8 +208,8 @@
 		{
 			"kind": "slack.conversation.thread",
 			"displayName": "Slack thread",
-			"description": "One Slack thread, in the order it was written. Read only from channels whose members have agreed to it.",
-			"selectionScope": "One thread, chosen by the job, with system and bot messages removed and the remaining messages in chronological order. A thread whose channel has not agreed, or which no longer exists, is reported as withheld rather than as an empty conversation.",
+			"description": "One Slack thread in chronological order, read only from channels whose consent is active.",
+			"selectionScope": "One thread, selected by the job, with system and bot messages excluded. A thread whose channel consent is not active, or which no longer exists, is reported as REDACTED or UNAVAILABLE rather than as an empty conversation.",
 			"artifactTypes": [
 				"CONVERSATION_THREAD"
 			],
@@ -242,8 +242,8 @@
 		{
 			"kind": "scm.linked-work-items",
 			"displayName": "Linked work items",
-			"description": "Issues this pull request says it addresses, found in its description, branch name, and commit subjects.",
-			"selectionScope": "Up to 8 issues resolved from closing references, the branch name, and up to 500 commit subjects. References pointing outside this repository are listed as unresolved rather than treated as missing evidence.",
+			"description": "Issues the pull request states it addresses, resolved from its description, branch name, and commit subjects.",
+			"selectionScope": "Up to 8 issues resolved from closing references, the branch name, and up to 500 commit subjects. References to work outside this repository are reported as unresolved rather than as incomplete evidence.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -276,8 +276,8 @@
 		{
 			"kind": "scm.review-threads",
 			"displayName": "Review threads and decisions",
-			"description": "Review conversations on the pull request and whether they were resolved, plus each reviewer's verdict.",
-			"selectionScope": "Up to 200 review threads and 30 review decisions for one pull request. Beyond that the capture reports itself partial.",
+			"description": "Review conversations on the pull request, whether each was resolved, and each reviewer's decision.",
+			"selectionScope": "Up to 200 review threads and 30 review decisions for one pull request. Beyond either limit the capture is reported as PARTIAL.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -310,8 +310,8 @@
 		{
 			"kind": "scm.general-review-comments",
 			"displayName": "General review comments",
-			"description": "Review comments about the pull request as a whole, rather than about a particular line.",
-			"selectionScope": "Up to 200 general review comments on one pull request. Beyond that the capture reports itself partial.",
+			"description": "Review comments addressing the pull request as a whole rather than a specific line.",
+			"selectionScope": "Up to 200 general review comments on one pull request. Beyond that limit the capture is reported as PARTIAL.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -344,8 +344,8 @@
 		{
 			"kind": "workspace.project-inventory",
 			"displayName": "Related workspace work",
-			"description": "Other work in the same workspace, so a change can be seen against what else is going on.",
-			"selectionScope": "Up to 200 issues and 200 pull requests across at most 25 visible repositories, excluding the work under review. Beyond that the capture reports itself partial.",
+			"description": "Other work items in the same workspace, supplied so a change can be read against related work.",
+			"selectionScope": "Up to 200 issues and 200 pull requests across at most 25 visible repositories, excluding the work item under review. Beyond any of those limits the capture is reported as PARTIAL.",
 			"artifactTypes": [
 				"PULL_REQUEST",
 				"ISSUE",
@@ -380,8 +380,8 @@
 		{
 			"kind": "outline.documents",
 			"displayName": "Referenced Outline documents",
-			"description": "Wiki pages the reviewed work refers to.",
-			"selectionScope": "Only documents referenced by the work or matched to it, at most 15. Retrieval cannot prove it found everything relevant, so this source is never complete.",
+			"description": "Outline documents the reviewed work references.",
+			"selectionScope": "Only documents referenced by the reviewed work or matched to it, up to 15. Retrieval cannot establish that it found every relevant document, so this source is never reported as COMPLETE.",
 			"artifactTypes": [
 				"PULL_REQUEST",
 				"ISSUE"

@@ -499,18 +499,18 @@ export function PracticeEvidenceEditor({
 			{canAttemptReview && unavailableRequiredSources.length > 0 && (
 				<Alert variant="warning">
 					<TriangleAlert />
-					<AlertTitle>This evidence needs a privacy decision first</AlertTitle>
+					<AlertTitle>This evidence requires an authorization decision</AlertTitle>
 					<AlertDescription>
 						{unavailableRequiredSources
 							.map((source) => evidenceSourceLabel(source.sourceKind, options.allowedSources))
 							.join(", ")}{" "}
-						{unavailableRequiredSources.length === 1 ? "contains" : "contain"} people's private
-						conversations, so Hephaestus does not read{" "}
-						{unavailableRequiredSources.length === 1 ? "it" : "them"} until an instance operator
-						turns it on with{" "}
+						{unavailableRequiredSources.length === 1 ? "contains" : "contain"} private
+						conversations. Hephaestus reads{" "}
+						{unavailableRequiredSources.length === 1 ? "it" : "them"} only after an instance
+						operator authorizes the source in{" "}
 						<code className="font-mono text-xs">HEPHAESTUS_EVIDENCE_SENSITIVE_SOURCE_USES</code>.
-						Everyday code sources such as pull requests and issues need no such step. Until then,
-						Hephaestus skips this practice rather than guessing.
+						Sources such as pull requests and issues need no separate authorization. Until the
+						source is authorized, Hephaestus skips automated review for this practice.
 					</AlertDescription>
 				</Alert>
 			)}
@@ -573,7 +573,7 @@ export function PracticeEvidenceEditor({
 													)}
 													{!source.supportsEmpty && <Badge variant="outline">Never empty</Badge>}
 													{!source.authorizedForAutomatedReview && (
-														<Badge variant="warning">Needs a privacy decision</Badge>
+														<Badge variant="warning">Needs authorization</Badge>
 													)}
 												</div>
 												<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>

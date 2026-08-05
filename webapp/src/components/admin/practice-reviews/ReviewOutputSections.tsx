@@ -31,7 +31,7 @@ export type ReviewSectionState<T> =
 	| { status: "ready"; items: T[]; total: number };
 
 const INSUFFICIENT_EVIDENCE_EXPLANATION =
-	"Hephaestus declined this review because required evidence was missing, unreadable, out of date, or not authorized. This is not a clean result — nothing was checked.";
+	"Hephaestus skipped automated review because required evidence was missing, unreadable, out of date, or not authorized. No practice was assessed, so this is not a result of finding nothing.";
 
 export interface ReviewOutputScope {
 	agentJobId?: string;

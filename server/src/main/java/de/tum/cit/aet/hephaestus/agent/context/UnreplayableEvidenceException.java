@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
 /**
- * A recorded manifest cannot be re-judged because the source contract it was captured under is no
- * longer shipped.
+ * Review readiness cannot be re-evaluated for a recorded manifest because the source contract it was
+ * captured under is no longer shipped.
  *
- * <p>Distinct from invalid evidence on purpose. The recorded decision was correct when it was made
- * and the captured evidence is still exactly what was seen; only the ability to re-derive a verdict
- * from it is gone. A replay should report that honestly rather than fail as if the evidence were
- * corrupt.
+ * <p>Deliberately distinct from invalid evidence. The recorded result remains correct for the
+ * evidence it was produced from, and that evidence is unchanged; only the ability to re-derive a
+ * readiness result is unavailable. A replay reports this outcome rather than failing as though the
+ * evidence were malformed.
  */
 public class UnreplayableEvidenceException extends RuntimeException {
 

@@ -6779,10 +6779,10 @@ components:
           description: "Why a COMPLETED run produced the findings it did. INSUFFICIENT_EVIDENCE\
             \ means no model ran because required evidence was missing, unreadable,\
             \ stale, or unauthorized — so no findings means nothing was assessed,\
-            \ not that nothing was wrong. JUDGED means the model ran against sufficient\
+            \ not that nothing was wrong. REVIEWED means the model ran against sufficient\
             \ evidence."
           enum:
-          - JUDGED
+          - REVIEWED
           - INSUFFICIENT_EVIDENCE
         startedAt:
           type: string

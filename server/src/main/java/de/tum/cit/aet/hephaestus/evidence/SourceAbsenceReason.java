@@ -3,11 +3,11 @@ package de.tum.cit.aet.hephaestus.evidence;
 /**
  * Why a source is not present in a capture.
  *
- * <p>The availability states are only half the answer: "absent" is actionable for a reader —
- * operator, auditor, or the model's prompt — only when it says <em>why</em>. A free-form code lets
- * every new collector invent its own vocabulary, so downstream code cannot branch on the reason and
- * "deliberately minimised" collapses into "the provider fell over". Each constant below names one
- * cause and states which availability it belongs with.
+ * <p>An availability state records that a source is absent; this records why, which is what makes
+ * the absence actionable for an operator, an auditor, or the review prompt. A free-form code would
+ * let each collector introduce its own vocabulary, leaving downstream code unable to branch on the
+ * reason and collapsing a deliberate minimisation into an indistinguishable collection failure. Each
+ * constant names one cause and states the availability state it accompanies.
  */
 public enum SourceAbsenceReason {
     /** {@code NOT_COLLECTED}: the practice did not ask for this source, so it was never read. */

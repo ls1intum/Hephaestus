@@ -117,9 +117,9 @@ public class ConversationThreadContentSource implements EvidenceSource {
         int messageCount = payload.path("messageCount").asInt();
         Instant effectiveTime = projection.sourceEffectiveAt(metadata.path("slack_last_ts").asString(null));
         Map<SourceKind, Instant> effectiveAt = effectiveTime == null ? Map.of() : Map.of(KIND, effectiveTime);
-        // An empty payload has three causes and only one of them is "nobody said anything". A paused
-        // or revoked channel, or a thread that is gone, must not read as a conversation the developer
-        // failed to have.
+        // An empty payload has three causes, and only one of them is a thread with no messages. A
+        // channel whose consent is paused or withdrawn, and a thread that no longer exists, must not
+        // be reported as a conversation the developer did not have.
         Map<SourceKind, SourceCaptureState> stateOverrides =
             messageCount == 0
                 ? absenceOf(

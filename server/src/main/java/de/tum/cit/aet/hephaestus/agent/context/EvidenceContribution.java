@@ -16,9 +16,9 @@ public record EvidenceContribution(
     Map<SourceKind, Instant> sourceEffectiveAt,
     Map<SourceKind, SourceContentState> contentStates,
     /**
-     * States a collector can only report about itself: withheld for consent, or absent upstream. The
-     * manifest otherwise infers absence from missing files, which cannot tell "nobody said anything"
-     * apart from "we were not allowed to look".
+     * Capture states only the collector can establish, such as evidence withheld for consent or an
+     * artifact absent upstream. The manifest otherwise infers absence from missing files, which
+     * cannot distinguish an empty source from one that was not permitted to be read.
      */
     Map<SourceKind, SourceCaptureState> stateOverrides
 ) {

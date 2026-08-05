@@ -144,7 +144,7 @@ describe("PracticeEvidenceEditor", () => {
 		expect(screen.getByTestId("code").textContent).toBe("RUNTIME_BEHAVIOR_NOT_OBSERVED");
 	});
 
-	it("explains that private conversation evidence needs a deliberate privacy decision", async () => {
+	it("explains that private conversation evidence requires operator authorization", async () => {
 		const conversation = mockPracticeDefinitionOptions.workTypes[2];
 		await renderWithRouter(
 			<PracticeEvidenceEditor
@@ -155,9 +155,11 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		expect(screen.getByText("This evidence needs a privacy decision first")).toBeTruthy();
+		expect(screen.getByText("This evidence requires an authorization decision")).toBeTruthy();
 		expect(screen.getByText(/HEPHAESTUS_EVIDENCE_SENSITIVE_SOURCE_USES/)).toBeTruthy();
-		expect(screen.getByText(/pull requests and issues need no such step/)).toBeTruthy();
+		expect(
+			screen.getByText(/pull requests and issues need no separate authorization/),
+		).toBeTruthy();
 	});
 
 	it("still allows human review when AI support is unavailable", async () => {

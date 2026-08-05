@@ -133,9 +133,9 @@ public class IssueReviewHandler implements JobTypeHandler {
         );
         List<Practice> eligible = practices;
         practices = readiness.readyPractices();
-        // A practice dropped for want of evidence leaves no trace in the delivered review, so the
-        // reader cannot tell it was skipped from it having found nothing. Name them in the log now;
-        // the readiness report carries the same list for the admin surface.
+        // A practice skipped for insufficient evidence leaves no trace in the delivered review, so a
+        // reader cannot distinguish it from a practice that was assessed and produced no findings.
+        // The readiness report records the same list for the administration surface.
         if (practices.size() < eligible.size()) {
             log.info(
                 "Skipping {} of {} practice(s) for insufficient evidence: jobId={}, skipped={}",

@@ -75,8 +75,9 @@ export const CompletedWithMixedOutput: Story = {
 };
 
 /**
- * A run that declined for want of evidence completes successfully and produces no findings — exactly
- * like a clean review. The empty state must say so, or a refusal reads as a clean bill of health.
+ * A run that skipped automated review for insufficient evidence completes successfully and produces
+ * no findings, exactly like a review that assessed the work and found none. The empty state must
+ * distinguish the two.
  */
 export const DeclinedForInsufficientEvidence: Story = {
 	parameters: {

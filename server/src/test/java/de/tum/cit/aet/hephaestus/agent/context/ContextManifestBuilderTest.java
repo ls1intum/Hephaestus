@@ -165,10 +165,10 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldNotDeclineOnAMirrorWhoseCurrentnessIsUnprovable() {
-        // A pull request nobody has touched in months is not stale evidence — it is a quiet pull
-        // request, correctly mirrored. The old gate read the mirror's change-stamp as a check-stamp
-        // and refused exactly this case, which is every backfilled review and every quiet repository.
+    void shouldReviewAMirroredRecordWhoseCurrentnessCannotBeEstablished() {
+        // A pull request unchanged for months is correctly mirrored, not stale. The previous gate
+        // read the mirror's last-written timestamp as a last-verified timestamp and skipped exactly
+        // this case, which covers every backfilled review and every established repository.
         var manifest = coreManifest(builder, "job-quiet", Instant.EPOCH);
 
         assertThat(
@@ -303,11 +303,10 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldReviewWorkThatHasNotChangedUpstreamInMonths() {
-        // The case that refused on the live deployment: a merge request mirrored in July, reviewed in
-        // August, with a reconciliation in between that correctly wrote nothing because nothing had
-        // changed. Nothing about it is stale — it is simply quiet — and the whole backfill and replay
-        // story depends on this being reviewable.
+    void shouldReviewWorkUnchangedUpstreamSinceTheLastSynchronization() {
+        // Reproduces the failure observed on the test deployment: a merge request mirrored two weeks
+        // before the review, with a reconciliation in between that correctly wrote nothing because
+        // the record was unchanged. Backfill and replay both depend on this remaining reviewable.
         ArtifactSourceManifest manifest = coreManifest(builder, "job-quiet-mirror", NOW.minusSeconds(14 * 86_400));
 
         assertThat(
@@ -318,13 +317,13 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldReachTheSameVerdictWhenReplayed() {
+    void shouldProduceTheSameReadinessResultWhenReplayed() {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-replay", NOW);
         List<Practice> practices = List.of(practiceRequiring(CORE, "pr-core"));
 
         var original = builder.checkAutomatedReviewReadiness(manifest, practices, NOW);
-        // Months later, against the recorded evidence and the recorded anchor. A replay that can
-        // reach a different verdict from the same inputs is not a replay.
+        // Re-evaluated much later against the recorded evidence and the recorded anchor. Readiness is
+        // a pure function of those inputs, so the result must be identical.
         var replayed = builderAt(NOW.plusSeconds(90 * 86_400)).checkAutomatedReviewReadiness(manifest, practices, NOW);
 
         assertThat(replayed.readyPractices()).hasSameElementsAs(original.readyPractices());
@@ -445,7 +444,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldNotRefuseWhenCurrentnessCannotBeDemonstrated() {
+    void shouldTreatAnIncoherentWatermarkAsUnknownRatherThanStale() {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-invalid-watermark", NOW.plusSeconds(60));
 
         // Nothing here can show the copy is behind: the mirror records when a row last changed, not
