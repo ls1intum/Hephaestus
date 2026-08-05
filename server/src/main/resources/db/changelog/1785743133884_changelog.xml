@@ -657,6 +657,12 @@
             WHERE p.automated_review_policy @> '{"requiredEvidence": [{"sourceKind": "scm.pull-request.diff"}]}'
               AND NOT p.automated_review_policy @> '{"optionalContext": [{"sourceKind": "scm.repository.tree"}]}';
 
+            -- Only the current revision, never a superseded one. A superseded revision records the rules
+            -- that were in force while it was current; granting it a source it never had would rewrite
+            -- that record and destroy the fingerprint that identifies the rules it was reviewed under.
+            -- The current revision must move because the projection trigger requires it to match its
+            -- practice, and clearing its fingerprint is the point: the startup backfill recomputes it,
+            -- which marks claims made under the previous rules as needing re-evaluation.
             UPDATE practice_revision v
             SET automated_review_policy = jsonb_set(
                     v.automated_review_policy,
@@ -664,9 +670,10 @@
                     coalesce(v.automated_review_policy->'optionalContext', '[]'::jsonb)
                         || '[{"sourceKind": "scm.repository.tree"}]'::jsonb
                 ),
-                -- The review rules changed, so the recorded fingerprint no longer describes them.
                 review_rule_fingerprint = NULL
-            WHERE v.automated_review_policy IS NOT NULL
+            FROM practice p
+            WHERE p.current_revision_id = v.id
+              AND v.automated_review_policy IS NOT NULL
               AND v.automated_review_policy @> '{"requiredEvidence": [{"sourceKind": "scm.pull-request.diff"}]}'
               AND NOT v.automated_review_policy @> '{"optionalContext": [{"sourceKind": "scm.repository.tree"}]}';
 
