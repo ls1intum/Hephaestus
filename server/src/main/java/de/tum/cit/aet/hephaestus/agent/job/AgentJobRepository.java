@@ -295,8 +295,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("ID-based provenance stamp; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
-        "UPDATE AgentJob j SET j.promptDigest = :promptDigest, j.inputsDigest = :inputsDigest, " +
-            "j.evidenceSnapshot = :evidenceSnapshot, j.reviewReadiness = :reviewReadiness " +
+        "UPDATE AgentJob j SET j.promptDigest = :#{#stamp.promptDigest}, " +
+            "j.inputsDigest = :#{#stamp.inputsDigest}, " +
+            "j.evidenceSnapshot = :#{#stamp.evidenceSnapshot}, " +
+            "j.reviewReadiness = :#{#stamp.reviewReadiness} " +
             "WHERE j.id = :id AND j.status = 'RUNNING' " +
             "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) " +
             "AND j.retryCount = :retryCount"
@@ -305,11 +307,16 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("id") UUID id,
         @Param("workerId") String workerId,
         @Param("retryCount") int retryCount,
-        @Param("promptDigest") String promptDigest,
-        @Param("inputsDigest") String inputsDigest,
-        @Param("evidenceSnapshot") JsonNode evidenceSnapshot,
-        @Param("reviewReadiness") JsonNode reviewReadiness
+        @Param("stamp") ProvenanceStamp stamp
     );
+
+    /** What one run consumed, written as a unit so the snapshot and its decisions cannot diverge. */
+    record ProvenanceStamp(
+        @Nullable String promptDigest,
+        @Nullable String inputsDigest,
+        @Nullable JsonNode evidenceSnapshot,
+        @Nullable JsonNode reviewReadiness
+    ) {}
 
     @WorkspaceAgnostic("ID-based evidence-refusal transition; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)

@@ -732,10 +732,14 @@ public class AgentJobExecutor {
                 jobId,
                 workerId,
                 retryCount,
-                promptDigest,
-                inputsDigest,
-                evidenceSnapshot,
-                automatedReviewReadinessReport == null ? null : objectMapper.valueToTree(automatedReviewReadinessReport)
+                new AgentJobRepository.ProvenanceStamp(
+                    promptDigest,
+                    inputsDigest,
+                    evidenceSnapshot,
+                    automatedReviewReadinessReport == null
+                        ? null
+                        : objectMapper.valueToTree(automatedReviewReadinessReport)
+                )
             )
         );
         if (updated == null || updated != 1) {

@@ -601,21 +601,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             // The adapter's prompt digest, and an inputs digest over the merged file set — written first, so an
             // observation can always be tied to what produced it even when the sandbox then fails.
-            ArgumentCaptor<String> inputsDigest = ArgumentCaptor.forClass(String.class);
+            ArgumentCaptor<AgentJobRepository.ProvenanceStamp> stamp = ArgumentCaptor.forClass(
+                AgentJobRepository.ProvenanceStamp.class
+            );
             InOrder order = inOrder(jobRepository, sandboxManager);
-            order
-                .verify(jobRepository)
-                .updateProvenanceDigests(
-                    eq(jobId),
-                    isNull(),
-                    eq(0),
-                    eq("prompt-digest"),
-                    inputsDigest.capture(),
-                    any(),
-                    any()
-                );
+            order.verify(jobRepository).updateProvenanceDigests(eq(jobId), isNull(), eq(0), stamp.capture());
             order.verify(sandboxManager).execute(any());
-            assertThat(inputsDigest.getValue()).matches("[0-9a-f]{64}");
+            assertThat(stamp.getValue().promptDigest()).isEqualTo("prompt-digest");
+            assertThat(stamp.getValue().inputsDigest()).matches("[0-9a-f]{64}");
         }
 
         @Test
@@ -634,9 +627,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 PreparedJobInputs.filesOnly(Map.of("task.json", "{}".getBytes()))
             );
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
-            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any())).thenReturn(
-                0
-            );
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(0);
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
@@ -693,26 +684,16 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(handler.prepareInputs(any())).thenThrow(
                 new InsufficientEvidenceException("No practice has sufficient evidence", inputs)
             );
-            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any())).thenReturn(
-                1
-            );
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
             when(jobRepository.transitionToEvidenceRefused(any(), any(), anyInt(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
 
-            ArgumentCaptor<JsonNode> evidence = ArgumentCaptor.forClass(JsonNode.class);
-            verify(jobRepository).updateProvenanceDigests(
-                eq(jobId),
-                isNull(),
-                eq(0),
-                isNull(),
-                any(),
-                evidence.capture(),
-                any()
+            ArgumentCaptor<AgentJobRepository.ProvenanceStamp> stamp = ArgumentCaptor.forClass(
+                AgentJobRepository.ProvenanceStamp.class
             );
-            assertThat(
-                evidence.getValue().path("automatedReviewReadiness").path("decisions").get(0).path("ready").asBoolean()
-            ).isFalse();
+            verify(jobRepository).updateProvenanceDigests(eq(jobId), isNull(), eq(0), stamp.capture());
+            assertThat(stamp.getValue().reviewReadiness().path("decisions").get(0).path("ready").asBoolean()).isFalse();
             ArgumentCaptor<JsonNode> output = ArgumentCaptor.forClass(JsonNode.class);
             verify(jobRepository).transitionToEvidenceRefused(eq(jobId), isNull(), eq(0), any(), output.capture());
             assertThat(output.getValue().path("outcome").asString()).isEqualTo("INSUFFICIENT_EVIDENCE");
@@ -2039,9 +2020,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(0);
-            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any())).thenReturn(
-                1
-            );
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.prepareInputs(any())).thenReturn(PreparedJobInputs.filesOnly(Map.of()));
@@ -2087,9 +2066,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private JobTypeHandler setupFullExecution(SandboxResult sandboxResult) {
         // Every execution stamps its provenance digests before the sandbox starts, and fails loud if the write
         // matches no row — so the standard path must report the row it updated.
-        lenient()
-            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any()))
-            .thenReturn(1);
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputs(any())).thenReturn(
@@ -2139,9 +2116,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     private void setupFullExecutionWithException(Exception exception) {
-        lenient()
-            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any()))
-            .thenReturn(1);
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputs(any())).thenReturn(PreparedJobInputs.filesOnly(Map.of()));
