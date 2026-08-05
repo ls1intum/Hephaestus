@@ -5,9 +5,11 @@ import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStatusDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeAreaStatusService;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -51,6 +53,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeAreaController {
 
     private final PracticeAreaService areaService;
+    private final PracticeAreaStatusService practiceAreaStatusService;
     private final CatalogOriginPresenter presenter;
 
     @GetMapping
@@ -86,6 +89,24 @@ public class PracticeAreaController {
     @SecurityRequirements
     public ResponseEntity<PracticeAreaDTO> getArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
         return ResponseEntity.ok(presenter.present(areaService.getArea(workspaceContext, areaSlug)));
+    }
+
+    @GetMapping("/status")
+    @Operation(
+        summary = "Derived practice-area statuses for the current developer",
+        description = "Aggregates the authenticated developer's latest-run findings across every active practice " +
+            "area into qualitative statuses, with supporting feedback items attached so each status stays " +
+            "traceable to real feedback. NO_DATA when an area has no displayable findings for the caller."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Active-area statuses returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeAreaStatusDTO.class)))
+    )
+    @SecurityRequirements
+    public ResponseEntity<List<PracticeAreaStatusDTO>> getPracticeAreaStatuses(WorkspaceContext workspaceContext) {
+        List<PracticeArea> activeAreas = areaService.listAreas(workspaceContext, true);
+        return ResponseEntity.ok(practiceAreaStatusService.getAreaStatuses(workspaceContext.id(), activeAreas));
     }
 
     @PostMapping

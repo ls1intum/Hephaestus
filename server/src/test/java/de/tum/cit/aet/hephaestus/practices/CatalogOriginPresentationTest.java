@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeAreaStatusService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
@@ -65,7 +66,11 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         WorkspaceContext context = mock(WorkspaceContext.class);
         List<PracticeArea> areas = List.of(mock(PracticeArea.class), mock(PracticeArea.class));
         when(service.listAreas(context, null)).thenReturn(areas);
-        PracticeAreaController controller = new PracticeAreaController(service, presenter);
+        PracticeAreaController controller = new PracticeAreaController(
+            service,
+            mock(PracticeAreaStatusService.class),
+            presenter
+        );
 
         controller.listAreas(context, null);
 

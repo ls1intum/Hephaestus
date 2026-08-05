@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation.dto;
 
+import de.tum.cit.aet.hephaestus.practices.observation.AreaTrajectory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -34,7 +35,13 @@ public record ReflectionPracticeDTO(
     @NonNull
     @Schema(description = "Specific feedback to act on (highest-impact first)")
     List<ReflectionItemDTO> toWorkOn,
-    @NonNull @Schema(description = "What the developer already does well here") List<ReflectionItemDTO> strengths
+    @NonNull @Schema(description = "What the developer already does well here") List<ReflectionItemDTO> strengths,
+    @Nullable
+    @Schema(
+        description = "Day-to-day direction of this practice's feedback (null until two days carry evidence)",
+        allowableValues = { "IMPROVING", "STEADY", "REGRESSING" }
+    )
+    AreaTrajectory trajectory
 ) {
     /** Coarse, human standing derived from the developer's latest-run feedback on this practice. */
     public enum Standing {

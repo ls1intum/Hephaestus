@@ -4070,6 +4070,34 @@ paths:
       summary: Reorder practice areas
       tags:
       - Practice Areas
+  /workspaces/{workspaceSlug}/practice-areas/status:
+    get:
+      description: "Aggregates the authenticated developer's latest-run findings across\
+        \ every active practice area into qualitative statuses, with supporting feedback\
+        \ items attached so each status stays traceable to real feedback. NO_DATA\
+        \ when an area has no displayable findings for the caller."
+      operationId: getPracticeAreaStatuses
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeAreaStatus"
+          description: Active-area statuses returned
+      security: []
+      summary: Derived practice-area statuses for the current developer
+      tags:
+      - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
     delete:
       description: "Moves its practices to Unassigned, then deletes the area"
@@ -4396,6 +4424,12 @@ paths:
         required: false
         schema:
           type: string
+      - description: Filter by the practice area the observed practice belongs to
+        in: query
+        name: areaSlug
+        required: false
+        schema:
+          type: string
       - description: Filter by presence
         in: query
         name: presence
@@ -4406,6 +4440,63 @@ paths:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+      - description: Only observations on these artifact kinds (repeatable); omit
+          for all kinds
+        in: query
+        name: artifactTypes
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - PULL_REQUEST
+            - ISSUE
+            - CONVERSATION_THREAD
+      - description: Only observations with these severities (repeatable); omit for
+          all
+        in: query
+        name: severities
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - description: Drop NOT_APPLICABLE rows — only observations where the practice
+          actually applied
+        in: query
+        name: displayableOnly
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - description: "Feed ordering: DATE (default) or SEVERITY (most severe first,\
+          \ ties newest-first)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+          default: DATE
+          enum:
+          - DATE
+          - SEVERITY
+      - description: "Ordering direction: for DATE newest/oldest first, for SEVERITY\
+          \ most/least severe first"
+        in: query
+        name: direction
+        required: false
+        schema:
+          type: string
+          default: DESC
+          enum:
+          - ASC
+          - DESC
       - in: query
         name: page
         required: false
@@ -8160,6 +8251,24 @@ components:
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review
+    FeedbackSourceCount:
+      type: object
+      description: Distinct work artifacts of one kind that contributed feedback
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Distinct artifacts of this kind in the window
+        source:
+          type: string
+          description: The kind of work the feedback came from
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          - CONVERSATION_THREAD
+      required:
+      - count
+      - source
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -8978,6 +9087,10 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        artifactUrl:
+          type: string
+          description: Link to the reviewed artifact on its platform (null when it
+            cannot be resolved)
         assessment:
           type: string
           description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
@@ -9591,6 +9704,72 @@ components:
       - id
       - name
       - slug
+    PracticeAreaStatus:
+      type: object
+      description: A developer's derived qualitative standing for one practice area
+      properties:
+        areaName:
+          type: string
+          description: Area name
+        areaSlug:
+          type: string
+          description: Area slug
+        feedbackSince:
+          type: string
+          format: date-time
+          description: When the oldest observation contributing to this status was
+            made (null for NO_DATA)
+        feedbackSpanDays:
+          type: integer
+          format: int32
+          description: Days of feedback the status actually rests on — since the oldest
+            in-window observation (null for NO_DATA)
+        guidance:
+          type: string
+          description: "Learner-facing guidance aggregated from the area's feedback\
+            \ (null for NO_DATA). The deterministic summary combines standing, next\
+            \ focus, and learner-facing catalog guidance; the same field carries AI-aggregated\
+            \ guidance when a provider supplies it."
+        guidanceSource:
+          type: string
+          description: How the guidance text was produced (null when there is no guidance)
+          enum:
+          - RULE_BASED
+          - AI_AGGREGATED
+        items:
+          type: array
+          description: Supporting feedback the status derives from (problems first);
+            empty only for NO_DATA
+          items:
+            $ref: "#/components/schemas/ReflectionItem"
+        sources:
+          type: array
+          description: "Distinct work artifacts the feedback comes from, per kind\
+            \ (provenance, not a score); empty for NO_DATA"
+          items:
+            $ref: "#/components/schemas/FeedbackSourceCount"
+        status:
+          type: string
+          description: Derived qualitative status across the area's practices
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+          - NO_DATA
+        trajectory:
+          type: string
+          description: Weighted direction of the area's per-practice day-to-day standing
+            changes (null until at least one practice has two evidence-bearing days)
+          enum:
+          - IMPROVING
+          - STEADY
+          - REGRESSING
+      required:
+      - areaName
+      - areaSlug
+      - items
+      - sources
+      - status
     PracticeReviewSettings:
       type: object
       description: "A workspace's practice-review policy: effective values plus raw\
@@ -10200,6 +10379,14 @@ components:
           description: Specific feedback to act on (highest-impact first)
           items:
             $ref: "#/components/schemas/ReflectionItem"
+        trajectory:
+          type: string
+          description: Day-to-day direction of this practice's feedback (null until
+            two days carry evidence)
+          enum:
+          - IMPROVING
+          - STEADY
+          - REGRESSING
         whatGoodLooksLike:
           type: string
           description: A concrete picture of doing this well

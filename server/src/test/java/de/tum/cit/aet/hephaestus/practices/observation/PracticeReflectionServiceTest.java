@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -38,7 +39,7 @@ import org.springframework.data.domain.Pageable;
  * null-severity item sorts after a graded one.
  */
 @ExtendWith(MockitoExtension.class)
-class ObservationServiceReflectionTest extends BaseUnitTest {
+class PracticeReflectionServiceTest extends BaseUnitTest {
 
     private static final Long WORKSPACE_ID = 1L;
     private static final Long USER_ID = 7L;
@@ -52,14 +53,18 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
-    private ObservationService observationService;
+    private PracticeReflectionService practiceReflectionService;
 
     @BeforeEach
     void setUp() {
         User user = new User();
         user.setId(USER_ID);
         when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
+        when(clock.instant()).thenReturn(Instant.parse("2026-08-05T10:00:00Z"));
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
@@ -122,7 +127,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
         when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         List<Severity> order = cards
@@ -154,7 +159,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(lowConfCritical, confidentMinor));
         when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
@@ -183,7 +188,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(q1, q2));
         when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
         // No toWorkOn items and no strengths → the card is empty and contributes nothing to the dashboard.
         assertThat(cards).isEmpty();
@@ -208,7 +213,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(minorTargetB, criticalTargetA));
         when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         // Neither is quarantined (2 distinct targets) → the CRITICAL leads on severity-weight.
@@ -236,7 +241,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(lowConfLocusA, confidentLocusB));
         when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
@@ -266,7 +271,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(locusOnA, locusOnB));
         when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         // Both share a locus seen on 2 targets → neither quarantined → both displayed.

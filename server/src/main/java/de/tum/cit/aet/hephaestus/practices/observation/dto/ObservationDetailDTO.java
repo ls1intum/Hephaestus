@@ -41,11 +41,15 @@ public record ObservationDetailDTO(
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
+    @Nullable
+    @Schema(description = "Link to the reviewed artifact on its platform (null when it cannot be resolved)")
+    String artifactUrl,
     @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     public static ObservationDetailDTO from(
         Observation observation,
         @Nullable String deliveredGuidance,
+        @Nullable String artifactUrl,
         tools.jackson.databind.ObjectMapper mapper
     ) {
         var practice = observation.getPractice();
@@ -63,6 +67,7 @@ public record ObservationDetailDTO(
             toMap(observation.getEvidence(), mapper),
             observation.getReasoning(),
             deliveredGuidance,
+            artifactUrl,
             observation.getObservedAt()
         );
     }

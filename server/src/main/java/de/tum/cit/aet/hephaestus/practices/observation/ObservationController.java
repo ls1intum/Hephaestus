@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
@@ -46,6 +48,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class ObservationController {
 
     private final ObservationService observationService;
+    private final PracticeReflectionService practiceReflectionService;
     private final JsonMapper objectMapper;
 
     @GetMapping
@@ -58,16 +61,49 @@ public class ObservationController {
     public ResponseEntity<Page<ObservationListDTO>> listObservations(
         WorkspaceContext workspaceContext,
         @Parameter(description = "Filter by practice slug") @RequestParam(required = false) String practiceSlug,
+        @Parameter(description = "Filter by the practice area the observed practice belongs to") @RequestParam(
+            required = false
+        ) String areaSlug,
         @Parameter(description = "Filter by presence") @RequestParam(required = false) Presence presence,
+        @Parameter(
+            description = "Only observations on these artifact kinds (repeatable); omit for all kinds"
+        ) @RequestParam(required = false) List<WorkArtifact> artifactTypes,
+        @Parameter(description = "Only observations with these severities (repeatable); omit for all") @RequestParam(
+            required = false
+        ) List<Severity> severities,
+        @Parameter(
+            description = "Drop NOT_APPLICABLE rows — only observations where the practice actually applied"
+        ) @RequestParam(required = false, defaultValue = "false") boolean displayableOnly,
+        @Parameter(
+            description = "Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)"
+        ) @RequestParam(required = false, defaultValue = "DATE") ObservationService.ObservationSort sort,
+        @Parameter(
+            description = "Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first"
+        ) @RequestParam(required = false, defaultValue = "DESC") Sort.Direction direction,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
         int safePage = Math.max(page, 0);
         int pageSize = Math.max(1, Math.min(size, 100));
-        Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("observedAt").descending());
+        // The severity query carries its own ORDER BY; an additional pageable sort would conflict.
+        Pageable pageable =
+            sort == ObservationService.ObservationSort.SEVERITY
+                ? PageRequest.of(safePage, pageSize)
+                : PageRequest.of(safePage, pageSize, Sort.by(direction, "observedAt"));
 
         Page<ObservationListDTO> observations = observationService
-            .getObservations(workspaceContext.id(), practiceSlug, presence, pageable)
+            .getObservations(
+                workspaceContext.id(),
+                practiceSlug,
+                areaSlug,
+                presence,
+                artifactTypes,
+                severities,
+                displayableOnly,
+                sort,
+                direction == Sort.Direction.DESC,
+                pageable
+            )
             .map(ObservationListDTO::from);
         return ResponseEntity.ok(observations);
     }
@@ -107,7 +143,7 @@ public class ObservationController {
     )
     @SecurityRequirements
     public ResponseEntity<List<ReflectionPracticeDTO>> getReflection(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(observationService.getReflection(workspaceContext.id()));
+        return ResponseEntity.ok(practiceReflectionService.getReflection(workspaceContext.id()));
     }
 
     @GetMapping("/{observationId}")
@@ -129,7 +165,8 @@ public class ObservationController {
     ) {
         var observation = observationService.getObservation(workspaceContext.id(), observationId);
         String deliveredGuidance = observationService.getDeliveredGuidance(observationId).orElse(null);
-        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredGuidance, objectMapper));
+        String artifactUrl = observationService.getArtifactUrl(workspaceContext.id(), observation).orElse(null);
+        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredGuidance, artifactUrl, objectMapper));
     }
 
     @GetMapping("/pull-request/{prId}")

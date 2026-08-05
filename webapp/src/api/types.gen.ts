@@ -2144,6 +2144,10 @@ export type ReflectionPractice = {
      */
     toWorkOn: Array<ReflectionItem>;
     /**
+     * Day-to-day direction of this practice's feedback (null until two days carry evidence)
+     */
+    trajectory?: 'IMPROVING' | 'STEADY' | 'REGRESSING';
+    /**
      * A concrete picture of doing this well
      */
     whatGoodLooksLike?: string;
@@ -2616,6 +2620,66 @@ export type PracticeReviewSettings = {
      * Raw override; null = inheriting the fleet default
      */
     skipDraftsOverride?: boolean;
+};
+
+/**
+ * A developer's derived qualitative standing for one practice area
+ */
+export type PracticeAreaStatus = {
+    /**
+     * Area name
+     */
+    areaName: string;
+    /**
+     * Area slug
+     */
+    areaSlug: string;
+    /**
+     * When the oldest observation contributing to this status was made (null for NO_DATA)
+     */
+    feedbackSince?: Date;
+    /**
+     * Days of feedback the status actually rests on — since the oldest in-window observation (null for NO_DATA)
+     */
+    feedbackSpanDays?: number;
+    /**
+     * Learner-facing guidance aggregated from the area's feedback (null for NO_DATA). The deterministic summary combines standing, next focus, and learner-facing catalog guidance; the same field carries AI-aggregated guidance when a provider supplies it.
+     */
+    guidance?: string;
+    /**
+     * How the guidance text was produced (null when there is no guidance)
+     */
+    guidanceSource?: 'RULE_BASED' | 'AI_AGGREGATED';
+    /**
+     * Supporting feedback the status derives from (problems first); empty only for NO_DATA
+     */
+    items: Array<ReflectionItem>;
+    /**
+     * Distinct work artifacts the feedback comes from, per kind (provenance, not a score); empty for NO_DATA
+     */
+    sources: Array<FeedbackSourceCount>;
+    /**
+     * Derived qualitative status across the area's practices
+     */
+    status: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NO_DATA';
+    /**
+     * Weighted direction of the area's per-practice day-to-day standing changes (null until at least one practice has two evidence-bearing days)
+     */
+    trajectory?: 'IMPROVING' | 'STEADY' | 'REGRESSING';
+};
+
+/**
+ * Distinct work artifacts of one kind that contributed feedback
+ */
+export type FeedbackSourceCount = {
+    /**
+     * Distinct artifacts of this kind in the window
+     */
+    count: number;
+    /**
+     * The kind of work the feedback came from
+     */
+    source: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
 };
 
 /**
@@ -3230,6 +3294,10 @@ export type ObservationDetail = {
      * Artifact type (e.g. PULL_REQUEST)
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Link to the reviewed artifact on its platform (null when it cannot be resolved)
+     */
+    artifactUrl?: string;
     /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
@@ -8120,6 +8188,27 @@ export type ReorderAreasResponses = {
 
 export type ReorderAreasResponse = ReorderAreasResponses[keyof ReorderAreasResponses];
 
+export type GetPracticeAreaStatusesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/status';
+};
+
+export type GetPracticeAreaStatusesResponses = {
+    /**
+     * Active-area statuses returned
+     */
+    200: Array<PracticeAreaStatus>;
+};
+
+export type GetPracticeAreaStatusesResponse = GetPracticeAreaStatusesResponses[keyof GetPracticeAreaStatusesResponses];
+
 export type DeleteAreaData = {
     body?: never;
     path: {
@@ -8415,9 +8504,33 @@ export type ListObservationsData = {
          */
         practiceSlug?: string;
         /**
+         * Filter by the practice area the observed practice belongs to
+         */
+        areaSlug?: string;
+        /**
          * Filter by presence
          */
         presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+        /**
+         * Only observations on these artifact kinds (repeatable); omit for all kinds
+         */
+        artifactTypes?: Array<'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD'>;
+        /**
+         * Only observations with these severities (repeatable); omit for all
+         */
+        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        /**
+         * Drop NOT_APPLICABLE rows — only observations where the practice actually applied
+         */
+        displayableOnly?: boolean;
+        /**
+         * Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)
+         */
+        sort?: 'DATE' | 'SEVERITY';
+        /**
+         * Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first
+         */
+        direction?: 'ASC' | 'DESC';
         page?: number;
         size?: number;
     };
