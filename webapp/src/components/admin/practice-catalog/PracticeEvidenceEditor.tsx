@@ -125,7 +125,7 @@ function RequirementCheckbox({
 					onCheckedChange={(next) => onCheckedChange(next === true)}
 				/>
 				<FieldTitle className="font-normal">
-					{label} <span className="sr-only">for {sourceLabel}</span>
+					{label} <span className="sr-only">— {sourceLabel}</span>
 				</FieldTitle>
 			</Field>
 		</FieldLabel>
@@ -552,7 +552,7 @@ export function PracticeEvidenceEditor({
 								);
 								return (
 									<div key={source.sourceKind} className="rounded-lg border p-4">
-										<div className="grid gap-3 sm:grid-cols-[1fr_12rem] sm:items-start">
+										<div className="space-y-3">
 											<div>
 												<div className="flex flex-wrap items-center gap-2">
 													<p className="font-medium">{sourceLabel}</p>
@@ -613,17 +613,17 @@ export function PracticeEvidenceEditor({
 											<div className="mt-4 border-t pt-4">
 												<FieldSet>
 													<FieldLegend variant="label">
-														Minimum quality <span className="sr-only">for {sourceLabel}</span>
+														Only review when <span className="sr-only">{sourceLabel} is</span>
 													</FieldLegend>
 													<FieldDescription>
 														Hephaestus skips the practice when a checked requirement is not met.
 														Only the requirements this source can establish are shown.
 													</FieldDescription>
-													<div className="flex flex-wrap gap-x-5 gap-y-2">
+													<div className="space-y-2">
 														{source.supportsComplete && (
 															<RequirementCheckbox
 																id={`practice-completeness-${source.sourceKind}`}
-																label="Must be complete"
+																label="fully captured, not cut off by a size limit"
 																sourceLabel={sourceLabel}
 																disabled={disabled}
 																checked={requirement.completeness === "COMPLETE"}
@@ -639,7 +639,7 @@ export function PracticeEvidenceEditor({
 														{source.supportsCurrent && (
 															<RequirementCheckbox
 																id={`practice-freshness-${source.sourceKind}`}
-																label="Must be current"
+																label="taken from the exact commit under review"
 																sourceLabel={sourceLabel}
 																disabled={disabled}
 																checked={requirement.freshness === "CURRENT"}
@@ -655,7 +655,7 @@ export function PracticeEvidenceEditor({
 														{source.supportsEmpty && (
 															<RequirementCheckbox
 																id={`practice-content-${source.sourceKind}`}
-																label="Must not be empty"
+																label="not empty"
 																sourceLabel={sourceLabel}
 																disabled={disabled}
 																checked={requirement.content === "NON_EMPTY"}

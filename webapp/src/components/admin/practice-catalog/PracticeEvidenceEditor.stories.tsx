@@ -48,20 +48,18 @@ export const EveryChoiceIsVisible: Story = {
 		await expect(within(diff).getByRole("radio", { name: "Optional context" })).toBeVisible();
 		await expect(within(diff).getByRole("radio", { name: "Not used" })).toBeVisible();
 
+		await expect(canvas.getByRole("checkbox", { name: /not empty — Code changes/ })).toBeChecked();
 		await expect(
-			canvas.getByRole("checkbox", { name: "Must not be empty for Code changes" }),
-		).toBeChecked();
-		await expect(
-			canvas.getByRole("checkbox", { name: "Must be complete for Code changes" }),
+			canvas.getByRole("checkbox", { name: /fully captured.*Code changes/ }),
 		).toBeChecked();
 
 		// The pull-request record's freshness mode is NOT_APPLICABLE, so the control is absent rather
 		// than present-and-unselectable.
 		await expect(
-			canvas.getByRole("checkbox", { name: "Must be complete for Pull request details" }),
+			canvas.getByRole("checkbox", { name: /fully captured.*Pull request details/ }),
 		).toBeChecked();
 		await expect(
-			canvas.queryByRole("checkbox", { name: "Must be current for Pull request details" }),
+			canvas.queryByRole("checkbox", { name: /exact commit.*Pull request details/ }),
 		).toBeNull();
 
 		await expect(canvas.queryByRole("combobox", { name: /Use in this practice/ })).toBeNull();
