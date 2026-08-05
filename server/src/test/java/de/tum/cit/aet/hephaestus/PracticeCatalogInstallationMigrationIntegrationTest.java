@@ -69,16 +69,12 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 "source_curated_fingerprint = repeat('c', 64) WHERE id = 136302"
         );
         seedLegacyAuditVocabulary();
-        // The v1 -> v2 stamping is asserted before the changesets that follow it, because a later
-        // review-rule change legitimately clears the fingerprint it stamped.
-        updateThrough("1785743133884-11");
-        assertHistoricalFingerprintsVersioned();
         try (Liquibase liquibase = liquibase()) {
             liquibase.update(contexts());
         }
 
         assertMarkerRepair();
-        assertRuleChangeInvalidatedCurrentFingerprint();
+        assertHistoricalFingerprintsVersioned();
         assertAuditHistoryPreserved();
         assertEmptyCatalogBootstrap();
         assertWorkspaceRevisionBackfill();
@@ -134,23 +130,6 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     "WHERE practice_id = 136301 ORDER BY revision_number DESC LIMIT 1"
             )
         ).isEqualTo("v1:" + "a".repeat(64));
-        assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302")).isEqualTo(
-            "v1:" + "c".repeat(64)
-        );
-    }
-
-    /**
-     * Granting the repository tree changed the current revision's review rules, so the fingerprint that
-     * identified the previous rules must not survive: leaving it would let a claim evaluated under the
-     * old rules read as still current. The startup backfill recomputes it.
-     */
-    private static void assertRuleChangeInvalidatedCurrentFingerprint() throws SQLException {
-        assertThat(
-            scalar(
-                "SELECT review_rule_fingerprint FROM practice_revision " +
-                    "WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)"
-            )
-        ).isNull();
         assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302")).isEqualTo(
             "v1:" + "c".repeat(64)
         );
@@ -341,14 +320,12 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             WHERE practice_id = 136301 AND slug IS NOT NULL AND review_rule_fingerprint IS NULL
             """
         );
-        // Two revisions carry no fingerprint: the one that never had one, and the current revision,
-        // whose fingerprint the review-rule change cleared for the startup backfill to recompute.
         assertThat(
             scalar(
                 "SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301" +
                     " AND review_rule_fingerprint = ('v2:' || repeat('a', 64))"
             )
-        ).isEqualTo("2");
+        ).isEqualTo("1");
 
         assertThatThrownBy(() ->
             execute(

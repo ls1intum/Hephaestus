@@ -16,9 +16,9 @@
         <sql>
             UPDATE practice
             SET automated_review_policy = CASE applies_to
-                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
-                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
-                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
+                WHEN 'ISSUE' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"issue-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"NO_REQUIREMENT","content":"NO_REQUIREMENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"IMPLEMENTATION_NOT_OBSERVED","description":"Issue evidence does not establish whether the described work was implemented correctly."}]}'::jsonb
+                WHEN 'CONVERSATION_THREAD' THEN '{"sourceContractVersion":"1.0.0","evidenceProfile":"conversation-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"NO_REQUIREMENT","content":"NO_REQUIREMENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"PRIVATE_CONTEXT_NOT_OBSERVED","description":"The captured thread does not include decisions or context shared outside the conversation."}]}'::jsonb
+                ELSE '{"sourceContractVersion":"1.0.0","evidenceProfile":"pull-request-review","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"NO_REQUIREMENT","content":"NO_REQUIREMENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT","content":"NON_EMPTY"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"},{"sourceKind":"scm.repository.tree"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[{"code":"RUNTIME_BEHAVIOR_NOT_OBSERVED","description":"Repository evidence does not establish behavior in a deployed runtime."}]}'::jsonb
             END
         </sql>
         <addNotNullConstraint tableName="practice" columnName="automated_review_policy" columnDataType="jsonb"/>
@@ -552,137 +552,6 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-evidence-contract" id="1785743133884-12">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.automated_review_policy is not present">
-            <!-- Both statements below are guarded by IS DISTINCT FROM, so this changeset is idempotent
-                 and needs no precondition on the data itself. A count-based precondition here would be
-                 satisfied only once the work was already done, and onFail="MARK_RAN" would then record
-                 the changeset as applied without running it. -->
-            <columnExists tableName="practice" columnName="automated_review_policy"/>
-        </preConditions>
-        <comment>Bring stored policies in line with the source contract's currentness and content fields.</comment>
-        <sql splitStatements="false"><![CDATA[
-            -- Only sources pinned to an immutable upstream identity can establish currentness, so a
-            -- stored CURRENT requirement on any other source is one authoring validation now rejects:
-            -- every practice predating that change fails to save until its policy is normalised. The
-            -- optional content field is written at the same time so the practice row and its current
-            -- revision stay byte-identical, which the projection trigger requires.
-            ALTER TABLE practice DISABLE TRIGGER practice_requires_current_revision_projection;
-            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
 
-            WITH normalised AS (
-                SELECT p.id,
-                       jsonb_set(
-                           p.automated_review_policy,
-                           '{requiredEvidence}',
-                           (
-                               SELECT coalesce(jsonb_agg(
-                                   CASE
-                                       WHEN r->>'sourceKind' NOT IN ('scm.pull-request.diff', 'scm.repository.tree')
-                                           THEN jsonb_set(r, '{freshness}', '"NO_REQUIREMENT"')
-                                       ELSE r
-                                   END || jsonb_build_object('content', coalesce(r->>'content', 'NO_REQUIREMENT'))
-                                   ORDER BY ordinality
-                               ), '[]'::jsonb)
-                               FROM jsonb_array_elements(p.automated_review_policy->'requiredEvidence')
-                                   WITH ORDINALITY AS elements(r, ordinality)
-                           )
-                       ) AS policy
-                FROM practice p
-            )
-            UPDATE practice p SET automated_review_policy = normalised.policy
-            FROM normalised WHERE normalised.id = p.id
-              AND p.automated_review_policy IS DISTINCT FROM normalised.policy;
-
-            WITH normalised AS (
-                SELECT v.id,
-                       jsonb_set(
-                           v.automated_review_policy,
-                           '{requiredEvidence}',
-                           (
-                               SELECT coalesce(jsonb_agg(
-                                   CASE
-                                       WHEN r->>'sourceKind' NOT IN ('scm.pull-request.diff', 'scm.repository.tree')
-                                           THEN jsonb_set(r, '{freshness}', '"NO_REQUIREMENT"')
-                                       ELSE r
-                                   END || jsonb_build_object('content', coalesce(r->>'content', 'NO_REQUIREMENT'))
-                                   ORDER BY ordinality
-                               ), '[]'::jsonb)
-                               FROM jsonb_array_elements(v.automated_review_policy->'requiredEvidence')
-                                   WITH ORDINALITY AS elements(r, ordinality)
-                           )
-                       ) AS policy
-                FROM practice_revision v
-                WHERE v.automated_review_policy IS NOT NULL
-            )
-            UPDATE practice_revision v
-            SET automated_review_policy = normalised.policy,
-                -- The review rules changed, so the recorded fingerprint no longer describes them.
-                -- Clearing it lets the startup backfill recompute it, which also marks findings
-                -- recorded under the old rules as needing re-evaluation.
-                review_rule_fingerprint = NULL
-            FROM normalised WHERE normalised.id = v.id
-              AND v.automated_review_policy IS DISTINCT FROM normalised.policy;
-
-            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
-            ALTER TABLE practice ENABLE TRIGGER practice_requires_current_revision_projection;
-        ]]></sql>
-        <rollback>
-            <comment>Normalisation is not reversible: the superseded policies were invalid under the contract.</comment>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-evidence-contract" id="1785743133884-13">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.automated_review_policy is not present">
-            <columnExists tableName="practice" columnName="automated_review_policy"/>
-        </preConditions>
-        <comment>Offer the repository tree as optional context to practices that review a diff.</comment>
-        <sql splitStatements="false"><![CDATA[
-            -- A practice that reviews a diff can only judge the changed lines it was given; the code a
-            -- changed line calls into lives elsewhere in the repository. Listing the tree as optional
-            -- context lets the reviewing agent open that code and cite it, and cannot make a practice
-            -- unreviewable, because an optional source never gates readiness. Practices installed
-            -- before this changeset keep their own copy of the policy, so the catalog change alone
-            -- would never reach them.
-            ALTER TABLE practice DISABLE TRIGGER practice_requires_current_revision_projection;
-            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
-
-            UPDATE practice p
-            SET automated_review_policy = jsonb_set(
-                p.automated_review_policy,
-                '{optionalContext}',
-                coalesce(p.automated_review_policy->'optionalContext', '[]'::jsonb)
-                    || '[{"sourceKind": "scm.repository.tree"}]'::jsonb
-            )
-            WHERE p.automated_review_policy @> '{"requiredEvidence": [{"sourceKind": "scm.pull-request.diff"}]}'
-              AND NOT p.automated_review_policy @> '{"optionalContext": [{"sourceKind": "scm.repository.tree"}]}';
-
-            -- Only the current revision, never a superseded one. A superseded revision records the rules
-            -- that were in force while it was current; granting it a source it never had would rewrite
-            -- that record and destroy the fingerprint that identifies the rules it was reviewed under.
-            -- The current revision must move because the projection trigger requires it to match its
-            -- practice, and clearing its fingerprint is the point: the startup backfill recomputes it,
-            -- which marks claims made under the previous rules as needing re-evaluation.
-            UPDATE practice_revision v
-            SET automated_review_policy = jsonb_set(
-                    v.automated_review_policy,
-                    '{optionalContext}',
-                    coalesce(v.automated_review_policy->'optionalContext', '[]'::jsonb)
-                        || '[{"sourceKind": "scm.repository.tree"}]'::jsonb
-                ),
-                review_rule_fingerprint = NULL
-            FROM practice p
-            WHERE p.current_revision_id = v.id
-              AND v.automated_review_policy IS NOT NULL
-              AND v.automated_review_policy @> '{"requiredEvidence": [{"sourceKind": "scm.pull-request.diff"}]}'
-              AND NOT v.automated_review_policy @> '{"optionalContext": [{"sourceKind": "scm.repository.tree"}]}';
-
-            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
-            ALTER TABLE practice ENABLE TRIGGER practice_requires_current_revision_projection;
-        ]]></sql>
-        <rollback>
-            <comment>Removing the source again would not restore the superseded fingerprints.</comment>
-        </rollback>
-    </changeSet>
 
 </databaseChangeLog>
