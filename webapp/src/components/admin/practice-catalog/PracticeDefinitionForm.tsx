@@ -409,14 +409,14 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										{FOCUS_ARTIFACT_OPTIONS.map((option) => (
 											<FieldLabel key={option.value} htmlFor={`practice-artifact-${option.value}`}>
 												<Field orientation="horizontal">
-													<FieldContent>
-														<FieldTitle>{option.label}</FieldTitle>
-														<FieldDescription>{option.hint}</FieldDescription>
-													</FieldContent>
 													<RadioGroupItem
 														id={`practice-artifact-${option.value}`}
 														value={option.value}
 													/>
+													<FieldContent>
+														<FieldTitle>{option.label}</FieldTitle>
+														<FieldDescription>{option.hint}</FieldDescription>
+													</FieldContent>
 												</Field>
 											</FieldLabel>
 										))}

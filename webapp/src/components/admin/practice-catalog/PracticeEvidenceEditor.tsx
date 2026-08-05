@@ -347,6 +347,11 @@ export function PracticeEvidenceEditor({
 			>
 				<FieldLabel htmlFor="practice-mentoring-ai-supported">
 					<Field orientation="horizontal" data-disabled={disabled || !supportsAiReview}>
+						<RadioGroupItem
+							id="practice-mentoring-ai-supported"
+							value="AI_SUPPORTED"
+							disabled={disabled || !supportsAiReview}
+						/>
 						<FieldContent>
 							<FieldTitle>AI-supported mentoring</FieldTitle>
 							<FieldDescription>
@@ -357,15 +362,15 @@ export function PracticeEvidenceEditor({
 								)}
 							</FieldDescription>
 						</FieldContent>
-						<RadioGroupItem
-							id="practice-mentoring-ai-supported"
-							value="AI_SUPPORTED"
-							disabled={disabled || !supportsAiReview}
-						/>
 					</Field>
 				</FieldLabel>
 				<FieldLabel htmlFor="practice-mentoring-human-context">
 					<Field orientation="horizontal" data-disabled={disabled}>
+						<RadioGroupItem
+							id="practice-mentoring-human-context"
+							value="HUMAN_CONTEXT_REQUIRED"
+							disabled={disabled}
+						/>
 						<FieldContent>
 							<FieldTitle>Human review needed</FieldTitle>
 							<FieldDescription>
@@ -373,26 +378,21 @@ export function PracticeEvidenceEditor({
 								developer, peer, or mentor can review it.
 							</FieldDescription>
 						</FieldContent>
-						<RadioGroupItem
-							id="practice-mentoring-human-context"
-							value="HUMAN_CONTEXT_REQUIRED"
-							disabled={disabled}
-						/>
 					</Field>
 				</FieldLabel>
 				<FieldLabel htmlFor="practice-mentoring-guidance-only">
 					<Field orientation="horizontal" data-disabled={disabled}>
+						<RadioGroupItem
+							id="practice-mentoring-guidance-only"
+							value="GUIDANCE_ONLY"
+							disabled={disabled}
+						/>
 						<FieldContent>
 							<FieldTitle>Guidance only</FieldTitle>
 							<FieldDescription>
 								Keep the criteria and guidance without asking Hephaestus to review this practice.
 							</FieldDescription>
 						</FieldContent>
-						<RadioGroupItem
-							id="practice-mentoring-guidance-only"
-							value="GUIDANCE_ONLY"
-							disabled={disabled}
-						/>
 					</Field>
 				</FieldLabel>
 			</RadioGroup>
@@ -583,18 +583,18 @@ export function PracticeEvidenceEditor({
 															),
 														)
 													}
-													className="flex flex-wrap gap-x-5 gap-y-2"
+													className="gap-2"
 													aria-label={`Use in this practice for ${sourceLabel}`}
 												>
 													{EVIDENCE_ROLE_OPTIONS.map((option) => (
 														<FieldLabel
 															key={option.value}
 															htmlFor={`practice-evidence-${source.sourceKind}-${option.value}`}
-															className="w-auto font-normal"
+															className="font-normal"
 														>
 															<Field
 																orientation="horizontal"
-																className="w-auto gap-2"
+																className="gap-2"
 																data-disabled={disabled}
 															>
 																<RadioGroupItem
