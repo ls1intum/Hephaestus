@@ -118,7 +118,9 @@ export const HephaestusUpdateAvailable: Story = {
 		onSubmit: fn(),
 	},
 	play: async ({ canvas, userEvent }) => {
-		await expect(canvas.getByText("Hephaestus update available")).toBeVisible();
+		// The label itself has to name what kind of update it is; colour alone left the two
+		// indistinguishable to a screen-reader or colour-blind admin.
+		await expect(canvas.getByText("Hephaestus update available: review behavior")).toBeVisible();
 		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Review Hephaestus update" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Apply Hephaestus update" })).toBeVisible();

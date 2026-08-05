@@ -270,12 +270,15 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void writesNothingWhenRepositoryIdMissing() {
+    void reportsCollectionErrorWhenRepositoryIdMissing() {
         var job = new AgentJob();
         job.setMetadata(objectMapper.createObjectNode());
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(new ContextRequest.IssueReviewRequest(job), files);
-        assertThat(files).doesNotContainKey(OUTPUT);
+
+        // An empty inventory reads as "this workspace tracks no work" — the inverse of the truth
+        // when the job simply arrived without its focal repository.
+        assertThatThrownBy(() -> provider.contribute(new ContextRequest.IssueReviewRequest(job), new LinkedHashMap<>()))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasRootCauseMessage("Workspace-inventory collection has no repository_id");
     }
 
     @Test

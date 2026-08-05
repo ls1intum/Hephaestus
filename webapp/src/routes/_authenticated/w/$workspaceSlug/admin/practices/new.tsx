@@ -17,6 +17,7 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";
 import { practiceCatalogStructureScope, upsertPractice } from "@/hooks/practice-catalog-cache";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/new")({
 	head: workspaceAdminHead("Create practice"),
@@ -62,10 +63,7 @@ function CreatePracticeContainer() {
 			toast.success("Practice created");
 			navigate({ to: ".." });
 		} catch (error) {
-			const status =
-				typeof error === "object" && error !== null && "status" in error
-					? (error as { status: number }).status
-					: undefined;
+			const status = problemStatusOf(error);
 			toast.error(
 				status === 409
 					? "A practice with this identifier already exists in this workspace"

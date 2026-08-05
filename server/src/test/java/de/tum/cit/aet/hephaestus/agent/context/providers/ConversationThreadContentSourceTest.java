@@ -6,6 +6,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -81,9 +83,56 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
         when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
         SourceKind kind = new SourceKind("slack.conversation.thread");
 
+        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000")).thenReturn(
+            ConversationThreadProjection.ThreadReadability.READABLE
+        );
+
         var contribution = source.capture(new ContextRequest.ConversationReviewRequest(job), Set.of(kind));
 
         assertThat(contribution.contentStates()).containsEntry(kind, SourceContentState.EMPTY);
         assertThat(contribution.completeness()).containsEntry(kind, SourceCompleteness.COMPLETE);
+        assertThat(contribution.stateOverrides()).isEmpty();
+    }
+
+    @Test
+    void reportsAWithheldChannelAsRedactedRatherThanAnEmptyConversation() {
+        AgentJob job = conversationJob();
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("messageCount", 0);
+        payload.put("truncated", false);
+        when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
+        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000")).thenReturn(
+            ConversationThreadProjection.ThreadReadability.CONSENT_NOT_ACTIVE
+        );
+        SourceKind kind = new SourceKind("slack.conversation.thread");
+
+        var contribution = source.capture(new ContextRequest.ConversationReviewRequest(job), Set.of(kind));
+
+        // Reporting this as an empty conversation would have the model judge a developer's
+        // communication on a thread it was never permitted to read.
+        assertThat(contribution.stateOverrides()).containsEntry(
+            kind,
+            new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE)
+        );
+    }
+
+    @Test
+    void reportsAMissingThreadAsUnavailable() {
+        AgentJob job = conversationJob();
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("messageCount", 0);
+        payload.put("truncated", false);
+        when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
+        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000")).thenReturn(
+            ConversationThreadProjection.ThreadReadability.NOT_FOUND
+        );
+        SourceKind kind = new SourceKind("slack.conversation.thread");
+
+        var contribution = source.capture(new ContextRequest.ConversationReviewRequest(job), Set.of(kind));
+
+        assertThat(contribution.stateOverrides()).containsEntry(
+            kind,
+            new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)
+        );
     }
 }

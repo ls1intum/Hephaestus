@@ -51,7 +51,9 @@ jobs:
               - '.node-version'
             application-server:
               - 'server/**'
-              - 'scripts/db-utils.sh'
+              # The contract validator and the immutability guard live here; a PR that edits only a
+              # guard would otherwise skip the workflow that runs it.
+              - 'scripts/**'
             agent-images:
               - 'docker/agents/**'
             docs:

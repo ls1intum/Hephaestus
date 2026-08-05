@@ -128,8 +128,10 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         }
         JsonNode m = job.getMetadata();
         Long repositoryId = m == null ? null : MetaJson.optLong(m, "repository_id");
+        // Without the focal repository the inventory cannot say what else exists, and an empty
+        // inventory reads as "this workspace tracks no work" — the inverse of the truth.
         if (repositoryId == null) {
-            return;
+            throw new EvidenceCollectionException("Workspace-inventory collection has no repository_id", null);
         }
 
         // Identify the focal artifact so the agent can tell "what else exists" from "the one under review".
@@ -233,7 +235,9 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
 
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode repoNames = root.putArray("repositories");
-        for (Repository repo : repos) {
+        // Only the scanned repositories were searched. Listing all of them would show a name with no
+        // artifacts beside it, which reads as "this repository is empty" rather than "not looked at".
+        for (Repository repo : scanned) {
             if (repo.getNameWithOwner() != null) {
                 repoNames.add(repo.getNameWithOwner());
             }

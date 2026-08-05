@@ -22,6 +22,7 @@ import { PageLayout } from "@/components/core/PageLayout";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/settings")({
 	head: workspaceAdminHead("Practice review settings"),
@@ -77,7 +78,7 @@ function ReviewSettingsContainer() {
 				queryClient.setQueryData(reviewSettingsQueryKey, context.previous);
 			}
 			toast.error("Failed to update review settings", {
-				description: error instanceof Error ? error.message : undefined,
+				description: problemDetailOf(error),
 			});
 		},
 		onSettled: () => {
@@ -106,7 +107,7 @@ function ReviewSettingsContainer() {
 		updateFeatures.mutate({ path: { workspaceSlug }, body: settings });
 	};
 
-	const isLoading = reviewSettingsQuery.isLoading || workspaceQuery.isLoading;
+	const isLoading = reviewSettingsQuery.isPending || workspaceQuery.isPending;
 	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
 	let content: ReactNode;

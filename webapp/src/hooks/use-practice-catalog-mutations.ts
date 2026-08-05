@@ -27,6 +27,7 @@ import {
 	upsertArea,
 } from "@/hooks/practice-catalog-cache";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { problemStatusOf } from "@/lib/problem-detail";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -84,10 +85,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			toast.success("Area created");
 		},
 		onError: (error) => {
-			const status =
-				typeof error === "object" && error !== null && "status" in error
-					? (error as { status: number }).status
-					: undefined;
+			const status = problemStatusOf(error);
 			toast.error(
 				status === 409 ? "An area with that name already exists" : "Couldn't create the area",
 			);

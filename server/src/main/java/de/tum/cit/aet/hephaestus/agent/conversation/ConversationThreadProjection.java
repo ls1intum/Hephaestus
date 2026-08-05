@@ -38,6 +38,26 @@ public interface ConversationThreadProjection {
      */
     ObjectNode buildThreadPayload(long workspaceId, String channelId, String threadTs);
 
+    /**
+     * Whether the thread exists and its channel's consent is {@code ACTIVE}.
+     *
+     * <p>{@link #buildThreadPayload} answers a withheld channel, a tombstoned thread, and a thread
+     * where nobody spoke with the same empty payload. Only the first two are absences of permission
+     * or of the artifact; reporting them as an empty conversation would have the model judge a
+     * developer's communication on evidence it was never allowed to see.
+     */
+    default ThreadReadability threadReadability(long workspaceId, String channelId, String threadTs) {
+        return ThreadReadability.READABLE;
+    }
+
+    enum ThreadReadability {
+        READABLE,
+        /** The channel's consent is not ACTIVE, so its messages must not be read. */
+        CONSENT_NOT_ACTIVE,
+        /** No such thread in this workspace. */
+        NOT_FOUND,
+    }
+
     default @Nullable Instant sourceEffectiveAt(String sourceEventId) {
         return null;
     }

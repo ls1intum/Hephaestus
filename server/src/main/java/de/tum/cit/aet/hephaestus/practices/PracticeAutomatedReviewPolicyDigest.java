@@ -26,7 +26,8 @@ public final class PracticeAutomatedReviewPolicyDigest {
         digest
             .add(requirement.sourceKind().value())
             .add(requirement.completeness().name())
-            .add(requirement.freshness().name());
+            .add(requirement.freshness().name())
+            .add(requirement.content().name());
     }
 
     private static void add(CanonicalDigest digest, PracticeOptionalContextSource requirement) {

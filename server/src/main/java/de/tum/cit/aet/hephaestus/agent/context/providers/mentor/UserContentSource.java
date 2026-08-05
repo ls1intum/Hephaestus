@@ -76,8 +76,6 @@ public class UserContentSource implements ContentSource {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
             // An ObjectNode of longs/strings is effectively always serializable, so this is defensive only.
-            // Note: because required()==false, WorkspaceContextBuilder catches this and logs-and-continues
-            // rather than aborting the turn — it does NOT hard-fail the job despite the throw shape here.
             throw new IllegalStateException("Failed to serialize user context", e);
         }
     }

@@ -48,6 +48,7 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
@@ -656,7 +657,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 "a".repeat(64),
                 profile,
                 now,
-                List.of(new SourceCapture(source, new SourceCaptureState.NotCollected("DISABLED"), List.of())),
+                List.of(
+                    new SourceCapture(
+                        source,
+                        new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED),
+                        List.of()
+                    )
+                ),
                 List.of()
             );
             SourceReadinessCheck assessment = new SourceReadinessCheck(

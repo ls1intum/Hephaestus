@@ -66,7 +66,7 @@ class SourceContractValueTest {
         assertThatIllegalArgumentException().isThrownBy(() ->
             new SourceCapture(
                 new SourceKind("scm.pull-request.diff"),
-                new SourceCaptureState.Unavailable("PINNED_HEAD_MISSING"),
+                new SourceCaptureState.Unavailable(SourceAbsenceReason.PINNED_HEAD_MISSING),
                 List.of(new SourceArtifact("inputs/context/diff.patch", "text/x-diff", "a".repeat(64), 1))
             )
         );

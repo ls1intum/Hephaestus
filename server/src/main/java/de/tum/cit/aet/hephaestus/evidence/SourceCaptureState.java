@@ -35,35 +35,27 @@ public sealed interface SourceCaptureState
         }
     }
 
-    record NotCollected(String reasonCode) implements SourceCaptureState {
+    record NotCollected(SourceAbsenceReason reasonCode) implements SourceCaptureState {
         public NotCollected {
-            reasonCode = requireReason(reasonCode);
+            Objects.requireNonNull(reasonCode, "reason code");
         }
     }
 
-    record Unavailable(String reasonCode) implements SourceCaptureState {
+    record Unavailable(SourceAbsenceReason reasonCode) implements SourceCaptureState {
         public Unavailable {
-            reasonCode = requireReason(reasonCode);
+            Objects.requireNonNull(reasonCode, "reason code");
         }
     }
 
-    record Redacted(String reasonCode) implements SourceCaptureState {
+    record Redacted(SourceAbsenceReason reasonCode) implements SourceCaptureState {
         public Redacted {
-            reasonCode = requireReason(reasonCode);
+            Objects.requireNonNull(reasonCode, "reason code");
         }
     }
 
-    record CollectionError(String errorCode) implements SourceCaptureState {
+    record CollectionError(SourceAbsenceReason errorCode) implements SourceCaptureState {
         public CollectionError {
-            errorCode = requireReason(errorCode);
+            Objects.requireNonNull(errorCode, "error code");
         }
-    }
-
-    private static String requireReason(String value) {
-        Objects.requireNonNull(value, "reason code");
-        if (!value.matches("[A-Z][A-Z0-9_]*")) {
-            throw new IllegalArgumentException("Invalid reason code: " + value);
-        }
-        return value;
     }
 }

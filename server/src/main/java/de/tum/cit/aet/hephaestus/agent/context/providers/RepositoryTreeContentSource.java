@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
@@ -70,6 +72,20 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         SourceCompleteness completeness = snapshot.complete()
             ? SourceCompleteness.COMPLETE
             : SourceCompleteness.PARTIAL;
+        // With checkout switched off the snapshot carries no tree, and "<sha>:null" is a non-null
+        // string that freshness assessment reads as a pinned identity — reporting a tree that was
+        // never read as current. Say the source is unavailable instead.
+        if (snapshot.treeSha() == null) {
+            return new EvidenceContribution(
+                files,
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(KIND, new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED))
+            );
+        }
         return new EvidenceContribution(
             files,
             Map.of(KIND, completeness),

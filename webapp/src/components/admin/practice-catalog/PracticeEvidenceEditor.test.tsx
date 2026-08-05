@@ -213,8 +213,13 @@ describe("PracticeEvidenceEditor", () => {
 		const evidenceGroup = screen.getByRole("region", {
 			name: "How Hephaestus can help",
 		});
-		expect(evidenceGroup.getAttribute("aria-invalid")).toBe("true");
+		// aria-invalid is not a global attribute and assistive tech ignores it on a region, so the
+		// message itself has to be reachable: it is announced (role="alert") and the region points
+		// at it.
 		expect(evidenceGroup.getAttribute("aria-describedby")).toBe("practice-evidence-error");
+		expect(screen.getByRole("alert").textContent).toBe(
+			"Choose at least one required evidence source.",
+		);
 
 		await user.click(screen.getByRole("button", { name: "Add limitation" }));
 		const addedDescription = screen.getByRole("textbox", {

@@ -9,6 +9,8 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -104,7 +106,8 @@ public class ConversationThreadContentSource implements EvidenceSource {
     public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
         EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
         if (!selectedKinds.contains(KIND)) return captured;
-        JsonNode metadata = ((ContextRequest.ConversationReviewRequest) request).job().getMetadata();
+        AgentJob job = ((ContextRequest.ConversationReviewRequest) request).job();
+        JsonNode metadata = job.getMetadata();
         JsonNode payload;
         try {
             payload = objectMapper.readTree(captured.files().get(OUTPUT_KEY));
@@ -114,6 +117,19 @@ public class ConversationThreadContentSource implements EvidenceSource {
         int messageCount = payload.path("messageCount").asInt();
         Instant effectiveTime = projection.sourceEffectiveAt(metadata.path("slack_last_ts").asString(null));
         Map<SourceKind, Instant> effectiveAt = effectiveTime == null ? Map.of() : Map.of(KIND, effectiveTime);
+        // An empty payload has three causes and only one of them is "nobody said anything". A paused
+        // or revoked channel, or a thread that is gone, must not read as a conversation the developer
+        // failed to have.
+        Map<SourceKind, SourceCaptureState> stateOverrides =
+            messageCount == 0
+                ? absenceOf(
+                      projection.threadReadability(
+                          job.getWorkspace().getId(),
+                          metadata.path("slack_channel_id").asString(null),
+                          metadata.path("slack_thread_ts").asString(null)
+                      )
+                  )
+                : Map.of();
         return new EvidenceContribution(
             captured.files(),
             Map.of(
@@ -123,7 +139,21 @@ public class ConversationThreadContentSource implements EvidenceSource {
             Map.of(),
             Map.of(),
             effectiveAt,
-            Map.of(KIND, messageCount == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
+            Map.of(KIND, messageCount == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY),
+            stateOverrides
         );
+    }
+
+    private static Map<SourceKind, SourceCaptureState> absenceOf(
+        ConversationThreadProjection.ThreadReadability readability
+    ) {
+        return switch (readability) {
+            case READABLE -> Map.of();
+            case CONSENT_NOT_ACTIVE -> Map.of(
+                KIND,
+                new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE)
+            );
+            case NOT_FOUND -> Map.of(KIND, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
+        };
     }
 }

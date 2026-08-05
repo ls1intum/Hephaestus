@@ -11,6 +11,21 @@ import org.junit.jupiter.api.Test;
 
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
+    private static final String PINNED_DIGEST = "a35046a27f5597abad1a4010049854a656473f3edf46364ab3c051153932f7bb";
+
+    @Test
+    void shouldPinACanonicalDigestForAKnownPolicy() {
+        // Fingerprints computed by earlier releases are stored and compared against, so the digest is
+        // a wire format. Reordering the fields inside it, or changing how they are framed, silently
+        // invalidates every stored fingerprint and marks every past review claim stale — with a green
+        // suite, because the other tests here only compare digests to each other. This pins the value.
+        String digest = PracticeAutomatedReviewPolicyDigest.digest(
+            requirements(List.of(requirement("scm.pull-request.core"), requirement("scm.pull-request.diff")))
+        );
+
+        assertThat(digest).isEqualTo(PINNED_DIGEST);
+    }
+
     @Test
     void shouldBeStableAcrossDeclarationOrdering() {
         PracticeEvidenceRequirement core = requirement("scm.pull-request.core");

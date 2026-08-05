@@ -26,10 +26,13 @@ public class PracticeEvidenceDefaults {
                         EvidenceCompletenessRequirement.COMPLETE,
                         EvidenceFreshnessRequirement.CURRENT
                     ),
+                    // A diff with no changes in it cannot support a judgement about how a change
+                    // was made; without this the model falls back to the title and description.
                     requirement(
                         "scm.pull-request.diff",
                         EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT
+                        EvidenceFreshnessRequirement.CURRENT,
+                        EvidenceContentRequirement.NON_EMPTY
                     )
                 ),
                 List.of(optionalRequirement("scm.pull-request.comments")),
@@ -91,7 +94,16 @@ public class PracticeEvidenceDefaults {
         EvidenceCompletenessRequirement completeness,
         EvidenceFreshnessRequirement freshness
     ) {
-        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), completeness, freshness);
+        return requirement(sourceKind, completeness, freshness, EvidenceContentRequirement.NO_REQUIREMENT);
+    }
+
+    private static PracticeEvidenceRequirement requirement(
+        String sourceKind,
+        EvidenceCompletenessRequirement completeness,
+        EvidenceFreshnessRequirement freshness,
+        EvidenceContentRequirement content
+    ) {
+        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), completeness, freshness, content);
     }
 
     private static PracticeOptionalContextSource optionalRequirement(String sourceKind) {

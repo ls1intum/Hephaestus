@@ -987,6 +987,7 @@ export type UpdatePracticeRequest = {
  */
 export type PracticeEvidenceRequirement = {
     completeness: 'COMPLETE' | 'NO_REQUIREMENT';
+    content?: 'NON_EMPTY' | 'NO_REQUIREMENT';
     freshness: 'CURRENT' | 'NO_REQUIREMENT';
     sourceKind: string;
 };

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
@@ -283,7 +284,10 @@ public class WorkspaceContextBuilder {
         if (manifestBuilder != null) {
             for (SourceKind kind : Set.copyOf(selectedKinds)) {
                 if (!manifestBuilder.isSourceUsePermitted(plan.contractVersion(), kind)) {
-                    stateOverrides.put(kind, new SourceCaptureState.NotCollected("GOVERNANCE_NOT_EFFECTIVE"));
+                    stateOverrides.put(
+                        kind,
+                        new SourceCaptureState.NotCollected(SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE)
+                    );
                     selectedKinds.remove(kind);
                 }
             }
@@ -292,23 +296,17 @@ public class WorkspaceContextBuilder {
         for (SourceKind kind : source.sourceKinds()) {
             if (!selectedKinds.contains(kind)) continue;
             attemptedKinds.add(kind);
+            EvidenceContribution contribution;
             try {
-                EvidenceContribution contribution = source.capture(request, Set.of(kind));
-                validateContribution(source, Set.of(kind), contribution);
-                contribution
-                    .files()
-                    .forEach((path, bytes) -> {
-                        if (files.put(path, bytes) != null) {
-                            throw new IllegalStateException(providerName + " emitted duplicate file " + path);
-                        }
-                    });
-                completeness.putAll(contribution.completeness());
-                contentStates.putAll(contribution.contentStates());
-                immutableIdentities.putAll(contribution.immutableIdentities());
-                observedAt.putAll(contribution.observedAt());
-                sourceEffectiveAt.putAll(contribution.sourceEffectiveAt());
-            } catch (JobPreparationException | EvidenceCollectionException e) {
-                stateOverrides.put(kind, new SourceCaptureState.CollectionError("PROVIDER_FAILURE"));
+                contribution = source.capture(request, Set.of(kind));
+            } catch (RuntimeException e) {
+                // Isolation is the point of collecting per source: a datastore hiccup inside one
+                // collector must cost that source, not the whole review. Recording the error is
+                // fail-closed anyway — readiness refuses any practice that required this source —
+                // whereas letting it escape aborted every other source that had already succeeded.
+                // Only the collector's own failures are absorbed here; the checks below police the
+                // contribution against its contract and must stay loud.
+                stateOverrides.put(kind, new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE));
                 meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
                 log.warn(
                     "Evidence source failed; recording collection error: {} {} — {}",
@@ -316,7 +314,22 @@ public class WorkspaceContextBuilder {
                     kind,
                     e.getMessage()
                 );
+                continue;
             }
+            validateContribution(source, Set.of(kind), contribution);
+            contribution
+                .files()
+                .forEach((path, bytes) -> {
+                    if (files.put(path, bytes) != null) {
+                        throw new IllegalStateException(providerName + " emitted duplicate file " + path);
+                    }
+                });
+            completeness.putAll(contribution.completeness());
+            contentStates.putAll(contribution.contentStates());
+            stateOverrides.putAll(contribution.stateOverrides());
+            immutableIdentities.putAll(contribution.immutableIdentities());
+            observedAt.putAll(contribution.observedAt());
+            sourceEffectiveAt.putAll(contribution.sourceEffectiveAt());
         }
         return files;
     }

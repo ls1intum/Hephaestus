@@ -406,6 +406,11 @@ function CatalogFilters({
 					))}
 				</SelectContent>
 			</Select>
+			{/*
+			 * toolbar, not the default group: ToggleGroup emits aria-orientation, which ARIA permits on
+			 * toolbar but not on group, and these toggle buttons already carry roving arrow-key focus.
+			 * radiogroup would be worse — the items are aria-pressed buttons, not radios.
+			 */}
 			<ToggleGroup
 				role="toolbar"
 				value={[status]}

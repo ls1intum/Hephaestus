@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
@@ -260,7 +261,74 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 .filter(source -> source.kind().equals(comments))
                 .findFirst()
                 .orElseThrow();
-            assertThat(capture.state()).isEqualTo(new SourceCaptureState.CollectionError("PROVIDER_FAILURE"));
+            assertThat(capture.state()).isEqualTo(
+                new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE)
+            );
+            assertThat(
+                layout.jobDir(String.valueOf(request.job().getId())).resolve("artifact-source-manifest.json")
+            ).exists();
+        }
+
+        @Test
+        void untypedProviderFailureIsIsolatedToItsOwnSource(@TempDir Path root) {
+            SourceKind comments = new SourceKind("scm.pull-request.comments");
+            EvidenceSource bad = new EvidenceSource() {
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public boolean required() {
+                    return true;
+                }
+
+                @Override
+                public Set<SourceKind> sourceKinds() {
+                    return Set.of(comments);
+                }
+
+                @Override
+                public SourceKind sourceKindFor(String path) {
+                    return comments;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    // The shape a repository actually throws. Letting it escape would abort every source
+                    // that had already succeeded, which is the opposite of per-source collection.
+                    throw new org.springframework.dao.QueryTimeoutException("statement timed out");
+                }
+            };
+            JsonMapper mapper = JsonMapper.builder().build();
+            FabricLayout layout = new FabricLayout(root.toString());
+            ContextManifestBuilder manifestBuilder = new ContextManifestBuilder(
+                new ContentAddressedStore(layout),
+                layout,
+                mapper,
+                new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC(), ""),
+                Clock.systemUTC()
+            );
+            var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
+            EvidencePlan plan = new EvidencePlan(
+                new SourceContractVersion("1.0.0"),
+                new EvidenceProfileId("pull-request-review"),
+                Set.of(comments)
+            );
+            ContextRequest.PracticeReviewRequest request = reviewRequest();
+
+            PreparedEvidence prepared = builder.prepare(request, plan);
+
+            var capture = prepared
+                .manifest()
+                .sources()
+                .stream()
+                .filter(source -> source.kind().equals(comments))
+                .findFirst()
+                .orElseThrow();
+            assertThat(capture.state()).isEqualTo(
+                new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE)
+            );
             assertThat(
                 layout.jobDir(String.valueOf(request.job().getId())).resolve("artifact-source-manifest.json")
             ).exists();

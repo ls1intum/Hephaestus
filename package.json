@@ -31,7 +31,7 @@
 		"format:server:check": "run-s format:java:check",
 		"lint:server": "run-s format:java:check lint:java",
 		"check:server": "pnpm run format:server:check && pnpm run lint:server",
-		"check:contracts": "node scripts/validate-artifact-source-contracts.mjs && node scripts/check-artifact-source-contract-immutability.mjs",
+		"check:contracts": "node scripts/validate-artifact-source-contracts.mjs && node scripts/check-artifact-source-contract-immutability.mjs && node --test scripts/check-artifact-source-contract-immutability.test.mjs",
 		"format:client": "pnpm run format:webapp",
 		"format:client:check": "pnpm run format:webapp:check",
 		"lint:client": "run-s -c check:webapp typecheck:webapp",

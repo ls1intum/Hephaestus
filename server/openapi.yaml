@@ -9900,6 +9900,11 @@ components:
           enum:
           - COMPLETE
           - NO_REQUIREMENT
+        content:
+          type: string
+          enum:
+          - NON_EMPTY
+          - NO_REQUIREMENT
         freshness:
           type: string
           enum:

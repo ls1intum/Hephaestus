@@ -72,12 +72,14 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
         try {
             AgentJob job = pr.job();
             JsonNode m = job.getMetadata();
+            // As in ReviewThreadContentSource: a missing key is a malformed job, and "no review
+            // comments" is a claim the model would otherwise take as established.
             if (m == null || m.isNull() || m.isMissingNode()) {
-                return;
+                throw new EvidenceCollectionException("Review-comment collection has no job metadata", null);
             }
             Long pullRequestId = MetaJson.optLong(m, "pull_request_id");
             if (pullRequestId == null) {
-                return;
+                throw new EvidenceCollectionException("Review-comment collection has no pull_request_id", null);
             }
 
             List<IssueComment> comments = new java.util.ArrayList<>(

@@ -125,6 +125,22 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         return root;
     }
 
+    /**
+     * Distinguishes the three ways {@link #buildThreadPayload} can answer with no messages. The
+     * consent-gated read is the authority on what may be shown; {@code countLiveTurns} ignores
+     * consent, so turns existing while the gated read is empty means the channel is not ACTIVE.
+     */
+    @Override
+    public ThreadReadability threadReadability(long workspaceId, String channelId, String threadTs) {
+        if (messageRepository.countLiveTurns(workspaceId, channelId, threadTs) == 0) {
+            return ThreadReadability.NOT_FOUND;
+        }
+        boolean readable = !messageRepository
+            .findThreadMessages(workspaceId, channelId, threadTs, PageRequest.of(0, 1))
+            .isEmpty();
+        return readable ? ThreadReadability.READABLE : ThreadReadability.CONSENT_NOT_ACTIVE;
+    }
+
     @Override
     public Instant sourceEffectiveAt(String sourceEventId) {
         Long epochMicros = SlackTs.toEpochMicros(sourceEventId);

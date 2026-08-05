@@ -172,7 +172,9 @@ function AreaActions({
 }) {
 	return (
 		<>
-			{pending && <Spinner className="size-4 text-muted-foreground" />}
+			{pending && (
+				<Spinner className="size-4 text-muted-foreground" role="status" aria-label="Saving" />
+			)}
 			<Switch
 				className="hidden sm:inline-flex"
 				checked={area.status.offered}
@@ -305,7 +307,9 @@ function PracticeActions({
 		: practice;
 	return (
 		<>
-			{pending && <Spinner className="size-4 text-muted-foreground" />}
+			{pending && (
+				<Spinner className="size-4 text-muted-foreground" role="status" aria-label="Saving" />
+			)}
 			<Switch
 				className="hidden sm:inline-flex"
 				checked={practice.effectivelyOffered}

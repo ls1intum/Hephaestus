@@ -40,7 +40,13 @@ export function curatedEntryCopy(
 				};
 			}
 			return {
-				label: "Hephaestus update available",
+				// The label has to carry the distinction: colour alone left a screen-reader user and a
+				// colour-blind admin unable to tell a wording change from one that alters what the AI
+				// does — the exact decision this screen exists to support (WCAG 2.2 SC 1.4.1).
+				label:
+					status.changeKind === "WORDING"
+						? "Hephaestus update available: wording"
+						: "Hephaestus update available: review behavior",
 				tone: status.changeKind === "WORDING" ? "info" : "attention",
 				detail:
 					status.changeKind === "WORDING"
@@ -55,7 +61,9 @@ export function curatedEntryCopy(
 					? `Hephaestus no longer provides this ${kind}. Keep it as a custom ${kind}, or exclude it from new workspaces.`
 					: `This ${kind} is no longer included with Hephaestus and is excluded from new workspaces. Existing workspaces do not change.`,
 			};
-		default:
+		// Named rather than defaulted: a state added by the API later must become a type error, not
+		// silently render the most reassuring answer this function can give.
+		case "FROM_HEPHAESTUS":
 			return {
 				label: "Uses Hephaestus default",
 				tone: "neutral",

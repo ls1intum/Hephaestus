@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -146,14 +147,14 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_noPrId_writesNothing() {
+    void contribute_noPrId_reportsCollectionError() {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
 
-        Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(request(metadata), files);
-
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        // "No unresolved threads" is a finding about the author; a missing key is a broken job.
+        assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasRootCauseMessage("Review-thread collection has no pull_request_id");
     }
 
     @Test

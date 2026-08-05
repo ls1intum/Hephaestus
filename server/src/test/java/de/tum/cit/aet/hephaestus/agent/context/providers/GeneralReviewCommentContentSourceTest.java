@@ -76,14 +76,15 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_noPrId_writesNothing() {
+    void contribute_noPrId_reportsCollectionError() {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
 
-        Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(request(metadata), files);
-
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        // Writing nothing would be read downstream as "this pull request received no review
+        // comments", which is a claim about the work rather than about the collection.
+        assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasRootCauseMessage("Review-comment collection has no pull_request_id");
     }
 
     @Test

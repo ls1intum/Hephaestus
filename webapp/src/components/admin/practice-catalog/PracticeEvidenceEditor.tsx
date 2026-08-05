@@ -1,6 +1,6 @@
 import deepEqual from "fast-deep-equal";
 import { ChevronRight, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeEvidenceSourceOption,
@@ -61,6 +61,7 @@ function withRole(
 	requirements: PracticeAutomatedReviewPolicy,
 	source: PracticeEvidenceSourceOption,
 	role: EvidenceRole,
+	recommended: PracticeAutomatedReviewPolicy,
 ): PracticeAutomatedReviewPolicy {
 	const required = requirements.requiredEvidence.filter(
 		(requirement) => requirement.sourceKind !== source.sourceKind,
@@ -73,6 +74,10 @@ function withRole(
 			sourceKind: source.sourceKind,
 			completeness: source.supportsComplete ? "COMPLETE" : "NO_REQUIREMENT",
 			freshness: source.supportsCurrent ? "CURRENT" : "NO_REQUIREMENT",
+			// Whether an empty capture can be judged is an editorial call per source, not something
+			// the editor can infer, so re-adding a source restores the recommended answer rather
+			// than silently dropping to "an empty one will do".
+			content: recommendedContentFor(recommended, source.sourceKind),
 		});
 	}
 	if (role === "OPTIONAL") {
@@ -87,6 +92,71 @@ function withRole(
  * behaviour or only wording. A random code would make retyping the same sentence look like a new
  * rule, so the code is derived from the text: identical wording always yields the identical code.
  */
+function recommendedContentFor(
+	recommended: PracticeAutomatedReviewPolicy,
+	sourceKind: string,
+): PracticeAutomatedReviewPolicy["requiredEvidence"][number]["content"] {
+	return recommended.requiredEvidence.find((requirement) => requirement.sourceKind === sourceKind)
+		?.content;
+}
+
+/** One requirement's quality dropdown. Both axes render the same control from the same option list. */
+function RequirementQualitySelect({
+	id,
+	label,
+	sourceLabel,
+	disabled,
+	value,
+	options,
+	onSelect,
+}: {
+	id: string;
+	label: string;
+	sourceLabel: string;
+	disabled: boolean;
+	value: string;
+	options: ReadonlyArray<{ value: string; label: string }>;
+	onSelect: (value: string) => void;
+}) {
+	// Base UI types the value as nullable for clearable selects; these are required, so a null
+	// selection is not a state this field can reach.
+	const handleChange = (next: string | null) => next !== null && onSelect(next);
+	return (
+		<Field>
+			<FieldLabel htmlFor={id}>
+				{label} <span className="sr-only">for {sourceLabel}</span>
+			</FieldLabel>
+			{/* Base UI resolves the trigger's label from `items`, so both it and the options below have
+			    to come from the same array or the two can disagree. */}
+			<Select disabled={disabled} items={options} value={value} onValueChange={handleChange}>
+				<SelectTrigger id={id}>
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{options.map((option) => (
+						<SelectItem key={option.value} value={option.value}>
+							{option.label}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</Field>
+	);
+}
+
+function patchRequirement(
+	requirements: PracticeAutomatedReviewPolicy,
+	sourceKind: string,
+	patch: Partial<PracticeAutomatedReviewPolicy["requiredEvidence"][number]>,
+): PracticeAutomatedReviewPolicy {
+	return {
+		...requirements,
+		requiredEvidence: requirements.requiredEvidence.map((item) =>
+			item.sourceKind === sourceKind ? { ...item, ...patch } : item,
+		),
+	};
+}
+
 function limitationCodeFor(description: string) {
 	const slug = description
 		.toUpperCase()
@@ -184,14 +254,15 @@ export function PracticeEvidenceEditor({
 		new Map(value.automatedReview.mode === "NONE" ? [] : [[profileKey, value]]),
 	);
 	const addLimitationButton = useRef<HTMLButtonElement>(null);
-	useEffect(() => {
-		if (value.automatedReview.mode !== "NONE") {
-			savedAutomatedRequirements.current.set(profileKey, value);
-		}
-	}, [profileKey, value]);
-	useEffect(() => {
+	// Reveal the customization panel when a submit lands an error the user cannot see from the
+	// collapsed state. Adjusting during render rather than in an effect keeps it keyed on the error
+	// itself, so editing afterwards no longer re-opens the panel under the caret.
+	// https://react.dev/learn/you-might-not-need-an-effect
+	const [lastError, setLastError] = useState(error);
+	if (error !== lastError) {
+		setLastError(error);
 		if (error && !humanReviewReasonIsMissing(value)) setOpen(true);
-	}, [error, value]);
+	}
 	const focusLimitation = (focusTarget: string) => {
 		requestAnimationFrame(() => {
 			if (focusTarget === "add") {
@@ -209,6 +280,8 @@ export function PracticeEvidenceEditor({
 		evidenceSourceLabel(requirement.sourceKind, options.allowedSources),
 	);
 	const mentoringSupport = mentoringSupportOf(value);
+	const limitationOffset = mentoringSupport === "HUMAN_CONTEXT_REQUIRED" ? 1 : 0;
+	const editableLimitations = value.knownLimitations.slice(limitationOffset);
 	const supportsAiReview = options.supportedAutomatedReviewModes.includes("LANGUAGE_MODEL");
 	const unavailableRequiredSources = value.requiredEvidence.filter((requirement) => {
 		const source = options.allowedSources.find(
@@ -260,7 +333,6 @@ export function PracticeEvidenceEditor({
 			className="space-y-4"
 			aria-labelledby="practice-evidence-heading"
 			aria-describedby={error ? "practice-evidence-error" : undefined}
-			aria-invalid={error ? true : undefined}
 		>
 			<div>
 				<h2
@@ -292,6 +364,9 @@ export function PracticeEvidenceEditor({
 							<FieldDescription>
 								Hephaestus may review connected work and offer practice-focused guidance. It skips
 								the practice when required evidence is unavailable.
+								{!supportsAiReview && (
+									<> This work type has no AI review available on this instance.</>
+								)}
 							</FieldDescription>
 						</FieldContent>
 						<RadioGroupItem
@@ -347,17 +422,32 @@ export function PracticeEvidenceEditor({
 							onChange({
 								...value,
 								knownLimitations: value.knownLimitations.map((limitation, index) =>
-									index === 0 ? { ...limitation, description: event.target.value } : limitation,
+									index === 0
+										? {
+												...limitation,
+												description: event.target.value,
+												code: limitationCodeFor(event.target.value),
+											}
+										: limitation,
 								),
 							})
 						}
 						maxLength={500}
 						aria-invalid={showHumanReviewReasonError || undefined}
-						aria-describedby="practice-human-review-reason-description"
+						aria-describedby={
+							showHumanReviewReasonError
+								? "practice-human-review-reason-error practice-human-review-reason-description"
+								: "practice-human-review-reason-description"
+						}
 					/>
 					<FieldDescription id="practice-human-review-reason-description">
 						Name the context a person may have that the connected work cannot provide.
 					</FieldDescription>
+					{showHumanReviewReasonError && (
+						<FieldError id="practice-human-review-reason-error">
+							Say what a person can see here that the connected work cannot show.
+						</FieldError>
+					)}
 				</Field>
 			)}
 
@@ -397,9 +487,11 @@ export function PracticeEvidenceEditor({
 						</dd>
 					</dl>
 					<p className="mt-3 text-muted-foreground">
-						{mentoringSupport === "AI_SUPPORTED"
+						{canAttemptReview
 							? "Hephaestus checks every required source before reviewing. Missing, incomplete, or outdated evidence makes it skip this practice instead of guessing."
-							: "Even when these sources are ready, Hephaestus does not have enough context. It skips this practice."}
+							: mentoringSupport === "AI_SUPPORTED"
+								? "No AI review is available for this work type on this instance, so these sources are recorded but nothing is reviewed."
+								: "Even when these sources are ready, Hephaestus does not have enough context. It skips this practice."}
 					</p>
 				</div>
 			)}
@@ -495,7 +587,14 @@ export function PracticeEvidenceEditor({
 													items={EVIDENCE_ROLE_OPTIONS}
 													value={role}
 													onValueChange={(nextRole) =>
-														onChange(withRole(value, source, nextRole as EvidenceRole))
+														onChange(
+															withRole(
+																value,
+																source,
+																nextRole as EvidenceRole,
+																options.recommendedRequirements,
+															),
+														)
 													}
 												>
 													<SelectTrigger id={`practice-evidence-${source.sourceKind}`}>
@@ -511,86 +610,46 @@ export function PracticeEvidenceEditor({
 										</div>
 										{requirement && (
 											<div className="mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2">
-												<Field>
-													<FieldLabel htmlFor={`practice-completeness-${source.sourceKind}`}>
-														Minimum completeness <span className="sr-only">for {sourceLabel}</span>
-													</FieldLabel>
-													<Select
-														disabled={disabled}
-														items={[
-															...(source.supportsComplete
-																? [{ value: "COMPLETE", label: "Complete" }]
-																: []),
-															{ value: "NO_REQUIREMENT", label: "No completeness requirement" },
-														]}
-														value={requirement.completeness}
-														onValueChange={(completeness) =>
-															onChange({
-																...value,
-																requiredEvidence: value.requiredEvidence.map((item) =>
-																	item.sourceKind === source.sourceKind
-																		? {
-																				...item,
-																				completeness: completeness as "NO_REQUIREMENT" | "COMPLETE",
-																			}
-																		: item,
-																),
-															})
-														}
-													>
-														<SelectTrigger id={`practice-completeness-${source.sourceKind}`}>
-															<SelectValue />
-														</SelectTrigger>
-														<SelectContent>
-															{source.supportsComplete && (
-																<SelectItem value="COMPLETE">Complete</SelectItem>
-															)}
-															<SelectItem value="NO_REQUIREMENT">
-																No completeness requirement
-															</SelectItem>
-														</SelectContent>
-													</Select>
-												</Field>
-												<Field>
-													<FieldLabel htmlFor={`practice-freshness-${source.sourceKind}`}>
-														Minimum freshness <span className="sr-only">for {sourceLabel}</span>
-													</FieldLabel>
-													<Select
-														disabled={disabled}
-														items={[
-															...(source.supportsCurrent
-																? [{ value: "CURRENT", label: "Current" }]
-																: []),
-															{ value: "NO_REQUIREMENT", label: "No freshness requirement" },
-														]}
-														value={requirement.freshness}
-														onValueChange={(freshness) =>
-															onChange({
-																...value,
-																requiredEvidence: value.requiredEvidence.map((item) =>
-																	item.sourceKind === source.sourceKind
-																		? {
-																				...item,
-																				freshness: freshness as "NO_REQUIREMENT" | "CURRENT",
-																			}
-																		: item,
-																),
-															})
-														}
-													>
-														<SelectTrigger id={`practice-freshness-${source.sourceKind}`}>
-															<SelectValue />
-														</SelectTrigger>
-														<SelectContent>
-															{source.supportsCurrent && (
-																<SelectItem value="CURRENT">Current</SelectItem>
-															)}
-															<SelectItem value="NO_REQUIREMENT">
-																No freshness requirement
-															</SelectItem>
-														</SelectContent>
-													</Select>
-												</Field>
+												<RequirementQualitySelect
+													id={`practice-completeness-${source.sourceKind}`}
+													label="Minimum completeness"
+													sourceLabel={sourceLabel}
+													disabled={disabled}
+													value={requirement.completeness}
+													options={[
+														...(source.supportsComplete
+															? [{ value: "COMPLETE", label: "Complete" }]
+															: []),
+														{ value: "NO_REQUIREMENT", label: "No completeness requirement" },
+													]}
+													onSelect={(completeness) =>
+														onChange(
+															patchRequirement(value, source.sourceKind, {
+																completeness: completeness as "NO_REQUIREMENT" | "COMPLETE",
+															}),
+														)
+													}
+												/>
+												<RequirementQualitySelect
+													id={`practice-freshness-${source.sourceKind}`}
+													label="Minimum freshness"
+													sourceLabel={sourceLabel}
+													disabled={disabled}
+													value={requirement.freshness}
+													options={[
+														...(source.supportsCurrent
+															? [{ value: "CURRENT", label: "Current" }]
+															: []),
+														{ value: "NO_REQUIREMENT", label: "No freshness requirement" },
+													]}
+													onSelect={(freshness) =>
+														onChange(
+															patchRequirement(value, source.sourceKind, {
+																freshness: freshness as "NO_REQUIREMENT" | "CURRENT",
+															}),
+														)
+													}
+												/>
 											</div>
 										)}
 									</div>
@@ -606,7 +665,13 @@ export function PracticeEvidenceEditor({
 									passes.
 								</p>
 							</div>
-							{value.knownLimitations.map((limitation, index) => {
+							{/*
+							 * Under "Human review needed" the first limitation IS the reason, edited above under
+							 * its own label. Listing it again binds one value to two controls with contradictory
+							 * labels, only one of which carries the invalid state.
+							 */}
+							{editableLimitations.map((limitation, offsetIndex) => {
+								const index = offsetIndex + limitationOffset;
 								// Identity for markup is the row's position; the code is derived from the text and
 								// would change under the caret on every keystroke.
 								const limitationId = String(index);
@@ -617,7 +682,8 @@ export function PracticeEvidenceEditor({
 									>
 										<Field>
 											<FieldLabel htmlFor={`practice-limitation-description-${limitationId}`}>
-												Description <span className="sr-only">for limitation {index + 1}</span>
+												Description{" "}
+												<span className="sr-only">for limitation {offsetIndex + 1}</span>
 											</FieldLabel>
 											<Input
 												disabled={disabled}
@@ -651,7 +717,7 @@ export function PracticeEvidenceEditor({
 													(_, itemIndex) => itemIndex !== index,
 												);
 												const focusTarget =
-													remaining.length === 0
+													remaining.length === limitationOffset
 														? "add"
 														: String(Math.min(index, remaining.length - 1));
 												onChange({
@@ -660,7 +726,7 @@ export function PracticeEvidenceEditor({
 												});
 												focusLimitation(focusTarget);
 											}}
-											aria-label={`Remove limitation ${index + 1}`}
+											aria-label={`Remove limitation ${offsetIndex + 1}`}
 										>
 											<Trash2 className="size-4" />
 										</Button>

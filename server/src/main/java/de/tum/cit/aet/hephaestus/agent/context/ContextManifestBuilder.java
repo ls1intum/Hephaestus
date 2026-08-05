@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.evidence.CompletenessBasis;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceViewTransformation;
 import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
 import de.tum.cit.aet.hephaestus.evidence.RepresentationFidelity;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
 import de.tum.cit.aet.hephaestus.evidence.SourceAuthority;
@@ -28,6 +29,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
+import de.tum.cit.aet.hephaestus.practices.EvidenceContentRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
@@ -218,7 +220,11 @@ public class ContextManifestBuilder {
             .map(source ->
                 plan.selectedSources().contains(source.kind())
                     ? source
-                    : new SourceCapture(source.kind(), new SourceCaptureState.NotCollected("MINIMIZED"), List.of())
+                    : new SourceCapture(
+                          source.kind(),
+                          new SourceCaptureState.NotCollected(SourceAbsenceReason.MINIMIZED),
+                          List.of()
+                      )
             )
             .toList();
         Set<String> retainedArtifacts = sources
@@ -340,6 +346,11 @@ public class ContextManifestBuilder {
                     requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
                     freshness != SourceFreshness.CURRENT
                 ) reasons.add(SourceReadinessReason.SOURCE_NOT_CURRENT);
+                if (
+                    requirement.content() == EvidenceContentRequirement.NON_EMPTY &&
+                    (!available ||
+                        ((SourceCaptureState.Available) capture.state()).content() != SourceContentState.NON_EMPTY)
+                ) reasons.add(SourceReadinessReason.SOURCE_EMPTY);
                 sourceChecks.add(
                     new SourceReadinessCheck(
                         requirement.sourceKind(),
@@ -404,14 +415,14 @@ public class ContextManifestBuilder {
     ) {
         ArtifactSourceContract contract = catalogs.requireSource(plan.contractVersion(), kind);
         if (!plan.selectedSources().contains(kind)) {
-            return missingCapture(contract, new SourceCaptureState.NotCollected("MINIMIZED"));
+            return missingCapture(contract, new SourceCaptureState.NotCollected(SourceAbsenceReason.MINIMIZED));
         }
         SourceCaptureState override = stateOverrides.get(kind);
         if (override != null) {
             return missingCapture(contract, override);
         }
         if (!attemptedKinds.contains(kind)) {
-            return missingCapture(contract, new SourceCaptureState.Unavailable("NO_PROVIDER"));
+            return missingCapture(contract, new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_PROVIDER));
         }
         List<SourceArtifact> artifacts = pathKinds
             .entrySet()
@@ -421,7 +432,7 @@ public class ContextManifestBuilder {
             .map(entry -> artifact(entry.getKey(), files.get(entry.getKey())))
             .toList();
         if (artifacts.isEmpty() && !contract.completenessPolicy().supportsEmpty()) {
-            return missingCapture(contract, new SourceCaptureState.Unavailable("EMPTY_NOT_VALID"));
+            return missingCapture(contract, new SourceCaptureState.Unavailable(SourceAbsenceReason.EMPTY_NOT_VALID));
         }
         SourceCompleteness completeness = reportedCompleteness.getOrDefault(
             kind,
@@ -481,7 +492,9 @@ public class ContextManifestBuilder {
         if (truncationMarkers.stream().anyMatch(Boolean.TRUE::equals)) {
             return SourceCompleteness.PARTIAL;
         }
-        if (!truncationMarkers.isEmpty() && contract.completenessPolicy().supportsComplete()) {
+        // Every artifact must have said it was untruncated. One marker among several unmarked files
+        // is not evidence about the unmarked ones, and COMPLETE is the claim a practice requires.
+        if (truncationMarkers.size() == artifacts.size() && contract.completenessPolicy().supportsComplete()) {
             return SourceCompleteness.COMPLETE;
         }
         return contract.completenessPolicy().supportsPartial()

@@ -772,6 +772,11 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .jsonPath("$.artifact.provider")
                 .doesNotExist()
                 .jsonPath("$.artifact.url")
+                .doesNotExist()
+                // The finding resolves, but nothing about the other workspace's evidence may come
+                // with it: the citations and their captured content are the payload a leak would
+                // actually expose, and the artifact fields alone never covered them.
+                .jsonPath("$.evidence")
                 .doesNotExist();
         }
 

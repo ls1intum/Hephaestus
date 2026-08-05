@@ -12,17 +12,21 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
+import de.tum.cit.aet.hephaestus.practices.EvidenceContentRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReview;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
@@ -150,7 +154,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 Map.of(),
                 Map.of(),
                 Map.of(),
-                Map.of(COMMENTS, new SourceCaptureState.Redacted("PRIVACY_POLICY")),
+                Map.of(COMMENTS, new SourceCaptureState.Redacted(SourceAbsenceReason.PRIVACY_POLICY)),
                 Set.of(COMMENTS)
             )
         );
@@ -169,6 +173,72 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 .checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")))
                 .readyPractices()
         ).isEmpty();
+    }
+
+    @Test
+    void shouldDeclineWhenARequiredNonEmptySourceCapturedNothing() {
+        // A pull request really can produce an empty diff — a full revert, a force-push, a
+        // merge-commit-only range. The contract allows it, so availability, completeness and
+        // freshness all pass. Only the content requirement separates "there is nothing here to
+        // judge" from "I looked and it was fine".
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        String path = "inputs/context/diff.patch";
+        files.put(path, new byte[0]);
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(path, DIFF),
+            "job-empty-diff",
+            plan(Set.of(DIFF)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(DIFF, SourceCompleteness.COMPLETE),
+                Map.of(DIFF, SourceContentState.EMPTY),
+                Map.of(DIFF, "abc123"),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(DIFF)
+            )
+        );
+
+        Practice demandsSubstance = practiceRequiring(DIFF, "needs-substance", EvidenceFreshnessRequirement.CURRENT);
+        PracticeAutomatedReviewPolicy policy = demandsSubstance.getAutomatedReviewPolicy();
+        demandsSubstance.setAutomatedReviewPolicy(
+            new PracticeAutomatedReviewPolicy(
+                policy.sourceContractVersion(),
+                policy.evidenceProfile(),
+                policy.automatedReview(),
+                List.of(
+                    new PracticeEvidenceRequirement(
+                        DIFF,
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        EvidenceFreshnessRequirement.CURRENT,
+                        EvidenceContentRequirement.NON_EMPTY
+                    )
+                ),
+                policy.optionalContext(),
+                policy.whenEvidenceIsInsufficient(),
+                policy.knownLimitations()
+            )
+        );
+
+        AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadiness(
+            manifest,
+            List.of(demandsSubstance)
+        );
+        assertThat(refused.readyPractices()).isEmpty();
+        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).contains(
+            SourceReadinessReason.SOURCE_EMPTY
+        );
+
+        // The same empty capture is still reviewable for a practice that did not ask for substance.
+        assertThat(
+            builder
+                .checkAutomatedReviewReadiness(
+                    manifest,
+                    List.of(practiceRequiring(DIFF, "any-capture-will-do", EvidenceFreshnessRequirement.CURRENT))
+                )
+                .readyPractices()
+        ).hasSize(1);
     }
 
     @Test
@@ -544,7 +614,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 .findFirst()
                 .orElseThrow()
                 .state()
-        ).isEqualTo(new SourceCaptureState.NotCollected("MINIMIZED"));
+        ).isEqualTo(new SourceCaptureState.NotCollected(SourceAbsenceReason.MINIMIZED));
     }
 
     @Test

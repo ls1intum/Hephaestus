@@ -161,7 +161,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 
 			{conflict && (
 				<div className="max-w-3xl space-y-2">
-					<Alert variant="warning">
+					<Alert variant="warning" role="alert">
 						<RotateCcw />
 						<AlertTitle>This practice changed while you were editing</AlertTitle>
 						<AlertDescription>
