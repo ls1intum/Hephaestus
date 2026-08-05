@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, within } from "storybook/test";
+import { expect, waitFor, within } from "storybook/test";
 import { mockJobCompleted, mockJobRunning } from "@/components/admin/ai/story-mock-data";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunDetailPage } from "./ReviewRunDetailPage";
@@ -96,7 +96,11 @@ export const DeclinedForInsufficientEvidence: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(await canvas.findAllByText("Nothing was assessed")).toHaveLength(2);
+		// findAllByText resolves on the first match, so asserting a count on it races the second
+		// panel's render. Wait for both.
+		await waitFor(async () =>
+			expect(await canvas.findAllByText("Nothing was assessed")).toHaveLength(2),
+		);
 		await expect(canvas.queryByText("No findings were recorded")).toBeNull();
 		await expect(canvas.queryByText("No messages")).toBeNull();
 		await expect(
