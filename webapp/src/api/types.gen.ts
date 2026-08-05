@@ -2773,6 +2773,46 @@ export type PracticeReviewSettings = {
 };
 
 /**
+ * Recent review readiness for one practice's evidence requirements
+ */
+export type PracticeEvidenceOutcome = {
+    /**
+     * Reviews that considered this practice
+     */
+    consideredReviews: number;
+    /**
+     * Practice this outcome describes
+     */
+    practiceSlug: string;
+    /**
+     * Reviews where the evidence met every requirement
+     */
+    reviewedCount: number;
+    /**
+     * Why the remaining reviews were skipped, most frequent first
+     */
+    skippedBecause: Array<PracticeEvidenceBlock>;
+};
+
+/**
+ * One reason automated review was skipped, and how often
+ */
+export type PracticeEvidenceBlock = {
+    /**
+     * Readiness reason recorded for that source
+     */
+    reasonCode: string;
+    /**
+     * Reviews skipped for this source and reason
+     */
+    reviews: number;
+    /**
+     * Source that did not meet its requirement
+     */
+    sourceKind: string;
+};
+
+/**
  * Available and recommended authoring choices for each type of reviewed work
  */
 export type PracticeDefinitionOptions = {
@@ -8901,6 +8941,27 @@ export type ListPracticeReviewsResponses = {
 };
 
 export type ListPracticeReviewsResponse = ListPracticeReviewsResponses[keyof ListPracticeReviewsResponses];
+
+export type ListPracticeEvidenceOutcomesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/evidence-outcomes';
+};
+
+export type ListPracticeEvidenceOutcomesResponses = {
+    /**
+     * Evidence outcomes returned
+     */
+    200: Array<PracticeEvidenceOutcome>;
+};
+
+export type ListPracticeEvidenceOutcomesResponse = ListPracticeEvidenceOutcomesResponses[keyof ListPracticeEvidenceOutcomesResponses];
 
 export type ListPracticeReviewFeedbackData = {
     body?: never;

@@ -5,6 +5,7 @@ import type {
 	Practice,
 	PracticeArea,
 	PracticeDefinitionOptions,
+	PracticeEvidenceOutcome,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import {
@@ -36,6 +37,8 @@ interface PracticeFormEditProps {
 	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
+	/** Recent readiness outcomes for this practice; absent until it has been reviewed at least once. */
+	evidenceOutcome?: PracticeEvidenceOutcome;
 }
 
 export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
@@ -158,6 +161,9 @@ export function PracticeForm(props: PracticeFormProps) {
 					definitionOptions={definitionOptions}
 					cancelAction={cancelAction}
 					afterFields={reviewResults}
+					{...(props.mode === "edit" && props.evidenceOutcome
+						? { evidenceOutcome: props.evidenceOutcome }
+						: {})}
 					onSubmit={submit}
 				/>
 			)}

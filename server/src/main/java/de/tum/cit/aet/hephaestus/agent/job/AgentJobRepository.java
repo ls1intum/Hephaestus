@@ -578,6 +578,83 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         long getRunning();
     }
 
+    /**
+     * Per-practice readiness outcomes over the most recent reviews of a workspace.
+     *
+     * <p>Native because the readiness report lives in a JSONB column and the interesting shape is one
+     * row per decision, which needs {@code jsonb_array_elements}. Bounded to a window of recent jobs so
+     * an authoring screen cannot scan the workspace's whole review history.
+     */
+    @Query(
+        value = "WITH recent AS (" +
+            "  SELECT j.evidence_snapshot FROM agent_job j" +
+            "   WHERE j.workspace_id = :workspaceId AND j.evidence_snapshot IS NOT NULL" +
+            "   ORDER BY j.created_at DESC LIMIT :window" +
+            "), decision AS (" +
+            "  SELECT d FROM recent," +
+            "   jsonb_array_elements(recent.evidence_snapshot -> 'automatedReviewReadiness' -> 'decisions') d" +
+            ")" +
+            " SELECT d ->> 'practiceSlug' AS practiceSlug," +
+            "        count(*) AS consideredReviews," +
+            "        count(*) FILTER (WHERE (d ->> 'ready')::boolean) AS reviewedCount" +
+            "   FROM decision GROUP BY 1",
+        nativeQuery = true
+    )
+    List<PracticeReadinessCountRow> countReadinessByPractice(
+        @Param("workspaceId") Long workspaceId,
+        @Param("window") int window
+    );
+
+    /**
+     * Which source blocked each skipped decision, and how often. Split from the counts above because a
+     * decision can be blocked by more than one source, so joining the two in one query would multiply
+     * the review counts by the number of failing sources.
+     */
+    @Query(
+        value = "WITH recent AS (" +
+            "  SELECT j.evidence_snapshot FROM agent_job j" +
+            "   WHERE j.workspace_id = :workspaceId AND j.evidence_snapshot IS NOT NULL" +
+            "   ORDER BY j.created_at DESC LIMIT :window" +
+            "), decision AS (" +
+            "  SELECT d FROM recent," +
+            "   jsonb_array_elements(recent.evidence_snapshot -> 'automatedReviewReadiness' -> 'decisions') d" +
+            "   WHERE NOT (d ->> 'ready')::boolean" +
+            "), failing AS (" +
+            "  SELECT d ->> 'practiceSlug' AS practice_slug, c AS check_row" +
+            "    FROM decision, jsonb_array_elements(d -> 'sourceChecks') c" +
+            "   WHERE NOT (c ->> 'meetsRequirements')::boolean" +
+            ")" +
+            " SELECT practice_slug AS practiceSlug," +
+            "        check_row ->> 'sourceKind' AS sourceKind," +
+            "        reason AS reasonCode," +
+            "        count(*) AS reviews" +
+            "   FROM failing, jsonb_array_elements_text(check_row -> 'reasonCodes') reason" +
+            "  GROUP BY 1, 2, 3 ORDER BY 4 DESC, 2, 3",
+        nativeQuery = true
+    )
+    List<PracticeReadinessBlockRow> countReadinessBlocksByPractice(
+        @Param("workspaceId") Long workspaceId,
+        @Param("window") int window
+    );
+
+    interface PracticeReadinessCountRow {
+        String getPracticeSlug();
+
+        long getConsideredReviews();
+
+        long getReviewedCount();
+    }
+
+    interface PracticeReadinessBlockRow {
+        String getPracticeSlug();
+
+        String getSourceKind();
+
+        String getReasonCode();
+
+        long getReviews();
+    }
+
     interface ReviewRunTargetRow {
         UUID getId();
 

@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class PracticeReviewSummaryController {
 
     private final ReviewRunSummaryQueryService queryService;
+    private final PracticeEvidenceOutcomeService evidenceOutcomeService;
 
     @GetMapping
     @Operation(
@@ -55,5 +57,16 @@ public class PracticeReviewSummaryController {
     ) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         return ResponseEntity.ok(new PagedModel<>(queryService.list(workspaceContext.id(), status, pageable)));
+    }
+
+    @GetMapping("/evidence-outcomes")
+    @Operation(
+        summary = "Summarize how each practice's evidence requirements turned out on recent reviews",
+        description = "One entry per practice that recent reviews considered, with the sources that skipped it.",
+        operationId = "listPracticeEvidenceOutcomes"
+    )
+    @ApiResponse(responseCode = "200", description = "Evidence outcomes returned")
+    public ResponseEntity<List<PracticeEvidenceOutcomeDTO>> listEvidenceOutcomes(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(evidenceOutcomeService.recentOutcomes(workspaceContext.id()));
     }
 }

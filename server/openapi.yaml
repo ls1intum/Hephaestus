@@ -4727,6 +4727,32 @@ paths:
       summary: List practice reviews with finding and feedback outcomes
       tags:
       - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/evidence-outcomes:
+    get:
+      description: "One entry per practice that recent reviews considered, with the\
+        \ sources that skipped it."
+      operationId: listPracticeEvidenceOutcomes
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeEvidenceOutcome"
+          description: Evidence outcomes returned
+      summary: Summarize how each practice's evidence requirements turned out on recent
+        reviews
+      tags:
+      - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/feedback:
     get:
       description: Results are ordered newest first and include every delivery state.
@@ -9872,6 +9898,24 @@ components:
             $ref: "#/components/schemas/PracticeWorkTypeDefinitionOptions"
       required:
       - workTypes
+    PracticeEvidenceBlock:
+      type: object
+      description: "One reason automated review was skipped, and how often"
+      properties:
+        reasonCode:
+          type: string
+          description: Readiness reason recorded for that source
+        reviews:
+          type: integer
+          format: int32
+          description: Reviews skipped for this source and reason
+        sourceKind:
+          type: string
+          description: Source that did not meet its requirement
+      required:
+      - reasonCode
+      - reviews
+      - sourceKind
     PracticeEvidenceLimitation:
       type: object
       description: Known claim that the selected evidence cannot support even when
@@ -9891,6 +9935,31 @@ components:
       required:
       - code
       - description
+    PracticeEvidenceOutcome:
+      type: object
+      description: Recent review readiness for one practice's evidence requirements
+      properties:
+        consideredReviews:
+          type: integer
+          format: int32
+          description: Reviews that considered this practice
+        practiceSlug:
+          type: string
+          description: Practice this outcome describes
+        reviewedCount:
+          type: integer
+          format: int32
+          description: Reviews where the evidence met every requirement
+        skippedBecause:
+          type: array
+          description: "Why the remaining reviews were skipped, most frequent first"
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceBlock"
+      required:
+      - consideredReviews
+      - practiceSlug
+      - reviewedCount
+      - skippedBecause
     PracticeEvidenceRequirement:
       type: object
       description: Source and minimum capture quality required by a practice

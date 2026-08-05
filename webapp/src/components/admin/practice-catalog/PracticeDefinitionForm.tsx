@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeDefinitionOptions,
+	PracticeEvidenceOutcome,
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
 import {
@@ -86,6 +87,8 @@ interface PracticeDefinitionFormBaseProps {
 	cancelAction: React.ReactNode;
 	onSubmit: (value: PracticeDefinitionValue) => void;
 	definitionOptions: PracticeDefinitionOptions;
+	/** How this practice's evidence requirements have turned out on recent reviews, when it has any. */
+	evidenceOutcome?: PracticeEvidenceOutcome;
 }
 
 interface PracticeDefinitionFormCreateProps extends PracticeDefinitionFormBaseProps {
@@ -186,6 +189,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		cancelAction,
 		initialData,
 		definitionOptions,
+		evidenceOutcome,
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
@@ -530,6 +534,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					<PracticeEvidenceEditor
 						options={selectedDefinitionOptions}
 						value={form.automatedReviewPolicy}
+						{...(evidenceOutcome ? { outcome: evidenceOutcome } : {})}
 						disabled={formDisabled}
 						onChange={(automatedReviewPolicy) =>
 							setForm((previous) => {

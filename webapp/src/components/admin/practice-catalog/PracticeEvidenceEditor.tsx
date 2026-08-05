@@ -3,9 +3,11 @@ import { ChevronRight, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-rea
 import { useRef, useState } from "react";
 import type {
 	PracticeAutomatedReviewPolicy,
+	PracticeEvidenceOutcome,
 	PracticeEvidenceSourceOption,
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
+import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-catalog/PracticeEvidenceOutcomeSummary";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -224,6 +226,8 @@ export function practiceEvidenceError(requirements: PracticeAutomatedReviewPolic
 export interface PracticeEvidenceEditorProps {
 	options: PracticeWorkTypeDefinitionOptions;
 	value: PracticeAutomatedReviewPolicy;
+	/** How these requirements have turned out on recent reviews; omitted while creating a practice. */
+	outcome?: PracticeEvidenceOutcome;
 	onChange: (value: PracticeAutomatedReviewPolicy) => void;
 	error?: string;
 	disabled?: boolean;
@@ -232,6 +236,7 @@ export interface PracticeEvidenceEditorProps {
 export function PracticeEvidenceEditor({
 	options,
 	value,
+	outcome,
 	onChange,
 	error,
 	disabled = false,
@@ -543,6 +548,9 @@ export function PracticeEvidenceEditor({
 								integrations control that separately.
 							</p>
 						</div>
+						{outcome && (
+							<PracticeEvidenceOutcomeSummary outcome={outcome} sources={options.allowedSources} />
+						)}
 						<FieldGroup className="gap-4">
 							{options.allowedSources.map((source) => {
 								const role = roleOf(value, source.sourceKind);

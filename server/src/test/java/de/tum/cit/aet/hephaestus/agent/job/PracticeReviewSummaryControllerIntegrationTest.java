@@ -167,6 +167,67 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     @Test
+    @WithAdminUser
+    void reportsHowEachPracticesEvidenceRequirementsTurnedOut() {
+        AgentJob skipped = persistJob(workspace, AgentPurpose.PRACTICE_REVIEW);
+        skipped.setEvidenceSnapshot(readinessSnapshot(false));
+        jobRepository.save(skipped);
+        AgentJob reviewed = persistJob(workspace, AgentPurpose.PRACTICE_REVIEW);
+        reviewed.setEvidenceSnapshot(readinessSnapshot(true));
+        jobRepository.save(reviewed);
+        // A review in another workspace must not be counted into this workspace's history.
+        AgentJob elsewhere = persistJob(otherWorkspace, AgentPurpose.PRACTICE_REVIEW);
+        elsewhere.setEvidenceSnapshot(readinessSnapshot(false));
+        jobRepository.save(elsewhere);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/practices/reviews/evidence-outcomes", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.length()")
+            .isEqualTo(1)
+            .jsonPath("$[0].practiceSlug")
+            .isEqualTo(practice.getSlug())
+            .jsonPath("$[0].consideredReviews")
+            .isEqualTo(2)
+            .jsonPath("$[0].reviewedCount")
+            .isEqualTo(1)
+            .jsonPath("$[0].skippedBecause[0].sourceKind")
+            .isEqualTo("scm.pull-request.diff")
+            .jsonPath("$[0].skippedBecause[0].reasonCode")
+            .isEqualTo("SOURCE_EMPTY")
+            .jsonPath("$[0].skippedBecause[0].reviews")
+            .isEqualTo(1);
+    }
+
+    /** One readiness report as the executor records it, for one practice, ready or skipped. */
+    private tools.jackson.databind.JsonNode readinessSnapshot(boolean ready) {
+        Map<String, Object> check = ready
+            ? Map.of("sourceKind", "scm.pull-request.diff", "meetsRequirements", true, "reasonCodes", List.of())
+            : Map.of(
+                  "sourceKind",
+                  "scm.pull-request.diff",
+                  "meetsRequirements",
+                  false,
+                  "reasonCodes",
+                  List.of("SOURCE_EMPTY")
+              );
+        return objectMapper.valueToTree(
+            Map.of(
+                "automatedReviewReadiness",
+                Map.of(
+                    "decisions",
+                    List.of(Map.of("practiceSlug", practice.getSlug(), "ready", ready, "sourceChecks", List.of(check)))
+                )
+            )
+        );
+    }
+
+    @Test
     @WithUser
     void rejectsAWorkspaceMember() {
         webTestClient

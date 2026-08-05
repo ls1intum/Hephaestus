@@ -6,6 +6,7 @@ import {
 	getPracticeOptions,
 	getPracticeQueryKey,
 	listAreasOptions,
+	listPracticeEvidenceOutcomesOptions,
 	listPracticesQueryKey,
 	updatePracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -57,6 +58,12 @@ function EditPracticeContainer() {
 	});
 	const definitionOptionsQuery = useQuery({
 		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
+	});
+	// Deliberately not part of the loading or error gates below: how past reviews turned out is context
+	// for the requirements, not something the author needs in order to edit them. A workspace with no
+	// review history yet, or a request that fails, simply shows the editor without it.
+	const evidenceOutcomesQuery = useQuery({
+		...listPracticeEvidenceOutcomesOptions({ path: { workspaceSlug } }),
 	});
 
 	const updatePractice = useMutation({
@@ -132,6 +139,12 @@ function EditPracticeContainer() {
 			definitionOptions={definitionOptionsQuery.data}
 			onSubmit={handleSubmit}
 			isPending={updatePractice.isPending}
+			{...(() => {
+				const outcome = evidenceOutcomesQuery.data?.find(
+					(entry) => entry.practiceSlug === practiceSlug,
+				);
+				return outcome ? { evidenceOutcome: outcome } : {};
+			})()}
 		/>
 	);
 }

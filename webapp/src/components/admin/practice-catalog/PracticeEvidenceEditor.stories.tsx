@@ -72,3 +72,45 @@ export const InvalidRule: Story = {
 		error: "Choose at least one required evidence source.",
 	},
 };
+
+/**
+ * Requirements are set against an idea of what the sources usually hold, and until the runtime reads
+ * its own readiness decisions back there is nothing to check that idea against: a requirement that
+ * skips four reviews in five looks exactly like one that never skips.
+ */
+export const RequirementsThatKeepSkipping: Story = {
+	args: {
+		outcome: {
+			practiceSlug: "handles-errors-instead-of-swallowing-them",
+			consideredReviews: 12,
+			reviewedCount: 4,
+			skippedBecause: [
+				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_EMPTY", reviews: 6 },
+				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_NOT_CURRENT", reviews: 2 },
+			],
+		},
+	},
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
+		await expect(
+			canvas.getByText(/skipped this practice in 8 of the last 12 reviews/),
+		).toBeVisible();
+		await expect(canvas.getByText(/Code changes — was empty \(6 reviews\)/)).toBeVisible();
+	},
+};
+
+/** Requirements that always hold say so, so an author can leave them alone with the same confidence. */
+export const RequirementsThatAlwaysHold: Story = {
+	args: {
+		outcome: {
+			practiceSlug: "submit-reviewable-work",
+			consideredReviews: 12,
+			reviewedCount: 12,
+			skippedBecause: [],
+		},
+	},
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
+		await expect(canvas.getByText(/met every time, across the last 12 reviews/)).toBeVisible();
+	},
+};
