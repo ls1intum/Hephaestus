@@ -228,6 +228,11 @@ function UserProfile() {
 								if (areasQuery.isError) areasQuery.refetch();
 								if (areaStatusesQuery.isError) areaStatusesQuery.refetch();
 							},
+							onOpenDetails: (area) =>
+								navigate({
+									to: "/w/$workspaceSlug/user/$username/practice-areas/$areaSlug",
+									params: { workspaceSlug, username, areaSlug: area.slug },
+								}),
 						}
 					: undefined
 			}
