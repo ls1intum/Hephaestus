@@ -40,6 +40,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
     @Test
     void shouldMaterializePinnedTreeWithoutGitDirectory() {
         AgentJob job = job(17L, "0123456789012345678901234567890123456789");
+        when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
         when(
             gitRepositoryManager.readTreeSnapshot(
@@ -73,6 +74,8 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
 
     @Test
     void shouldRejectUnpinnedTree() {
+        when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
         assertThatThrownBy(() ->
             source.contribute(new ContextRequest.PracticeReviewRequest(job(17L, null)), new LinkedHashMap<>())
         )
@@ -126,7 +129,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         assertThat(contribution.stateOverrides()).containsExactly(
             entry(
                 new SourceKind("scm.repository.tree"),
-                new SourceCaptureState.Unavailable(SourceAbsenceReason.PINNED_HEAD_MISSING)
+                new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY)
             )
         );
     }

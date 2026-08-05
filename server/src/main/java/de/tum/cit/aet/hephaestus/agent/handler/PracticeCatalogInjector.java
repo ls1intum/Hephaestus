@@ -67,13 +67,8 @@ class PracticeCatalogInjector {
      * false strength (see {@code ValidatedFinding#coerceCoherence}).
      */
     Set<String> defectDetectorSlugs(AgentJob job) {
-        JsonNode snapshot = job.getEvidenceSnapshot();
-        JsonNode practices = snapshot == null ? null : snapshot.path("practices");
-        if (practices == null || !practices.isArray()) {
-            throw new JobDeliveryException("Job has no admitted practice snapshot: jobId=" + job.getId());
-        }
         Set<String> slugs = new HashSet<>();
-        for (JsonNode practice : practices) {
+        for (JsonNode practice : admittedPractices(job)) {
             if (practice.path("defectDetector").asBoolean(false)) {
                 slugs.add(practice.path("slug").asString());
             }
@@ -81,13 +76,17 @@ class PracticeCatalogInjector {
         return Set.copyOf(slugs);
     }
 
-    boolean isAdmitted(AgentJob job, String slug) {
+    private static JsonNode admittedPractices(AgentJob job) {
         JsonNode snapshot = job.getEvidenceSnapshot();
         JsonNode practices = snapshot == null ? null : snapshot.path("practices");
         if (practices == null || !practices.isArray()) {
             throw new JobDeliveryException("Job has no admitted practice snapshot: jobId=" + job.getId());
         }
-        for (JsonNode practice : practices) {
+        return practices;
+    }
+
+    boolean isAdmitted(AgentJob job, String slug) {
+        for (JsonNode practice : admittedPractices(job)) {
             if (slug.equals(practice.path("slug").asString()) && practice.path("revisionId").isIntegralNumber()) {
                 return true;
             }
@@ -215,21 +214,16 @@ class PracticeCatalogInjector {
         );
     }
 
-    /**
-     * The claims this practice's evidence cannot support, appended to its criteria.
-     *
-     * <p>A limitation is the author's statement that even a fully satisfied evidence requirement leaves
-     * a specific claim out of reach — that a diff cannot show how the code behaves once deployed, say.
-     * Recorded on the policy but withheld from the model, it constrains nobody: the model still reaches
-     * the conclusion the author knew the evidence could not carry.
-     */
+    /** The claims this practice's evidence cannot support, appended to the criteria staged for the model. */
     private static String renderKnownLimitations(Practice p) {
         List<PracticeEvidenceLimitation> limitations = p.getAutomatedReviewPolicy().knownLimitations();
         if (limitations.isEmpty()) {
             return "";
         }
+        // Each bullet states a limit of the evidence, not a claim to avoid. Reading them as claims
+        // inverts the instruction: it would forbid the hedge and leave the overclaim it guards against.
         StringBuilder section = new StringBuilder("\n\n## What this evidence cannot show\n\n");
-        section.append("Do not make these claims for this practice, however plausible they look:\n\n");
+        section.append("Do not state or imply any conclusion that would require going beyond these limits:\n\n");
         for (PracticeEvidenceLimitation limitation : limitations) {
             section.append("- ").append(limitation.description()).append("\n");
         }

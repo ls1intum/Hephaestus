@@ -3,11 +3,8 @@ package de.tum.cit.aet.hephaestus.evidence;
 /**
  * Why a source is not present in a capture.
  *
- * <p>An availability state records that a source is absent; this records why, which is what makes
- * the absence actionable for an operator, an auditor, or the review prompt. A free-form code would
- * let each collector introduce its own vocabulary, leaving downstream code unable to branch on the
- * reason and collapsing a deliberate minimisation into an indistinguishable collection failure. Each
- * constant names one cause and states the availability state it accompanies.
+ * <p>An availability state records <em>that</em> a source is absent; this records <em>why</em>, which is
+ * what makes the absence actionable for an operator, an auditor, or the review prompt.
  */
 public enum SourceAbsenceReason {
     /** {@code NOT_COLLECTED}: the practice did not ask for this source, so it was never read. */
@@ -20,8 +17,10 @@ public enum SourceAbsenceReason {
     NO_PROVIDER,
     /** {@code UNAVAILABLE}: the collector reported empty for a source whose contract forbids empty. */
     EMPTY_NOT_VALID,
-    /** {@code UNAVAILABLE}: the pinned commit the capture is anchored to is not in the mirror, up to and including the case where the repository has no working copy at all. */
+    /** {@code UNAVAILABLE}: the pinned commit the capture is anchored to is gone from the mirror. */
     PINNED_HEAD_MISSING,
+    /** {@code UNAVAILABLE}: this repository has no working copy, so nothing could be read at any commit. */
+    NO_WORKING_COPY,
     /** {@code UNAVAILABLE}: the requested conversation or artifact does not exist upstream. */
     NOT_FOUND,
     /** {@code REDACTED}: withheld by policy rather than by a subject's choice. */

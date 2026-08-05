@@ -41,14 +41,9 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         return KIND;
     }
 
-    /**
-     * The tree's share of the sandbox input budget.
-     *
-     * <p>Held below {@code SandboxWorkspaceManager.MAX_INPUT_BYTES} so the tree cannot consume the whole
-     * of it. Sized to the budget, a tree that filled it would leave nothing for the diff and the
-     * conversation and fail the job outright — for an optional source, whose absence is supposed to cost
-     * only context. Exceeding this bound truncates the tree and reports the capture as partial instead.
-     */
+    /** Below {@code SandboxWorkspaceManager.MAX_INPUT_BYTES}: a tree that filled the budget would leave
+     * nothing for the diff and fail the job, which an optional source must never do. Past this bound the
+     * tree truncates and reports partial. */
     static final long MAX_TOTAL_BYTES = 32L * 1024 * 1024;
 
     private final GitRepositoryManager gitRepositoryManager;
@@ -65,9 +60,7 @@ public class RepositoryTreeContentSource implements EvidenceSource {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        snapshot(request)
-            .files()
-            .forEach((path, bytes) -> files.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, bytes));
+        files.putAll(capture(request, sourceKinds()).files());
     }
 
     @Override
@@ -75,11 +68,9 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         if (!selectedKinds.contains(KIND)) {
             return new EvidenceContribution(Map.of(), Map.of());
         }
-        // The tree is optional context for every practice that selects it, and a deployment that keeps
-        // no working copy is a supported configuration rather than a fault. Throwing here would record
-        // a provider failure and emit a warning on every run of such a deployment, so report the
-        // absence for what it is.
-        SourceCaptureState absence = absenceState(request);
+        // A deployment with no working copy is a supported configuration, not a fault: throwing would
+        // record a provider failure and warn on every run of one.
+        SourceCaptureState absence = absenceOrNull(request);
         if (absence != null) {
             return absent(absence);
         }
@@ -114,9 +105,8 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         );
     }
 
-    /** Why no tree can be read for this request, or {@code null} when one can. */
     @Nullable
-    private SourceCaptureState absenceState(ContextRequest request) {
+    private SourceCaptureState absenceOrNull(ContextRequest request) {
         if (!gitRepositoryManager.isEnabled()) {
             return new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED);
         }
@@ -130,7 +120,7 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         if (gitRepositoryManager.isRepositoryCloned(metadata.path("repository_id").asLong())) {
             return null;
         }
-        return new SourceCaptureState.Unavailable(SourceAbsenceReason.PINNED_HEAD_MISSING);
+        return new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY);
     }
 
     private GitRepositoryManager.GitTreeSnapshot snapshot(ContextRequest request) {
