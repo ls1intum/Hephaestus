@@ -797,7 +797,12 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
                 List.of(
-                    new PracticeEvidenceRequirement(sourceKind, EvidenceCompletenessRequirement.COMPLETE, freshness)
+                    new PracticeEvidenceRequirement(
+                        sourceKind,
+                        EvidenceCompletenessRequirement.COMPLETE,
+                        freshness,
+                        EvidenceContentRequirement.NO_REQUIREMENT
+                    )
                 ),
                 List.of(),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,

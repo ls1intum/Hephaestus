@@ -153,7 +153,8 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
         return new PracticeEvidenceRequirement(
             sourceKind,
             EvidenceCompletenessRequirement.COMPLETE,
-            EvidenceFreshnessRequirement.CURRENT
+            EvidenceFreshnessRequirement.CURRENT,
+            EvidenceContentRequirement.NO_REQUIREMENT
         );
     }
 }

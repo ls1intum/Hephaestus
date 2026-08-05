@@ -38,7 +38,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                         new PracticeEvidenceRequirement(
                             DIFF,
                             EvidenceCompletenessRequirement.COMPLETE,
-                            EvidenceFreshnessRequirement.CURRENT
+                            EvidenceFreshnessRequirement.CURRENT,
+                            EvidenceContentRequirement.NO_REQUIREMENT
                         )
                     )
                 )
@@ -54,7 +55,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             new PracticeEvidenceRequirement(
                 new SourceKind("scm.pull-request.unknown"),
                 EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.CURRENT
+                EvidenceFreshnessRequirement.CURRENT,
+                EvidenceContentRequirement.NO_REQUIREMENT
             )
         );
 
@@ -69,7 +71,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             new PracticeEvidenceRequirement(
                 OUTSIDE_PROFILE,
                 EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.CURRENT
+                EvidenceFreshnessRequirement.CURRENT,
+                EvidenceContentRequirement.NO_REQUIREMENT
             )
         );
 
@@ -84,7 +87,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             new PracticeEvidenceRequirement(
                 PARTIAL,
                 EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.CURRENT
+                EvidenceFreshnessRequirement.CURRENT,
+                EvidenceContentRequirement.NO_REQUIREMENT
             )
         );
 
@@ -99,7 +103,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             new PracticeEvidenceRequirement(
                 TIMELESS,
                 EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.CURRENT
+                EvidenceFreshnessRequirement.CURRENT,
+                EvidenceContentRequirement.NO_REQUIREMENT
             )
         );
 
@@ -206,7 +211,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 new PracticeEvidenceRequirement(
                     DIFF,
                     EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceFreshnessRequirement.CURRENT
+                    EvidenceFreshnessRequirement.CURRENT,
+                    EvidenceContentRequirement.NO_REQUIREMENT
                 )
             ),
             List.of(),

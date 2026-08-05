@@ -21,12 +21,4 @@ public record PracticeEvidenceRequirement(
         // meant "any capture will do", which is what NO_REQUIREMENT says.
         content = content == null ? EvidenceContentRequirement.NO_REQUIREMENT : content;
     }
-
-    public PracticeEvidenceRequirement(
-        SourceKind sourceKind,
-        EvidenceCompletenessRequirement completeness,
-        EvidenceFreshnessRequirement freshness
-    ) {
-        this(sourceKind, completeness, freshness, EvidenceContentRequirement.NO_REQUIREMENT);
-    }
 }

@@ -24,7 +24,7 @@ public class PracticeEvidenceDefaults {
                     requirement(
                         "scm.pull-request.core",
                         EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT
+                        EvidenceFreshnessRequirement.NO_REQUIREMENT
                     ),
                     // A diff with no changes in it cannot support a judgement about how a change
                     // was made; without this the model falls back to the title and description.
@@ -45,7 +45,7 @@ public class PracticeEvidenceDefaults {
                     requirement(
                         "scm.issue.core",
                         EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT
+                        EvidenceFreshnessRequirement.NO_REQUIREMENT
                     )
                 ),
                 List.of(optionalRequirement("scm.issue.comments")),
@@ -58,7 +58,7 @@ public class PracticeEvidenceDefaults {
                     requirement(
                         "slack.conversation.thread",
                         EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT
+                        EvidenceFreshnessRequirement.NO_REQUIREMENT
                     )
                 ),
                 List.of(),

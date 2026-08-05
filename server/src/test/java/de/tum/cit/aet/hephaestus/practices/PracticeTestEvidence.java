@@ -45,11 +45,16 @@ public final class PracticeTestEvidence {
             ),
             kinds
                 .stream()
+                // Only a source pinned to an immutable upstream identity can demonstrate currentness;
+                // demanding it of a mirrored source is rejected at authoring time, as it should be.
                 .map(kind ->
                     new PracticeEvidenceRequirement(
                         new SourceKind(kind),
                         EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT
+                        "scm.pull-request.diff".equals(kind) || "scm.repository.tree".equals(kind)
+                            ? EvidenceFreshnessRequirement.CURRENT
+                            : EvidenceFreshnessRequirement.NO_REQUIREMENT,
+                        EvidenceContentRequirement.NO_REQUIREMENT
                     )
                 )
                 .toList(),
