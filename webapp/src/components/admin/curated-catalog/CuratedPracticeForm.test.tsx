@@ -222,10 +222,8 @@ describe("CuratedPracticeForm", () => {
 		});
 		if (!limitationDescription) throw new Error("New limitation description was not rendered");
 		await user.type(limitationDescription, "Keep this limitation");
-		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
-		await user.click(await screen.findByRole("option", { name: "Issue" }));
-		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
-		await user.click(await screen.findByRole("option", { name: /Pull or merge request/ }));
+		await user.click(screen.getByRole("radio", { name: /Issue/ }));
+		await user.click(screen.getByRole("radio", { name: /Pull or merge request/ }));
 
 		expect(screen.getByDisplayValue("Keep this limitation")).toBeTruthy();
 	});
@@ -245,8 +243,7 @@ describe("CuratedPracticeForm", () => {
 		);
 
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
-		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
-		await user.click(await screen.findByRole("option", { name: "Issue" }));
+		await user.click(screen.getByRole("radio", { name: /Issue/ }));
 		expect(screen.getByRole("radio", { name: /Guidance only/ }).getAttribute("aria-checked")).toBe(
 			"true",
 		);
@@ -272,19 +269,16 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
-		await user.click(await screen.findByRole("option", { name: "Issue" }));
+		await user.click(screen.getByRole("radio", { name: /Issue/ }));
 		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
 		await user.click(screen.getByRole("checkbox", { name: "Issue is closed" }));
-		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
-		await user.click(await screen.findByRole("option", { name: /Pull or merge request/ }));
+		await user.click(screen.getByRole("radio", { name: /Pull or merge request/ }));
 		expect(
 			screen
 				.getByRole("checkbox", { name: "Pull or merge request is opened" })
 				.getAttribute("aria-checked"),
 		).toBe("true");
-		await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
-		await user.click(await screen.findByRole("option", { name: "Issue" }));
+		await user.click(screen.getByRole("radio", { name: /Issue/ }));
 		expect(
 			screen.getByRole("checkbox", { name: "Issue is closed" }).getAttribute("aria-checked"),
 		).toBe("true");

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -171,8 +171,7 @@ export const ConversationPractice: Story = {
 	play: async ({ canvas, userEvent }) => {
 		createSubmit.mockClear();
 		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
-		await userEvent.click(canvas.getByRole("combobox", { name: "Review this kind of work" }));
-		await userEvent.click(await screen.findByRole("option", { name: "Conversation" }));
+		await userEvent.click(canvas.getByRole("radio", { name: /Conversation/ }));
 		await userEvent.click(canvas.getByRole("button", { name: /Technical settings/ }));
 		await expect(canvas.queryByText("Run mentoring when *")).not.toBeInTheDocument();
 		await userEvent.type(

@@ -661,8 +661,7 @@ describe("instance catalog routes", () => {
 		await screen.findByRole("button", { name: "Save changes" }, ROUTE_RENDER_WAIT);
 		if (changeArtifact) {
 			const user = userEvent.setup();
-			await user.click(screen.getByRole("combobox", { name: "Review this kind of work" }));
-			await user.click(await screen.findByRole("option", { name: "Conversation" }));
+			await user.click(screen.getByRole("radio", { name: /Conversation/ }));
 		}
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 

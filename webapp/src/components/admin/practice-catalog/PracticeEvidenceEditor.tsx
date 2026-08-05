@@ -9,6 +9,7 @@ import type {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Field,
@@ -17,17 +18,12 @@ import {
 	FieldError,
 	FieldGroup,
 	FieldLabel,
+	FieldLegend,
+	FieldSet,
 	FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { evidenceQualityLabel, evidenceSourceLabel } from "./evidence-presentation";
 
 type EvidenceRole = "NOT_USED" | "OPTIONAL" | "REQUIRED";
@@ -100,47 +96,39 @@ function recommendedContentFor(
 		?.content;
 }
 
-/** One requirement's quality dropdown. Both axes render the same control from the same option list. */
-function RequirementQualitySelect({
+/**
+ * One requirement, as a checkbox. Each is a yes/no decision, and the caller renders only the
+ * requirements the source can actually establish, so an option is never shown that cannot be chosen.
+ */
+function RequirementCheckbox({
 	id,
 	label,
 	sourceLabel,
 	disabled,
-	value,
-	options,
-	onSelect,
+	checked,
+	onCheckedChange,
 }: {
 	id: string;
 	label: string;
 	sourceLabel: string;
 	disabled: boolean;
-	value: string;
-	options: ReadonlyArray<{ value: string; label: string }>;
-	onSelect: (value: string) => void;
+	checked: boolean;
+	onCheckedChange: (checked: boolean) => void;
 }) {
-	// Base UI types the value as nullable for clearable selects; these are required, so a null
-	// selection is not a state this field can reach.
-	const handleChange = (next: string | null) => next !== null && onSelect(next);
 	return (
-		<Field>
-			<FieldLabel htmlFor={id}>
-				{label} <span className="sr-only">for {sourceLabel}</span>
-			</FieldLabel>
-			{/* Base UI resolves the trigger's label from `items`, so both it and the options below have
-			    to come from the same array or the two can disagree. */}
-			<Select disabled={disabled} items={options} value={value} onValueChange={handleChange}>
-				<SelectTrigger id={id}>
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					{options.map((option) => (
-						<SelectItem key={option.value} value={option.value}>
-							{option.label}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-		</Field>
+		<FieldLabel htmlFor={id} className="w-auto font-normal">
+			<Field orientation="horizontal" className="w-auto gap-2" data-disabled={disabled}>
+				<Checkbox
+					id={id}
+					disabled={disabled}
+					checked={checked}
+					onCheckedChange={(next) => onCheckedChange(next === true)}
+				/>
+				<FieldTitle className="font-normal">
+					{label} <span className="sr-only">for {sourceLabel}</span>
+				</FieldTitle>
+			</Field>
+		</FieldLabel>
 	);
 }
 
@@ -578,15 +566,14 @@ export function PracticeEvidenceEditor({
 												</div>
 												<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>
 											</div>
-											<Field>
-												<FieldLabel htmlFor={`practice-evidence-${source.sourceKind}`}>
+											<FieldSet>
+												<FieldLegend variant="label">
 													Use in this practice <span className="sr-only">for {sourceLabel}</span>
-												</FieldLabel>
-												<Select
-													disabled={disabled}
-													items={EVIDENCE_ROLE_OPTIONS}
+												</FieldLegend>
+												<RadioGroup
 													value={role}
 													onValueChange={(nextRole) =>
+														nextRole &&
 														onChange(
 															withRole(
 																value,
@@ -596,60 +583,93 @@ export function PracticeEvidenceEditor({
 															),
 														)
 													}
+													className="flex flex-wrap gap-x-5 gap-y-2"
+													aria-label={`Use in this practice for ${sourceLabel}`}
 												>
-													<SelectTrigger id={`practice-evidence-${source.sourceKind}`}>
-														<SelectValue />
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem value="REQUIRED">Required</SelectItem>
-														<SelectItem value="OPTIONAL">Optional context</SelectItem>
-														<SelectItem value="NOT_USED">Not used</SelectItem>
-													</SelectContent>
-												</Select>
-											</Field>
+													{EVIDENCE_ROLE_OPTIONS.map((option) => (
+														<FieldLabel
+															key={option.value}
+															htmlFor={`practice-evidence-${source.sourceKind}-${option.value}`}
+															className="w-auto font-normal"
+														>
+															<Field
+																orientation="horizontal"
+																className="w-auto gap-2"
+																data-disabled={disabled}
+															>
+																<RadioGroupItem
+																	id={`practice-evidence-${source.sourceKind}-${option.value}`}
+																	value={option.value}
+																	disabled={disabled}
+																/>
+																<FieldTitle className="font-normal">{option.label}</FieldTitle>
+															</Field>
+														</FieldLabel>
+													))}
+												</RadioGroup>
+											</FieldSet>
 										</div>
 										{requirement && (
-											<div className="mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2">
-												<RequirementQualitySelect
-													id={`practice-completeness-${source.sourceKind}`}
-													label="Minimum completeness"
-													sourceLabel={sourceLabel}
-													disabled={disabled}
-													value={requirement.completeness}
-													options={[
-														...(source.supportsComplete
-															? [{ value: "COMPLETE", label: "Complete" }]
-															: []),
-														{ value: "NO_REQUIREMENT", label: "No completeness requirement" },
-													]}
-													onSelect={(completeness) =>
-														onChange(
-															patchRequirement(value, source.sourceKind, {
-																completeness: completeness as "NO_REQUIREMENT" | "COMPLETE",
-															}),
-														)
-													}
-												/>
-												<RequirementQualitySelect
-													id={`practice-freshness-${source.sourceKind}`}
-													label="Minimum freshness"
-													sourceLabel={sourceLabel}
-													disabled={disabled}
-													value={requirement.freshness}
-													options={[
-														...(source.supportsCurrent
-															? [{ value: "CURRENT", label: "Current" }]
-															: []),
-														{ value: "NO_REQUIREMENT", label: "No freshness requirement" },
-													]}
-													onSelect={(freshness) =>
-														onChange(
-															patchRequirement(value, source.sourceKind, {
-																freshness: freshness as "NO_REQUIREMENT" | "CURRENT",
-															}),
-														)
-													}
-												/>
+											<div className="mt-4 border-t pt-4">
+												<FieldSet>
+													<FieldLegend variant="label">
+														Minimum quality <span className="sr-only">for {sourceLabel}</span>
+													</FieldLegend>
+													<FieldDescription>
+														Hephaestus skips the practice when a checked requirement is not met.
+														Only the requirements this source can establish are shown.
+													</FieldDescription>
+													<div className="flex flex-wrap gap-x-5 gap-y-2">
+														{source.supportsComplete && (
+															<RequirementCheckbox
+																id={`practice-completeness-${source.sourceKind}`}
+																label="Must be complete"
+																sourceLabel={sourceLabel}
+																disabled={disabled}
+																checked={requirement.completeness === "COMPLETE"}
+																onCheckedChange={(checked) =>
+																	onChange(
+																		patchRequirement(value, source.sourceKind, {
+																			completeness: checked ? "COMPLETE" : "NO_REQUIREMENT",
+																		}),
+																	)
+																}
+															/>
+														)}
+														{source.supportsCurrent && (
+															<RequirementCheckbox
+																id={`practice-freshness-${source.sourceKind}`}
+																label="Must be current"
+																sourceLabel={sourceLabel}
+																disabled={disabled}
+																checked={requirement.freshness === "CURRENT"}
+																onCheckedChange={(checked) =>
+																	onChange(
+																		patchRequirement(value, source.sourceKind, {
+																			freshness: checked ? "CURRENT" : "NO_REQUIREMENT",
+																		}),
+																	)
+																}
+															/>
+														)}
+														{source.supportsEmpty && (
+															<RequirementCheckbox
+																id={`practice-content-${source.sourceKind}`}
+																label="Must not be empty"
+																sourceLabel={sourceLabel}
+																disabled={disabled}
+																checked={requirement.content === "NON_EMPTY"}
+																onCheckedChange={(checked) =>
+																	onChange(
+																		patchRequirement(value, source.sourceKind, {
+																			content: checked ? "NON_EMPTY" : "NO_REQUIREMENT",
+																		}),
+																	)
+																}
+															/>
+														)}
+													</div>
+												</FieldSet>
 											</div>
 										)}
 									</div>

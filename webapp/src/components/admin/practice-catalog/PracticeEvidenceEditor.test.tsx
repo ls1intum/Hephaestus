@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -25,16 +25,18 @@ describe("PracticeEvidenceEditor", () => {
 		expect(
 			screen.getByRole("radio", { name: /AI-supported mentoring/ }).getAttribute("aria-checked"),
 		).toBe("true");
-		expect(screen.queryByRole("combobox", { name: /Use in this practice/ })).toBeNull();
+		expect(screen.queryByRole("radiogroup", { name: /Use in this practice/ })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Use recommended evidence" })).toBeNull();
 
 		await user.click(screen.getByRole("button", { name: "Customize evidence" }));
+		// Every choice is visible once the panel is open; none is hidden behind a menu.
 		await user.click(
-			screen.getByRole("combobox", {
-				name: "Use in this practice for Inline review comments",
-			}),
+			within(
+				screen.getByRole("radiogroup", {
+					name: "Use in this practice for Inline review comments",
+				}),
+			).getByRole("radio", { name: "Required" }),
 		);
-		await user.click(await screen.findByRole("option", { name: "Required" }));
 
 		expect(onChange).toHaveBeenCalledWith(
 			expect.objectContaining({

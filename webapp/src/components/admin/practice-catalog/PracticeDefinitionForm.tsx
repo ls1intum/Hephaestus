@@ -35,14 +35,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Field,
+	FieldContent,
 	FieldDescription,
 	FieldError,
 	FieldGroup,
 	FieldLabel,
 	FieldLegend,
 	FieldSet,
+	FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
 	Select,
 	SelectContent,
@@ -362,11 +365,12 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							</Field>
 
 							<div className="grid gap-4 sm:grid-cols-2">
-								<Field>
-									<FieldLabel htmlFor="practice-artifact">Review this kind of work</FieldLabel>
-									<Select
+								<FieldSet>
+									<FieldLegend variant="label">Review this kind of work</FieldLegend>
+									<RadioGroup
 										value={form.artifactType}
 										onValueChange={(value) =>
+											value &&
 											setForm((previous) => {
 												const artifactType = value as WorkArtifact;
 												const nextOptions = definitionOptionsFor(definitionOptions, artifactType);
@@ -400,34 +404,24 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 												};
 											})
 										}
+										className="gap-2"
 									>
-										<SelectTrigger
-											id="practice-artifact"
-											aria-describedby="practice-artifact-description"
-										>
-											<SelectValue>
-												{
-													FOCUS_ARTIFACT_OPTIONS.find(
-														(option) => option.value === form.artifactType,
-													)?.label
-												}
-											</SelectValue>
-										</SelectTrigger>
-										<SelectContent>
-											{FOCUS_ARTIFACT_OPTIONS.map((option) => (
-												<SelectItem key={option.value} value={option.value}>
-													{option.label}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									<FieldDescription id="practice-artifact-description">
-										{
-											FOCUS_ARTIFACT_OPTIONS.find((option) => option.value === form.artifactType)
-												?.hint
-										}
-									</FieldDescription>
-								</Field>
+										{FOCUS_ARTIFACT_OPTIONS.map((option) => (
+											<FieldLabel key={option.value} htmlFor={`practice-artifact-${option.value}`}>
+												<Field orientation="horizontal">
+													<FieldContent>
+														<FieldTitle>{option.label}</FieldTitle>
+														<FieldDescription>{option.hint}</FieldDescription>
+													</FieldContent>
+													<RadioGroupItem
+														id={`practice-artifact-${option.value}`}
+														value={option.value}
+													/>
+												</Field>
+											</FieldLabel>
+										))}
+									</RadioGroup>
+								</FieldSet>
 
 								<Field>
 									<FieldLabel htmlFor="practice-area">Practice area</FieldLabel>
