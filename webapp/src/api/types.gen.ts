@@ -2789,7 +2789,7 @@ export type PracticeEvidenceOutcome = {
      */
     reviewedCount: number;
     /**
-     * Why the remaining reviews were skipped, most frequent first
+     * Why the remaining reviews were skipped, most frequent first. Not a partition: one review blocked on two sources appears under both, so these can sum above the skipped count.
      */
     skippedBecause: Array<PracticeEvidenceBlock>;
 };
@@ -2799,17 +2799,17 @@ export type PracticeEvidenceOutcome = {
  */
 export type PracticeEvidenceBlock = {
     /**
-     * Readiness reason recorded for that source
+     * Readiness reason recorded for that source or practice
      */
-    reasonCode: string;
+    reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_NOT_CURRENT' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT';
     /**
-     * Reviews skipped for this source and reason
+     * Reviews skipped for this reason
      */
     reviews: number;
     /**
-     * Source that did not meet its requirement
+     * Source that did not meet its requirement; absent when the practice itself runs no review
      */
-    sourceKind: string;
+    sourceKind?: string;
 };
 
 /**

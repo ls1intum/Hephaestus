@@ -940,9 +940,6 @@
                                         <include>de.tum.cit.aet.hephaestus.agent.context</include>
                                         <include>de.tum.cit.aet.hephaestus.agent.context.providers</include>
                                     </includes>
-                                    <excludes>
-                                        <exclude>*WebhookSecretSource</exclude>
-                                    </excludes>
                                     <limits>
                                         <limit>
                                             <counter>BRANCH</counter>
@@ -958,9 +955,6 @@
                                         <include>de.tum.cit.aet.hephaestus.evidence</include>
                                         <include>de.tum.cit.aet.hephaestus.evidence.internal</include>
                                     </includes>
-                                    <excludes>
-                                        <exclude>*WebhookSecretSource</exclude>
-                                    </excludes>
                                     <limits>
                                         <limit>
                                             <counter>BRANCH</counter>

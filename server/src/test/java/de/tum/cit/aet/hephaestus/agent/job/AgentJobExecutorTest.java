@@ -611,6 +611,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     eq(0),
                     eq("prompt-digest"),
                     inputsDigest.capture(),
+                    any(),
                     any()
                 );
             order.verify(sandboxManager).execute(any());
@@ -633,7 +634,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 PreparedJobInputs.filesOnly(Map.of("task.json", "{}".getBytes()))
             );
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
-            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any())).thenReturn(0);
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any())).thenReturn(
+                0
+            );
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
@@ -690,7 +693,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(handler.prepareInputs(any())).thenThrow(
                 new InsufficientEvidenceException("No practice has sufficient evidence", inputs)
             );
-            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any())).thenReturn(1);
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any())).thenReturn(
+                1
+            );
             when(jobRepository.transitionToEvidenceRefused(any(), any(), anyInt(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
@@ -702,7 +707,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 eq(0),
                 isNull(),
                 any(),
-                evidence.capture()
+                evidence.capture(),
+                any()
             );
             assertThat(
                 evidence.getValue().path("automatedReviewReadiness").path("decisions").get(0).path("ready").asBoolean()
@@ -2033,7 +2039,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(0);
-            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any())).thenReturn(1);
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any())).thenReturn(
+                1
+            );
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.prepareInputs(any())).thenReturn(PreparedJobInputs.filesOnly(Map.of()));
@@ -2080,7 +2088,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         // Every execution stamps its provenance digests before the sandbox starts, and fails loud if the write
         // matches no row — so the standard path must report the row it updated.
         lenient()
-            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any()))
+            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any()))
             .thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
@@ -2132,7 +2140,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private void setupFullExecutionWithException(Exception exception) {
         lenient()
-            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any()))
+            .when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any(), any(), any(), any()))
             .thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);

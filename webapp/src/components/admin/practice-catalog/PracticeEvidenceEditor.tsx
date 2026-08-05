@@ -84,12 +84,6 @@ function withRole(
 	return { ...requirements, requiredEvidence: required, optionalContext: optional };
 }
 
-/**
- * The server digests a limitation's code together with its text, and that digest decides whether a
- * practice's independent validation is still current and whether a curated update changed review
- * behaviour or only wording. A random code would make retyping the same sentence look like a new
- * rule, so the code is derived from the text: identical wording always yields the identical code.
- */
 function recommendedContentFor(
 	recommended: PracticeAutomatedReviewPolicy,
 	sourceKind: string,
@@ -147,6 +141,11 @@ function patchRequirement(
 	};
 }
 
+/**
+ * Derived from the text, never random: the server digests code and text together, and that digest
+ * decides whether a curated update changed review behaviour or only wording. Retyping the same
+ * sentence must yield the same code.
+ */
 function limitationCodeFor(description: string) {
 	const slug = description
 		.toUpperCase()

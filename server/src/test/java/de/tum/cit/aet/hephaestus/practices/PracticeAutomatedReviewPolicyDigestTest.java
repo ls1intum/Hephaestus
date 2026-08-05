@@ -31,10 +31,13 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         PracticeEvidenceRequirement core = requirement("scm.pull-request.core");
         PracticeEvidenceRequirement diff = requirement("scm.pull-request.diff");
 
-        String first = PracticeAutomatedReviewPolicyDigest.digest(requirements(List.of(core, diff)));
-        String second = PracticeAutomatedReviewPolicyDigest.digest(requirements(List.of(diff, core)));
-
-        assertThat(first).isEqualTo(second);
+        // Asserted on the policy, not the digest: the policy sorts on construction, so two digests
+        // taken from it are equal however the author declared the sources — including if the digest
+        // itself became order-sensitive. The normalisation is the invariant worth pinning.
+        assertThat(requirements(List.of(diff, core)).requiredEvidence())
+            .isEqualTo(requirements(List.of(core, diff)).requiredEvidence())
+            .extracting(requirement -> requirement.sourceKind().value())
+            .containsExactly("scm.pull-request.core", "scm.pull-request.diff");
     }
 
     @Test

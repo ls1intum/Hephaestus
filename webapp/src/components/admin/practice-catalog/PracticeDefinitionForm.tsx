@@ -193,6 +193,10 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
+	// Recorded history belongs to the work type the practice was reviewed under. Switching work type in
+	// the form changes which sources are even allowed, so the same rows would resolve to "Unknown source"
+	// and describe a work type the author is no longer editing.
+	const artifactTypeUnchanged = initialData?.artifactType === form.artifactType;
 	const evidenceDrafts = useRef<Partial<Record<WorkArtifact, PracticeAutomatedReviewPolicy>>>({
 		[form.artifactType]: form.automatedReviewPolicy,
 	});
@@ -534,7 +538,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					<PracticeEvidenceEditor
 						options={selectedDefinitionOptions}
 						value={form.automatedReviewPolicy}
-						{...(evidenceOutcome ? { outcome: evidenceOutcome } : {})}
+						outcome={artifactTypeUnchanged ? evidenceOutcome : undefined}
 						disabled={formDisabled}
 						onChange={(automatedReviewPolicy) =>
 							setForm((previous) => {

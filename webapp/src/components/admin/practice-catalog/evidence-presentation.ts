@@ -1,4 +1,11 @@
-import type { PracticeAutomatedReviewPolicy, PracticeEvidenceSourceOption } from "@/api/types.gen";
+import type {
+	PracticeAutomatedReviewPolicy,
+	PracticeEvidenceOutcome,
+	PracticeEvidenceSourceOption,
+} from "@/api/types.gen";
+
+/** Every reason a review can record for skipping a practice, closed by the generated schema. */
+type PracticeEvidenceReason = PracticeEvidenceOutcome["skippedBecause"][number]["reasonCode"];
 
 export function evidenceSourceLabel(
 	sourceKind: string,
@@ -68,3 +75,22 @@ export function mentoringSupportLabel(
 ) {
 	return automatedReviewLimitationLabel(automatedReview) ?? "AI-supported mentoring";
 }
+
+/**
+ * A readiness reason, read back as the thing an author would change.
+ *
+ * Keyed on the generated union, so a reason added server-side fails the build here rather than
+ * reaching an admin as a raw constant name.
+ */
+export function readinessReasonLabel(reasonCode: PracticeEvidenceReason): string {
+	return READINESS_REASON_LABELS[reasonCode];
+}
+
+const READINESS_REASON_LABELS: Record<PracticeEvidenceReason, string> = {
+	SOURCE_NOT_AVAILABLE: "was not available",
+	SOURCE_INCOMPLETE: "was not fully captured",
+	SOURCE_NOT_CURRENT: "was not taken from the commit under review",
+	SOURCE_EMPTY: "was empty",
+	NO_AUTOMATED_REVIEW: "this practice is not set up for automated review",
+	DECLARED_EVIDENCE_INSUFFICIENT: "this practice declares its evidence insufficient",
+};

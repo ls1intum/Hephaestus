@@ -43,7 +43,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,7 +55,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -701,7 +699,6 @@ public class AgentJobExecutor {
             agentSpec.promptDigest(),
             sandboxSpec.inputFiles(),
             job.getRetryCount(),
-            preparedInputs.artifactSourceManifest(),
             preparedInputs.automatedReviewReadinessReport()
         );
         return sandboxSpec;
@@ -713,7 +710,6 @@ public class AgentJobExecutor {
             null,
             preparedInputs.files(),
             retryCount,
-            preparedInputs.artifactSourceManifest(),
             preparedInputs.automatedReviewReadinessReport()
         );
     }
@@ -727,15 +723,10 @@ public class AgentJobExecutor {
         @Nullable String promptDigest,
         Map<String, byte[]> inputFiles,
         int retryCount,
-        @Nullable ArtifactSourceManifest artifactSourceManifest,
         @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
     ) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
-        JsonNode evidenceSnapshot = evidenceSnapshot(
-            inputFiles,
-            artifactSourceManifest,
-            automatedReviewReadinessReport
-        );
+        JsonNode evidenceSnapshot = evidenceSnapshot(inputFiles, automatedReviewReadinessReport);
         Integer updated = transactionTemplate.execute(status ->
             jobRepository.updateProvenanceDigests(
                 jobId,
@@ -743,7 +734,8 @@ public class AgentJobExecutor {
                 retryCount,
                 promptDigest,
                 inputsDigest,
-                evidenceSnapshot
+                evidenceSnapshot,
+                automatedReviewReadinessReport == null ? null : objectMapper.valueToTree(automatedReviewReadinessReport)
             )
         );
         if (updated == null || updated != 1) {
@@ -754,14 +746,13 @@ public class AgentJobExecutor {
 
     private JsonNode evidenceSnapshot(
         Map<String, byte[]> inputFiles,
-        @Nullable ArtifactSourceManifest artifactSourceManifest,
         @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
     ) {
         byte[] manifest = inputFiles.get(SandboxLayout.MANIFEST_PATH);
         byte[] practices = inputFiles.get(SandboxLayout.PRACTICES_PREFIX + "index.json");
-        if (
-            manifest == null && practices == null && automatedReviewReadinessReport == null
-        ) return objectMapper.nullNode();
+        // Java null, not NullNode: NullNode serializes to the JSON value null, which is a non-SQL-NULL
+        // jsonb and so passes every IS NOT NULL predicate a reader writes against this column.
+        if (manifest == null && practices == null && automatedReviewReadinessReport == null) return null;
         if (manifest == null || automatedReviewReadinessReport == null) {
             throw new IllegalStateException("Practice review inputs have an incomplete evidence snapshot");
         }
@@ -770,9 +761,6 @@ public class AgentJobExecutor {
         snapshot.set("automatedReviewReadiness", objectMapper.valueToTree(automatedReviewReadinessReport));
         if (practices != null) {
             snapshot.set("practices", objectMapper.readTree(practices));
-        }
-        if (artifactSourceManifest != null) {
-            snapshot.set("artifactSourceManifest", objectMapper.valueToTree(artifactSourceManifest));
         }
         return snapshot;
     }

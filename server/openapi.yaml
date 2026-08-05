@@ -9904,18 +9904,25 @@ components:
       properties:
         reasonCode:
           type: string
-          description: Readiness reason recorded for that source
+          description: Readiness reason recorded for that source or practice
+          enum:
+          - SOURCE_NOT_AVAILABLE
+          - SOURCE_INCOMPLETE
+          - SOURCE_NOT_CURRENT
+          - SOURCE_EMPTY
+          - NO_AUTOMATED_REVIEW
+          - DECLARED_EVIDENCE_INSUFFICIENT
         reviews:
           type: integer
           format: int32
-          description: Reviews skipped for this source and reason
+          description: Reviews skipped for this reason
         sourceKind:
           type: string
-          description: Source that did not meet its requirement
+          description: Source that did not meet its requirement; absent when the practice
+            itself runs no review
       required:
       - reasonCode
       - reviews
-      - sourceKind
     PracticeEvidenceLimitation:
       type: object
       description: Known claim that the selected evidence cannot support even when
@@ -9952,7 +9959,9 @@ components:
           description: Reviews where the evidence met every requirement
         skippedBecause:
           type: array
-          description: "Why the remaining reviews were skipped, most frequent first"
+          description: "Why the remaining reviews were skipped, most frequent first.\
+            \ Not a partition: one review blocked on two sources appears under both,\
+            \ so these can sum above the skipped count."
           items:
             $ref: "#/components/schemas/PracticeEvidenceBlock"
       required:

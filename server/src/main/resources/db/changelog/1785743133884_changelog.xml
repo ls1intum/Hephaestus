@@ -554,4 +554,36 @@
 
 
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-12">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.review_readiness already present">
+            <not><columnExists tableName="agent_job" columnName="review_readiness"/></not>
+        </preConditions>
+        <comment>Keep the readiness decisions out of the evidence snapshot so they can be read in bulk.</comment>
+        <addColumn tableName="agent_job">
+            <column name="review_readiness" type="jsonb"/>
+        </addColumn>
+        <sql>
+            <![CDATA[
+            -- A snapshot carries one entry per staged file, so a repository-tree capture makes it
+            -- megabytes. Postgres cannot read one key out of a TOASTed jsonb without detoasting the
+            -- whole value, so reporting on 200 reviews meant decompressing 200 snapshots for a few
+            -- kilobytes of answer. The decisions move to their own column; the snapshot stays put.
+            UPDATE agent_job
+            SET review_readiness = evidence_snapshot -> 'automatedReviewReadiness'
+            WHERE jsonb_typeof(evidence_snapshot) = 'object'
+              AND jsonb_exists(evidence_snapshot, 'automatedReviewReadiness');
+
+            -- The snapshot stored the source manifest twice: once as the bytes staged in the sandbox
+            -- and once as the object they were rendered from. Nothing ever read the second copy.
+            UPDATE agent_job
+            SET evidence_snapshot = evidence_snapshot - 'artifactSourceManifest'
+            WHERE jsonb_typeof(evidence_snapshot) = 'object'
+              AND jsonb_exists(evidence_snapshot, 'artifactSourceManifest');
+            ]]>
+        </sql>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="review_readiness"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

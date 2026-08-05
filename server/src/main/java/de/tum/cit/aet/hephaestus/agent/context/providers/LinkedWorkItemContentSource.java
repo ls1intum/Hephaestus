@@ -192,10 +192,8 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
             log.info("Linked work items: wrote {} item(s), resolvedFrom={}", items.size(), refs.resolvedFrom);
             return new EvidenceContribution(
                 files,
-                // Always partial. Links are resolved by scanning the description, the branch name and
-                // commit subjects, and no scan of those can establish that the work has no further
-                // link it never mentioned. Reporting COMPLETE would answer a question this source
-                // cannot answer, and a practice requiring completeness would then run on it.
+                // Always partial: links are scanned out of the description, branch name and commit
+                // subjects, and no such scan can establish there is no link the work never mentioned.
                 Map.of(KIND, SourceCompleteness.PARTIAL),
                 Map.of(),
                 Map.of(),
