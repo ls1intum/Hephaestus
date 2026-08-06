@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.framework;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -158,6 +159,13 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
             List.of(), // inlineFindingChannels
             List.of(), // approvalChannels
             lifecycleListeners,
+            // A validator over an empty world: these tests are about capability wiring, and every manifest
+            // below contributes nothing to review, so the review contract has nothing to say about them.
+            new ReviewContractValidator(
+                new ArtifactDescriptorRegistry(List.of()),
+                new IntegrationMessageHandlerRegistry(List.of()),
+                List.of()
+            ),
             webhookRoleEnabled
         );
     }
@@ -177,6 +185,11 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
             @Override
             public Set<Capability> declaredCapabilities() {
                 return capabilities;
+            }
+
+            @Override
+            public ReviewContribution reviewContribution() {
+                return ReviewContribution.none();
             }
         };
     }

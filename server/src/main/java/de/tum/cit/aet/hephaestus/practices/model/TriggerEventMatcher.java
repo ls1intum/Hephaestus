@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -32,5 +34,26 @@ public final class TriggerEventMatcher {
             }
         }
         return false;
+    }
+
+    /**
+     * The event names a practice subscribes to, in declaration order.
+     *
+     * <p>Same total-function stance as {@link #matches}: a malformed element is skipped, never coerced.
+     * Callers that need to reason about a binding as a whole — "can anything connected here raise any of
+     * these?" — need the set rather than a per-event predicate, and asking that question must not be able
+     * to fail on a row somebody edited by hand.
+     */
+    public static Set<String> eventsOf(@Nullable JsonNode triggerEvents) {
+        if (triggerEvents == null || !triggerEvents.isArray()) {
+            return Set.of();
+        }
+        Set<String> events = new LinkedHashSet<>();
+        for (JsonNode node : triggerEvents) {
+            if (node.isString()) {
+                events.add(node.asString());
+            }
+        }
+        return events;
     }
 }

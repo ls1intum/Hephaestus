@@ -12,10 +12,13 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,10 +48,20 @@ import tools.jackson.databind.node.ObjectNode;
  * transactionally so the lazy collections (labels, assignees, comments) load within the same tx.
  */
 @Component
-public class IssueContentSource implements EvidenceSource {
+public class IssueContentSource implements EvidenceSource, ReviewContextBuilder {
 
     private static final SourceKind CORE = new SourceKind("scm.issue.core");
     private static final SourceKind COMMENTS = new SourceKind("scm.issue.comments");
+
+    /**
+     * The declared proof that issue review context can be assembled. The integration framework checks
+     * this against every descriptor that calls itself reviewable, so a kind cannot be opened for
+     * practices before anything can materialise its subject.
+     */
+    @Override
+    public ArtifactKind artifactKind() {
+        return ScmSignals.ISSUE;
+    }
 
     @Override
     public Set<SourceKind> sourceKinds() {

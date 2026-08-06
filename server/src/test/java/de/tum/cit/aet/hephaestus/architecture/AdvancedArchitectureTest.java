@@ -233,6 +233,10 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
                         javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
+                        // Content sources are the agent's adapters onto a domain; one of them additionally
+                        // declares ReviewContextBuilder so the integration framework can check that a
+                        // reviewable artifact kind has something able to assemble its subject.
+                        javaClass.getPackageName().contains(".context.providers") ||
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
                         javaClass.getPackageName().contains(".manifest") || // IntegrationManifest impls + bootstrap utilities
                         javaClass.getPackageName().contains(".registry") || // ConnectionPurgeContributor lives with the entity

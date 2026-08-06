@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -93,6 +94,11 @@ public final class ScmSignals {
     /** The signal a domain event raises, if any practice vocabulary covers it. */
     public static Optional<SignalName> forTriggerEvent(@Nullable String triggerEventName) {
         return Optional.ofNullable(triggerEventName).map(BY_TRIGGER_EVENT::get);
+    }
+
+    /** Every trigger-event literal this domain translates, for callers validating an authoring vocabulary. */
+    public static Set<String> triggerEventNames() {
+        return BY_TRIGGER_EVENT.keySet();
     }
 
     /** The trigger-event literal a signal came from, for re-running the gate on a pending signal. */

@@ -15,12 +15,15 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -47,11 +50,21 @@ import tools.jackson.databind.node.ObjectNode;
 
 @Component
 @Order(100)
-public class PullRequestContentSource implements EvidenceSource {
+public class PullRequestContentSource implements EvidenceSource, ReviewContextBuilder {
 
     private static final SourceKind CORE = new SourceKind("scm.pull-request.core");
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
     private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
+
+    /**
+     * The declared proof that pull request review context can be assembled. The integration framework checks
+     * this against every descriptor that calls itself reviewable, so a kind cannot be opened for
+     * practices before anything can materialise its subject.
+     */
+    @Override
+    public ArtifactKind artifactKind() {
+        return ScmSignals.PULL_REQUEST;
+    }
 
     @Override
     public Set<SourceKind> sourceKinds() {

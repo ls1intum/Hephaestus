@@ -1,0 +1,52 @@
+package de.tum.cit.aet.hephaestus.integration.core.spi;
+
+import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * One observable thing that can happen to an artifact, declared by the module that owns the artifact.
+ *
+ * <p>The load-bearing field is {@link #producedBy()}. Without it a signal name is a wish: nothing
+ * connects it to an ingested event, so a practice can be bound to it, the binding can look healthy in
+ * the UI, and it can simply never fire — which is precisely how thirteen Outline document events came
+ * to be ingested while no practice could react to any of them. {@code SubjectClass}'s javadoc already
+ * warns about the same failure mode ("aspirational entries become silent classification bugs"); this
+ * record makes the warning enforceable, because the bootstrap can check that each named event type has
+ * a registered handler.
+ *
+ * <p>An empty {@code producedBy} is legal and meaningful — it says "no ingested event raises this; it
+ * comes from somewhere else", which is true of a review someone explicitly asked for. What is not
+ * legal is an integration claiming to <em>raise</em> such a signal, and the bootstrap refuses that.
+ *
+ * @param name        the vendor-neutral name practices bind to; persisted, hence {@link #stability()}
+ * @param displayName human-readable label for authoring surfaces
+ * @param producedBy  the ingested event types that raise this signal, across every vendor of the
+ *                    owning domain — provenance, not routing
+ * @param revision    how a distinct occurrence is identified, declared per signal because a
+ *                    description edit and a push are not the same kind of change
+ * @param stability   whether this name is safe to bind to
+ */
+public record Signal(
+    SignalName name,
+    String displayName,
+    Set<EventTypeKey> producedBy,
+    RevisionScheme revision,
+    Stability stability
+) {
+    public Signal {
+        Objects.requireNonNull(name, "signal name must not be null");
+        Objects.requireNonNull(revision, "revision scheme must not be null");
+        Objects.requireNonNull(stability, "stability must not be null");
+        if (displayName == null || displayName.isBlank()) {
+            throw new IllegalArgumentException("signal " + name + " must have a display name");
+        }
+        producedBy = Set.copyOf(Objects.requireNonNullElse(producedBy, Set.of()));
+    }
+
+    /** Whether any ingested event of the given integration raises this signal. */
+    public boolean isProducedBy(IntegrationKind kind) {
+        return producedBy.stream().anyMatch(key -> key.kind() == kind);
+    }
+}

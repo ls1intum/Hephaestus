@@ -30,6 +30,12 @@ import org.springframework.stereotype.Component;
  * per-kind SPI beans wired. Throws so misconfigurations surface immediately, not at
  * the first request. Gated to the application-server runtime role since worker pods
  * intentionally wire only a subset of SPI beans.
+ *
+ * <p>Also the single place the review contract is enforced. A manifest has two sections — the
+ * capabilities, which say what plumbing exists, and the {@code ReviewContribution}, which says what the
+ * integration contributes to practice review — and both are checked here against the same
+ * collect-then-throw pattern, so an operator sees every declaration problem in one message. The
+ * per-section rules live in {@link ReviewContractValidator}; the aggregation and the failure stay here.
  */
 @Component
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -47,6 +53,7 @@ public class IntegrationFrameworkBootstrap {
     private final List<InlineFindingChannel> inlineFindingChannels;
     private final List<ApprovalChannel> approvalChannels;
     private final List<IntegrationLifecycleListener> lifecycleListeners;
+    private final ReviewContractValidator reviewContract;
     private final boolean webhookRoleEnabled;
 
     public IntegrationFrameworkBootstrap(
@@ -60,6 +67,7 @@ public class IntegrationFrameworkBootstrap {
         List<InlineFindingChannel> inlineFindingChannels,
         List<ApprovalChannel> approvalChannels,
         List<IntegrationLifecycleListener> lifecycleListeners,
+        ReviewContractValidator reviewContract,
         @Value("${" + RuntimeRole.WEBHOOK_PROPERTY + ":true}") boolean webhookRoleEnabled
     ) {
         this.manifests = manifests;
@@ -72,16 +80,21 @@ public class IntegrationFrameworkBootstrap {
         this.inlineFindingChannels = inlineFindingChannels;
         this.approvalChannels = approvalChannels;
         this.lifecycleListeners = lifecycleListeners;
+        this.reviewContract = reviewContract;
         this.webhookRoleEnabled = webhookRoleEnabled;
     }
 
     @PostConstruct
     public void validate() {
         List<String> violations = new ArrayList<>();
+        // Descriptor rules first: they are about the domain's own vocabulary and hold regardless of which
+        // vendors are enabled, so reporting them before the per-vendor ones puts the root cause on top.
+        violations.addAll(reviewContract.validateDescriptors());
         for (IntegrationKind kind : manifests.registeredKinds()) {
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
             Set<Capability> declared = manifest.declaredCapabilities();
             checkRequired(kind, declared, violations);
+            violations.addAll(reviewContract.validateContribution(manifest));
         }
         if (!violations.isEmpty()) {
             String joined = String.join("\n  - ", violations);

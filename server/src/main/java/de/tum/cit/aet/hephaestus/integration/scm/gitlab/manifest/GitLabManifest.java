@@ -1,9 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.manifest;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -54,5 +57,47 @@ public class GitLabManifest implements IntegrationManifest {
             capabilities.add(Capability.APPROVAL_WORKFLOW);
         }
         return Set.copyOf(capabilities);
+    }
+
+    /**
+     * GitLab carries the same shared domain as GitHub minus one signal, and that omission is the reason
+     * this declaration exists.
+     *
+     * <p>{@code scm.pull_request.synchronized} is absent because GitLab's webhook path emits no
+     * synchronize event at all — a merge-request hook fires on a push, but the processor derives no
+     * "new commits" transition from it. So a practice watching for new commits has never fired on
+     * GitLab, and there was no way to tell that apart from a quiet week. Declared here, it becomes a
+     * dormant binding with a reason instead of silence, and the day the processor learns to diff head
+     * commits, this set grows by one line and every such practice wakes up.
+     *
+     * <p>Delivery lanes are gated on the same flag as the channel beans: claiming a lane whose
+     * {@code FeedbackChannel} is not wired would be caught at boot, which is the intended behaviour but
+     * a poor way to find out.
+     */
+    @Override
+    public ReviewContribution reviewContribution() {
+        return new ReviewContribution(
+            Set.of(ScmSignals.PULL_REQUEST, ScmSignals.ISSUE),
+            Map.of(
+                ScmSignals.PULL_REQUEST,
+                Set.of(
+                    ScmSignals.PULL_REQUEST_OPENED,
+                    ScmSignals.PULL_REQUEST_READY,
+                    ScmSignals.PULL_REQUEST_REVIEWED,
+                    ScmSignals.PULL_REQUEST_MERGED,
+                    ScmSignals.PULL_REQUEST_CLOSED
+                ),
+                ScmSignals.ISSUE,
+                Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED)
+            ),
+            gitlabStackEnabled
+                ? Map.of(
+                      ScmSignals.PULL_REQUEST,
+                      Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE),
+                      ScmSignals.ISSUE,
+                      Set.of(FeedbackLane.IN_CONTEXT_SUMMARY)
+                  )
+                : Map.of()
+        );
     }
 }

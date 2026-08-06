@@ -31,4 +31,19 @@ public class OutlineManifest implements IntegrationManifest {
         // OutlineSubjectParser. Outline still emits no observations/findings; it remains a content source.
         return Set.of(Capability.WEBHOOK_INGEST);
     }
+
+    /**
+     * Nothing — which is the defect this contract was built to make visible.
+     *
+     * <p>Outline ingests thirteen document lifecycle events through a fully wired webhook stack, and not
+     * one of them can trigger a review of anything. Before this declaration existed there was no place
+     * that fact could be written down, so it read as an integration that simply never had much to say.
+     * It is now an explicit empty contribution: no document descriptor, no signals, nothing raised.
+     * Closing it is a descriptor plus a non-empty {@code raises} in this file, with no edit anywhere in
+     * the practices module — which is the test of whether the contract works.
+     */
+    @Override
+    public ReviewContribution reviewContribution() {
+        return ReviewContribution.none();
+    }
 }
