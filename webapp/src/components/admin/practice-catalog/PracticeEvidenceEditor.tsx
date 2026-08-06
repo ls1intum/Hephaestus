@@ -111,19 +111,18 @@ function RequirementCheckbox({
 	checked: boolean;
 	onCheckedChange: (checked: boolean) => void;
 }) {
+	// FieldLabel turns into a bordered, full-width column when it wraps a Field, which is the card
+	// treatment for a standalone choice. These sit inside one legend as a list, so they use the same
+	// shape as the trigger-event checkboxes: label, checkbox first, text beside it.
 	return (
-		<FieldLabel htmlFor={id} className="w-auto font-normal">
-			<Field orientation="horizontal" className="w-auto gap-2" data-disabled={disabled}>
-				<Checkbox
-					id={id}
-					disabled={disabled}
-					checked={checked}
-					onCheckedChange={(next) => onCheckedChange(next === true)}
-				/>
-				<FieldTitle className="font-normal">
-					{label} <span className="sr-only">— {sourceLabel}</span>
-				</FieldTitle>
-			</Field>
+		<FieldLabel htmlFor={id} className="flex cursor-pointer items-center gap-2 font-normal">
+			<Checkbox
+				id={id}
+				disabled={disabled}
+				checked={checked}
+				onCheckedChange={(next) => onCheckedChange(next === true)}
+			/>
+			{label} <span className="sr-only">— {sourceLabel}</span>
 		</FieldLabel>
 	);
 }
