@@ -86,6 +86,7 @@ describe("PracticeEvidenceEditor", () => {
 			return (
 				<>
 					<output data-testid="limitation-count">{value.knownLimitations.length}</output>
+					<output data-testid="reason">{value.insufficiencyReason ? "set" : "none"}</output>
 					<PracticeEvidenceEditor options={options} value={value} onChange={setValue} />
 				</>
 			);
@@ -94,11 +95,13 @@ describe("PracticeEvidenceEditor", () => {
 
 		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
 		expect(screen.getByRole("textbox", { name: /Why is human review needed/ })).toBeTruthy();
-		expect(screen.getByTestId("limitation-count").textContent).toBe("1");
+		expect(screen.getByTestId("reason").textContent).toBe("set");
+		// The reason is not a limitation, so asking for a human adds nothing to that list.
+		expect(screen.getByTestId("limitation-count").textContent).toBe("0");
 
 		await user.click(screen.getByRole("radio", { name: /AI-supported mentoring/ }));
 		expect(screen.queryByRole("textbox", { name: /Why is human review needed/ })).toBeNull();
-		expect(screen.getByTestId("limitation-count").textContent).toBe("0");
+		expect(screen.getByTestId("reason").textContent).toBe("none");
 	});
 
 	it("restores evidence customization after switching to guidance only", async () => {

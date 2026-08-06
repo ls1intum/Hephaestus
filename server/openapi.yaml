@@ -9810,6 +9810,10 @@ components:
         evidenceProfile:
           type: string
           description: Set of evidence sources allowed for this type of reviewed work
+        insufficiencyReason:
+          $ref: "#/components/schemas/PracticeEvidenceLimitation"
+          description: Why this practice needs a human rather than automated review;
+            present only when evidenceSufficiency is DECLARED_EVIDENCE_INSUFFICIENT
         knownLimitations:
           type: array
           description: Claims the selected evidence cannot support even when every

@@ -19,6 +19,8 @@ public final class PracticeAutomatedReviewPolicyDigest {
         requirements
             .knownLimitations()
             .forEach(limitation -> digest.add(limitation.code()).add(limitation.description()));
+        PracticeEvidenceLimitation reason = requirements.insufficiencyReason();
+        digest.add(reason == null ? "" : reason.code()).add(reason == null ? "" : reason.description());
         return digest.hex();
     }
 

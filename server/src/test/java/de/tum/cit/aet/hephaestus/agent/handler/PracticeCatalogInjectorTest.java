@@ -217,7 +217,8 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
                         "RUNTIME_BEHAVIOR_NOT_OBSERVED",
                         "Repository evidence does not establish behavior in a deployed runtime."
                     )
-                )
+                ),
+                null
             )
         );
         Practice unlimited = practice("retrospective", "PullRequestCreated");

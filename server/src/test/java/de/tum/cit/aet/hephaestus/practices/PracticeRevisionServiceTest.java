@@ -113,7 +113,8 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
                 ),
                 List.of(),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-                List.of()
+                List.of(),
+                null
             )
         );
 

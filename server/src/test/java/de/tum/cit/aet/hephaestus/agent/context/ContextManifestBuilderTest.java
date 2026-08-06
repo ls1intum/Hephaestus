@@ -220,7 +220,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 ),
                 policy.optionalContext(),
                 policy.whenEvidenceIsInsufficient(),
-                policy.knownLimitations()
+                policy.knownLimitations(),
+                policy.insufficiencyReason()
             )
         );
 
@@ -282,7 +283,13 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                                       "The available sources do not contain the context required for this assessment."
                                   )
                               )
-                            : practice.getAutomatedReviewPolicy().knownLimitations()
+                            : practice.getAutomatedReviewPolicy().knownLimitations(),
+                    needsAdditionalContext
+                        ? new PracticeEvidenceLimitation(
+                              "ADDITIONAL_CONTEXT_NEEDED",
+                              "The available sources do not contain the context required for this assessment."
+                          )
+                        : null
                 )
             );
 
@@ -800,7 +807,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 ),
                 List.of(),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-                List.of()
+                List.of(),
+                null
             )
         );
         return practice;

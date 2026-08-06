@@ -63,3 +63,40 @@ export const InvalidRule: Story = {
 		error: "Choose at least one required evidence source.",
 	},
 };
+
+/**
+ * The reason a practice needs a human is its own field, so a limitation can never be mistaken for it.
+ * Both are editable at once, and the limitation list is complete rather than missing its first entry.
+ */
+export const HumanReviewReasonIsNotALimitation: Story = {
+	args: {
+		value: {
+			...pullRequestOptions.recommendedRequirements,
+			automatedReview: {
+				mode: "LANGUAGE_MODEL",
+				evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
+			},
+			insufficiencyReason: {
+				code: "MENTOR_CONVERSATION_NOT_OBSERVED",
+				description: "The trade-off was agreed in a conversation Hephaestus cannot read.",
+			},
+			knownLimitations: [
+				{
+					code: "RUNTIME_BEHAVIOR_NOT_OBSERVED",
+					description: "Repository evidence does not establish behavior in a deployed runtime.",
+				},
+			],
+		},
+	},
+	play: async ({ canvas, userEvent }) => {
+		await expect(canvas.getByLabelText(/Why is human review needed/)).toHaveValue(
+			"The trade-off was agreed in a conversation Hephaestus cannot read.",
+		);
+		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
+		await expect(
+			canvas.getByDisplayValue(
+				"Repository evidence does not establish behavior in a deployed runtime.",
+			),
+		).toBeVisible();
+	},
+};

@@ -181,8 +181,8 @@ function matchesRecommendedEvidence(
 function humanReviewReasonIsMissing(requirements: PracticeAutomatedReviewPolicy) {
 	return (
 		requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" &&
-		requirements.knownLimitations[0] !== undefined &&
-		!requirements.knownLimitations[0].description.trim()
+		requirements.insufficiencyReason !== undefined &&
+		!requirements.insufficiencyReason.description.trim()
 	);
 }
 
@@ -272,8 +272,6 @@ export function PracticeEvidenceEditor({
 		evidenceSourceLabel(requirement.sourceKind, options.allowedSources),
 	);
 	const mentoringSupport = mentoringSupportOf(value);
-	const limitationOffset = mentoringSupport === "HUMAN_CONTEXT_REQUIRED" ? 1 : 0;
-	const editableLimitations = value.knownLimitations.slice(limitationOffset);
 	const supportsAiReview = options.supportedAutomatedReviewModes.includes("LANGUAGE_MODEL");
 	const unavailableRequiredSources = value.requiredEvidence.filter((requirement) => {
 		const source = options.allowedSources.find(
@@ -305,7 +303,6 @@ export function PracticeEvidenceEditor({
 			? (savedAutomatedRequirements.current.get(profileKey) ?? options.recommendedRequirements)
 			: value;
 		const needsHumanContext = next === "HUMAN_CONTEXT_REQUIRED";
-		const needsLimitation = needsHumanContext && restored.knownLimitations.length === 0;
 		onChange({
 			...restored,
 			automatedReview: {
@@ -314,9 +311,12 @@ export function PracticeEvidenceEditor({
 					? "DECLARED_EVIDENCE_INSUFFICIENT"
 					: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 			},
-			knownLimitations: needsLimitation
-				? [{ code: limitationCodeFor(""), description: "" }]
-				: restored.knownLimitations.filter((limitation) => limitation.description.trim()),
+			knownLimitations: restored.knownLimitations.filter((limitation) =>
+				limitation.description.trim(),
+			),
+			insufficiencyReason: needsHumanContext
+				? (restored.insufficiencyReason ?? { code: limitationCodeFor(""), description: "" })
+				: undefined,
 		});
 	};
 
@@ -401,7 +401,7 @@ export function PracticeEvidenceEditor({
 				</FieldLabel>
 			</RadioGroup>
 
-			{mentoringSupport === "HUMAN_CONTEXT_REQUIRED" && value.knownLimitations[0] && (
+			{mentoringSupport === "HUMAN_CONTEXT_REQUIRED" && value.insufficiencyReason && (
 				<Field data-invalid={showHumanReviewReasonError || undefined}>
 					<FieldLabel htmlFor="practice-human-review-reason">
 						Why is human review needed? *
@@ -409,19 +409,14 @@ export function PracticeEvidenceEditor({
 					<Input
 						id="practice-human-review-reason"
 						disabled={disabled}
-						value={value.knownLimitations[0].description}
+						value={value.insufficiencyReason.description}
 						onChange={(event) =>
 							onChange({
 								...value,
-								knownLimitations: value.knownLimitations.map((limitation, index) =>
-									index === 0
-										? {
-												...limitation,
-												description: event.target.value,
-												code: limitationCodeFor(event.target.value),
-											}
-										: limitation,
-								),
+								insufficiencyReason: {
+									code: limitationCodeFor(event.target.value),
+									description: event.target.value,
+								},
 							})
 						}
 						maxLength={500}
@@ -697,8 +692,7 @@ export function PracticeEvidenceEditor({
 							 * its own label. Listing it again binds one value to two controls with contradictory
 							 * labels, only one of which carries the invalid state.
 							 */}
-							{editableLimitations.map((limitation, offsetIndex) => {
-								const index = offsetIndex + limitationOffset;
+							{value.knownLimitations.map((limitation, index) => {
 								// Identity for markup is the row's position; the code is derived from the text and
 								// would change under the caret on every keystroke.
 								const limitationId = String(index);
@@ -709,8 +703,7 @@ export function PracticeEvidenceEditor({
 									>
 										<Field>
 											<FieldLabel htmlFor={`practice-limitation-description-${limitationId}`}>
-												Description{" "}
-												<span className="sr-only">for limitation {offsetIndex + 1}</span>
+												Description <span className="sr-only">for limitation {index + 1}</span>
 											</FieldLabel>
 											<Input
 												disabled={disabled}
@@ -744,7 +737,7 @@ export function PracticeEvidenceEditor({
 													(_, itemIndex) => itemIndex !== index,
 												);
 												const focusTarget =
-													remaining.length === limitationOffset
+													remaining.length === 0
 														? "add"
 														: String(Math.min(index, remaining.length - 1));
 												onChange({
@@ -753,7 +746,7 @@ export function PracticeEvidenceEditor({
 												});
 												focusLimitation(focusTarget);
 											}}
-											aria-label={`Remove limitation ${offsetIndex + 1}`}
+											aria-label={`Remove limitation ${index + 1}`}
 										>
 											<Trash2 className="size-4" />
 										</Button>

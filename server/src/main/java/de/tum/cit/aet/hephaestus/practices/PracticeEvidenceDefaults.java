@@ -85,7 +85,8 @@ public class PracticeEvidenceDefaults {
             required,
             optional,
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(new PracticeEvidenceLimitation(limitationCode, limitationDescription))
+            List.of(new PracticeEvidenceLimitation(limitationCode, limitationDescription)),
+            null
         );
     }
 

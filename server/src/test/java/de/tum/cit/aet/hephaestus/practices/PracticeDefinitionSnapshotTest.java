@@ -40,7 +40,8 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
                 ),
                 List.of(),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-                List.of()
+                List.of(),
+                null
             )
         );
         practice.setWhyItMatters("Keeps feedback useful.");

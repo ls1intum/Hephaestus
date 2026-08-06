@@ -185,7 +185,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             List.of(requirement),
             List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of()
+            List.of(),
+            null
         );
     }
 
@@ -197,7 +198,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             List.of(),
             List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of()
+            List.of(),
+            null
         );
     }
 
@@ -219,7 +221,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             ),
             List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice."))
+            List.of(),
+            new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice.")
         );
     }
 }

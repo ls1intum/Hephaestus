@@ -76,7 +76,7 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectDuplicateLimitationCodesAndUnexplainedAdditionalContext() {
+    void shouldRejectDuplicateLimitationCodesAndInsufficientEvidenceWithNoReason() {
         PracticeEvidenceLimitation limitation = new PracticeEvidenceLimitation(
             "MISSING_CONTEXT",
             "Context is missing."
@@ -92,7 +92,7 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
         );
         assertThatThrownBy(() -> requirements(additionalContext, List.of(required(CORE)), List.of(), List.of()))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("must be explained");
+            .hasMessageContaining("must state why a human is needed");
     }
 
     @Test
@@ -134,7 +134,8 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
             requiredEvidence,
             optionalContext,
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            knownLimitations
+            knownLimitations,
+            null
         );
     }
 

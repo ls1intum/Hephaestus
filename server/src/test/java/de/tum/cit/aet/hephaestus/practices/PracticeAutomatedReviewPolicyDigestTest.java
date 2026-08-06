@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
-    private static final String PINNED_DIGEST = "a35046a27f5597abad1a4010049854a656473f3edf46364ab3c051153932f7bb";
+    private static final String PINNED_DIGEST = "5a5502bc8464f58ca59e27a295d387f11f0d93fac5dcfdccdb2e0d5ac45c639b";
 
     @Test
     void shouldPinACanonicalDigestForAKnownPolicy() {
@@ -99,7 +99,10 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
             required,
             List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime behavior is outside scope."))
+            List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime behavior is outside scope.")),
+            automatedReview.evidenceSufficiency() == PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
+                ? new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice.")
+                : null
         );
     }
 

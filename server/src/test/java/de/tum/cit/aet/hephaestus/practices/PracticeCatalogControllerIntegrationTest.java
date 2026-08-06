@@ -161,7 +161,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             List.of(),
             List.of(),
             evidence.whenEvidenceIsInsufficient(),
-            List.of()
+            List.of(),
+            null
         );
     }
 
