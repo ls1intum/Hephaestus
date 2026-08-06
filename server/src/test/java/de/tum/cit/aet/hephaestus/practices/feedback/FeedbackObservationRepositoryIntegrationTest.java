@@ -8,14 +8,15 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationAdviceBody;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -199,7 +200,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 .id(id)
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(42L)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
@@ -222,7 +223,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             agentJob.getId(),
             practice.getId(),
             null,
-            "PULL_REQUEST",
+            "scm.pull_request",
             42L,
             recipient.getId(),
             "Observation title",

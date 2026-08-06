@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -10,7 +10,7 @@ import tools.jackson.databind.JsonNode;
 
 public record PracticeDefinition(
     String name,
-    WorkArtifact artifactType,
+    ArtifactKind artifactKind,
     List<String> triggerEvents,
     String criteria,
     @Nullable String precomputeScript,
@@ -23,7 +23,7 @@ public record PracticeDefinition(
 
     public PracticeDefinition {
         Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(artifactType, "artifactType");
+        Objects.requireNonNull(artifactKind, "artifactKind");
         triggerEvents = List.copyOf(Objects.requireNonNull(triggerEvents, "triggerEvents").stream().sorted().toList());
         Objects.requireNonNull(criteria, "criteria");
         Objects.requireNonNull(automatedReviewPolicy, "automatedReviewPolicy");
@@ -35,7 +35,7 @@ public record PracticeDefinition(
     public static PracticeDefinition from(Practice practice) {
         return new PracticeDefinition(
             practice.getName(),
-            practice.getArtifactType(),
+            practice.getArtifactKind(),
             TriggerEventsConverter.toList(practice.getTriggerEvents()),
             practice.getCriteria(),
             practice.getPrecomputeScript(),
@@ -55,7 +55,7 @@ public record PracticeDefinition(
         return ReviewRuleFingerprint.of(
             slug,
             name,
-            artifactType,
+            artifactKind,
             triggerEvents,
             criteria,
             precomputeScript,

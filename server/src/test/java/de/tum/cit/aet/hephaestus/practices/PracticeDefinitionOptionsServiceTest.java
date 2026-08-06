@@ -3,10 +3,11 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeWorkTypeDefinitionOptionsDTO;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.time.Clock;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -23,8 +24,8 @@ class PracticeDefinitionOptionsServiceTest {
         PracticeDefinitionOptionsDTO result = service.options();
 
         assertThat(result.workTypes())
-            .extracting(PracticeWorkTypeDefinitionOptionsDTO::artifactType)
-            .containsExactly(WorkArtifact.PULL_REQUEST, WorkArtifact.ISSUE, WorkArtifact.CONVERSATION_THREAD);
+            .extracting(PracticeWorkTypeDefinitionOptionsDTO::artifactKind)
+            .containsExactly(ArtifactKinds.PULL_REQUEST, ArtifactKinds.ISSUE, ArtifactKinds.CONVERSATION_THREAD);
         PracticeWorkTypeDefinitionOptionsDTO pullRequests = result.workTypes().getFirst();
         assertThat(pullRequests.triggerEvents())
             .filteredOn(option -> option.recommended())

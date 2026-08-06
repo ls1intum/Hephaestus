@@ -2,9 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.TransitionStatus;
@@ -117,7 +118,7 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     private static TrendDelta delta(List<LocusTransition> transitions) {
         return new TrendDelta(
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             100L,
             UUID.randomUUID(),
             UUID.randomUUID(),

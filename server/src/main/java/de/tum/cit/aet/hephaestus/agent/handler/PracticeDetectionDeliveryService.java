@@ -10,16 +10,17 @@ import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
@@ -80,7 +81,7 @@ public class PracticeDetectionDeliveryService {
         this.sourceCatalogs = sourceCatalogs;
     }
 
-    private record Target(WorkArtifact type, Long id, Long aboutUserId) {}
+    private record Target(ArtifactKind type, Long id, Long aboutUserId) {}
 
     @Transactional
     public DeliveryResult deliver(AgentJob job, List<ValidatedFinding> validFindings) {
@@ -123,7 +124,7 @@ public class PracticeDetectionDeliveryService {
         }
 
         Long aboutUserId = target.aboutUserId();
-        WorkArtifact artifactType = target.type();
+        ArtifactKind artifactKind = target.type();
         Long artifactId = target.id();
 
         int inserted = 0;
@@ -142,7 +143,7 @@ public class PracticeDetectionDeliveryService {
 
             // The index disambiguates multiple findings for the same practice on one artifact.
             String occurrenceKey =
-                finding.practiceSlug() + ":" + i + ":" + artifactType.name() + ":" + artifactId + ":" + job.getId();
+                finding.practiceSlug() + ":" + i + ":" + artifactKind.value() + ":" + artifactId + ":" + job.getId();
 
             String evidenceJson = null;
             if (finding.evidence() != null) {
@@ -158,7 +159,7 @@ public class PracticeDetectionDeliveryService {
             // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
             String recurrenceKey = ObservationFingerprint.compute(
                 finding.practiceSlug(),
-                artifactType.name(),
+                artifactKind.value(),
                 artifactId,
                 aboutUserId,
                 firstLocationPath(finding.evidence())
@@ -179,7 +180,7 @@ public class PracticeDetectionDeliveryService {
                 job.getId(),
                 practice.getId(),
                 practiceRevisionId,
-                artifactType.name(),
+                artifactKind.value(),
                 artifactId,
                 aboutUserId,
                 finding.title(),
@@ -216,7 +217,7 @@ public class PracticeDetectionDeliveryService {
             new PracticeDetectionCompletedEvent(
                 job.getId(),
                 workspaceId,
-                artifactType,
+                artifactKind,
                 artifactId,
                 aboutUserId, // the event's developerId field == aboutUserId (author-side subject today)
                 inserted,
@@ -573,12 +574,14 @@ public class PracticeDetectionDeliveryService {
 
     /**
      * Route the delivery target on the job's artifact. Issue and conversation jobs stamp
-     * {@code artifact_type}; PR jobs omit it by convention (they carry only {@code pull_request_id}), so
-     * the missing discriminator defaults to PULL_REQUEST.
+     * {@code artifact_kind}; PR jobs omit it by convention (they carry only {@code pull_request_id}), so
+     * the missing discriminator defaults to a pull request.
      */
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
-        String artifactType = metadata.has("artifact_type") ? metadata.get("artifact_type").asString() : "PULL_REQUEST";
-        if (WorkArtifact.CONVERSATION_THREAD.name().equals(artifactType)) {
+        String artifactKind = metadata.has("artifact_kind")
+            ? metadata.get("artifact_kind").asString()
+            : ArtifactKinds.PULL_REQUEST.value();
+        if (ArtifactKinds.CONVERSATION_THREAD.value().equals(artifactKind)) {
             // Repo-less: the subject user is carried EXPLICITLY in metadata (about_user_id), not resolved
             // from an SCM artifact author. artifactId is the slack_thread aggregate id.
             JsonNode threadIdNode = metadata.get("slack_thread_id");
@@ -606,9 +609,9 @@ public class PracticeDetectionDeliveryService {
                     "Conversation target is no longer authorized or does not match the job: jobId=" + job.getId()
                 );
             }
-            return new Target(WorkArtifact.CONVERSATION_THREAD, threadId, aboutUserId);
+            return new Target(ArtifactKinds.CONVERSATION_THREAD, threadId, aboutUserId);
         }
-        if (WorkArtifact.ISSUE.name().equals(artifactType)) {
+        if (ArtifactKinds.ISSUE.value().equals(artifactKind)) {
             JsonNode issueIdNode = metadata.get("issue_id");
             if (issueIdNode == null || issueIdNode.isNull() || !issueIdNode.isNumber()) {
                 throw new JobDeliveryException("Missing issue_id in job metadata: jobId=" + job.getId());
@@ -623,7 +626,7 @@ public class PracticeDetectionDeliveryService {
                 throw new JobDeliveryException("Issue has no author: issueId=" + issueId + ", jobId=" + job.getId());
             }
             requireMatchingArtifact(issue, metadata, "issue_number", job);
-            return new Target(WorkArtifact.ISSUE, issueId, issue.getAuthor().getId());
+            return new Target(ArtifactKinds.ISSUE, issueId, issue.getAuthor().getId());
         }
         JsonNode pullRequestIdNode = metadata.get("pull_request_id");
         if (pullRequestIdNode == null || pullRequestIdNode.isNull() || !pullRequestIdNode.isNumber()) {
@@ -643,7 +646,7 @@ public class PracticeDetectionDeliveryService {
             );
         }
         requireMatchingArtifact(pullRequest, metadata, "pr_number", job);
-        return new Target(WorkArtifact.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
+        return new Target(ArtifactKinds.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
     }
 
     private static String requiredMetadataText(JsonNode metadata, String field, AgentJob job) {

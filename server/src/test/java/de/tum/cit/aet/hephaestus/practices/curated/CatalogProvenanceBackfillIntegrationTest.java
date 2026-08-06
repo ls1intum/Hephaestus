@@ -93,7 +93,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
             matching,
             shipped.criteria(),
             false,
-            evidenceDefaults.forArtifact(shipped.artifactType()),
+            evidenceDefaults.forArtifact(shipped.artifactKind()),
             v1Fingerprint
         );
 
@@ -202,7 +202,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 areaId,
                 SHIPPED_SLUG,
                 shipped.name(),
-                shipped.artifactType().name(),
+                shipped.artifactKind().value(),
                 triggerEventsJson(shipped),
                 criteria,
                 evidenceJson(evidence),
@@ -221,7 +221,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 practiceId,
                 SHIPPED_SLUG,
                 shipped.name(),
-                shipped.artifactType().name(),
+                shipped.artifactKind().value(),
                 triggerEventsJson(shipped),
                 criteria,
                 evidenceJson(evidence),
@@ -241,7 +241,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                     practiceId,
                     SHIPPED_SLUG,
                     shipped.name(),
-                    shipped.artifactType().name(),
+                    shipped.artifactKind().value(),
                     triggerEventsJson(shipped),
                     criteria,
                     evidenceJson(evidence),

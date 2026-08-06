@@ -58,7 +58,7 @@
         // agent's read path carries no raw SQL against the Slack schema. One-way integration.slack -> agent edge,
         // so no bounded-context cycle forms.
         "agent::conversation-source",
-        // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the CONVERSATION_THREAD-derived
+        // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the chat.conversation_thread-derived
         // observations/feedback via the practices-owned ConversationFeedbackErasure port (one-way edge, no cycle).
         "practices::spi",
     }

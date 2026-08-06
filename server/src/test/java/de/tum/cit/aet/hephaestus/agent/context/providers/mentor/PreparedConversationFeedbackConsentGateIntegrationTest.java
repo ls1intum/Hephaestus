@@ -9,15 +9,16 @@ import de.tum.cit.aet.hephaestus.agent.handler.conversation.RoutingContext;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.HashMap;
@@ -75,7 +76,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         );
         setUpWorkspaceAndRecipient("conv-consent-gate-test");
         practice = new Practice();
-        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
@@ -116,7 +117,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
         assertThat(arr.get(0).get("findingId").asString()).isEqualTo(activeObs.getId().toString());
-        assertThat(arr.get(0).get("artifactType").asString()).isEqualTo("CONVERSATION_THREAD");
+        assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("chat.conversation_thread");
         assertThat(arr.get(0).get("artifactId").asLong()).isEqualTo(activeThreadId);
         assertThat(root.get("totalPrepared").asInt()).isEqualTo(1);
     }
@@ -124,7 +125,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     @Test
     @DisplayName("Slack consent does not suppress an otherwise-authorized pull-request observation")
     void nonSlackArtifactFactAlwaysSurfaces() {
-        practice.setArtifactType(WorkArtifact.PULL_REQUEST);
+        practice.setArtifactKind(ArtifactKinds.PULL_REQUEST);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 2));
         practice.setCurrentRevision(revision);
@@ -138,7 +139,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
         assertThat(arr.get(0).get("findingId").asString()).isEqualTo(prObs.getId().toString());
-        assertThat(arr.get(0).get("artifactType").asString()).isEqualTo("PULL_REQUEST");
+        assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("scm.pull_request");
     }
 
     private JsonNode contribute() {
@@ -157,14 +158,14 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     }
 
     private Observation saveConversationObservation(AgentJob job, String occurrenceKey, long threadId) {
-        return saveObservation(job, occurrenceKey, "CONVERSATION_THREAD", threadId);
+        return saveObservation(job, occurrenceKey, "chat.conversation_thread", threadId);
     }
 
     private Observation savePullRequestObservation(AgentJob job, String occurrenceKey, long pullRequestId) {
-        return saveObservation(job, occurrenceKey, "PULL_REQUEST", pullRequestId);
+        return saveObservation(job, occurrenceKey, "scm.pull_request", pullRequestId);
     }
 
-    private Observation saveObservation(AgentJob job, String occurrenceKey, String artifactType, long artifactId) {
+    private Observation saveObservation(AgentJob job, String occurrenceKey, String artifactKind, long artifactId) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
             id,
@@ -172,7 +173,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
             job.getId(),
             practice.getId(),
             practice.getCurrentRevision().getId(),
-            artifactType,
+            artifactKind,
             artifactId,
             recipient.getId(),
             "Observation title",
@@ -180,7 +181,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
             "BAD",
             "MAJOR",
             0.8f,
-            artifactType.equals("CONVERSATION_THREAD")
+            artifactKind.equals("chat.conversation_thread")
                 ? "{\"citations\":[{\"sourceKind\":\"slack.conversation.thread\",\"artifactPath\":\"inputs/context/thread.json\",\"path\":\"Slack thread\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}"
                 : "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/pull-request.json\",\"path\":\"pull-request.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             null,

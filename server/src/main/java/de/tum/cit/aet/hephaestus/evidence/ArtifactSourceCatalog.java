@@ -33,9 +33,9 @@ public record ArtifactSourceCatalog(
                 if (source == null) {
                     throw new IllegalArgumentException("Profile references unknown source: " + kind);
                 }
-                if (!source.appliesTo(profile.artifactType())) {
+                if (!source.appliesTo(profile.artifactKind())) {
                     throw new IllegalArgumentException(
-                        "Source " + kind + " is incompatible with profile artifact " + profile.artifactType()
+                        "Source " + kind + " is incompatible with profile artifact " + profile.artifactKind()
                     );
                 }
             }

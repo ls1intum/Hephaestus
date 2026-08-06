@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+
 /**
  * Where a piece of feedback about an artifact can be put.
  *
@@ -21,7 +23,7 @@ public enum FeedbackLane {
 
     /**
      * A note anchored to a position in a diff. Only an artifact that carries a diff has this lane, which
-     * is the fact {@code WorkArtifact.hasInlineLane()} states from the practices side.
+     * is the fact {@code ArtifactKind.hasInlineLane()} states from the practices side.
      */
     IN_CONTEXT_INLINE,
 

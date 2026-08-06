@@ -18,8 +18,9 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,7 @@ import tools.jackson.databind.node.ObjectNode;
  * turns ({@code inputs/context/conversation_thread.json}) plus the workspace-wide project inventory, since a
  * conversation isn't anchored to one repo.
  *
- * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type CONVERSATION_THREAD,
+ * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (artifact kind chat.conversation_thread,
  * {@code aboutUserId} carried explicitly in metadata) and then publishes {@link PracticeDetectionDeliveredEvent}
  * to drive the conversational-delivery loop: OBSERVED problems become PREPARED CONVERSATION units for the
  * judged author and surface in their next mentor DM turn. Nothing is posted back to Slack from here.
@@ -89,7 +90,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
             );
         }
         ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("artifact_type", WorkArtifact.CONVERSATION_THREAD.name());
+        metadata.put("artifact_kind", ArtifactKinds.CONVERSATION_THREAD.value());
         metadata.put("slack_thread_id", r.slackThreadId());
         metadata.put("slack_channel_id", r.slackChannelId());
         if (r.slackChannelName() != null) {
@@ -125,7 +126,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
         }
         List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(
             job,
-            WorkArtifact.CONVERSATION_THREAD
+            ArtifactKinds.CONVERSATION_THREAD
         );
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.ConversationReviewRequest(job),
@@ -173,7 +174,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
         prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
-        practiceCatalogInjector.inject(files, job, WorkArtifact.CONVERSATION_THREAD, practices);
+        practiceCatalogInjector.inject(files, job, ArtifactKinds.CONVERSATION_THREAD, practices);
         log.info("Conversation context preparation complete: {} files, jobId={}", files.size(), job.getId());
         return new PreparedJobInputs(
             files,

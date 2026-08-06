@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
@@ -31,8 +32,8 @@ import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -173,7 +174,7 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         SlackConversationTestSupport.BoundConversation otherConv = seedBoundConversation(threadId, otherMemberId);
         UUID otherObs = otherConv.observationId();
         UUID otherFb = otherConv.feedbackId();
-        UUID prObs = seedObservation(WorkArtifact.PULL_REQUEST, 7777L, meMemberId);
+        UUID prObs = seedObservation(ArtifactKinds.PULL_REQUEST, 7777L, meMemberId);
         UUID myDmId = seedOwnMentorDm();
 
         handler.handleBlockActions(optOut(OPTING_OUT_SLACK_USER));
@@ -336,7 +337,7 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    private UUID seedObservation(WorkArtifact artifactType, long artifactId, long aboutUserId) {
+    private UUID seedObservation(ArtifactKind artifactKind, long artifactId, long aboutUserId) {
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
             observationId,
@@ -344,7 +345,7 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
             job.getId(),
             practice.getId(),
             null,
-            artifactType.name(),
+            artifactKind.value(),
             artifactId,
             aboutUserId,
             "Observation title",

@@ -7,13 +7,14 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -51,7 +52,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         p.setSlug(slug);
         p.setName(slug);
         p.setCriteria("criteria for " + slug);
-        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         var revision = new PracticeRevision();
         ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
         p.setCurrentRevision(revision);
@@ -84,7 +85,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a trigger event materialises only the practices that declare it")
     void filtersToTriggerMatchingPractices() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(
             List.of(
                 practice("authoring", "PullRequestCreated"),
@@ -94,7 +95,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job("PullRequestMerged"), WorkArtifact.PULL_REQUEST);
+        injector.inject(files, job("PullRequestMerged"), ArtifactKinds.PULL_REQUEST);
 
         assertThat(files).containsKey(md("retrospective"));
         assertThat(files).doesNotContainKey(md("authoring"));
@@ -105,13 +106,13 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a job with no trigger event keeps the full focus set (legacy / bot-command path)")
     void noTriggerEventKeepsFullSet() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(
             List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job(null), WorkArtifact.PULL_REQUEST);
+        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
 
         assertThat(files).containsKey(md("authoring"));
         assertThat(files).containsKey(md("retrospective"));
@@ -121,15 +122,15 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a trigger event that matches nothing fails closed")
     void noMatchFailsClosed() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(
             List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        assertThatThrownBy(() -> injector.inject(files, job("SomeEventNobodyDeclares"), WorkArtifact.PULL_REQUEST))
+        assertThatThrownBy(() -> injector.inject(files, job("SomeEventNobodyDeclares"), ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
-            .hasMessageContaining("No active PULL_REQUEST practices");
+            .hasMessageContaining("No active scm.pull_request practices");
         assertThat(files).isEmpty();
     }
 
@@ -139,10 +140,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         // Defense-in-depth: slugs are interpolated into filesystem paths, so a mis-seeded slug with a path
         // traversal must be rejected, not written to disk.
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(List.of(practice("../escape", "PullRequestCreated")));
 
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), WorkArtifact.PULL_REQUEST))
+        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("ABI pattern");
     }
@@ -152,7 +153,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     void noWorkspaceThrows() {
         AgentJob job = new AgentJob();
 
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job, WorkArtifact.PULL_REQUEST))
+        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job, ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("no workspace");
     }
@@ -161,10 +162,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("an empty active-practice set throws JobPreparationException")
     void emptyFocusSetThrows() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(List.of());
 
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), WorkArtifact.PULL_REQUEST))
+        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("No active");
     }
@@ -177,11 +178,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         Practice blankScript = practice("retrospective", "PullRequestMerged");
         blankScript.setPrecomputeScript("   "); // blank → no .ts written
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(List.of(withScript, blankScript));
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job(null), WorkArtifact.PULL_REQUEST);
+        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
 
         // index.json lists both practices (area falls back to the slug when ungrouped).
         String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
@@ -223,11 +224,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         );
         Practice unlimited = practice("retrospective", "PullRequestCreated");
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(List.of(limited, unlimited));
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job(null), WorkArtifact.PULL_REQUEST);
+        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
 
         String staged = new String(files.get(md("authoring")), StandardCharsets.UTF_8);
         assertThat(staged)
@@ -247,10 +248,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         Practice blankWhy = practice("retrospective", "PullRequestMerged");
         blankWhy.setWhyItMatters("   ");
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(List.of(withWhy, blankWhy));
 
-        Map<String, String> why = injector.whyBySlug(1L, WorkArtifact.PULL_REQUEST);
+        Map<String, String> why = injector.whyBySlug(1L, ArtifactKinds.PULL_REQUEST);
 
         assertThat(why)
             .containsEntry("authoring", "Clear descriptions help reviewers.")

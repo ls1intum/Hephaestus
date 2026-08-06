@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
@@ -42,8 +43,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -731,7 +732,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Workspace a = createBareWorkspace("slack-conv-a");
             Workspace b = createBareWorkspace("slack-conv-b");
 
-            // Seed a slack_thread + its derived CONVERSATION_THREAD observation/feedback for each workspace.
+            // Seed a slack_thread + its derived chat.conversation_thread observation/feedback for each workspace.
             SlackThread threadA = new SlackThread();
             threadA.setWorkspaceId(a.getId());
             threadA.setSlackChannelId("CA");
@@ -761,11 +762,11 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(observationRepository.findById(convObsB)).isPresent();
         }
 
-        /** Seed a CONVERSATION_THREAD observation + feedback + join anchored to {@code threadId} for {@code workspace}. */
+        /** Seed a chat.conversation_thread observation + feedback + join anchored to {@code threadId} for {@code workspace}. */
         private UUID seedDerivedConversation(Workspace workspace, long threadId) {
             User owner = persistUser("conv-" + workspace.getId() + "-subject");
             Practice practice = new Practice();
-            practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+            practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
             practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
             practice.setWorkspace(workspace);
             practice.setSlug("conv-practice-" + workspace.getId());
@@ -787,7 +788,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 job.getId(),
                 practice.getId(),
                 null,
-                WorkArtifact.CONVERSATION_THREAD.name(),
+                ArtifactKinds.CONVERSATION_THREAD.value(),
                 threadId,
                 owner.getId(),
                 "Observation title",
@@ -804,7 +805,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.CONVERSATION_THREAD)
+                    .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
                     .artifactId(threadId)
                     .recipientUserId(owner.getId())
                     .aboutUserId(owner.getId())

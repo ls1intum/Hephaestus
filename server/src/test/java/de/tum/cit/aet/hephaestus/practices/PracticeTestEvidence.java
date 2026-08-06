@@ -3,7 +3,8 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
 
 public final class PracticeTestEvidence {
@@ -11,30 +12,27 @@ public final class PracticeTestEvidence {
     private PracticeTestEvidence() {}
 
     public static PracticeAutomatedReviewPolicy pullRequest() {
-        return forArtifact(WorkArtifact.PULL_REQUEST);
+        return forArtifact(ArtifactKinds.PULL_REQUEST);
     }
 
     public static PracticeAutomatedReviewPolicy conversationThread() {
-        return forArtifact(WorkArtifact.CONVERSATION_THREAD);
+        return forArtifact(ArtifactKinds.CONVERSATION_THREAD);
     }
 
-    public static PracticeAutomatedReviewPolicy forArtifact(WorkArtifact artifactType) {
+    public static PracticeAutomatedReviewPolicy forArtifact(ArtifactKind artifactKind) {
         String profile;
         List<String> kinds;
-        switch (artifactType) {
-            case PULL_REQUEST -> {
-                profile = "pull-request-review";
-                kinds = List.of("scm.pull-request.core", "scm.pull-request.diff");
-            }
-            case ISSUE -> {
-                profile = "issue-review";
-                kinds = List.of("scm.issue.core");
-            }
-            case CONVERSATION_THREAD -> {
-                profile = "conversation-review";
-                kinds = List.of("slack.conversation.thread");
-            }
-            default -> throw new IllegalArgumentException("Unsupported artifact type: " + artifactType);
+        if (ArtifactKinds.PULL_REQUEST.equals(artifactKind)) {
+            profile = "pull-request-review";
+            kinds = List.of("scm.pull-request.core", "scm.pull-request.diff");
+        } else if (ArtifactKinds.ISSUE.equals(artifactKind)) {
+            profile = "issue-review";
+            kinds = List.of("scm.issue.core");
+        } else if (ArtifactKinds.CONVERSATION_THREAD.equals(artifactKind)) {
+            profile = "conversation-review";
+            kinds = List.of("slack.conversation.thread");
+        } else {
+            throw new IllegalArgumentException("Unsupported artifact kind: " + artifactKind);
         }
         return new PracticeAutomatedReviewPolicy(
             new SourceContractVersion("1.0.0"),

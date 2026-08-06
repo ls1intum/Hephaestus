@@ -8,7 +8,7 @@ final class PracticeDefinitionDigest {
         CanonicalDigest digest = new CanonicalDigest()
             .add(slug)
             .add(definition.name())
-            .add(definition.artifactType().name())
+            .add(definition.artifactKind().value())
             .addInt(definition.triggerEvents().size());
         definition.triggerEvents().forEach(digest::add);
         return digest

@@ -23,11 +23,11 @@ class PracticeRevisionTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("clear-feedback");
         practice.setName("Clear feedback");
-        practice.setArtifactType(WorkArtifact.PULL_REQUEST);
+        practice.setArtifactKind(ArtifactKinds.PULL_REQUEST);
         practice.setTriggerEvents(triggers);
         practice.setCriteria("Detect clear feedback");
         practice.setPrecomputeScript("export default {}");
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         practice.setWhyItMatters("Prevents rework");
         practice.setWhatGoodLooksLike("A concrete suggestion");
         practice.setArea(area);
@@ -38,7 +38,7 @@ class PracticeRevisionTest extends BaseUnitTest {
         assertThat(revision.getRevisionNumber()).isEqualTo(3);
         assertThat(revision.getSlug()).isEqualTo("clear-feedback");
         assertThat(revision.getName()).isEqualTo("Clear feedback");
-        assertThat(revision.getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+        assertThat(revision.getArtifactKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
         assertThat(TriggerEventsConverter.toList(revision.getTriggerEvents())).containsExactly("PullRequestCreated");
         assertThat(revision.getCriteria()).isEqualTo("Detect clear feedback");
         assertThat(revision.getPrecomputeScript()).isEqualTo("export default {}");

@@ -3,7 +3,8 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +17,16 @@ public class PracticeEvidenceDefaults {
         this.catalogs = catalogs;
     }
 
-    public PracticeAutomatedReviewPolicy forArtifact(WorkArtifact artifact) {
-        return switch (artifact) {
-            case PULL_REQUEST -> requirements(
+    /**
+     * The evidence a review of this kind needs when the author has not said otherwise.
+     *
+     * <p>An artifact kind is an open vocabulary, so the compiler no longer proves this covers every one;
+     * an unknown kind throws rather than falling back to a pull request's requirements, because a
+     * silently borrowed default would demand a diff of something that has none and refuse every review.
+     */
+    public PracticeAutomatedReviewPolicy forArtifact(ArtifactKind artifact) {
+        if (ArtifactKinds.PULL_REQUEST.equals(artifact)) {
+            return requirements(
                 "pull-request-review",
                 List.of(
                     requirement("scm.pull-request.core", EvidenceCompletenessRequirement.COMPLETE),
@@ -34,21 +42,26 @@ public class PracticeEvidenceDefaults {
                 "RUNTIME_BEHAVIOR_NOT_OBSERVED",
                 "Repository evidence does not establish behavior in a deployed runtime."
             );
-            case ISSUE -> requirements(
+        }
+        if (ArtifactKinds.ISSUE.equals(artifact)) {
+            return requirements(
                 "issue-review",
                 List.of(requirement("scm.issue.core", EvidenceCompletenessRequirement.COMPLETE)),
                 List.of(optionalRequirement("scm.issue.comments")),
                 "IMPLEMENTATION_NOT_OBSERVED",
                 "Issue evidence does not establish whether the described work was implemented correctly."
             );
-            case CONVERSATION_THREAD -> requirements(
+        }
+        if (ArtifactKinds.CONVERSATION_THREAD.equals(artifact)) {
+            return requirements(
                 "conversation-review",
                 List.of(requirement("slack.conversation.thread", EvidenceCompletenessRequirement.COMPLETE)),
                 List.of(),
                 "PRIVATE_CONTEXT_NOT_OBSERVED",
                 "The captured thread does not include decisions or context shared outside the conversation."
             );
-        };
+        }
+        throw new IllegalArgumentException("No default evidence requirements for artifact kind: " + artifact);
     }
 
     private PracticeAutomatedReviewPolicy requirements(

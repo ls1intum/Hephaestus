@@ -16,10 +16,11 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -93,7 +94,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             JobSubmission submission = handler.createSubmission(sampleRequest());
             JsonNode metadata = submission.metadata();
 
-            assertThat(metadata.get("artifact_type").asString()).isEqualTo("CONVERSATION_THREAD");
+            assertThat(metadata.get("artifact_kind").asString()).isEqualTo("chat.conversation_thread");
             assertThat(metadata.get("slack_thread_id").asLong()).isEqualTo(555L);
             assertThat(metadata.get("slack_channel_id").asString()).isEqualTo("C0ABC");
             assertThat(metadata.get("slack_channel_name").asString()).isEqualTo("engineering");
@@ -131,7 +132,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             workspace.setId(1L);
             job.setWorkspace(workspace);
             ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("artifact_type", "CONVERSATION_THREAD");
+            metadata.put("artifact_kind", "chat.conversation_thread");
             metadata.put("slack_channel_id", "C0ABC");
             metadata.put("slack_thread_ts", "1700000000.100000");
             metadata.put("about_user_id", 42L);
@@ -144,11 +145,11 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             AgentJob job = conversationJob();
             Practice practice = new Practice();
             practice.setSlug("conversation-practice");
-            practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.CONVERSATION_THREAD));
+            practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.CONVERSATION_THREAD));
             var revision = new PracticeRevision();
             ReflectionTestUtils.setField(revision, "id", 12L);
             practice.setCurrentRevision(revision);
-            when(practiceCatalogInjector.resolveEligiblePractices(job, WorkArtifact.CONVERSATION_THREAD)).thenReturn(
+            when(practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.CONVERSATION_THREAD)).thenReturn(
                 List.of(practice)
             );
             when(workspaceContextBuilder.prepare(any(), any())).thenReturn(

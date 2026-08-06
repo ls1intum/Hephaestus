@@ -5,7 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Tag;
@@ -20,7 +21,7 @@ class PracticeEvidenceDefaultsTest {
     @ParameterizedTest
     @MethodSource("baselines")
     void shouldCreateTheArtifactBaseline(
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         String profile,
         List<String> required,
         List<String> optional
@@ -47,14 +48,14 @@ class PracticeEvidenceDefaultsTest {
     private static Stream<Arguments> baselines() {
         return Stream.of(
             Arguments.of(
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 "pull-request-review",
                 List.of("scm.pull-request.core", "scm.pull-request.diff"),
                 List.of("scm.pull-request.comments")
             ),
-            Arguments.of(WorkArtifact.ISSUE, "issue-review", List.of("scm.issue.core"), List.of("scm.issue.comments")),
+            Arguments.of(ArtifactKinds.ISSUE, "issue-review", List.of("scm.issue.core"), List.of("scm.issue.comments")),
             Arguments.of(
-                WorkArtifact.CONVERSATION_THREAD,
+                ArtifactKinds.CONVERSATION_THREAD,
                 "conversation-review",
                 List.of("slack.conversation.thread"),
                 List.of()

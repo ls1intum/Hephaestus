@@ -6,7 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -35,7 +36,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
         PracticeDefinition original = definition(requirements());
         PracticeDefinition revised = new PracticeDefinition(
             original.name(),
-            original.artifactType(),
+            original.artifactKind(),
             original.triggerEvents(),
             original.criteria(),
             original.precomputeScript(),
@@ -93,7 +94,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
     private static PracticeDefinition definition(PracticeAutomatedReviewPolicy requirements) {
         return new PracticeDefinition(
             "Focused review",
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of("PullRequestCreated"),
             "Assess whether the change stays focused.",
             null,

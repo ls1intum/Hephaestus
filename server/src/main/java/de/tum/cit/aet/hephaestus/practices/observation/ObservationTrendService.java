@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.LocusObservation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
@@ -39,9 +39,9 @@ public class ObservationTrendService {
      * when fewer than two runs exist — the first review has nothing to trend against.
      */
     @Transactional(readOnly = true)
-    public Optional<TrendDelta> computeForTarget(WorkArtifact artifactType, Long artifactId, Long workspaceId) {
+    public Optional<TrendDelta> computeForTarget(ArtifactKind artifactKind, Long artifactId, Long workspaceId) {
         List<RunRef> runs = observationRepository.findRecentRunRefsForTarget(
-            artifactType,
+            artifactKind,
             artifactId,
             workspaceId,
             PageRequest.of(0, 2)
@@ -57,7 +57,7 @@ public class ObservationTrendService {
         );
         return Optional.of(
             new TrendDelta(
-                artifactType,
+                artifactKind,
                 artifactId,
                 curr.getAgentJobId(),
                 prev.getAgentJobId(),

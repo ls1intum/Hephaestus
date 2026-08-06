@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -39,10 +40,10 @@ import tools.jackson.databind.JsonNode;
     indexes = {
         @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
         @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
-        @Index(name = "idx_observation_target", columnList = "artifact_type, artifact_id"),
+        @Index(name = "idx_observation_target", columnList = "artifact_kind, artifact_id"),
         @Index(
             name = "idx_observation_target_run",
-            columnList = "artifact_type, artifact_id, agent_job_id, observed_at DESC"
+            columnList = "artifact_kind, artifact_id, agent_job_id, observed_at DESC"
         ),
         @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
         // Reviewer-side observations are filed against the subject (about_user_id); index for subject dashboards.
@@ -104,9 +105,8 @@ public class Observation {
     private PracticeRevision practiceRevision;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(name = "artifact_type", length = 32, nullable = false)
-    private WorkArtifact artifactType;
+    @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH, nullable = false)
+    private ArtifactKind artifactKind;
 
     @NotNull
     @Column(name = "artifact_id", nullable = false)

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.observation.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -17,7 +17,7 @@ public record ReflectionItemDTO(
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
     @Nullable @Schema(description = "Impact level (null unless assessed BAD)") Severity severity,
-    @NonNull @Schema(description = "The kind of work this is about (PR / issue)") WorkArtifact artifactType,
+    @NonNull @Schema(description = "The kind of work this is about (PR / issue)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
 ) {
@@ -27,7 +27,7 @@ public record ReflectionItemDTO(
             observation.getTitle(),
             deliveredGuidance,
             observation.getSeverity(),
-            observation.getArtifactType(),
+            observation.getArtifactKind(),
             observation.getArtifactId(),
             locatorOf(observation.getEvidence())
         );

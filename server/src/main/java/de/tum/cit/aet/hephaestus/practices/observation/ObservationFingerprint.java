@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li>{@code practiceSlug} — the practice's stable per-workspace slug (NOT its surrogate id, which is
  *       workspace-local and survives reseeds poorly); identity is per-practice.</li>
- *   <li>{@code artifactType} + {@code artifactId} — the artifact under review (PR / ISSUE).</li>
+ *   <li>{@code artifactKind} + {@code artifactId} — the artifact under review (PR / ISSUE).</li>
  *   <li>{@code aboutUserId} — the person the observation is <em>about</em> (always populated). For
  *       author-side practices this equals the developer; for reviewer-side practices the subject differs,
  *       and two reviewers on one PR must not collapse to one key.</li>
@@ -51,7 +51,7 @@ public final class ObservationFingerprint {
      * Compute the stable 64-char recurrence key for an observation.
      *
      * @param practiceSlug the practice's stable slug (required)
-     * @param artifactType the artifact-type discriminator, e.g. {@code PULL_REQUEST} / {@code ISSUE} (required)
+     * @param artifactKind the artifact-type discriminator, e.g. {@code scm.pull_request} / {@code scm.issue} (required)
      * @param artifactId the artifact id under review (required)
      * @param aboutUserId the user the observation is ABOUT — the always-populated {@code about_user_id} (the
      *     subject for reviewer-side practices; equals the developer for author-side), so the same underlying
@@ -64,18 +64,18 @@ public final class ObservationFingerprint {
      */
     public static String compute(
         String practiceSlug,
-        String artifactType,
+        String artifactKind,
         long artifactId,
         long aboutUserId,
         @Nullable String firstLocationPath
     ) {
         Objects.requireNonNull(practiceSlug, "practiceSlug");
-        Objects.requireNonNull(artifactType, "artifactType");
+        Objects.requireNonNull(artifactKind, "artifactKind");
 
         String canonical = new StringBuilder()
             .append(practiceSlug)
             .append(SEP)
-            .append(artifactType)
+            .append(artifactKind)
             .append(SEP)
             .append(artifactId)
             .append(SEP)

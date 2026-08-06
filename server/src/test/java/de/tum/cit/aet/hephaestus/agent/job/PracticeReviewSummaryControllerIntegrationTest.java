@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -12,8 +13,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -135,7 +136,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             .jsonPath("$.content[0].id")
             .isEqualTo(job.getId().toString())
             .jsonPath("$.content[0].target.type")
-            .isEqualTo("PULL_REQUEST")
+            .isEqualTo("scm.pull_request")
             .jsonPath("$.content[0].target.id")
             .isEqualTo(7)
             .jsonPath("$.content[0].target.provider")
@@ -274,7 +275,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             job.getId(),
             practice.getId(),
             null,
-            WorkArtifact.PULL_REQUEST.name(),
+            ArtifactKinds.PULL_REQUEST.value(),
             7L,
             subject.getId(),
             title,
@@ -299,7 +300,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(7L)
                 .recipientUserId(subject.getId())
                 .aboutUserId(subject.getId())

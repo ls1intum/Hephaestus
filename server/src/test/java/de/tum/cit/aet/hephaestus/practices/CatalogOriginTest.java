@@ -2,13 +2,14 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogLink;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -83,11 +84,11 @@ class CatalogOriginTest extends BaseUnitTest {
         AreaDefinition area = new AreaDefinition("Quality", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
             "Small PRs",
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of("PullRequestCreated"),
             "Seed criteria",
             null,
-            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
             "Reason",
             null,
             "quality"
@@ -103,11 +104,11 @@ class CatalogOriginTest extends BaseUnitTest {
     private static PracticeDefinition definition(String criteria) {
         return new PracticeDefinition(
             "Small PRs",
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of("PullRequestCreated"),
             criteria,
             null,
-            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
             "Reason",
             null,
             null
@@ -127,10 +128,10 @@ class CatalogOriginTest extends BaseUnitTest {
         practice.setId(1L);
         practice.setSlug(SLUG);
         practice.setName("Small PRs");
-        practice.setArtifactType(WorkArtifact.PULL_REQUEST);
+        practice.setArtifactKind(ArtifactKinds.PULL_REQUEST);
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         practice.setCriteria(criteria);
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         practice.setWhyItMatters("Reason");
         if (copiedFromFingerprint != null) {
             practice.setSourceCuratedSlug(SLUG);

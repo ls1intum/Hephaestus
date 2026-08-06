@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
@@ -15,10 +16,10 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -65,7 +66,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         databaseTestUtils.cleanDatabase();
         setUpWorkspaceAndRecipient("delivered-consent-gate-test");
         practice = new Practice();
-        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
@@ -87,10 +88,10 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         long pausedThreadId = seedThread("C-paused", "200.0", ConsentState.PAUSED);
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
 
-        saveDelivered(WorkArtifact.CONVERSATION_THREAD, activeThreadId, FeedbackChannel.CONVERSATION, "active-body");
-        saveDelivered(WorkArtifact.CONVERSATION_THREAD, pausedThreadId, FeedbackChannel.CONVERSATION, "paused-body");
-        saveDelivered(WorkArtifact.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
-        saveDelivered(WorkArtifact.PULL_REQUEST, 4242L, FeedbackChannel.IN_CONTEXT, "pr-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, activeThreadId, FeedbackChannel.CONVERSATION, "active-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, pausedThreadId, FeedbackChannel.CONVERSATION, "paused-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
+        saveDelivered(ArtifactKinds.PULL_REQUEST, 4242L, FeedbackChannel.IN_CONTEXT, "pr-body");
 
         JsonNode root = contribute();
 
@@ -103,8 +104,8 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
     @Test
     @DisplayName("Slack consent does not suppress otherwise-authorized PR/issue feedback")
     void prIssueOnlyPayloadPassesThroughWithoutEnvelope() {
-        saveDelivered(WorkArtifact.PULL_REQUEST, 555L, FeedbackChannel.IN_CONTEXT, "pr-body");
-        saveDelivered(WorkArtifact.ISSUE, 777L, FeedbackChannel.IN_CONTEXT, "issue-body");
+        saveDelivered(ArtifactKinds.PULL_REQUEST, 555L, FeedbackChannel.IN_CONTEXT, "pr-body");
+        saveDelivered(ArtifactKinds.ISSUE, 777L, FeedbackChannel.IN_CONTEXT, "issue-body");
 
         JsonNode root = contribute();
 
@@ -116,8 +117,8 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
     @DisplayName("revoked conversation feedback does not suppress authorized PR feedback")
     void prSurvivesWhenAllConversationRevoked() {
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
-        saveDelivered(WorkArtifact.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
-        saveDelivered(WorkArtifact.PULL_REQUEST, 909L, FeedbackChannel.IN_CONTEXT, "pr-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
+        saveDelivered(ArtifactKinds.PULL_REQUEST, 909L, FeedbackChannel.IN_CONTEXT, "pr-body");
 
         JsonNode root = contribute();
 
@@ -142,7 +143,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         return bodies;
     }
 
-    private void saveDelivered(WorkArtifact artifactType, long artifactId, FeedbackChannel channel, String body) {
+    private void saveDelivered(ArtifactKind artifactKind, long artifactId, FeedbackChannel channel, String body) {
         Instant now = Instant.now();
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
@@ -151,7 +152,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
             job.getId(),
             practice.getId(),
             practice.getCurrentRevision().getId(),
-            artifactType.name(),
+            artifactKind.value(),
             artifactId,
             recipient.getId(),
             "Observation title",
@@ -159,7 +160,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
             "BAD",
             "MAJOR",
             0.8f,
-            evidence(artifactType),
+            evidence(artifactKind),
             null,
             null,
             now
@@ -168,7 +169,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(artifactType)
+                .artifactKind(artifactKind)
                 .artifactId(artifactId)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
@@ -184,9 +185,10 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
     }
 
-    private static String evidence(WorkArtifact artifactType) {
-        String sourceKind =
-            artifactType == WorkArtifact.CONVERSATION_THREAD ? "slack.conversation.thread" : "scm.pull-request.core";
+    private static String evidence(ArtifactKind artifactKind) {
+        String sourceKind = ArtifactKinds.CONVERSATION_THREAD.equals(artifactKind)
+            ? "slack.conversation.thread"
+            : "scm.pull-request.core";
         return """
         {"citations":[{"sourceKind":"%s","artifactPath":"inputs/context/source.json",\
         "path":"source.json","startLine":1,"endLine":1,"quote":"evidence",\

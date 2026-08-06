@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
@@ -10,10 +11,10 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeUsageRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -84,7 +85,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setName(name);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice.setCriteria("Detect prompt for " + slug);
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         practice.setUsedInNewReviews(active);
         return practiceRepository.save(practice);
     }
@@ -111,7 +112,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             List.of("PullRequestCreated", "ReviewSubmitted"),
             "Detect if the PR follows best practices",
             null,
-            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
             null,
             null,
             null,
@@ -127,7 +128,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             request.criteria(),
             request.precomputeScript(),
             request.automatedReviewPolicy(),
-            request.artifactType(),
+            request.artifactKind(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
             areaSlug
@@ -146,7 +147,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             request.criteria(),
             automatedReview ? request.precomputeScript() : null,
             evidence,
-            request.artifactType(),
+            request.artifactKind(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
             request.areaSlug()
@@ -183,8 +184,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.workTypes[0].artifactType")
-            .isEqualTo("PULL_REQUEST")
+            .jsonPath("$.workTypes[0].artifactKind")
+            .isEqualTo("scm.pull_request")
             .jsonPath("$.workTypes[0].recommendedRequirements.requiredEvidence[1].sourceKind")
             .isEqualTo("scm.pull-request.diff")
             .jsonPath("$.workTypes[0].allowedSources[0].displayName")
@@ -413,7 +414,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated", "ReviewSubmitted");
             assertThat(result.criteria()).isEqualTo("Detect if the PR follows best practices");
             assertThat(result.automatedReviewPolicy()).isEqualTo(
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST)
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
             );
             assertThat(result.usedInNewReviews()).isTrue();
             assertThat(result.id()).isNotNull();
@@ -465,7 +466,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
             assertThat(result.usedInNewReviews()).isTrue();
             assertThat(result.automatedReviewPolicy()).isEqualTo(
-                evidenceDefaults.forArtifact(WorkArtifact.PULL_REQUEST)
+                evidenceDefaults.forArtifact(ArtifactKinds.PULL_REQUEST)
             );
         }
 
@@ -628,7 +629,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("PullRequestCreated"),
                 null,
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null,
@@ -670,7 +671,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("NonExistentEvent"),
                 null,
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null,
@@ -708,7 +709,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("PullRequestCreated", "PullRequestCreated"),
                 null,
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null,
@@ -737,7 +738,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of(),
                 null,
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null,
@@ -775,7 +776,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("PullRequestCreated"),
                 null,
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null,
@@ -804,7 +805,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of(),
                 null,
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null,
@@ -911,7 +912,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 null,
                 null,
-                WorkArtifact.ISSUE,
+                ArtifactKinds.ISSUE,
                 null,
                 null,
                 null,
@@ -932,8 +933,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.artifactType()).isEqualTo(WorkArtifact.ISSUE);
-            assertThat(result.automatedReviewPolicy()).isEqualTo(evidenceDefaults.forArtifact(WorkArtifact.ISSUE));
+            assertThat(result.artifactKind()).isEqualTo(ArtifactKinds.ISSUE);
+            assertThat(result.automatedReviewPolicy()).isEqualTo(evidenceDefaults.forArtifact(ArtifactKinds.ISSUE));
         }
 
         @Test
@@ -1936,7 +1937,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(revisions.get(0).getRevisionNumber()).isEqualTo(1);
             assertThat(revisions.get(0).getSlug()).isEqualTo("versioned-practice");
             assertThat(revisions.get(0).getName()).isEqualTo("Practice versioned-practice");
-            assertThat(revisions.get(0).getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+            assertThat(revisions.get(0).getArtifactKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
             assertThat(TriggerEventsConverter.toList(revisions.get(0).getTriggerEvents())).containsExactly(
                 "PullRequestCreated",
                 "ReviewSubmitted"
@@ -2151,7 +2152,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("PATCH artifactType=ISSUE on a PR practice with PR-only triggers → 400 (merged-state check)")
+        @DisplayName("PATCH artifactKind=ISSUE on a PR practice with PR-only triggers → 400 (merged-state check)")
         void changingFocusToIssueWithStalePrTriggersIsRejected() {
             ensureAdminMembership(workspace);
             persistPractice("focus-flip", "Focus Flip", true);
@@ -2162,7 +2163,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 null,
                 null,
-                WorkArtifact.ISSUE,
+                ArtifactKinds.ISSUE,
                 null,
                 null,
                 null,
@@ -2189,8 +2190,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), "focus-flip")
                     .orElseThrow()
-                    .getArtifactType()
-            ).isEqualTo(WorkArtifact.PULL_REQUEST);
+                    .getArtifactKind()
+            ).isEqualTo(ArtifactKinds.PULL_REQUEST);
         }
 
         @Test
@@ -2205,8 +2206,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("ReviewSubmitted"),
                 "Detect something",
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.ISSUE),
-                WorkArtifact.ISSUE,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE),
+                ArtifactKinds.ISSUE,
                 null,
                 null,
                 null
@@ -2243,8 +2244,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of(),
                 "Detect constructive conversations",
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.CONVERSATION_THREAD),
-                WorkArtifact.CONVERSATION_THREAD,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.CONVERSATION_THREAD),
+                ArtifactKinds.CONVERSATION_THREAD,
                 null,
                 null,
                 null
@@ -2264,7 +2265,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.artifactType()).isEqualTo(WorkArtifact.CONVERSATION_THREAD);
+            assertThat(result.artifactKind()).isEqualTo(ArtifactKinds.CONVERSATION_THREAD);
             assertThat(result.triggerEvents()).isEmpty();
         }
     }
@@ -2285,7 +2286,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("PullRequestCreated"),
                 "INTERNAL detection rubric — must never reach a learner",
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 "Small, focused PRs are easier to review.",
                 "A PR that changes one thing and explains why in the description.",
@@ -2334,7 +2335,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("PullRequestCreated"),
                 "Detect prompt",
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 "Why it matters.",
                 whatGoodLooksLike,
@@ -2396,7 +2397,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("PullRequestCreated"),
                 "Detect prompt",
                 null,
-                PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 "The error handler is PRESENT in every case.",
                 "A clean exemplar.",

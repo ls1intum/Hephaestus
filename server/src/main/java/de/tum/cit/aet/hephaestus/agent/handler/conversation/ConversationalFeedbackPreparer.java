@@ -125,7 +125,7 @@ public class ConversationalFeedbackPreparer {
                 Feedback.builder()
                     .agentJobId(agentJobId)
                     .workspaceId(workspaceId)
-                    .artifactType(observation.getArtifactType())
+                    .artifactKind(observation.getArtifactKind())
                     .artifactId(observation.getArtifactId())
                     .recipientUserId(recipient)
                     .aboutUserId(recipient)

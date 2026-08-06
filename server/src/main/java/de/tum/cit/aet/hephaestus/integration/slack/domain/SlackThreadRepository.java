@@ -68,7 +68,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /**
      * The ids of every thread aggregate on one channel — collected on channel erasure so the derived
-     * {@code CONVERSATION_THREAD} observations/feedback (keyed by these {@code slack_thread} ids as
+     * {@code chat.conversation_thread} observations/feedback (keyed by these {@code slack_thread} ids as
      * {@code artifact_id}) can be hard-deleted through the practices erasure port before the aggregates themselves
      * are dropped.
      */
@@ -184,7 +184,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     /**
      * Agent-owned {@code ConversationSourceLiveness} SPI: the subset of {@code threadIds} whose source channel
      * consent is still {@code ACTIVE} in this workspace — the fail-closed allow-set a
-     * {@code CONVERSATION_THREAD}-derived row must belong to before it may reach the mentor. Callers guard an
+     * {@code chat.conversation_thread}-derived row must belong to before it may reach the mentor. Callers guard an
      * empty {@code threadIds}.
      */
     @Query(

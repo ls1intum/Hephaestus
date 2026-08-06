@@ -4,14 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         databaseTestUtils.cleanDatabase();
         setUpWorkspaceAndRecipient("obs-consent-gate-test");
         practice = new Practice();
-        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
@@ -72,10 +73,10 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         long pausedThreadId = seedThread("C-paused", "200.0", ConsentState.PAUSED);
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
 
-        Observation activeObs = saveObservation("occ-active", "CONVERSATION_THREAD", activeThreadId);
-        saveObservation("occ-paused", "CONVERSATION_THREAD", pausedThreadId);
-        saveObservation("occ-revoked", "CONVERSATION_THREAD", revokedThreadId);
-        Observation prObs = saveObservation("occ-pr", "PULL_REQUEST", 4242L);
+        Observation activeObs = saveObservation("occ-active", "chat.conversation_thread", activeThreadId);
+        saveObservation("occ-paused", "chat.conversation_thread", pausedThreadId);
+        saveObservation("occ-revoked", "chat.conversation_thread", revokedThreadId);
+        Observation prObs = saveObservation("occ-pr", "scm.pull_request", 4242L);
 
         JsonNode root = contribute();
 
@@ -90,8 +91,8 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
     @Test
     @DisplayName("Slack consent does not suppress otherwise-authorized PR/issue observations")
     void prIssueOnlyPayloadPassesThroughWithoutEnvelope() {
-        Observation prObs = saveObservation("occ-pr", "PULL_REQUEST", 555L);
-        Observation issueObs = saveObservation("occ-issue", "ISSUE", 777L);
+        Observation prObs = saveObservation("occ-pr", "scm.pull_request", 555L);
+        Observation issueObs = saveObservation("occ-issue", "scm.issue", 777L);
 
         JsonNode root = contribute();
 
@@ -106,8 +107,8 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
     @DisplayName("a revoked conversation observation does not suppress an authorized PR observation")
     void prSurvivesWhenAllConversationRevoked() {
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
-        saveObservation("occ-revoked", "CONVERSATION_THREAD", revokedThreadId);
-        Observation prObs = saveObservation("occ-pr", "PULL_REQUEST", 909L);
+        saveObservation("occ-revoked", "chat.conversation_thread", revokedThreadId);
+        Observation prObs = saveObservation("occ-pr", "scm.pull_request", 909L);
 
         JsonNode root = contribute();
 
@@ -132,7 +133,7 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         return ids;
     }
 
-    private Observation saveObservation(String occurrenceKey, String artifactType, long artifactId) {
+    private Observation saveObservation(String occurrenceKey, String artifactKind, long artifactId) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
             id,
@@ -140,7 +141,7 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
             job.getId(),
             practice.getId(),
             practice.getCurrentRevision().getId(),
-            artifactType,
+            artifactKind,
             artifactId,
             recipient.getId(),
             "Observation title",
@@ -148,7 +149,7 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
             "BAD",
             "MAJOR",
             0.8f,
-            evidence(artifactType),
+            evidence(artifactKind),
             null,
             null,
             Instant.now()
@@ -156,8 +157,8 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         return observationRepository.findById(id).orElseThrow();
     }
 
-    private static String evidence(String artifactType) {
-        String sourceKind = "CONVERSATION_THREAD".equals(artifactType)
+    private static String evidence(String artifactKind) {
+        String sourceKind = "chat.conversation_thread".equals(artifactKind)
             ? "slack.conversation.thread"
             : "scm.pull-request.core";
         return """

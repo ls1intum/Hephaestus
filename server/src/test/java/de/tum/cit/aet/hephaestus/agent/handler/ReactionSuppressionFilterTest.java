@@ -13,12 +13,13 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
@@ -51,7 +52,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     // The canonical key the filter recomputes for a SLUG finding with no location — the SAME value deliver() persists.
     private static final String CK = ObservationFingerprint.compute(
         SLUG,
-        WorkArtifact.PULL_REQUEST.name(),
+        ArtifactKinds.PULL_REQUEST.value(),
         TARGET,
         CONTRIBUTOR,
         null
@@ -148,7 +149,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void secretBadFinding_isNotSuppressedDespiteDisputedReaction() {
         String secretKey = ObservationFingerprint.compute(
             "avoids-insecure-defaults-and-over-broad-permissions",
-            WorkArtifact.PULL_REQUEST.name(),
+            ArtifactKinds.PULL_REQUEST.value(),
             TARGET,
             CONTRIBUTOR,
             null

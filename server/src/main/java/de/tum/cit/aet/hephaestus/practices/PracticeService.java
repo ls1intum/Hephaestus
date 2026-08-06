@@ -5,12 +5,13 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.ClearablePracticeField;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -237,20 +238,20 @@ public class PracticeService {
         PracticeDefinition beforeDefinition = PracticeDefinition.from(practice);
 
         Set<ClearablePracticeField> fieldsToClear = request.clear() == null ? Set.of() : request.clear();
-        WorkArtifact artifactType =
-            request.artifactType() == null ? beforeDefinition.artifactType() : request.artifactType();
+        ArtifactKind artifactKind =
+            request.artifactKind() == null ? beforeDefinition.artifactKind() : request.artifactKind();
         PracticeAutomatedReviewPolicy automatedReviewPolicy =
             request.automatedReviewPolicy() != null
                 ? request.automatedReviewPolicy()
-                : artifactType == beforeDefinition.artifactType()
+                : artifactKind.equals(beforeDefinition.artifactKind())
                     ? beforeDefinition.automatedReviewPolicy()
-                    : evidenceDefaults.forArtifact(artifactType);
+                    : evidenceDefaults.forArtifact(artifactKind);
         boolean removesAutomatedReview =
             request.automatedReviewPolicy() != null &&
             !automatedReviewPolicy.automatedReview().canAttemptAutomatedReview();
         PracticeDefinition afterDefinition = new PracticeDefinition(
             request.name() == null ? beforeDefinition.name() : request.name(),
-            artifactType,
+            artifactKind,
             request.triggerEvents() == null
                 ? removesAutomatedReview
                     ? List.of()
@@ -375,15 +376,16 @@ public class PracticeService {
     }
 
     private PracticeDefinition definition(CreatePracticeRequestDTO request) {
-        WorkArtifact artifactType = request.artifactType() == null ? WorkArtifact.PULL_REQUEST : request.artifactType();
+        ArtifactKind artifactKind =
+            request.artifactKind() == null ? ArtifactKinds.PULL_REQUEST : request.artifactKind();
         return new PracticeDefinition(
             request.name(),
-            artifactType,
+            artifactKind,
             request.triggerEvents(),
             request.criteria(),
             request.precomputeScript(),
             request.automatedReviewPolicy() == null
-                ? evidenceDefaults.forArtifact(artifactType)
+                ? evidenceDefaults.forArtifact(artifactKind)
                 : request.automatedReviewPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
@@ -393,7 +395,7 @@ public class PracticeService {
 
     private static void applyDefinition(Practice practice, PracticeDefinition definition) {
         practice.setName(definition.name());
-        practice.setArtifactType(definition.artifactType());
+        practice.setArtifactKind(definition.artifactKind());
         practice.setTriggerEvents(definition.triggerEventsJson());
         practice.setCriteria(definition.criteria());
         practice.setPrecomputeScript(definition.precomputeScript());

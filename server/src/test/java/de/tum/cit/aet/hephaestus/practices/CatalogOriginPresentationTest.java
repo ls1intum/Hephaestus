@@ -6,12 +6,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
@@ -37,7 +38,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
     private static void stubDefinition(Practice practice, String slug) {
         when(practice.getSlug()).thenReturn(slug);
         when(practice.getName()).thenReturn(slug);
-        when(practice.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        when(practice.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         when(practice.getTriggerEvents()).thenReturn(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
         when(practice.getCriteria()).thenReturn("Review the change");
         when(practice.getAutomatedReviewPolicy()).thenReturn(PracticeTestEvidence.pullRequest());

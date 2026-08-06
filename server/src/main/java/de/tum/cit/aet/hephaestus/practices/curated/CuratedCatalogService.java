@@ -427,7 +427,7 @@ public class CuratedCatalogService {
         PracticeDefinition definition = entry.effective();
         PracticeDefinition moved = new PracticeDefinition(
             definition.name(),
-            definition.artifactType(),
+            definition.artifactKind(),
             definition.triggerEvents(),
             definition.criteria(),
             definition.precomputeScript(),

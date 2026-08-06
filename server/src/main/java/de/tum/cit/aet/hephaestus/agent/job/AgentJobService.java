@@ -16,14 +16,14 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -255,9 +255,9 @@ public class AgentJobService {
                 return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
             }
             if (
-                !practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                !practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     workspace.getId(),
-                    artifactTypeFor(jobType)
+                    artifactKindFor(jobType)
                 )
             ) {
                 log.debug(
@@ -326,7 +326,7 @@ public class AgentJobService {
             job.setWorkspace(currentWorkspace);
             job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
             job.setJobType(jobType);
-            job.setSubjectClass(subjectClassFor(jobType));
+            job.setArtifactKind(artifactKindFor(jobType));
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(detectionKey);
             try {
@@ -389,19 +389,17 @@ public class AgentJobService {
         return null;
     }
 
-    private static SubjectClass subjectClassFor(AgentJobType jobType) {
+    /**
+     * The artifact a job of this type is about. One switch: until this slice there were two, one
+     * producing a {@code SubjectClass} for the job row and one a {@code WorkArtifact} for the
+     * observations, which is how {@code SLACK_MESSAGE_THREAD} and {@code CONVERSATION_THREAD} came to
+     * name the same thing.
+     */
+    static ArtifactKind artifactKindFor(AgentJobType jobType) {
         return switch (jobType) {
-            case PULL_REQUEST_REVIEW -> SubjectClass.PULL_REQUEST;
-            case ISSUE_REVIEW -> SubjectClass.ISSUE;
-            case CONVERSATION_REVIEW -> SubjectClass.SLACK_MESSAGE_THREAD;
-        };
-    }
-
-    private static WorkArtifact artifactTypeFor(AgentJobType jobType) {
-        return switch (jobType) {
-            case PULL_REQUEST_REVIEW -> WorkArtifact.PULL_REQUEST;
-            case ISSUE_REVIEW -> WorkArtifact.ISSUE;
-            case CONVERSATION_REVIEW -> WorkArtifact.CONVERSATION_THREAD;
+            case PULL_REQUEST_REVIEW -> ArtifactKinds.PULL_REQUEST;
+            case ISSUE_REVIEW -> ArtifactKinds.ISSUE;
+            case CONVERSATION_REVIEW -> ArtifactKinds.CONVERSATION_THREAD;
         };
     }
 

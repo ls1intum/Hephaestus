@@ -6,15 +6,15 @@ import java.util.Set;
 public record EvidenceProfile(
     EvidenceProfileId id,
     SourceContractVersion version,
-    String artifactType,
+    String artifactKind,
     Set<SourceKind> allowedSources
 ) {
     public EvidenceProfile {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(version, "version");
-        Objects.requireNonNull(artifactType, "artifactType");
-        if (artifactType.isBlank()) {
-            throw new IllegalArgumentException("artifactType must not be blank: " + id);
+        Objects.requireNonNull(artifactKind, "artifactKind");
+        if (artifactKind.isBlank()) {
+            throw new IllegalArgumentException("artifactKind must not be blank: " + id);
         }
         allowedSources = Set.copyOf(Objects.requireNonNull(allowedSources, "allowedSources"));
         if (allowedSources.isEmpty()) {

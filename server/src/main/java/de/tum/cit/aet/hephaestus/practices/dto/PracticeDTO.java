@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewValidation;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -23,7 +23,7 @@ public record PracticeDTO(
     String precomputeScript,
     @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
     @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
-    @NonNull @Schema(description = "Type of work this practice reviews") WorkArtifact artifactType,
+    @NonNull @Schema(description = "Type of work this practice reviews") ArtifactKind artifactKind,
     @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
     @NonNull @Schema(description = "Position within its area (lowest first); ties broken by name") Integer displayOrder,
     @Nullable @Schema(description = "Developer-facing rationale (learner layer)") String whyItMatters,
@@ -43,7 +43,7 @@ public record PracticeDTO(
             practice.getPrecomputeScript(),
             practice.getAutomatedReviewPolicy(),
             PracticeAutomatedReviewValidation.authorDeclared(practice.getSlug(), PracticeDefinition.from(practice)),
-            practice.getArtifactType(),
+            practice.getArtifactKind(),
             practice.getArea() != null ? practice.getArea().getSlug() : null,
             practice.getDisplayOrder(),
             practice.getWhyItMatters(),

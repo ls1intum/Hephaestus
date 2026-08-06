@@ -98,7 +98,7 @@
       "required": [
         "slug",
         "name",
-        "artifactType",
+        "artifactKind",
         "triggerEvents",
         "automatedReviewPolicyId",
         "criteria"
@@ -112,12 +112,12 @@
           "description": "Human-facing practice name.",
           "$ref": "#/$defs/name"
         },
-        "artifactType": {
-          "description": "Type of work against which the practice is reviewed.",
+        "artifactKind": {
+          "description": "Kind of work against which the practice is reviewed.",
           "enum": [
-            "PULL_REQUEST",
-            "ISSUE",
-            "CONVERSATION_THREAD"
+            "scm.pull_request",
+            "scm.issue",
+            "chat.conversation_thread"
           ]
         },
         "triggerEvents": {

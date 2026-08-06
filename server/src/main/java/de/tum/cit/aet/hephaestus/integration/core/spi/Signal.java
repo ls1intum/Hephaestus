@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import java.util.Objects;
@@ -11,7 +12,7 @@ import java.util.Set;
  * <p>The load-bearing field is {@link #producedBy()}. Without it a signal name is a wish: nothing
  * connects it to an ingested event, so a practice can be bound to it, the binding can look healthy in
  * the UI, and it can simply never fire — which is precisely how thirteen Outline document events came
- * to be ingested while no practice could react to any of them. {@code SubjectClass}'s javadoc already
+ * to be ingested while no practice could react to any of them. {@code ArtifactKind}'s javadoc already
  * warns about the same failure mode ("aspirational entries become silent classification bugs"); this
  * record makes the warning enforceable, because the bootstrap can check that each named event type has
  * a registered handler.

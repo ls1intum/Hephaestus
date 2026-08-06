@@ -191,7 +191,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         // Raw content: one message + one thread aggregate.
         messageRepository.insertIfAbsent(workspace.getId(), "T1", "C1", "100.1", null, "U1", null, "hello");
         long threadId = seedThread(workspace.getId(), "C1", "100.1");
-        // Derived CONVERSATION_THREAD observation + feedback anchored to the thread id.
+        // Derived chat.conversation_thread observation + feedback anchored to the thread id.
         SlackConversationTestSupport.BoundConversation conv = seedBoundConversation(threadId);
         UUID observationId = conv.observationId();
         UUID feedbackId = conv.feedbackId();

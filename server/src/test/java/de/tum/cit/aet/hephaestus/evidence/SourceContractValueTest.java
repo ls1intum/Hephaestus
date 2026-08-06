@@ -91,7 +91,7 @@ class SourceContractValueTest {
             "Example",
             "An example source.",
             "Everything in scope.",
-            Set.of("PULL_REQUEST"),
+            Set.of("scm.pull_request"),
             authority,
             new IdentityPolicy(freshness),
             new CompletenessPolicy(supportsComplete, true, true),

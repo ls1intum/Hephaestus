@@ -5,15 +5,16 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import java.time.Instant;
@@ -101,13 +102,13 @@ public class ObservationHistoryContentSource implements ContentSource {
             .stream()
             .filter(
                 o ->
-                    o.getArtifactType() != WorkArtifact.CONVERSATION_THREAD ||
+                    !ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()) ||
                     isSurvivingConversation(o, activeThreadIds)
             )
             .toList();
         boolean anyConversationSurvivor = visible
             .stream()
-            .anyMatch(o -> o.getArtifactType() == WorkArtifact.CONVERSATION_THREAD);
+            .anyMatch(o -> ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()));
 
         ObjectNode root = objectMapper.createObjectNode();
         // Untrusted-content quarantine: only when a Slack-derived (attacker-controllable) reasoning survives the gate
@@ -153,8 +154,8 @@ public class ObservationHistoryContentSource implements ContentSource {
             node.put("severity", severity == null ? null : severity.name());
             node.put("confidence", o.getConfidence());
             node.put("observedAt", o.getObservedAt().toString());
-            if (o.getArtifactType() != null) {
-                node.put("artifactType", o.getArtifactType().name());
+            if (o.getArtifactKind() != null) {
+                node.put("artifactKind", o.getArtifactKind().value());
             }
             if (o.getArtifactId() != null) {
                 node.put("artifactId", o.getArtifactId());
@@ -189,7 +190,7 @@ public class ObservationHistoryContentSource implements ContentSource {
     private static List<Long> conversationThreadIds(List<Observation> observations) {
         List<Long> ids = new ArrayList<>();
         for (Observation o : observations) {
-            if (o.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && o.getArtifactId() != null) {
+            if (ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()) && o.getArtifactId() != null) {
                 ids.add(o.getArtifactId());
             }
         }
@@ -198,7 +199,7 @@ public class ObservationHistoryContentSource implements ContentSource {
 
     private static boolean isSurvivingConversation(Observation o, Set<Long> activeThreadIds) {
         return (
-            o.getArtifactType() == WorkArtifact.CONVERSATION_THREAD &&
+            ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()) &&
             o.getArtifactId() != null &&
             activeThreadIds.contains(o.getArtifactId())
         );

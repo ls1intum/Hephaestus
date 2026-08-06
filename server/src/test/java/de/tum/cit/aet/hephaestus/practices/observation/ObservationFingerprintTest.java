@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class ObservationFingerprintTest extends BaseUnitTest {
 
     private static final String SLUG = "ships-tests-with-the-change";
-    private static final String TYPE = "PULL_REQUEST";
+    private static final String TYPE = "scm.pull_request";
 
     @Test
     @DisplayName("identical locus → identical 64-char key (deterministic across runs)")
@@ -38,7 +38,7 @@ class ObservationFingerprintTest extends BaseUnitTest {
     void discriminators() {
         String base = ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "F.swift");
         assertThat(ObservationFingerprint.compute("other-practice", TYPE, 42L, 7L, "F.swift")).isNotEqualTo(base);
-        assertThat(ObservationFingerprint.compute(SLUG, "ISSUE", 42L, 7L, "F.swift")).isNotEqualTo(base);
+        assertThat(ObservationFingerprint.compute(SLUG, "scm.issue", 42L, 7L, "F.swift")).isNotEqualTo(base);
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 99L, 7L, "F.swift")).isNotEqualTo(base);
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 8L, "F.swift")).isNotEqualTo(base);
     }
@@ -103,17 +103,23 @@ class ObservationFingerprintTest extends BaseUnitTest {
             .hasMessage("practiceSlug");
         assertThatThrownBy(() -> ObservationFingerprint.compute(SLUG, null, 1L, 1L, null))
             .isInstanceOf(NullPointerException.class)
-            .hasMessage("artifactType");
+            .hasMessage("artifactKind");
     }
 
     @Test
     @DisplayName("golden vector: the canonical digest is pinned so the wire identity never drifts silently")
     void goldenVector() {
         // A change to the field set, separator, normalization, or hash algorithm would silently
-        // re-identify EVERY historical finding (breaking cross-run supersession). Pin one vector so
+        // re-identify EVERY historical observation (breaking cross-run supersession). Pin one vector so
         // such a change must be a deliberate, reviewed edit to this expectation.
+        //
+        // Edited once, deliberately: the artifact kind fed in here went from PULL_REQUEST to
+        // scm.pull_request when the two forked artifact enums merged, so every key computed after that
+        // change differs from the ones already stored. Observations recorded before it keep their old
+        // key and stop correlating with new ones — at most one re-posted piece of feedback per open
+        // artifact, which is why the vocabulary change was worth making once rather than twice.
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift")).isEqualTo(
-            "90419eec6d267f4442ca1e0fd1c8afc9658eaa003ab1dacb7af1d0f68c4809d9"
+            "a8b20bf6e20b28b3315420a241577853676ceed52e7be2976f94d3978cfa830d"
         );
     }
 }

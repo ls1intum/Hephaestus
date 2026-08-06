@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -99,7 +99,7 @@ public class BundledPracticeCatalogLoader {
         JsonNode node,
         String slug
     ) {
-        WorkArtifact artifactType = WorkArtifact.valueOf(requiredText(node, "artifactType"));
+        ArtifactKind artifactKind = ArtifactKind.of(requiredText(node, "artifactKind"));
         JsonNode triggersNode = node.path("triggerEvents");
         if (!triggersNode.isArray()) {
             throw new IllegalStateException("bundled practice triggerEvents must be an array: " + slug);
@@ -114,14 +114,14 @@ public class BundledPracticeCatalogLoader {
         List<String> triggerEvents = rawTriggerEvents.stream().sorted().toList();
         String preambleKey = text(node, "preamble");
         if (preambleKey == null) {
-            preambleKey = artifactType.name();
+            preambleKey = artifactKind.value();
         }
         String criteria = composeCriteria(catalog, preambleKey, requiredText(node, "criteria"));
         String whyItMatters = text(node, "whyItMatters");
         String whatGoodLooksLike = text(node, "whatGoodLooksLike");
         PracticeDefinition definition = new PracticeDefinition(
             requiredText(node, "name"),
-            artifactType,
+            artifactKind,
             triggerEvents,
             criteria,
             loadPrecomputeScript(node, slug),

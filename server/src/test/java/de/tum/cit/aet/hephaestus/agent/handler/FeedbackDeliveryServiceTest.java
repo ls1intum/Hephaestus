@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedExceptio
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -25,9 +26,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -252,7 +253,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 any(),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of()),
                 eq(false),
                 eq(false)
@@ -286,7 +287,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
                 eq(true)
@@ -315,7 +316,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_ping");
             when(
-                observationTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
+                observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
 
             footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
@@ -411,7 +412,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
                 delivery,
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 List.of(),
                 true,
                 false
@@ -488,7 +489,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
                 delivery,
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 List.of(signal),
                 true,
                 true
@@ -742,7 +743,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
                 eq(true)
@@ -832,7 +833,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of(firstSignal, secondSignal)),
                 eq(false),
                 eq(true)
@@ -1025,7 +1026,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             0.8f
         );
         return new TrendDelta(
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             PULL_REQUEST_ID,
             UUID.randomUUID(),
             UUID.randomUUID(),

@@ -28,12 +28,13 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -122,7 +123,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.getFeatures().setPracticesEnabled(true);
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         lenient()
-            .when(practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(anyLong(), any()))
+            .when(practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(anyLong(), any()))
             .thenReturn(true);
 
         enabledBinding = new WorkspaceAgentBinding();
@@ -257,9 +258,9 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldNotSubmitWithoutAnActivePracticeForTheReviewedWork() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(
-                practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     1L,
-                    WorkArtifact.CONVERSATION_THREAD
+                    ArtifactKinds.CONVERSATION_THREAD
                 )
             ).thenReturn(false);
             JobTypeHandler handler = mock(JobTypeHandler.class);

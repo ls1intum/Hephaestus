@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Practices-internal implementation of {@link ConversationFeedbackErasure}. Runs two scoped bulk deletes —
  * feedback first (DB {@code ON DELETE CASCADE} clears its join/child tables), then the observations. Both
- * statements pin {@code artifact_type = CONVERSATION_THREAD} + workspace (plus the per-method scope), so
+ * statements pin {@code artifact_kind = chat.conversation_thread} + workspace (plus the per-method scope), so
  * PR/ISSUE rows and other tenants' rows are never touched — the no-regression contract of the port.
  */
 @Component

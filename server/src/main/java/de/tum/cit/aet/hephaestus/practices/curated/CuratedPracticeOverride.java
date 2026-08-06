@@ -1,13 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -36,9 +34,8 @@ public class CuratedPracticeOverride {
     @Column(name = "name", length = 128)
     private @Nullable String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "applies_to", length = 32)
-    private @Nullable WorkArtifact artifactType;
+    @Column(name = "applies_to", length = ArtifactKind.MAX_LENGTH)
+    private @Nullable ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb")
@@ -91,7 +88,7 @@ public class CuratedPracticeOverride {
     public @Nullable PracticeDefinition definition() {
         if (
             name == null ||
-            artifactType == null ||
+            artifactKind == null ||
             triggerEvents == null ||
             criteria == null ||
             automatedReviewPolicy == null
@@ -100,7 +97,7 @@ public class CuratedPracticeOverride {
         }
         return new PracticeDefinition(
             name,
-            artifactType,
+            artifactKind,
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
@@ -113,7 +110,7 @@ public class CuratedPracticeOverride {
 
     public void write(PracticeDefinition definition, @Nullable String acceptedBundledDigest, Instant now) {
         this.name = definition.name();
-        this.artifactType = definition.artifactType();
+        this.artifactKind = definition.artifactKind();
         this.triggerEvents = definition.triggerEventsJson();
         this.criteria = definition.criteria();
         this.precomputeScript = definition.precomputeScript();
@@ -127,7 +124,7 @@ public class CuratedPracticeOverride {
 
     public void clearDefinition(Instant now) {
         this.name = null;
-        this.artifactType = null;
+        this.artifactKind = null;
         this.triggerEvents = null;
         this.criteria = null;
         this.precomputeScript = null;

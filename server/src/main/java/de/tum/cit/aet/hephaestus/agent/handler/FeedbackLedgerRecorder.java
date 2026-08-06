@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedba
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
@@ -24,10 +25,10 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.Comparator;
@@ -127,7 +128,7 @@ public class FeedbackLedgerRecorder {
     public void record(
         AgentJob job,
         DeliveryContent delivery,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals
     ) {
         record(job, delivery, artifact, inlineSignals, true, !inlineSignals.isEmpty());
@@ -137,7 +138,7 @@ public class FeedbackLedgerRecorder {
     public void record(
         AgentJob job,
         DeliveryContent delivery,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals,
         boolean summaryDelivered,
         boolean inlineDelivered
@@ -149,7 +150,7 @@ public class FeedbackLedgerRecorder {
     public void recordWithoutConversation(
         AgentJob job,
         DeliveryContent delivery,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals,
         boolean summaryDelivered,
         boolean inlineDelivered
@@ -160,7 +161,7 @@ public class FeedbackLedgerRecorder {
     private void record(
         AgentJob job,
         DeliveryContent delivery,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals,
         boolean summaryDelivered,
         boolean inlineDelivered,
@@ -185,7 +186,7 @@ public class FeedbackLedgerRecorder {
 
         Observation any = findings.get(0);
         long recipientUserId = any.getAboutUserId();
-        WorkArtifact artifactType = any.getArtifactType();
+        ArtifactKind artifactKind = any.getArtifactKind();
         Long artifactId = any.getArtifactId();
         String feedbackThreadKey = feedbackThreadKeyFor(any);
 
@@ -201,7 +202,7 @@ public class FeedbackLedgerRecorder {
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
-                .artifactType(artifactType)
+                .artifactKind(artifactKind)
                 .artifactId(artifactId)
                 // recipient == about for the author-side catalogue (single source); they diverge only for
                 // reviewer-audience practices (ADR 0021 C2).
@@ -287,7 +288,7 @@ public class FeedbackLedgerRecorder {
         }
 
         int inlinePlacementCount = 0;
-        if (artifact.hasInlineLane() && inlineDelivered) {
+        if (ArtifactKinds.hasInlineLane(artifact) && inlineDelivered) {
             for (DiffNote note : delivery.diffNotes()) {
                 DeliveredSignal signal = matchSignal(note, inlineSignals);
                 if (signal == null || signal.disposition() == Disposition.FAILED) {
@@ -368,7 +369,7 @@ public class FeedbackLedgerRecorder {
                 Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(job.getWorkspace().getId())
-                    .artifactType(droppedFinding.getArtifactType())
+                    .artifactKind(droppedFinding.getArtifactKind())
                     .artifactId(droppedFinding.getArtifactId())
                     .recipientUserId(droppedFinding.getAboutUserId())
                     .aboutUserId(droppedFinding.getAboutUserId())
@@ -460,7 +461,7 @@ public class FeedbackLedgerRecorder {
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
-                .artifactType(any.getArtifactType())
+                .artifactKind(any.getArtifactKind())
                 .artifactId(any.getArtifactId())
                 .recipientUserId(any.getAboutUserId())
                 .aboutUserId(any.getAboutUserId())
@@ -540,7 +541,7 @@ public class FeedbackLedgerRecorder {
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
-                .artifactType(finding.getArtifactType())
+                .artifactKind(finding.getArtifactKind())
                 .artifactId(finding.getArtifactId())
                 .recipientUserId(finding.getAboutUserId())
                 .aboutUserId(finding.getAboutUserId())
@@ -604,7 +605,7 @@ public class FeedbackLedgerRecorder {
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
-                .artifactType(any.getArtifactType())
+                .artifactKind(any.getArtifactKind())
                 .artifactId(any.getArtifactId())
                 .recipientUserId(any.getAboutUserId())
                 .aboutUserId(any.getAboutUserId())
@@ -680,7 +681,7 @@ public class FeedbackLedgerRecorder {
      */
     private static String feedbackThreadKeyFor(Observation any) {
         return FeedbackThreadKey.compute(
-            any.getArtifactType().name(),
+            any.getArtifactKind().value(),
             any.getArtifactId(),
             any.getAboutUserId(),
             FeedbackChannel.IN_CONTEXT

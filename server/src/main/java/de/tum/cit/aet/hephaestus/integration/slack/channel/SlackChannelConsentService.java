@@ -47,7 +47,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>{@code ACTIVE ⇄ PAUSED}: stop / resume ingestion, keeping stored data. Resuming an already-announced
  *       channel does NOT re-announce or re-stamp.</li>
  *   <li>{@code * → REVOKED}: stops ingestion and erases raw messages, thread aggregates, and derived
- *       {@code CONVERSATION_THREAD} observations/feedback ({@link SlackIngestService#eraseChannel}). A later
+ *       {@code chat.conversation_thread} observations/feedback ({@link SlackIngestService#eraseChannel}). A later
  *       registration starts a fresh {@code PENDING} setup with a new announcement boundary.</li>
  * </ul>
  * A same-state PATCH is an idempotent no-op (no side effect, no audit row). Every other edge not drawn above is a

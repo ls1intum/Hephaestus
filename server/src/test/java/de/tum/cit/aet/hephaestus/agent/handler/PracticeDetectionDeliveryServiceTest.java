@@ -21,17 +21,18 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -113,7 +114,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         testPractice = new Practice();
         ReflectionTestUtils.setField(testPractice, "id", 10L);
         testPractice.setSlug("pr-description-quality");
-        testPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        testPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         testPractice.setWorkspace(workspace);
 
         testJob = new AgentJob();
@@ -474,11 +475,11 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             ArgumentCaptor<String> fingerprintCaptor = ArgumentCaptor.forClass(String.class);
             verify(observationRepository).insertIfAbsent(
                 any(UUID.class),
-                eq("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId()),
+                eq("pr-description-quality:0:scm.pull_request:456:" + testJob.getId()),
                 eq(testJob.getId()),
                 eq(10L),
                 eq(11L),
-                eq("PULL_REQUEST"),
+                eq("scm.pull_request"),
                 eq(456L),
                 eq(789L), // aboutUserId
                 eq("Test finding"),
@@ -562,7 +563,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void conversationTargetMustMatchTheLiveWorkspaceThreadAndParticipant() {
             ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("artifact_type", WorkArtifact.CONVERSATION_THREAD.name());
+            metadata.put("artifact_kind", ArtifactKinds.CONVERSATION_THREAD.value());
             metadata.put("slack_thread_id", 77L);
             metadata.put("slack_channel_id", "C123");
             metadata.put("slack_thread_ts", "1700000000.100000");
@@ -634,7 +635,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
             admit(otherPractice, 22L);
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
@@ -789,7 +790,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             String key = keyCaptor.getValue();
-            assertThat(key).isEqualTo("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId());
+            assertThat(key).isEqualTo("pr-description-quality:0:scm.pull_request:456:" + testJob.getId());
         }
     }
 
@@ -802,7 +803,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
-            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
             admit(otherPractice, 22L);
 
             var findings = List.of(
@@ -818,7 +819,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(event.findingsDiscarded()).isZero();
             assertThat(event.hasNegative()).isTrue(); // error-handling finding is NEGATIVE
             assertThat(event.developerId()).isEqualTo(789L);
-            assertThat(event.artifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+            assertThat(event.artifactKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
             assertThat(event.artifactId()).isEqualTo(456L);
         }
     }
@@ -827,8 +828,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     class IssueRouting {
 
         @Test
-        void routesToIssueTargetAndAuthorWhenArtifactTypeIsIssue() {
-            // Job carries artifact_type=ISSUE + issue_id → resolve the Issue (TYPE-filtered) + its author.
+        void routesToIssueTargetAndAuthorWhenArtifactKindIsIssue() {
+            // Job carries artifact_kind=ISSUE + issue_id → resolve the Issue (TYPE-filtered) + its author.
             var issue = new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
             ReflectionTestUtils.setField(issue, "id", 999L);
             issue.setAuthor(testAuthor);
@@ -840,7 +841,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithAuthorAndRepository(999L)).thenReturn(Optional.of(issue));
 
             ObjectNode meta = new ObjectMapper().createObjectNode();
-            meta.put("artifact_type", "ISSUE");
+            meta.put("artifact_kind", ArtifactKinds.ISSUE.value());
             meta.put("issue_id", 999L);
             meta.put("repository_id", 123L);
             meta.put("repository_full_name", "owner/repo");
@@ -853,11 +854,11 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(result.inserted()).isEqualTo(1);
             verify(observationRepository).insertIfAbsent(
                 any(),
-                eq("pr-description-quality:0:ISSUE:999:" + testJob.getId()),
+                eq("pr-description-quality:0:scm.issue:999:" + testJob.getId()),
                 eq(testJob.getId()),
                 anyLong(),
                 eq(11L),
-                eq("ISSUE"),
+                eq("scm.issue"),
                 eq(999L),
                 eq(789L), // aboutUserId
                 anyString(), // title
@@ -871,7 +872,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any()
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue().artifactType()).isEqualTo(WorkArtifact.ISSUE);
+            assertThat(eventCaptor.getValue().artifactKind()).isEqualTo(ArtifactKinds.ISSUE);
             assertThat(eventCaptor.getValue().artifactId()).isEqualTo(999L);
         }
     }

@@ -5,14 +5,15 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -135,14 +136,15 @@ public class DeliveredFeedbackContentSource implements ContentSource {
                 continue;
             }
             if (
-                f.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && !isSurvivingConversation(f, activeThreadIds)
+                ArtifactKinds.CONVERSATION_THREAD.equals(f.getArtifactKind()) &&
+                !isSurvivingConversation(f, activeThreadIds)
             ) {
                 continue;
             }
             ObjectNode node = arr.addObject();
             node.put("surface", f.getChannel().name());
-            if (f.getArtifactType() != null) {
-                node.put("artifactType", f.getArtifactType().name());
+            if (f.getArtifactKind() != null) {
+                node.put("artifactKind", f.getArtifactKind().value());
             }
             if (f.getArtifactId() != null) {
                 node.put("artifactId", f.getArtifactId());
@@ -159,7 +161,7 @@ public class DeliveredFeedbackContentSource implements ContentSource {
     private static List<Long> conversationThreadIds(List<Feedback> units) {
         List<Long> ids = new ArrayList<>();
         for (Feedback f : units) {
-            if (f.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && f.getArtifactId() != null) {
+            if (ArtifactKinds.CONVERSATION_THREAD.equals(f.getArtifactKind()) && f.getArtifactId() != null) {
                 ids.add(f.getArtifactId());
             }
         }
@@ -168,7 +170,7 @@ public class DeliveredFeedbackContentSource implements ContentSource {
 
     private static boolean isSurvivingConversation(Feedback f, Set<Long> activeThreadIds) {
         return (
-            f.getArtifactType() == WorkArtifact.CONVERSATION_THREAD &&
+            ArtifactKinds.CONVERSATION_THREAD.equals(f.getArtifactKind()) &&
             f.getArtifactId() != null &&
             activeThreadIds.contains(f.getArtifactId())
         );

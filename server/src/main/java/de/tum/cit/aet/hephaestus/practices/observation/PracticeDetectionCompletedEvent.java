@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import java.util.UUID;
 
 /**
@@ -8,7 +8,7 @@ import java.util.UUID;
  *
  * @param agentJobId      the agent job that produced these observations
  * @param workspaceId     the workspace context
- * @param artifactType      the target entity type (e.g., {@link WorkArtifact#PULL_REQUEST})
+ * @param artifactKind      the target entity type (e.g., {@link ArtifactKind#PULL_REQUEST})
  * @param artifactId        the target entity ID
  * @param developerId   the user the observations are about (ADR-0022 {@code aboutUserId})
  * @param findingsInserted number of new observations persisted
@@ -18,7 +18,7 @@ import java.util.UUID;
 public record PracticeDetectionCompletedEvent(
     UUID agentJobId,
     Long workspaceId,
-    WorkArtifact artifactType,
+    ArtifactKind artifactKind,
     Long artifactId,
     Long developerId,
     int findingsInserted,

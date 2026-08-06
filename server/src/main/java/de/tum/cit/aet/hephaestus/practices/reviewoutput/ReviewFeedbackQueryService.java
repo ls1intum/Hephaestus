@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
@@ -47,15 +48,23 @@ class ReviewFeedbackQueryService {
             rows
                 .getContent()
                 .stream()
-                .filter(row -> row.getArtifactType() != null && row.getArtifactId() != null)
-                .map(row -> new ArtifactRef(row.getAgentJobId(), row.getArtifactType(), row.getArtifactId()))
+                .filter(row -> row.getArtifactKind() != null && row.getArtifactId() != null)
+                .map(row ->
+                    new ArtifactRef(row.getAgentJobId(), ArtifactKind.of(row.getArtifactKind()), row.getArtifactId())
+                )
                 .toList()
         );
         return rows.map(row -> {
             var artifact =
-                row.getArtifactType() == null || row.getArtifactId() == null
+                row.getArtifactKind() == null || row.getArtifactId() == null
                     ? null
-                    : artifacts.get(new ArtifactRef(row.getAgentJobId(), row.getArtifactType(), row.getArtifactId()));
+                    : artifacts.get(
+                          new ArtifactRef(
+                              row.getAgentJobId(),
+                              ArtifactKind.of(row.getArtifactKind()),
+                              row.getArtifactId()
+                          )
+                      );
             return ReviewFeedbackDTO.from(row, artifact, subjects);
         });
     }
@@ -79,9 +88,9 @@ class ReviewFeedbackQueryService {
             List.of(feedback.getRecipientUserId(), feedback.getAboutUserId())
         );
         var artifactKey =
-            feedback.getArtifactType() == null || feedback.getArtifactId() == null
+            feedback.getArtifactKind() == null || feedback.getArtifactId() == null
                 ? null
-                : new ArtifactRef(feedback.getAgentJobId(), feedback.getArtifactType(), feedback.getArtifactId());
+                : new ArtifactRef(feedback.getAgentJobId(), feedback.getArtifactKind(), feedback.getArtifactId());
         var artifact =
             artifactKey == null ? null : artifactResolver.resolve(workspaceId, List.of(artifactKey)).get(artifactKey);
         return ReviewFeedbackDetailDTO.from(

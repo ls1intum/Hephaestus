@@ -84,7 +84,7 @@ erDiagram
         VARCHAR(32) cancellation_reason
         VARCHAR(255) worker_id
         VARCHAR(48) integration_kind
-        VARCHAR(48) subject_class
+        VARCHAR(64) artifact_kind
         VARCHAR(64) prompt_digest
         VARCHAR(64) inputs_digest
         TIMESTAMPTZ available_at "NOT NULL"
@@ -94,6 +94,21 @@ erDiagram
         VARCHAR(32) hold_reason
         JSONB evidence_snapshot
         JSONB review_readiness
+    }
+
+    ArtifactSignal {
+        UUID id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) artifact_kind UK "NOT NULL"
+        BIGINT artifact_id UK "NOT NULL"
+        VARCHAR(128) signal_name UK "NOT NULL"
+        VARCHAR(128) revision UK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        VARCHAR(16) discovered_via "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(48) state_reason
+        UUID job_id
+        TIMESTAMPTZ state_changed_at "NOT NULL"
     }
 
     AuthEvent {
@@ -246,7 +261,7 @@ erDiagram
     CuratedPracticeOverride {
         VARCHAR(64) slug PK
         VARCHAR(128) name
-        VARCHAR(32) applies_to
+        VARCHAR(64) applies_to
         JSONB trigger_events
         TEXT criteria
         TEXT precompute_script
@@ -327,7 +342,7 @@ erDiagram
         UUID id PK
         UUID agent_job_id FK,UK "NOT NULL"
         BIGINT workspace_id FK "NOT NULL"
-        VARCHAR(32) artifact_type
+        VARCHAR(64) artifact_kind
         BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
         BIGINT about_user_id FK "NOT NULL"
@@ -696,7 +711,7 @@ erDiagram
         VARCHAR(255) occurrence_key UK "NOT NULL"
         UUID agent_job_id FK "NOT NULL"
         BIGINT practice_id FK "NOT NULL"
-        VARCHAR(32) artifact_type "NOT NULL"
+        VARCHAR(64) artifact_kind "NOT NULL"
         BIGINT artifact_id "NOT NULL"
         BIGINT about_user_id FK "NOT NULL"
         VARCHAR(255) title "NOT NULL"
@@ -802,7 +817,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         TEXT precompute_script
         BIGINT practice_area_id FK
-        VARCHAR(32) applies_to "NOT NULL"
+        VARCHAR(64) applies_to "NOT NULL"
         TEXT why_it_matters
         TEXT what_good_looks_like
         INTEGER display_order "NOT NULL"
@@ -842,7 +857,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         VARCHAR(64) slug
         VARCHAR(128) name
-        VARCHAR(32) applies_to
+        VARCHAR(64) applies_to
         JSONB trigger_events
         TEXT precompute_script
         TEXT why_it_matters
@@ -1369,6 +1384,7 @@ erDiagram
     Repository ||--o{ ActivityEvent : has
     Workspace ||--o{ ActivityEvent : has
     Workspace ||--o{ AgentJob : has
+    Workspace ||--o{ ArtifactSignal : has
     Account ||--o{ AuthEvent : account_id
     Account ||--o{ AuthEvent : acting_account_id
     IdentityProvider ||--o{ AuthEvent : references

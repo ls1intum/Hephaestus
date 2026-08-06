@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -26,9 +26,9 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     /** Practices included in new reviews for one work type. */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+    List<Practice> findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
-    boolean existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+    boolean existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);

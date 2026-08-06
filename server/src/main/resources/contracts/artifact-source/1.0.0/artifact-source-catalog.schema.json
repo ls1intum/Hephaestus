@@ -46,7 +46,7 @@
 				"displayName",
 				"description",
 				"selectionScope",
-				"artifactTypes",
+				"artifactKinds",
 				"authority",
 				"identity",
 				"completeness",
@@ -76,15 +76,15 @@
 					"minLength": 1,
 					"description": "Exact object, fields, limits, ordering, and exclusions captured by this source."
 				},
-				"artifactTypes": {
+				"artifactKinds": {
 					"type": "array",
 					"minItems": 1,
 					"uniqueItems": true,
 					"items": {
 						"enum": [
-							"PULL_REQUEST",
-							"ISSUE",
-							"CONVERSATION_THREAD"
+							"scm.pull_request",
+							"scm.issue",
+							"chat.conversation_thread"
 						]
 					},
 					"description": "Types of reviewed work for which this source is meaningful."
@@ -197,7 +197,7 @@
 			"required": [
 				"id",
 				"version",
-				"artifactType",
+				"artifactKind",
 				"allowedSources"
 			],
 			"properties": {
@@ -210,11 +210,11 @@
 					"const": "1.0.0",
 					"description": "Source contract that defines this profile."
 				},
-				"artifactType": {
+				"artifactKind": {
 					"enum": [
-						"PULL_REQUEST",
-						"ISSUE",
-						"CONVERSATION_THREAD"
+						"scm.pull_request",
+						"scm.issue",
+						"chat.conversation_thread"
 					],
 					"description": "Type of reviewed work governed by this profile."
 				},

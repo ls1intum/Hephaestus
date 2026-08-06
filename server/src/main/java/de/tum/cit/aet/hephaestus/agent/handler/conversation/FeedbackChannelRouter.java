@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -68,7 +69,7 @@ public class FeedbackChannelRouter {
     }
 
     private static boolean hasNaturalInlineAnchor(Observation observation) {
-        if (!observation.getArtifactType().hasInlineLane()) {
+        if (!ArtifactKinds.hasInlineLane(observation.getArtifactKind())) {
             return false;
         }
         JsonNode evidence = observation.getEvidence();

@@ -12,13 +12,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -128,11 +129,11 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         AreaDefinition area = new AreaDefinition("Packaging work", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
             "Small PRs",
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of("PullRequestCreated"),
             "Seed criteria",
             null,
-            PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST),
+            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
             "Reason",
             null,
             "packaging"

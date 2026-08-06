@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationQueryFilter;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.constraints.Positive;
@@ -23,8 +23,8 @@ public record ReviewFindingFilterParams(
     @RequestParam(required = false) @Nullable List<Assessment> assessment,
     @RequestParam(required = false) @Nullable List<Severity> severity,
     @RequestParam(required = false) @Nullable UUID agentJobId,
-    @RequestParam(required = false) @Nullable WorkArtifact artifactType,
-    @Parameter(description = "Artifact ID; requires artifactType")
+    @RequestParam(required = false) @Nullable ArtifactKind artifactKind,
+    @Parameter(description = "Artifact ID; requires artifactKind")
     @RequestParam(required = false)
     @Positive
     @Nullable
@@ -42,8 +42,8 @@ public record ReviewFindingFilterParams(
     Instant to
 ) {
     public ObservationQueryFilter toFilter() {
-        if (artifactId != null && artifactType == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "artifactId requires artifactType");
+        if (artifactId != null && artifactKind == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "artifactId requires artifactKind");
         }
         if (from != null && to != null && from.isAfter(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must not be after to");
@@ -55,7 +55,7 @@ public record ReviewFindingFilterParams(
             assessment,
             severity,
             agentJobId,
-            artifactType,
+            artifactKind,
             artifactId,
             subjectUserId,
             from,

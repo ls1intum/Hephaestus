@@ -5,11 +5,12 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.REPO_MOUNT_R
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -149,7 +150,7 @@ class DeliveryComposer {
     /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
-        return compose(findings, WorkArtifact.PULL_REQUEST);
+        return compose(findings, ArtifactKinds.PULL_REQUEST);
     }
 
     /**
@@ -158,7 +159,7 @@ class DeliveryComposer {
      * problem vs a strength?" is decided per finding by its {@code assessment} (ADR 0022).
      */
     @Nullable
-    static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
+    static DeliveryContent compose(List<ValidatedFinding> findings, ArtifactKind artifact) {
         return compose(findings, artifact, Map.of());
     }
 
@@ -172,7 +173,7 @@ class DeliveryComposer {
     @Nullable
     static DeliveryContent compose(
         List<ValidatedFinding> findings,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         Map<String, String> whyBySlug
     ) {
         // First-pass compose: inline notes have not been posted yet, so NO finding is known-delivered.
@@ -193,7 +194,7 @@ class DeliveryComposer {
     @Nullable
     static DeliveryContent compose(
         List<ValidatedFinding> findings,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         Map<String, String> whyBySlug,
         @Nullable String unifiedDiff
     ) {
@@ -211,7 +212,7 @@ class DeliveryComposer {
     @Nullable
     static String recomposeMrNote(
         List<ValidatedFinding> findings,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
@@ -222,7 +223,7 @@ class DeliveryComposer {
     @Nullable
     private static DeliveryContent compose(
         List<ValidatedFinding> findings,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
@@ -232,7 +233,7 @@ class DeliveryComposer {
     @Nullable
     private static DeliveryContent compose(
         List<ValidatedFinding> findings,
-        WorkArtifact artifact,
+        ArtifactKind artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys,
         GroundingContext grounding
@@ -261,7 +262,7 @@ class DeliveryComposer {
         // Severity-sorted above (CRITICAL ordinal 0 first), so the first epic-structure finding seen is
         // the lead we keep; later ones are the redundant siblings we drop. Conservative: ISSUE-only,
         // and only within EPIC_STRUCTURE_PRACTICES, so distinct lessons are never merged.
-        if (artifact == WorkArtifact.ISSUE) {
+        if (ArtifactKinds.ISSUE.equals(artifact)) {
             List<ValidatedFinding> before = negatives;
             negatives = dedupEpicStructure(negatives);
             dedupDropped.addAll(identityDiff(before, negatives));
@@ -316,7 +317,7 @@ class DeliveryComposer {
         // Issues carry no diff, so a positional note can never be posted on them — every issue finding
         // must be expanded in full in the issue note itself rather than demoted to a diff note that
         // silently vanishes, leaving the student a bare title with no reasoning or guidance.
-        boolean inlineSupported = artifact.hasInlineLane();
+        boolean inlineSupported = ArtifactKinds.hasInlineLane(artifact);
         List<ValidatedFinding> inlinable = new ArrayList<>();
         List<ValidatedFinding> nonInlinable = new ArrayList<>();
         for (ValidatedFinding f : negatives) {
@@ -1283,8 +1284,8 @@ class DeliveryComposer {
          * dropping every anchor would be worse than the status quo, so we fall back to the pre-existing
          * downstream {@code DiffHunkValidator} line check.
          */
-        static GroundingContext fromDiff(WorkArtifact artifact, @Nullable String unifiedDiff) {
-            if (artifact == WorkArtifact.ISSUE) {
+        static GroundingContext fromDiff(ArtifactKind artifact, @Nullable String unifiedDiff) {
+            if (ArtifactKinds.ISSUE.equals(artifact)) {
                 return new GroundingContext(true, true, Map.of());
             }
             if (unifiedDiff == null || unifiedDiff.isBlank()) {

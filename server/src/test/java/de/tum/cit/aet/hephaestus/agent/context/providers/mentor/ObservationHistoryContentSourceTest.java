@@ -9,16 +9,17 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -183,7 +184,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
             .id(UUID.randomUUID())
             .title("Swallowed IOException")
             .practice(practiceBad)
-            .artifactType(WorkArtifact.PULL_REQUEST)
+            .artifactKind(ArtifactKinds.PULL_REQUEST)
             .artifactId(123L)
             .presence(Presence.PRESENT)
             .assessment(Assessment.BAD)
@@ -248,7 +249,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         assertThat(bad.get("assessment").asString()).isEqualTo("BAD");
         assertThat(bad.get("severity").asString()).isEqualTo("MAJOR");
         assertThat(bad.get("observedAt").asString()).isEqualTo(observedBad.toString());
-        assertThat(bad.get("artifactType").asString()).isEqualTo("PULL_REQUEST");
+        assertThat(bad.get("artifactKind").asString()).isEqualTo("scm.pull_request");
         assertThat(bad.get("artifactId").asLong()).isEqualTo(123L);
         assertThat(bad.get("evidence").get("citations").get(0).get("path").asString()).isEqualTo("src/Retry.java");
         assertThat(bad.get("evidence").get("citations").get(0).get("quote").asString()).contains("IOException");

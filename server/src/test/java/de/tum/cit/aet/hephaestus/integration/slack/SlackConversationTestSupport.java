@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
@@ -12,8 +13,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
@@ -140,7 +141,7 @@ public final class SlackConversationTestSupport {
     /** Saves a minimal {@link Practice} owned by the given workspace, slugged so repeated calls do not collide. */
     public static Practice newPractice(PracticeRepository practiceRepository, Workspace workspace, String slugPrefix) {
         Practice practice = new Practice();
-        practice.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug(slugPrefix + "-" + UUID.randomUUID());
@@ -151,7 +152,7 @@ public final class SlackConversationTestSupport {
     }
 
     /**
-     * Inserts a derived CONVERSATION_THREAD {@link de.tum.cit.aet.hephaestus.practices.observation.Observation} +
+     * Inserts a derived chat.conversation_thread {@link de.tum.cit.aet.hephaestus.practices.observation.Observation} +
      * {@link Feedback} pair about {@code aboutUserId}, anchored to {@code threadId} — the shape the Slack consent
      * erasure paths (person opt-out, channel revoke) must sweep.
      */
@@ -172,7 +173,7 @@ public final class SlackConversationTestSupport {
             jobId,
             practiceId,
             null,
-            WorkArtifact.CONVERSATION_THREAD.name(),
+            ArtifactKinds.CONVERSATION_THREAD.value(),
             threadId,
             aboutUserId,
             "Observation title",
@@ -189,7 +190,7 @@ public final class SlackConversationTestSupport {
             Feedback.builder()
                 .agentJobId(jobId)
                 .workspaceId(workspaceId)
-                .artifactType(WorkArtifact.CONVERSATION_THREAD)
+                .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
                 .artifactId(threadId)
                 .recipientUserId(aboutUserId)
                 .aboutUserId(aboutUserId)

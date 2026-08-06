@@ -29,15 +29,16 @@ import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -198,8 +199,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setName(name);
         p.setCriteria(criteria);
         p.setUsedInNewReviews(true);
-        p.setArtifactType(WorkArtifact.PULL_REQUEST);
-        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(WorkArtifact.PULL_REQUEST));
+        p.setArtifactKind(ArtifactKinds.PULL_REQUEST);
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         var revision = new PracticeRevision();
         ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
         p.setCurrentRevision(revision);
@@ -231,9 +232,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             .thenAnswer(invocation -> invocation.getArgument(0));
         lenient()
             .when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    ArtifactKinds.PULL_REQUEST
                 )
             )
             .thenReturn(samplePractices());
@@ -319,9 +320,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 invocation -> readiness(invocation.getArgument(1))
             );
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());
 
@@ -368,9 +369,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void rejectsMalformedSlug() {
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
 
@@ -382,15 +383,15 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenNoActivePractices() {
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(List.of());
 
             assertThatThrownBy(() -> handler.prepareInputs(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("No active PULL_REQUEST practices");
+                .hasMessageContaining("No active scm.pull_request practices");
             verifyNoInteractions(workspaceContextBuilder);
         }
 
@@ -414,9 +415,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 invocation -> readiness(invocation.getArgument(1))
             );
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
+                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());
 

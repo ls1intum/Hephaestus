@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -14,7 +14,7 @@ public final class ReviewRuleFingerprint {
     public static String of(
         String slug,
         String name,
-        WorkArtifact artifactType,
+        ArtifactKind artifactKind,
         List<String> triggerEvents,
         String criteria,
         @Nullable String precomputeScript,
@@ -24,7 +24,7 @@ public final class ReviewRuleFingerprint {
         CanonicalDigest digest = new CanonicalDigest()
             .add(slug)
             .add(name)
-            .add(artifactType.name())
+            .add(artifactKind.value())
             .addInt(triggerEvents.size());
         triggerEvents.stream().sorted().forEach(digest::add);
         return (

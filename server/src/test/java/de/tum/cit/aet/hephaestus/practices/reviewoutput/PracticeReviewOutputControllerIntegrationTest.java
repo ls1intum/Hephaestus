@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
@@ -21,9 +22,9 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -168,7 +169,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             agentJob.getId(),
             practice.getId(),
             null,
-            WorkArtifact.PULL_REQUEST.name(),
+            ArtifactKinds.PULL_REQUEST.value(),
             artifactId,
             about.getId(),
             title,
@@ -202,7 +203,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             reason,
             body,
             Instant.now(),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             7L
         );
     }
@@ -226,7 +227,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             reason,
             body,
             createdAt,
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             7L
         );
     }
@@ -240,14 +241,14 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         FeedbackSuppressionReason reason,
         String body,
         Instant createdAt,
-        WorkArtifact artifactType,
+        ArtifactKind artifactKind,
         Long artifactId
     ) {
         return feedbackRepository.save(
             Feedback.builder()
                 .agentJobId(agentJob.getId())
                 .workspaceId(ws.getId())
-                .artifactType(artifactType)
+                .artifactKind(artifactKind)
                 .artifactId(artifactId)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
@@ -278,7 +279,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
     private void expectResolvedPullRequestArtifact(String uri, String path, Object... uriVariables) {
         getOk(uri, uriVariables)
             .jsonPath(path + ".type")
-            .isEqualTo("PULL_REQUEST")
+            .isEqualTo("scm.pull_request")
             .jsonPath(path + ".provider")
             .isEqualTo("GITHUB")
             .jsonPath(path + ".number")
@@ -431,7 +432,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .jsonPath("$.content[0].title")
                 .isEqualTo("This run");
 
-            getOk(FINDINGS + "?artifactType=PULL_REQUEST&artifactId=9", workspace.getWorkspaceSlug())
+            getOk(FINDINGS + "?artifactKind=PULL_REQUEST&artifactId=9", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].title")
@@ -702,12 +703,12 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 null,
                 "Body",
                 Instant.now(),
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 artifactId
             );
 
             expectResolvedPullRequestArtifact(
-                FINDINGS + "?artifactType=PULL_REQUEST&artifactId={id}",
+                FINDINGS + "?artifactKind=PULL_REQUEST&artifactId={id}",
                 "$.content[0].artifact",
                 workspace.getWorkspaceSlug(),
                 artifactId
@@ -719,7 +720,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 observationId
             );
             expectResolvedPullRequestArtifact(
-                FEEDBACK + "?artifactType=PULL_REQUEST&artifactId={id}",
+                FEEDBACK + "?artifactKind=PULL_REQUEST&artifactId={id}",
                 "$.content[0].artifact",
                 workspace.getWorkspaceSlug(),
                 artifactId
@@ -764,7 +765,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
             getOk(FINDINGS + "/{id}", workspace.getWorkspaceSlug(), observationId)
                 .jsonPath("$.artifact.type")
-                .isEqualTo("PULL_REQUEST")
+                .isEqualTo("scm.pull_request")
                 .jsonPath("$.artifact.id")
                 .isEqualTo(812)
                 .jsonPath("$.artifact.title")
@@ -794,13 +795,13 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 null,
                 null,
                 Instant.now(),
-                WorkArtifact.CONVERSATION_THREAD,
+                ArtifactKinds.CONVERSATION_THREAD,
                 812L
             );
 
             getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), feedback.getId())
                 .jsonPath("$.artifact.type")
-                .isEqualTo("CONVERSATION_THREAD")
+                .isEqualTo("chat.conversation_thread")
                 .jsonPath("$.artifact.id")
                 .isEqualTo(812)
                 .jsonPath("$.artifact.title")
@@ -954,7 +955,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.ISSUE)
+                    .artifactKind(ArtifactKinds.ISSUE)
                     .artifactId(99L)
                     .recipientUserId(alice.getId())
                     .aboutUserId(alice.getId())
@@ -971,7 +972,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.ISSUE)
+                    .artifactKind(ArtifactKinds.ISSUE)
                     .artifactId(100L)
                     .recipientUserId(alice.getId())
                     .aboutUserId(alice.getId())
@@ -985,11 +986,11 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .build()
             );
 
-            getOk(FEEDBACK + "?artifactType=ISSUE", workspace.getWorkspaceSlug())
+            getOk(FEEDBACK + "?artifactKind=ISSUE", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(2);
 
-            getOk(FEEDBACK + "?artifactType=ISSUE&artifactId=99", workspace.getWorkspaceSlug())
+            getOk(FEEDBACK + "?artifactKind=ISSUE&artifactId=99", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].bodyPreview")

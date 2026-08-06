@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -101,12 +101,11 @@ public class AgentJob {
 
     /**
      * Discriminator for the work subject this job analyses; drives polymorphic delivery dispatch.
-     * Nullable for legacy rows, which are backfilled as {@link SubjectClass#PULL_REQUEST}.
+     * Nullable for legacy rows, which are backfilled as {@link ArtifactKind#PULL_REQUEST}.
      */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "subject_class", length = 48)
+    @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH)
     @Nullable
-    private SubjectClass subjectClass;
+    private ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")

@@ -1,7 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -116,12 +117,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     /**
-     * Hard-delete the {@code CONVERSATION_THREAD} feedback for a workspace whose {@code artifact_id} (the
+     * Hard-delete the {@code chat.conversation_thread} feedback for a workspace whose {@code artifact_id} (the
      * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
      * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
      * withdrawn. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} / {@code feedback_placement} /
      * {@code feedback_reaction}. Bulk JPQL delete (the {@code @Immutable} entity forbids an ORM remove). The
-     * {@code workspace_id} + {@code artifact_type} + {@code artifact_id} predicates keep it scoped so no PR/ISSUE unit
+     * {@code workspace_id} + {@code artifact_kind} + {@code artifact_id} predicates keep it scoped so no PR/ISSUE unit
      * and no other-tenant row is affected. Callers guard an empty {@code artifactIds}.
      *
      * @return the number of feedback units deleted
@@ -132,21 +133,26 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """
         DELETE FROM Feedback f
         WHERE f.workspaceId = :workspaceId
-          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND f.artifactKind = :artifactKind
           AND f.artifactId IN :artifactIds
         """
     )
-    int deleteConversationThreadFeedback(
+    int deleteFeedbackOfKind(
         @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") ArtifactKind artifactKind,
         @Param("artifactIds") Collection<Long> artifactIds
     );
 
+    default int deleteConversationThreadFeedback(Long workspaceId, Collection<Long> artifactIds) {
+        return deleteFeedbackOfKind(workspaceId, ArtifactKinds.CONVERSATION_THREAD, artifactIds);
+    }
+
     /**
-     * Hard-delete <em>every</em> {@code CONVERSATION_THREAD} feedback unit for a workspace — the whole-tenant erasure
+     * Hard-delete <em>every</em> {@code chat.conversation_thread} feedback unit for a workspace — the whole-tenant erasure
      * the Slack module invokes through
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseAllConversationForWorkspace} on
      * app-uninstall / workspace-purge. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} /
-     * {@code feedback_placement} / {@code feedback_reaction}. The {@code workspace_id} + {@code artifact_type}
+     * {@code feedback_placement} / {@code feedback_reaction}. The {@code workspace_id} + {@code artifact_kind}
      * predicates keep it scoped so no PR/ISSUE unit and no other-tenant row is affected. Idempotent (0 when the
      * workspace has no conversation feedback).
      *
@@ -158,20 +164,27 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """
         DELETE FROM Feedback f
         WHERE f.workspaceId = :workspaceId
-          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND f.artifactKind IN :artifactKinds
         """
     )
-    int deleteAllConversationThreadFeedback(@Param("workspaceId") Long workspaceId);
+    int deleteAllFeedbackOfKinds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds
+    );
+
+    default int deleteAllConversationThreadFeedback(Long workspaceId) {
+        return deleteAllFeedbackOfKinds(workspaceId, List.of(ArtifactKinds.CONVERSATION_THREAD));
+    }
 
     /**
-     * Hard-delete every {@code PULL_REQUEST} / {@code ISSUE} feedback unit for a workspace — the
+     * Hard-delete every {@code scm.pull_request} / {@code scm.issue} feedback unit for a workspace — the
      * SCM-derived counterpart of {@link #deleteAllConversationThreadFeedback}, invoked when the
      * workspace's SCM mirror is erased on connection-disconnect or workspace-purge. These units hold
      * mirrored third-party content directly (quoted diff/comment text in the evidence payload) and
      * reference the artifact only by a soft {@code artifact_id}, so they neither cascade with the
      * repository delete nor survive it meaningfully. DB {@code ON DELETE CASCADE} clears
      * {@code feedback_observation} / {@code feedback_placement} / {@code feedback_reaction}. The
-     * {@code workspace_id} + {@code artifact_type} predicates keep {@code CONVERSATION_THREAD} units
+     * {@code workspace_id} + {@code artifact_kind} predicates keep {@code chat.conversation_thread} units
      * and other tenants' rows untouched. Idempotent.
      *
      * @return the number of feedback units deleted
@@ -182,21 +195,25 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """
         DELETE FROM Feedback f
         WHERE f.workspaceId = :workspaceId
-          AND f.artifactType IN (
-            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST,
-            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
-          )
+          AND f.artifactKind IN :artifactKinds
         """
     )
-    int deleteAllScmArtifactFeedback(@Param("workspaceId") Long workspaceId);
+    int deleteAllScmFeedbackOfKinds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds
+    );
+
+    default int deleteAllScmArtifactFeedback(Long workspaceId) {
+        return deleteAllScmFeedbackOfKinds(workspaceId, List.of(ArtifactKinds.PULL_REQUEST, ArtifactKinds.ISSUE));
+    }
 
     /**
-     * Hard-delete the {@code CONVERSATION_THREAD} feedback a single person is the <em>subject</em> of
+     * Hard-delete the {@code chat.conversation_thread} feedback a single person is the <em>subject</em> of
      * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
      * account hard-delete, invoked through
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}.
      * DB {@code ON DELETE CASCADE} clears the join/placement/reaction children. The {@code workspace_id} +
-     * {@code artifact_type} + {@code about_user_id} predicates keep another person's rows, PR/ISSUE rows, and other
+     * {@code artifact_kind} + {@code about_user_id} predicates keep another person's rows, PR/ISSUE rows, and other
      * tenants' rows intact. Idempotent.
      *
      * @return the number of feedback units deleted
@@ -207,14 +224,19 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """
         DELETE FROM Feedback f
         WHERE f.workspaceId = :workspaceId
-          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND f.artifactKind = :artifactKind
           AND f.aboutUserId = :aboutUserId
         """
     )
-    int deleteConversationThreadFeedbackAboutUser(
+    int deleteFeedbackOfKindAboutUser(
         @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") ArtifactKind artifactKind,
         @Param("aboutUserId") Long aboutUserId
     );
+
+    default int deleteConversationThreadFeedbackAboutUser(Long workspaceId, Long aboutUserId) {
+        return deleteFeedbackOfKindAboutUser(workspaceId, ArtifactKinds.CONVERSATION_THREAD, aboutUserId);
+    }
 
     // --- conversational feedback delivery loop ---
 
@@ -326,7 +348,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
           AND (CAST(:#{#f.suppressionReasonNames()} AS text[]) IS NULL OR f.suppression_reason = ANY(CAST(:#{#f.suppressionReasonNames()} AS text[])))
           AND (CAST(:#{#f.channelNames()} AS text[]) IS NULL OR f.channel = ANY(CAST(:#{#f.channelNames()} AS text[])))
           AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR f.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
-          AND (CAST(:#{#f.artifactTypeName()} AS text) IS NULL OR f.artifact_type = CAST(:#{#f.artifactTypeName()} AS text))
+          AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR f.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
           AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR f.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
           AND (CAST(:#{#f.recipientUserId()} AS bigint) IS NULL OR f.recipient_user_id = CAST(:#{#f.recipientUserId()} AS bigint))
           AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR f.created_at >= CAST(:#{#f.from()} AS timestamptz))
@@ -336,7 +358,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Query(
         value = "SELECT f.id AS \"id\"," +
             " f.agent_job_id AS \"agentJobId\"," +
-            " f.artifact_type AS \"artifactType\"," +
+            " f.artifact_kind AS \"artifactKind\"," +
             " f.artifact_id AS \"artifactId\"," +
             " f.recipient_user_id AS \"recipientUserId\"," +
             " f.about_user_id AS \"aboutUserId\"," +
@@ -371,7 +393,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     interface OperatorFeedbackRow {
         UUID getId();
         UUID getAgentJobId();
-        WorkArtifact getArtifactType();
+        /**
+         * The raw column, converted by the caller. A native-query projection is assembled by reflection
+         * over JDBC types, so declaring {@link ArtifactKind} here would make the mapping depend on a
+         * conversion the compiler cannot see.
+         */
+        String getArtifactKind();
         Long getArtifactId();
         Long getRecipientUserId();
         Long getAboutUserId();

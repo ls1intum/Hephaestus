@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Dif
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.WithheldFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -25,11 +26,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -99,7 +100,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             )
         );
 
-        recorder().record(job(), delivery, WorkArtifact.PULL_REQUEST, List.of());
+        recorder().record(job(), delivery, ArtifactKinds.PULL_REQUEST, List.of());
 
         // Every finding bound exactly once across ALL units (3 to DELIVERED + 1 each to the 2 SUPPRESSED units).
         var boundFindingIds = ArgumentCaptor.forClass(UUID.class);
@@ -134,7 +135,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder().record(
             job(),
             new DeliveryContent("body", List.of(), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of()
         );
 
@@ -169,7 +170,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder().record(
             job(),
             new DeliveryContent("body", List.of(note), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of(signal)
         );
 
@@ -201,7 +202,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder().record(
             job(),
             new DeliveryContent("body", List.of(note), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of(signal)
         );
 
@@ -226,7 +227,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             List.of(new WithheldFinding(findings.get(5).getOccurrenceKey(), FeedbackSuppressionReason.VOLUME_CAPPED))
         );
 
-        recorder.record(job(), delivery, WorkArtifact.PULL_REQUEST, List.of());
+        recorder.record(job(), delivery, ArtifactKinds.PULL_REQUEST, List.of());
 
         var bound = ArgumentCaptor.forClass(UUID.class);
         verify(feedbackObservationRepository, org.mockito.Mockito.atLeastOnce()).insertIfAbsent(
@@ -250,7 +251,12 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var recorder = recorder();
         when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
 
-        recorder.record(job(), new DeliveryContent("body", List.of(), List.of()), WorkArtifact.PULL_REQUEST, List.of());
+        recorder.record(
+            job(),
+            new DeliveryContent("body", List.of(), List.of()),
+            ArtifactKinds.PULL_REQUEST,
+            List.of()
+        );
 
         var bound = ArgumentCaptor.forClass(UUID.class);
         verify(feedbackObservationRepository).insertIfAbsent(any(), bound.capture(), any(), anyInt());
@@ -271,7 +277,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder().record(
             job(),
             new DeliveryContent("body", List.of(), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of()
         );
 
@@ -298,7 +304,12 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         when(priorSummary.getFeedbackId()).thenReturn(priorId);
         when(feedbackPlacementRepository.findLatestDeliveredSummary(any())).thenReturn(Optional.of(priorSummary));
 
-        recorder.record(job(), new DeliveryContent("body", List.of(), List.of()), WorkArtifact.PULL_REQUEST, List.of());
+        recorder.record(
+            job(),
+            new DeliveryContent("body", List.of(), List.of()),
+            ArtifactKinds.PULL_REQUEST,
+            List.of()
+        );
 
         // The prior is superseded by id+name.
         verify(feedbackRepository).updateState(priorId, FeedbackDeliveryState.SUPERSEDED.name());
@@ -326,7 +337,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder().record(
             job(),
             new DeliveryContent("body", List.of(), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of()
         );
 
@@ -358,7 +369,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder.record(
             job(),
             new DeliveryContent("body", List.of(), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of(),
             false,
             false
@@ -390,7 +401,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder().record(
             job(),
             new DeliveryContent(null, List.of(note), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of(signal),
             false,
             true
@@ -527,7 +538,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             List.of(new WithheldFinding(deduped.getOccurrenceKey(), FeedbackSuppressionReason.COMPOSER_DEDUPED))
         );
 
-        recorder().record(job(), delivery, WorkArtifact.PULL_REQUEST, List.of());
+        recorder().record(job(), delivery, ArtifactKinds.PULL_REQUEST, List.of());
 
         var saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository, org.mockito.Mockito.atLeast(2)).save(saved.capture());
@@ -635,7 +646,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackLedgerRecorder recorder = recorder();
         AgentJob job = job();
 
-        recorder.record(job, delivery, WorkArtifact.PULL_REQUEST, List.of(signal), false, true);
+        recorder.record(job, delivery, ArtifactKinds.PULL_REQUEST, List.of(signal), false, true);
         recorder.recordSuppressedRemainder(
             job,
             delivery,
@@ -671,7 +682,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         recorder().recordWithoutConversation(
             job(),
             new DeliveryContent("landed summary", List.of(), List.of()),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             List.of(),
             true,
             false
@@ -688,7 +699,12 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
         AgentJob job = job(); // deliveryCommentId stays null
 
-        recorder().record(job, new DeliveryContent("body", List.of(), List.of()), WorkArtifact.PULL_REQUEST, List.of());
+        recorder().record(
+            job,
+            new DeliveryContent("body", List.of(), List.of()),
+            ArtifactKinds.PULL_REQUEST,
+            List.of()
+        );
 
         verify(feedbackPlacementRepository, org.mockito.Mockito.never()).save(any());
     }
@@ -706,7 +722,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         lenient().when(pf.getAssessment()).thenReturn(Assessment.GOOD);
         lenient().when(pf.getSeverity()).thenReturn(null); // GOOD strengths carry no severity (ADR 0022)
         lenient().when(pf.getConfidence()).thenReturn(0.95f);
-        lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(pf.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         lenient().when(pf.getArtifactId()).thenReturn(100L);
         lenient().when(pf.getAboutUserId()).thenReturn(7L);
         return pf;
@@ -719,7 +735,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         lenient().when(pf.getAssessment()).thenReturn(null); // NA carries no valence (ADR 0022)
         lenient().when(pf.getSeverity()).thenReturn(null);
         lenient().when(pf.getConfidence()).thenReturn(0.5f);
-        lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(pf.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         lenient().when(pf.getArtifactId()).thenReturn(100L);
         lenient().when(pf.getAboutUserId()).thenReturn(7L);
         return pf;
@@ -734,7 +750,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         lenient().when(pf.getAssessment()).thenReturn(Assessment.BAD);
         lenient().when(pf.getSeverity()).thenReturn(Severity.MINOR);
         lenient().when(pf.getConfidence()).thenReturn(confidence);
-        lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(pf.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         lenient().when(pf.getArtifactId()).thenReturn(100L);
         // about_user_id is the recipient the recorder binds feedback to.
         lenient().when(pf.getAboutUserId()).thenReturn(7L);

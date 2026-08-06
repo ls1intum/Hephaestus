@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
@@ -17,7 +18,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusReques
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -97,8 +98,8 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.workTypes[2].artifactType")
-            .isEqualTo("CONVERSATION_THREAD")
+            .jsonPath("$.workTypes[2].artifactKind")
+            .isEqualTo("chat.conversation_thread")
             .jsonPath("$.workTypes[2].recommendedRequirements.requiredEvidence[0].sourceKind")
             .isEqualTo("slack.conversation.thread")
             .jsonPath("$.workTypes[2].allowedSources[0].displayName")
@@ -138,7 +139,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedPracticeDTO before = getPractice();
         CuratedPracticeRequestDTO body = new CuratedPracticeRequestDTO(
             before.definition().name(),
-            before.definition().artifactType(),
+            before.definition().artifactKind(),
             before.definition().triggerEvents(),
             before.definition().criteria(),
             before.definition().precomputeScript(),
@@ -643,7 +644,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         var source = definitionOf(template, "Server baseline criteria");
         var request = new CuratedPracticeRequestDTO(
             source.name(),
-            source.artifactType(),
+            source.artifactKind(),
             source.triggerEvents(),
             source.criteria(),
             source.precomputeScript(),
@@ -668,7 +669,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
         assertThat(created).isNotNull();
         assertThat(created.definition().automatedReviewPolicy()).isEqualTo(
-            evidenceDefaults.forArtifact(source.artifactType())
+            evidenceDefaults.forArtifact(source.artifactKind())
         );
     }
 
@@ -924,7 +925,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedPracticeDTO edited = getPractice();
         CuratedPracticeRequestDTO guidanceEdit = new CuratedPracticeRequestDTO(
             edited.definition().name(),
-            edited.definition().artifactType(),
+            edited.definition().artifactKind(),
             edited.definition().triggerEvents(),
             edited.definition().criteria(),
             edited.definition().precomputeScript(),
@@ -971,9 +972,9 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     private static CuratedPracticeRequestDTO definitionOf(CuratedPracticeDTO practice, String criteria) {
         return new CuratedPracticeRequestDTO(
             practice.definition().name(),
-            practice.definition().artifactType() == null
-                ? WorkArtifact.PULL_REQUEST
-                : practice.definition().artifactType(),
+            practice.definition().artifactKind() == null
+                ? ArtifactKinds.PULL_REQUEST
+                : practice.definition().artifactKind(),
             practice.definition().triggerEvents() == null
                 ? List.of("PullRequestCreated")
                 : practice.definition().triggerEvents(),

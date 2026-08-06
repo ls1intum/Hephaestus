@@ -1,12 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.ReviewRuleFingerprint;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -79,9 +78,8 @@ public class PracticeRevision {
     @Column(name = "name", length = 128)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "applies_to", length = 32)
-    private WorkArtifact artifactType;
+    @Column(name = "applies_to", length = ArtifactKind.MAX_LENGTH)
+    private ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb")
@@ -138,7 +136,7 @@ public class PracticeRevision {
         this.revisionNumber = revisionNumber;
         this.slug = Objects.requireNonNull(practice.getSlug(), "practice.slug");
         this.name = Objects.requireNonNull(practice.getName(), "practice.name");
-        this.artifactType = Objects.requireNonNull(practice.getArtifactType(), "practice.artifactType");
+        this.artifactKind = Objects.requireNonNull(practice.getArtifactKind(), "practice.artifactKind");
         this.triggerEvents = Objects.requireNonNull(practice.getTriggerEvents(), "practice.triggerEvents").deepCopy();
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
         this.precomputeScript = practice.getPrecomputeScript();
@@ -159,7 +157,7 @@ public class PracticeRevision {
         this.reviewRuleFingerprint = ReviewRuleFingerprint.of(
             slug,
             name,
-            artifactType,
+            artifactKind,
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,
@@ -172,7 +170,7 @@ public class PracticeRevision {
         return ReviewRuleFingerprint.of(
             slug,
             name,
-            artifactType,
+            artifactKind,
             TriggerEventsConverter.toList(triggerEvents),
             criteria,
             precomputeScript,

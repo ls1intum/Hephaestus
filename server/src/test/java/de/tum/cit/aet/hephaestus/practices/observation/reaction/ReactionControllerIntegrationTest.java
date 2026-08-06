@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -15,12 +16,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.CreateReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionDTO;
@@ -106,7 +107,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .occurrenceKey("test-key-" + UUID.randomUUID())
             .agentJobId(agentJob.getId())
             .practice(practice)
-            .artifactType(WorkArtifact.PULL_REQUEST)
+            .artifactKind(ArtifactKinds.PULL_REQUEST)
             .artifactId(42L)
             .aboutUserId(adminUser.getId())
             .title("Missing error handling")
@@ -124,7 +125,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             Feedback.builder()
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(42L)
                 .recipientUserId(adminUser.getId())
                 .aboutUserId(adminUser.getId())
@@ -301,7 +302,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 Feedback.builder()
                     .agentJobId(feedbackUnit.getAgentJobId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.PULL_REQUEST)
+                    .artifactKind(ArtifactKinds.PULL_REQUEST)
                     .artifactId(43L)
                     .recipientUserId(adminUser.getId())
                     .aboutUserId(mentorUser.getId())
@@ -540,7 +541,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 Feedback.builder()
                     .agentJobId(feedbackUnit.getAgentJobId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.PULL_REQUEST)
+                    .artifactKind(ArtifactKinds.PULL_REQUEST)
                     .artifactId(42L)
                     .recipientUserId(feedbackUnit.getRecipientUserId())
                     .aboutUserId(feedbackUnit.getAboutUserId())

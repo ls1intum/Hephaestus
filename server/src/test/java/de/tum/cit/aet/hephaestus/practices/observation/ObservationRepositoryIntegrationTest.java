@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -19,13 +20,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
@@ -132,7 +133,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 42L,
                 aboutUser.getId(),
                 "Good PR description",
@@ -171,7 +172,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Duplicate test",
@@ -191,7 +192,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 2L,
                 aboutUser.getId(),
                 "Should not insert",
@@ -221,7 +222,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 99L,
                 aboutUser.getId(),
                 "Missing error handling in Main.java",
@@ -258,7 +259,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Purge test finding",
@@ -308,7 +309,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "WS-A finding",
@@ -328,7 +329,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJobB.getId(),
                 practiceB.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 2L,
                 aboutUser.getId(),
                 "WS-B finding",
@@ -375,7 +376,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Cascade test 1",
@@ -395,7 +396,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 otherPractice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 2L,
                 aboutUser.getId(),
                 "Cascade test 2",
@@ -443,7 +444,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 jobId,
                 practice.getId(),
                 null,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 artifactId,
                 aboutUser.getId(),
                 "finding",
@@ -539,10 +540,10 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class ArtifactTypeTests {
+    class ArtifactKindTests {
 
         @Test
-        @DisplayName("persisted 'PULL_REQUEST' maps to WorkArtifact.PULL_REQUEST on read")
+        @DisplayName("persisted 'PULL_REQUEST' maps to ArtifactKinds.PULL_REQUEST on read")
         void enumRoundTrip() {
             UUID id = UUID.randomUUID();
             observationRepository.insertIfAbsent(
@@ -551,7 +552,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Enum mapping test",
@@ -566,7 +567,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
 
             Observation found = observationRepository.findById(id).orElseThrow();
-            assertThat(found.getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+            assertThat(found.getArtifactKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
         }
     }
 
@@ -599,7 +600,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 jobId,
                 targetPractice.getId(),
                 null,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 artifactId,
                 aboutUser.getId(),
                 "Tiebreak observation",
@@ -771,7 +772,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 artifactId,
                 aboutUser.getId(),
                 "Hidden-repo exclusion observation",

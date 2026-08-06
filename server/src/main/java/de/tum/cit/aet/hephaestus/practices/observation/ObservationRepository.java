@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import java.time.Instant;
 import java.util.Collection;
@@ -85,14 +87,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         value = """
         INSERT INTO observation (
             id, occurrence_key, agent_job_id, practice_id, practice_revision_id,
-            artifact_type, artifact_id, about_user_id,
+            artifact_kind, artifact_id, about_user_id,
             title, presence, assessment, severity, confidence,
             evidence, reasoning,
             recurrence_key, observed_at
         )
         VALUES (
             :id, :idempotencyKey, :agentJobId, :practiceId, :practiceRevisionId,
-            :artifactType, :artifactId, :aboutUserId,
+            :artifactKind, :artifactId, :aboutUserId,
             :title, :presence, :assessment, :severity, :confidence,
             CAST(:evidence AS jsonb), :reasoning,
             :recurrenceKey, :observedAt
@@ -107,7 +109,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("agentJobId") UUID agentJobId,
         @Param("practiceId") Long practiceId,
         @Param("practiceRevisionId") Long practiceRevisionId,
-        @Param("artifactType") String artifactType,
+        @Param("artifactKind") String artifactKind,
         @Param("artifactId") Long artifactId,
         @Param("aboutUserId") Long aboutUserId,
         @Param("title") String title,
@@ -130,11 +132,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     void deleteAllByPracticeWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     /**
-     * Hard-delete the {@code CONVERSATION_THREAD} observations for a workspace whose {@code artifact_id} (the
+     * Hard-delete the {@code chat.conversation_thread} observations for a workspace whose {@code artifact_id} (the
      * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
      * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
      * withdrawn. Workspace is scoped through the {@code Practice.workspace} relationship (this repo is
-     * {@code @WorkspaceAgnostic}); the {@code artifactType} + {@code artifactId} predicates keep PR/ISSUE observations
+     * {@code @WorkspaceAgnostic}); the {@code artifactKind} + {@code artifactId} predicates keep PR/ISSUE observations
      * and other tenants' rows untouched. DB {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} /
      * {@code reaction} children. Callers guard an empty {@code artifactIds}.
      *
@@ -145,22 +147,27 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query(
         """
         DELETE FROM Observation o
-        WHERE o.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+        WHERE o.artifactKind = :artifactKind
           AND o.artifactId IN :artifactIds
           AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
         """
     )
-    int deleteConversationThreadObservations(
+    int deleteObservationsOfKind(
         @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") ArtifactKind artifactKind,
         @Param("artifactIds") Collection<Long> artifactIds
     );
 
+    default int deleteConversationThreadObservations(Long workspaceId, Collection<Long> artifactIds) {
+        return deleteObservationsOfKind(workspaceId, ArtifactKinds.CONVERSATION_THREAD, artifactIds);
+    }
+
     /**
-     * Hard-delete <em>every</em> {@code CONVERSATION_THREAD} observation for a workspace — the whole-tenant erasure
+     * Hard-delete <em>every</em> {@code chat.conversation_thread} observation for a workspace — the whole-tenant erasure
      * the Slack module invokes through
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseAllConversationForWorkspace} on
      * app-uninstall / workspace-purge. Workspace is scoped through the {@code Practice.workspace} relationship (this
-     * repo is {@code @WorkspaceAgnostic}); the {@code artifactType} predicate keeps PR/ISSUE observations and other
+     * repo is {@code @WorkspaceAgnostic}); the {@code artifactKind} predicate keeps PR/ISSUE observations and other
      * tenants' rows untouched. DB {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} /
      * {@code reaction} children. Idempotent.
      *
@@ -171,21 +178,28 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query(
         """
         DELETE FROM Observation o
-        WHERE o.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+        WHERE o.artifactKind IN :artifactKinds
           AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
         """
     )
-    int deleteAllConversationThreadObservations(@Param("workspaceId") Long workspaceId);
+    int deleteAllObservationsOfKinds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds
+    );
+
+    default int deleteAllConversationThreadObservations(Long workspaceId) {
+        return deleteAllObservationsOfKinds(workspaceId, List.of(ArtifactKinds.CONVERSATION_THREAD));
+    }
 
     /**
-     * Hard-delete every {@code PULL_REQUEST} / {@code ISSUE} observation for a workspace — the
+     * Hard-delete every {@code scm.pull_request} / {@code scm.issue} observation for a workspace — the
      * SCM-derived counterpart of {@link #deleteAllConversationThreadObservations}, invoked when the
      * workspace's SCM mirror is erased on connection-disconnect or workspace-purge. The
      * {@code evidence} jsonb quotes mirrored diff/comment content verbatim and {@code artifact_id} is
      * a soft reference (no FK to {@code issue}/{@code pull_request}), so these rows would otherwise
      * outlive the artifacts they describe. Workspace is scoped through the {@code Practice.workspace}
-     * relationship (this repo is {@code @WorkspaceAgnostic}); the {@code artifactType} predicate keeps
-     * {@code CONVERSATION_THREAD} observations and other tenants' rows untouched. DB
+     * relationship (this repo is {@code @WorkspaceAgnostic}); the {@code artifactKind} predicate keeps
+     * {@code chat.conversation_thread} observations and other tenants' rows untouched. DB
      * {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} / {@code reaction}
      * children. Idempotent.
      *
@@ -196,21 +210,25 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query(
         """
         DELETE FROM Observation o
-        WHERE o.artifactType IN (
-            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST,
-            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
-          )
+        WHERE o.artifactKind IN :artifactKinds
           AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
         """
     )
-    int deleteAllScmArtifactObservations(@Param("workspaceId") Long workspaceId);
+    int deleteAllScmObservationsOfKinds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds
+    );
+
+    default int deleteAllScmArtifactObservations(Long workspaceId) {
+        return deleteAllScmObservationsOfKinds(workspaceId, List.of(ArtifactKinds.PULL_REQUEST, ArtifactKinds.ISSUE));
+    }
 
     /**
-     * Hard-delete the {@code CONVERSATION_THREAD} observations a single person is the <em>subject</em> of
+     * Hard-delete the {@code chat.conversation_thread} observations a single person is the <em>subject</em> of
      * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
      * account hard-delete, invoked through
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}.
-     * Workspace is scoped through {@code Practice.workspace}; the {@code artifactType} + {@code aboutUserId}
+     * Workspace is scoped through {@code Practice.workspace}; the {@code artifactKind} + {@code aboutUserId}
      * predicates keep another person's rows, PR/ISSUE observations, and other tenants' rows intact. DB
      * {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} / {@code reaction} children. Idempotent.
      *
@@ -221,15 +239,20 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query(
         """
         DELETE FROM Observation o
-        WHERE o.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+        WHERE o.artifactKind = :artifactKind
           AND o.aboutUserId = :aboutUserId
           AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
         """
     )
-    int deleteConversationThreadObservationsAboutUser(
+    int deleteObservationsOfKindAboutUser(
         @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") ArtifactKind artifactKind,
         @Param("aboutUserId") Long aboutUserId
     );
+
+    default int deleteConversationThreadObservationsAboutUser(Long workspaceId, Long aboutUserId) {
+        return deleteObservationsOfKindAboutUser(workspaceId, ArtifactKinds.CONVERSATION_THREAD, aboutUserId);
+    }
 
     // Read queries for the developer dashboard (Issue #896)
 
@@ -302,14 +325,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                 ON wtrs.workspace_id = p.workspace_id
                AND wtrs.repository_id = target_artifact.repository_id
                AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
                 AND target_artifact.id = f.artifact_id
           )
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_type = f.artifact_type
+                AND f2.artifact_kind = f.artifact_kind
                 AND f2.artifact_id = f.artifact_id
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC
               LIMIT 1
@@ -354,14 +377,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
-        WHERE f.artifactType = :artifactType
+        WHERE f.artifactKind = :artifactKind
         AND f.artifactId = :pullRequestId
         AND p.workspace.id = :workspaceId
         ORDER BY f.observedAt DESC
         """
     )
     List<Observation> findByPullRequestAndWorkspace(
-        @Param("artifactType") WorkArtifact artifactType,
+        @Param("artifactKind") ArtifactKind artifactKind,
         @Param("pullRequestId") Long pullRequestId,
         @Param("workspaceId") Long workspaceId
     );
@@ -395,7 +418,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                 ON wtrs.workspace_id = p.workspace_id
                AND wtrs.repository_id = target_artifact.repository_id
                AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
                 AND target_artifact.id = f.artifact_id
           )
           AND f.observed_at >= :since
@@ -404,7 +427,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         ORDER BY f.observed_at DESC
@@ -440,7 +463,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                 ON wtrs.workspace_id = p.workspace_id
                AND wtrs.repository_id = target_artifact.repository_id
                AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
                 AND target_artifact.id = f.artifact_id
           )
           AND f.observed_at >= :since
@@ -449,7 +472,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.severity
@@ -481,7 +504,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                 ON wtrs.workspace_id = p.workspace_id
                AND wtrs.repository_id = target_artifact.repository_id
                AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
                 AND target_artifact.id = f.artifact_id
           )
           AND f.observed_at >= :since
@@ -489,7 +512,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.presence
@@ -513,14 +536,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         """
         SELECT f.agentJobId AS agentJobId, MAX(f.observedAt) AS runAt
         FROM Observation f JOIN f.practice p
-        WHERE f.artifactType = :artifactType AND f.artifactId = :artifactId AND p.workspace.id = :workspaceId
+        WHERE f.artifactKind = :artifactKind AND f.artifactId = :artifactId AND p.workspace.id = :workspaceId
           AND f.recurrenceKey IS NOT NULL
         GROUP BY f.agentJobId
         ORDER BY MAX(f.observedAt) DESC, f.agentJobId DESC
         """
     )
     List<RunRef> findRecentRunRefsForTarget(
-        @Param("artifactType") WorkArtifact artifactType,
+        @Param("artifactKind") ArtifactKind artifactKind,
         @Param("artifactId") Long artifactId,
         @Param("workspaceId") Long workspaceId,
         Pageable pageable
@@ -589,7 +612,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND (CAST(:#{#f.assessmentNames()} AS text[]) IS NULL OR o.assessment = ANY(CAST(:#{#f.assessmentNames()} AS text[])))
           AND (CAST(:#{#f.severityNames()} AS text[]) IS NULL OR o.severity = ANY(CAST(:#{#f.severityNames()} AS text[])))
           AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR o.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
-          AND (CAST(:#{#f.artifactTypeName()} AS text) IS NULL OR o.artifact_type = CAST(:#{#f.artifactTypeName()} AS text))
+          AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR o.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
           AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR o.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
           AND (CAST(:#{#f.aboutUserId()} AS bigint) IS NULL OR o.about_user_id = CAST(:#{#f.aboutUserId()} AS bigint))
           AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR o.observed_at >= CAST(:#{#f.from()} AS timestamptz))
@@ -606,7 +629,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    pa.name AS "areaName",
                    pa.icon AS "areaIcon",
                    pa.color AS "areaColor",
-                   o.artifact_type AS "artifactType",
+                   o.artifact_kind AS "artifactKind",
                    o.artifact_id AS "artifactId",
                    o.about_user_id AS "aboutUserId",
                    o.title AS "title",
@@ -670,7 +693,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         String getAreaName();
         String getAreaIcon();
         String getAreaColor();
-        WorkArtifact getArtifactType();
+        /**
+         * The raw column, converted by the caller. A native-query projection is assembled by reflection
+         * over JDBC types, so declaring {@link ArtifactKind} here would make the mapping depend on a
+         * conversion the compiler cannot see.
+         */
+        String getArtifactKind();
         Long getArtifactId();
         Long getAboutUserId();
         String getTitle();

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
@@ -21,8 +22,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -44,7 +45,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Real-Postgres proof of the thread-grain Slack retention sweep. Once a thread goes cold (its {@code last_ts} is
- * older than the retention window), the sweep erases the derived {@code CONVERSATION_THREAD} observations/feedback
+ * older than the retention window), the sweep erases the derived {@code chat.conversation_thread} observations/feedback
  * (through the practices erasure port) <b>and</b> drops the {@code slack_thread} aggregate (which holds the
  * {@code participant_member_ids} PII) — while a still-active thread's derived rows and an unrelated PR observation
  * are left intact. The assertions fail if the retention erasure path is removed (the aged derived rows would
@@ -128,7 +129,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         UUID freshFb = lastFeedbackId;
 
         // An unrelated PR observation for the same workspace — a different artifact type, MUST survive.
-        UUID prObs = seedObservation(WorkArtifact.PULL_REQUEST, 7777L);
+        UUID prObs = seedObservation(ArtifactKinds.PULL_REQUEST, 7777L);
 
         // At least one message so the workspace is enumerated by the sweep; also proves message-grain pruning.
         insertMessage("agedmsg.1", "aged-root", now.minus(Duration.ofDays(60)));
@@ -245,12 +246,12 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private UUID seedBoundConversation(long threadId) {
-        UUID observationId = seedObservation(WorkArtifact.CONVERSATION_THREAD, threadId);
+        UUID observationId = seedObservation(ArtifactKinds.CONVERSATION_THREAD, threadId);
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.CONVERSATION_THREAD)
+                .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
                 .artifactId(threadId)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
@@ -266,7 +267,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         return observationId;
     }
 
-    private UUID seedObservation(WorkArtifact artifactType, long artifactId) {
+    private UUID seedObservation(ArtifactKind artifactKind, long artifactId) {
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
             observationId,
@@ -274,7 +275,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
             job.getId(),
             practice.getId(),
             null,
-            artifactType.name(),
+            artifactKind.value(),
             artifactId,
             recipient.getId(),
             "Observation title",
@@ -292,7 +293,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     private Practice savePractice(Workspace ws) {
         Practice p = new Practice();
-        p.setArtifactType(WorkArtifact.CONVERSATION_THREAD);
+        p.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
         p.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         p.setWorkspace(ws);
         p.setSlug("retain-practice-" + ws.getId());

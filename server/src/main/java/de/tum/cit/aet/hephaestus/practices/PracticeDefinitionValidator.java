@@ -3,7 +3,8 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,17 +28,17 @@ public final class PracticeDefinitionValidator {
             .automatedReviewPolicy()
             .automatedReview()
             .canAttemptAutomatedReview();
-        validateTriggers(definition.artifactType(), definition.triggerEvents(), canRunAutomatedReview);
+        validateTriggers(definition.artifactKind(), definition.triggerEvents(), canRunAutomatedReview);
         if (!canRunAutomatedReview && definition.precomputeScript() != null) {
             throw new IllegalArgumentException("A practice Hephaestus cannot review cannot define a precompute script");
         }
         rejectDetectorVocabulary("Why it matters", definition.whyItMatters());
         rejectDetectorVocabulary("What good looks like", definition.whatGoodLooksLike());
-        validateEvidence(definition.artifactType(), definition.automatedReviewPolicy());
+        validateEvidence(definition.artifactKind(), definition.automatedReviewPolicy());
     }
 
     private static void validateTriggers(
-        WorkArtifact artifactType,
+        ArtifactKind artifactKind,
         List<String> triggerEvents,
         boolean canRunAutomatedReview
     ) {
@@ -49,8 +50,10 @@ public final class PracticeDefinitionValidator {
                 "A practice Hephaestus cannot review cannot define events that start a review"
             );
         }
-        Set<String> allowed = TriggerEventCatalog.eligibleFor(artifactType);
-        if (canRunAutomatedReview && artifactType != WorkArtifact.CONVERSATION_THREAD && triggerEvents.isEmpty()) {
+        Set<String> allowed = TriggerEventCatalog.eligibleFor(artifactKind);
+        if (
+            canRunAutomatedReview && !ArtifactKinds.CONVERSATION_THREAD.equals(artifactKind) && triggerEvents.isEmpty()
+        ) {
             throw new IllegalArgumentException("Choose at least one event that starts a review");
         }
         List<String> incompatible = triggerEvents
@@ -70,12 +73,12 @@ public final class PracticeDefinitionValidator {
         }
     }
 
-    private void validateEvidence(WorkArtifact artifactType, PracticeAutomatedReviewPolicy requirements) {
+    private void validateEvidence(ArtifactKind artifactKind, PracticeAutomatedReviewPolicy requirements) {
         EvidenceProfile profile = sourceCatalogs.requireProfile(
             requirements.sourceContractVersion(),
             requirements.evidenceProfile()
         );
-        if (!profile.artifactType().equals(artifactType.name())) {
+        if (!profile.artifactKind().equals(artifactKind.value())) {
             throw new IllegalArgumentException("Evidence profile is not available for the selected work type");
         }
         validateRequirements(profile, requirements, requirements.requiredEvidence());

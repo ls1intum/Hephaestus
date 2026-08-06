@@ -4,11 +4,11 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.TriggerEventMatcher;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -31,7 +31,7 @@ import tools.jackson.databind.node.ObjectNode;
  * regardless of artifact — the catalog is per-job (workspace-active practices), not provider-shaped,
  * so it does not live behind the {@code ContentSource} SPI.
  *
- * <p>Filters by {@link WorkArtifact}: a PR job injects only PR-focus practices, an issue job only
+ * <p>Filters by {@link ArtifactKind}: a PR job injects only PR-focus practices, an issue job only
  * issue-focus practices — so a diff-anchored practice never reaches an issue (and vice-versa).
  */
 class PracticeCatalogInjector {
@@ -52,9 +52,9 @@ class PracticeCatalogInjector {
      * workspace — only {@code getCriteria()} reaches the agent — so the principle stays server-controlled and
      * cannot be fabricated or drift in model prose. Practices with a blank principle are omitted.
      */
-    Map<String, String> whyBySlug(Long workspaceId, WorkArtifact focus) {
+    Map<String, String> whyBySlug(Long workspaceId, ArtifactKind focus) {
         return practiceRepository
-            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(workspaceId, focus)
+            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(workspaceId, focus)
             .stream()
             .filter(p -> p.getWhyItMatters() != null && !p.getWhyItMatters().isBlank())
             .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
@@ -102,17 +102,17 @@ class PracticeCatalogInjector {
      * @throws JobPreparationException if the job has no workspace, no matching active practices, or a
      *     slug violates the workspace ABI pattern.
      */
-    void inject(Map<String, byte[]> files, AgentJob job, WorkArtifact focus) {
+    void inject(Map<String, byte[]> files, AgentJob job, ArtifactKind focus) {
         inject(files, job, focus, resolveEligiblePractices(job, focus));
     }
 
-    List<Practice> resolveEligiblePractices(AgentJob job, WorkArtifact focus) {
+    List<Practice> resolveEligiblePractices(AgentJob job, ArtifactKind focus) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
         Long workspaceId = job.getWorkspace().getId();
         List<Practice> practices = practiceRepository
-            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(workspaceId, focus)
+            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(workspaceId, focus)
             .stream()
             .sorted(Comparator.comparing(Practice::getSlug))
             .toList();
@@ -139,7 +139,7 @@ class PracticeCatalogInjector {
         return practices;
     }
 
-    void inject(Map<String, byte[]> files, AgentJob job, WorkArtifact focus, List<Practice> practices) {
+    void inject(Map<String, byte[]> files, AgentJob job, ArtifactKind focus, List<Practice> practices) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }

@@ -22,10 +22,11 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,7 +92,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             );
         }
         ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("artifact_type", "ISSUE");
+        metadata.put("artifact_kind", ArtifactKinds.ISSUE.value());
         metadata.put("repository_id", r.repositoryId());
         metadata.put("repository_full_name", r.repositoryFullName());
         metadata.put("issue_id", r.issueId());
@@ -119,7 +120,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
-        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, WorkArtifact.ISSUE);
+        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.ISSUE);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.IssueReviewRequest(job),
             EvidencePlan.compile(practices)
@@ -166,7 +167,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
-        practiceCatalogInjector.inject(files, job, WorkArtifact.ISSUE, practices);
+        practiceCatalogInjector.inject(files, job, ArtifactKinds.ISSUE, practices);
         log.info(
             "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
             files.size(),
@@ -241,10 +242,10 @@ public class IssueReviewHandler implements JobTypeHandler {
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
-                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.ISSUE);
+                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), ArtifactKinds.ISSUE);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             coercedFindings,
-            WorkArtifact.ISSUE,
+            ArtifactKinds.ISSUE,
             whyBySlug
         );
         postIssueNote(job, delivery);
@@ -302,7 +303,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             return;
         }
         try {
-            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.ISSUE, List.of());
+            feedbackLedgerRecorder.record(job, delivery, ArtifactKinds.ISSUE, List.of());
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",

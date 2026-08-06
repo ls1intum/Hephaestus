@@ -4,9 +4,10 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.PreparedConversationFact;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import java.util.ArrayList;
@@ -86,7 +87,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
                 continue;
             }
             if (
-                fact.getArtifactType() == WorkArtifact.CONVERSATION_THREAD &&
+                ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind()) &&
                 (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))
             ) {
                 continue;
@@ -102,8 +103,8 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             if (fact.getReasoning() != null) {
                 node.put("reasoning", fact.getReasoning());
             }
-            if (fact.getArtifactType() != null) {
-                node.put("artifactType", fact.getArtifactType().name());
+            if (fact.getArtifactKind() != null) {
+                node.put("artifactKind", fact.getArtifactKind().value());
             }
             if (fact.getArtifactId() != null) {
                 node.put("artifactId", fact.getArtifactId());
@@ -123,7 +124,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     private static List<Long> conversationThreadIds(List<PreparedConversationFact> facts) {
         List<Long> ids = new ArrayList<>();
         for (PreparedConversationFact fact : facts) {
-            if (fact.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && fact.getArtifactId() != null) {
+            if (ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind()) && fact.getArtifactId() != null) {
                 ids.add(fact.getArtifactId());
             }
         }

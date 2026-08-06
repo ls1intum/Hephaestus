@@ -6,11 +6,12 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Del
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.WithheldFinding;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
@@ -178,10 +179,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_forIssueArtifact_usesNonBlockingTightenCta() {
         // W3: Hephaestus is non-blocking. The CTA is state-neutral feed-forward ("to tighten"), never the
         // gatekeeping "to fix before merging" — and that holds for issues (which are never merged) too.
-        DeliveryContent result = DeliveryComposer.compose(
-            mixedFindings(),
-            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
-        );
+        DeliveryContent result = DeliveryComposer.compose(mixedFindings(), ArtifactKinds.ISSUE);
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
@@ -890,7 +888,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Add a short checklist of done conditions, e.g. a `- [ ]` list of observable outcomes."
         );
 
-        DeliveryContent issue = DeliveryComposer.compose(List.of(f), WorkArtifact.ISSUE);
+        DeliveryContent issue = DeliveryComposer.compose(List.of(f), ArtifactKinds.ISSUE);
 
         assertThat(issue).isNotNull();
         // Full reasoning + guidance reach the student inside the issue note itself.
@@ -931,7 +929,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of()
         );
 
-        DeliveryContent dc = DeliveryComposer.compose(List.of(scrubbed, real), WorkArtifact.ISSUE);
+        DeliveryContent dc = DeliveryComposer.compose(List.of(scrubbed, real), ArtifactKinds.ISSUE);
 
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).contains("one deliverable");
@@ -955,7 +953,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of()
         );
 
-        DeliveryContent dc = DeliveryComposer.compose(List.of(scrubbed), WorkArtifact.ISSUE);
+        DeliveryContent dc = DeliveryComposer.compose(List.of(scrubbed), ArtifactKinds.ISSUE);
 
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).contains("nothing to change here");
@@ -988,7 +986,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
 
-        DeliveryContent dc = DeliveryComposer.compose(findings, WorkArtifact.ISSUE);
+        DeliveryContent dc = DeliveryComposer.compose(findings, ArtifactKinds.ISSUE);
 
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).contains("a couple of things to tighten:");
@@ -1024,8 +1022,8 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of()
         );
 
-        assertThat(DeliveryComposer.compose(List.of(na1, na2), WorkArtifact.ISSUE)).isNull();
-        assertThat(DeliveryComposer.compose(List.of(na1, na2), WorkArtifact.PULL_REQUEST)).isNull();
+        assertThat(DeliveryComposer.compose(List.of(na1, na2), ArtifactKinds.ISSUE)).isNull();
+        assertThat(DeliveryComposer.compose(List.of(na1, na2), ArtifactKinds.PULL_REQUEST)).isNull();
     }
 
     @Test
@@ -1046,7 +1044,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Add a short Why paragraph."
         );
 
-        DeliveryContent dc = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST);
+        DeliveryContent dc = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST);
 
         assertThat(dc).isNotNull();
         // No echo, and therefore none of the raw metadata-snippet / JSON-envelope artifacts can leak.
@@ -1071,7 +1069,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Validate the field before using it."
         );
 
-        DeliveryContent result = DeliveryComposer.compose(List.of(finding), WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(List.of(finding), ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         assertThat(result.diffNotes())
@@ -1099,7 +1097,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "Add a unit test."
             )
         );
-        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        var dc = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).contains("client/App/Services/APIClient.swift");
         assertThat(dc.mrNote()).doesNotContain("inputs/sources/scm/repo/client/");
@@ -1147,7 +1145,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "State the beneficiary."
             )
         );
-        var dc = DeliveryComposer.compose(findings, WorkArtifact.ISSUE);
+        var dc = DeliveryComposer.compose(findings, ArtifactKinds.ISSUE);
         assertThat(dc).isNotNull();
         // The MAJOR "is this issue well-formed?" lead (scoped) survives; its near-duplicate sibling
         // (checkable) is collapsed away. The DISTINCT lessons — breaks-large-work and states-actionable —
@@ -1185,7 +1183,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "g"
             )
         );
-        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        var dc = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
         // Both structure findings carry locations, so on a PR they become inline diff notes — and BOTH
         // survive: dropping the `artifact == ISSUE` guard on dedupEpicStructure would collapse them to one.
         assertThat(dc).isNotNull();
@@ -1223,7 +1221,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
 
-        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        var dc = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
 
         assertThat(dc).isNotNull();
         // ONE blocking issue surfaced, not two — the redundant DoD-honesty finding is folded into ships-tests.
@@ -1251,7 +1249,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
 
-        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        var dc = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
 
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).contains("1 issue to tighten");
@@ -1273,7 +1271,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "Use env."
             )
         );
-        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        var dc = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).doesNotContain("Nice work");
         assertThat(dc.mrNote()).contains("Worth keeping: you're engaging with the review feedback.");
@@ -1312,7 +1310,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "Use env."
             )
         );
-        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        var dc = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).doesNotContain("Nice work");
         // An uncurated GOOD slug is acknowledged generically (grammatical), never dropped or dumped raw.
@@ -1347,7 +1345,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             findings.add(negativeWithConfidence("nudge-" + i, "Minor nudge " + i, Severity.MINOR, 0.90f));
         }
 
-        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
@@ -1370,7 +1368,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             findings.add(negativeWithConfidence("minor-" + i, "Minor " + i, Severity.MINOR, 0.9f));
         }
 
-        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
@@ -1391,7 +1389,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             findings.add(negativeWithConfidence("nudge-" + i, "Minor nudge " + i, Severity.MINOR, 0.9f));
         }
 
-        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         assertThat(result.mrNote()).contains("3 suggestions for improvement:");
@@ -1408,7 +1406,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         findings.add(negativeWithConfidence("high-b", "High B nudge", Severity.MINOR, 0.92f));
         findings.add(negativeWithConfidence("high-c", "High C nudge", Severity.MINOR, 0.90f));
 
-        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
@@ -1430,7 +1428,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         findings.add(negativeWithConfidence("info-1", "Info one", Severity.INFO, 0.99f));
         findings.add(negativeWithConfidence("info-2", "Info two", Severity.INFO, 0.99f));
 
-        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(findings, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
@@ -1477,8 +1475,8 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of()
         );
 
-        DeliveryContent asProblem = DeliveryComposer.compose(List.of(asProblemFinding), WorkArtifact.PULL_REQUEST);
-        DeliveryContent asStrength = DeliveryComposer.compose(List.of(asStrengthFinding), WorkArtifact.PULL_REQUEST);
+        DeliveryContent asProblem = DeliveryComposer.compose(List.of(asProblemFinding), ArtifactKinds.PULL_REQUEST);
+        DeliveryContent asStrength = DeliveryComposer.compose(List.of(asStrengthFinding), ArtifactKinds.PULL_REQUEST);
 
         assertThat(asProblem).isNotNull();
         assertThat(asProblem.diffNotes()).as("(PRESENT, BAD) is a problem → inline diff note").isNotEmpty();
@@ -1513,7 +1511,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Split this MR into two stacked changes so each is reviewable on its own."
         );
 
-        DeliveryContent result = DeliveryComposer.compose(List.of(leaky), WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(List.of(leaky), ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         // The full student-facing surface = the MR summary + every inline diff note (inline-first puts the
@@ -1565,7 +1563,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Add a '## Why' section naming the user problem this solves."
         );
 
-        DeliveryContent result = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST);
+        DeliveryContent result = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
         String note = result.mrNote();
@@ -1628,14 +1626,14 @@ class DeliveryComposerTest extends BaseUnitTest {
         List<ValidatedFinding> findings = List.of(delivered, failed);
 
         // Baseline (no signals yet): both findings keep their full summary lines, no pointer.
-        String firstPass = DeliveryComposer.recomposeMrNote(findings, WorkArtifact.PULL_REQUEST, Map.of(), Set.of());
+        String firstPass = DeliveryComposer.recomposeMrNote(findings, ArtifactKinds.PULL_REQUEST, Map.of(), Set.of());
         assertThat(firstPass).contains("Dead code in view").contains("Non-descriptive name 'Data'");
         assertThat(firstPass).doesNotContain("see the");
 
         // After delivery: only corr-delivered landed.
         String demoted = DeliveryComposer.recomposeMrNote(
             findings,
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(),
             Set.of("corr-delivered")
         );
@@ -1674,7 +1672,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String demoted = DeliveryComposer.recomposeMrNote(
             List.of(a, b),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(),
             Set.of("k-a", "k-b")
         );
@@ -1700,7 +1698,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String demoted = DeliveryComposer.recomposeMrNote(
             List.of(keyless),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(),
             Set.of("some-other-key")
         );
@@ -1822,7 +1820,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "@@ -1,1 +1,1 @@\n" +
             "+import React from 'react';\n";
 
-        DeliveryContent result = DeliveryComposer.compose(List.of(stamped), WorkArtifact.PULL_REQUEST, Map.of(), diff);
+        DeliveryContent result = DeliveryComposer.compose(List.of(stamped), ArtifactKinds.PULL_REQUEST, Map.of(), diff);
 
         assertThat(result).isNotNull();
         assertThat(result.diffNotes()).hasSize(1);
@@ -1848,7 +1846,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(
             List.of(f),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of("scope-one-reviewable-change", SCOPE_WHY)
         );
 
@@ -1869,8 +1867,8 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Split it up."
         );
 
-        String withoutMap = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST).mrNote();
-        String withEmptyMap = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST, Map.of()).mrNote();
+        String withoutMap = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST).mrNote();
+        String withEmptyMap = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST, Map.of()).mrNote();
 
         assertThat(withEmptyMap).isEqualTo(withoutMap);
         assertThat(withEmptyMap).doesNotContain("Why this matters");
@@ -1900,7 +1898,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String note = DeliveryComposer.compose(
             List.of(a, b),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of("scope-one-reviewable-change", SCOPE_WHY)
         ).mrNote();
 
@@ -1922,7 +1920,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(
             List.of(info),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(
                 "leaves-the-code-clean-with-intent-revealing-comments",
                 "Intent-revealing code lowers the next reader's cost."
@@ -1957,7 +1955,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String note = DeliveryComposer.compose(
             List.of(a, b),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(
                 "describe-what-and-why",
                 "A clear description lets a reviewer orient before reading the diff.",
@@ -1993,7 +1991,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String note = DeliveryComposer.compose(
             List.of(blocking, advisory),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(
                 "handles-errors-instead-of-swallowing-them",
                 "A swallowed error turns a loud failure into a silent one nobody can debug.",
@@ -2032,7 +2030,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String note = DeliveryComposer.compose(
             observed,
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of("scope-one-reviewable-change", SCOPE_WHY)
         ).mrNote();
 
@@ -2050,7 +2048,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String note = DeliveryComposer.compose(
             observed,
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of("scope-one-reviewable-change", SCOPE_WHY)
         ).mrNote();
 
@@ -2063,7 +2061,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // (empty whyBySlug is a strict no-op — behaviour identical to before W7).
         var observed = List.of(positiveWithReasoning("scope-one-reviewable-change", "The change stays focused."));
 
-        String note = DeliveryComposer.compose(observed, WorkArtifact.PULL_REQUEST, Map.of()).mrNote();
+        String note = DeliveryComposer.compose(observed, ArtifactKinds.PULL_REQUEST, Map.of()).mrNote();
 
         assertThat(note).contains("What's working well here");
         assertThat(note).doesNotContain("_Why this matters:_");
@@ -2096,7 +2094,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(
             List.of(hallucinated),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(),
             REAL_DIFF
         );
@@ -2123,7 +2121,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(
             List.of(grounded),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(),
             REAL_DIFF
         );
@@ -2148,7 +2146,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(
             List.of(fabricatedSnippet),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(),
             REAL_DIFF
         );
@@ -2173,7 +2171,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(
             List.of(issueFinding),
-            WorkArtifact.ISSUE,
+            ArtifactKinds.ISSUE,
             Map.of(),
             null // issues have no diff; force-no-locus still applies via the ISSUE branch
         );
@@ -2201,7 +2199,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(
             List.of(finding),
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             Map.of(),
             (String) null
         );
@@ -2349,7 +2347,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null
         ).withKeys(new ObservationKeys("occ-rk-checkable", "rk-checkable"));
 
-        DeliveryContent result = DeliveryComposer.compose(List.of(scoped, checkable), WorkArtifact.ISSUE);
+        DeliveryContent result = DeliveryComposer.compose(List.of(scoped, checkable), ArtifactKinds.ISSUE);
 
         assertThat(result).isNotNull();
         // Severity-sorted: the MAJOR scoped finding leads and is kept; the sibling collapses.

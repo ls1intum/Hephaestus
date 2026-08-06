@@ -13,7 +13,7 @@ import java.util.Objects;
  * fresh one.
  *
  * <p><strong>Identity is the destination, NOT the content.</strong> The unit is keyed by <em>where it is
- * delivered</em>: the artifact {@code (artifact_type, artifact_id)}, the {@code recipient}, and the
+ * delivered</em>: the artifact {@code (artifact_kind, artifact_id)}, the {@code recipient}, and the
  * {@code surface}. Two reviews of the same PR deliver the same in-context summary unit to the same author →
  * same continuity key → the second supersedes the first. The observations it references are the changing
  * <em>content</em>, recorded separately, so the unit's identity is stable even as its body churns between
@@ -31,17 +31,17 @@ public final class FeedbackThreadKey {
     /**
      * Compute the stable continuity key for a delivery unit.
      *
-     * @param artifactType the artifact-type discriminator (e.g. {@code PULL_REQUEST}); empty string when the
+     * @param artifactKind the artifact-type discriminator (e.g. {@code PULL_REQUEST}); empty string when the
      *     unit is not artifact-anchored (a dashboard digest)
      * @param artifactId the artifact id, or {@code null} when not artifact-anchored
      * @param recipientUserId the user the unit is delivered to (required)
      * @param surface the delivery surface (required)
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
-    public static String compute(String artifactType, Long artifactId, long recipientUserId, FeedbackChannel surface) {
+    public static String compute(String artifactKind, Long artifactId, long recipientUserId, FeedbackChannel surface) {
         Objects.requireNonNull(surface, "surface");
         String canonical = new StringBuilder()
-            .append(artifactType == null ? "" : artifactType)
+            .append(artifactKind == null ? "" : artifactKind)
             .append(SEP)
             .append(artifactId == null ? "" : artifactId)
             .append(SEP)

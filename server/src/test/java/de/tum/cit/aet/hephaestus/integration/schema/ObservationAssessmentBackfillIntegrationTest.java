@@ -217,9 +217,9 @@ class ObservationAssessmentBackfillIntegrationTest {
         overrides.put("id", id);
         overrides.put("practice_id", practiceId);
         overrides.put("presence", presence);
-        // artifact_type carries a value-restricting CHECK (IN ('PULL_REQUEST','ISSUE')); the generic
+        // artifact_kind carries a value-restricting CHECK (IN ('scm.pull_request','scm.issue')); the generic
         // dummy filler can't know that, so pin a valid value explicitly.
-        overrides.put("artifact_type", "PULL_REQUEST");
+        overrides.put("artifact_kind", "scm.pull_request");
         // assessment intentionally omitted -> NULL (the pre-backfill state).
         insertRow("observation", overrides);
         return id;

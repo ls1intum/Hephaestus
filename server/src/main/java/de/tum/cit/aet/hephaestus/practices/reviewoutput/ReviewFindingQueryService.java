@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationQueryFilter;
@@ -66,11 +67,17 @@ class ReviewFindingQueryService {
             rows
                 .getContent()
                 .stream()
-                .map(row -> new ArtifactRef(row.getAgentJobId(), row.getArtifactType(), row.getArtifactId()))
+                .map(row ->
+                    new ArtifactRef(row.getAgentJobId(), ArtifactKind.of(row.getArtifactKind()), row.getArtifactId())
+                )
                 .toList()
         );
         return rows.map(row -> {
-            ArtifactRef key = new ArtifactRef(row.getAgentJobId(), row.getArtifactType(), row.getArtifactId());
+            ArtifactRef key = new ArtifactRef(
+                row.getAgentJobId(),
+                ArtifactKind.of(row.getArtifactKind()),
+                row.getArtifactId()
+            );
             return ReviewFindingDTO.from(row, dispositions.get(row.getId()), artifacts.get(key), subjects);
         });
     }
@@ -90,7 +97,7 @@ class ReviewFindingQueryService {
             .get(observation.getAboutUserId());
         ArtifactRef artifactKey = new ArtifactRef(
             observation.getAgentJobId(),
-            observation.getArtifactType(),
+            observation.getArtifactKind(),
             observation.getArtifactId()
         );
         var artifact = artifactResolver.resolve(workspaceId, List.of(artifactKey)).get(artifactKey);

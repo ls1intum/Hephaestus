@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
@@ -41,12 +41,12 @@ public record UpdatePracticeRequestDTO(
 
     @Valid
     @Schema(
-        description = "Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactType changes"
+        description = "Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactKind changes"
     )
     @Nullable
     PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
-    @Schema(description = "Type of reviewed work", example = "ISSUE") @Nullable WorkArtifact artifactType,
+    @Schema(description = "Type of reviewed work", example = "ISSUE") @Nullable ArtifactKind artifactKind,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Why-it-matters must not be blank")

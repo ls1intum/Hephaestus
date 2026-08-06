@@ -681,4 +681,280 @@
         </rollback>
     </changeSet>
 
+    <!-- One name for the thing a practice observes. WorkArtifact (practices) and SubjectClass
+         (integration SPI) were the same concept under two names, with two spellings for a chat thread
+         (CONVERSATION_THREAD vs SLACK_MESSAGE_THREAD) produced by two parallel switches over one job
+         type. Both collapse onto ArtifactKind, whose values are the namespaced, vendor-neutral ids the
+         signal ledger already stores in artifact_signal.artifact_kind.
+
+         PULL_REQUEST        -> scm.pull_request
+         ISSUE               -> scm.issue
+         CONVERSATION_THREAD -> chat.conversation_thread
+         SLACK_MESSAGE_THREAD-> chat.conversation_thread   (agent_job only)
+
+         Column names follow where they were already about the artifact (observation.artifact_type,
+         feedback.artifact_type, agent_job.subject_class all become artifact_kind). practice.applies_to,
+         practice_revision.applies_to and curated_practice_override.applies_to keep their names on
+         purpose: the practice-revision immutability and projection triggers name that column in their
+         bodies, and a rename there would silently break plpgsql that nothing in the test suite runs.
+         Their VALUES migrate with everything else, so there is still one vocabulary. -->
+
+    <changeSet author="hephaestus-terminology" id="1785743133884-15">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation.artifact_kind already present">
+            <not><columnExists tableName="observation" columnName="artifact_kind"/></not>
+        </preConditions>
+        <comment>observation.artifact_type becomes artifact_kind, carrying the namespaced vocabulary.</comment>
+        <renameColumn tableName="observation" oldColumnName="artifact_type" newColumnName="artifact_kind"
+                      columnDataType="VARCHAR(32)"/>
+        <modifyDataType tableName="observation" columnName="artifact_kind" newDataType="VARCHAR(64)"/>
+        <addNotNullConstraint tableName="observation" columnName="artifact_kind" columnDataType="VARCHAR(64)"/>
+        <sql splitStatements="false"><![CDATA[
+            -- The old CHECK admits only the old values, so it comes off before the rows move, not after.
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_target_type;
+            UPDATE observation SET artifact_kind = CASE artifact_kind
+                WHEN 'PULL_REQUEST' THEN 'scm.pull_request'
+                WHEN 'ISSUE' THEN 'scm.issue'
+                WHEN 'CONVERSATION_THREAD' THEN 'chat.conversation_thread'
+                ELSE artifact_kind
+            END;
+            ALTER TABLE observation
+            ADD CONSTRAINT chk_observation_artifact_kind
+            CHECK (artifact_kind IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_artifact_kind;
+                UPDATE observation SET artifact_kind = CASE artifact_kind
+                    WHEN 'scm.pull_request' THEN 'PULL_REQUEST'
+                    WHEN 'scm.issue' THEN 'ISSUE'
+                    WHEN 'chat.conversation_thread' THEN 'CONVERSATION_THREAD'
+                    ELSE artifact_kind
+                END;
+                ALTER TABLE observation
+                ADD CONSTRAINT chk_observation_target_type
+                CHECK (artifact_kind IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD'));
+            ]]></sql>
+            <modifyDataType tableName="observation" columnName="artifact_kind" newDataType="VARCHAR(32)"/>
+            <addNotNullConstraint tableName="observation" columnName="artifact_kind" columnDataType="VARCHAR(32)"/>
+            <renameColumn tableName="observation" oldColumnName="artifact_kind" newColumnName="artifact_type"
+                          columnDataType="VARCHAR(32)"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-terminology" id="1785743133884-16">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback.artifact_kind already present">
+            <not><columnExists tableName="feedback" columnName="artifact_kind"/></not>
+        </preConditions>
+        <comment>feedback.artifact_type becomes artifact_kind, carrying the namespaced vocabulary.</comment>
+        <renameColumn tableName="feedback" oldColumnName="artifact_type" newColumnName="artifact_kind"
+                      columnDataType="VARCHAR(32)"/>
+        <modifyDataType tableName="feedback" columnName="artifact_kind" newDataType="VARCHAR(64)"/>
+        <sql splitStatements="false"><![CDATA[
+            -- Old CHECK off first, same as observation: it admits only the pre-merge spellings.
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_target_type;
+            UPDATE feedback SET artifact_kind = CASE artifact_kind
+                WHEN 'PULL_REQUEST' THEN 'scm.pull_request'
+                WHEN 'ISSUE' THEN 'scm.issue'
+                WHEN 'CONVERSATION_THREAD' THEN 'chat.conversation_thread'
+                ELSE artifact_kind
+            END;
+            ALTER TABLE feedback
+            ADD CONSTRAINT chk_feedback_artifact_kind
+            CHECK (artifact_kind IS NULL
+                   OR artifact_kind IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_artifact_kind;
+                UPDATE feedback SET artifact_kind = CASE artifact_kind
+                    WHEN 'scm.pull_request' THEN 'PULL_REQUEST'
+                    WHEN 'scm.issue' THEN 'ISSUE'
+                    WHEN 'chat.conversation_thread' THEN 'CONVERSATION_THREAD'
+                    ELSE artifact_kind
+                END;
+                ALTER TABLE feedback
+                ADD CONSTRAINT chk_feedback_target_type
+                CHECK (artifact_kind IS NULL OR artifact_kind IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD'));
+            ]]></sql>
+            <modifyDataType tableName="feedback" columnName="artifact_kind" newDataType="VARCHAR(32)"/>
+            <renameColumn tableName="feedback" oldColumnName="artifact_kind" newColumnName="artifact_type"
+                          columnDataType="VARCHAR(32)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- The job row and its metadata carried the vendor-shaped spelling (SLACK_MESSAGE_THREAD) and a
+         second key of its own (metadata.artifact_type). Both move, including for jobs still queued:
+         delivery routes on metadata.artifact_kind, so a job left half-migrated would deliver to the
+         wrong surface. -->
+    <changeSet author="hephaestus-terminology" id="1785743133884-17">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.artifact_kind already present">
+            <not><columnExists tableName="agent_job" columnName="artifact_kind"/></not>
+        </preConditions>
+        <comment>agent_job.subject_class becomes artifact_kind; the metadata discriminator follows it.</comment>
+        <renameColumn tableName="agent_job" oldColumnName="subject_class" newColumnName="artifact_kind"
+                      columnDataType="VARCHAR(48)"/>
+        <modifyDataType tableName="agent_job" columnName="artifact_kind" newDataType="VARCHAR(64)"/>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE agent_job SET artifact_kind = CASE artifact_kind
+                WHEN 'PULL_REQUEST' THEN 'scm.pull_request'
+                WHEN 'ISSUE' THEN 'scm.issue'
+                WHEN 'SLACK_MESSAGE_THREAD' THEN 'chat.conversation_thread'
+                WHEN 'CONVERSATION_THREAD' THEN 'chat.conversation_thread'
+                ELSE artifact_kind
+            END;
+            UPDATE agent_job
+            SET metadata = (metadata - 'artifact_type') || jsonb_build_object('artifact_kind',
+                CASE metadata->>'artifact_type'
+                    WHEN 'PULL_REQUEST' THEN 'scm.pull_request'
+                    WHEN 'ISSUE' THEN 'scm.issue'
+                    WHEN 'CONVERSATION_THREAD' THEN 'chat.conversation_thread'
+                    WHEN 'SLACK_MESSAGE_THREAD' THEN 'chat.conversation_thread'
+                    ELSE metadata->>'artifact_type'
+                END)
+            WHERE jsonb_exists(metadata, 'artifact_type');
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                UPDATE agent_job
+                SET metadata = (metadata - 'artifact_kind') || jsonb_build_object('artifact_type',
+                    CASE metadata->>'artifact_kind'
+                        WHEN 'scm.pull_request' THEN 'PULL_REQUEST'
+                        WHEN 'scm.issue' THEN 'ISSUE'
+                        WHEN 'chat.conversation_thread' THEN 'CONVERSATION_THREAD'
+                        ELSE metadata->>'artifact_kind'
+                    END)
+                WHERE jsonb_exists(metadata, 'artifact_kind');
+                UPDATE agent_job SET artifact_kind = CASE artifact_kind
+                    WHEN 'scm.pull_request' THEN 'PULL_REQUEST'
+                    WHEN 'scm.issue' THEN 'ISSUE'
+                    WHEN 'chat.conversation_thread' THEN 'SLACK_MESSAGE_THREAD'
+                    ELSE artifact_kind
+                END;
+            ]]></sql>
+            <modifyDataType tableName="agent_job" columnName="artifact_kind" newDataType="VARCHAR(48)"/>
+            <renameColumn tableName="agent_job" oldColumnName="artifact_kind" newColumnName="subject_class"
+                          columnDataType="VARCHAR(48)"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-terminology" id="1785743133884-18">
+        <!-- Keyed on the column default rather than on the rows: a fresh install has no practices yet
+             and still needs the widening, the default and the CHECKs moved. -->
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.applies_to already namespaced">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_name = 'practice' AND column_name = 'applies_to'
+                  AND column_default LIKE '%PULL_REQUEST%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Move the practice catalog onto the namespaced artifact-kind vocabulary.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE practice_revision DROP CONSTRAINT IF EXISTS ck_practice_revision_applies_to;
+            ALTER TABLE curated_practice_override DROP CONSTRAINT IF EXISTS ck_curated_practice_override_applies_to;
+            -- Postgres refuses to retype a column a trigger names in its UPDATE OF list, so the
+            -- projection trigger comes off and goes back on unchanged around the widening. Dropped by
+            -- name and recreated from its own definition; the function it calls is untouched.
+            DROP TRIGGER IF EXISTS practice_requires_current_revision_projection ON practice;
+            ALTER TABLE practice ALTER COLUMN applies_to TYPE VARCHAR(64);
+            ALTER TABLE practice ALTER COLUMN applies_to SET DEFAULT 'scm.pull_request';
+            CREATE CONSTRAINT TRIGGER practice_requires_current_revision_projection
+                AFTER INSERT OR UPDATE OF current_revision_id, slug, name, applies_to, trigger_events,
+                    criteria, precompute_script, automated_review_policy, why_it_matters,
+                    what_good_looks_like, practice_area_id
+                ON practice
+                DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION enforce_practice_current_revision_projection();
+            ALTER TABLE practice_revision ALTER COLUMN applies_to TYPE VARCHAR(64);
+            ALTER TABLE curated_practice_override ALTER COLUMN applies_to TYPE VARCHAR(64);
+            UPDATE practice SET applies_to = CASE applies_to
+                WHEN 'PULL_REQUEST' THEN 'scm.pull_request'
+                WHEN 'ISSUE' THEN 'scm.issue'
+                WHEN 'CONVERSATION_THREAD' THEN 'chat.conversation_thread'
+                ELSE applies_to
+            END;
+            -- A revision is immutable by trigger, and this is exactly the out-of-band act that trigger
+            -- exists to force somebody to write down. It comes off for the vocabulary move and goes
+            -- straight back on.
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+            UPDATE practice_revision SET applies_to = CASE applies_to
+                WHEN 'PULL_REQUEST' THEN 'scm.pull_request'
+                WHEN 'ISSUE' THEN 'scm.issue'
+                WHEN 'CONVERSATION_THREAD' THEN 'chat.conversation_thread'
+                ELSE applies_to
+            END;
+            -- The review-rule fingerprint digests the artifact kind, so every stored one now describes a
+            -- rule set written in a vocabulary that no longer exists. Left alone, the admin catalog would
+            -- compare a stale digest against a freshly computed one and report every bundled practice as
+            -- locally edited. Clearing them hands the recomputation to the backfill that already exists
+            -- for exactly this state (CatalogProvenanceBackfill#fingerprintMigratedRevisions), which is
+            -- also why the scope matches that query's.
+            UPDATE practice_revision SET review_rule_fingerprint = NULL
+            WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+            UPDATE curated_practice_override SET applies_to = CASE applies_to
+                WHEN 'PULL_REQUEST' THEN 'scm.pull_request'
+                WHEN 'ISSUE' THEN 'scm.issue'
+                WHEN 'CONVERSATION_THREAD' THEN 'chat.conversation_thread'
+                ELSE applies_to
+            END;
+            ALTER TABLE practice_revision
+                ADD CONSTRAINT ck_practice_revision_applies_to
+                CHECK (applies_to IS NULL
+                       OR applies_to IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+            ALTER TABLE curated_practice_override
+                ADD CONSTRAINT ck_curated_practice_override_applies_to
+                CHECK (applies_to IS NULL
+                       OR applies_to IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+        ]]></sql>
+        <rollback>
+            <!-- Every schema change comes first and every row change second, in both directions: an
+                 UPDATE on practice queues a deferred constraint-trigger event, and Postgres will not
+                 ALTER a table that has one pending. -->
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE practice_revision DROP CONSTRAINT IF EXISTS ck_practice_revision_applies_to;
+                ALTER TABLE curated_practice_override DROP CONSTRAINT IF EXISTS ck_curated_practice_override_applies_to;
+                DROP TRIGGER IF EXISTS practice_requires_current_revision_projection ON practice;
+                ALTER TABLE practice ALTER COLUMN applies_to SET DEFAULT 'PULL_REQUEST';
+                ALTER TABLE practice ALTER COLUMN applies_to TYPE VARCHAR(32);
+                CREATE CONSTRAINT TRIGGER practice_requires_current_revision_projection
+                    AFTER INSERT OR UPDATE OF current_revision_id, slug, name, applies_to, trigger_events,
+                        criteria, precompute_script, automated_review_policy, why_it_matters,
+                        what_good_looks_like, practice_area_id
+                    ON practice
+                    DEFERRABLE INITIALLY DEFERRED
+                    FOR EACH ROW EXECUTE FUNCTION enforce_practice_current_revision_projection();
+                ALTER TABLE practice_revision ALTER COLUMN applies_to TYPE VARCHAR(32);
+                ALTER TABLE curated_practice_override ALTER COLUMN applies_to TYPE VARCHAR(32);
+                UPDATE practice SET applies_to = CASE applies_to
+                    WHEN 'scm.pull_request' THEN 'PULL_REQUEST'
+                    WHEN 'scm.issue' THEN 'ISSUE'
+                    WHEN 'chat.conversation_thread' THEN 'CONVERSATION_THREAD'
+                    ELSE applies_to
+                END;
+                ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+                UPDATE practice_revision SET applies_to = CASE applies_to
+                    WHEN 'scm.pull_request' THEN 'PULL_REQUEST'
+                    WHEN 'scm.issue' THEN 'ISSUE'
+                    WHEN 'chat.conversation_thread' THEN 'CONVERSATION_THREAD'
+                    ELSE applies_to
+                END;
+                UPDATE practice_revision SET review_rule_fingerprint = NULL
+                WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+                ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+                UPDATE curated_practice_override SET applies_to = CASE applies_to
+                    WHEN 'scm.pull_request' THEN 'PULL_REQUEST'
+                    WHEN 'scm.issue' THEN 'ISSUE'
+                    WHEN 'chat.conversation_thread' THEN 'CONVERSATION_THREAD'
+                    ELSE applies_to
+                END;
+                ALTER TABLE practice_revision
+                    ADD CONSTRAINT ck_practice_revision_applies_to
+                    CHECK (applies_to IS NULL OR applies_to IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD'));
+                ALTER TABLE curated_practice_override
+                    ADD CONSTRAINT ck_curated_practice_override_applies_to
+                    CHECK (applies_to IS NULL OR applies_to IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

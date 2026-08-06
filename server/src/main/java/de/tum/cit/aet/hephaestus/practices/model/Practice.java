@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
@@ -76,10 +77,9 @@ public class Practice {
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "applies_to", nullable = false, length = 32)
-    @ColumnDefault("'PULL_REQUEST'")
-    private WorkArtifact artifactType = WorkArtifact.PULL_REQUEST;
+    @Column(name = "applies_to", nullable = false, length = ArtifactKind.MAX_LENGTH)
+    @ColumnDefault("'scm.pull_request'")
+    private ArtifactKind artifactKind = ArtifactKinds.PULL_REQUEST;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_area"))

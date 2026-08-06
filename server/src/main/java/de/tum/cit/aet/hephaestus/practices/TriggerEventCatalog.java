@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -29,17 +31,20 @@ public final class TriggerEventCatalog {
 
     private TriggerEventCatalog() {}
 
-    public static Set<String> eligibleFor(WorkArtifact focus) {
+    public static Set<String> eligibleFor(ArtifactKind focus) {
         return Set.copyOf(optionsFor(focus).stream().map(TriggerEventOption::event).toList());
     }
 
-    static List<TriggerEventOption> optionsFor(WorkArtifact focus) {
-        return switch (focus) {
-            case PULL_REQUEST -> PULL_REQUEST_EVENTS;
-            case ISSUE -> ISSUE_EVENTS;
-            case CONVERSATION_THREAD -> List.of();
-        };
+    static List<TriggerEventOption> optionsFor(ArtifactKind focus) {
+        return BY_KIND.getOrDefault(focus, List.of());
     }
+
+    private static final Map<ArtifactKind, List<TriggerEventOption>> BY_KIND = Map.of(
+        ArtifactKinds.PULL_REQUEST,
+        PULL_REQUEST_EVENTS,
+        ArtifactKinds.ISSUE,
+        ISSUE_EVENTS
+    );
 
     public static Set<String> allEvents() {
         return ALL_EVENTS;

@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -138,7 +138,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                o.title AS title,
                o.reasoning AS reasoning,
                o.severity AS severity,
-               fo.feedback.artifactType AS artifactType,
+               fo.feedback.artifactKind AS artifactKind,
                fo.feedback.artifactId AS artifactId,
                fo.feedback.createdAt AS preparedAt
         FROM FeedbackObservation fo
@@ -242,7 +242,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getTitle();
         String getReasoning();
         Severity getSeverity();
-        WorkArtifact getArtifactType();
+        ArtifactKind getArtifactKind();
         Long getArtifactId();
         Instant getPreparedAt();
     }

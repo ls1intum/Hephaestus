@@ -26,11 +26,12 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -183,7 +184,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
 
-        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, WorkArtifact.PULL_REQUEST);
+        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.PracticeReviewRequest(job),
             EvidencePlan.compile(practices)
@@ -232,7 +233,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
-        practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST, practices);
+        practiceCatalogInjector.inject(files, job, ArtifactKinds.PULL_REQUEST, practices);
         ContextMapWriter.write(files);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -447,13 +448,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
-                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
+                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), ArtifactKinds.PULL_REQUEST);
         // unifiedDiff (computed once at the top of deliver()) is the substrate for BOTH the M1 grounding
         // guard (drop a hallucinated inline anchor before it lands on a student) and the downstream
         // line-position validator below.
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             deliverable,
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             whyBySlug,
             unifiedDiff
         );
@@ -480,7 +481,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // findings + work artifact here keeps FeedbackDeliveryService free of the composition inputs — it only
         // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
-            DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, whyBySlug, deliveredKeys)
+            DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, whyBySlug, deliveredKeys)
         );
     }
 

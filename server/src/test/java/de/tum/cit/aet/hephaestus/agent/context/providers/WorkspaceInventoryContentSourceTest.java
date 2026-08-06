@@ -179,7 +179,7 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         assertThat(files).containsKey(OUTPUT);
         JsonNode root = objectMapper.readTree(files.get(OUTPUT));
         assertThat(root.get("repository").asString()).isEqualTo("acme/widgets");
-        assertThat(root.get("focal").get("type").asString()).isEqualTo("ISSUE");
+        assertThat(root.get("focal").get("type").asString()).isEqualTo("scm.issue");
         assertThat(root.get("focal").get("number").asInt()).isEqualTo(99);
 
         JsonNode issues = root.get("issues");
@@ -243,7 +243,7 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         provider.contribute(prRequest(42), files);
 
         JsonNode root = objectMapper.readTree(files.get(OUTPUT));
-        assertThat(root.get("focal").get("type").asString()).isEqualTo("PULL_REQUEST");
+        assertThat(root.get("focal").get("type").asString()).isEqualTo("scm.pull_request");
         JsonNode prs = root.get("pullRequests");
         assertThat(prs).hasSize(1);
         assertThat(prs.get(0).get("number").asInt()).isEqualTo(41);
@@ -325,7 +325,7 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         assertThat(repos.get(0).asString()).isEqualTo("acme/widgets");
         assertThat(repos.get(1).asString()).isEqualTo("acme/gadgets");
 
-        assertThat(root.get("focal").get("type").asString()).isEqualTo("CONVERSATION_THREAD");
+        assertThat(root.get("focal").get("type").asString()).isEqualTo("chat.conversation_thread");
         // A conversation isn't itself an issue/PR, so nothing is excluded.
         assertThat(root.get("focal").has("number")).isFalse();
 

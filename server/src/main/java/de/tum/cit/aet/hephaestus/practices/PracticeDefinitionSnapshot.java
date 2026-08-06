@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 record PracticeDefinitionSnapshot(
     String slug,
     String name,
-    WorkArtifact artifactType,
+    ArtifactKind artifactKind,
     List<String> triggerEvents,
     @Nullable Integer criteriaRevision,
     String criteriaSha256,
@@ -24,7 +24,7 @@ record PracticeDefinitionSnapshot(
         return new PracticeDefinitionSnapshot(
             practice.getSlug(),
             practice.getName(),
-            practice.getArtifactType(),
+            practice.getArtifactKind(),
             TriggerEventsConverter.toList(practice.getTriggerEvents()).stream().sorted().toList(),
             criteriaRevision,
             CanonicalDigest.sha256Hex(practice.getCriteria()),

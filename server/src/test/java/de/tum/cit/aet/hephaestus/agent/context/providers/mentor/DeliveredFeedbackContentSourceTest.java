@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -17,8 +18,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -93,7 +94,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         Feedback withBody = Feedback.builder()
             .id(UUID.randomUUID())
             .channel(FeedbackChannel.IN_CONTEXT)
-            .artifactType(WorkArtifact.PULL_REQUEST)
+            .artifactKind(ArtifactKinds.PULL_REQUEST)
             .artifactId(575L)
             .deliveredAt(Instant.parse("2026-06-17T08:30:00Z"))
             .body("Nice work scoping this PR — one thing to tighten before merge.")
@@ -101,7 +102,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         Feedback blank = Feedback.builder()
             .id(UUID.randomUUID())
             .channel(FeedbackChannel.IN_CONTEXT)
-            .artifactType(WorkArtifact.ISSUE)
+            .artifactKind(ArtifactKinds.ISSUE)
             .artifactId(574L)
             .deliveredAt(Instant.parse("2026-06-16T08:30:00Z"))
             .body("   ")
@@ -119,13 +120,13 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         JsonNode only = root.get("deliveredFeedback").get(0);
         assertThat(only.get("body").asString()).contains("Nice work scoping this PR");
         assertThat(only.get("surface").asString()).isEqualTo("IN_CONTEXT");
-        assertThat(only.get("artifactType").asString()).isEqualTo("PULL_REQUEST");
+        assertThat(only.get("artifactKind").asString()).isEqualTo("scm.pull_request");
         assertThat(only.get("artifactId").asLong()).isEqualTo(575L);
     }
 
     @Test
     @DisplayName(
-        "omits artifactType/artifactId for a reflection-style unit with no artifact, still ships surface + body"
+        "omits artifactKind/artifactId for a reflection-style unit with no artifact, still ships surface + body"
     )
     void omitsNullArtifactFields() throws Exception {
         User user = new User();
@@ -149,7 +150,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         JsonNode root = objectMapper.readTree(files.get("inputs/context/delivered_feedback.json"));
         assertThat(root.get("totalDelivered").asLong()).isEqualTo(1L);
         JsonNode only = root.get("deliveredFeedback").get(0);
-        assertThat(only.has("artifactType")).isFalse();
+        assertThat(only.has("artifactKind")).isFalse();
         assertThat(only.has("artifactId")).isFalse();
         assertThat(only.get("surface").asString()).isEqualTo("IN_CONTEXT");
         assertThat(only.get("body").asString()).contains("Reflecting on your last few reviews");

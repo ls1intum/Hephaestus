@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -135,9 +136,13 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         }
 
         // Identify the focal artifact so the agent can tell "what else exists" from "the one under review".
-        String focalType = request instanceof ContextRequest.IssueReviewRequest ? "ISSUE" : "PULL_REQUEST";
+        String focalType = (
+            request instanceof ContextRequest.IssueReviewRequest ? ArtifactKinds.ISSUE : ArtifactKinds.PULL_REQUEST
+        ).value();
         Integer focalNumber =
-            m == null ? null : MetaJson.optInteger(m, focalType.equals("ISSUE") ? "issue_number" : "pr_number");
+            m == null
+                ? null
+                : MetaJson.optInteger(m, focalType.equals(ArtifactKinds.ISSUE.value()) ? "issue_number" : "pr_number");
 
         PageRequest cap = PageRequest.of(0, MAX_PER_TYPE);
         List<Issue> issues = issueRepository.findIssueInventoryByRepositoryId(repositoryId, cap);
@@ -168,9 +173,19 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         );
 
         ArrayNode issuesArr = root.putArray("issues");
-        int issuesEmitted = emit(issuesArr, issues, focalType.equals("ISSUE") ? focalNumber : null, false);
+        int issuesEmitted = emit(
+            issuesArr,
+            issues,
+            focalType.equals(ArtifactKinds.ISSUE.value()) ? focalNumber : null,
+            false
+        );
         ArrayNode prsArr = root.putArray("pullRequests");
-        int prsEmitted = emit(prsArr, pullRequests, focalType.equals("PULL_REQUEST") ? focalNumber : null, true);
+        int prsEmitted = emit(
+            prsArr,
+            pullRequests,
+            focalType.equals(ArtifactKinds.PULL_REQUEST.value()) ? focalNumber : null,
+            true
+        );
 
         ObjectNode counts = root.putObject("counts");
         counts.put("issuesListed", issuesEmitted);
@@ -244,7 +259,7 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
             }
         }
         ObjectNode focal = root.putObject("focal");
-        focal.put("type", "CONVERSATION_THREAD");
+        focal.put("type", ArtifactKinds.CONVERSATION_THREAD.value());
         root.put(
             "note",
             "Whole-workspace index of issues and pull requests across every monitored repository (titles + " +

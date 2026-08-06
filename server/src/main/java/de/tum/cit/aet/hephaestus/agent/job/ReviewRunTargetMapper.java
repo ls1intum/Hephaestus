@@ -2,8 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository.ReviewRunTargetRow;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup.Target;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -27,7 +28,7 @@ final class ReviewRunTargetMapper {
     ) {
         return switch (jobType) {
             case PULL_REQUEST_REVIEW -> new Target(
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 longValue(metadata, "pull_request_id"),
                 integrationKind,
                 integerValue(metadata, "pr_number"),
@@ -37,7 +38,7 @@ final class ReviewRunTargetMapper {
                 textValue(metadata, "pr_url", null)
             );
             case ISSUE_REVIEW -> new Target(
-                WorkArtifact.ISSUE,
+                ArtifactKinds.ISSUE,
                 longValue(metadata, "issue_id"),
                 integrationKind,
                 integerValue(metadata, "issue_number"),
@@ -47,7 +48,7 @@ final class ReviewRunTargetMapper {
                 textValue(metadata, "issue_url", null)
             );
             case CONVERSATION_REVIEW -> new Target(
-                WorkArtifact.CONVERSATION_THREAD,
+                ArtifactKinds.CONVERSATION_THREAD,
                 longValue(metadata, "slack_thread_id"),
                 integrationKind,
                 null,

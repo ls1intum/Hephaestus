@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -16,7 +16,7 @@ public record ObservationQueryFilter(
     @Nullable List<Assessment> assessments,
     @Nullable List<Severity> severities,
     @Nullable UUID agentJobId,
-    @Nullable WorkArtifact artifactType,
+    @Nullable ArtifactKind artifactKind,
     @Nullable Long artifactId,
     @Nullable Long aboutUserId,
     @Nullable Instant from,
@@ -48,8 +48,8 @@ public record ObservationQueryFilter(
         return names(severities);
     }
 
-    public @Nullable String artifactTypeName() {
-        return artifactType == null ? null : artifactType.name();
+    public @Nullable String artifactKindValue() {
+        return artifactKind == null ? null : artifactKind.value();
     }
 
     private static String@Nullable [] names(@Nullable List<? extends Enum<?>> values) {

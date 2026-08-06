@@ -5,10 +5,11 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -106,7 +107,7 @@ class FeedbackDeliveryService {
             feedbackLedgerRecorder.recordWithoutConversation(
                 job,
                 delivery,
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 List.of(),
                 true,
                 false
@@ -124,7 +125,7 @@ class FeedbackDeliveryService {
     ) {
         TrendDelta trend = reviewProperties.progressFooter()
             ? observationTrendService
-                  .computeForTarget(WorkArtifact.PULL_REQUEST, pullRequest.getId(), job.getWorkspace().getId())
+                  .computeForTarget(ArtifactKinds.PULL_REQUEST, pullRequest.getId(), job.getWorkspace().getId())
                   .orElse(null)
             : null;
 
@@ -165,7 +166,7 @@ class FeedbackDeliveryService {
                 feedbackLedgerRecorder.recordWithoutConversation(
                     job,
                     delivery,
-                    WorkArtifact.PULL_REQUEST,
+                    ArtifactKinds.PULL_REQUEST,
                     inlineSignals,
                     summaryOutcome == SummaryOutcome.DELIVERED,
                     inlineDelivered
@@ -174,7 +175,7 @@ class FeedbackDeliveryService {
                 feedbackLedgerRecorder.record(
                     job,
                     delivery,
-                    WorkArtifact.PULL_REQUEST,
+                    ArtifactKinds.PULL_REQUEST,
                     inlineSignals,
                     summaryOutcome == SummaryOutcome.DELIVERED,
                     inlineDelivered

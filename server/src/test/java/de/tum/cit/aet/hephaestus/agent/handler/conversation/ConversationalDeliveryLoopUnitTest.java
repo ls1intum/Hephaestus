@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -27,11 +28,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
@@ -398,7 +399,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient().when(o.getAssessment()).thenReturn(Assessment.BAD);
         lenient().when(o.getSeverity()).thenReturn(Severity.MAJOR);
         lenient().when(o.getConfidence()).thenReturn(confidence);
-        lenient().when(o.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         lenient().when(o.getArtifactId()).thenReturn(100L);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
         lenient().when(o.getEvidence()).thenReturn(evidence);
@@ -412,7 +413,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient().when(o.getPresence()).thenReturn(Presence.PRESENT);
         lenient().when(o.getAssessment()).thenReturn(Assessment.GOOD);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
-        lenient().when(o.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         return o;
     }
 
@@ -422,7 +423,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient().when(o.getPresence()).thenReturn(Presence.NOT_APPLICABLE);
         lenient().when(o.getAssessment()).thenReturn(null);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
-        lenient().when(o.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         return o;
     }
 }

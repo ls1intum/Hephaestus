@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  * LLM re-words its title every run.
  */
 public record TrendDelta(
-    WorkArtifact artifactType,
+    ArtifactKind artifactKind,
     @Nullable Long artifactId,
     UUID currentRunJobId,
     UUID priorRunJobId,

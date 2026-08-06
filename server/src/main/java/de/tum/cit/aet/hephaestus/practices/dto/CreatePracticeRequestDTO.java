@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -60,7 +60,7 @@ public record CreatePracticeRequestDTO(
 
     @Schema(description = "Type of reviewed work. Defaults to PULL_REQUEST when omitted.", example = "PULL_REQUEST")
     @Nullable
-    WorkArtifact artifactType,
+    ArtifactKind artifactKind,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Schema(description = "Plain-language rationale shown to the developer")

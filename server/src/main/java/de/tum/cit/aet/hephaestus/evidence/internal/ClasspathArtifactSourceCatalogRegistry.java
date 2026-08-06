@@ -185,7 +185,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 "displayName",
                 "description",
                 "selectionScope",
-                "artifactTypes",
+                "artifactKinds",
                 "authority",
                 "identity",
                 "completeness",
@@ -218,7 +218,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             requiredText(node, "displayName", kind.toString()),
             requiredText(node, "description", kind.toString()),
             requiredText(node, "selectionScope", kind.toString()),
-            textSet(node, "artifactTypes", kind.toString()),
+            textSet(node, "artifactKinds", kind.toString()),
             enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
             new IdentityPolicy(identityMode),
             new CompletenessPolicy(
@@ -240,7 +240,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
 
     private static EvidenceProfile parseProfile(JsonNode node) {
         requireObject(node, "profile");
-        rejectUnknown(node, Set.of("id", "version", "artifactType", "allowedSources"), "profile");
+        rejectUnknown(node, Set.of("id", "version", "artifactKind", "allowedSources"), "profile");
         Set<SourceKind> allowedSources = new HashSet<>();
         for (String source : textSet(node, "allowedSources", "profile")) {
             allowedSources.add(new SourceKind(source));
@@ -248,7 +248,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         return new EvidenceProfile(
             new EvidenceProfileId(requiredText(node, "id", "profile")),
             new SourceContractVersion(requiredText(node, "version", "profile")),
-            requiredText(node, "artifactType", "profile"),
+            requiredText(node, "artifactKind", "profile"),
             allowedSources
         );
     }

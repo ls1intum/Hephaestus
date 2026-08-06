@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.dto.ValidTriggerEvents;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -20,7 +20,7 @@ public record CuratedPracticeRequestDTO(
     @NonNull
     String name,
 
-    @NonNull @NotNull(message = "Artifact type is required") WorkArtifact artifactType,
+    @NonNull @NotNull(message = "Artifact type is required") ArtifactKind artifactKind,
 
     @NotNull(message = "Trigger events are required")
     @Size(max = 10, message = "Trigger events must contain at most 10 entries")
@@ -56,7 +56,7 @@ public record CuratedPracticeRequestDTO(
     public PracticeDefinition definition(PracticeAutomatedReviewPolicy resolvedEvidence) {
         return new PracticeDefinition(
             name,
-            artifactType,
+            artifactKind,
             triggerEvents,
             criteria,
             precomputeScript,

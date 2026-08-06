@@ -9,7 +9,7 @@ public record ArtifactSourceContract(
     String displayName,
     String description,
     String selectionScope,
-    Set<String> artifactTypes,
+    Set<String> artifactKinds,
     SourceAuthority authority,
     IdentityPolicy identityPolicy,
     CompletenessPolicy completenessPolicy,
@@ -24,9 +24,9 @@ public record ArtifactSourceContract(
         displayName = requireText(displayName, "displayName", kind);
         description = requireText(description, "description", kind);
         selectionScope = requireText(selectionScope, "selectionScope", kind);
-        artifactTypes = Set.copyOf(Objects.requireNonNull(artifactTypes, "artifactTypes"));
-        if (artifactTypes.isEmpty() || artifactTypes.stream().anyMatch(value -> value == null || value.isBlank())) {
-            throw new IllegalArgumentException("artifactTypes must contain non-blank values: " + kind);
+        artifactKinds = Set.copyOf(Objects.requireNonNull(artifactKinds, "artifactKinds"));
+        if (artifactKinds.isEmpty() || artifactKinds.stream().anyMatch(value -> value == null || value.isBlank())) {
+            throw new IllegalArgumentException("artifactKinds must contain non-blank values: " + kind);
         }
         Objects.requireNonNull(authority, "authority");
         Objects.requireNonNull(identityPolicy, "identityPolicy");
@@ -61,8 +61,8 @@ public record ArtifactSourceContract(
         }
     }
 
-    public boolean appliesTo(String artifactType) {
-        return artifactTypes.contains(artifactType);
+    public boolean appliesTo(String artifactKind) {
+        return artifactKinds.contains(artifactKind);
     }
 
     private static String requireText(String value, String field, SourceKind kind) {

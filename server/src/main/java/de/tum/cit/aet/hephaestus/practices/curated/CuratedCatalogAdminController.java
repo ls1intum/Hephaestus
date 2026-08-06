@@ -457,7 +457,7 @@ public class CuratedCatalogAdminController {
     private PracticeDefinition definition(CuratedPracticeRequestDTO request) {
         var evidence =
             request.automatedReviewPolicy() == null
-                ? evidenceDefaults.forArtifact(request.artifactType())
+                ? evidenceDefaults.forArtifact(request.artifactKind())
                 : request.automatedReviewPolicy();
         return request.definition(evidence);
     }
