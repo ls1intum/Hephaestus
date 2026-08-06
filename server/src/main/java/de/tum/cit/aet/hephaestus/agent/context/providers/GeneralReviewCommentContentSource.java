@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
@@ -44,7 +45,7 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
 
     static final String FILE_NAME = "general_comments.json";
 
-    static final int MAX_COMMENTS = 200;
+    static final int MAX_COMMENTS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
 
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus:";
 

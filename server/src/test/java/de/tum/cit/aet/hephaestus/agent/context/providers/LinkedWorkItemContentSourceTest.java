@@ -222,7 +222,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void capsAtEightItems() throws Exception {
+    void keepsEveryLinkedIssueRatherThanTheFirstFew() throws Exception {
         StringBuilder body = new StringBuilder();
         for (int i = 1; i <= 20; i++) {
             body.append("Closes #").append(i).append(' ');
@@ -238,8 +238,11 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
+        // Twenty closing references used to become eight. A collector does not decide how many linked
+        // issues a reviewer can hold; it reports what the work actually links to.
         JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
-        assertThat(root.get("workItems")).hasSize(LinkedWorkItemContentSource.MAX_ITEMS);
+        assertThat(root.get("workItems")).hasSize(20);
+        assertThat(root.get("truncated").asBoolean()).isFalse();
     }
 
     @Test

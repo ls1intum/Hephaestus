@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
@@ -52,7 +53,7 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
 
     static final String OUTPUT_FILE = OUTPUT_PREFIX + "linked_work_items.json";
 
-    static final int MAX_ITEMS = 8;
+    static final int MAX_ITEMS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
 
     static final int EXCERPT_CHARS = 2000;
 

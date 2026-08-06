@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -62,7 +63,7 @@ public class IssueContentSource implements EvidenceSource {
     private static final Logger log = LoggerFactory.getLogger(IssueContentSource.class);
 
     /** Cap the thread included in context; most recent kept on truncation. */
-    static final int MAX_COMMENTS = 200;
+    static final int MAX_COMMENTS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
 
     private final ObjectMapper objectMapper;
     private final IssueRepository issueRepository;

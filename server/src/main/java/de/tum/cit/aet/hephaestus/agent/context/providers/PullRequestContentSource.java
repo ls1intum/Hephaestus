@@ -7,6 +7,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -68,7 +69,7 @@ public class PullRequestContentSource implements EvidenceSource {
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestContentSource.class);
 
-    static final int MAX_COMMENTS = 500;
+    static final int MAX_COMMENTS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
 
     /** Captures the b-side path of a git diff header — robust against renames and paths containing " b/". */
     private static final Pattern DIFF_GIT_HEADER = Pattern.compile("^diff --git a/.* b/(.+)$");

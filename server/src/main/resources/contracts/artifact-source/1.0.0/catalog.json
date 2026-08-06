@@ -236,7 +236,7 @@
 			"kind": "scm.linked-work-items",
 			"displayName": "Linked work items",
 			"description": "Issues the pull request states it addresses, resolved from its description, branch name, and commit subjects.",
-			"selectionScope": "Up to 8 issues resolved from closing references, the branch name, and up to 500 commit subjects. Resolution cannot establish that it found every link the work actually has, so this source is never reported as COMPLETE. References to work outside this repository are reported as unresolved rather than as incomplete evidence.",
+			"selectionScope": "Issues resolved from closing references, the branch name, and up to 500 commit subjects. Resolution cannot establish that it found every link the work actually has, so this source is never reported as COMPLETE. References to work outside this repository are reported as unresolved rather than as incomplete evidence.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -269,7 +269,7 @@
 			"kind": "scm.review-threads",
 			"displayName": "Review threads and decisions",
 			"description": "Review conversations on the pull request, whether each was resolved, and each reviewer's decision.",
-			"selectionScope": "Up to 200 review threads and 30 review decisions for one pull request. Beyond either limit the capture is reported as PARTIAL.",
+			"selectionScope": "Every review thread and review decision for one pull request.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],
@@ -302,7 +302,7 @@
 			"kind": "scm.general-review-comments",
 			"displayName": "General review comments",
 			"description": "Review comments addressing the pull request as a whole rather than a specific line.",
-			"selectionScope": "Up to 200 general review comments on one pull request. Beyond that limit the capture is reported as PARTIAL.",
+			"selectionScope": "Every general review comment on one pull request.",
 			"artifactTypes": [
 				"PULL_REQUEST"
 			],

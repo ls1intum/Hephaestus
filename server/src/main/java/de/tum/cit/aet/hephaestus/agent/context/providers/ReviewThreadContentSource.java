@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
@@ -47,7 +48,7 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
     static final String FILE_NAME = "review_threads.json";
 
-    static final int MAX_THREADS = 200;
+    static final int MAX_THREADS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
 
     static final int MAX_DECISIONS = 30;
 
