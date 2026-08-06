@@ -2,8 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
@@ -62,6 +64,30 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
     @Override
     public boolean required() {
         return false;
+    }
+
+    /**
+     * Reports the truncation the payload already records.
+     *
+     * <p>The default capture leaves completeness to the catalog, which permits COMPLETE for this source —
+     * so a pull request past the comment limit would be described as holding all of them.
+     */
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        byte[] emitted = captured.files().get(OUTPUT_PREFIX + FILE_NAME);
+        if (!selectedKinds.contains(KIND) || emitted == null) {
+            return captured;
+        }
+        boolean truncated = objectMapper.readTree(emitted).path("truncated").asBoolean(false);
+        return new EvidenceContribution(
+            captured.files(),
+            Map.of(KIND, truncated ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE),
+            captured.immutableIdentities(),
+            captured.observedAt(),
+            captured.sourceEffectiveAt(),
+            captured.contentStates()
+        );
     }
 
     @Override
