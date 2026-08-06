@@ -6,6 +6,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
+import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import java.lang.reflect.Field;
@@ -63,6 +64,26 @@ class EvidenceCompletenessReportingTest {
 
         assertThat(silent)
             .as("these collectors let the catalog answer for them, so a truncated capture reads as complete")
+            .isEmpty();
+    }
+
+    @Test
+    @DisplayName("a collector for a source pinned to an immutable identity reports that identity itself")
+    void collectorsThatPinAnIdentityOverrideCapture() {
+        Set<SourceKind> pinned = java.util.Arrays.stream(CATALOG)
+            .filter(contract -> contract.freshnessPolicy().mode() == FreshnessMode.PINNED_IDENTITY)
+            .map(ArtifactSourceContract::kind)
+            .collect(Collectors.toSet());
+
+        List<String> silent = new ArrayList<>();
+        for (Class<?> collector : collectors()) {
+            if (declaredKinds(collector).stream().anyMatch(pinned::contains) && !overridesCapture(collector)) {
+                silent.add(collector.getSimpleName());
+            }
+        }
+
+        assertThat(silent)
+            .as("without an identity from the collector, a pinned source can only ever read as unknown freshness")
             .isEmpty();
     }
 
