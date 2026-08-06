@@ -366,7 +366,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
         double blockedBefore = blockedCount("instance");
 
-        var job = agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null);
+        var job = agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null);
 
         assertThat(job).isEmpty();
         assertThat(blockedCount("instance")).isEqualTo(blockedBefore + 1);
@@ -387,7 +387,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double byoBlockedBefore = blockedCount("byo");
 
         Throwable thrown = catchThrowable(() ->
-            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null)
+            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null)
         );
 
         // A budget refusal is a QUIET return of Optional.empty(), never a throw. So a non-null
@@ -408,7 +408,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         bindDetectionTo(workspace, FundingSource.WORKSPACE);
         double blockedBefore = blockedCount("byo");
 
-        var job = agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null);
+        var job = agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null);
 
         assertThat(job).isEmpty();
         assertThat(blockedCount("byo")).isEqualTo(blockedBefore + 1);
@@ -424,7 +424,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double byoBlockedBefore = blockedCount("byo");
 
         Throwable thrown = catchThrowable(() ->
-            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null)
+            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null)
         );
 
         // As above: a throw means the gate let this through. A zero BYO cap that reached across would

@@ -534,6 +534,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             mrNumber
         );
         boolean isNew = existingOpt.isEmpty();
+        // Read BEFORE the upsert below overwrites it. A draft transition is only ever visible as a
+        // difference against what we last knew; once the row agrees with upstream the evidence is gone
+        // and there is no later event to recover it from, because upstream already announced it.
+        Boolean wasDraft = existingOpt.map(PullRequest::isDraft).orElse(null);
 
         User author = findOrCreateUser(
             new GitLabUserLookup(
@@ -675,6 +679,19 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         } else {
             eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(prData, Set.of(), eventCtx));
             log.debug("Updated merge request from sync: nativeId={}, iid={}", nativeId, data.iid());
+        }
+
+        // The same draft diff the webhook path runs. Reconciliation sees state as often as delivery
+        // does, and dropping the transition here meant a merge request that went ready while we were
+        // between webhooks could never be reviewed as ready at all.
+        if (wasDraft != null) {
+            if (wasDraft && !data.draft()) {
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReady(prData, eventCtx));
+                log.info("Merge request found ready during sync: prId={}, iid={}", pr.getId(), data.iid());
+            } else if (!wasDraft && data.draft()) {
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestDrafted(prData, eventCtx));
+                log.info("Merge request found converted to draft during sync: prId={}, iid={}", pr.getId(), data.iid());
+            }
         }
 
         return pr;

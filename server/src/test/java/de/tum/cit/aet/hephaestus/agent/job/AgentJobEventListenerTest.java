@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,6 +17,9 @@ import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -63,11 +67,34 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     @Mock
     private PracticeReviewDetectionGate practiceReviewDetectionGate;
 
+    @Mock
+    private WorkspaceResolver workspaceResolver;
+
+    @Mock
+    private SignalRecorder signalRecorder;
+
     private AgentJobEventListener listener;
 
     @BeforeEach
     void setUp() {
-        listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
+        listener = new AgentJobEventListener(
+            agentJobService,
+            pullRequestRepository,
+            practiceReviewDetectionGate,
+            workspaceResolver,
+            signalRecorder
+        );
+
+        Workspace owningWorkspace = new Workspace();
+        owningWorkspace.setId(WORKSPACE_ID);
+        // Every dispatching path now asks two questions before it may do anything: who owns this
+        // repository, and is this observation ours to act on. Lenient because the paths that
+        // short-circuit before dispatch never ask them.
+        lenient().when(workspaceResolver.resolveForRepository(any())).thenReturn(Optional.of(owningWorkspace));
+        lenient().when(signalRecorder.record(any(), any(), any())).thenReturn(true);
+        // A PR signal is keyed on its head commit, read through a projection rather than the gate's
+        // fetch graph so that recording costs nothing extra.
+        lenient().when(pullRequestRepository.findHeadRefOidById(any())).thenReturn(Optional.of("abc123"));
     }
 
     // Helpers
@@ -149,14 +176,14 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         workspace.setId(WORKSPACE_ID);
         var detect = new GateDecision.Detect(workspace, List.of());
         when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(detect);
-        when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+        when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
         return pr;
     }
 
     private PullRequestReviewSubmissionRequest captureSubmission(Long workspaceId) {
         var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
+        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture(), any());
         return captor.getValue();
     }
 
@@ -166,14 +193,18 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     class FilteringTests {
 
         @Test
-        void shouldSkipSyncEvents() {
+        void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
+            // Recording is unconditional; triggering is policy. Reconciliation establishes THAT the
+            // transition happened, which is why the row is written — but replaying a repository's whole
+            // history as live coaching is not what a sync was asked to do, so nothing else runs.
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new ScmDomainEvent.PullRequestCreated(prData, syncContext());
 
             listener.onPullRequestCreated(event);
 
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -184,7 +215,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestCreated(event);
 
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -195,7 +226,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestCreated(event);
 
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -207,7 +238,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestCreated(event);
 
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -218,7 +249,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            // The signal was claimed before the artifact was read, so a vanished PR must be settled
+            // rather than left pending for a reaper to re-offer forever.
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_GONE));
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -232,7 +266,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestCreated(event);
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -246,7 +280,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestCreated(event);
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -260,7 +294,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestCreated(event);
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -280,7 +314,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            // A workspace's own gate declining is an answer, not an omission — it settles the signal so
+            // the refusal is countable instead of invisible.
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.GATE_SKIPPED));
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -311,7 +348,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)
             ).thenReturn(detect);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onPullRequestCreated(event);
 
@@ -319,7 +356,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             verify(agentJobService).submit(
                 workspaceIdCaptor.capture(),
                 eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
+                any(PullRequestReviewSubmissionRequest.class),
+                any()
             );
             assertThat(workspaceIdCaptor.getValue()).isEqualTo(42L).isNotEqualTo(99L);
         }
@@ -336,12 +374,17 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             workspace.setId(WORKSPACE_ID);
             var detect = new GateDecision.Detect(workspace, List.of());
             when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(detect);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onPullRequestCreated(event);
 
             var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-            verify(agentJobService).submit(eq(WORKSPACE_ID), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
+            verify(agentJobService).submit(
+                eq(WORKSPACE_ID),
+                eq(AgentJobType.PULL_REQUEST_REVIEW),
+                captor.capture(),
+                any()
+            );
 
             PullRequestReviewSubmissionRequest request = captor.getValue();
             assertThat(request.pullRequest()).isSameAs(prData);
@@ -364,7 +407,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestCreated(event);
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO);
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -414,7 +457,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("DB error"));
+            when(agentJobService.submit(any(), any(), any(), any())).thenThrow(new RuntimeException("DB error"));
 
             // Swallowing is the contract: this listener runs on the webhook consumer, and a thrown
             // exception would NAK the delivery and redeliver the same doomed submission.
@@ -435,7 +478,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             // Should not throw — outer catch handles gate exceptions
             listener.onPullRequestCreated(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -457,14 +500,17 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldSkipSyncEvents() {
+        void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
+            // Same split as every other handler: the push is recorded so it is not lost, and no review is
+            // coached on a revision reconciliation merely caught up with.
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new ScmDomainEvent.PullRequestSynchronized(prData, syncContext());
 
             listener.onPullRequestSynchronized(event);
 
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -494,7 +540,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
             ).thenReturn(detect);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onReviewSubmitted(event);
 
@@ -508,14 +554,29 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldSkipSyncEvents() {
+        void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
+            // A ReviewSubmitted event carries no PullRequestData, so unlike the PR handlers this path must
+            // load the PR before it can key anything — the recording still happens and the review still
+            // does not, because a reconciled review is history, not a live transition to coach on.
             var reviewData = createReviewData();
             var event = new ScmDomainEvent.ReviewSubmitted(reviewData, syncContext());
 
+            PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
+            Repository repo = new Repository();
+            repo.setId(100L);
+            repo.setNameWithOwner("owner/repo");
+            repo.setDefaultBranch("main");
+            pr.setRepository(repo);
+            pr.setNumber(PR_NUMBER);
+            pr.setTitle("Test PR");
+            pr.setHtmlUrl("https://github.com/owner/repo/pull/42");
+            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
+
             listener.onReviewSubmitted(event);
 
-            verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -526,7 +587,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -541,7 +602,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onReviewSubmitted(event);
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -557,7 +618,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onReviewSubmitted(event);
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -573,7 +634,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onReviewSubmitted(event);
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -587,7 +648,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onReviewSubmitted(event);
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -603,7 +664,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -627,7 +688,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("submission failed"));
+            when(agentJobService.submit(any(), any(), any(), any())).thenThrow(
+                new RuntimeException("submission failed")
+            );
 
             assertThatCode(() -> listener.onReviewSubmitted(event)).doesNotThrowAnyException();
         }
@@ -646,7 +709,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             // Should not throw — outer catch handles gate exceptions
             listener.onReviewSubmitted(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -672,7 +735,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_MERGED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             var prData = createPrData(Issue.State.MERGED, false, true);
             listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, webhookContext(1L)));
@@ -682,13 +745,16 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void onPullRequestMerged_skipsSyncEvents() {
-            // A sync replays EVERY historical merge — retrospective detection is for real-time transitions only.
+        void onPullRequestMerged_recordsSyncDiscoveredMergesWithoutReviewingThem() {
+            // A sync replays EVERY historical merge — retrospective detection is for real-time transitions
+            // only. The ledger row is still written, so the merge we did receive leaves a trace instead of
+            // being dropped at the door and never noticed again.
             var prData = createPrData(Issue.State.MERGED, false, true);
             listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, syncContext()));
 
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -701,7 +767,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CLOSED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             var prData = createPrData(Issue.State.CLOSED, false, false);
             // wasMerged=false → abandoned close, routed under PULL_REQUEST_CLOSED.
@@ -719,18 +785,20 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var prData = createPrData(Issue.State.MERGED, false, true);
             listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(prData, true, webhookContext(1L)));
 
+            verify(signalRecorder, never()).record(any(), any(), any());
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
-        void onPullRequestClosed_skipsSyncEvents() {
+        void onPullRequestClosed_recordsSyncDiscoveredClosesWithoutReviewingThem() {
             var prData = createPrData(Issue.State.CLOSED, false, false);
             listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(prData, false, syncContext()));
 
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -750,7 +818,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         ) {
             static CollaborationFixture create(
                 AgentJobService agentJobService,
-                PullRequestRepository pullRequestRepository
+                PullRequestRepository pullRequestRepository,
+                SignalRecorder signalRecorder
             ) {
                 var userRoleChecker = mock(UserRoleChecker.class);
                 var practiceDetectionReadiness = mock(PracticeReviewReadiness.class);
@@ -764,7 +833,15 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                     practiceRepository,
                     workspaceResolver
                 );
-                var listener = new AgentJobEventListener(agentJobService, pullRequestRepository, realGate);
+                // One resolver for both, as in production: the ledger key and the gate must agree on which
+                // workspace owns the repository.
+                var listener = new AgentJobEventListener(
+                    agentJobService,
+                    pullRequestRepository,
+                    realGate,
+                    workspaceResolver,
+                    signalRecorder
+                );
                 return new CollaborationFixture(
                     listener,
                     userRoleChecker,
@@ -794,7 +871,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void listenerWithRealGateSubmitsOnDetectCarryingTheGatesTrigger() {
-            var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
+            var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository, signalRecorder);
 
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
@@ -813,7 +890,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             );
 
             setupCollaborationPR();
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
@@ -826,7 +903,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void realGateSkipsWhenNoMatchingPractices() {
-            var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
+            var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository, signalRecorder);
 
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
@@ -850,7 +927,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
             fixture.listener().onPullRequestCreated(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 }

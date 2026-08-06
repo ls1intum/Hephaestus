@@ -204,7 +204,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isPresent();
@@ -233,12 +234,14 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> first = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
             Optional<AgentJob> second = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(first).isPresent();
@@ -256,12 +259,14 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> first = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request1
+                request1,
+                null
             );
             Optional<AgentJob> second = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request2
+                request2,
+                null
             );
 
             assertThat(first).isPresent();
@@ -291,7 +296,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isPresent();
@@ -310,7 +316,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isEmpty();
@@ -325,7 +332,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isEmpty();
@@ -342,7 +350,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isPresent();

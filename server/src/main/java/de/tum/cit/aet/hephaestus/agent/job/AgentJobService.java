@@ -16,6 +16,9 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -57,6 +60,7 @@ public class AgentJobService {
     private final PracticeRepository practiceRepository;
     private final LlmBudgetService llmBudgetService;
     private final LlmModelResolver llmModelResolver;
+    private final SignalRecorder signalRecorder;
 
     public AgentJobService(
         AgentJobRepository agentJobRepository,
@@ -69,7 +73,8 @@ public class AgentJobService {
         PracticeReviewProperties reviewProperties,
         PracticeRepository practiceRepository,
         LlmBudgetService llmBudgetService,
-        LlmModelResolver llmModelResolver
+        LlmModelResolver llmModelResolver,
+        SignalRecorder signalRecorder
     ) {
         this.agentJobRepository = agentJobRepository;
         this.agentBindingRepository = agentBindingRepository;
@@ -82,6 +87,7 @@ public class AgentJobService {
         this.practiceRepository = practiceRepository;
         this.llmBudgetService = llmBudgetService;
         this.llmModelResolver = llmModelResolver;
+        this.signalRecorder = signalRecorder;
     }
 
     @Transactional(readOnly = true)
@@ -143,8 +149,13 @@ public class AgentJobService {
     }
 
     /** Submit a prepared dev request and render the result message. Call only after the build transaction commits. */
-    public String submitPrepared(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
-        Optional<AgentJob> job = submit(workspaceId, jobType, request);
+    public String submitPrepared(
+        Long workspaceId,
+        AgentJobType jobType,
+        JobSubmissionRequest request,
+        @Nullable SignalKey signalKey
+    ) {
+        Optional<AgentJob> job = submit(workspaceId, jobType, request, signalKey);
         return job
             .map(j -> "Job submitted: " + j.getId())
             .orElse(
@@ -161,10 +172,19 @@ public class AgentJobService {
      * its own so the idempotency-key race it absorbs rolls back only that insert; joined to an outer
      * transaction, the same race would poison the caller's whole unit of work.
      *
+     * @param signalKey the ledger entry this submission answers, already won by the caller. Every
+     *     refusal below is recorded against it, which is what allows a review refused for a reason an
+     *     operator can lift to happen later instead of being lost. Null for the paths that cannot name
+     *     a signal yet, which then keep the older in-flight-only deduplication.
      * @return the created (or existing, deduplicated) job; empty when the workspace has no enabled
      *     practice-review binding, or the cap funding it is reached
      */
-    public Optional<AgentJob> submit(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
+    public Optional<AgentJob> submit(
+        Long workspaceId,
+        AgentJobType jobType,
+        JobSubmissionRequest request,
+        @Nullable SignalKey signalKey
+    ) {
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
@@ -175,27 +195,44 @@ public class AgentJobService {
             .orElse(null);
         if (binding == null) {
             log.debug("No practice-review binding to run: workspaceId={}", workspaceId);
-            return Optional.empty();
+            return refuse(signalKey, SignalStateReason.BINDING_DISABLED);
         }
 
         // THE choke point for all sandboxed LLM work, scoped to whoever pays for THIS binding — which is
         // why the binding is resolved first: an exhausted host budget must not pause work the workspace
         // funds itself, or vice versa. Eventually consistent; uncosted in-flight jobs may overshoot.
         if (llmBudgetService.blockSubmission(workspace, jobType.name(), binding.getFundingSource())) {
-            return Optional.empty();
+            return refuse(signalKey, SignalStateReason.BUDGET_EXHAUSTED);
         }
 
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        return Optional.ofNullable(submitForBinding(workspace, jobType, submission));
+        return Optional.ofNullable(submitForBinding(workspace, jobType, submission, signalKey));
+    }
+
+    /**
+     * Hold a refused signal open so the reaper can re-offer it, and answer the caller with the empty
+     * result the refusal implies. Wrapped in the transaction template because the callers differ in
+     * whether they already have one.
+     */
+    private Optional<AgentJob> refuse(@Nullable SignalKey signalKey, SignalStateReason reason) {
+        if (signalKey != null) {
+            transactionTemplate.executeWithoutResult(status -> signalRecorder.markRefused(signalKey, reason));
+        }
+        return Optional.empty();
     }
 
     /**
      * Submit exactly one practice-review job — never a fan-out. The binding is re-fetched inside the
      * transaction because the discovery read in {@link #submit} runs detached.
      */
-    private @Nullable AgentJob submitForBinding(Workspace workspace, AgentJobType jobType, JobSubmission submission) {
+    private @Nullable AgentJob submitForBinding(
+        Workspace workspace,
+        AgentJobType jobType,
+        JobSubmission submission,
+        @Nullable SignalKey signalKey
+    ) {
         String detectionKey = submission.idempotencyKey() + ":detection";
 
         return transactionTemplate.execute(status -> {
@@ -208,14 +245,14 @@ public class AgentJobService {
                     currentWorkspace.getId(),
                     currentWorkspace.getStatus()
                 );
-                return null;
+                return refuseInTransaction(signalKey, SignalStateReason.WORKSPACE_INACTIVE);
             }
             if (!Boolean.TRUE.equals(currentWorkspace.getFeatures().getPracticesEnabled())) {
                 log.debug(
                     "Skipping practice review while the workspace feature is off: workspaceId={}",
                     workspace.getId()
                 );
-                return null;
+                return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
             }
             if (
                 !practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactType(
@@ -228,7 +265,7 @@ public class AgentJobService {
                     workspace.getId(),
                     jobType
                 );
-                return null;
+                return refuseInTransaction(signalKey, SignalStateReason.NO_ACTIVE_PRACTICE);
             }
 
             WorkspaceAgentBinding binding = agentBindingRepository
@@ -236,25 +273,32 @@ public class AgentJobService {
                 .filter(WorkspaceAgentBinding::isEnabled)
                 .orElse(null);
             if (binding == null) {
-                return null; // unbound or disabled since discovery
+                // Unbound or disabled since discovery.
+                return refuseInTransaction(signalKey, SignalStateReason.BINDING_DISABLED);
             }
 
-            // Application-level idempotency; the partial unique index is the safety net.
-            Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
-                workspace.getId(),
-                detectionKey,
-                ACTIVE_STATUSES
-            );
-            if (existing.isPresent()) {
-                log.info(
-                    "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
-                    existing.get().getId(),
-                    detectionKey
+            // A keyed submission was already deduplicated by the ledger's unique constraint, which
+            // outlives the job. The status-scoped check below only ever caught a duplicate while a job
+            // was still running, so a redelivery after completion re-ran the whole review; it remains
+            // for the paths that cannot name a signal yet.
+            if (signalKey == null) {
+                Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
+                    workspace.getId(),
+                    detectionKey,
+                    ACTIVE_STATUSES
                 );
-                return existing.get();
+                if (existing.isPresent()) {
+                    log.info(
+                        "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
+                        existing.get().getId(),
+                        detectionKey
+                    );
+                    return existing.get();
+                }
             }
 
-            // Cooldown: refuse a re-trigger of the same subject at ANY freshness, not just this one.
+            // Rate limiting, not correctness — a workspace may set it to zero. It refuses a re-trigger
+            // of the same subject at ANY freshness, not just this one.
             int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(reviewProperties.cooldownMinutes());
             if (cooldown > 0) {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
@@ -274,7 +318,7 @@ public class AgentJobService {
                         cooldown,
                         detectionKey
                     );
-                    return null;
+                    return refuseInTransaction(signalKey, SignalStateReason.COOLDOWN_ACTIVE);
                 }
             }
 
@@ -292,7 +336,7 @@ public class AgentJobService {
                     "Skipping practice-review binding whose model is no longer available: workspaceId={}",
                     workspace.getId()
                 );
-                return null;
+                return refuseInTransaction(signalKey, SignalStateReason.MODEL_UNAVAILABLE);
             }
             // Resolved here rather than per-path so EVERY submission carries a delivery channel; without
             // one the job still costs LLM spend but its feedback is dropped at the poster.
@@ -315,10 +359,15 @@ public class AgentJobService {
                 agentJobRepository.saveAndFlush(job);
             } catch (DataIntegrityViolationException e) {
                 // Partial unique index race: another concurrent submit won. Mark rollback so the broken
-                // Hibernate Session is cleaned up.
+                // Hibernate Session is cleaned up — which also unwinds this signal's ledger row, leaving
+                // the occurrence free to be recorded again rather than consumed by a job that never was.
                 log.info("Idempotency constraint caught concurrent duplicate: key={}", detectionKey);
                 status.setRollbackOnly();
                 return null;
+            }
+
+            if (signalKey != null) {
+                signalRecorder.markTriggered(signalKey, job.getId());
             }
 
             log.info(
@@ -330,6 +379,14 @@ public class AgentJobService {
 
             return job;
         });
+    }
+
+    /** Settle a refused signal inside the submission transaction, so the two stand or fall together. */
+    private @Nullable AgentJob refuseInTransaction(@Nullable SignalKey signalKey, SignalStateReason reason) {
+        if (signalKey != null) {
+            signalRecorder.markRefused(signalKey, reason);
+        }
+        return null;
     }
 
     private static SubjectClass subjectClassFor(AgentJobType jobType) {

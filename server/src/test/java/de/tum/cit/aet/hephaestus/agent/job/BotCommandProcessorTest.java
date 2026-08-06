@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -80,12 +81,13 @@ class BotCommandProcessorTest extends BaseUnitTest {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
 
             processor.onBotCommandReceived(event(command));
 
             var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
+            // A bot command is not (yet) a ledger-keyed signal, so the submission carries no signal key.
+            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture(), isNull());
             PullRequestReviewSubmissionRequest request = captor.getValue();
             assertThat(request.pullRequest().number()).isEqualTo(MR_NUMBER);
             assertThat(request.headRefOid()).isEqualTo("abc123");
@@ -98,7 +100,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event(command));
 
             verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -111,7 +113,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -122,7 +124,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -133,7 +135,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -145,7 +147,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -162,7 +164,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -170,7 +172,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
@@ -189,7 +191,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 

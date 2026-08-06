@@ -107,7 +107,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         seedMessage(ws, "C1", t2, rootTs);
         seedMessage(ws, "C1", lastTs, rootTs);
 
-        when(agentJobService.submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), any())).thenReturn(
+        when(agentJobService.submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), any(), any())).thenReturn(
             Optional.of(new AgentJob())
         );
 
@@ -116,7 +116,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         ArgumentCaptor<ConversationReviewSubmissionRequest> captor = ArgumentCaptor.forClass(
             ConversationReviewSubmissionRequest.class
         );
-        verify(agentJobService, times(2)).submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), captor.capture());
+        verify(agentJobService, times(2)).submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), captor.capture(), any());
         assertThat(captor.getAllValues())
             .extracting(ConversationReviewSubmissionRequest::aboutUserId)
             .containsExactlyInAnyOrder(100L, 101L);
@@ -155,7 +155,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
 
         scheduler.detectNow();
 
-        verify(agentJobService, times(0)).submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), any());
+        verify(agentJobService, times(0)).submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), any(), any());
     }
 
     @Test
@@ -258,13 +258,13 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
             seedMessage(wsB, "C1", s + ".000000", s == baseSecond ? null : rootTs);
         }
 
-        when(agentJobService.submit(eq(wsB), eq(AgentJobType.CONVERSATION_REVIEW), any())).thenReturn(
+        when(agentJobService.submit(eq(wsB), eq(AgentJobType.CONVERSATION_REVIEW), any(), any())).thenReturn(
             Optional.of(new AgentJob())
         );
 
         scheduler.detectNow();
 
-        verify(agentJobService, times(0)).submit(eq(wsA), any(), any());
-        verify(agentJobService, times(1)).submit(eq(wsB), eq(AgentJobType.CONVERSATION_REVIEW), any());
+        verify(agentJobService, times(0)).submit(eq(wsA), any(), any(), any());
+        verify(agentJobService, times(1)).submit(eq(wsB), eq(AgentJobType.CONVERSATION_REVIEW), any(), any());
     }
 }

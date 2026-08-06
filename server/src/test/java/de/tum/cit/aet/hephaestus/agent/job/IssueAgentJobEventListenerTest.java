@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,6 +17,9 @@ import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -25,6 +29,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -52,11 +57,31 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     @Mock
     private PracticeReviewDetectionGate practiceReviewDetectionGate;
 
+    @Mock
+    private WorkspaceResolver workspaceResolver;
+
+    @Mock
+    private SignalRecorder signalRecorder;
+
     private IssueAgentJobEventListener listener;
 
     @BeforeEach
     void setUp() {
-        listener = new IssueAgentJobEventListener(agentJobService, issueRepository, practiceReviewDetectionGate);
+        listener = new IssueAgentJobEventListener(
+            agentJobService,
+            issueRepository,
+            practiceReviewDetectionGate,
+            workspaceResolver,
+            signalRecorder
+        );
+
+        Workspace owningWorkspace = new Workspace();
+        owningWorkspace.setId(WORKSPACE_ID);
+        // Every dispatching path now asks two questions before it may do anything: who owns this
+        // repository, and is this observation ours to act on. Lenient because the paths that
+        // short-circuit before dispatch never ask them.
+        lenient().when(workspaceResolver.resolveForRepository(any())).thenReturn(Optional.of(owningWorkspace));
+        lenient().when(signalRecorder.record(any(), any(), any())).thenReturn(true);
     }
 
     // Helpers
@@ -128,14 +153,14 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         workspace.setId(WORKSPACE_ID);
         var detect = new GateDecision.Detect(workspace, List.of());
         when(practiceReviewDetectionGate.evaluateIssue(eq(issue), any(), any())).thenReturn(detect);
-        when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+        when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
         return issue;
     }
 
     private IssueReviewSubmissionRequest captureSubmission(Long workspaceId) {
         var captor = ArgumentCaptor.forClass(IssueReviewSubmissionRequest.class);
-        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.ISSUE_REVIEW), captor.capture());
+        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.ISSUE_REVIEW), captor.capture(), any());
         return captor.getValue();
     }
 
@@ -145,15 +170,19 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     class FilteringTests {
 
         @Test
-        void shouldSkipSyncEvents() {
+        void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
+            // Recording is unconditional; triggering is policy. Reconciliation establishes THAT the issue
+            // was opened, which is why the row is written — but replaying a repository's whole history as
+            // live coaching is not what a sync was asked to do, so nothing else runs.
             var issueData = createIssueData(Issue.State.OPEN);
             var event = new ScmDomainEvent.IssueCreated(issueData, syncContext());
 
             listener.onIssueCreated(event);
 
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -165,7 +194,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -176,8 +205,11 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
+            // The signal was claimed before the artifact was read, so a vanished issue must be settled
+            // rather than left pending for a reaper to re-offer forever.
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_GONE));
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -191,8 +223,9 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_GONE));
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -212,7 +245,10 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            // A workspace's own gate declining is an answer, not an omission — it settles the signal so
+            // the refusal is countable instead of invisible.
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.GATE_SKIPPED));
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -241,7 +277,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO)
             ).thenReturn(detect);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onIssueCreated(event);
 
@@ -249,7 +285,8 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             verify(agentJobService).submit(
                 workspaceIdCaptor.capture(),
                 eq(AgentJobType.ISSUE_REVIEW),
-                any(IssueReviewSubmissionRequest.class)
+                any(IssueReviewSubmissionRequest.class),
+                any()
             );
             assertThat(workspaceIdCaptor.getValue()).isEqualTo(42L).isNotEqualTo(99L);
         }
@@ -268,12 +305,12 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             workspace.setId(WORKSPACE_ID);
             var detect = new GateDecision.Detect(workspace, List.of());
             when(practiceReviewDetectionGate.evaluateIssue(eq(issue), any(), any())).thenReturn(detect);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onIssueCreated(event);
 
             var captor = ArgumentCaptor.forClass(IssueReviewSubmissionRequest.class);
-            verify(agentJobService).submit(eq(WORKSPACE_ID), eq(AgentJobType.ISSUE_REVIEW), captor.capture());
+            verify(agentJobService).submit(eq(WORKSPACE_ID), eq(AgentJobType.ISSUE_REVIEW), captor.capture(), any());
 
             IssueReviewSubmissionRequest request = captor.getValue();
             assertThat(request.issueId()).isEqualTo(ISSUE_ID);
@@ -300,12 +337,12 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             when(practiceReviewDetectionGate.evaluateIssue(eq(issue), any(), any())).thenReturn(
                 new GateDecision.Detect(workspace, List.of())
             );
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onIssueCreated(event);
 
             var captor = ArgumentCaptor.forClass(IssueReviewSubmissionRequest.class);
-            verify(agentJobService).submit(eq(WORKSPACE_ID), eq(AgentJobType.ISSUE_REVIEW), captor.capture());
+            verify(agentJobService).submit(eq(WORKSPACE_ID), eq(AgentJobType.ISSUE_REVIEW), captor.capture(), any());
             assertThat(captor.getValue().body()).isEmpty();
         }
 
@@ -343,7 +380,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             // Should not throw — outer catch handles gate exceptions
             listener.onIssueCreated(event);
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -359,7 +396,9 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("submission failed"));
+            when(agentJobService.submit(any(), any(), any(), any())).thenThrow(
+                new RuntimeException("submission failed")
+            );
 
             // Swallowing is the contract: this listener runs on the webhook consumer, and a thrown
             // exception would NAK the delivery and redeliver the same doomed submission.
@@ -381,7 +420,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             var issueData = createIssueData(Issue.State.CLOSED);
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", webhookContext(1L)));
@@ -391,15 +430,17 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void onIssueClosed_skipsSyncEventsToAvoidMassReplayStorm() {
-            // The sync-skip guard: a history replay must NOT fire a retrospective review for every issue the
-            // repository ever closed. Without it, one sync = a mass-replay job storm.
+        void onIssueClosed_recordsSyncDiscoveredClosesWithoutReviewingThem() {
+            // The sync-trigger guard: a history replay must NOT fire a retrospective review for every issue
+            // the repository ever closed. Without it, one sync = a mass-replay job storm. The ledger row is
+            // still written, so a close we did receive leaves a trace instead of being dropped at the door.
             var issueData = createIssueData(Issue.State.CLOSED);
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", syncContext()));
 
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 
@@ -421,15 +462,18 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldSkipSyncEvents() {
+        void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
+            // Same split as the created path: a labelling caught up with by reconciliation is recorded and
+            // not coached on.
             var issueData = createIssueData(Issue.State.OPEN);
             var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), syncContext());
 
             listener.onIssueLabeled(event);
 
+            verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -443,7 +487,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
 
         @Test
@@ -457,8 +501,9 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueLabeled(event);
 
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_GONE));
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
     }
 }

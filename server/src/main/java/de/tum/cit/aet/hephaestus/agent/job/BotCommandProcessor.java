@@ -163,7 +163,7 @@ public class BotCommandProcessor {
                     );
 
                     agentJobService
-                        .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request)
+                        .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null)
                         .ifPresentOrElse(
                             job ->
                                 log.info(

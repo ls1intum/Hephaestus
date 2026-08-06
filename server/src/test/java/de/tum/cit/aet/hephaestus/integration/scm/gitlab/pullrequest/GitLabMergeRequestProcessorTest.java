@@ -1315,6 +1315,72 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldPublishReadyWhenSyncFindsAMergeRequestThatLeftDraft() {
+            // The transition arrives as a difference against what we last knew, and the upsert below
+            // overwrites that. Dropping it here made a merge request that went ready between webhooks
+            // unreviewable as ready forever: the mirror agrees with upstream and upstream has already
+            // announced the change.
+            PullRequest existingDraft = createPullRequestEntity();
+            existingDraft.setDraft(true);
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID)).thenReturn(
+                Optional.of(existingDraft)
+            );
+
+            processor.processFromSync(createSyncData(false), testRepo, 1L);
+
+            assertThat(publishedEvents()).anyMatch(e -> e instanceof ScmDomainEvent.PullRequestReady);
+        }
+
+        @Test
+        void shouldPublishDraftedWhenSyncFindsAMergeRequestSentBackToDraft() {
+            PullRequest existingReady = createPullRequestEntity();
+            existingReady.setDraft(false);
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID)).thenReturn(
+                Optional.of(existingReady)
+            );
+
+            processor.processFromSync(createSyncData(true), testRepo, 1L);
+
+            assertThat(publishedEvents()).anyMatch(e -> e instanceof ScmDomainEvent.PullRequestDrafted);
+        }
+
+        @Test
+        void shouldNotPublishADraftTransitionWhenNothingAboutTheDraftFlagMoved() {
+            PullRequest existingReady = createPullRequestEntity();
+            existingReady.setDraft(false);
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID)).thenReturn(
+                Optional.of(existingReady)
+            );
+
+            processor.processFromSync(createSyncData(false), testRepo, 1L);
+
+            assertThat(publishedEvents()).noneMatch(
+                e -> e instanceof ScmDomainEvent.PullRequestReady || e instanceof ScmDomainEvent.PullRequestDrafted
+            );
+        }
+
+        @Test
+        void shouldNotInventATransitionForAMergeRequestSyncIsSeeingForTheFirstTime() {
+            // Nothing to diff against, so a backfill of open merge requests must not read as a wave of
+            // freshly-ready ones.
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(createPullRequestEntity()));
+
+            processor.processFromSync(createSyncData(false), testRepo, 1L);
+
+            assertThat(publishedEvents()).noneMatch(
+                e -> e instanceof ScmDomainEvent.PullRequestReady || e instanceof ScmDomainEvent.PullRequestDrafted
+            );
+        }
+
+        private List<Object> publishedEvents() {
+            var captor = ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+            return captor.getAllValues();
+        }
+
+        @Test
         void processFromSyncLinksMilestone() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -2179,13 +2245,17 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     }
 
     private GitLabMergeRequestProcessor.SyncMergeRequestData createSyncData() {
+        return createSyncData(false);
+    }
+
+    private GitLabMergeRequestProcessor.SyncMergeRequestData createSyncData(boolean draft) {
         return new GitLabMergeRequestProcessor.SyncMergeRequestData(
             "gid://gitlab/MergeRequest/999555",
             "5",
             "Add awesome feature",
             "This MR adds an awesome feature",
             "opened",
-            false,
+            draft,
             null,
             null,
             false,

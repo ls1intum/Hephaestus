@@ -126,7 +126,9 @@ public class ConversationThreadTriggerScheduler {
                         c.lastTs()
                     );
                     if (
-                        agentJobService.submit(c.workspaceId(), AgentJobType.CONVERSATION_REVIEW, request).isPresent()
+                        agentJobService
+                            .submit(c.workspaceId(), AgentJobType.CONVERSATION_REVIEW, request, null)
+                            .isPresent()
                     ) {
                         enqueuedAny = true;
                         enqueued++;

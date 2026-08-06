@@ -5,11 +5,14 @@ import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -102,11 +105,34 @@ public class DevTriggerController {
         if (prepared == null || prepared.request() == null) {
             return prepared == null ? "No submission prepared" : prepared.message();
         }
+        // An explicit ask is its own occurrence, so it keys on a fresh run id and is never deduplicated
+        // against an earlier one: clicking trigger twice means two runs were asked for.
         return agentJobService.submitPrepared(
             workspaceId,
             prepared.jobType(),
-            (JobSubmissionRequest) prepared.request()
+            (JobSubmissionRequest) prepared.request(),
+            manualSignalKey(workspaceId, prepared)
         );
+    }
+
+    private static SignalKey manualSignalKey(Long workspaceId, Prepared prepared) {
+        return switch (prepared.request()) {
+            case PullRequestReviewSubmissionRequest pr -> ScmSignals.manualKey(
+                workspaceId,
+                pr.pullRequest().id(),
+                ScmSignals.PULL_REQUEST_REVIEW_REQUESTED,
+                UUID.randomUUID()
+            );
+            case IssueReviewSubmissionRequest issue -> ScmSignals.manualKey(
+                workspaceId,
+                issue.issueId(),
+                ScmSignals.ISSUE_REVIEW_REQUESTED,
+                UUID.randomUUID()
+            );
+            default -> throw new IllegalStateException(
+                "No signal declared for dev-triggered request: " + prepared.request()
+            );
+        };
     }
 
     private Prepared preparePullRequest(Long prId, @Nullable String triggerEvent) {

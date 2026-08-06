@@ -282,7 +282,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         UUID u2Obs = u2Conv.observationId();
         UUID u2Fb = u2Conv.feedbackId();
 
-        when(agentJobService.submit(eq(workspaceId), eq(AgentJobType.CONVERSATION_REVIEW), any())).thenReturn(
+        when(agentJobService.submit(eq(workspaceId), eq(AgentJobType.CONVERSATION_REVIEW), any(), any())).thenReturn(
             Optional.of(new AgentJob())
         );
         scheduler.detectNow();
@@ -292,7 +292,8 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         verify(agentJobService, times(2)).submit(
             eq(workspaceId),
             eq(AgentJobType.CONVERSATION_REVIEW),
-            captor.capture()
+            captor.capture(),
+            any()
         );
         assertThat(captor.getAllValues())
             .extracting(ConversationReviewSubmissionRequest::aboutUserId)

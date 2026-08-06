@@ -14,7 +14,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Re-offers signals whose review was refused by something an operator can undo.
@@ -62,7 +61,6 @@ public class PendingSignalReaper {
      */
     @Scheduled(fixedDelay = 15, initialDelay = 5, timeUnit = TimeUnit.MINUTES)
     @SchedulerLock(name = "pending-signal-reaper", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
-    @Transactional
     public void sweep() {
         Instant now = Instant.now();
 

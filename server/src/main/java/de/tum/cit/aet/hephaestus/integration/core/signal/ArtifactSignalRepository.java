@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Every write here is a single statement the database arbitrates — an insert that yields to whoever
@@ -133,6 +134,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * @return how many signals lapsed
      */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
+    @Transactional
     @Modifying
     @Query(
         value = """

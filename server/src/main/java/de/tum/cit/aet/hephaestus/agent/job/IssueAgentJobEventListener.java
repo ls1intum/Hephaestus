@@ -7,11 +7,20 @@ import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,15 +50,21 @@ public class IssueAgentJobEventListener {
     private final AgentJobService agentJobService;
     private final IssueRepository issueRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
+    private final WorkspaceResolver workspaceResolver;
+    private final SignalRecorder signalRecorder;
 
     public IssueAgentJobEventListener(
         AgentJobService agentJobService,
         IssueRepository issueRepository,
-        PracticeReviewDetectionGate practiceReviewDetectionGate
+        PracticeReviewDetectionGate practiceReviewDetectionGate,
+        WorkspaceResolver workspaceResolver,
+        SignalRecorder signalRecorder
     ) {
         this.agentJobService = agentJobService;
         this.issueRepository = issueRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
+        this.workspaceResolver = workspaceResolver;
+        this.signalRecorder = signalRecorder;
     }
 
     @Async
@@ -74,58 +89,114 @@ public class IssueAgentJobEventListener {
     }
 
     private void handleIssueEvent(ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
-        // Agent reviews are for real-time activity only.
-        if (context.isSync()) {
-            return;
-        }
         if (issueData.state() == Issue.State.CLOSED) {
             return;
         }
-        dispatchIssueEvent(issueData, triggerEventName);
+        dispatchIssueEvent(issueData, context, triggerEventName);
     }
 
     /**
      * Retrospective counterpart of {@link #handleIssueEvent}, deliberately without its closed-skip: here
-     * CLOSED is the trigger's reason to run. Sync is still skipped so a history replay does not fire a
-     * retrospective review for every issue the repository ever closed.
+     * CLOSED is the trigger's reason to run.
      */
     private void handleRetrospectiveIssueEvent(
         ScmEventPayload.IssueData issueData,
         EventContext context,
         String triggerEventName
     ) {
-        if (context.isSync()) {
-            return;
-        }
-        dispatchIssueEvent(issueData, triggerEventName);
+        dispatchIssueEvent(issueData, context, triggerEventName);
     }
 
-    private void dispatchIssueEvent(ScmEventPayload.IssueData issueData, String triggerEventName) {
+    /**
+     * Records the observation, then decides whether it warrants a review — the same split as the PR
+     * listener, and for the same reason: what we saw is a fact, whether to coach on it is a policy.
+     */
+    private void dispatchIssueEvent(
+        ScmEventPayload.IssueData issueData,
+        EventContext context,
+        String triggerEventName
+    ) {
         try {
+            SignalKey key = signalKeyFor(issueData, triggerEventName);
+            if (key == null) {
+                return;
+            }
+
+            DiscoveredVia discoveredVia = context.isSync() ? DiscoveredVia.SYNC : DiscoveredVia.EVENT;
+            if (!signalRecorder.record(key, context.occurredAt(), discoveredVia)) {
+                log.debug(
+                    "Signal already settled, not reviewing again: issueId={}, signal={}",
+                    issueData.id(),
+                    key.signalName()
+                );
+                return;
+            }
+
+            // A history replay would otherwise fire a retrospective review for every issue the
+            // repository ever closed. The row it leaves behind still records that we saw it.
+            if (context.isSync()) {
+                return;
+            }
+
             Issue issue = issueRepository.findByIdWithRepositoryAndAssignees(issueData.id()).orElse(null);
             if (issue == null || issue.getRepository() == null) {
                 log.warn(
                     "Cannot submit issue agent job: issue not found or missing repository, issueId={}",
                     issueData.id()
                 );
+                signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
                 return;
             }
 
             switch (practiceReviewDetectionGate.evaluateIssue(issue, triggerEventName, TriggerMode.AUTO)) {
-                case GateDecision.Skip skip -> log.debug(
-                    "Issue agent job skipped by practice gate: issueId={}, event={}, reason={}",
-                    issue.getId(),
-                    triggerEventName,
-                    skip.reason()
-                );
-                case GateDecision.Detect detect -> submitJob(issue, detect, triggerEventName);
+                case GateDecision.Skip skip -> {
+                    log.debug(
+                        "Issue agent job skipped by practice gate: issueId={}, event={}, reason={}",
+                        issue.getId(),
+                        triggerEventName,
+                        skip.reason()
+                    );
+                    signalRecorder.markRefused(key, SignalStateReason.GATE_SKIPPED);
+                }
+                case GateDecision.Detect detect -> submitJob(issue, detect, triggerEventName, key);
             }
         } catch (Exception e) {
             log.error("Failed to handle issue event: issueId={}, event={}", issueData.id(), triggerEventName, e);
         }
     }
 
-    private void submitJob(Issue issue, GateDecision.Detect detect, String triggerEventName) {
+    /**
+     * The ledger identity of this event. An issue carries no commit, so its signals key on what the
+     * author wrote — which is also what the issue-focused practices are about, so an edit is a fresh
+     * occurrence and gets re-measured.
+     */
+    private @Nullable SignalKey signalKeyFor(ScmEventPayload.IssueData issueData, String triggerEventName) {
+        Workspace workspace = workspaceResolver
+            .resolveForRepository(issueData.repository().nameWithOwner())
+            .orElse(null);
+        if (workspace == null) {
+            log.debug(
+                "No workspace owns this repository, nothing to record: repoName={}",
+                issueData.repository().nameWithOwner()
+            );
+            return null;
+        }
+        SignalName signal = ScmSignals.forTriggerEvent(triggerEventName).orElse(null);
+        if (signal == null) {
+            log.debug("No signal declared for trigger event, nothing to record: event={}", triggerEventName);
+            return null;
+        }
+        return ScmSignals.issueKey(
+            workspace.getId(),
+            issueData.id(),
+            signal,
+            issueData.title(),
+            issueData.body(),
+            issueData.updatedAt()
+        ).orElse(null);
+    }
+
+    private void submitJob(Issue issue, GateDecision.Detect detect, String triggerEventName, SignalKey signalKey) {
         IssueReviewSubmissionRequest request = new IssueReviewSubmissionRequest(
             issue.getId(),
             issue.getNumber(),
@@ -139,7 +210,7 @@ public class IssueAgentJobEventListener {
             triggerEventName
         );
         agentJobService
-            .submit(detect.workspace().getId(), AgentJobType.ISSUE_REVIEW, request)
+            .submit(detect.workspace().getId(), AgentJobType.ISSUE_REVIEW, request, signalKey)
             .ifPresent(job ->
                 log.info(
                     "Submitted issue review job: issueId={}, event={}, workspaceId={}, jobId={}",

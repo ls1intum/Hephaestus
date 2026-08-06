@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -87,6 +88,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     @Mock
     private LlmModelResolver llmModelResolver;
 
+    @Mock
+    private SignalRecorder signalRecorder;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AgentJobService service;
@@ -107,7 +111,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             new PracticeReviewProperties(false, true, false, 15, false, false),
             practiceRepository,
             llmBudgetService,
-            llmModelResolver
+            llmModelResolver,
+            signalRecorder
         );
 
         workspace = new Workspace();
@@ -184,7 +189,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -201,7 +207,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -219,7 +226,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -237,7 +245,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -260,7 +269,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.CONVERSATION_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -304,7 +314,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).as("the payer's cap is exhausted, so no job may be created").isEmpty();
@@ -326,7 +337,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -348,7 +360,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -376,7 +389,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isPresent();
@@ -405,7 +419,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isPresent();
@@ -458,7 +473,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -482,7 +498,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isEmpty();
@@ -509,7 +526,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).isPresent();
@@ -538,7 +556,7 @@ class AgentJobServiceTest extends BaseUnitTest {
                 return j;
             });
 
-            service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class));
+            service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             ArgumentCaptor<String> prefix = ArgumentCaptor.forClass(String.class);
             verify(agentJobRepository).findRecentJobByKeyPrefix(eq(1L), prefix.capture(), any());
@@ -625,7 +643,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             String result = service.submitPrepared(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
+                mock(JobSubmissionRequest.class),
+                null
             );
 
             assertThat(result).contains("No job created").contains("unbound or disabled").contains("budget");
