@@ -5,15 +5,15 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPr
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubFeedbackChannel.PrCoordinates;
+import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubSummaryChannel.PrCoordinates;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,7 +55,7 @@ import org.springframework.stereotype.Component;
  * {@code FAILED} {@link DeliveredSignal} (GitHub has no analogue for document/channel/issue anchors on a PR
  * review) so the SPI invariant {@code posted + failed == signals.size()} holds, matching GitLab.
  *
- * <p>The commit SHA the review is anchored to is read from the {@link FeedbackChannel.FeedbackTarget#resourceUrl}
+ * <p>The commit SHA the review is anchored to is read from the {@link SummaryChannel.FeedbackTarget#resourceUrl}
  * field — the agent layer encodes the head commit there so the channel doesn't need
  * to re-resolve PR metadata.
  */
@@ -102,7 +102,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Override
-    public InlineResult postInlineFindings(FeedbackChannel.FeedbackTarget target, List<InlineFinding> findings) {
+    public InlineResult postInlineFindings(SummaryChannel.FeedbackTarget target, List<InlineFinding> findings) {
         if (findings == null || findings.isEmpty()) {
             return InlineResult.counts(0, 0);
         }
@@ -116,7 +116,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             return InlineResult.counts(0, findings.size());
         }
 
-        PrCoordinates pr = GithubFeedbackChannel.parseSubjectExternalId(target.subjectExternalId());
+        PrCoordinates pr = GithubSummaryChannel.parseSubjectExternalId(target.subjectExternalId());
 
         // Index this reviewer's prior threads by correlation key so a finding that still holds is preserved
         // instead of re-posted (GitHub reviews are append-only — a duplicate cannot be edited away). Best-effort:
@@ -285,13 +285,13 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
      * non-destructive way to retire a thread.
      */
     @Override
-    public void clearStaleFindings(FeedbackChannel.FeedbackTarget target, String marker) {
+    public void clearStaleFindings(SummaryChannel.FeedbackTarget target, String marker) {
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             log.warn("GitHub rate limit critical — skipping stale inline-thread minimize: workspaceId={}", scopeId);
             return;
         }
-        PrCoordinates pr = GithubFeedbackChannel.parseSubjectExternalId(target.subjectExternalId());
+        PrCoordinates pr = GithubSummaryChannel.parseSubjectExternalId(target.subjectExternalId());
         Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr);
         int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), Set.of());
         if (minimized > 0) {

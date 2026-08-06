@@ -3,15 +3,20 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 import java.util.Objects;
 
 /**
- * Root feedback SPI — every kind that declares {@link Capability#FEEDBACK_DELIVERY}
- * implements this. {@link InlineFindingChannel} and {@link ApprovalChannel} are
- * separate capability-gated SPIs.
+ * The vendor pipe that posts a review's summary — every integration declaring
+ * {@link Capability#FEEDBACK_DELIVERY} implements it. Named for what it posts, like its siblings
+ * {@link InlineFindingChannel} and {@link ApprovalChannel}, which are separate capability-gated SPIs.
+ *
+ * <p>It was called {@code FeedbackChannel} and was the only type name declared twice in the codebase:
+ * {@code practices.feedback.FeedbackChannel} is an enum of destinations (in-context, conversation,
+ * profile) that a delivery is recorded against, and it keeps the word because that is what it names.
+ * This is a pipe, and every method on it posts, updates or finds a summary.
  *
  * <p>Vendor-specific subject formatting (e.g. GitHub {@code owner/repo#42} vs
  * GitLab {@code group/project!42}) lives behind {@link #formatPullRequestSubjectId} so
  * the agent module never branches on {@link IntegrationKind}.
  */
-public interface FeedbackChannel {
+public interface SummaryChannel {
     IntegrationKind kind();
 
     SummaryHandle postSummary(FeedbackTarget target, FeedbackContent content);

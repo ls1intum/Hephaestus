@@ -10,6 +10,12 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  *
  * <p>Constrained at the DB by {@code chk_feedback_channel} (the {@code PROFILE} value is the ADR-0022 §5
  * rename of the dropped {@code REFLECTION_DASHBOARD}).
+ *
+ * <p>This is the destination a delivery is recorded against, not the thing that does the delivering:
+ * the vendor pipes are {@code integration.core.spi.SummaryChannel}, {@code InlineFindingChannel} and
+ * {@code ApprovalChannel}, each named for what it posts. Both in-context lanes collapse to
+ * {@link #IN_CONTEXT} here, because the ledger records that the developer was told in place while the
+ * delivery path still has to know which bean to call.
  */
 public enum FeedbackChannel {
     /** Placed directly on the work artifact (PR summary / inline note, issue comment). */

@@ -71,7 +71,7 @@ public class GitLabManifest implements IntegrationManifest {
      * commits, this set grows by one line and every such practice wakes up.
      *
      * <p>Delivery lanes are gated on the same flag as the channel beans: claiming a lane whose
-     * {@code FeedbackChannel} is not wired would be caught at boot, which is the intended behaviour but
+     * {@code SummaryChannel} is not wired would be caught at boot, which is the intended behaviour but
      * a poor way to find out.
      */
     @Override

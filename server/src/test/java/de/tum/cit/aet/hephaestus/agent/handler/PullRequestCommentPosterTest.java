@@ -12,9 +12,9 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -32,10 +32,10 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
-    private FeedbackChannel githubChannel;
+    private SummaryChannel githubChannel;
 
     @Mock
-    private FeedbackChannel gitlabChannel;
+    private SummaryChannel gitlabChannel;
 
     private PullRequestCommentPoster poster;
 
@@ -296,9 +296,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @Test
         void resolvesGithubChannelByJobIntegrationKind() {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            when(githubChannel.postSummary(any(), any())).thenReturn(
-                new FeedbackChannel.SummaryHandle("IC_comment456")
-            );
+            when(githubChannel.postSummary(any(), any())).thenReturn(new SummaryChannel.SummaryHandle("IC_comment456"));
 
             String commentId = poster.postFormattedBody(job, "Formatted review");
 
@@ -310,7 +308,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void resolvesGitlabChannelByJobIntegrationKind() {
             AgentJob job = createTestJob(IntegrationKind.GITLAB);
             when(gitlabChannel.postSummary(any(), any())).thenReturn(
-                new FeedbackChannel.SummaryHandle("gid://gitlab/Note/123")
+                new SummaryChannel.SummaryHandle("gid://gitlab/Note/123")
             );
 
             String noteId = poster.postFormattedBody(job, "Formatted review");
@@ -335,7 +333,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
 
             assertThatThrownBy(() -> githubOnly.postFormattedBody(job, "Formatted review"))
                 .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No FeedbackChannel wired for kind GITLAB");
+                .hasMessageContaining("No SummaryChannel wired for kind GITLAB");
         }
 
         @Test
@@ -364,7 +362,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             ((ObjectNode) job.getMetadata()).put("issue_number", 7);
             when(gitlabChannel.formatIssueSubjectId("owner/repo", 7)).thenReturn("owner/repo#7");
             when(gitlabChannel.postSummary(any(), any())).thenReturn(
-                new FeedbackChannel.SummaryHandle("gid://gitlab/Note/77")
+                new SummaryChannel.SummaryHandle("gid://gitlab/Note/77")
             );
 
             String commentId = poster.postIssueFormattedBody(job, "Formatted issue note");
@@ -390,12 +388,12 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @Test
         @DisplayName("should fail bean construction when two channels declare the same kind")
         void duplicateChannelKindsFailFast() {
-            FeedbackChannel anotherGithub = mock(FeedbackChannel.class);
+            SummaryChannel anotherGithub = mock(SummaryChannel.class);
             lenient().when(anotherGithub.kind()).thenReturn(IntegrationKind.GITHUB);
 
             assertThatThrownBy(() -> new PullRequestCommentPoster(List.of(githubChannel, anotherGithub)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Duplicate FeedbackChannel for kind GITHUB");
+                .hasMessageContaining("Duplicate SummaryChannel for kind GITHUB");
         }
 
         @Test

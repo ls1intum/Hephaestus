@@ -4,13 +4,13 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TokenRefresher;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import jakarta.annotation.PostConstruct;
@@ -49,7 +49,7 @@ public class IntegrationFrameworkBootstrap {
     private final List<SubjectParser> subjectParsers;
     private final List<ApiCredentialProvider> credentialProviders;
     private final List<TokenRefresher> tokenRefreshers;
-    private final List<FeedbackChannel> feedbackChannels;
+    private final List<SummaryChannel> feedbackChannels;
     private final List<InlineFindingChannel> inlineFindingChannels;
     private final List<ApprovalChannel> approvalChannels;
     private final List<IntegrationLifecycleListener> lifecycleListeners;
@@ -63,7 +63,7 @@ public class IntegrationFrameworkBootstrap {
         List<SubjectParser> subjectParsers,
         List<ApiCredentialProvider> credentialProviders,
         List<TokenRefresher> tokenRefreshers,
-        List<FeedbackChannel> feedbackChannels,
+        List<SummaryChannel> feedbackChannels,
         List<InlineFindingChannel> inlineFindingChannels,
         List<ApprovalChannel> approvalChannels,
         List<IntegrationLifecycleListener> lifecycleListeners,
@@ -137,7 +137,7 @@ public class IntegrationFrameworkBootstrap {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
         }
         if (declared.contains(Capability.FEEDBACK_DELIVERY)) {
-            require(kind, "FeedbackChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
+            require(kind, "SummaryChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
         }
         if (declared.contains(Capability.INLINE_FINDINGS)) {
             require(

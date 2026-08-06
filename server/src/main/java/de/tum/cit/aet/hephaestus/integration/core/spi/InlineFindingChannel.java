@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 public interface InlineFindingChannel {
     IntegrationKind kind();
 
-    InlineResult postInlineFindings(FeedbackChannel.FeedbackTarget target, List<InlineFinding> findings);
+    InlineResult postInlineFindings(SummaryChannel.FeedbackTarget target, List<InlineFinding> findings);
 
     /**
      * Removes this run's previously-posted inline findings (matched by {@code marker}) WITHOUT posting new
@@ -24,7 +24,7 @@ public interface InlineFindingChannel {
      * it: GitLab deletes every marker-bearing note; GitHub (whose threads cannot be deleted, only minimized)
      * minimizes each vanished thread as {@code OUTDATED}. "Append-only" therefore does NOT mean "no-op" here.
      */
-    default void clearStaleFindings(FeedbackChannel.FeedbackTarget target, String marker) {}
+    default void clearStaleFindings(SummaryChannel.FeedbackTarget target, String marker) {}
 
     /**
      * One finding to post inline. {@code recurrenceKey} carries the stable

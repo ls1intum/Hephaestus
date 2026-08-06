@@ -5,11 +5,11 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPr
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubFeedbackChannel.PrCoordinates;
+import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubSummaryChannel.PrCoordinates;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -46,14 +46,14 @@ public class GithubApprovalChannel implements ApprovalChannel {
     }
 
     @Override
-    public void approve(FeedbackChannel.FeedbackTarget target, String message) {
+    public void approve(SummaryChannel.FeedbackTarget target, String message) {
         egressGuard.requireDeliveryAllowed("github.approve");
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             throw new FeedbackDeliveryException("GitHub rate limit critical — skipping approval for scope " + scopeId);
         }
 
-        PrCoordinates pr = GithubFeedbackChannel.parseSubjectExternalId(target.subjectExternalId());
+        PrCoordinates pr = GithubSummaryChannel.parseSubjectExternalId(target.subjectExternalId());
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
 
         ClientGraphQlResponse response = gitHubProvider

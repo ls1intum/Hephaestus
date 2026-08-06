@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
@@ -19,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SignalVocabulary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import io.nats.client.Message;
 import java.util.List;
 import java.util.Map;
@@ -233,8 +233,8 @@ final class FixtureIntegration {
     }
 
     /** The bean {@code FEEDBACK_DELIVERY} promises; removing it from a bootstrap must fail the boot. */
-    static FeedbackChannel feedbackChannel() {
-        return new FeedbackChannel() {
+    static SummaryChannel feedbackChannel() {
+        return new SummaryChannel() {
             @Override
             public IntegrationKind kind() {
                 return KIND;

@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPr
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
@@ -22,20 +22,20 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link FeedbackChannel}. Posts a single PR-level comment via
+ * GitHub adapter for {@link SummaryChannel}. Posts a single PR-level comment via
  * the {@code AddPullRequestComment} GraphQL mutation.
  *
- * <p>{@link FeedbackChannel.FeedbackTarget#subjectExternalId} convention for GitHub is
+ * <p>{@link SummaryChannel.FeedbackTarget#subjectExternalId} convention for GitHub is
  * {@code "owner/repo#prNumber"} — the channel parses, resolves the PR node ID
  * via {@link GithubPrNodeIdResolver}, then issues the mutation. The returned
- * {@link FeedbackChannel.SummaryHandle} carries the comment node ID so
+ * {@link SummaryChannel.SummaryHandle} carries the comment node ID so
  * the feedback ledger records it ({@code FeedbackPlacement.external_ref}) for edit-in-place on subsequent runs.
  */
 @Component
 @OutboundEgressGateway
-public class GithubFeedbackChannel implements FeedbackChannel {
+public class GithubSummaryChannel implements SummaryChannel {
 
-    private static final Logger log = LoggerFactory.getLogger(GithubFeedbackChannel.class);
+    private static final Logger log = LoggerFactory.getLogger(GithubSummaryChannel.class);
 
     /** GitHub caps a connection page at 100. */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
@@ -47,7 +47,7 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     private final GithubPrNodeIdResolver prNodeIdResolver;
     private final OutboundEgressGuard egressGuard;
 
-    public GithubFeedbackChannel(
+    public GithubSummaryChannel(
         GitHubGraphQlClientProvider gitHubProvider,
         GithubPrNodeIdResolver prNodeIdResolver,
         OutboundEgressGuard egressGuard

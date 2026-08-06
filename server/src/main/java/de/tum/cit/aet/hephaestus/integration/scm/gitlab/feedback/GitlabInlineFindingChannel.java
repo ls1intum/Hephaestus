@@ -6,12 +6,12 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMr
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
@@ -106,7 +106,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
      * a PR re-reviewed into nothing-inline doesn't keep line-numbered notes on code no longer in the diff.
      */
     @Override
-    public void clearStaleFindings(FeedbackChannel.FeedbackTarget target, String marker) {
+    public void clearStaleFindings(SummaryChannel.FeedbackTarget target, String marker) {
         if (marker == null || marker.isBlank()) {
             return;
         }
@@ -120,7 +120,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Override
-    public InlineResult postInlineFindings(FeedbackChannel.FeedbackTarget target, List<InlineFinding> findings) {
+    public InlineResult postInlineFindings(SummaryChannel.FeedbackTarget target, List<InlineFinding> findings) {
         if (findings == null || findings.isEmpty()) {
             return InlineResult.counts(0, 0);
         }
@@ -202,7 +202,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             }
 
             String body = appendCorrelationTag(
-                appendMarker(GitlabFeedbackChannel.escapeSlashCommands(finding.body()), marker),
+                appendMarker(GitlabSummaryChannel.escapeSlashCommands(finding.body()), marker),
                 key
             );
 

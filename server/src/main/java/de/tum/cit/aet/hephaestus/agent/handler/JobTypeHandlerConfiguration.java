@@ -4,8 +4,8 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -56,7 +56,7 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    PullRequestCommentPoster pullRequestCommentPoster(List<FeedbackChannel> feedbackChannels) {
+    PullRequestCommentPoster pullRequestCommentPoster(List<SummaryChannel> feedbackChannels) {
         return new PullRequestCommentPoster(feedbackChannels);
     }
 

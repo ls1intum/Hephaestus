@@ -10,7 +10,7 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Every other test of {@code GithubFeedbackChannel.findExistingSummary} stubs
+ * Every other test of {@code GithubSummaryChannel.findExistingSummary} stubs
  * {@code ClientResponseField.toEntity} and hands back an already-built connection, so no JSON is decoded:
  * were {@code hasPreviousPage}/{@code startCursor} dropped on the way in, the scan would report a confirmed
  * {@code ABSENT} after one page and license a duplicate summary on any thread longer than the page size.

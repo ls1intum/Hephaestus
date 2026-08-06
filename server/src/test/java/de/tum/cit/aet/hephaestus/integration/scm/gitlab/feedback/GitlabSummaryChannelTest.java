@@ -14,14 +14,14 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.ExistingSummaryLookup;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackContent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.SummaryHandle;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabBackwardPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
@@ -38,7 +38,7 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-class GitlabFeedbackChannelTest extends BaseUnitTest {
+class GitlabSummaryChannelTest extends BaseUnitTest {
 
     @Mock
     private GitLabGraphQlClientProvider gitLabProvider;
@@ -49,11 +49,11 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     @Mock
     private OutboundEgressGuard egressGuard;
 
-    private GitlabFeedbackChannel channel;
+    private GitlabSummaryChannel channel;
 
     @BeforeEach
     void setUp() {
-        channel = new GitlabFeedbackChannel(gitLabProvider, mrResolver, egressGuard);
+        channel = new GitlabSummaryChannel(gitLabProvider, mrResolver, egressGuard);
     }
 
     @Test
@@ -162,15 +162,15 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     void escapeSlashCommands_leavesMidLineCommandsUntouched() {
         // The ^...MULTILINE anchoring means only a LINE-START slash command is an action; a mid-line
         // "/approve" is ordinary text and must be left alone. This pins the anchoring against a regex edit.
-        assertThat(GitlabFeedbackChannel.escapeSlashCommands("Please ask them to /approve it")).isEqualTo(
+        assertThat(GitlabSummaryChannel.escapeSlashCommands("Please ask them to /approve it")).isEqualTo(
             "Please ask them to /approve it"
         );
-        assertThat(GitlabFeedbackChannel.escapeSlashCommands("/approve\n/merge")).isEqualTo("`/approve`\n`/merge`");
+        assertThat(GitlabSummaryChannel.escapeSlashCommands("/approve\n/merge")).isEqualTo("`/approve`\n`/merge`");
     }
 
     @Test
     void slashCommandPattern_matchesTheCanonicalPullRequestPosterLiteral() {
-        // GitlabFeedbackChannel.GITLAB_SLASH_COMMAND is a deliberate duplicate of
+        // GitlabSummaryChannel.GITLAB_SLASH_COMMAND is a deliberate duplicate of
         // PullRequestCommentPoster.GITLAB_SLASH_COMMAND (which is private). Pin the channel's copy against the
         // canonical literal so editing one copy without the other fails CI rather than silently degrading the
         // belt-and-suspenders guarantee.
@@ -178,7 +178,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
             "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|" +
             "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|" +
             "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)";
-        assertThat(GitlabFeedbackChannel.GITLAB_SLASH_COMMAND.pattern()).isEqualTo(canonical);
+        assertThat(GitlabSummaryChannel.GITLAB_SLASH_COMMAND.pattern()).isEqualTo(canonical);
     }
 
     @Test
@@ -283,13 +283,13 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         when(response.getErrors()).thenReturn(List.of());
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
             target,
             "gid://gitlab/Note/789",
             new FeedbackContent("updated body", "marker")
         );
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.EDITED);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.EDITED);
         assertThat(outcome.handle().externalId()).isEqualTo("gid://gitlab/Note/789");
         // No MR/issue resolution — the note id addresses the comment directly.
         verify(spec).variable(eq("id"), eq("gid://gitlab/Note/789"));
@@ -301,13 +301,13 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         stubMutationErrors(List.of("note not found"));
 
-        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
             target,
             "gid://gitlab/Note/gone",
             new FeedbackContent("body", "marker")
         );
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.GONE);
     }
 
     @Test
@@ -316,13 +316,13 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         stubMutationErrors(List.of("something went wrong"));
 
-        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
             target,
             "gid://gitlab/Note/1",
             new FeedbackContent("body", "marker")
         );
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.TRANSIENT);
     }
 
     @Test
@@ -330,13 +330,13 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
 
-        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
             target,
             "gid://gitlab/Note/1",
             new FeedbackContent("body", "marker")
         );
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.TRANSIENT);
     }
 
     @Test
@@ -385,13 +385,13 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         when(response.getErrors()).thenReturn(List.of(notFound));
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
             target,
             "gid://gitlab/Note/4825166",
             new FeedbackContent("body", "marker")
         );
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.GONE);
     }
 
     private static final String MARKER = "<!-- hephaestus-summary:job-1 -->";

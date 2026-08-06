@@ -14,7 +14,7 @@ public enum Capability {
     /** OAuth refresh tokens are minted via {@code TokenRefresher}. */
     TOKEN_REFRESH,
 
-    /** Implements {@code FeedbackChannel.postSummary}. */
+    /** Implements {@code SummaryChannel.postSummary}. */
     FEEDBACK_DELIVERY,
     /** Implements {@code InlineFindingChannel.postInlineFindings}. */
     INLINE_FINDINGS,

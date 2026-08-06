@@ -6,9 +6,9 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
  * Where a piece of feedback about an artifact can be put.
  *
  * <p>Core owns this enum because delivery genuinely branches on it — a summary goes through
- * {@code FeedbackChannel}, a diff-anchored note through {@code InlineFindingChannel}, and the two are
+ * {@code SummaryChannel}, a diff-anchored note through {@code InlineFindingChannel}, and the two are
  * separate SPIs with separate failure modes. That split is why the enum is finer-grained than the
- * persisted {@code practices.feedback.FeedbackChannel}, where both in-context lanes collapse to
+ * persisted {@code practices.feedback.SummaryChannel}, where both in-context lanes collapse to
  * {@code IN_CONTEXT}: the ledger only records that the developer was told in place, while the
  * delivery path has to know which bean to call.
  *
@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
  * {@link Capability}.
  */
 public enum FeedbackLane {
-    /** One comment on the artifact itself. Delivered through {@code FeedbackChannel.postSummary}. */
+    /** One comment on the artifact itself. Delivered through {@code SummaryChannel.postSummary}. */
     IN_CONTEXT_SUMMARY,
 
     /**

@@ -16,14 +16,14 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.ExistingSummaryLookup;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackContent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.SummaryHandle;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
@@ -39,7 +39,7 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-class GithubFeedbackChannelTest extends BaseUnitTest {
+class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Mock
     private GitHubGraphQlClientProvider gitHubProvider;
@@ -50,11 +50,11 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     @Mock
     private OutboundEgressGuard egressGuard;
 
-    private GithubFeedbackChannel channel;
+    private GithubSummaryChannel channel;
 
     @BeforeEach
     void setUp() {
-        channel = new GithubFeedbackChannel(gitHubProvider, prNodeIdResolver, egressGuard);
+        channel = new GithubSummaryChannel(gitHubProvider, prNodeIdResolver, egressGuard);
     }
 
     @Test
@@ -187,7 +187,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("new body", "marker"));
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.EDITED);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.EDITED);
         assertThat(outcome.handle().externalId()).isEqualTo("IC_edited");
         verify(spec).variable("id", "IC_prior");
     }
@@ -215,7 +215,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("body", "marker"));
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.TRANSIENT);
     }
 
     @Test
@@ -241,7 +241,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("body", "marker"));
 
-        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
+        assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.GONE);
     }
 
     @Test
@@ -305,7 +305,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void parseIssueSubjectExternalId_rejectsSubjectWithoutNumber() {
-        assertThatThrownBy(() -> GithubFeedbackChannel.parseIssueSubjectExternalId("owner/issues/x"))
+        assertThatThrownBy(() -> GithubSummaryChannel.parseIssueSubjectExternalId("owner/issues/x"))
             .isInstanceOf(FeedbackDeliveryException.class)
             .hasMessageContaining("Invalid GitHub issue subjectExternalId");
     }

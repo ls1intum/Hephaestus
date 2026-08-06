@@ -8,5 +8,5 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 public interface ApprovalChannel {
     IntegrationKind kind();
 
-    void approve(FeedbackChannel.FeedbackTarget target, String message);
+    void approve(SummaryChannel.FeedbackTarget target, String message);
 }

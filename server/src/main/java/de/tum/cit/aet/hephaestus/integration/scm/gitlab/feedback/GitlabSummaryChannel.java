@@ -5,9 +5,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMr
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabBackwardPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
@@ -23,10 +23,10 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab adapter for {@link FeedbackChannel}. Posts a single MR-level note via the
+ * GitLab adapter for {@link SummaryChannel}. Posts a single MR-level note via the
  * {@code CreateMergeRequestNote} GraphQL mutation.
  *
- * <p>{@link FeedbackChannel.FeedbackTarget#subjectExternalId} convention for GitLab is
+ * <p>{@link SummaryChannel.FeedbackTarget#subjectExternalId} convention for GitLab is
  * {@code "project/full/path!iid"}; the channel resolves the MR global gid via
  * {@link GitlabMrResolver} before issuing the mutation.
  *
@@ -41,9 +41,9 @@ import org.springframework.stereotype.Component;
 @Component
 @OutboundEgressGateway
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
-public class GitlabFeedbackChannel implements FeedbackChannel {
+public class GitlabSummaryChannel implements SummaryChannel {
 
-    private static final Logger log = LoggerFactory.getLogger(GitlabFeedbackChannel.class);
+    private static final Logger log = LoggerFactory.getLogger(GitlabSummaryChannel.class);
 
     /**
      * Matches GitLab slash commands at line start. Backtick-escaped so they render as
@@ -63,7 +63,7 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
     private final GitlabMrResolver mrResolver;
     private final OutboundEgressGuard egressGuard;
 
-    public GitlabFeedbackChannel(
+    public GitlabSummaryChannel(
         GitLabGraphQlClientProvider gitLabProvider,
         GitlabMrResolver mrResolver,
         OutboundEgressGuard egressGuard
