@@ -161,7 +161,13 @@ public class ConversationReviewHandler implements JobTypeHandler {
         if (practices.isEmpty()) {
             throw new InsufficientEvidenceException(
                 "No practice has sufficient evidence: jobId=" + job.getId(),
-                new PreparedJobInputs(prepared.files(), artifactSourceManifest, readiness.report())
+                new PreparedJobInputs(
+                    prepared.files(),
+                    prepared.filesOnDisk(),
+                    prepared.cleanups(),
+                    artifactSourceManifest,
+                    readiness.report()
+                )
             );
         }
         prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
@@ -169,7 +175,13 @@ public class ConversationReviewHandler implements JobTypeHandler {
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, WorkArtifact.CONVERSATION_THREAD, practices);
         log.info("Conversation context preparation complete: {} files, jobId={}", files.size(), job.getId());
-        return new PreparedJobInputs(files, artifactSourceManifest, readiness.report());
+        return new PreparedJobInputs(
+            files,
+            prepared.filesOnDisk(),
+            prepared.cleanups(),
+            artifactSourceManifest,
+            readiness.report()
+        );
     }
 
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {

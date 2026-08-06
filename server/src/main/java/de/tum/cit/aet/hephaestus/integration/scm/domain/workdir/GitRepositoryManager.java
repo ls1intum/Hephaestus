@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.workdir;
 
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -695,18 +698,33 @@ public class GitRepositoryManager {
         };
     }
 
-    /** Reads a bounded commit tree without dereferencing symlinks or submodules across the source boundary. */
-    public GitTreeSnapshot readTreeSnapshot(Long repositoryId, String commitSha, long maxTotalBytes) {
+    /**
+     * Materialises a commit tree into a temporary directory, without dereferencing symlinks or
+     * submodules across the source boundary.
+     *
+     * <p>Blobs are streamed one at a time from the object database straight to disk, so peak memory is
+     * one buffer regardless of repository size — the tree never exists in this process's heap. The
+     * caller owns the result and must {@link GitTreeSnapshot#close() close} it to delete the directory.
+     *
+     * <p>The git handles are opened and closed entirely within this call. Returning lazy readers instead
+     * would be cheaper still, but would leave an {@code ObjectReader} and the repository read lock alive
+     * across the staging boundary, where a slow consumer would hold both open indefinitely.
+     */
+    public GitTreeSnapshot readTreeSnapshot(Long repositoryId, String commitSha) {
         if (!properties.enabled()) {
             throw new IllegalStateException("Repository checkout is disabled; callers must check isEnabled()");
-        }
-        if (maxTotalBytes <= 0) {
-            throw new IllegalArgumentException("maxTotalBytes must be positive");
         }
 
         return lockManager.withReadLock(repositoryId, () -> {
             Path repoPath = getRepositoryPath(repositoryId);
-            Map<String, byte[]> result = new LinkedHashMap<>();
+            Path stagingDir;
+            try {
+                stagingDir = Files.createTempDirectory("tree-snapshot-");
+            } catch (IOException e) {
+                throw new GitOperationException("Could not create staging directory for repoId=" + repositoryId, e);
+            }
+
+            Map<String, Path> result = new LinkedHashMap<>();
             Set<String> limitations = new java.util.TreeSet<>();
             long totalBytes = 0;
             int visitedFiles = 0;
@@ -732,10 +750,6 @@ public class GitRepositoryManager {
 
                         while (treeWalk.next()) {
                             visitedFiles++;
-                            if (visitedFiles > MAX_TREE_FILES) {
-                                limitations.add("FILE_COUNT_LIMIT_REACHED");
-                                break;
-                            }
                             String sourcePath = treeWalk.getPathString();
                             FileMode mode = treeWalk.getFileMode(0);
                             if (FileMode.SYMLINK.equals(mode)) {
@@ -755,33 +769,18 @@ public class GitRepositoryManager {
                                 continue;
                             }
                             ObjectId blobId = treeWalk.getObjectId(0);
-                            long size = reader.getObjectSize(blobId, Constants.OBJ_BLOB);
-
-                            // Skip individual files larger than 10 MB
-                            if (size > 10L * 1024 * 1024) {
-                                limitations.add("OVERSIZED_FILE_EXCLUDED");
-                                log.debug("Skipping oversized file: path={}, size={}", treeWalk.getPathString(), size);
-                                continue;
+                            Path target = stagingDir.resolve(sourcePath);
+                            Files.createDirectories(target.getParent());
+                            try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(target))) {
+                                reader.open(blobId, Constants.OBJ_BLOB).copyTo(out);
                             }
-
-                            if (totalBytes + size > maxTotalBytes) {
-                                limitations.add("TOTAL_SIZE_LIMIT_REACHED");
-                                log.warn(
-                                    "File collection exceeded size limit ({} bytes), stopping: repoId={}, commit={}",
-                                    maxTotalBytes,
-                                    repositoryId,
-                                    commitSha
-                                );
-                                break;
-                            }
-
-                            byte[] content = reader.open(blobId).getBytes();
-                            result.put(sourcePath, content);
-                            totalBytes += content.length;
+                            totalBytes += Files.size(target);
+                            result.put(sourcePath, target);
                         }
                     }
                 }
             } catch (IOException e) {
+                deleteTreeQuietly(stagingDir);
                 throw new GitOperationException(
                     "Failed to read files at commit: repoId=" + repositoryId + ", commit=" + commitSha,
                     e
@@ -789,6 +788,7 @@ public class GitRepositoryManager {
             }
 
             return new GitTreeSnapshot(
+                stagingDir,
                 resolvedCommitSha,
                 treeSha,
                 result,
@@ -798,6 +798,22 @@ public class GitRepositoryManager {
                 limitations
             );
         });
+    }
+
+    static void deleteTreeQuietly(Path root) {
+        try (Stream<Path> paths = Files.walk(root)) {
+            paths
+                .sorted(Comparator.reverseOrder())
+                .forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException e) {
+                        log.warn("Could not delete staged file {}", path, e);
+                    }
+                });
+        } catch (IOException e) {
+            log.warn("Could not delete staging directory {}", root, e);
+        }
     }
 
     private static boolean unsafeWorkspacePath(String path) {
@@ -812,20 +828,29 @@ public class GitRepositoryManager {
         return false;
     }
 
-    /** A tree read at one commit. Callers check {@link #isEnabled()} first; there is no disabled form. */
+    /**
+     * A commit tree materialised on disk. {@code files} maps repository-relative paths to host files
+     * under {@code stagingDir}; closing deletes the whole directory.
+     */
     public record GitTreeSnapshot(
+        Path stagingDir,
         String commitSha,
         String treeSha,
-        Map<String, byte[]> files,
+        Map<String, Path> files,
         long totalBytes,
         int visitedFiles,
         boolean complete,
         Set<String> limitations
-    ) {
+    ) implements AutoCloseable {
         public GitTreeSnapshot {
             Objects.requireNonNull(treeSha, "treeSha");
             files = Collections.unmodifiableMap(new LinkedHashMap<>(files));
             limitations = Set.copyOf(limitations);
+        }
+
+        @Override
+        public void close() {
+            deleteTreeQuietly(stagingDir);
         }
     }
 

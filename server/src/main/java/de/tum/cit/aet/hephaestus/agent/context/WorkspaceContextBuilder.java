@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -92,7 +93,7 @@ public class WorkspaceContextBuilder {
             if (result.manifest() == null) {
                 throw new IllegalStateException("Detector evidence was prepared without a source manifest");
             }
-            return new PreparedEvidence(result.files(), result.manifest());
+            return new PreparedEvidence(result.files(), result.filesOnDisk(), result.cleanups(), result.manifest());
         } finally {
             if (lock != null) {
                 lock.unlock();
@@ -142,7 +143,12 @@ public class WorkspaceContextBuilder {
         return repoLockStripes[idx];
     }
 
-    private record BuildResult(Map<String, byte[]> files, @Nullable ArtifactSourceManifest manifest) {}
+    private record BuildResult(
+        Map<String, byte[]> files,
+        Map<String, java.nio.file.Path> filesOnDisk,
+        List<AutoCloseable> cleanups,
+        @Nullable ArtifactSourceManifest manifest
+    ) {}
 
     private BuildResult buildLocked(ContextRequest request, @Nullable EvidencePlan evidencePlan) {
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -155,6 +161,8 @@ public class WorkspaceContextBuilder {
         Map<SourceKind, Instant> sourceEffectiveAt = new HashMap<>();
         Map<SourceKind, SourceCaptureState> stateOverrides = new HashMap<>();
         Set<SourceKind> attemptedKinds = new HashSet<>();
+        Map<String, java.nio.file.Path> filesOnDisk = new LinkedHashMap<>();
+        List<AutoCloseable> cleanups = new ArrayList<>();
         int contributed = 0;
         for (ContentSource provider : providers) {
             if (!provider.supports(request)) {
@@ -182,7 +190,9 @@ public class WorkspaceContextBuilder {
                     observedAt,
                     sourceEffectiveAt,
                     stateOverrides,
-                    attemptedKinds
+                    attemptedKinds,
+                    filesOnDisk,
+                    cleanups
                 );
             } else {
                 try {
@@ -201,8 +211,14 @@ public class WorkspaceContextBuilder {
                     continue;
                 }
             }
-            for (Map.Entry<String, byte[]> entry : contributionFiles.entrySet()) {
-                String key = entry.getKey();
+            Set<String> contributedKeys = new LinkedHashSet<>(contributionFiles.keySet());
+            for (var onDisk : filesOnDisk.entrySet()) {
+                if (!keyOwner.containsKey(onDisk.getKey())) {
+                    contributedKeys.add(onDisk.getKey());
+                }
+            }
+            for (String key : contributedKeys) {
+                byte[] value = contributionFiles.get(key);
                 if (files.containsKey(key)) {
                     throw new IllegalStateException(
                         "Duplicate workspace key " +
@@ -233,10 +249,11 @@ public class WorkspaceContextBuilder {
                 } else if (evidencePlan != null) {
                     throw new IllegalStateException(providerName + " emitted undocumented detector input " + key);
                 }
-                if (entry.getValue() == null) {
-                    throw new IllegalStateException(providerName + " emitted null bytes for " + key);
+                if (value == null) {
+                    // Staged from disk: the bytes are never read by this process.
+                    continue;
                 }
-                files.put(key, entry.getValue().clone());
+                files.put(key, value.clone());
             }
             contributed++;
         }
@@ -246,6 +263,7 @@ public class WorkspaceContextBuilder {
             if (job != null) {
                 manifest = manifestBuilder.augment(
                     files,
+                    filesOnDisk,
                     keySourceKind,
                     String.valueOf(job.getId()),
                     evidencePlan,
@@ -261,8 +279,13 @@ public class WorkspaceContextBuilder {
                 );
             }
         }
-        log.debug("Workspace context built: {} files from {} provider(s)", files.size(), contributed);
-        return new BuildResult(files, manifest);
+        log.debug(
+            "Workspace context built: {} files ({} staged from disk) from {} provider(s)",
+            files.size() + filesOnDisk.size(),
+            filesOnDisk.size(),
+            contributed
+        );
+        return new BuildResult(files, filesOnDisk, cleanups, manifest);
     }
 
     private Map<String, byte[]> captureIndependently(
@@ -276,7 +299,9 @@ public class WorkspaceContextBuilder {
         Map<SourceKind, Instant> observedAt,
         Map<SourceKind, Instant> sourceEffectiveAt,
         Map<SourceKind, SourceCaptureState> stateOverrides,
-        Set<SourceKind> attemptedKinds
+        Set<SourceKind> attemptedKinds,
+        Map<String, java.nio.file.Path> filesOnDisk,
+        List<AutoCloseable> cleanups
     ) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         Set<SourceKind> selectedKinds = new HashSet<>(source.sourceKinds());
@@ -325,6 +350,16 @@ public class WorkspaceContextBuilder {
                         throw new IllegalStateException(providerName + " emitted duplicate file " + path);
                     }
                 });
+            contribution
+                .filesOnDisk()
+                .forEach((path, file) -> {
+                    if (filesOnDisk.put(path, file) != null || files.containsKey(path)) {
+                        throw new IllegalStateException(providerName + " emitted duplicate file " + path);
+                    }
+                });
+            if (contribution.cleanup() != null) {
+                cleanups.add(contribution.cleanup());
+            }
             completeness.putAll(contribution.completeness());
             contentStates.putAll(contribution.contentStates());
             stateOverrides.putAll(contribution.stateOverrides());

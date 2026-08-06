@@ -20,10 +20,42 @@ public record EvidenceContribution(
      * artifact absent upstream. The manifest otherwise infers absence from missing files, which
      * cannot distinguish an empty source from one that was not permitted to be read.
      */
-    Map<SourceKind, SourceCaptureState> stateOverrides
+    Map<SourceKind, SourceCaptureState> stateOverrides,
+    /**
+     * Content already materialised on disk, staged by path so its bytes never enter this process. A
+     * repository checkout is written once by the collector and read once by the archive writer.
+     */
+    Map<String, java.nio.file.Path> filesOnDisk,
+    /**
+     * Releases whatever backs {@link #filesOnDisk}, or null when nothing needs releasing. The staging
+     * pipeline owns this and closes it once the sandbox has the files.
+     */
+    @org.jspecify.annotations.Nullable AutoCloseable cleanup
 ) {
+    public EvidenceContribution(
+        Map<String, byte[]> files,
+        Map<SourceKind, SourceCompleteness> completeness,
+        Map<SourceKind, String> immutableIdentities,
+        Map<SourceKind, Instant> observedAt,
+        Map<SourceKind, Instant> sourceEffectiveAt,
+        Map<SourceKind, SourceContentState> contentStates,
+        Map<SourceKind, SourceCaptureState> stateOverrides
+    ) {
+        this(
+            files,
+            completeness,
+            immutableIdentities,
+            observedAt,
+            sourceEffectiveAt,
+            contentStates,
+            stateOverrides,
+            Map.of(),
+            null
+        );
+    }
+
     public EvidenceContribution(Map<String, byte[]> files, Map<SourceKind, SourceCompleteness> completeness) {
-        this(files, completeness, Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+        this(files, completeness, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null);
     }
 
     public EvidenceContribution(
@@ -31,7 +63,7 @@ public record EvidenceContribution(
         Map<SourceKind, SourceCompleteness> completeness,
         Map<SourceKind, String> immutableIdentities
     ) {
-        this(files, completeness, immutableIdentities, Map.of(), Map.of(), Map.of(), Map.of());
+        this(files, completeness, immutableIdentities, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null);
     }
 
     public EvidenceContribution(
@@ -41,7 +73,17 @@ public record EvidenceContribution(
         Map<SourceKind, Instant> observedAt,
         Map<SourceKind, Instant> sourceEffectiveAt
     ) {
-        this(files, completeness, immutableIdentities, observedAt, sourceEffectiveAt, Map.of(), Map.of());
+        this(
+            files,
+            completeness,
+            immutableIdentities,
+            observedAt,
+            sourceEffectiveAt,
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            null
+        );
     }
 
     public EvidenceContribution(
@@ -52,7 +94,17 @@ public record EvidenceContribution(
         Map<SourceKind, Instant> sourceEffectiveAt,
         Map<SourceKind, SourceContentState> contentStates
     ) {
-        this(files, completeness, immutableIdentities, observedAt, sourceEffectiveAt, contentStates, Map.of());
+        this(
+            files,
+            completeness,
+            immutableIdentities,
+            observedAt,
+            sourceEffectiveAt,
+            contentStates,
+            Map.of(),
+            Map.of(),
+            null
+        );
     }
 
     public EvidenceContribution {

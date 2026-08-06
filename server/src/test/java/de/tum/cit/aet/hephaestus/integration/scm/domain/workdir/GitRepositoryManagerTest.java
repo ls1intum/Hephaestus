@@ -18,6 +18,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -511,7 +512,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         void shouldRefuseToReadATreeWhenCheckoutIsDisabled() {
             manager = createManager(false);
 
-            assertThatThrownBy(() -> manager.readTreeSnapshot(1L, "abc123", 50L * 1024 * 1024))
+            assertThatThrownBy(() -> manager.readTreeSnapshot(1L, "abc123"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("checkout is disabled");
         }
@@ -523,10 +524,14 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 String headSha = sourceGit.log().call().iterator().next().getName();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
-                Map<String, byte[]> files = manager.readTreeSnapshot(1L, headSha, 50L * 1024 * 1024).files();
+                try (var snapshot = manager.readTreeSnapshot(1L, headSha)) {
+                    Map<String, Path> files = snapshot.files();
 
-                assertThat(files).containsKey("README.md");
-                assertThat(new String(files.get("README.md"), StandardCharsets.UTF_8)).isEqualTo("# Test Repository\n");
+                    assertThat(files).containsKey("README.md");
+                    assertThat(Files.readString(files.get("README.md"), StandardCharsets.UTF_8)).isEqualTo(
+                        "# Test Repository\n"
+                    );
+                }
             }
         }
 
@@ -537,9 +542,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 String headSha = sourceGit.log().call().iterator().next().getName();
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                var snapshot = manager.readTreeSnapshot(1L, headSha.substring(0, 8), 50L * 1024 * 1024);
-
-                assertThat(snapshot.commitSha()).isEqualTo(headSha);
+                try (var snapshot = manager.readTreeSnapshot(1L, headSha.substring(0, 8))) {
+                    assertThat(snapshot.commitSha()).isEqualTo(headSha);
+                }
             }
         }
 
@@ -561,22 +566,32 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                Map<String, byte[]> filesAtFirst = manager.readTreeSnapshot(1L, firstSha, 50L * 1024 * 1024).files();
-                assertThat(filesAtFirst).containsKey("README.md");
-                assertThat(filesAtFirst).doesNotContainKey("file2.txt");
+                try (var snapshot = manager.readTreeSnapshot(1L, firstSha)) {
+                    assertThat(snapshot.files()).containsKey("README.md");
+                    assertThat(snapshot.files()).doesNotContainKey("file2.txt");
+                }
             }
         }
 
         @Test
-        void shouldRespectMaxTotalBytesLimit() throws Exception {
+        @DisplayName("stages a file far past the old 50 MB whole-input ceiling")
+        void shouldStageFilesLargerThanTheFormerInputCeiling() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
-                Path file = sourceRepoPath.resolve("large.txt");
-                Files.writeString(file, "a".repeat(1000));
-                sourceGit.add().addFilepattern("large.txt").call();
+                // 64 MB in one blob: over the removed per-input ceiling and the removed 10 MB per-file
+                // skip. Streaming to disk means peak memory here is one buffer, not one repository.
+                Path file = sourceRepoPath.resolve("large.bin");
+                byte[] chunk = new byte[1024 * 1024];
+                java.util.Arrays.fill(chunk, (byte) 'a');
+                try (var out = Files.newOutputStream(file)) {
+                    for (int i = 0; i < 64; i++) {
+                        out.write(chunk);
+                    }
+                }
+                sourceGit.add().addFilepattern("large.bin").call();
                 String sha = sourceGit
                     .commit()
-                    .setMessage("Add large file")
+                    .setMessage("Add a large file")
                     .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                     .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
                     .call()
@@ -584,18 +599,28 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                // Set max to 500 bytes — README.md (18 bytes) fits, large.txt (1000 bytes) is over the limit.
-                Map<String, byte[]> files = manager.readTreeSnapshot(1L, sha, 500).files();
-                long totalSize = files
-                    .values()
-                    .stream()
-                    .mapToLong(b -> b.length)
-                    .sum();
-                assertThat(totalSize).isLessThanOrEqualTo(500);
-                // Prove the byte-limit branch actually collected the small file and skipped the over-limit one,
-                // so the bound is not satisfied vacuously by an empty result.
-                assertThat(files).containsKey("README.md");
-                assertThat(files).doesNotContainKey("large.txt");
+                try (var snapshot = manager.readTreeSnapshot(1L, sha)) {
+                    assertThat(snapshot.files()).containsKey("large.bin");
+                    assertThat(Files.size(snapshot.files().get("large.bin"))).isEqualTo(64L * 1024 * 1024);
+                    assertThat(snapshot.complete()).isTrue();
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("deletes its staging directory when closed")
+        void shouldReleaseStagingOnClose() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String headSha = sourceGit.log().call().iterator().next().getName();
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                Path stagingDir;
+                try (var snapshot = manager.readTreeSnapshot(1L, headSha)) {
+                    stagingDir = snapshot.stagingDir();
+                    assertThat(stagingDir).exists();
+                }
+                assertThat(stagingDir).doesNotExist();
             }
         }
 
@@ -605,9 +630,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThatThrownBy(() ->
-                    manager.readTreeSnapshot(1L, "0000000000000000000000000000000000000000", 50L * 1024 * 1024)
-                )
+                assertThatThrownBy(() -> manager.readTreeSnapshot(1L, "0000000000000000000000000000000000000000"))
                     .isInstanceOf(GitRepositoryManager.GitOperationException.class)
                     .hasMessageContaining("Failed to read files at commit");
             }

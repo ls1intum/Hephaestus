@@ -37,22 +37,20 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         source = new RepositoryTreeContentSource(gitRepositoryManager);
     }
 
+    @org.junit.jupiter.api.io.TempDir
+    java.nio.file.Path stagingDir;
+
     @Test
     void shouldMaterializePinnedTreeWithoutGitDirectory() {
         AgentJob job = job(17L, "0123456789012345678901234567890123456789");
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
-        when(
-            gitRepositoryManager.readTreeSnapshot(
-                17L,
-                "0123456789012345678901234567890123456789",
-                RepositoryTreeContentSource.MAX_TOTAL_BYTES
-            )
-        ).thenReturn(
+        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789")).thenReturn(
             new GitRepositoryManager.GitTreeSnapshot(
+                stagingDir,
                 "0123456789012345678901234567890123456789",
                 "1123456789012345678901234567890123456789",
-                Map.of("src/App.java", "class App {}".getBytes(StandardCharsets.UTF_8)),
+                Map.of("src/App.java", stagingDir.resolve("src/App.java")),
                 12,
                 1,
                 true,
@@ -60,16 +58,13 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
             )
         );
 
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        source.contribute(new ContextRequest.PracticeReviewRequest(job), files);
+        var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
 
-        assertThat(files).containsOnlyKeys("inputs/sources/scm/repo/src/App.java");
-        assertThat(files).doesNotContainKey("inputs/sources/scm/repo/.git/HEAD");
-        verify(gitRepositoryManager).readTreeSnapshot(
-            17L,
-            "0123456789012345678901234567890123456789",
-            RepositoryTreeContentSource.MAX_TOTAL_BYTES
-        );
+        // Staged by path: the tree's bytes are never held by this process.
+        assertThat(contribution.files()).isEmpty();
+        assertThat(contribution.filesOnDisk()).containsOnlyKeys("inputs/sources/scm/repo/src/App.java");
+        assertThat(contribution.filesOnDisk()).doesNotContainKey("inputs/sources/scm/repo/.git/HEAD");
+        verify(gitRepositoryManager).readTreeSnapshot(17L, "0123456789012345678901234567890123456789");
     }
 
     @Test
@@ -77,7 +72,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
         assertThatThrownBy(() ->
-            source.contribute(new ContextRequest.PracticeReviewRequest(job(17L, null)), new LinkedHashMap<>())
+            source.capture(new ContextRequest.PracticeReviewRequest(job(17L, null)), source.sourceKinds())
         )
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("commit_sha");
@@ -88,13 +83,9 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         AgentJob job = job(17L, "0123456789012345678901234567890123456789");
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
-        when(
-            gitRepositoryManager.readTreeSnapshot(
-                17L,
-                "0123456789012345678901234567890123456789",
-                RepositoryTreeContentSource.MAX_TOTAL_BYTES
-            )
-        ).thenThrow(new GitRepositoryManager.GitOperationException("unreadable commit", new java.io.IOException()));
+        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789")).thenThrow(
+            new GitRepositoryManager.GitOperationException("unreadable commit", new java.io.IOException())
+        );
 
         assertThatThrownBy(() -> source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds()))
             .isInstanceOf(EvidenceCollectionException.class)

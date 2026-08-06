@@ -11,9 +11,6 @@ import java.util.regex.Pattern;
  */
 public final class SandboxLayout {
 
-    /** Total size of the files a job may stage. Sources take shares of this, never all of it. */
-    public static final long MAX_INPUT_BYTES = 50L * 1024 * 1024;
-
     private SandboxLayout() {}
 
     /** Container workspace root. */

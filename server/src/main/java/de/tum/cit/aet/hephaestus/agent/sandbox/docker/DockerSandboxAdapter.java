@@ -229,7 +229,7 @@ public class DockerSandboxAdapter implements SandboxManager {
 
             // Inject input files via docker cp
             if (!spec.inputFiles().isEmpty()) {
-                workspaceManager.injectFiles(containerId, spec.inputFiles());
+                workspaceManager.injectFiles(containerId, spec.inputFiles(), spec.inputFilesOnDisk());
                 log.debug("Injected {} input files", spec.inputFiles().size());
             }
 

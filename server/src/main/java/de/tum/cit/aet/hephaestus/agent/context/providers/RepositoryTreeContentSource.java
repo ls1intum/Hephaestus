@@ -41,9 +41,6 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         return KIND;
     }
 
-    /** A share of the job's input budget, leaving room for the diff. Past this bound the tree truncates and reports partial. */
-    static final long MAX_TOTAL_BYTES = (SandboxLayout.MAX_INPUT_BYTES * 2) / 3;
-
     private final GitRepositoryManager gitRepositoryManager;
 
     @Override
@@ -58,7 +55,9 @@ public class RepositoryTreeContentSource implements EvidenceSource {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        files.putAll(capture(request, sourceKinds()).files());
+        // The tree is staged by reference; a caller that only understands byte[] would have to read it
+        // all into heap, which is the cost this source exists to avoid.
+        throw new UnsupportedOperationException("Repository-tree capture stages files from disk; use capture()");
     }
 
     @Override
@@ -73,15 +72,21 @@ public class RepositoryTreeContentSource implements EvidenceSource {
             return absent(absence);
         }
         GitRepositoryManager.GitTreeSnapshot snapshot = snapshot(request);
-        Map<String, byte[]> files = new java.util.LinkedHashMap<>();
-        snapshot.files().forEach((path, bytes) -> files.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, bytes));
+        Map<String, java.nio.file.Path> onDisk = new java.util.LinkedHashMap<>();
+        snapshot.files().forEach((path, file) -> onDisk.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, file));
         SourceCompleteness completeness = snapshot.complete()
             ? SourceCompleteness.COMPLETE
             : SourceCompleteness.PARTIAL;
         return new EvidenceContribution(
-            files,
+            Map.of(),
             Map.of(KIND, completeness),
-            Map.of(KIND, snapshot.commitSha() + ":" + snapshot.treeSha())
+            Map.of(KIND, snapshot.commitSha() + ":" + snapshot.treeSha()),
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            onDisk,
+            snapshot
         );
     }
 
@@ -134,7 +139,7 @@ public class RepositoryTreeContentSource implements EvidenceSource {
             );
         }
         try {
-            return gitRepositoryManager.readTreeSnapshot(repositoryId, commitSha, MAX_TOTAL_BYTES);
+            return gitRepositoryManager.readTreeSnapshot(repositoryId, commitSha);
         } catch (GitRepositoryManager.GitOperationException e) {
             throw new EvidenceCollectionException("Could not capture repository tree at " + commitSha, e);
         }

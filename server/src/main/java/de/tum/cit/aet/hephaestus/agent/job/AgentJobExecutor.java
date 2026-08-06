@@ -584,10 +584,13 @@ public class AgentJobExecutor {
         Instant startTime = Instant.now();
         String metricOutcome = "unknown";
         boolean sandboxExecutionStarted = false;
+        PreparedJobInputs stagedInputs = null;
         try {
             log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
 
-            SandboxSpec sandboxSpec = prepareSandboxSpec(jobId, job, claim.snapshot);
+            PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot);
+            stagedInputs = preparedSandbox.stagedInputs();
+            SandboxSpec sandboxSpec = preparedSandbox.spec();
             // Past this boundary provider usage may exist even if execute() throws, so it is persisted
             // for recovery on another process. A lost fence means the job was cancelled or requeued
             // while preparation ran, so its sandbox must not start.
@@ -642,6 +645,11 @@ public class AgentJobExecutor {
         } catch (Exception e) {
             metricOutcome = handleExecutionFailure(jobId, job, e, sandboxExecutionStarted);
         } finally {
+            // The sandbox has whatever it was going to get by now, so the staging directories behind any
+            // disk-staged evidence are no longer referenced by anything.
+            if (stagedInputs != null) {
+                stagedInputs.close();
+            }
             recordExecutionDuration(job.getJobType(), metricOutcome, Duration.between(startTime, Instant.now()));
             releaseCapacity();
             localRunningJobs.remove(jobId);
@@ -667,7 +675,14 @@ public class AgentJobExecutor {
     }
 
     /** Prepares the spec without starting provider execution — no LLM cost accrues here. */
-    private SandboxSpec prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
+    /**
+     * A sandbox specification together with the staged inputs backing it. The staging directories must
+     * outlive {@code injectFiles} — which runs inside the sandbox execution — so the caller closes them
+     * once the run is over, whatever its outcome.
+     */
+    private record PreparedSandbox(SandboxSpec spec, PreparedJobInputs stagedInputs) {}
+
+    private PreparedSandbox prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
 
         // The claim transaction is long gone, so the handler needs a transaction of its own here to
@@ -693,7 +708,13 @@ public class AgentJobExecutor {
         );
 
         PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
-        SandboxSpec sandboxSpec = buildSandboxSpec(jobId, preparedInputs.files(), agentSpec, snapshot);
+        SandboxSpec sandboxSpec = buildSandboxSpec(
+            jobId,
+            preparedInputs.files(),
+            preparedInputs.filesOnDisk(),
+            agentSpec,
+            snapshot
+        );
         persistProvenanceDigests(
             jobId,
             agentSpec.promptDigest(),
@@ -701,7 +722,7 @@ public class AgentJobExecutor {
             job.getRetryCount(),
             preparedInputs.automatedReviewReadinessReport()
         );
-        return sandboxSpec;
+        return new PreparedSandbox(sandboxSpec, preparedInputs);
     }
 
     private void persistRefusedEvidence(UUID jobId, int retryCount, PreparedJobInputs preparedInputs) {
@@ -771,6 +792,7 @@ public class AgentJobExecutor {
     private static SandboxSpec buildSandboxSpec(
         UUID jobId,
         Map<String, byte[]> handlerFiles,
+        Map<String, java.nio.file.Path> handlerFilesOnDisk,
         PracticeSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
@@ -794,6 +816,7 @@ public class AgentJobExecutor {
             limits,
             agentSpec.securityProfile(),
             allInputFiles,
+            handlerFilesOnDisk,
             agentSpec.outputPath(),
             agentSpec.volumeMounts()
         );

@@ -154,7 +154,13 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (practices.isEmpty()) {
             throw new InsufficientEvidenceException(
                 "No practice has sufficient evidence: jobId=" + job.getId(),
-                new PreparedJobInputs(prepared.files(), artifactSourceManifest, readiness.report())
+                new PreparedJobInputs(
+                    prepared.files(),
+                    prepared.filesOnDisk(),
+                    prepared.cleanups(),
+                    artifactSourceManifest,
+                    readiness.report()
+                )
             );
         }
         prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
@@ -167,7 +173,13 @@ public class IssueReviewHandler implements JobTypeHandler {
             metadata.path("issue_number").asInt(),
             job.getId()
         );
-        return new PreparedJobInputs(files, artifactSourceManifest, readiness.report());
+        return new PreparedJobInputs(
+            files,
+            prepared.filesOnDisk(),
+            prepared.cleanups(),
+            artifactSourceManifest,
+            readiness.report()
+        );
     }
 
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {

@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -127,8 +128,20 @@ public class ContextManifestBuilder {
         }
     }
 
+    /** For captures held entirely in memory, which is every source but the repository tree. */
     public ArtifactSourceManifest augment(
         Map<String, byte[]> files,
+        Map<String, SourceKind> pathKinds,
+        String jobId,
+        EvidencePlan plan,
+        CaptureMetadata metadata
+    ) {
+        return augment(files, Map.of(), pathKinds, jobId, plan, metadata);
+    }
+
+    public ArtifactSourceManifest augment(
+        Map<String, byte[]> files,
+        Map<String, java.nio.file.Path> filesOnDisk,
         Map<String, SourceKind> pathKinds,
         String jobId,
         EvidencePlan plan,
@@ -149,6 +162,7 @@ public class ContextManifestBuilder {
                 capture(
                     kind,
                     files,
+                    filesOnDisk,
                     pathKinds,
                     plan,
                     capturedAt,
@@ -235,10 +249,14 @@ public class ContextManifestBuilder {
             .map(SourceArtifact::path)
             .collect(java.util.stream.Collectors.toSet());
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
+        Map<String, java.nio.file.Path> filesOnDisk = new LinkedHashMap<>(prepared.filesOnDisk());
         allArtifacts
             .stream()
             .filter(path -> !retainedArtifacts.contains(path))
-            .forEach(files::remove);
+            .forEach(path -> {
+                files.remove(path);
+                filesOnDisk.remove(path);
+            });
         ArtifactSourceManifest restricted = new ArtifactSourceManifest(
             prepared.manifest().contractVersion(),
             prepared.manifest().catalogDigest(),
@@ -247,7 +265,9 @@ public class ContextManifestBuilder {
             sources
         );
         files.put(SandboxLayout.MANIFEST_PATH, objectMapper.writeValueAsBytes(restricted));
-        return new PreparedEvidence(files, restricted);
+        // The cleanups travel with the restricted view: minimising a source hides it from the sandbox
+        // but does not make its staging directory somebody else's to delete.
+        return new PreparedEvidence(files, filesOnDisk, prepared.cleanups(), restricted);
     }
 
     /**
@@ -402,6 +422,7 @@ public class ContextManifestBuilder {
     private SourceCapture capture(
         SourceKind kind,
         Map<String, byte[]> files,
+        Map<String, java.nio.file.Path> filesOnDisk,
         Map<String, SourceKind> pathKinds,
         EvidencePlan plan,
         Instant capturedAt,
@@ -429,7 +450,7 @@ public class ContextManifestBuilder {
             .stream()
             .filter(entry -> entry.getValue().equals(kind))
             .sorted(Map.Entry.comparingByKey())
-            .map(entry -> artifact(entry.getKey(), files.get(entry.getKey())))
+            .map(entry -> artifact(entry.getKey(), files.get(entry.getKey()), filesOnDisk.get(entry.getKey())))
             .toList();
         if (artifacts.isEmpty() && !contract.completenessPolicy().supportsEmpty()) {
             return missingCapture(contract, new SourceCaptureState.Unavailable(SourceAbsenceReason.EMPTY_NOT_VALID));
@@ -513,7 +534,14 @@ public class ContextManifestBuilder {
         }
     }
 
-    private SourceArtifact artifact(String path, byte[] bytes) {
+    private SourceArtifact artifact(String path, byte@Nullable [] bytes, java.nio.file.@Nullable Path onDisk) {
+        if (onDisk != null) {
+            try {
+                return new SourceArtifact(path, mediaType(path), cas.put(onDisk), java.nio.file.Files.size(onDisk));
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException("Evidence artifact unreadable: " + path, e);
+            }
+        }
         if (bytes == null) {
             throw new IllegalStateException("Evidence artifact has null bytes: " + path);
         }

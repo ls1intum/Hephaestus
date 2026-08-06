@@ -45,6 +45,49 @@ public class ContentAddressedStore {
     }
 
     /**
+     * Stores the contents of {@code source} atomically and returns its SHA-256 digest, streaming the
+     * file twice — once to digest, once to copy — so a blob of any size costs one buffer of memory.
+     */
+    public String put(Path source) {
+        String sha = sha256(source);
+        Path blob = pathFor(sha);
+        try (BlobLock ignored = lockBlob(sha)) {
+            if (Files.exists(blob)) {
+                Files.setLastModifiedTime(blob, FileTime.from(Instant.now()));
+                return sha;
+            }
+            Files.createDirectories(blob.getParent());
+            Path temp = Files.createTempFile(blob.getParent(), "incoming-", ".tmp");
+            try {
+                Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temp, blob, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException e) {
+                Files.deleteIfExists(temp);
+                throw e;
+            }
+            return sha;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to store blob from " + source, e);
+        }
+    }
+
+    private static String sha256(Path source) {
+        try (var in = Files.newInputStream(source)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = in.read(buffer)) >= 0) {
+                digest.update(buffer, 0, read);
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to digest " + source, e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /**
      * Stores {@code content} atomically and returns its SHA-256 digest. Reusing a blob refreshes its retention age.
      */
     public String put(byte[] content) {
