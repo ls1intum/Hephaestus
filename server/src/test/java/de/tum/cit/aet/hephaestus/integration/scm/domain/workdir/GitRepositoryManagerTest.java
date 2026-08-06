@@ -508,12 +508,12 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     class ReadTreeSnapshot {
 
         @Test
-        void shouldReturnEmptyMapWhenNotEnabled() {
+        void shouldRefuseToReadATreeWhenCheckoutIsDisabled() {
             manager = createManager(false);
 
-            Map<String, byte[]> result = manager.readTreeSnapshot(1L, "abc123", 50L * 1024 * 1024).files();
-
-            assertThat(result).isEmpty();
+            assertThatThrownBy(() -> manager.readTreeSnapshot(1L, "abc123", 50L * 1024 * 1024))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("checkout is disabled");
         }
 
         @Test

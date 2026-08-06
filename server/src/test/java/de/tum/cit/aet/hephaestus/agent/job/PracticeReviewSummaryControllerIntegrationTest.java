@@ -196,11 +196,11 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             .isEqualTo(2)
             .jsonPath("$[0].reviewedCount")
             .isEqualTo(1)
-            .jsonPath("$[0].skippedBecause[0].sourceKind")
+            .jsonPath("$[0].blockersObserved[0].sourceKind")
             .isEqualTo("scm.pull-request.diff")
-            .jsonPath("$[0].skippedBecause[0].reasonCode")
+            .jsonPath("$[0].blockersObserved[0].reasonCode")
             .isEqualTo("SOURCE_EMPTY")
-            .jsonPath("$[0].skippedBecause[0].reviews")
+            .jsonPath("$[0].blockersObserved[0].reviewsAffected")
             .isEqualTo(1);
     }
 

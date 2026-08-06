@@ -762,7 +762,6 @@ public class AgentJobExecutor {
         }
         ObjectNode snapshot = objectMapper.createObjectNode();
         snapshot.set("manifest", objectMapper.readTree(manifest));
-        snapshot.set("automatedReviewReadiness", objectMapper.valueToTree(automatedReviewReadinessReport));
         if (practices != null) {
             snapshot.set("practices", objectMapper.readTree(practices));
         }

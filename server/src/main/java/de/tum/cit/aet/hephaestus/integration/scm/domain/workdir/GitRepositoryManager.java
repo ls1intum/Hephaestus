@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
@@ -697,7 +698,7 @@ public class GitRepositoryManager {
     /** Reads a bounded commit tree without dereferencing symlinks or submodules across the source boundary. */
     public GitTreeSnapshot readTreeSnapshot(Long repositoryId, String commitSha, long maxTotalBytes) {
         if (!properties.enabled()) {
-            return new GitTreeSnapshot(commitSha, null, Map.of(), 0, 0, false, Set.of("COLLECTION_DISABLED"));
+            throw new IllegalStateException("Repository checkout is disabled; callers must check isEnabled()");
         }
         if (maxTotalBytes <= 0) {
             throw new IllegalArgumentException("maxTotalBytes must be positive");
@@ -811,9 +812,10 @@ public class GitRepositoryManager {
         return false;
     }
 
+    /** A tree read at one commit. Callers check {@link #isEnabled()} first; there is no disabled form. */
     public record GitTreeSnapshot(
         String commitSha,
-        @Nullable String treeSha,
+        String treeSha,
         Map<String, byte[]> files,
         long totalBytes,
         int visitedFiles,
@@ -821,6 +823,7 @@ public class GitRepositoryManager {
         Set<String> limitations
     ) {
         public GitTreeSnapshot {
+            Objects.requireNonNull(treeSha, "treeSha");
             files = Collections.unmodifiableMap(new LinkedHashMap<>(files));
             limitations = Set.copyOf(limitations);
         }

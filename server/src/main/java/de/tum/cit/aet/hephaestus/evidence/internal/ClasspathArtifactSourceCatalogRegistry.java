@@ -511,17 +511,6 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         return value.asBoolean();
     }
 
-    private static @Nullable Long optionalPositiveLong(JsonNode node, String field, String context) {
-        JsonNode value = node.get(field);
-        if (value == null) {
-            return null;
-        }
-        if (!value.isIntegralNumber() || value.asLong() <= 0) {
-            throw new IllegalStateException(context + "." + field + " must be a positive integer");
-        }
-        return value.asLong();
-    }
-
     private static <E extends Enum<E>> E enumValue(Class<E> type, String value, String field) {
         try {
             return Enum.valueOf(type, value);

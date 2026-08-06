@@ -20,9 +20,13 @@ export const RequirementsThatKeepSkipping: Story = {
 			practiceSlug: "handles-errors-instead-of-swallowing-them",
 			consideredReviews: 12,
 			reviewedCount: 4,
-			skippedBecause: [
-				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_EMPTY", reviews: 6 },
-				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_NOT_CURRENT", reviews: 2 },
+			blockersObserved: [
+				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_EMPTY", reviewsAffected: 6 },
+				{
+					sourceKind: "scm.pull-request.diff",
+					reasonCode: "SOURCE_NOT_CURRENT",
+					reviewsAffected: 2,
+				},
 			],
 		},
 	},
@@ -44,9 +48,17 @@ export const ReasonsCanOutnumberTheSkips: Story = {
 			practiceSlug: "validates-inputs-and-edge-cases-at-the-boundary",
 			consideredReviews: 5,
 			reviewedCount: 4,
-			skippedBecause: [
-				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_INCOMPLETE", reviews: 1 },
-				{ sourceKind: "scm.pull-request.core", reasonCode: "SOURCE_NOT_AVAILABLE", reviews: 1 },
+			blockersObserved: [
+				{
+					sourceKind: "scm.pull-request.diff",
+					reasonCode: "SOURCE_INCOMPLETE",
+					reviewsAffected: 1,
+				},
+				{
+					sourceKind: "scm.pull-request.core",
+					reasonCode: "SOURCE_NOT_AVAILABLE",
+					reviewsAffected: 1,
+				},
 			],
 		},
 	},
@@ -65,7 +77,7 @@ export const SkippedByItsOwnSetting: Story = {
 			practiceSlug: "records-significant-decisions-with-rationale",
 			consideredReviews: 9,
 			reviewedCount: 0,
-			skippedBecause: [{ reasonCode: "NO_AUTOMATED_REVIEW", reviews: 9 }],
+			blockersObserved: [{ reasonCode: "NO_AUTOMATED_REVIEW", reviewsAffected: 9 }],
 		},
 	},
 	play: async ({ canvas }) => {
@@ -81,7 +93,7 @@ export const RequirementsThatAlwaysHold: Story = {
 			practiceSlug: "submit-reviewable-work",
 			consideredReviews: 12,
 			reviewedCount: 12,
-			skippedBecause: [],
+			blockersObserved: [],
 		},
 	},
 	play: async ({ canvas }) => {
@@ -96,7 +108,7 @@ export const NeverReviewed: Story = {
 			practiceSlug: "submit-reviewable-work",
 			consideredReviews: 0,
 			reviewedCount: 0,
-			skippedBecause: [],
+			blockersObserved: [],
 		},
 	},
 	play: async ({ canvasElement }) => {

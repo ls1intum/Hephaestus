@@ -41,10 +41,8 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         return KIND;
     }
 
-    /** Below {@code SandboxWorkspaceManager.MAX_INPUT_BYTES}: a tree that filled the budget would leave
-     * nothing for the diff and fail the job, which an optional source must never do. Past this bound the
-     * tree truncates and reports partial. */
-    static final long MAX_TOTAL_BYTES = 32L * 1024 * 1024;
+    /** A share of the job's input budget, leaving room for the diff. Past this bound the tree truncates and reports partial. */
+    static final long MAX_TOTAL_BYTES = (SandboxLayout.MAX_INPUT_BYTES * 2) / 3;
 
     private final GitRepositoryManager gitRepositoryManager;
 
@@ -80,12 +78,6 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         SourceCompleteness completeness = snapshot.complete()
             ? SourceCompleteness.COMPLETE
             : SourceCompleteness.PARTIAL;
-        // With checkout disabled the snapshot carries no tree, and "<sha>:null" is a non-null
-        // string that freshness assessment accepts as a pinned identity, reporting a tree that was
-        // never read as current. Report the source as not collected instead.
-        if (snapshot.treeSha() == null) {
-            return absent(new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED));
-        }
         return new EvidenceContribution(
             files,
             Map.of(KIND, completeness),

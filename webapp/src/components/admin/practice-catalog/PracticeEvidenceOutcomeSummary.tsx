@@ -33,14 +33,14 @@ export function PracticeEvidenceOutcomeSummary({
 						Hephaestus skipped this practice in {skipped} of the last{" "}
 						{reviews(outcome.consideredReviews)} that reached it.
 					</p>
-					{outcome.skippedBecause.length > 0 && (
+					{outcome.blockersObserved.length > 0 && (
 						<ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-							{outcome.skippedBecause.map((block) => (
-								<li key={`${block.sourceKind ?? "practice"}:${block.reasonCode}`}>
-									{block.sourceKind
-										? `${evidenceSourceLabel(block.sourceKind, sources)} — ${readinessReasonLabel(block.reasonCode)}`
-										: readinessReasonLabel(block.reasonCode)}{" "}
-									({reviews(block.reviews)})
+							{outcome.blockersObserved.map((blocker) => (
+								<li key={`${blocker.sourceKind ?? "practice"}:${blocker.reasonCode}`}>
+									{blocker.sourceKind
+										? `${evidenceSourceLabel(blocker.sourceKind, sources)} — ${readinessReasonLabel(blocker.reasonCode)}`
+										: readinessReasonLabel(blocker.reasonCode)}{" "}
+									({reviews(blocker.reviewsAffected)})
 								</li>
 							))}
 						</ul>

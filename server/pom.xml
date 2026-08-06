@@ -916,19 +916,14 @@
                         <configuration>
                             <skip>${skipCoverage}</skip>
                             <rules>
-                                <!-- Per-package BRANCH floors. There is deliberately no whole-bundle
-                                     rule: the previous one had a minimum of 0.00, which no code can
-                                     fail, and a gate that cannot fail reads as a guarantee while
-                                     providing none.
+<!-- Per-package BRANCH floors. There is deliberately no whole-bundle rule: a minimum any
+                                     code can clear reads as a guarantee while providing none.
 
-                                     Measured on the unit tier: core.webhook 0.78, github.webhook 0.78,
-                                     gitlab.webhook 0.73-0.77, outline.webhook 0.78, agent.context 0.74,
-                                     agent.context.providers 0.72, evidence 0.69, evidence.internal 0.66,
-                                     slack.webhook 0.62. The floors sit below those because surefire runs
-                                     tests in parallel and the ratio moves by several points between
-                                     runs; a floor set at the measured value fails on nothing but noise.
-                                     They are a ratchet against regression, not a claim that coverage is
-                                     where it should be — raise one whenever its package clears the next
+                                     Whole-package figures, including the Spring-wired credential adapters: a rule's
+                                     includes/excludes match the element name, so a class glob cannot narrow a
+                                     PACKAGE rule. Floors sit below the measured ratios because surefire runs tests
+                                     in parallel and the numbers move several points between runs. They are a
+                                     ratchet against regression — raise one whenever its package clears the next
                                      step with room to spare. -->
                                 <rule>
                                     <element>PACKAGE</element>

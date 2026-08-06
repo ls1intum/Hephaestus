@@ -2777,6 +2777,10 @@ export type PracticeReviewSettings = {
  */
 export type PracticeEvidenceOutcome = {
     /**
+     * Blockers seen on the skipped reviews, most frequent first
+     */
+    blockersObserved: Array<PracticeEvidenceBlocker>;
+    /**
      * Reviews that considered this practice
      */
     consideredReviews: number;
@@ -2788,24 +2792,20 @@ export type PracticeEvidenceOutcome = {
      * Reviews where the evidence met every requirement
      */
     reviewedCount: number;
-    /**
-     * Why the remaining reviews were skipped, most frequent first. Not a partition: one review blocked on two sources appears under both, so these can sum above the skipped count.
-     */
-    skippedBecause: Array<PracticeEvidenceBlock>;
 };
 
 /**
- * One reason automated review was skipped, and how often
+ * One thing that blocked automated review, and how many reviews it affected
  */
-export type PracticeEvidenceBlock = {
+export type PracticeEvidenceBlocker = {
     /**
      * Readiness reason recorded for that source or practice
      */
     reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_NOT_CURRENT' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT';
     /**
-     * Reviews skipped for this reason
+     * Reviews this blocker affected
      */
-    reviews: number;
+    reviewsAffected: number;
     /**
      * Source that did not meet its requirement; absent when the practice itself runs no review
      */

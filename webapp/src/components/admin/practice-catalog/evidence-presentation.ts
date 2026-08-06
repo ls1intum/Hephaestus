@@ -5,7 +5,7 @@ import type {
 } from "@/api/types.gen";
 
 /** Every reason a review can record for skipping a practice, closed by the generated schema. */
-type PracticeEvidenceReason = PracticeEvidenceOutcome["skippedBecause"][number]["reasonCode"];
+type PracticeEvidenceReason = PracticeEvidenceOutcome["blockersObserved"][number]["reasonCode"];
 
 export function evidenceSourceLabel(
 	sourceKind: string,

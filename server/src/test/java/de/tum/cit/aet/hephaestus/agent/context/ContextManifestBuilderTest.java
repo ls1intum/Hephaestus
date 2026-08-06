@@ -304,9 +304,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldReviewWorkUnchangedUpstreamSinceTheLastSynchronization() {
-        // Reproduces the failure observed on the test deployment: a merge request mirrored two weeks
-        // before the review, with a reconciliation in between that correctly wrote nothing because
-        // the record was unchanged. Backfill and replay both depend on this remaining reviewable.
+        // A mirrored record upstream has not touched is current, however old the last write is.
         ArtifactSourceManifest manifest = coreManifest(builder, "job-quiet-mirror", NOW.minusSeconds(14 * 86_400));
 
         assertThat(

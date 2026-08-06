@@ -9898,9 +9898,10 @@ components:
             $ref: "#/components/schemas/PracticeWorkTypeDefinitionOptions"
       required:
       - workTypes
-    PracticeEvidenceBlock:
+    PracticeEvidenceBlocker:
       type: object
-      description: "One reason automated review was skipped, and how often"
+      description: "One thing that blocked automated review, and how many reviews\
+        \ it affected"
       properties:
         reasonCode:
           type: string
@@ -9912,17 +9913,17 @@ components:
           - SOURCE_EMPTY
           - NO_AUTOMATED_REVIEW
           - DECLARED_EVIDENCE_INSUFFICIENT
-        reviews:
+        reviewsAffected:
           type: integer
           format: int32
-          description: Reviews skipped for this reason
+          description: Reviews this blocker affected
         sourceKind:
           type: string
           description: Source that did not meet its requirement; absent when the practice
             itself runs no review
       required:
       - reasonCode
-      - reviews
+      - reviewsAffected
     PracticeEvidenceLimitation:
       type: object
       description: Known claim that the selected evidence cannot support even when
@@ -9946,6 +9947,11 @@ components:
       type: object
       description: Recent review readiness for one practice's evidence requirements
       properties:
+        blockersObserved:
+          type: array
+          description: "Blockers seen on the skipped reviews, most frequent first"
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceBlocker"
         consideredReviews:
           type: integer
           format: int32
@@ -9957,18 +9963,11 @@ components:
           type: integer
           format: int32
           description: Reviews where the evidence met every requirement
-        skippedBecause:
-          type: array
-          description: "Why the remaining reviews were skipped, most frequent first.\
-            \ Not a partition: one review blocked on two sources appears under both,\
-            \ so these can sum above the skipped count."
-          items:
-            $ref: "#/components/schemas/PracticeEvidenceBlock"
       required:
+      - blockersObserved
       - consideredReviews
       - practiceSlug
       - reviewedCount
-      - skippedBecause
     PracticeEvidenceRequirement:
       type: object
       description: Source and minimum capture quality required by a practice

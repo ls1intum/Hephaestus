@@ -629,15 +629,18 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             "    FROM decision, jsonb_array_elements_text(d -> 'reasonCodes') reason" +
             "   WHERE NOT (d ->> 'ready')::boolean" +
             "   GROUP BY 1, 2, 3" +
+            "), aggregated AS (" +
+            "  SELECT practice_slug, jsonb_agg(jsonb_build_object(" +
+            "           'sourceKind', source_kind, 'reasonCode', reason_code, 'reviewsAffected', reviews" +
+            "         ) ORDER BY reviews DESC, source_kind NULLS FIRST, reason_code) AS blockers" +
+            "    FROM blocked GROUP BY 1" +
             ")" +
             " SELECT counted.practice_slug AS practiceSlug," +
             "        counted.considered AS consideredReviews," +
             "        counted.reviewed AS reviewedCount," +
-            "        blocked.source_kind AS sourceKind," +
-            "        blocked.reason_code AS reasonCode," +
-            "        blocked.reviews AS reviews" +
-            "   FROM counted LEFT JOIN blocked USING (practice_slug)" +
-            "  ORDER BY counted.practice_slug, blocked.reviews DESC NULLS LAST, blocked.source_kind, blocked.reason_code",
+            "        coalesce(aggregated.blockers, '[]'::jsonb)::text AS blockersObserved" +
+            "   FROM counted LEFT JOIN aggregated USING (practice_slug)" +
+            "  ORDER BY counted.practice_slug",
         nativeQuery = true
     )
     List<PracticeReadinessRow> findReadinessOutcomes(
@@ -645,21 +648,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("window") int window
     );
 
-    /** One practice's counts, repeated across its blocking reasons; the reason columns are null when it never skipped. */
     interface PracticeReadinessRow {
         String getPracticeSlug();
 
-        long getConsideredReviews();
+        int getConsideredReviews();
 
-        long getReviewedCount();
+        int getReviewedCount();
 
-        @Nullable
-        String getSourceKind();
-
-        @Nullable
-        String getReasonCode();
-
-        long getReviews();
+        /** A JSON array of blockers, aggregated by the query so one row is one practice. */
+        String getBlockersObserved();
     }
 
     interface ReviewRunTargetRow {

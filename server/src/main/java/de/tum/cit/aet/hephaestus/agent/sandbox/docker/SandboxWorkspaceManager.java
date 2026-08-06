@@ -41,7 +41,7 @@ public class SandboxWorkspaceManager {
     static final long MAX_SINGLE_FILE_BYTES = 10L * 1024 * 1024;
 
     /** Maximum total size of injected input files (50 MB). */
-    static final long MAX_INPUT_BYTES = 50L * 1024 * 1024;
+    static final long MAX_INPUT_BYTES = SandboxLayout.MAX_INPUT_BYTES;
 
     /** Maximum total size of a directory injected via tar (1 GB). */
     static final long MAX_DIRECTORY_BYTES = 1024L * 1024 * 1024;
