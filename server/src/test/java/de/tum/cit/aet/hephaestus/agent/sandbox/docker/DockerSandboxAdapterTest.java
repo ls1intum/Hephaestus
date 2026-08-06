@@ -167,7 +167,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(networkManager).createJobNetwork(JOB_ID, false);
             verify(networkManager).connectAppServer(NETWORK_ID);
             verify(containerManager).createContainer(any());
-            verify(workspaceManager).injectFiles(eq(CONTAINER_ID), any());
+            verify(workspaceManager).injectFiles(eq(CONTAINER_ID), any(), any());
             verify(containerManager).startContainer(CONTAINER_ID);
             verify(containerManager).waitForCompletion(eq(CONTAINER_ID), any());
             verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/out");

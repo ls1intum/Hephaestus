@@ -111,7 +111,7 @@ public class SandboxWorkspaceManager {
         try {
             tarFile = Files.createTempFile("sandbox-inputs-", ".tar");
             writeInputTar(tarFile, inMemory, onDisk);
-            try (InputStream tarStream = new BufferedInputStream(Files.newInputStream(tarFile), COPY_BUFFER_SIZE)) {
+            try (InputStream tarStream = Files.newInputStream(tarFile)) {
                 fileOps.copyArchiveToContainer(containerId, "/workspace", tarStream);
             }
             log.debug("Injected {} files into container {}", inMemory.size() + onDisk.size(), containerId);
