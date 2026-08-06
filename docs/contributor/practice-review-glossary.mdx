@@ -14,7 +14,6 @@ The broader [practice feedback language](./practice-feedback-language.md) remain
 | **AI-supported mentoring** | Hephaestus may review connected work and offer guidance when every required source is ready. | AI mentor, guaranteed feedback |
 | **Human review needed** | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review outside the current product, and Hephaestus skips it. | human context needed, unobservable, not applicable |
 | **Guidance only** | Keep the practice's criteria and guidance without asking Hephaestus to review it. | practice guidance only, invalid practice, human-only |
-| **Finding detection** | The internal step that turns an automated review into candidate findings. Use this only for that pipeline step, not for the product flow or a practice's overall review support. | practice review, automated review policy |
 | **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
 | **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
 | **Automated-review policy** | The complete rule for how Hephaestus may review one practice, including mode, evidence, refusal behavior, and known limits. | evidence requirements |
@@ -34,8 +33,6 @@ The broader [practice feedback language](./practice-feedback-language.md) remain
 | **Source authorization** | Instance governance permits a source for an explicit product use. | enabled, available |
 | **Source-use purpose** | Why Hephaestus processes evidence, such as automated review or feedback delivery. | audience, recipient |
 | **Audience / recipient** | Who may receive or inspect evidence. | purpose |
-| **Integration availability** | A workspace integration can provide a source. | authorized, collected |
-| **Runtime support** | The deployed implementation supports the configured review mode. | source availability |
 | **Review readiness** | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks. | validation, activation |
 | **Used in new reviews** | A workspace currently includes the practice in newly started reviews. | detectable, universally observable |
 
@@ -59,7 +56,7 @@ label a practice as universally observable or unobservable.
 | **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it. |
 
 A future human-review feature needs its own consent, provenance, retention, access, rubric, and validation
-model. It must record the reviewer relationship (`SELF`, `PEER`, or `MENTOR`) at review time. Human reviews
+model. It must record who reviewed and in what relationship to the author. Human reviews
 may use different rubrics and evidence, and disagreement remains multiple provenance-bearing reviews rather
 than one ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an automated review.
 
@@ -107,7 +104,6 @@ Keep availability, content, completeness, freshness, and collection outcome sepa
 - **Partial** means only part of the requested scope was captured.
 - **Not current** is a time-based readiness result, not another word for unavailable.
 - **Collection error** means collection was attempted and failed.
-- **Ablated** means evaluation deliberately removed evidence; production does not treat it as natural absence.
 
 ## Lifecycle
 
@@ -133,20 +129,3 @@ Keep availability, content, completeness, freshness, and collection outcome sepa
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
 
-These rules follow [Digital.gov plain-language guidance](https://digital.gov/guides/plain-language), Nielsen
-Norman Group’s [match between the system and the real world](https://www.nngroup.com/articles/ten-usability-heuristics/#toc-2-match-between-the-system-and-the-real-world-2),
-[WCAG consistent identification](https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification.html), and
-[OpenTelemetry naming guidance](https://opentelemetry.io/docs/specs/semconv/general/naming/). The reviewer-relative
-model follows [W3C SOSA observations](https://www.w3.org/TR/vocab-ssn/#SOSAObservation): an observation relates the
-procedure, observed property, feature, result, and the human or software sensor that made it. Conservative skipping
-follows selective-classification research on [reject options](https://www.jmlr.org/papers/v11/el-yaniv10a.html).
-The voluntary [NIST AI RMF](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-ai-rmf-10)
-recommends documenting knowledge limits and designing for safe failure. The contract follows
-[JSON Schema's annotation model](https://json-schema.org/understanding-json-schema/reference/annotations) so machine
-schemas carry human definitions, and uses explicit absence reasons in the same spirit as
-[HL7 Data Absent Reason](https://terminology.hl7.org/6.5.0/CodeSystem-data-absent-reason.html).
-The authoring UI follows the research-backed
-[Guidelines for Human-AI Interaction](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/)
-by making capabilities and limits clear, and uses progressive disclosure in line with the
-[GOV.UK Details guidance](https://design-system.service.gov.uk/components/details/) so technical evidence controls
-remain available without dominating the common path.

@@ -27,9 +27,8 @@ The contract separates three identities:
 Paths are materializations, not source identities. Prompts, practice files, task envelopes, runner code, model
 settings, and executables are invocation inputs and require separate evaluation provenance.
 
-Runtime components must reference the exact contract version and catalog digest they implement. The
-`schemaVersion: 1` context index is not an artifact-source manifest and must not acquire `1.0.0` semantics.
-Inputs outside the catalog cannot satisfy a practice requirement.
+Runtime components must reference the exact contract version and catalog digest they implement. Inputs
+outside the catalog cannot satisfy a practice requirement.
 
 This contract governs automated-review evidence, not every file used by the separate Mentor conversation
 runtime. Mentor inputs remain subject to Mentor consent and integration controls and cannot support an automated
@@ -46,9 +45,10 @@ practice review. Reusing one for review requires registering it as a source kind
 | `DETERMINISTIC_DERIVATION` | A deterministic transform of declared dependencies. |
 | `LOSSY_DERIVATION` | A sample, excerpt, aggregation, heuristic, or other information-losing transform. |
 
-Capture time is separately `EVENT_TIME_SNAPSHOT`, `COLLECTION_TIME_SNAPSHOT`, or
-`PINNED_IMMUTABLE_IDENTITY`. An available capture records representation fidelity as `EXACT`,
-`LOSSLESS_DERIVATION`, or `LOSSY_DERIVATION`.
+A source's authority constrains what it may claim. Only a capture anchored to an immutable upstream
+identity may claim currentness — a `SYNCHRONIZED_MIRROR` reflects state that moves independently of the
+capture — and a `LOSSY_DERIVATION` may never claim completeness. `check:contracts` rejects a catalog
+that breaks either rule.
 
 A database row is not automatically authoritative for the current state of GitHub, GitLab, Slack, or Outline.
 Currentness depends on a source watermark, event time, or immutable identity defined by the source contract.
@@ -111,10 +111,6 @@ and listing a non-sensitive source is a startup error rather than a silent no-op
 grow back into an everything-list. Withholding an everyday source needs no separate switch: a practice author
 chooses which sources a practice uses, and an integration that is not connected yields nothing.
 
-Requiring operators to re-declare the sources the product exists to read would minimise no data — the deployment
-and the workspace connection already state that purpose — while a prompt that fires on every source trains
-operators to wave through the sources where a deliberate answer actually carries information.
-
 Changing a source's meaning, selection scope, limit, mapping, freshness policy, dependency, or normalization
 requires a new contract version. Repository history is not part of `scm.repository.tree` and requires its own
 source and governance decision.
@@ -144,11 +140,9 @@ Only `AVAILABLE` has:
 - capture and optional source times or immutable identity;
 - artifacts.
 
-Capture facts hold only what could not be known before the capture ran. A manifest pins the exact catalog by
-digest, so restating a source's selection scope, its representation fidelity, or the basis on which it may claim
-completeness would copy a constant into every capture of every run — values that can then drift out of agreement
-with the catalog they were copied from, leaving a reader to decide which to believe. Each is derivable from the
-pinned catalog and is deliberately absent.
+Capture facts hold only what could not be known before the capture ran. Everything derivable from the
+catalog the manifest pins by digest — selection scope, limits, the states a source may report — is read
+from the catalog, never copied into the capture.
 
 Logical content is independent of serialized bytes: a JSON file containing `[]` represents an `EMPTY` source.
 Field-level redaction remains an available, usually partial source; whole-source redaction uses `REDACTED`.
@@ -159,19 +153,13 @@ copy is out of date. `NOT_APPLICABLE` records that the contract offers no curren
 so authoring validation rejects a `CURRENT` requirement on it; `NO_REQUIREMENT` accepts the absence of a claim
 without asserting that the data is current.
 
-There is deliberately no age-based freshness mode. An age threshold requires a watermark recording when a copy was
-last *verified* against upstream. The mirror records only when a row was last *written*, and rows are written only
-when the upstream record changed, so an age derived from it measures time since the last upstream modification.
-Applied as a freshness test, that reports a correctly mirrored record which has not changed recently as stale, and
-a record modified moments ago as current. The five-minute window used previously therefore skipped automated
-review for every backfilled review, every replay, and every review of an established repository, without
-identifying a single case of genuinely out-of-date evidence.
-
-Adding an age-based mode has a prerequisite: the synchronization layer must record a verified-as-of watermark,
-advanced by a reconciliation pass that confirms a record is unchanged. Such a pass is the equivalent of an HTTP
-`304`, which [RFC 9111 §4.3.4](https://www.rfc-editor.org/rfc/rfc9111.html) defines as refreshing a stored
-response without altering it. Until that watermark exists, a currentness guarantee on a mirrored source would be a
-claim the system cannot substantiate.
+No freshness mode is age-based. An age threshold needs a watermark recording when a copy was last
+*verified* against upstream; the mirror records only when a row was last *written*, so an age derived
+from it measures time since the last upstream change — reporting a correctly mirrored quiet record as
+stale and a record modified moments ago as current. Adding one therefore has a prerequisite: a
+reconciliation pass that advances a verified-as-of watermark after confirming a record is unchanged.
+Until that watermark exists, a currentness guarantee on a mirrored source would be a claim the system
+cannot substantiate.
 
 Review readiness is a pure function of the manifest, the practices, the temporal anchor, and the source contract,
 which is what makes a replay reproducible. A replay supplies the recorded anchor; supplying the current instant
@@ -238,11 +226,11 @@ the governed integrations. It does not claim that a practice is universally obse
 enough, the declared sources cannot support review, or automated review is not configured. These are author-defined
 settings, not empirical validation. `automatedReviewValidation` is bound to the exact automated-review
 policy and review-rule fingerprint. A reviewed status must also identify the exact evaluator procedure: model,
-prompt, tools, and preprocessing. This release reports `AUTHOR_DECLARED`; independent validation is introduced by
-[#1437](https://github.com/ls1intum/Hephaestus/issues/1437) and must record its evaluation protocol and scope.
-Validation never certifies every future finding.
+prompt, tools, and preprocessing. An `AUTHOR_DECLARED` status carries no evaluator provenance and the type refuses to hold any. A validated
+status must identify the exact evaluator procedure — model, prompt, tools, and preprocessing — and never
+certifies a future finding.
 
-The current runtime admits only `LANGUAGE_MODEL` with `SUFFICIENT_WHEN_REQUIREMENTS_MET`. It skips:
+Only `LANGUAGE_MODEL` with `SUFFICIENT_WHEN_REQUIREMENTS_MET` runs a model. These skip:
 
 - `DECLARED_EVIDENCE_INSUFFICIENT` with `DECLARED_EVIDENCE_INSUFFICIENT`;
 - `NONE` with `NO_AUTOMATED_REVIEW`.
@@ -263,10 +251,12 @@ input, it needs a governed source kind and purpose authorization.
 
 ### Required evidence is insufficient
 
-`scope-one-reviewable-change` requires current, complete `scm.pull-request.core` and
-`scm.pull-request.diff`. If the diff is unavailable or the pull-request watermark is stale or unknown, the
-runtime records insufficient evidence and makes no claim that the change is focused, sprawling, or
-`NOT_APPLICABLE`.
+`scope-one-reviewable-change` requires a complete `scm.pull-request.core` record and a complete,
+current, non-empty `scm.pull-request.diff`. If the diff cannot be read, or the pinned commit is gone from
+the mirror, the runtime records insufficient evidence and makes no claim that the change is focused,
+sprawling, or `NOT_APPLICABLE`. The pull-request record itself carries no freshness requirement: nothing
+available can demonstrate that a mirrored record is current, so requiring it is rejected at authoring
+time.
 
 ### Empty evidence is valid
 
@@ -317,24 +307,15 @@ currentness; rows without comparable versioned fingerprints are `UNVERIFIABLE`.
 Complete the [artifact-source governance decision](../admin/dsms/artifact-source-governance) before enabling a new
 or expanded source use. Accuracy or product benefit alone does not authorize collection.
 
-Tests must cover the runtime source inventory, every supported capture state, valid empty evidence, impossible
-requirements, atomic capture, tenant isolation, retention and erasure, and safe telemetry.
+`check:contracts` enforces the cross-resource rules mechanically: every profile source exists and suits the
+profile's artifact type, every source carries an unexpired decision for each product purpose, retention and
+erasure agree between source and decision, no mirror pins an identity, and no lossy derivation claims
+completeness. Each rule is exercised against a deliberately broken fixture, because a guard whose failure
+path never runs is indistinguishable from one that cannot fail.
 
-## Standards and references
+## Prior art
 
+- [Gebru et al., "Datasheets for Datasets"](https://doi.org/10.1145/3458723) — the source catalog is a
+  datasheet: composition, selection scope, uses, and limitations recorded alongside the data.
 - [GDPR Article 5](https://eur-lex.europa.eu/eli/reg/2016/679/art_5/oj) — purpose limitation, minimization,
-  accuracy, and storage limitation.
-- [GDPR Article 25](https://eur-lex.europa.eu/eli/reg/2016/679/art_25/oj) — data protection by design and default.
-- [HL7 DataAbsentReason](https://terminology.hl7.org/6.5.0/CodeSystem-data-absent-reason.html) — distinct reasons
-  for absent data.
-- [OpenTelemetry log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/) — event time and
-  observation time.
-- [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/json-schema-core) — closed, versioned contracts.
-- [W3C PROV-DM](https://www.w3.org/TR/prov-dm/) and [SLSA provenance](https://slsa.dev/spec/v1.2/provenance) —
-  provenance and immutable subject identity.
-- [El-Yaniv and Wiener, “On the Foundations of Noise-free Selective Classification”](https://www.jmlr.org/papers/v11/el-yaniv10a.html)
-  — selective prediction with abstention.
-- [Gebru et al., “Datasheets for Datasets”](https://doi.org/10.1145/3458723) — source composition, uses, and
-  limitations.
-- [NIST AI RMF 1.0](https://doi.org/10.6028/NIST.AI.100-1) and
-  [NIST Generative AI Profile](https://doi.org/10.6028/NIST.AI.600-1) — AI risk management and data governance.
+  accuracy, and storage limitation, which the source-use decisions record per source and purpose.
