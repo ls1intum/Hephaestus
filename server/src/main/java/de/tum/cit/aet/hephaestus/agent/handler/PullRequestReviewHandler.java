@@ -227,6 +227,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
         practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST, practices);
+        ContextMapWriter.write(files);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
