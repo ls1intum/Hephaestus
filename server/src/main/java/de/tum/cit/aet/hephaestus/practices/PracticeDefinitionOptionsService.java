@@ -56,7 +56,6 @@ public class PracticeDefinitionOptionsService {
                         source.description(),
                         source.privacyClass(),
                         source.completenessPolicy().supportsComplete(),
-                        source.freshnessPolicy().supportsCurrentRequirement(),
                         source.completenessPolicy().supportsEmpty()
                     )
                 )

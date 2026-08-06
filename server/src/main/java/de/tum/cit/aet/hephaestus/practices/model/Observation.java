@@ -81,9 +81,14 @@ public class Observation {
      * for bulk/native deletes where Hibernate lifecycle callbacks never fire.
      */
     @NotNull
+    /**
+     * The practice measured. Deliberately NOT cascade-deleted: an observation is an immutable
+     * measurement and the substrate for longitudinal research, so pruning a practice from the
+     * catalog must not erase the history of everyone ever measured against it. Retire practices
+     * instead; hard deletion is reserved for workspace purge, which removes observations directly.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "practice_id", nullable = false, foreignKey = @ForeignKey(name = "fk_observation_practice"))
-    @OnDelete(action = OnDeleteAction.CASCADE)
     private Practice practice;
 
     /**

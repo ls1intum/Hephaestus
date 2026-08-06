@@ -38,7 +38,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                         new PracticeEvidenceRequirement(
                             DIFF,
                             EvidenceCompletenessRequirement.COMPLETE,
-                            EvidenceFreshnessRequirement.CURRENT,
                             EvidenceContentRequirement.NO_REQUIREMENT
                         )
                     )
@@ -55,7 +54,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             new PracticeEvidenceRequirement(
                 new SourceKind("scm.pull-request.unknown"),
                 EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.CURRENT,
                 EvidenceContentRequirement.NO_REQUIREMENT
             )
         );
@@ -71,7 +69,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             new PracticeEvidenceRequirement(
                 OUTSIDE_PROFILE,
                 EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.CURRENT,
                 EvidenceContentRequirement.NO_REQUIREMENT
             )
         );
@@ -87,7 +84,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             new PracticeEvidenceRequirement(
                 PARTIAL,
                 EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceFreshnessRequirement.CURRENT,
                 EvidenceContentRequirement.NO_REQUIREMENT
             )
         );
@@ -95,24 +91,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         assertThatThrownBy(() -> validator.validate(definition(requirements)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Evidence source cannot satisfy COMPLETE requirements");
-    }
-
-    @Test
-    void rejectsImpossibleFreshnessRequirement() {
-        // Completeness is left unrequired so the freshness rule is what fails: this source is a lossy
-        // derivation and cannot satisfy COMPLETE either, and that check runs first.
-        PracticeAutomatedReviewPolicy requirements = requirements(
-            new PracticeEvidenceRequirement(
-                TIMELESS,
-                EvidenceCompletenessRequirement.NO_REQUIREMENT,
-                EvidenceFreshnessRequirement.CURRENT,
-                EvidenceContentRequirement.NO_REQUIREMENT
-            )
-        );
-
-        assertThatThrownBy(() -> validator.validate(definition(requirements)))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evidence source cannot satisfy CURRENT requirements");
     }
 
     @Test
@@ -215,7 +193,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 new PracticeEvidenceRequirement(
                     DIFF,
                     EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceFreshnessRequirement.CURRENT,
                     EvidenceContentRequirement.NO_REQUIREMENT
                 )
             ),

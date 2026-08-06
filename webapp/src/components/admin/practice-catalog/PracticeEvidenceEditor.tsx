@@ -70,7 +70,6 @@ function withRole(
 		required.push({
 			sourceKind: source.sourceKind,
 			completeness: source.supportsComplete ? "COMPLETE" : "NO_REQUIREMENT",
-			freshness: source.supportsCurrent ? "CURRENT" : "NO_REQUIREMENT",
 			// Whether an empty capture can be judged is an editorial call per source, not something
 			// the editor can infer, so re-adding a source restores the recommended answer rather
 			// than silently dropping to "an empty one will do".
@@ -600,22 +599,6 @@ export function PracticeEvidenceEditor({
 																	onChange(
 																		patchRequirement(value, source.sourceKind, {
 																			completeness: checked ? "COMPLETE" : "NO_REQUIREMENT",
-																		}),
-																	)
-																}
-															/>
-														)}
-														{source.supportsCurrent && (
-															<RequirementCheckbox
-																id={`practice-freshness-${source.sourceKind}`}
-																label="taken from the exact commit under review"
-																sourceLabel={sourceLabel}
-																disabled={disabled}
-																checked={requirement.freshness === "CURRENT"}
-																onCheckedChange={(checked) =>
-																	onChange(
-																		patchRequirement(value, source.sourceKind, {
-																			freshness: checked ? "CURRENT" : "NO_REQUIREMENT",
 																		}),
 																	)
 																}

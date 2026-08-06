@@ -27,7 +27,6 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceContentRequirement;
-import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReview;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
@@ -203,7 +202,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             )
         );
 
-        Practice demandsSubstance = practiceRequiring(DIFF, "needs-substance", EvidenceFreshnessRequirement.CURRENT);
+        Practice demandsSubstance = practiceRequiring(DIFF, "needs-substance");
         PracticeAutomatedReviewPolicy policy = demandsSubstance.getAutomatedReviewPolicy();
         demandsSubstance.setAutomatedReviewPolicy(
             new PracticeAutomatedReviewPolicy(
@@ -214,7 +213,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                     new PracticeEvidenceRequirement(
                         DIFF,
                         EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT,
                         EvidenceContentRequirement.NON_EMPTY
                     )
                 ),
@@ -237,10 +235,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         // The same empty capture is still reviewable for a practice that did not ask for substance.
         assertThat(
             builder
-                .checkAutomatedReviewReadinessAsOfNow(
-                    manifest,
-                    List.of(practiceRequiring(DIFF, "any-capture-will-do", EvidenceFreshnessRequirement.CURRENT))
-                )
+                .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiring(DIFF, "any-capture-will-do")))
                 .readyPractices()
         ).hasSize(1);
     }
@@ -539,7 +534,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             diff.selectionScope(),
             diff.artifactTypes(),
             diff.authority(),
-            diff.freshnessPolicy(),
+            diff.identityPolicy(),
             diff.completenessPolicy(),
             diff.privacyClass(),
             Set.of(SourceAbsenceState.UNAVAILABLE),
@@ -773,18 +768,10 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     private static Practice practiceRequiringComments() {
-        return practiceRequiring(COMMENTS, "review-comments", EvidenceFreshnessRequirement.NO_REQUIREMENT);
+        return practiceRequiring(COMMENTS, "review-comments");
     }
 
     private static Practice practiceRequiring(SourceKind sourceKind, String slug) {
-        return practiceRequiring(sourceKind, slug, EvidenceFreshnessRequirement.CURRENT);
-    }
-
-    private static Practice practiceRequiring(
-        SourceKind sourceKind,
-        String slug,
-        EvidenceFreshnessRequirement freshness
-    ) {
         Practice practice = new Practice();
         practice.setSlug(slug);
         practice.setAutomatedReviewPolicy(
@@ -801,7 +788,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                     new PracticeEvidenceRequirement(
                         sourceKind,
                         EvidenceCompletenessRequirement.COMPLETE,
-                        freshness,
                         EvidenceContentRequirement.NO_REQUIREMENT
                     )
                 ),

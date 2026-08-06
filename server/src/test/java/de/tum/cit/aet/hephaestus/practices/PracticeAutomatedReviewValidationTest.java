@@ -80,7 +80,6 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
                 new PracticeEvidenceRequirement(
                     new SourceKind("scm.pull-request.diff"),
                     EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceFreshnessRequirement.CURRENT,
                     EvidenceContentRequirement.NO_REQUIREMENT
                 )
             ),

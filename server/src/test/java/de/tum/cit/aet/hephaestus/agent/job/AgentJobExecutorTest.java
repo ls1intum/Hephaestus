@@ -52,7 +52,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
-import de.tum.cit.aet.hephaestus.evidence.SourceFreshness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
@@ -664,7 +663,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 version,
                 now,
                 now,
-                SourceFreshness.UNKNOWN,
                 false,
                 List.of(SourceReadinessReason.SOURCE_NOT_AVAILABLE)
             );

@@ -110,12 +110,6 @@ public final class PracticeDefinitionValidator {
             ) {
                 throw new IllegalArgumentException("Evidence source cannot satisfy COMPLETE requirements");
             }
-            if (
-                requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
-                !source.freshnessPolicy().supportsCurrentRequirement()
-            ) {
-                throw new IllegalArgumentException("Evidence source cannot satisfy CURRENT requirements");
-            }
         }
     }
 }

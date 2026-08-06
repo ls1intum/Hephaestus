@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.evidence.CompletenessPolicy;
 import de.tum.cit.aet.hephaestus.evidence.ErasurePolicy;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
-import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
-import de.tum.cit.aet.hephaestus.evidence.FreshnessPolicy;
+import de.tum.cit.aet.hephaestus.evidence.IdentityMode;
+import de.tum.cit.aet.hephaestus.evidence.IdentityPolicy;
 import de.tum.cit.aet.hephaestus.evidence.PrivacyClass;
 import de.tum.cit.aet.hephaestus.evidence.RetentionPolicy;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
@@ -187,7 +187,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 "selectionScope",
                 "artifactTypes",
                 "authority",
-                "freshness",
+                "identity",
                 "completeness",
                 "privacyClass",
                 "supportedAbsenceStates",
@@ -198,12 +198,12 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             "source"
         );
         SourceKind kind = new SourceKind(requiredText(node, "kind", "source"));
-        JsonNode freshness = requiredObject(node, "freshness", kind.toString());
-        rejectUnknown(freshness, Set.of("mode"), "freshness " + kind);
-        FreshnessMode freshnessMode = enumValue(
-            FreshnessMode.class,
-            requiredText(freshness, "mode", "freshness " + kind),
-            "freshness mode"
+        JsonNode identity = requiredObject(node, "identity", kind.toString());
+        rejectUnknown(identity, Set.of("mode"), "identity " + kind);
+        IdentityMode identityMode = enumValue(
+            IdentityMode.class,
+            requiredText(identity, "mode", "identity " + kind),
+            "identity mode"
         );
 
         JsonNode completeness = requiredObject(node, "completeness", kind.toString());
@@ -220,7 +220,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             requiredText(node, "selectionScope", kind.toString()),
             textSet(node, "artifactTypes", kind.toString()),
             enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
-            new FreshnessPolicy(freshnessMode),
+            new IdentityPolicy(identityMode),
             new CompletenessPolicy(
                 requiredBoolean(completeness, "supportsComplete", kind.toString()),
                 requiredBoolean(completeness, "supportsPartial", kind.toString()),

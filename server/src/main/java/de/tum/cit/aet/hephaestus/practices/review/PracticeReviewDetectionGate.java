@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.TriggerEventMatcher;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -290,22 +291,8 @@ public class PracticeReviewDetectionGate {
         return practiceRepository
             .findByWorkspaceIdAndUsedInNewReviewsTrue(workspaceId)
             .stream()
-            .filter(p -> containsTriggerEvent(p.getTriggerEvents(), triggerEventName))
+            .filter(p -> TriggerEventMatcher.matches(p.getTriggerEvents(), triggerEventName))
             .toList();
-    }
-
-    private boolean containsTriggerEvent(JsonNode triggerEvents, String eventName) {
-        if (triggerEvents == null || !triggerEvents.isArray()) {
-            return false;
-        }
-        for (JsonNode node : triggerEvents) {
-            // Guard the type before coercion: in Jackson 3 a non-scalar element (object/array, e.g. from an
-            // out-of-band JSONB edit) makes asString() THROW. Skipping non-strings keeps the matcher total.
-            if (node.isString() && eventName.equals(node.asString())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void logSkippedDueToUnhealthy(Issue reviewable) {

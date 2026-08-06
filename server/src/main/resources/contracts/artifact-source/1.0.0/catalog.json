@@ -10,7 +10,7 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -43,7 +43,7 @@
 				"PULL_REQUEST"
 			],
 			"authority": "DETERMINISTIC_DERIVATION",
-			"freshness": {
+			"identity": {
 				"mode": "PINNED_IDENTITY"
 			},
 			"completeness": {
@@ -76,7 +76,7 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -109,7 +109,7 @@
 				"PULL_REQUEST"
 			],
 			"authority": "UPSTREAM_SNAPSHOT",
-			"freshness": {
+			"identity": {
 				"mode": "PINNED_IDENTITY"
 			},
 			"completeness": {
@@ -142,7 +142,7 @@
 				"ISSUE"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -175,7 +175,7 @@
 				"ISSUE"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -208,7 +208,7 @@
 				"CONVERSATION_THREAD"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -241,7 +241,7 @@
 				"PULL_REQUEST"
 			],
 			"authority": "LOSSY_DERIVATION",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -274,7 +274,7 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -307,7 +307,7 @@
 				"PULL_REQUEST"
 			],
 			"authority": "SYNCHRONIZED_MIRROR",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -342,7 +342,7 @@
 				"CONVERSATION_THREAD"
 			],
 			"authority": "DETERMINISTIC_DERIVATION",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {
@@ -376,7 +376,7 @@
 				"ISSUE"
 			],
 			"authority": "LOSSY_DERIVATION",
-			"freshness": {
+			"identity": {
 				"mode": "NOT_APPLICABLE"
 			},
 			"completeness": {

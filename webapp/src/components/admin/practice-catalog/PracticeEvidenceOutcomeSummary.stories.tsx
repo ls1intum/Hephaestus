@@ -24,7 +24,7 @@ export const RequirementsThatKeepSkipping: Story = {
 				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_EMPTY", reviewsAffected: 6 },
 				{
 					sourceKind: "scm.pull-request.diff",
-					reasonCode: "SOURCE_NOT_CURRENT",
+					reasonCode: "SOURCE_INCOMPLETE",
 					reviewsAffected: 2,
 				},
 			],

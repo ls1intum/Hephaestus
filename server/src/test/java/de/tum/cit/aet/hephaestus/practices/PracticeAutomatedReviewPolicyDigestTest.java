@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
-    private static final String PINNED_DIGEST = "5a5502bc8464f58ca59e27a295d387f11f0d93fac5dcfdccdb2e0d5ac45c639b";
+    private static final String PINNED_DIGEST = "5f8725dac9f5c16596d8587df224004da1240c829fa692de4864f1f2ad25a37b";
 
     @Test
     void shouldPinACanonicalDigestForAKnownPolicy() {
@@ -110,7 +110,6 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         return new PracticeEvidenceRequirement(
             new SourceKind(sourceKind),
             EvidenceCompletenessRequirement.COMPLETE,
-            EvidenceFreshnessRequirement.CURRENT,
             EvidenceContentRequirement.NO_REQUIREMENT
         );
     }

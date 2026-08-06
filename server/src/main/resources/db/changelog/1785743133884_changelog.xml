@@ -586,4 +586,27 @@
         </rollback>
     </changeSet>
 
+    <!-- An observation is an immutable measurement and the substrate for longitudinal research.
+         Cascading from practice meant pruning the catalog silently erased the recorded history of
+         everyone ever measured against that practice. Practices retire; measurements persist. -->
+    <changeSet author="hephaestus" id="1785743133884-13">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_observation_practice already non-cascading">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'fk_observation_practice' AND confdeltype = 'c'
+            </sqlCheck>
+        </preConditions>
+        <comment>Stop cascade-deleting observations when a practice is removed.</comment>
+        <dropForeignKeyConstraint baseTableName="observation" constraintName="fk_observation_practice"/>
+        <addForeignKeyConstraint baseTableName="observation" baseColumnNames="practice_id"
+                                 constraintName="fk_observation_practice"
+                                 referencedTableName="practice" referencedColumnNames="id"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="observation" constraintName="fk_observation_practice"/>
+            <addForeignKeyConstraint baseTableName="observation" baseColumnNames="practice_id"
+                                     constraintName="fk_observation_practice"
+                                     referencedTableName="practice" referencedColumnNames="id" onDelete="CASCADE"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

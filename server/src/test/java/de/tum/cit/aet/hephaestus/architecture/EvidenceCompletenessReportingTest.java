@@ -6,7 +6,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
-import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
+import de.tum.cit.aet.hephaestus.evidence.IdentityMode;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import java.lang.reflect.Field;
@@ -71,7 +71,7 @@ class EvidenceCompletenessReportingTest {
     @DisplayName("a collector for a source pinned to an immutable identity reports that identity itself")
     void collectorsThatPinAnIdentityOverrideCapture() {
         Set<SourceKind> pinned = java.util.Arrays.stream(CATALOG)
-            .filter(contract -> contract.freshnessPolicy().mode() == FreshnessMode.PINNED_IDENTITY)
+            .filter(contract -> contract.identityPolicy().mode() == IdentityMode.PINNED_IDENTITY)
             .map(ArtifactSourceContract::kind)
             .collect(Collectors.toSet());
 

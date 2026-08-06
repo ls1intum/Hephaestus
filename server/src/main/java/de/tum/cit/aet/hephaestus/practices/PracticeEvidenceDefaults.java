@@ -21,17 +21,12 @@ public class PracticeEvidenceDefaults {
             case PULL_REQUEST -> requirements(
                 "pull-request-review",
                 List.of(
-                    requirement(
-                        "scm.pull-request.core",
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.NO_REQUIREMENT
-                    ),
+                    requirement("scm.pull-request.core", EvidenceCompletenessRequirement.COMPLETE),
                     // A diff with no changes in it cannot support a judgement about how a change
                     // was made; without this the model falls back to the title and description.
                     requirement(
                         "scm.pull-request.diff",
                         EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.CURRENT,
                         EvidenceContentRequirement.NON_EMPTY
                     )
                 ),
@@ -41,26 +36,14 @@ public class PracticeEvidenceDefaults {
             );
             case ISSUE -> requirements(
                 "issue-review",
-                List.of(
-                    requirement(
-                        "scm.issue.core",
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.NO_REQUIREMENT
-                    )
-                ),
+                List.of(requirement("scm.issue.core", EvidenceCompletenessRequirement.COMPLETE)),
                 List.of(optionalRequirement("scm.issue.comments")),
                 "IMPLEMENTATION_NOT_OBSERVED",
                 "Issue evidence does not establish whether the described work was implemented correctly."
             );
             case CONVERSATION_THREAD -> requirements(
                 "conversation-review",
-                List.of(
-                    requirement(
-                        "slack.conversation.thread",
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceFreshnessRequirement.NO_REQUIREMENT
-                    )
-                ),
+                List.of(requirement("slack.conversation.thread", EvidenceCompletenessRequirement.COMPLETE)),
                 List.of(),
                 "PRIVATE_CONTEXT_NOT_OBSERVED",
                 "The captured thread does not include decisions or context shared outside the conversation."
@@ -92,19 +75,17 @@ public class PracticeEvidenceDefaults {
 
     private static PracticeEvidenceRequirement requirement(
         String sourceKind,
-        EvidenceCompletenessRequirement completeness,
-        EvidenceFreshnessRequirement freshness
+        EvidenceCompletenessRequirement completeness
     ) {
-        return requirement(sourceKind, completeness, freshness, EvidenceContentRequirement.NO_REQUIREMENT);
+        return requirement(sourceKind, completeness, EvidenceContentRequirement.NO_REQUIREMENT);
     }
 
     private static PracticeEvidenceRequirement requirement(
         String sourceKind,
         EvidenceCompletenessRequirement completeness,
-        EvidenceFreshnessRequirement freshness,
         EvidenceContentRequirement content
     ) {
-        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), completeness, freshness, content);
+        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), completeness, content);
     }
 
     private static PracticeOptionalContextSource optionalRequirement(String sourceKind) {

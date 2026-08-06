@@ -10,7 +10,6 @@ public record SourceReadinessCheck(
     SourceContractVersion sourceContractVersion,
     Instant checkedAt,
     Instant temporalAnchor,
-    SourceFreshness freshness,
     boolean meetsRequirements,
     List<SourceReadinessReason> reasonCodes
 ) {
@@ -19,7 +18,6 @@ public record SourceReadinessCheck(
         Objects.requireNonNull(sourceContractVersion, "sourceContractVersion");
         Objects.requireNonNull(checkedAt, "checkedAt");
         Objects.requireNonNull(temporalAnchor, "temporalAnchor");
-        Objects.requireNonNull(freshness, "freshness");
         reasonCodes = List.copyOf(Objects.requireNonNull(reasonCodes, "reasonCodes"));
         if (new HashSet<>(reasonCodes).size() != reasonCodes.size()) {
             throw new IllegalArgumentException("Source readiness reason codes must be unique");

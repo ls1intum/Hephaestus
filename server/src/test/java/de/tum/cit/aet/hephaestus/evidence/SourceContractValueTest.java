@@ -71,19 +71,19 @@ class SourceContractValueTest {
     @Test
     void aMirrorCannotPinAnIdentityAndALossyDerivationCannotReportComplete() {
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> source(SourceAuthority.SYNCHRONIZED_MIRROR, FreshnessMode.PINNED_IDENTITY, false))
+            .isThrownBy(() -> source(SourceAuthority.SYNCHRONIZED_MIRROR, IdentityMode.PINNED_IDENTITY, false))
             .withMessageContaining("can pin an identity");
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> source(SourceAuthority.LOSSY_DERIVATION, FreshnessMode.NOT_APPLICABLE, true))
+            .isThrownBy(() -> source(SourceAuthority.LOSSY_DERIVATION, IdentityMode.NOT_APPLICABLE, true))
             .withMessageContaining("cannot report COMPLETE");
 
-        assertThat(source(SourceAuthority.UPSTREAM_SNAPSHOT, FreshnessMode.PINNED_IDENTITY, true)).isNotNull();
-        assertThat(source(SourceAuthority.LOSSY_DERIVATION, FreshnessMode.NOT_APPLICABLE, false)).isNotNull();
+        assertThat(source(SourceAuthority.UPSTREAM_SNAPSHOT, IdentityMode.PINNED_IDENTITY, true)).isNotNull();
+        assertThat(source(SourceAuthority.LOSSY_DERIVATION, IdentityMode.NOT_APPLICABLE, false)).isNotNull();
     }
 
     private static ArtifactSourceContract source(
         SourceAuthority authority,
-        FreshnessMode freshness,
+        IdentityMode freshness,
         boolean supportsComplete
     ) {
         return new ArtifactSourceContract(
@@ -93,7 +93,7 @@ class SourceContractValueTest {
             "Everything in scope.",
             Set.of("PULL_REQUEST"),
             authority,
-            new FreshnessPolicy(freshness),
+            new IdentityPolicy(freshness),
             new CompletenessPolicy(supportsComplete, true, true),
             PrivacyClass.INTERNAL,
             Set.of(SourceAbsenceState.NOT_COLLECTED),
@@ -137,15 +137,7 @@ class SourceContractValueTest {
         SourceContractVersion version = new SourceContractVersion("1.0.0");
 
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new SourceReadinessCheck(
-                kind,
-                version,
-                now,
-                now,
-                SourceFreshness.CURRENT,
-                true,
-                List.of(SourceReadinessReason.SOURCE_NOT_CURRENT)
-            )
+            new SourceReadinessCheck(kind, version, now, now, true, List.of(SourceReadinessReason.SOURCE_INCOMPLETE))
         );
         assertThatIllegalArgumentException().isThrownBy(() ->
             new SourceReadinessCheck(
@@ -153,9 +145,8 @@ class SourceContractValueTest {
                 version,
                 now,
                 now,
-                SourceFreshness.STALE,
                 false,
-                List.of(SourceReadinessReason.SOURCE_NOT_CURRENT, SourceReadinessReason.SOURCE_NOT_CURRENT)
+                List.of(SourceReadinessReason.SOURCE_INCOMPLETE, SourceReadinessReason.SOURCE_INCOMPLETE)
             )
         );
     }

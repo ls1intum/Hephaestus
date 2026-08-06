@@ -11,7 +11,7 @@ public record ArtifactSourceContract(
     String selectionScope,
     Set<String> artifactTypes,
     SourceAuthority authority,
-    FreshnessPolicy freshnessPolicy,
+    IdentityPolicy identityPolicy,
     CompletenessPolicy completenessPolicy,
     PrivacyClass privacyClass,
     Set<SourceAbsenceState> supportedAbsenceStates,
@@ -29,14 +29,14 @@ public record ArtifactSourceContract(
             throw new IllegalArgumentException("artifactTypes must contain non-blank values: " + kind);
         }
         Objects.requireNonNull(authority, "authority");
-        Objects.requireNonNull(freshnessPolicy, "freshnessPolicy");
+        Objects.requireNonNull(identityPolicy, "identityPolicy");
         Objects.requireNonNull(completenessPolicy, "completenessPolicy");
         // Only a source read straight from upstream, or derived from one without discarding anything,
         // can be anchored to an identity that cannot change under it. A mirror reflects upstream state
         // that moves independently, so calling its capture pinned would report a copy that has since
         // drifted as demonstrably current.
         if (
-            freshnessPolicy.mode() == FreshnessMode.PINNED_IDENTITY &&
+            identityPolicy.mode() == IdentityMode.PINNED_IDENTITY &&
             authority != SourceAuthority.UPSTREAM_SNAPSHOT &&
             authority != SourceAuthority.DETERMINISTIC_DERIVATION
         ) {

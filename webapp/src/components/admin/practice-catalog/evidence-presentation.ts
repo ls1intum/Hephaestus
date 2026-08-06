@@ -89,7 +89,6 @@ export function readinessReasonLabel(reasonCode: PracticeEvidenceReason): string
 const READINESS_REASON_LABELS: Record<PracticeEvidenceReason, string> = {
 	SOURCE_NOT_AVAILABLE: "was not available",
 	SOURCE_INCOMPLETE: "was not fully captured",
-	SOURCE_NOT_CURRENT: "was not taken from the commit under review",
 	SOURCE_EMPTY: "was empty",
 	NO_AUTOMATED_REVIEW: "this practice is not set up for automated review",
 	DECLARED_EVIDENCE_INSUFFICIENT: "this practice declares its evidence insufficient",

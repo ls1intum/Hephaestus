@@ -10,7 +10,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 public enum PracticeEvidenceSkipReason {
     SOURCE_NOT_AVAILABLE,
     SOURCE_INCOMPLETE,
-    SOURCE_NOT_CURRENT,
     SOURCE_EMPTY,
     NO_AUTOMATED_REVIEW,
     DECLARED_EVIDENCE_INSUFFICIENT,

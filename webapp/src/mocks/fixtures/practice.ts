@@ -19,11 +19,10 @@ export const mockPullRequestEvidence = {
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
 	requiredEvidence: [
-		{ sourceKind: "scm.pull-request.core", completeness: "COMPLETE", freshness: "NO_REQUIREMENT" },
+		{ sourceKind: "scm.pull-request.core", completeness: "COMPLETE" },
 		{
 			sourceKind: "scm.pull-request.diff",
 			completeness: "COMPLETE",
-			freshness: "CURRENT",
 			content: "NON_EMPTY",
 		},
 	],
@@ -44,9 +43,7 @@ const mockIssueEvidence = {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
-	requiredEvidence: [
-		{ sourceKind: "scm.issue.core", completeness: "COMPLETE", freshness: "CURRENT" },
-	],
+	requiredEvidence: [{ sourceKind: "scm.issue.core", completeness: "COMPLETE" }],
 	optionalContext: [{ sourceKind: "scm.issue.comments" }],
 	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
@@ -69,7 +66,6 @@ const mockConversationEvidence = {
 		{
 			sourceKind: "slack.conversation.thread",
 			completeness: "COMPLETE",
-			freshness: "CURRENT",
 		},
 	],
 	optionalContext: [],
@@ -120,7 +116,6 @@ export const mockPracticeDefinitionOptions = {
 					description: "Pull request metadata and commit subjects for the reviewed pull request.",
 					privacyClass: "PERSONAL",
 					supportsComplete: true,
-					supportsCurrent: false,
 					supportsEmpty: false,
 				},
 				{
@@ -129,7 +124,6 @@ export const mockPracticeDefinitionOptions = {
 					description: "Code changes in the reviewed pull request.",
 					privacyClass: "PERSONAL",
 					supportsComplete: true,
-					supportsCurrent: true,
 					supportsEmpty: true,
 				},
 				{
@@ -138,7 +132,6 @@ export const mockPracticeDefinitionOptions = {
 					description: "Inline review comments mirrored by the application.",
 					privacyClass: "PERSONAL",
 					supportsComplete: true,
-					supportsCurrent: false,
 					supportsEmpty: true,
 				},
 			],
@@ -159,7 +152,6 @@ export const mockPracticeDefinitionOptions = {
 					description: "Issue metadata and rendered description.",
 					privacyClass: "PERSONAL",
 					supportsComplete: true,
-					supportsCurrent: true,
 					supportsEmpty: false,
 				},
 				{
@@ -168,7 +160,6 @@ export const mockPracticeDefinitionOptions = {
 					description: "Issue discussion comments.",
 					privacyClass: "PERSONAL",
 					supportsComplete: true,
-					supportsCurrent: false,
 					supportsEmpty: true,
 				},
 			],
@@ -185,7 +176,6 @@ export const mockPracticeDefinitionOptions = {
 					description: "Ordered human messages from one Slack thread.",
 					privacyClass: "PERSONAL",
 					supportsComplete: true,
-					supportsCurrent: true,
 					supportsEmpty: false,
 				},
 			],

@@ -11,6 +11,5 @@ public record PracticeEvidenceSourceOptionDTO(
     @NonNull String description,
     @NonNull PrivacyClass privacyClass,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean supportsComplete,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean supportsCurrent,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean supportsEmpty
 ) {}

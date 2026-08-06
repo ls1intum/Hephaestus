@@ -48,7 +48,7 @@
 				"selectionScope",
 				"artifactTypes",
 				"authority",
-				"freshness",
+				"identity",
 				"completeness",
 				"privacyClass",
 				"supportedAbsenceStates",
@@ -98,7 +98,7 @@
 					],
 					"description": "Relationship between the captured representation and its origin."
 				},
-				"freshness": {
+				"identity": {
 					"$ref": "#/$defs/freshness",
 					"description": "Policy used to evaluate whether a capture is current enough."
 				},
@@ -150,7 +150,7 @@
 			},
 			"description": "Authority, capture, quality, privacy, retention, erasure, and absence semantics for one evidence source."
 		},
-		"freshness": {
+		"identity": {
 			"type": "object",
 			"additionalProperties": false,
 			"required": [

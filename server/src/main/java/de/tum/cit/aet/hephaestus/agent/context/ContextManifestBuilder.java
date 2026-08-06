@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
-import de.tum.cit.aet.hephaestus.evidence.FreshnessMode;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
@@ -17,7 +16,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
-import de.tum.cit.aet.hephaestus.evidence.SourceFreshness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
@@ -26,7 +24,6 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
 import de.tum.cit.aet.hephaestus.practices.EvidenceContentRequirement;
-import de.tum.cit.aet.hephaestus.practices.EvidenceFreshnessRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -353,14 +350,6 @@ public class ContextManifestBuilder {
                 SourceCompleteness completeness = available
                     ? ((SourceCaptureState.Available) capture.state()).completeness()
                     : SourceCompleteness.UNKNOWN;
-                SourceFreshness freshness = available
-                    ? assessFreshness(
-                          catalogs.requireSource(manifest.contractVersion(), requirement.sourceKind()),
-                          (SourceCaptureState.Available) capture.state(),
-                          temporalAnchor,
-                          manifest.capturedAt()
-                      )
-                    : SourceFreshness.UNKNOWN;
                 List<SourceReadinessReason> reasons = new ArrayList<>();
                 if (!available) reasons.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
                 if (
@@ -372,10 +361,6 @@ public class ContextManifestBuilder {
                 // a replay, or a source with no watermark. An unanswerable question is not evidence
                 // that the copy is out of date.
                 if (
-                    requirement.freshness() == EvidenceFreshnessRequirement.CURRENT &&
-                    freshness == SourceFreshness.STALE
-                ) reasons.add(SourceReadinessReason.SOURCE_NOT_CURRENT);
-                if (
                     requirement.content() == EvidenceContentRequirement.NON_EMPTY &&
                     (!available ||
                         ((SourceCaptureState.Available) capture.state()).content() != SourceContentState.NON_EMPTY)
@@ -386,7 +371,6 @@ public class ContextManifestBuilder {
                         manifest.contractVersion(),
                         checkedAt,
                         temporalAnchor,
-                        freshness,
                         reasons.isEmpty(),
                         reasons
                     )
@@ -403,20 +387,6 @@ public class ContextManifestBuilder {
             if (decision.ready()) ready.add(practice);
         }
         return new AutomatedReviewReadinessResult(ready, decisions);
-    }
-
-    private SourceFreshness assessFreshness(
-        ArtifactSourceContract contract,
-        SourceCaptureState.Available capture,
-        Instant temporalAnchor,
-        Instant capturedAt
-    ) {
-        var policy = contract.freshnessPolicy();
-        if (policy.mode() == FreshnessMode.NOT_APPLICABLE) return SourceFreshness.UNKNOWN;
-        if (policy.mode() == FreshnessMode.PINNED_IDENTITY) {
-            return capture.facts().immutableIdentity() != null ? SourceFreshness.CURRENT : SourceFreshness.UNKNOWN;
-        }
-        throw new IllegalStateException("Unhandled freshness mode: " + policy.mode());
     }
 
     private SourceCapture capture(

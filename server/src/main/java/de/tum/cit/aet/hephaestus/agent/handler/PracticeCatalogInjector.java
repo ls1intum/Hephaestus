@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.TriggerEventMatcher;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
@@ -119,7 +120,7 @@ class PracticeCatalogInjector {
         if (triggerEvent != null) {
             practices = practices
                 .stream()
-                .filter(p -> containsTriggerEvent(p.getTriggerEvents(), triggerEvent))
+                .filter(p -> TriggerEventMatcher.matches(p.getTriggerEvents(), triggerEvent))
                 .toList();
         }
         if (practices.isEmpty()) {
@@ -243,18 +244,5 @@ class PracticeCatalogInjector {
         }
         String event = node.asString();
         return (event == null || event.isBlank()) ? null : event;
-    }
-
-    /** True iff the practice's {@code triggerEvents} JSONB array contains {@code event} (gate semantics). */
-    private static boolean containsTriggerEvent(@Nullable JsonNode triggerEvents, String event) {
-        if (triggerEvents == null || !triggerEvents.isArray()) {
-            return false;
-        }
-        for (JsonNode n : triggerEvents) {
-            if (event.equals(n.asString())) {
-                return true;
-            }
-        }
-        return false;
     }
 }
