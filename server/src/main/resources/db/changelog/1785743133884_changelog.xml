@@ -609,4 +609,76 @@
         </rollback>
     </changeSet>
 
+    <!-- Dedup used to last only as long as a job was QUEUED or RUNNING, so a redelivery after the job
+         finished re-ran the whole review; the only remaining guard was a cooldown a workspace can set
+         to zero. uq_artifact_signal makes "we already dealt with this occurrence" permanent, and the
+         state machine keeps a refusal from consuming the signal forever: submission can be declined
+         after the fact (workspace inactive, binding disabled, budget spent), and PENDING is what lets
+         that review still happen once the operator lifts the block. -->
+    <changeSet author="hephaestus-signal-ledger" id="1785743133884-14">
+        <preConditions onFail="MARK_RAN" onFailMessage="artifact_signal already present">
+            <not><tableExists tableName="artifact_signal"/></not>
+        </preConditions>
+        <comment>Record every observed artifact signal and what became of it.</comment>
+        <createTable tableName="artifact_signal">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" primaryKeyName="pk_artifact_signal" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="artifact_kind" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="artifact_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="signal_name" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Per-SIGNAL identity, never per artifact kind: editing a merge request description moves
+                 no commit SHA, so a description-shaped signal keyed on the head SHA could never be
+                 re-measured after the author fixed it. -->
+            <column name="revision" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="discovered_via" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state_reason" type="VARCHAR(48)"/>
+            <column name="job_id" type="UUID"/>
+            <column name="state_changed_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="artifact_signal"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_artifact_signal_workspace"
+            onDelete="CASCADE"/>
+        <createIndex tableName="artifact_signal" indexName="idx_artifact_signal_state_changed">
+            <column name="state"/>
+            <column name="state_changed_at"/>
+        </createIndex>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE artifact_signal ADD CONSTRAINT uq_artifact_signal
+                UNIQUE (workspace_id, artifact_kind, artifact_id, signal_name, revision);
+            ALTER TABLE artifact_signal ADD CONSTRAINT ck_artifact_signal_discovered_via
+                CHECK (discovered_via IN ('EVENT','SYNC','MANUAL'));
+            ALTER TABLE artifact_signal ADD CONSTRAINT ck_artifact_signal_state
+                CHECK (state IN ('RECORDED','TRIGGERED','SUPPRESSED','PENDING','LAPSED'));
+        ]]></sql>
+        <rollback>
+            <dropTable tableName="artifact_signal"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
