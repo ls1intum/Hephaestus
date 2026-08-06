@@ -10001,8 +10001,6 @@ components:
       type: object
       description: An evidence source allowed by the selected evidence profile
       properties:
-        authorizedForAutomatedReview:
-          type: boolean
         description:
           type: string
         displayName:
@@ -10023,7 +10021,6 @@ components:
         supportsEmpty:
           type: boolean
       required:
-      - authorizedForAutomatedReview
       - description
       - displayName
       - privacyClass

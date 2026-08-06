@@ -60,12 +60,6 @@ hephaestus:
     runtime:
         worker:
             enabled: false
-    evidence:
-        # Sensitive sources need a deliberate operator grant; everything else is governed by the
-        # reviewed decisions shipped in the contract. Slack is granted here so the conversation
-        # practices stay exercised under test.
-        sensitive-source-uses: >-
-            slack.conversation.thread:AUTOMATED_PRACTICE_REVIEW,slack.conversation.thread:PRACTICE_FEEDBACK_DELIVERY,slack.conversation.thread:CONVERSATIONAL_MENTORING,slack.conversation.thread:OPERATOR_EVIDENCE_REVIEW
     # Loud enforcement under test: any unguarded scoped-table query throws.
     # Production runs in 'log' mode for the staging canary period; this override
     # ensures tenancy bugs surface in CI rather than being masked.

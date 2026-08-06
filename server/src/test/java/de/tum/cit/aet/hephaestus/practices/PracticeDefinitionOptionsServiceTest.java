@@ -17,7 +17,7 @@ class PracticeDefinitionOptionsServiceTest {
 
     @Test
     void exposesTheCurrentBaselineAndOnlyProfileCompatibleSources() {
-        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC(), "");
+        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
         var service = new PracticeDefinitionOptionsService(catalogs, new PracticeEvidenceDefaults(catalogs));
 
         PracticeDefinitionOptionsDTO result = service.options();
@@ -50,9 +50,6 @@ class PracticeDefinitionOptionsServiceTest {
         assertThat(pullRequests.allowedSources())
             .filteredOn(option -> option.sourceKind().equals("scm.pull-request.core"))
             .singleElement()
-            .satisfies(option -> {
-                assertThat(option.displayName()).isEqualTo("Pull request details");
-                assertThat(option.authorizedForAutomatedReview()).isTrue();
-            });
+            .satisfies(option -> assertThat(option.displayName()).isEqualTo("Pull request details"));
     }
 }

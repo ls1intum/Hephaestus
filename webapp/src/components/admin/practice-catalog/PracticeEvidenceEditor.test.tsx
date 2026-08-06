@@ -149,7 +149,7 @@ describe("PracticeEvidenceEditor", () => {
 		expect(screen.getByTestId("code").textContent).toBe("RUNTIME_BEHAVIOR_NOT_OBSERVED");
 	});
 
-	it("explains that private conversation evidence requires operator authorization", async () => {
+	it("offers conversation evidence without asking the author to arrange authorization", async () => {
 		const conversation = mockPracticeDefinitionOptions.workTypes[2];
 		await renderWithRouter(
 			<PracticeEvidenceEditor
@@ -160,11 +160,10 @@ describe("PracticeEvidenceEditor", () => {
 			"/admin/practices/new",
 		);
 
-		expect(screen.getByText("This evidence requires an authorization decision")).toBeTruthy();
-		expect(screen.getByText(/HEPHAESTUS_EVIDENCE_SENSITIVE_SOURCE_USES/)).toBeTruthy();
-		expect(
-			screen.getByText(/pull requests and issues need no separate authorization/),
-		).toBeTruthy();
+		// Connecting the integration and enabling the practice is the authorization; a practice author
+		// has no lever to pull here, so an instruction to go and set one would be a dead end.
+		expect(screen.queryByText(/authorization/i)).toBeNull();
+		expect(screen.getByRole("button", { name: "Customize evidence" })).toBeTruthy();
 	});
 
 	it("still allows human review when AI support is unavailable", async () => {

@@ -83,21 +83,6 @@ Update clients in the same deployment as the server and webapp. The old names ha
 Database values and columns migrate automatically. This change removes ambiguous uses of “active,” “support,” and
 “detection”; it does not change historical finding results.
 
-#### 🟡 Reading Slack threads for practice review needs an explicit grant
-
-**Affected**: deployments that review Slack conversations.
-
-Automated practice review needs no configuration for the everyday code sources: connecting a workspace integration
-and enabling a practice is what authorizes reading its pull requests and issues, and a default deployment reviews
-them without further setup.
-
-One source is different. A Slack thread is other people's conversation, so it is read only after a deliberate
-decision. Set `HEPHAESTUS_EVIDENCE_SENSITIVE_SOURCE_USES` to comma-separated `source:purpose` grants — for example
-`slack.conversation.thread:AUTOMATED_PRACTICE_REVIEW`. Automated review, feedback delivery, Mentor context, and
-operator evidence review are granted separately. Wildcards are rejected, and listing a non-sensitive source is a
-startup error rather than a silent no-op, so the list cannot quietly grow back into an everything-list. Remove a
-grant and restart the server and workers to stop that use.
-
 #### 🔴 Outline connections require approved origins
 
 **Affected**: deployments that enable the Outline integration.

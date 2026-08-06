@@ -34,8 +34,7 @@ class ArtifactSourceCatalogCoverageTest {
 
     private static final Set<SourceKind> CATALOG_KINDS = new ClasspathArtifactSourceCatalogRegistry(
         JsonMapper.builder().build(),
-        Clock.systemUTC(),
-        ""
+        Clock.systemUTC()
     )
         .current()
         .sources()

@@ -2728,7 +2728,6 @@ export type PracticeTriggerEventOption = {
  * An evidence source allowed by the selected evidence profile
  */
 export type PracticeEvidenceSourceOption = {
-    authorizedForAutomatedReview: boolean;
     description: string;
     displayName: string;
     privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';

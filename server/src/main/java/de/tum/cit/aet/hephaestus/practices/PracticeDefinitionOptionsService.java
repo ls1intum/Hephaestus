@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeTriggerEventOptionDTO;
@@ -58,12 +57,7 @@ public class PracticeDefinitionOptionsService {
                         source.privacyClass(),
                         source.completenessPolicy().supportsComplete(),
                         source.freshnessPolicy().supportsCurrentRequirement(),
-                        source.completenessPolicy().supportsEmpty(),
-                        catalogs.isSourceUsePermitted(
-                            catalog.version(),
-                            source.kind(),
-                            SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
-                        )
+                        source.completenessPolicy().supportsEmpty()
                     )
                 )
                 .toList()

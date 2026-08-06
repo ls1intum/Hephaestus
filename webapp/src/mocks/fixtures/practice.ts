@@ -122,7 +122,6 @@ export const mockPracticeDefinitionOptions = {
 					supportsComplete: true,
 					supportsCurrent: false,
 					supportsEmpty: false,
-					authorizedForAutomatedReview: true,
 				},
 				{
 					sourceKind: "scm.pull-request.diff",
@@ -132,7 +131,6 @@ export const mockPracticeDefinitionOptions = {
 					supportsComplete: true,
 					supportsCurrent: true,
 					supportsEmpty: true,
-					authorizedForAutomatedReview: true,
 				},
 				{
 					sourceKind: "scm.pull-request.comments",
@@ -142,7 +140,6 @@ export const mockPracticeDefinitionOptions = {
 					supportsComplete: true,
 					supportsCurrent: false,
 					supportsEmpty: true,
-					authorizedForAutomatedReview: true,
 				},
 			],
 		},
@@ -164,7 +161,6 @@ export const mockPracticeDefinitionOptions = {
 					supportsComplete: true,
 					supportsCurrent: true,
 					supportsEmpty: false,
-					authorizedForAutomatedReview: true,
 				},
 				{
 					sourceKind: "scm.issue.comments",
@@ -174,7 +170,6 @@ export const mockPracticeDefinitionOptions = {
 					supportsComplete: true,
 					supportsCurrent: false,
 					supportsEmpty: true,
-					authorizedForAutomatedReview: true,
 				},
 			],
 		},
@@ -192,7 +187,6 @@ export const mockPracticeDefinitionOptions = {
 					supportsComplete: true,
 					supportsCurrent: true,
 					supportsEmpty: false,
-					authorizedForAutomatedReview: false,
 				},
 			],
 		},

@@ -54,21 +54,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     private final ArtifactSourceCatalog catalog;
     private final String catalogDigest;
     private final Map<String, SourceUseDecision> useDecisions;
-    private final Set<SourceUseGrant> sensitiveUses;
     private final Clock clock;
 
-    public ClasspathArtifactSourceCatalogRegistry(
-        JsonMapper objectMapper,
-        Clock clock,
-        @Value("${hephaestus.evidence.sensitive-source-uses:}") String sensitiveSourceUses
-    ) {
+    public ClasspathArtifactSourceCatalogRegistry(JsonMapper objectMapper, Clock clock) {
         this.clock = clock;
         byte[] catalogBytes = readBytes(CATALOG_RESOURCE);
         this.catalog = parse(read(objectMapper, catalogBytes, CATALOG_RESOURCE));
         this.catalogDigest = sha256(catalogBytes);
         this.useDecisions = parseUseDecisions(read(objectMapper, USE_DECISIONS_RESOURCE));
         validateUseDecisions(catalog, useDecisions);
-        this.sensitiveUses = parseSensitiveUses(catalog, sensitiveSourceUses);
         useDecisions
             .values()
             .stream()
@@ -110,26 +104,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
 
     /**
      * A use is permitted when the shipped contract carries a reviewed, unexpired decision for exactly this
-     * source and purpose and — for {@link PrivacyClass#SENSITIVE_PERSONAL} sources only — the operator has
-     * additionally granted it.
+     * source and purpose.
      *
-     * <p>The reviewed decision in {@code source-use-decisions.json} is the governance record, and it is
-     * the gate that cannot be waived at runtime: no configuration grants a source whose decision is
-     * missing, refused, or expired. Requiring operators to re-enter the sources the product exists to
-     * read would not minimise any data — the deployment and the workspace connection already state that
-     * purpose — and a prompt that fires on every source trains operators to wave through the one source
-     * where a deliberate answer carries information.
+     * <p>The decision in {@code source-use-decisions.json} is the gate, and no runtime configuration waives
+     * it: a source whose decision is missing, refused, or expired is never read. Within that boundary,
+     * connecting an integration and enabling a practice is what authorizes the everyday reading the product
+     * exists to do.
      */
-    @Override
     public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUsePurpose purpose) {
-        ArtifactSourceContract contract = requireSource(version, kind);
-        if (
-            contract.privacyClass() == PrivacyClass.SENSITIVE_PERSONAL &&
-            !sensitiveUses.contains(new SourceUseGrant(kind, purpose))
-        ) {
-            return false;
-        }
-        return contract
+        return requireSource(version, kind)
             .useDecisionIds()
             .stream()
             .map(id -> requireUseDecision(version, id))
@@ -173,44 +156,6 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             throw new IllegalArgumentException("Unsupported source contract version: " + version);
         }
     }
-
-    private static Set<SourceUseGrant> parseSensitiveUses(ArtifactSourceCatalog catalog, String configured) {
-        if (configured.isBlank()) {
-            return Set.of();
-        }
-        if (java.util.Arrays.stream(configured.split(",")).anyMatch(value -> value.trim().equals("*"))) {
-            throw new IllegalStateException("Wildcard artifact-source authorization is not supported");
-        }
-        Set<SourceUseGrant> authorized = new HashSet<>();
-        for (String value : configured.split(",")) {
-            String[] parts = value.trim().split(":", -1);
-            if (parts.length != 2) {
-                throw new IllegalStateException("Artifact-source authorization must use source:purpose syntax");
-            }
-            try {
-                SourceKind kind = new SourceKind(parts[0]);
-                SourceUsePurpose purpose = SourceUsePurpose.valueOf(parts[1]);
-                ArtifactSourceContract contract = catalog
-                    .source(kind)
-                    .orElseThrow(() -> new IllegalStateException("Unknown authorized artifact source: " + kind));
-                if (contract.privacyClass() != PrivacyClass.SENSITIVE_PERSONAL) {
-                    throw new IllegalStateException(
-                        "Artifact source " +
-                            kind +
-                            " is not sensitive and needs no operator grant; remove it from hephaestus.evidence.sensitive-source-uses"
-                    );
-                }
-                authorized.add(new SourceUseGrant(kind, purpose));
-            } catch (IllegalStateException exception) {
-                throw exception;
-            } catch (IllegalArgumentException exception) {
-                throw new IllegalStateException("Invalid artifact-source authorization: " + value.trim(), exception);
-            }
-        }
-        return Set.copyOf(authorized);
-    }
-
-    private record SourceUseGrant(SourceKind source, SourceUsePurpose purpose) {}
 
     static ArtifactSourceCatalog parse(JsonNode root) {
         requireObject(root, "catalog");

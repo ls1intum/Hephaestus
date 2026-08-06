@@ -1,5 +1,5 @@
 import deepEqual from "fast-deep-equal";
-import { ChevronRight, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
+import { ChevronRight, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import type {
 	PracticeAutomatedReviewPolicy,
@@ -8,7 +8,6 @@ import type {
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
 import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-catalog/PracticeEvidenceOutcomeSummary";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -272,12 +271,6 @@ export function PracticeEvidenceEditor({
 	);
 	const mentoringSupport = mentoringSupportOf(value);
 	const supportsAiReview = options.supportedAutomatedReviewModes.includes("LANGUAGE_MODEL");
-	const unavailableRequiredSources = value.requiredEvidence.filter((requirement) => {
-		const source = options.allowedSources.find(
-			(item) => item.sourceKind === requirement.sourceKind,
-		);
-		return !source?.authorizedForAutomatedReview;
-	});
 	const noAutomatedReview = value.automatedReview.mode === "NONE";
 	const canAttemptReview = mentoringSupport === "AI_SUPPORTED" && supportsAiReview;
 	const humanReviewReasonMissing = humanReviewReasonIsMissing(value);
@@ -482,25 +475,6 @@ export function PracticeEvidenceEditor({
 				</div>
 			)}
 
-			{canAttemptReview && unavailableRequiredSources.length > 0 && (
-				<Alert variant="warning">
-					<TriangleAlert />
-					<AlertTitle>This evidence requires an authorization decision</AlertTitle>
-					<AlertDescription>
-						{unavailableRequiredSources
-							.map((source) => evidenceSourceLabel(source.sourceKind, options.allowedSources))
-							.join(", ")}{" "}
-						{unavailableRequiredSources.length === 1 ? "contains" : "contain"} private
-						conversations. Hephaestus reads{" "}
-						{unavailableRequiredSources.length === 1 ? "it" : "them"} only after an instance
-						operator authorizes the source in{" "}
-						<code className="font-mono text-xs">HEPHAESTUS_EVIDENCE_SENSITIVE_SOURCE_USES</code>.
-						Sources such as pull requests and issues need no separate authorization. Until the
-						source is authorized, Hephaestus skips automated review for this practice.
-					</AlertDescription>
-				</Alert>
-			)}
-
 			{!noAutomatedReview && (
 				<Collapsible open={open} onOpenChange={setOpen}>
 					<div className="flex flex-wrap items-center gap-2">
@@ -557,13 +531,7 @@ export function PracticeEvidenceEditor({
 											<div>
 												<div className="flex flex-wrap items-center gap-2">
 													<p className="font-medium">{sourceLabel}</p>
-													{source.privacyClass === "SENSITIVE_PERSONAL" && (
-														<Badge variant="outline">Private conversations</Badge>
-													)}
 													{!source.supportsEmpty && <Badge variant="outline">Never empty</Badge>}
-													{!source.authorizedForAutomatedReview && (
-														<Badge variant="warning">Needs authorization</Badge>
-													)}
 												</div>
 												<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>
 											</div>

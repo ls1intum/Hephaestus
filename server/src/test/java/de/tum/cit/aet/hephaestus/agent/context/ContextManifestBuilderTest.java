@@ -530,7 +530,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldRejectAbsenceStateForbiddenByTheSourceContract() {
-        var realCatalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC(), "");
+        var realCatalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC());
         ArtifactSourceContract diff = realCatalogs.requireSource(plan(Set.of(DIFF)).contractVersion(), DIFF);
         ArtifactSourceContract restrictedDiff = new ArtifactSourceContract(
             diff.kind(),
@@ -741,7 +741,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             cas,
             layout,
             mapper,
-            new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC(), ""),
+            new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
             Clock.fixed(instant, java.time.ZoneOffset.UTC)
         );
     }
