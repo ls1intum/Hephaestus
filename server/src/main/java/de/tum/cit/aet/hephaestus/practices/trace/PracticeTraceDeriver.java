@@ -359,6 +359,7 @@ final class PracticeTraceDeriver {
         return switch (reason) {
             case GATE_SKIPPED -> "The workspace's review gate declined this occurrence.";
             case COOLDOWN_ACTIVE -> "Another review ran on this artifact inside the workspace's cooldown window.";
+            case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
             case OUT_OF_REVIEW_SCOPE -> "This artifact is outside the branches and repositories this workspace reviews.";
             case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";
             case PRACTICES_DISABLED -> "Practice review is switched off for this workspace; it is re-offered when it is switched on.";

@@ -16,6 +16,17 @@ public enum SignalStateReason {
     COOLDOWN_ACTIVE(SignalState.SUPPRESSED),
 
     /**
+     * Another submission for the same subject won the idempotency race; it carries the review.
+     *
+     * <p>Nothing records this today: the path that would have is the one that calls
+     * {@code setRollbackOnly()}, which unwinds the very row the reason would have been written to. It is
+     * kept because the vocabulary crosses the API and the webapp renders an exhaustive map of it, so
+     * removing it is a server-and-client change; it should go, together with that map and the
+     * regenerated client, rather than half of it here.
+     */
+    CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
+
+    /**
      * The artifact falls outside the workspace's review scope — the wrong target branch, or a repository
      * the workspace syncs but does not review.
      *
