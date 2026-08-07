@@ -76,12 +76,36 @@ Update clients in the same deployment as the server and webapp. The old names ha
 | AI purpose `PRACTICE_DETECTION` | `PRACTICE_REVIEW` |
 | `evidenceRequirements` | `automatedReviewPolicy` |
 | `evidenceSupport` | `evidenceSufficiency` |
-| practice `active` and `/active` | `usedInNewReviews` and `/used-in-new-reviews` |
+| practice `active` and `/active` | `reviewTier` and `/review-tier` (see below) |
 | practice-area `active` | `visibleInPracticeDashboards` |
 | finding `claimStatus` | `claimCurrentness` |
 
 Database values and columns migrate automatically. This change removes ambiguous uses of “active,” “support,” and
 “detection”; it does not change historical finding results.
+
+#### 🔴 A practice has a loudness tier, not an on/off switch
+
+**Affected**: API clients that turn practices on or off.
+
+`PATCH /workspaces/{slug}/practices/{practiceSlug}/used-in-new-reviews` with
+`{"usedInNewReviews": true|false}` is now
+`PATCH /workspaces/{slug}/practices/{practiceSlug}/review-tier` with `{"reviewTier": "..."}`. The
+practice payload carries `reviewTier` instead of `usedInNewReviews`, and the catalogue list filter is
+`?reviewTier=<TIER>` instead of `?usedInNewReviews=<bool>`. There are no aliases.
+
+The four tiers are `OFF`, `MEASURE`, `COACH` and `ENGAGE`. Existing data maps exactly and needs no
+decision from you: a practice that was used in new reviews becomes `ENGAGE`, one that was not becomes
+`OFF`, and the migration runs automatically. `MEASURE` and `COACH` are new ground — the review still
+runs and every observation is still recorded, and only the delivery is held back.
+
+#### 🟢 A workspace can restrict review to some branches and repositories
+
+**Affected**: nobody, unless you want it. Workspaces that do not configure a scope are unchanged.
+
+The practice-review settings resource carries a `reviewScope` of two exact-match lists,
+`targetBranches` and `repositories`. An empty list means no restriction on that axis. Exact names
+only — there are no glob patterns, and there is no path scope, because the changed files of a pull
+request are not known at the point where the decision to review is made.
 
 #### 🔴 The "Skip drafts" workspace setting is gone
 

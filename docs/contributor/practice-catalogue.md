@@ -19,10 +19,12 @@ it propagates:
 
 | Decision | Hephaestus defaults | Instance catalog | Workspace practices |
 | --- | --- | --- | --- |
-| Name, work type, criteria, and guidance | maintained in the repository | inherited or customized by an instance administrator | copied at workspace creation, then owned by the workspace |
-| AI-supported mentoring and required evidence | selected by `automatedReviewPolicyId`; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
+| Name, criteria, and guidance | maintained in the repository | inherited or customized by an instance administrator | copied at workspace creation, then owned by the workspace |
+| Bindings — the occasions a practice is reviewed on and the evidence each reads | declared as `on` in the bundled catalog; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
+| Review frame — contract version, review mode, known limitations | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form | copied, then customizable in the same practice form |
 | Included in new workspaces | default is included | instance administrator can include or exclude | not applicable after installation |
-| Used in new reviews | not a repository setting | not a curated-catalog setting | workspace administrator controls it; unavailable automation cannot be enabled |
+| Loudness tier | not a repository setting | not a curated-catalog setting | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
+| Review scope | not a repository setting | not a curated-catalog setting | workspace administrator sets it once for the whole workspace |
 | Area and order | JSON array order | inherited or changed with drag-and-drop or move actions | copied, then independently managed |
 
 This is a one-way lifecycle: a repository update can update an uncustomized instance definition, and
@@ -33,7 +35,7 @@ definition or an existing workspace.
 | --- | --- | --- |
 | Practice author | Define the habit, guidance, and responsible mentoring support | Authorize collection or certify review accuracy |
 | Instance administrator | Curate the defaults offered to new workspaces | Rewrite existing workspace practices |
-| Workspace administrator | Adapt practices and choose which are used in new reviews | Authorize a new data source for the instance |
+| Workspace administrator | Adapt practices, set each one's loudness tier, and scope which work is reviewed | Authorize a new data source for the instance |
 | Instance operator | Approve source purposes, privacy, retention, and erasure coverage | Decide that connected evidence proves a practice |
 | Developer, peer, or mentor | Use findings and available human context in a review | Supply hidden context to Hephaestus implicitly |
 
@@ -46,12 +48,14 @@ The practice editor follows the decisions an author can make confidently:
 2. **Review guidance** — describe what to look for, why it matters, and one concrete example.
 3. **How Hephaestus can help** — choose AI-supported mentoring, human review, or guidance only.
 
-The generated identifier, review timing, and optional static-analysis script are under **Technical
-settings**. New practices start with review events that fit the selected work type. Authors only
-change those defaults when the practice genuinely needs different timing. This keeps runtime
-plumbing out of the common path without hiding it from expert authors.
-The definition-options API supplies both available and recommended events, so the editor and runtime
-cannot silently disagree about valid review timing.
+The generated identifier, the occasions a review runs on, and the optional static-analysis script are
+under **Technical settings**. New practices start with bindings that fit the selected work type.
+Authors only change those defaults when the practice genuinely needs a different occasion. This keeps
+runtime plumbing out of the common path without hiding it from expert authors.
+The definition-options API supplies the signals a practice on that work type may bind to, the evidence
+a new binding starts with, and the sources it may read, so the editor and runtime cannot silently
+disagree about what is bindable. The practice never states its artifact kind: it is read off the
+signals' shared prefix, which is what stops a declared kind and its triggers from drifting apart.
 
 Write **What to look for** as a review boundary, not as a personality or a score. Define one
 observable habit, the signals that demonstrate it, and the cases where a reviewer should stay
@@ -66,13 +70,18 @@ settings:
 - **AI-supported mentoring** lets Hephaestus review connected work after every required source passes.
 - **Human review needed** records that connected work is not enough. Hephaestus skips the practice,
   while a developer, peer, or mentor may still review it from context the system does not collect.
-  Because Hephaestus will not run a review, this choice has no review events or static-analysis script.
+  It still names its occasions — that is where its artifact kind comes from, and saying what a
+  practice is about was never the same claim as asking Hephaestus to act on it — but it cannot define
+  a static-analysis script and its loudness tier is forced to `OFF`.
 - **Guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
 
-Each reviewed-work type starts with recommended evidence. Most authors should keep it. **Customize
-evidence** reveals source roles, minimum completeness and freshness, privacy classes, and known
-limitations for practices that genuinely need a different rule. Selecting a source never authorizes
-collection; instance governance and workspace integrations remain separate gates.
+Each binding starts with the recommended evidence for its work type. Most authors should keep it.
+**Customize evidence** reveals each source's display name, privacy class, the capture quality its
+contract demands, and whether it can be captured whole — so an author knows whether an `EXHAUSTIVE`
+stance is available — along with the practice's known limitations. How strictly a source must be
+captured is not a per-practice choice: it is stated once in the source contract, which every shipped
+practice already agreed with. Selecting a source never authorizes collection; instance governance and
+workspace integrations remain separate gates.
 
 ### Example: explain what changed and why
 
@@ -83,13 +92,13 @@ collection; instance governance and workspace integrations remain separate gates
 | What to look for | Look for a description that explains the behavior change and why. Stay silent for automated dependency updates. |
 | Why it matters | Reviewers can judge a change faster when they understand its purpose. |
 | What good looks like | “This changes retry behavior so temporary network failures no longer end the sync.” |
-| Hephaestus support | AI-supported mentoring with the recommended review timing and evidence |
+| Hephaestus support | AI-supported mentoring with the recommended bindings and evidence |
 
 The author does not choose source-contract identifiers or runtime states in this common path. If the
-required pull-request details or diff are missing, incomplete, or outdated, Hephaestus skips the
-practice instead of inventing a finding. A more contextual practice, such as whether a developer
-understood a trade-off discussed privately with a mentor, should use **Human review needed** and name
-that missing context.
+required pull-request details or diff are missing, or captured less completely than their contract
+demands, Hephaestus skips the practice instead of inventing a finding. A more contextual practice,
+such as whether a developer understood a trade-off discussed privately with a mentor, should use
+**Human review needed** and name that missing context.
 
 The instance tables store only decisions that differ from the bundled catalog: a customized
 definition, inclusion policy, accepted bundled digest, or position. No override row means the
@@ -152,10 +161,34 @@ The ordinary matching state has no badge. Exceptions say **Customized for this w
 **Instance catalog changed**, or **Not in the current instance catalog**. Drift is informational and
 never rewrites the workspace.
 
-A practice comparison covers the inputs that affect review behavior: slug, name, work type, trigger
-events, criteria, evidence requirements, precompute script, and area. **Why it matters** and **What good looks like** are
-guidance and do not affect review-rule drift. An area comparison covers name, description, icon, and
-color; position is excluded.
+A practice comparison covers the inputs that affect review behavior: slug, name, bindings (their
+signals, draft handling, and evidence needs with stances), criteria, precompute script, the
+automated-review policy, and area. The artifact kind is not compared separately — every signal name
+carries it, so digesting it too would only give a rename two places to be recorded. **Why it matters**
+and **What good looks like** are guidance and do not affect review-rule drift. An area comparison
+covers name, description, icon, and color; position is excluded.
+
+## Turning a practice down
+
+Loudness is a workspace decision, not a catalog one, and it is deliberately not a switch. Each practice
+carries a `reviewTier` of `OFF`, `MEASURE`, `COACH`, or `ENGAGE`; only `OFF` stops the review. `MEASURE`
+and `COACH` run it and record every observation exactly as `ENGAGE` does, and differ only in how far the
+result travels — `MEASURE` says nothing anywhere, `COACH` raises it in the recipient's mentor
+conversation, `ENGAGE` also places it on the artifact. This exists because the previous answer to "this
+practice is too noisy" was to stop using it, which also stopped the measurement and put a hole in the
+behaviour series.
+
+`COACH` reaches the mentor conversation and nothing else. The channel vocabulary also declares
+`PROFILE`, but nothing in the application writes one, so do not describe `COACH` as reaching a profile
+or reflection surface. A finding a tier withholds is recorded as suppressed with reason
+`PRACTICE_TIER_QUIET` rather than dropped, so a deliberate quiet stays distinguishable from a miss.
+
+Alongside it, a workspace review scope decides which work is reviewed at all: two exact-match lists,
+`targetBranches` and `repositories`, ANDed onto every binding, with an empty list meaning no
+restriction on that axis. There is no path scope and there are no glob patterns, and a branch scope
+cannot narrow issue review because an issue has no target branch. The
+[practice review glossary](./practice-review-glossary.mdx) documents both, including the refusal
+reasons an out-of-scope or tier-`OFF` artifact records.
 
 ## Selecting a practice
 
@@ -168,16 +201,19 @@ A practice must:
 5. use language useful to the developer doing the work; and
 6. cite research, a standard, or an explicitly identified practitioner norm.
 
-Evidence requirements use the versioned
+Evidence is declared per binding against the versioned
 [artifact-source contract](./artifact-source-contract) and the canonical
-[practice review glossary](./practice-review-glossary.mdx). They define required evidence, optional context,
-minimum completeness and freshness, conservative skipping, and known limitations. They must not infer availability
-from a missing file or require desired content to be non-empty. Author-defined requirements are not independent
-validation of automated review. They say nothing about whether a developer, peer, or human mentor can review the practice
-outside the governed integrations.
+[practice review glossary](./practice-review-glossary.mdx). Each entry names a source and a stance —
+`REQUIRED`, `EXHAUSTIVE`, or `CONTEXTUAL` — and the practice's policy adds conservative skipping and
+known limitations. Requirements must not infer availability from a missing file. Author-defined
+requirements are not independent validation of automated review. They say nothing about whether a
+developer, peer, or human mentor can review the practice outside the governed integrations.
 
-The review-rule fingerprint uses an explicit scheme prefix. Evidence-aware definitions use `v2`; stored `v1`
-fingerprints retain their original pre-contract meaning and never compare equal by accident.
+The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its *inputs* change rather
+than the rules, so a stored fingerprint is never compared against one computed from a different set of
+facts. The current scheme is `v3`, which dropped the named evidence profile — it was the set of sources
+that declare they apply to the artifact kind, which the kind already determines on its own. Earlier
+schemes retain their original meaning and never compare equal by accident.
 
 Architecture-wide qualities cannot be inferred from one change. A practice may review an observable
 act, such as recording a decision, without turning it into a claim about the whole system.
@@ -197,13 +233,15 @@ standard as an experiment or a convention as a proven outcome.
 
 1. State the user problem and supported reviewed work.
 2. Cite and classify the evidence.
-3. Draft applicability, signals, exclusions, evidence requirements, and severity.
-4. Validate every source against the applicable evidence profile and confirm its governance decision permits the product
-   purpose, audience, processor egress, and retention. A new source follows the
+3. Draft applicability, signals, exclusions, per-binding evidence, and severity.
+4. Confirm every source applies to the binding's artifact kind and that its governance decision permits
+   the product purpose, audience, processor egress, and retention. A new source follows the
    [artifact-source governance gate](../admin/dsms/artifact-source-governance).
 5. Update `server/src/main/resources/practices/default-catalog.json`; its adjacent JSON Schema provides
-   editor completion and CI validation, and Git history is the bundled version history. Reference any
-   precompute script explicitly; unreferenced scripts fail validation.
+   editor completion and CI validation, and Git history is the bundled version history. Declare the
+   occasions as `on` — a bare signal name is shorthand for a binding on that signal reading the
+   artifact kind's default evidence. Reference any precompute script explicitly; a script must be named
+   after the practice slug, and an unreferenced one fails validation.
 6. Add or update focused automated-review tests, including required-source skipping and valid-empty evidence.
 7. Review the admin presentation and a representative delivered message.
 

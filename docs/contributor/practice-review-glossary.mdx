@@ -16,16 +16,18 @@ The broader [practice feedback language](./practice-feedback-language.md) remain
 | **Guidance only** | Keep the practice's criteria and guidance without asking Hephaestus to review it. | practice guidance only, invalid practice, human-only |
 | **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
 | **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
-| **Automated-review policy** | The complete rule for how Hephaestus may review one practice, including mode, evidence, refusal behavior, and known limits. | evidence requirements |
-| **Evidence requirements** | The versioned rule describing what Hephaestus must receive before automated review may start. | evidence declaration, evidence contract, detector configuration |
-| **Required evidence** | A source that must pass its stated completeness and freshness checks. | mandatory artifact |
-| **Optional context** | A source that may help but never blocks a review when absent. | optional requirement |
+| **Automated-review policy** | The frame a review runs in for one practice: the source-contract version, the review mode, the refusal behaviour, and the known limits. It no longer lists sources. | evidence requirements |
+| **Binding** | One occasion a practice is reviewed on, and the evidence a review occasioned that way reads. A practice declares a list of them. | trigger, review event, schedule |
+| **Signal** | The name of an ingested event a binding can be occasioned by, such as `scm.pull_request.merged`. Its prefix is the artifact kind, which is why a practice never states its artifact kind separately. | trigger event, webhook, hook |
+| **Evidence requirement** | One source a binding reads, and the stance the practice takes towards it. | required evidence, evidence declaration, detector configuration |
+| **Evidence stance** | How a practice relates to one source: `REQUIRED`, `EXHAUSTIVE`, or `CONTEXTUAL`. | required/optional lists, source role |
+| **Required capture quality** | How well a source must be captured before a practice that reads it can be reviewed. It is a property of the source in the contract, not of the practice naming it. | completeness requirement, per-practice completeness |
 | **Evidence sufficiency** | Whether passing every requirement gives Hephaestus enough context to review the practice. | evidence coverage, confidence |
 | **Source contract** | A versioned catalog defining each source and the meaning of its states. | integration version |
 | **Artifact source** | A registered logical input that can supply evidence. | file, mount, cache |
 | **Materialization** | A file, database projection, cache entry, or tool result representing a source for one use. | source kind |
-| **Evidence profile** | The sources allowed for one type of reviewed work. | artifact profile |
 | **Source kind** | A stable identifier for one logical source, such as pull request details. | file type |
+| **Artifact kind** | The family of reviewed work a practice is about, such as `scm.pull_request`. Derived from a binding's signals, never stated separately. | work type, artifact type |
 | **Known limitation** | A claim the evidence cannot support even when every requirement passes. | blind spot, caveat |
 | **When evidence is insufficient** | The required behavior when evidence requirements are not met. Contract `1.0.0` always skips automated review. | fallback, error handling |
 | **Skip automated review** | Make no practice claim because the requirements are not met or the mode is unsupported. | not applicable, decline judgment, failure |
@@ -34,7 +36,8 @@ The broader [practice feedback language](./practice-feedback-language.md) remain
 | **Source-use purpose** | Why Hephaestus processes evidence, such as automated review or feedback delivery. | audience, recipient |
 | **Audience / recipient** | Who may receive or inspect evidence. | purpose |
 | **Review readiness** | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks. | validation, activation |
-| **Used in new reviews** | A workspace currently includes the practice in newly started reviews. | detectable, universally observable |
+| **Loudness tier** | How far one practice's result is allowed to travel in one workspace: `OFF`, `MEASURE`, `COACH`, or `ENGAGE`. | used in new reviews, enabled, detectable |
+| **Review scope** | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories. | filter, path filter, include pattern |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
 review is accurate. Independent validation records provenance separately.
@@ -50,7 +53,7 @@ label a practice as universally observable or unobservable.
 
 | Reviewer | Current system support |
 | --- | --- |
-| **Hephaestus** | Modeled by `automatedReview` and governed evidence requirements. It can only use authorized, connected evidence. |
+| **Hephaestus** | Modeled by `automatedReview` and the governed evidence each binding declares. It can only use authorized, connected evidence. |
 | **Developer** | A self-review may be possible for a specific practice; Hephaestus does not collect it. |
 | **Peer** | A peer review may be possible from team context; Hephaestus does not collect it. |
 | **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it. |
@@ -60,28 +63,101 @@ model. It must record who reviewed and in what relationship to the author. Human
 may use different rubrics and evidence, and disagreement remains multiple provenance-bearing reviews rather
 than one ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an automated review.
 
+## Loudness tiers
+
+`PracticeReviewTier` is the workspace's answer to "how loud may this practice be", and it replaced the
+boolean that used to answer only "is this practice used at all". Each tier adds to the one before it.
+
+| Tier | Review runs | Observation recorded | Mentor conversation | On the artifact |
+| --- | --- | --- | --- | --- |
+| `OFF` | no | no | no | no |
+| `MEASURE` | yes | yes | no | no |
+| `COACH` | yes | yes | yes | no |
+| `ENGAGE` | yes | yes | yes | yes |
+
+Only `OFF` stops the review. `MEASURE` and `COACH` run it and record every observation exactly as `ENGAGE`
+does; they differ only in how far the result travels. That is the point of the tier: turning a noisy
+practice down no longer puts a hole in the behaviour series, because the measurement and the intervention
+are separate decisions. `ENGAGE` is the default and the tier a workspace that never touches the setting
+stays at.
+
+**`COACH` means the mentor conversation, and nothing else.** The channel vocabulary
+(`FeedbackChannel`) declares `IN_CONTEXT`, `CONVERSATION`, and `PROFILE`, but nothing in the application
+writes a `PROFILE` unit — there is no producer. Do not describe `COACH` as reaching a profile or
+reflection surface. `PROFILE` is declared and unwritten; when a producer exists it joins `COACH`
+alongside `CONVERSATION` without the tier's meaning changing.
+
+A finding withheld by a tier is written to the feedback ledger as `SUPPRESSED` with reason
+`PRACTICE_TIER_QUIET` rather than dropped, so "we saw it and chose to stay quiet" reads differently from
+"we missed it" in every later evaluation.
+
+Setting the tier is `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier` with body
+`{"reviewTier": "MEASURE"}`. The catalog list endpoint filters on `?reviewTier=<TIER>`. A practice whose
+automated-review policy cannot attempt a review — any mode/sufficiency pair other than `LANGUAGE_MODEL`
+with `SUFFICIENT_WHEN_REQUIREMENTS_MET` — is forced to `OFF` when it is created or edited.
+
+## Review scope
+
+`WorkspaceReviewScope` narrows which of a workspace's work is reviewed at all. It is ANDed onto every
+binding and only ever narrows: a workspace that never sets it behaves exactly as before.
+
+| Axis | JSON key | Matching | Empty list means |
+| --- | --- | --- | --- |
+| Target branch | `targetBranches` | exact name against a pull request's base ref | every branch |
+| Repository | `repositories` | exact `owner/name` | every repository the workspace already syncs |
+
+Both axes must admit an artifact; within one axis, any entry matches. It lives on the practice-review
+settings resource as `reviewScope` (`GET`/`PATCH /workspaces/{workspaceSlug}/practices/review-settings`),
+and a `PATCH` replaces it wholesale rather than merging, because the lists *are* the setting and a merge
+could only ever add.
+
+Three limits are deliberate, not gaps waiting to be filled:
+
+- **No path scope.** The detection gate holds the `PullRequest` row, not the diff. Changed paths do not
+  exist until the evidence stage, by which point the review has already been admitted and paid for, so a
+  path predicate here would quietly never narrow anything.
+- **No patterns.** Exact names only. Adding globs later stays backward compatible; taking them away would not.
+- **A branch scope cannot narrow issue review.** An issue has no target branch, so a null branch passes
+  the branch axis rather than failing it. Only `repositories` narrows issue review.
+
+An artifact outside the scope refuses its signal with `OUT_OF_REVIEW_SCOPE`, which is terminal
+(`SUPPRESSED`): the branch a merge request targeted will not change, so re-offering it could not come out
+differently. Widening the scope changes what happens next, not what already did. A practice at tier `OFF`
+refuses with `PRACTICE_TIER_OFF`, which is retryable (`PENDING`): an admin raising the tier lifts it
+without the artifact changing.
+
 ## Machine names
 
 | Concept | JSON / API | Java | Database |
 | --- | --- | --- | --- |
 | Practice-review AI purpose | `PRACTICE_REVIEW` | `AgentPurpose.PRACTICE_REVIEW` | `PRACTICE_REVIEW` |
 | Automated-review policy | `automatedReviewPolicy` | `PracticeAutomatedReviewPolicy` | `automated_review_policy` |
-| Evidence profile | `evidenceProfile` | `EvidenceProfileId` | inside `automated_review_policy` |
+| Binding | `on` | `PracticeBinding` | `bindings` |
+| Signal | `signals[]` | `SignalName` | inside `bindings` |
+| Draft occasion | `onDrafts` | `PracticeBinding.onDrafts` | inside `bindings` |
+| Evidence requirement | `needs[]` | `PracticeEvidenceRequirement` | inside `bindings` |
+| Evidence stance | `stance` | `EvidenceStance` | inside `bindings` |
+| Artifact kind | `artifactKind` | `ArtifactKind` | `applies_to` |
 | Source display name | `displayName` | `ArtifactSourceContract.displayName` | source catalog |
+| Required capture quality | `requiredQuality` | `RequiredCaptureQuality` | source catalog |
+| Identity policy | `identity` | `IdentityPolicy` | source catalog |
 | Automated review | `automatedReview` | `PracticeAutomatedReview` | inside `automated_review_policy` |
 | Review mode | `mode` | `PracticeAutomatedReviewMode` | inside `automated_review_policy` |
 | Evidence sufficiency | `evidenceSufficiency` | `PracticeEvidenceSufficiency` | inside `automated_review_policy` |
-| Required evidence | `requiredEvidence` | `PracticeEvidenceRequirement` | inside `automated_review_policy` |
-| Optional context | `optionalContext` | `PracticeOptionalContextSource` | inside `automated_review_policy` |
 | Insufficient evidence action | `whenEvidenceIsInsufficient` | `PracticeInsufficientEvidenceAction` | inside `automated_review_policy` |
+| Reason a person is needed | `insufficiencyReason` | `PracticeEvidenceLimitation` | inside `automated_review_policy` |
 | Known limitations | `knownLimitations` | `PracticeEvidenceLimitation` | inside `automated_review_policy` |
 | Automated review validation | `automatedReviewValidation` | `PracticeAutomatedReviewValidation` | derived API value |
 | Automated review readiness | `automatedReviewReadiness` | `AutomatedReviewReadinessReport` | inside `agent_job.evidence_snapshot` |
 | Source readiness checks | `sourceChecks` | `SourceReadinessCheck` | internal readiness report |
-| Source-use purpose | `purpose` | `SourceUsePurpose` | deployment configuration |
+| Source-use purpose | `purpose` | `SourceUsePurpose` | source-use decisions |
 | Source absence state | `supportedAbsenceStates` | `SourceAbsenceState` | source catalog |
 | Materialization | `artifacts` | `SourceArtifact` | manifest and content-addressed storage metadata |
-| Used in new reviews | `usedInNewReviews` | `Practice.usedInNewReviews` | `used_in_new_reviews` |
+| Loudness tier | `reviewTier` | `Practice.reviewTier` | `review_tier` |
+| Review scope | `reviewScope` | `WorkspaceReviewScope` | `workspace.practice_review_scope` |
+| Feedback channel | `channel` | `FeedbackChannel` | `feedback.channel` |
+| Feedback suppression reason | `suppressionReason` | `FeedbackSuppressionReason` | `feedback.suppression_reason` |
+| Signal refusal reason | — | `SignalStateReason` | `artifact_signal.state_reason` |
 | Area dashboard visibility | `visibleInPracticeDashboards` | `PracticeArea.visibleInPracticeDashboards` | `visible_in_practice_dashboards` |
 | Claim currentness | `claimCurrentness` | `ReviewClaimCurrentness` | derived API value |
 | Review-rule fingerprint | `reviewRuleFingerprint` | `ReviewRuleFingerprint` | `review_rule_fingerprint` |
@@ -92,33 +168,50 @@ mentoring choice:
 - `LANGUAGE_MODEL` + `SUFFICIENT_WHEN_REQUIREMENTS_MET` → **AI-supported mentoring**
 - `LANGUAGE_MODEL` + `DECLARED_EVIDENCE_INSUFFICIENT` → **Human review needed**
 - `NONE` + `NONE` → **Guidance only**
-- `SKIP_AUTOMATED_REVIEW` → **Skip automated review**
 
 ## Source states
 
-Keep availability, content, completeness, freshness, and collection outcome separate. In particular:
+Keep availability, content, completeness, and collection outcome separate. In particular:
 
 - **Available and empty** means collection succeeded and the source legitimately contained no items.
 - **Not collected** means collection was not attempted.
 - **Redacted** means policy withheld the source.
 - **Partial** means only part of the requested scope was captured.
-- **Not current** is a time-based readiness result, not another word for unavailable.
 - **Collection error** means collection was attempted and failed.
+
+There is no staleness state. A capture either names something immutable — a commit SHA — or it does not,
+and nothing in the pipeline can tell "collected an hour ago and unchanged" from "collected an hour ago and
+since superseded". `IdentityPolicy` records only the honest half: whether a source can be anchored at all.
+
+## Outcome states
+
+Two distinctions carry the whole weight of reading the observation table as behaviour. Do not conflate them.
+
+| Outcome | Meaning | Where it lands |
+| --- | --- | --- |
+| `Presence.NOT_APPLICABLE` | The practice has no subject in this work. | An observation. |
+| `Presence.INDETERMINATE` | The evidence was present and read, and it does not settle the question either way. | An observation. |
+| A readiness refusal | We could not look: a source was missing, incomplete, empty where content was required, or governance-blocked. | `AutomatedReviewReadinessDecision` on the review. **No observation at all.** |
+
+`INDETERMINATE` is what a detector must say when it cannot decide. Saying `NOT_APPLICABLE` instead
+launders the detector's own uncertainty into a claim about the developer, which then enters the behaviour
+series as "nothing to see". A refusal is a fact about the instrument, is deliberately not representable as
+a `Presence` value, and is what lets the whole observation table be read as behaviour.
 
 ## Lifecycle
 
 1. A practice author chooses **AI-supported mentoring**, **Human review needed**, or **Guidance only**.
-2. For AI-supported mentoring, recommended evidence is applied automatically; an author customizes it only when the practice needs different evidence or limitations.
-3. Only AI-supported mentoring schedules review events or runs static analysis. The other choices never start an automated review.
+2. For AI-supported mentoring, recommended evidence is applied automatically per binding; an author customizes it only when that occasion needs different evidence or limitations.
+3. Only AI-supported mentoring can be reviewed. The other choices force the loudness tier to `OFF` and never start an automated review.
 4. An instance operator authorizes each source and product use through a reviewed governance decision.
 5. A workspace integration makes authorized sources available.
-6. A workspace administrator chooses whether the practice is used in new reviews.
+6. A workspace administrator sets each practice's loudness tier and, optionally, the workspace review scope.
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
 10. Observations retain the exact practice revision, source contract, and evidence provenance.
 11. Practice or source-contract changes can mark earlier claims stale.
-12. Automated review validation remains separate from source authorization, use in new reviews, and per-run readiness.
+12. Automated review validation remains separate from source authorization, loudness tier, and per-run readiness.
 
 ## Writing rules
 
@@ -128,4 +221,4 @@ Keep availability, content, completeness, freshness, and collection outcome sepa
 4. Put stable reason codes in machine fields and plain explanations in UI messages.
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
-
+7. Say what a tier reaches, never more: `COACH` reaches the mentor conversation, not a profile.

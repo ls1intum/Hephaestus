@@ -42,12 +42,12 @@ defines the governance decision that permits collection, retention, processing, 
 | Processor and transfer | Controller or delegated privacy/procurement reviewer | DPA/AVV, role, region, subprocessors, transfer basis, retention and training terms |
 | Security and access | Security reviewer | Trust boundary, tenant isolation, injection and secret controls, audience policy, safe logging |
 | Retention and erasure | Data owner and integration maintainer | Expiry trigger, deletion owner, derived-data graph, export and erasure tests |
-| Runtime contract | Agent/runtime maintainer | Schema, authority, timing, completeness, absence states, and contract tests |
+| Runtime contract | Agent/runtime maintainer | Schema, authority, identity anchoring, required capture quality, completeness, absence states, and contract tests |
 
-A material change reopens the affected reviews. Runtime collection is also bounded by the deployment's
-`hephaestus.evidence.authorized-source-uses` allowlist. The allowlist is empty by default: the controller must
-explicitly authorize each `source:purpose` grant before use. Wildcards are rejected. Removing a grant and restarting
-the server and workers is the emergency disable path; re-enablement follows the normal decision path.
+A material change reopens the affected reviews. There is no deployment-level allowlist: the shipped, versioned
+source-use decisions are the only gate, and no runtime configuration waives them. A source whose decision is
+missing, refused, or expired is never read, whatever the deployment sets. Disabling a use therefore means
+shipping a contract version in which that decision no longer permits it.
 
 The runtime registry is
 [`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
@@ -58,8 +58,12 @@ It is an engineering gate and contains only releasable decision summaries. Each 
 - `CONTROLLER_DECISION` requires a reviewer, decision time, expiry, and decided outcome. Only an unexpired
   `APPROVED` decision passes when that basis is used.
 
+Every record carries a reviewer, a decision time, and an expiry, whichever basis it uses, and the server refuses
+to start if a source's decisions do not cover every product purpose or if a decision's retention or erasure
+policy disagrees with its source.
+
 Neither the registry nor CI can establish a legal basis, certify a DPIA, or replace the controller's record. Every
-use requires both its unexpired engineering decision and matching deployment grant.
+use requires its own unexpired decision for exactly that source and purpose.
 
 `AGENT_EVIDENCE_RETENTION` is a layered policy. Diagnostic job output uses
 `hephaestus.agent.payload-retention` (14 days by default); the job row and its durable manifest/readiness snapshot use
@@ -168,18 +172,20 @@ The shipped decisions expire on the date recorded in
 `contracts/artifact-source/1.0.0/source-use-decisions.json`. Every governed use fails closed after expiry. Instance
 operators should alert when
 `artifact_source_governance_expiry_seconds` falls below 30 days and assign the alert to the instance
-privacy/governance owner.
+privacy/governance owner. The server logs a warning at startup inside the same window.
 
 Before the deadline, that owner must review the source scopes, processors, retention, erasure coverage, and DPIA
 record. Renewal creates a new contract version containing the new decision; published version directories are
 immutable. Migrate practice declarations and the runtime manifest reference to that version, run
-`pnpm run check:contracts`, and deploy. Never edit an existing version's dates. If renewal is denied or incomplete,
-remove the affected grants from `hephaestus.evidence.authorized-source-uses`; collection and disclosure then stop,
-and Hephaestus makes no automated review claim.
+`pnpm run check:contracts`, and deploy. Never edit an existing version's dates. If renewal is denied or
+incomplete, the expiry itself fails the use closed without any operator action: collection and disclosure stop,
+the source is captured as `NOT_COLLECTED` with reason `GOVERNANCE_NOT_EFFECTIVE`, and Hephaestus makes no
+automated review claim from it.
 
 ## Change checklist
 
-- [ ] Define a stable logical kind, authority, scope, timing, freshness, fidelity, caps, and absence states.
+- [ ] Define a stable logical kind, authority, selection scope, identity anchoring, required capture quality,
+      completeness, caps, and absence states.
 - [ ] Identify exact consumers and the least intrusive viable source.
 - [ ] Update the Art. 30 record and privacy notice before collection.
 - [ ] Record the DPIA determination and all required approvals.
