@@ -14,13 +14,13 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 | **Practice area**     | A group of related practices                                                    | category, goal, learning objective |
 | **Unassigned**        | Practices that are not in a practice area                                       | ungrouped, unbound                 |
 | **Practice review**   | One review of work against the practices selected when the review starts              | run, assessment              |
-| **Finding**           | One strength, improvement, or not-applicable result                             | observation                        |
-| **Practice feedback** | The collective guidance created from findings                                   | AI feedback, feedback items        |
+| **Observation**       | One strength, improvement, or not-applicable result                             | finding, detection                 |
+| **Practice feedback** | The collective guidance created from observations                               | AI feedback, feedback items        |
 | **Message**           | One countable unit of feedback                                                  | ledger unit                        |
 | **Delivery**          | A message's prepared, delivered, withheld, failed, or replaced outcome          | placement, surface                 |
 | **Channel**           | Where feedback is intended to appear: reviewed work, Mentor, or Review activity   | destination, surface               |
 | **Reviewed work**     | A pull request, merge request, issue, or conversation being reviewed             | artifact, target                   |
-| **Developer**         | The person a finding is about                                                   | learner                            |
+| **Developer**         | The person an observation is about                                              | learner                            |
 | **Contributor**       | A repository role relevant to review eligibility                                | user, when the role matters        |
 | **Heph**              | The conversational assistant                                                    | agent, bot                         |
 | **Mentor**            | The product area for conversations with Heph                                    |                                    |
@@ -36,6 +36,16 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 
 Use provider-specific names such as **pull request** or **merge request** when the provider is known;
 otherwise write **pull or merge request**.
+
+**Observation, not finding.** This table told you to avoid *observation* until this pass, while the shipped
+entity, the `observation` table and this table's own next row — feedback "created from observations" — all
+used it. An observation is the recorded result of measuring one practice against one piece of reviewed work;
+the guidance built from observations is *practice feedback*.
+
+*Finding* survives on the delivery side, where it still names the right thing: `FindingAnchor` and
+`InlineFindingChannel` are about a note pinned to a place in a diff, not about a measurement. They are in
+scope for the delivery-side rename, not for this one — do not rename them here. The read APIs and the
+reviews UI still say *findings* for the same reason: renaming a wire contract is its own change.
 
 Use **used in new reviews** for workspace participation. Do not use *shipped*, *offered*, *retired*,
 *ours*, *yours*, or *here* in catalog UI copy; those terms expose implementation or depend on who is

@@ -2,14 +2,14 @@
 
 This glossary is the canonical language for AI-supported practice mentoring and the versioned evidence contract.
 Use product terms in human-facing copy and the corresponding machine terms in contracts; do not invent synonyms.
-The broader [practice feedback language](./practice-feedback-language.md) remains canonical for findings and feedback.
+The broader [practice feedback language](./practice-feedback-language.md) remains canonical for observations and feedback.
 
 ## Product terms
 
 | Term | Plain meaning | Do not use for this concept |
 | --- | --- | --- |
 | **AI-supported practice mentoring** | The product experience in which Hephaestus uses connected work to offer practice-focused guidance while leaving room for self, peer, and human mentor context. It is support, not grading or a replacement for a person. | autonomous mentoring, performance scoring |
-| **Practice review** | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may produce findings. | practice detection, scan, mentoring relationship |
+| **Practice review** | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may produce observations. | practice detection, scan, mentoring relationship |
 | **Automated review** | The technical capability that lets Hephaestus perform a practice review. Prefer **AI-supported mentoring** in author-facing UI. | detection, detector capability, judgment |
 | **AI-supported mentoring** | Hephaestus may review connected work and offer guidance when every required source is ready. | AI mentor, guaranteed feedback |
 | **Human review needed** | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review outside the current product, and Hephaestus skips it. | human context needed, unobservable, not applicable |
@@ -41,7 +41,7 @@ review is accurate. Independent validation records provenance separately.
 
 “Mentoring” describes the product goal, not an anthropomorphic claim. Hephaestus does not know a developer's
 intent, private conversations, runtime conditions, or learning needs unless an authorized source explicitly
-provides that context. A finding is bounded feedback about observed work, not a grade, diagnosis, or ground truth.
+provides that context. An observation is a bounded record of observed work, not a grade, diagnosis, or ground truth.
 
 ## Who may review
 
@@ -116,7 +116,7 @@ Keep availability, content, completeness, freshness, and collection outcome sepa
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
-10. Findings retain the exact practice revision, source contract, and evidence provenance.
+10. Observations retain the exact practice revision, source contract, and evidence provenance.
 11. Practice or source-contract changes can mark earlier claims stale.
 12. Automated review validation remains separate from source authorization, use in new reviews, and per-run readiness.
 
