@@ -23,6 +23,9 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { ARTIFACT_KIND, artifactKindLabel, artifactKindPluralLabel } from "@/lib/artifact-kinds";
+import { asDate } from "@/lib/dates";
+import { formatCostUsd } from "@/lib/money";
 
 export interface PracticeReviewBackfillProps {
 	runs: ReviewBackfillRun[];
@@ -36,10 +39,14 @@ export interface PracticeReviewBackfillProps {
 	onCancel: (runId: string) => void;
 }
 
-const WORK_KINDS = [
-	{ value: "scm.pull_request", label: "Pull requests", noun: "pull request" },
-	{ value: "scm.issue", label: "Issues", noun: "issue" },
-] as const;
+/**
+ * The kinds a backfill can walk. Not every artifact kind qualifies — a backfill re-reads work as it
+ * stands today, which only makes sense where the work is still there to be re-read — so this is a
+ * chosen subset of {@link ARTIFACT_KIND} rather than every kind the instance knows. The words for
+ * each kind come from the shared vocabulary, so a workspace on GitLab is not told about "pull
+ * requests" here while every other screen calls them merge requests.
+ */
+const WORK_KINDS = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue] as const;
 
 const WINDOWS = [
 	{ value: "7", label: "The last 7 days" },
@@ -57,16 +64,20 @@ const PAUSE_EXPLANATIONS: Record<NonNullable<ReviewBackfillRun["pauseReason"]>, 
 		"Practice reviews are off for this workspace, or the workspace is not active. Nothing has been skipped — the backfill continues once they are back on.",
 };
 
-const nounFor = (artifactKind: string) =>
-	WORK_KINDS.find((kind) => kind.value === artifactKind)?.noun ?? "artifact";
+/** The kind as it reads mid-sentence: "each pull or merge request", "each issue". */
+const nounFor = (artifactKind: string) => artifactKindLabel(artifactKind).toLowerCase();
 
-const pluralize = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+/** "1 issue", "128 pull or merge requests" — the plural is the vocabulary's, not an appended "s". */
+const countOf = (count: number, artifactKind: string) =>
+	`${count} ${(count === 1 ? artifactKindLabel(artifactKind) : artifactKindPluralLabel(artifactKind)).toLowerCase()}`;
 
-const formatCost = (usd: number | undefined) =>
-	usd === undefined ? undefined : `$${usd.toFixed(2)}`;
-
-const formatWindow = (run: ReviewBackfillRun) =>
-	`${run.fromAt.toLocaleDateString()} – ${run.toAt.toLocaleDateString()}`;
+// `fromAt`/`toAt` are typed `Date` and arrive as ISO strings, so they are read through `asDate`.
+const formatWindow = (run: ReviewBackfillRun) => {
+	const from = asDate(run.fromAt);
+	const to = asDate(run.toAt);
+	if (!from || !to) return "Dates unavailable";
+	return `${from.toLocaleDateString()} – ${to.toLocaleDateString()}`;
+};
 
 /**
  * Reviewing work that already existed, as a decision rather than a switch.
@@ -174,8 +185,8 @@ function EstimateCard({
 						</SelectTrigger>
 						<SelectContent>
 							{WORK_KINDS.map((kind) => (
-								<SelectItem key={kind.value} value={kind.value}>
-									{kind.label}
+								<SelectItem key={kind} value={kind}>
+									{artifactKindPluralLabel(kind)}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -225,7 +236,11 @@ function ConfirmationCard({
 	onCancel: (runId: string) => void;
 }) {
 	const noun = nounFor(run.artifactKind);
-	const cost = formatCost(run.estimatedCostUsd);
+	const plural = artifactKindPluralLabel(run.artifactKind).toLowerCase();
+	// `formatCostUsd` renders a fraction of a cent as "<$0.01" rather than rounding it to "$0.00";
+	// this is the one screen where a rounded-to-nothing forecast would invite the unconsidered spend
+	// it exists to prevent. An absent estimate is a different statement and keeps its own copy.
+	const cost = run.estimatedCostUsd === undefined ? undefined : formatCostUsd(run.estimatedCostUsd);
 	const nothingToDo = run.estimatedArtifacts === 0;
 
 	return (
@@ -240,7 +255,9 @@ function ConfirmationCard({
 				<div className="grid gap-4 sm:grid-cols-2">
 					<div>
 						<p className="text-muted-foreground text-sm">Work to review</p>
-						<p className="font-semibold text-2xl">{pluralize(run.estimatedArtifacts, noun)}</p>
+						<p className="font-semibold text-2xl">
+							{countOf(run.estimatedArtifacts, run.artifactKind)}
+						</p>
 					</div>
 					<div>
 						<p className="text-muted-foreground text-sm">Estimated AI spend</p>
@@ -260,9 +277,9 @@ function ConfirmationCard({
 					<AlertDescription>
 						Each {noun} is measured once, as it stands now — there is no record of how it looked
 						while it was being worked on. Nothing is posted on the work itself and nobody is
-						notified: commenting on {noun}s that are already finished would notify everyone involved
-						about work nobody can act on. The measurements are kept separate from your live trends,
-						because older work has been polished since and comparing the two would invent an
+						notified: commenting on {plural} that are already finished would notify everyone
+						involved about work nobody can act on. The measurements are kept separate from your live
+						trends, because older work has been polished since and comparing the two would invent an
 						improvement nobody made.
 					</AlertDescription>
 				</Alert>
@@ -274,7 +291,9 @@ function ConfirmationCard({
 						aria-disabled={isUpdating || nothingToDo}
 					>
 						{isUpdating ? <Spinner /> : null}
-						{nothingToDo ? "Nothing in range" : `Review ${pluralize(run.estimatedArtifacts, noun)}`}
+						{nothingToDo
+							? "Nothing in range"
+							: `Review ${countOf(run.estimatedArtifacts, run.artifactKind)}`}
 					</Button>
 					<Button variant="outline" onClick={() => onCancel(run.id)} disabled={isUpdating}>
 						Discard
@@ -294,7 +313,6 @@ function ActiveRunCard({
 	isUpdating: boolean;
 	onCancel: (runId: string) => void;
 }) {
-	const noun = nounFor(run.artifactKind);
 	const walked = run.submittedCount + run.passedCount;
 	const total = Math.max(run.estimatedArtifacts, walked);
 	const percent = total === 0 ? 100 : Math.round((walked / total) * 100);
@@ -314,8 +332,8 @@ function ActiveRunCard({
 				<div className="space-y-2">
 					<Progress value={percent} aria-label="Backfill progress" />
 					<p className="text-muted-foreground text-sm">
-						{walked} of {pluralize(total, noun)} looked at — {run.submittedCount} sent for review,{" "}
-						{run.passedCount} already measured or outside your review rules.
+						{walked} of {countOf(total, run.artifactKind)} looked at — {run.submittedCount} sent for
+						review, {run.passedCount} already measured or outside your review rules.
 					</p>
 				</div>
 
@@ -368,15 +386,14 @@ function HistoryCard({ runs, isLoading }: { runs: ReviewBackfillRun[]; isLoading
 							<Item key={run.id} variant="outline">
 								<ItemContent>
 									<ItemTitle>
-										{WORK_KINDS.find((kind) => kind.value === run.artifactKind)?.label ??
-											run.artifactKind}
+										{artifactKindPluralLabel(run.artifactKind)}
 										{": "}
 										{formatWindow(run)}
 									</ItemTitle>
 									<ItemDescription>
 										{run.status === "CANCELLED"
-											? `Stopped after reviewing ${pluralize(run.submittedCount, nounFor(run.artifactKind))}.`
-											: `Reviewed ${pluralize(run.submittedCount, nounFor(run.artifactKind))}; ${run.passedCount} needed no new measurement.`}
+											? `Stopped after reviewing ${countOf(run.submittedCount, run.artifactKind)}.`
+											: `Reviewed ${countOf(run.submittedCount, run.artifactKind)}; ${run.passedCount} needed no new measurement.`}
 									</ItemDescription>
 								</ItemContent>
 								<ItemActions>

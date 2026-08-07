@@ -1,8 +1,8 @@
 // Realistic fixtures for the native-auth endpoints (ADR 0017), shared by the MSW
 // handlers and available for per-story overrides. Shapes mirror the generated
 // `src/api/types.gen.ts` views so stories render against the real component code
-// paths. Dates are ISO strings on the wire; the hey-api transformers revive them
-// into `Date` objects, matching how the server serializes them.
+// paths. Date fields are typed through `Wire<…>` because that is what a response
+// carries: ISO strings, never revived `Date` objects.
 
 import type {
 	AdminAccountView,
@@ -12,21 +12,7 @@ import type {
 	IdentityView,
 	SessionView,
 } from "@/api/types.gen";
-
-/**
- * Wire shape of a generated view: the hey-api transformers revive ISO date *strings* into
- * `Date` objects on the way in, so a view's `Date` fields are strings on the wire. These
- * fixtures are JSON-serialized by the MSW handlers (or fed to per-story overrides that do the
- * same), so they must be typed as the wire shape — not the post-transform `Date` shape. This
- * removes the ~15 `as unknown as Date` casts the post-transform typing forced.
- */
-type Wire<T> = {
-	[K in keyof T]: T[K] extends Date | undefined
-		? string | undefined
-		: T[K] extends Date
-			? string
-			: T[K];
-};
+import type { Wire } from "@/lib/dates";
 
 export const currentUser: CurrentUserView = {
 	id: 42,

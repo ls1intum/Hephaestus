@@ -1,23 +1,30 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
 import type { ReviewBackfillRun } from "@/api/types.gen";
+import type { Wire } from "@/lib/dates";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewBackfill } from "./PracticeReviewBackfill";
 
-const run = (overrides: Partial<ReviewBackfillRun> = {}): ReviewBackfillRun => ({
-	id: "11111111-1111-1111-1111-111111111111",
-	artifactKind: "scm.pull_request",
-	fromAt: new Date("2026-07-08T00:00:00Z"),
-	toAt: new Date("2026-08-07T00:00:00Z"),
-	status: "AWAITING_CONFIRMATION",
-	estimatedArtifacts: 128,
-	estimatedCostUsd: 15.36,
-	submittedCount: 0,
-	passedCount: 0,
-	requestedByAccountId: 7,
-	createdAt: new Date("2026-08-07T09:00:00Z"),
-	...overrides,
-});
+/**
+ * The run as it reaches the component: ISO strings, because no response transformer revives them.
+ * Building this from `new Date(…)` is what let a screen that calls `.toLocaleDateString()` on a
+ * string ship green, so the one cast below is the whole point of this factory.
+ */
+const run = (overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRun =>
+	({
+		id: "11111111-1111-1111-1111-111111111111",
+		artifactKind: "scm.pull_request",
+		fromAt: "2026-07-08T00:00:00Z",
+		toAt: "2026-08-07T00:00:00Z",
+		status: "AWAITING_CONFIRMATION",
+		estimatedArtifacts: 128,
+		estimatedCostUsd: 15.36,
+		submittedCount: 0,
+		passedCount: 0,
+		requestedByAccountId: 7,
+		createdAt: "2026-08-07T09:00:00Z",
+		...overrides,
+	}) satisfies Wire<ReviewBackfillRun> as unknown as ReviewBackfillRun;
 
 const meta = {
 	title: "Workspace admin/Practices/Review past work",
@@ -68,10 +75,10 @@ export const AwaitingConfirmation: Story = {
 	args: { runs: [run()] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("128 pull requests")).toBeInTheDocument();
+		await expect(canvas.getByText("128 pull or merge requests")).toBeInTheDocument();
 		await expect(canvas.getByText("$15.36")).toBeInTheDocument();
 		await expect(
-			canvas.getByRole("button", { name: /review 128 pull requests/i }),
+			canvas.getByRole("button", { name: /review 128 pull or merge requests/i }),
 		).toBeInTheDocument();
 	},
 };
@@ -137,7 +144,7 @@ export const WithHistory: Story = {
 				submittedCount: 118,
 				passedCount: 10,
 				confirmedByAccountId: 7,
-				finishedAt: new Date("2026-08-06T12:00:00Z"),
+				finishedAt: "2026-08-06T12:00:00Z",
 			}),
 			run({
 				id: "33333333-3333-3333-3333-333333333333",
@@ -147,7 +154,7 @@ export const WithHistory: Story = {
 				submittedCount: 12,
 				passedCount: 3,
 				confirmedByAccountId: 7,
-				finishedAt: new Date("2026-08-05T12:00:00Z"),
+				finishedAt: "2026-08-05T12:00:00Z",
 			}),
 		],
 	},

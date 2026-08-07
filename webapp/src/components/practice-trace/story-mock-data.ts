@@ -4,6 +4,7 @@ import type {
 	TracedArtifact,
 	TracedSignal,
 } from "@/api/types.gen";
+import type { Wire } from "@/lib/dates";
 
 /**
  * The visual spec for this surface. Every `outcome` the API can report appears at least once, so a
@@ -18,7 +19,7 @@ export const tracedArtifacts = [
 		number: 1423,
 		container: "ls1intum/Hephaestus",
 		url: "https://github.com/ls1intum/Hephaestus/pull/1423",
-		lastSignalAt: new Date("2026-08-07T09:12:00Z"),
+		lastSignalAt: "2026-08-07T09:12:00Z",
 		signalCount: 6,
 		reviewedSignalCount: 2,
 	},
@@ -29,7 +30,7 @@ export const tracedArtifacts = [
 		number: 1418,
 		container: "ls1intum/Hephaestus",
 		url: "https://github.com/ls1intum/Hephaestus/pull/1418",
-		lastSignalAt: new Date("2026-08-06T16:40:00Z"),
+		lastSignalAt: "2026-08-06T16:40:00Z",
 		signalCount: 3,
 		reviewedSignalCount: 1,
 	},
@@ -40,7 +41,7 @@ export const tracedArtifacts = [
 		number: 1430,
 		container: "ls1intum/Hephaestus",
 		url: "https://github.com/ls1intum/Hephaestus/issues/1430",
-		lastSignalAt: new Date("2026-08-05T11:02:00Z"),
+		lastSignalAt: "2026-08-05T11:02:00Z",
 		signalCount: 2,
 		reviewedSignalCount: 0,
 	},
@@ -49,11 +50,11 @@ export const tracedArtifacts = [
 		artifactKind: "chat.conversation_thread",
 		artifactId: 88,
 		title: "Conversation",
-		lastSignalAt: new Date("2026-08-04T08:30:00Z"),
+		lastSignalAt: "2026-08-04T08:30:00Z",
 		signalCount: 1,
 		reviewedSignalCount: 0,
 	},
-] satisfies TracedArtifact[];
+] satisfies Wire<TracedArtifact>[];
 
 /**
  * Two of these are `scm.pull_request.synchronized` at different revisions. That collision is the
@@ -66,7 +67,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.opened",
 		displayName: "Opened as a draft",
 		revision: "27f4e88c",
-		occurredAt: new Date("2026-08-05T08:02:00Z"),
+		occurredAt: "2026-08-05T08:02:00Z",
 		discoveredVia: "EVENT",
 		state: "SUPPRESSED",
 		stateReason: "GATE_SKIPPED",
@@ -76,7 +77,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.ready",
 		displayName: "Marked ready for review",
 		revision: "27f4e88c",
-		occurredAt: new Date("2026-08-06T10:15:00Z"),
+		occurredAt: "2026-08-06T10:15:00Z",
 		discoveredVia: "EVENT",
 		state: "TRIGGERED",
 		reviewId: "11111111-1111-1111-1111-111111111111",
@@ -86,7 +87,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.synchronized",
 		displayName: "New commits pushed",
 		revision: "9ab3c410",
-		occurredAt: new Date("2026-08-06T14:48:00Z"),
+		occurredAt: "2026-08-06T14:48:00Z",
 		discoveredVia: "SYNC",
 		state: "SUPPRESSED",
 		stateReason: "COOLDOWN_ACTIVE",
@@ -96,7 +97,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.review_requested",
 		displayName: "Review requested",
 		revision: "9ab3c410",
-		occurredAt: new Date("2026-08-07T08:30:00Z"),
+		occurredAt: "2026-08-07T08:30:00Z",
 		discoveredVia: "MANUAL",
 		state: "PENDING",
 	},
@@ -105,12 +106,12 @@ export const tracedSignals = [
 		signal: "scm.pull_request.synchronized",
 		displayName: "New commits pushed",
 		revision: "b71d0a52",
-		occurredAt: new Date("2026-08-07T09:12:00Z"),
+		occurredAt: "2026-08-07T09:12:00Z",
 		discoveredVia: "BACKFILL",
 		state: "LAPSED",
 		stateReason: "PENDING_DEADLINE_EXCEEDED",
 	},
-] satisfies TracedSignal[];
+] satisfies Wire<TracedSignal>[];
 
 /** One entry per `outcome`, plus the measured-but-deliberately-silent case that the tiers create. */
 export const practiceTraceEntries = [
@@ -124,7 +125,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready", "scm.pull_request.synchronized"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:19:00Z"),
+		decidedAt: "2026-08-06T10:19:00Z",
 		reviewId: "11111111-1111-1111-1111-111111111111",
 		observationCount: 3,
 		deliveredCount: 1,
@@ -140,7 +141,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:19:00Z"),
+		decidedAt: "2026-08-06T10:19:00Z",
 		reviewId: "11111111-1111-1111-1111-111111111111",
 		observationCount: 2,
 		deliveredCount: 0,
@@ -185,7 +186,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.synchronized"],
 		occasionedBy: "scm.pull_request.synchronized",
 		occasionedById: "sig-sync-9ab3c410",
-		decidedAt: new Date("2026-08-06T14:48:00Z"),
+		decidedAt: "2026-08-06T14:48:00Z",
 		observationCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
@@ -200,7 +201,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:19:00Z"),
+		decidedAt: "2026-08-06T10:19:00Z",
 		reviewId: "11111111-1111-1111-1111-111111111111",
 		observationCount: 0,
 		deliveredCount: 0,
@@ -252,7 +253,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.synchronized"],
 		occasionedBy: "scm.pull_request.synchronized",
 		occasionedById: "sig-sync-b71d0a52",
-		decidedAt: new Date("2026-08-07T09:42:00Z"),
+		decidedAt: "2026-08-07T09:42:00Z",
 		observationCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
@@ -267,13 +268,13 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:21:00Z"),
+		decidedAt: "2026-08-06T10:21:00Z",
 		reviewId: "33333333-3333-3333-3333-333333333333",
 		observationCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
-] satisfies PracticeTraceEntry[];
+] satisfies Wire<PracticeTraceEntry>[];
 
 export const artifactTrace = {
 	artifactKind: "scm.pull_request",
@@ -284,7 +285,7 @@ export const artifactTrace = {
 	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
 	signals: tracedSignals,
 	practices: practiceTraceEntries,
-} satisfies ArtifactTrace;
+} satisfies Wire<ArtifactTrace>;
 
 /** Nothing ever reached this artifact: the shape a reader lands on when the answer is "we never saw it". */
 export const untouchedArtifactTrace = {
@@ -300,7 +301,7 @@ export const untouchedArtifactTrace = {
 			signal: "scm.issue.opened",
 			displayName: "Opened",
 			revision: "1",
-			occurredAt: new Date("2026-08-05T11:02:00Z"),
+			occurredAt: "2026-08-05T11:02:00Z",
 			discoveredVia: "SYNC",
 			state: "SUPPRESSED",
 			stateReason: "NO_ACTIVE_PRACTICE",
@@ -320,9 +321,9 @@ export const untouchedArtifactTrace = {
 			withheldReasons: [],
 		},
 	],
-} satisfies ArtifactTrace;
+} satisfies Wire<ArtifactTrace>;
 
-export function tracedArtifactPage(content: TracedArtifact[] = tracedArtifacts, size = 20) {
+export function tracedArtifactPage(content: Wire<TracedArtifact>[] = tracedArtifacts, size = 20) {
 	return {
 		content,
 		page: {
