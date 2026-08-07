@@ -1913,19 +1913,46 @@
                        OR (applies_to ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(applies_to) <= 64));
         ]]></sql>
         <rollback>
-            <!-- Back to the allowlist, and only after anything outside it is gone: a row written while
-                 the grammar was in force would make the narrower CHECK unaddable, and failing the
-                 rollback with a constraint violation is better than not having one. -->
+            <!-- Narrowing back to the allowlist is only safe if nothing outside it was ever written. It
+                 destroys nothing to get there: a rollback that deleted the offending rows would take out
+                 a workspace's practices and, through observation.practice_revision_id, the criteria pin on
+                 everything they ever judged — silently, as the cost of a schema step. If rows exist for a
+                 kind the allowlist does not name, the honest outcome is to stop and say which, so an
+                 operator decides what happens to their data rather than discovering afterwards that a
+                 migration did.
+
+                 (Found by running this rollback rather than by reading it: the first version cleaned
+                 observation and feedback and then failed on practice_revision, which is the shape of
+                 half-done that leaves a database in neither state.) -->
             <sql splitStatements="false"><![CDATA[
-                DELETE FROM observation
-                WHERE artifact_kind NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread');
+                DO $$
+                DECLARE offending text;
+                BEGIN
+                    SELECT string_agg(DISTINCT entry, ', ') INTO offending FROM (
+                        SELECT 'observation.artifact_kind=' || artifact_kind AS entry FROM observation
+                         WHERE artifact_kind NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread')
+                        UNION ALL
+                        SELECT 'feedback.artifact_kind=' || artifact_kind FROM feedback
+                         WHERE artifact_kind IS NOT NULL
+                           AND artifact_kind NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread')
+                        UNION ALL
+                        SELECT 'practice_revision.applies_to=' || applies_to FROM practice_revision
+                         WHERE applies_to IS NOT NULL
+                           AND applies_to NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread')
+                        UNION ALL
+                        SELECT 'curated_practice_override.applies_to=' || applies_to FROM curated_practice_override
+                         WHERE applies_to IS NOT NULL
+                           AND applies_to NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread')
+                    ) found;
+                    IF offending IS NOT NULL THEN
+                        RAISE EXCEPTION 'Cannot restore the three-kind allowlist: rows exist for kinds outside it (%). Remove or migrate those practices and their observations first — this rollback will not delete them for you.', offending;
+                    END IF;
+                END $$;
+
                 ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_artifact_kind;
                 ALTER TABLE observation ADD CONSTRAINT chk_observation_artifact_kind
                     CHECK (artifact_kind IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
 
-                UPDATE feedback SET artifact_kind = NULL
-                WHERE artifact_kind IS NOT NULL
-                  AND artifact_kind NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread');
                 ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_artifact_kind;
                 ALTER TABLE feedback ADD CONSTRAINT chk_feedback_artifact_kind
                     CHECK (artifact_kind IS NULL
