@@ -114,8 +114,20 @@
                         AND before_candidate.automated_review_policy IS NULL
                   );
 
-                DELETE FROM practice_revision
-                WHERE automated_review_policy IS NOT NULL;
+                -- Only the revisions THIS migration inserted, which is exactly one per practice: the
+                -- lowest-numbered revision that carries a policy. Deleting every policy-carrying revision
+                -- instead would take out every revision authored since the migration ran, and
+                -- observation.practice_revision_id is ON DELETE SET NULL — so a rollback would silently
+                -- unpin the criteria that every observation since was judged against, with no error and
+                -- nothing to reconstruct them from.
+                DELETE FROM practice_revision pr
+                WHERE pr.automated_review_policy IS NOT NULL
+                  AND pr.revision_number = (
+                      SELECT MIN(candidate.revision_number)
+                      FROM practice_revision candidate
+                      WHERE candidate.practice_id = pr.practice_id
+                        AND candidate.automated_review_policy IS NOT NULL
+                  );
             ]]></sql>
             <dropColumn tableName="practice_revision" columnName="automated_review_policy"/>
         </rollback>
@@ -1852,6 +1864,134 @@
         <rollback><![CDATA[
             DROP TABLE IF EXISTS review_backfill_run;
         ]]></rollback>
+    </changeSet>
+
+    <!-- ==========================================================================================
+         Production-readiness repairs.
+
+         The four artifact_kind / applies_to CHECKs above were written as a hand-maintained list of
+         three literals, and the branch that added docs.document never added it to any of them. The
+         result was not a clean rejection: artifact_signal.artifact_kind and agent_job.artifact_kind
+         carry no CHECK at all, so a document signal recorded, the gate admitted it, the job ran, the
+         model was paid — and the work was thrown away at INSERT INTO observation. Nothing caught it
+         because the test suite builds its schema with ddl-auto:create and never sees these CHECKs.
+
+         The list is therefore replaced by the grammar, which is the thing that is actually invariant.
+         ArtifactKind owns "<domain>.<kind>, lowercase snake_case, <= 64 chars" and enforces exactly this
+         regex in Java; the database now enforces the same sentence. A kind becomes authorable by being
+         declared, which is what ArtifactKinds' javadoc already claimed and what SQL previously made
+         false. A typo is still rejected; a new domain no longer needs a migration.
+         ========================================================================================== -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-31">
+        <preConditions onFail="MARK_RAN" onFailMessage="artifact kind CHECKs already enforce the grammar">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_observation_artifact_kind'
+                  AND conrelid = 'observation'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%chat.conversation_thread%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Enforce the artifact-kind grammar instead of a three-value allowlist that docs.document fails.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_artifact_kind;
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_artifact_kind
+                CHECK (artifact_kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(artifact_kind) <= 64);
+
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_artifact_kind;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_artifact_kind
+                CHECK (artifact_kind IS NULL
+                       OR (artifact_kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(artifact_kind) <= 64));
+
+            ALTER TABLE practice_revision DROP CONSTRAINT IF EXISTS ck_practice_revision_applies_to;
+            ALTER TABLE practice_revision ADD CONSTRAINT ck_practice_revision_applies_to
+                CHECK (applies_to IS NULL
+                       OR (applies_to ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(applies_to) <= 64));
+
+            ALTER TABLE curated_practice_override DROP CONSTRAINT IF EXISTS ck_curated_practice_override_applies_to;
+            ALTER TABLE curated_practice_override ADD CONSTRAINT ck_curated_practice_override_applies_to
+                CHECK (applies_to IS NULL
+                       OR (applies_to ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(applies_to) <= 64));
+        ]]></sql>
+        <rollback>
+            <!-- Back to the allowlist, and only after anything outside it is gone: a row written while
+                 the grammar was in force would make the narrower CHECK unaddable, and failing the
+                 rollback with a constraint violation is better than not having one. -->
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM observation
+                WHERE artifact_kind NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread');
+                ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_artifact_kind;
+                ALTER TABLE observation ADD CONSTRAINT chk_observation_artifact_kind
+                    CHECK (artifact_kind IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+
+                UPDATE feedback SET artifact_kind = NULL
+                WHERE artifact_kind IS NOT NULL
+                  AND artifact_kind NOT IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread');
+                ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_artifact_kind;
+                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_artifact_kind
+                    CHECK (artifact_kind IS NULL
+                           OR artifact_kind IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+
+                ALTER TABLE practice_revision DROP CONSTRAINT IF EXISTS ck_practice_revision_applies_to;
+                ALTER TABLE practice_revision ADD CONSTRAINT ck_practice_revision_applies_to
+                    CHECK (applies_to IS NULL
+                           OR applies_to IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+
+                ALTER TABLE curated_practice_override DROP CONSTRAINT IF EXISTS ck_curated_practice_override_applies_to;
+                ALTER TABLE curated_practice_override ADD CONSTRAINT ck_curated_practice_override_applies_to
+                    CHECK (applies_to IS NULL
+                           OR applies_to IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!-- idx_observation_origin_target was created as (origin, artifact_kind, artifact_id) with a comment
+         claiming it narrowed the reads that filter on origin. It cannot: every one of those readers writes
+         `origin <> 'BACKFILL'`, and an inequality on the leading btree column is not a seek, so the index
+         was never used for that predicate and was pure write amplification on the largest table here.
+
+         Nothing replaces it. idx_observation_target already indexes exactly (artifact_kind, artifact_id) —
+         the columns those queries actually seek on — and the origin exclusion is a cheap recheck on rows
+         already narrowed to one artifact. A partial index on the same key columns would be a second index
+         with the same leading edge, earning its write cost only if backfill rows came to dominate the
+         table; that is a decision to make against a measurement, not ahead of one.
+
+         DROP CONCURRENTLY, and therefore runInTransaction="false": observation is the table we can least
+         afford to take an exclusive lock on. -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-32" runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation origin index already dropped">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_indexes
+                WHERE tablename = 'observation' AND indexname = 'idx_observation_origin_target'
+            </sqlCheck>
+        </preConditions>
+        <comment>Drop an index no query can use, on the table with the most rows to write.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            DROP INDEX CONCURRENTLY IF EXISTS idx_observation_origin_target;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="true" endDelimiter=";"><![CDATA[
+                CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_observation_origin_target
+                    ON observation (origin, artifact_kind, artifact_id);
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!-- The driver reads a campaign on one tick and saves it back detached, which is a full-column
+         merge. An admin cancelling mid-batch had RUNNING written straight back over CANCELLED and the
+         campaign kept spending. Optimistic locking makes the losing write fail instead. -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-33">
+        <preConditions onFail="MARK_RAN" onFailMessage="review_backfill_run.version already present">
+            <not><columnExists tableName="review_backfill_run" columnName="version"/></not>
+        </preConditions>
+        <comment>Give a backfill campaign an optimistic-lock version so a cancel cannot be overwritten.</comment>
+        <addColumn tableName="review_backfill_run">
+            <column name="version" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="review_backfill_run" columnName="version"/>
+        </rollback>
     </changeSet>
 
 </databaseChangeLog>

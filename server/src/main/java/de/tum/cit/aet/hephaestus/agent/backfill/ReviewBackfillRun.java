@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,6 +24,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -70,6 +72,22 @@ public class ReviewBackfillRun {
     @EqualsAndHashCode.Include
     @Column(columnDefinition = "UUID")
     private UUID id;
+
+    /**
+     * Optimistic-lock guard, and the only thing standing between an admin's cancel and a campaign that
+     * keeps spending.
+     *
+     * <p>The driver reads a run on one tick and writes it back detached, which is a {@code merge} — a
+     * full-column copy-back of {@code status}, {@code pauseReason} and the counters as they were when the
+     * batch started. An admin who cancels mid-batch would otherwise have {@code RUNNING} written straight
+     * back over {@code CANCELLED}, and the next tick would find an active campaign and carry on paying for
+     * it. With the version the losing write throws instead, the batch's progress is discarded, and the
+     * next tick re-reads the run and sees the cancel.
+     */
+    @Version
+    @ColumnDefault("0")
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
