@@ -12647,7 +12647,6 @@ components:
           enum:
           - GATE_SKIPPED
           - COOLDOWN_ACTIVE
-          - CONCURRENT_DUPLICATE
           - OUT_OF_REVIEW_SCOPE
           - WORKSPACE_INACTIVE
           - PRACTICES_DISABLED
