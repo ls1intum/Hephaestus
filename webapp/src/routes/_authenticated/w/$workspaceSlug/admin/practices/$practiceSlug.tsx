@@ -74,32 +74,32 @@ function EditPracticeContainer() {
 				queryClient.cancelQueries({ queryKey: listQueryKey }),
 			]);
 		},
+		onError: () => toast.error("Couldn't save the practice"),
 	});
 
+	// Reports the failure by rejecting rather than swallowing it: the form holds its unsaved-changes
+	// guard down from submit until it hears one way or the other, so a caught-and-resolved failure
+	// would leave a lost draft unguarded.
 	const handleSubmit = async (
 		slug: string,
 		data: UpdatePracticeRequest,
 		areaSlug: string | null,
 	) => {
-		try {
-			const request = { ...data, area: { areaSlug } };
-			const updated = await updatePractice.mutateAsync({
-				path: { workspaceSlug, practiceSlug: slug },
-				body: request,
-			});
-			queryClient.setQueryData(detailQueryKey, updated);
-			queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
-				practices
-					? patchPractice(practices, updated.slug, selectPracticePatch(updated, request))
-					: practices,
-			);
-			void queryClient.invalidateQueries({ queryKey: detailQueryKey });
-			void queryClient.invalidateQueries({ queryKey: listQueryKey });
-			toast.success("Practice saved");
-			navigate({ to: ".." });
-		} catch {
-			toast.error("Couldn't save the practice");
-		}
+		const request = { ...data, area: { areaSlug } };
+		const updated = await updatePractice.mutateAsync({
+			path: { workspaceSlug, practiceSlug: slug },
+			body: request,
+		});
+		queryClient.setQueryData(detailQueryKey, updated);
+		queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
+			practices
+				? patchPractice(practices, updated.slug, selectPracticePatch(updated, request))
+				: practices,
+		);
+		void queryClient.invalidateQueries({ queryKey: detailQueryKey });
+		void queryClient.invalidateQueries({ queryKey: listQueryKey });
+		toast.success("Practice saved");
+		navigate({ to: ".." });
 	};
 
 	if (practiceQuery.isPending || areasQuery.isPending || definitionOptionsQuery.isPending) {

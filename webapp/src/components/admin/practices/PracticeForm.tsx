@@ -23,7 +23,8 @@ interface PracticeFormCreateProps {
 	mode: "create";
 	workspaceSlug: string;
 	areas: PracticeArea[];
-	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
+	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
+	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
 	initialData?: never;
@@ -34,7 +35,12 @@ interface PracticeFormEditProps {
 	workspaceSlug: string;
 	initialData: Practice;
 	areas: PracticeArea[];
-	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
+	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
+	onSubmit: (
+		slug: string,
+		data: UpdatePracticeRequest,
+		areaSlug: string | null,
+	) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
 	/** Recent readiness outcomes for this practice; absent until it has been reviewed at least once. */
@@ -79,15 +85,14 @@ export function PracticeForm(props: PracticeFormProps) {
 	const submit = (value: PracticeDefinitionValue) => {
 		const { areaSlug, ...definition } = value;
 		if (props.mode === "create") {
-			props.onSubmit(definition, areaSlug ?? null);
-			return;
+			return props.onSubmit(definition, areaSlug ?? null);
 		}
 
 		const clear: NonNullable<UpdatePracticeRequest["clear"]> = [];
 		if (!definition.precomputeScript) clear.push("PRECOMPUTE_SCRIPT");
 		if (!definition.whyItMatters) clear.push("WHY_IT_MATTERS");
 		if (!definition.whatGoodLooksLike) clear.push("WHAT_GOOD_LOOKS_LIKE");
-		props.onSubmit(
+		return props.onSubmit(
 			props.initialData.slug,
 			{
 				name: definition.name,

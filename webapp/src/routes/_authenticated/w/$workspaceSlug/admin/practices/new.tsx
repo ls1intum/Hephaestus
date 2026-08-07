@@ -46,30 +46,32 @@ function CreatePracticeContainer() {
 		...createPracticeMutation(),
 		scope: practiceCatalogStructureScope(workspaceSlug),
 		onMutate: () => queryClient.cancelQueries({ queryKey: practicesQueryKey }),
-	});
-
-	const handleSubmit = async (data: CreatePracticeRequest, areaSlug: string | null) => {
-		try {
-			const created = await createPractice.mutateAsync({
-				path: { workspaceSlug },
-				body: { ...data, areaSlug },
-			});
-			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices) =>
-				practices ? upsertPractice(practices, created) : practices,
-			);
-			void queryClient.invalidateQueries({
-				queryKey: practicesQueryKey,
-			});
-			toast.success("Practice created");
-			navigate({ to: ".." });
-		} catch (error) {
+		onError: (error) => {
 			const status = problemStatusOf(error);
 			toast.error(
 				status === 409
 					? "A practice with this identifier already exists in this workspace"
 					: "Couldn't create the practice",
 			);
-		}
+		},
+	});
+
+	// Reports the failure by rejecting rather than swallowing it: the form holds its unsaved-changes
+	// guard down from submit until it hears one way or the other, so a caught-and-resolved failure
+	// would leave a lost draft unguarded.
+	const handleSubmit = async (data: CreatePracticeRequest, areaSlug: string | null) => {
+		const created = await createPractice.mutateAsync({
+			path: { workspaceSlug },
+			body: { ...data, areaSlug },
+		});
+		queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices) =>
+			practices ? upsertPractice(practices, created) : practices,
+		);
+		void queryClient.invalidateQueries({
+			queryKey: practicesQueryKey,
+		});
+		toast.success("Practice created");
+		navigate({ to: ".." });
 	};
 
 	if (areasQuery.isPending || definitionOptionsQuery.isPending) {

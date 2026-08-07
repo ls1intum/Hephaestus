@@ -98,7 +98,15 @@ interface PracticeDefinitionFormBaseProps {
 	isSubmitDisabled?: boolean;
 	afterFields?: React.ReactNode;
 	cancelAction: React.ReactNode;
-	onSubmit: (value: PracticeDefinitionValue) => void;
+	/**
+	 * Saves the practice.
+	 *
+	 * <p>Return a promise that rejects when the save failed. The unsaved-changes guard then stays down
+	 * from the moment of submit until it hears otherwise, which is what stops a caller that navigates
+	 * straight after an awaited save being asked whether to discard the changes it just saved. A
+	 * caller that returns nothing keeps the guard exactly as it is.
+	 */
+	onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>;
 	definitionOptions: PracticeDefinitionOptions;
 	/** How this practice's evidence requirements have turned out on recent reviews, when it has any. */
 	evidenceOutcome?: PracticeEvidenceOutcome;
@@ -221,35 +229,42 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	// the form changes which sources are even allowed, so the same rows would resolve to "Unknown
 	// source" and describe a work type the author is no longer editing.
 	const workTypeUnchanged = artifactKindOfBindings(initialData?.bindings ?? []) === artifactKind;
-	// One stash per work type, replacing three parallel ones keyed the same way. They could never
-	// disagree usefully — an occasion, its evidence and the script that prepares it all belong to the
-	// same kind of work — and keeping them apart meant every switch had to remember to write all three.
-	const workTypeDrafts = useRef<Map<string, WorkTypeDraft>>(
-		new Map(
-			artifactKind
-				? [
-						[
-							artifactKind,
-							{
-								bindings: form.bindings,
-								precomputeScript: form.precomputeScript,
-								automatedReviewPolicy: form.automatedReviewPolicy,
-							},
-						],
-					]
-				: [],
-		),
+	// What the author had written under each work type, so switching away and back does not throw it
+	// out. `useRef` takes no lazy initialiser, so the map is built on the first render and every later
+	// render is spared building one to discard.
+	// https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents
+	const draftsRef = useRef<Map<string, WorkTypeDraft>>(null);
+	draftsRef.current ??= new Map(
+		artifactKind
+			? [
+					[
+						artifactKind,
+						{
+							bindings: form.bindings,
+							precomputeScript: form.precomputeScript,
+							automatedReviewPolicy: form.automatedReviewPolicy,
+						},
+					],
+				]
+			: [],
 	);
+	const workTypeDrafts = draftsRef.current;
 	const canRunMentoring = canAttemptAutomatedReview(
 		form.automatedReviewPolicy,
 		selectedWorkType?.supportedAutomatedReviewModes ?? [],
 	);
 	const guidanceOnly = form.automatedReviewPolicy.automatedReview.mode === "NONE";
 	const isDirty = !deepEqual(form, initialState(definitionOptions, initialData));
+	// Down from the moment a save is dispatched until the caller says it failed. `isPending` drops the
+	// instant the mutation resolves and the caller navigates on the very next line, so releasing the
+	// guard on that alone races the navigation and asks "Discard unsaved changes?" about a save that
+	// has just succeeded.
+	const [saving, setSaving] = useState(false);
+	const guarded = isDirty && !saving;
 	const blocker = useBlocker({
-		shouldBlockFn: () => isDirty,
-		enableBeforeUnload: isDirty,
-		disabled: !isDirty || formDisabled,
+		shouldBlockFn: () => guarded,
+		enableBeforeUnload: guarded,
+		disabled: !guarded || formDisabled,
 		withResolver: true,
 	});
 
@@ -269,13 +284,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			const previousKind = artifactKindOfBindings(previous.bindings);
 			if (previousKind === next.artifactKind) return previous;
 			if (previousKind) {
-				workTypeDrafts.current.set(previousKind, {
+				workTypeDrafts.set(previousKind, {
 					bindings: previous.bindings,
 					precomputeScript: previous.precomputeScript,
 					automatedReviewPolicy: previous.automatedReviewPolicy,
 				});
 			}
-			const draft = workTypeDrafts.current.get(next.artifactKind);
+			const draft = workTypeDrafts.get(next.artifactKind);
 			const automatedReviewPolicy =
 				draft?.automatedReviewPolicy ??
 				recommendedPolicyWithCurrentSupport(next.recommendedPolicy, previous.automatedReviewPolicy);
@@ -358,7 +373,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			return;
 		}
 
-		props.onSubmit({
+		const submission = props.onSubmit({
 			slug: form.slug,
 			name: form.name.trim(),
 			bindings: normalizeBindings(form.bindings),
@@ -373,6 +388,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				: {}),
 			automatedReviewPolicy: form.automatedReviewPolicy,
 		});
+		// Only a caller that returns a promise can say the save failed, so only that caller gets the
+		// guard held down for it. One that returns nothing is telling us nothing, and holding the guard
+		// down on no information would leave a failed save unprotected for good.
+		if (submission instanceof Promise) {
+			setSaving(true);
+			void submission.catch(() => setSaving(false));
+		}
 	};
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
 	createAreaMutation,
@@ -6,6 +6,7 @@ import {
 	deletePracticeMutation,
 	getPracticeQueryKey,
 	listAreasQueryKey,
+	listPracticesOptions,
 	listPracticesQueryKey,
 	placePracticeMutation,
 	reorderAreasMutation,
@@ -310,6 +311,15 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
+	// Subscribed, not read out of the cache during render. `getQueryData` is a snapshot with no
+	// subscription behind it, so a catalogue that changed while a move or a delete was in flight left
+	// these buckets — and every reorder control they disable — describing the list as it used to be.
+	// The one caller renders this same query, so this shares its subscription rather than adding a
+	// fetch, and `select` keeps the hook from re-rendering on fields it does not read.
+	const { data: practices = [] } = useQuery({
+		...listPracticesOptions({ path: { workspaceSlug } }),
+		select: (all) => all.map(({ slug, areaSlug }) => ({ slug, areaSlug })),
+	});
 	const pendingAreaSlugs = usePendingMutationIds<{ path: { areaSlug?: string } }, string>(
 		areaMutationKey,
 		(variables) => variables.path.areaSlug,
@@ -323,7 +333,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 	if (place.isPending) {
 		blockedPracticeOrderBuckets.add(UNASSIGNED);
 		blockedMoveDestinationSlugs.add(UNASSIGNED);
-		for (const practice of queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? []) {
+		for (const practice of practices) {
 			if (practice.areaSlug) {
 				blockedPracticeOrderBuckets.add(practice.areaSlug);
 				blockedMoveDestinationSlugs.add(practice.areaSlug);
@@ -338,9 +348,9 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		blockedMoveDestinationSlugs.add(UNASSIGNED);
 	}
 	if (deletePractice.isPending && deletePractice.variables) {
-		const practice = queryClient
-			.getQueryData<Practice[]>(practicesQueryKey)
-			?.find(({ slug }) => slug === deletePractice.variables.path.practiceSlug);
+		const practice = practices.find(
+			({ slug }) => slug === deletePractice.variables.path.practiceSlug,
+		);
 		const bucket = practice?.areaSlug ?? UNASSIGNED;
 		blockedPracticeOrderBuckets.add(bucket);
 		blockedMoveDestinationSlugs.add(bucket);
