@@ -199,7 +199,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // Selected by kind rather than by position: the list is whatever the registered domains
             // declare reviewable, so an index would pin the wrong thing the first time a domain is added.
             .jsonPath("$.workTypes[*].artifactKind")
-            .value(containsInAnyOrder("scm.pull_request", "scm.issue", "chat.conversation_thread"))
+            .value(containsInAnyOrder("scm.pull_request", "scm.issue", "chat.conversation_thread", "docs.document"))
             .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].recommendedNeeds[1].sourceKind")
             .value(contains("scm.pull-request.diff"))
             .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].allowedSources[0].displayName")
