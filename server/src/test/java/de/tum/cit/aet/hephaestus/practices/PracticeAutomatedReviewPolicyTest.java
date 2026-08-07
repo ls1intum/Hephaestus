@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -13,7 +12,6 @@ import org.junit.jupiter.api.Test;
 class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
 
     private static final SourceContractVersion VERSION = new SourceContractVersion("1.0.0");
-    private static final EvidenceProfileId PROFILE = new EvidenceProfileId("pull-request-review");
     private static final SourceKind CORE = new SourceKind("scm.pull-request.core");
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
 
@@ -129,7 +127,6 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
     ) {
         return new PracticeAutomatedReviewPolicy(
             VERSION,
-            PROFILE,
             automatedReview,
             requiredEvidence,
             optionalContext,

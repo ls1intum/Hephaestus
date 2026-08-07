@@ -1038,10 +1038,6 @@ export type PracticeAutomatedReviewPolicy = {
      */
     automatedReview: PracticeAutomatedReview;
     /**
-     * Set of evidence sources allowed for this type of reviewed work
-     */
-    evidenceProfile: string;
-    /**
      * Why this practice needs a human rather than automated review; present only when evidenceSufficiency is DECLARED_EVIDENCE_INSUFFICIENT
      */
     insufficiencyReason?: PracticeEvidenceLimitation;

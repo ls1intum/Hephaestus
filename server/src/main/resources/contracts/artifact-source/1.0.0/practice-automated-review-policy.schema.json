@@ -7,7 +7,6 @@
   "additionalProperties": false,
   "required": [
     "sourceContractVersion",
-    "evidenceProfile",
     "automatedReview",
     "requiredEvidence",
     "optionalContext",
@@ -19,12 +18,6 @@
       "title": "Source contract version",
       "description": "Exact version that defines the available evidence sources and their states.",
       "const": "1.0.0"
-    },
-    "evidenceProfile": {
-      "title": "Evidence profile",
-      "description": "Set of evidence sources allowed for this type of reviewed work.",
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
     },
     "automatedReview": {
       "title": "Automated review",

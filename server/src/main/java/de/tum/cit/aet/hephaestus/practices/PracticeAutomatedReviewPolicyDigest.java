@@ -7,7 +7,6 @@ public final class PracticeAutomatedReviewPolicyDigest {
     public static String digest(PracticeAutomatedReviewPolicy requirements) {
         CanonicalDigest digest = new CanonicalDigest()
             .add(requirements.sourceContractVersion().value())
-            .add(requirements.evidenceProfile().value())
             .add(requirements.automatedReview().mode().name())
             .add(requirements.automatedReview().evidenceSufficiency().name())
             .add(requirements.whenEvidenceIsInsufficient().name())

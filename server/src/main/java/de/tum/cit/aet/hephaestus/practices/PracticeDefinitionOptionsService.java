@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeTriggerEventOptionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeWorkTypeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -41,7 +42,7 @@ public class PracticeDefinitionOptionsService {
 
     private PracticeWorkTypeDefinitionOptionsDTO options(ArtifactSourceCatalog catalog, ArtifactKind artifact) {
         PracticeAutomatedReviewPolicy recommendedPolicy = defaults.forArtifact(artifact);
-        EvidenceProfile profile = catalogs.requireProfile(catalog.version(), recommendedPolicy.evidenceProfile());
+        Set<SourceKind> applicable = catalogs.requireSourcesFor(catalog.version(), artifact.value());
         return new PracticeWorkTypeDefinitionOptionsDTO(
             artifact,
             triggerOptions
@@ -56,7 +57,7 @@ public class PracticeDefinitionOptionsService {
             catalog
                 .sources()
                 .stream()
-                .filter(source -> profile.allows(source.kind()))
+                .filter(source -> applicable.contains(source.kind()))
                 .map(source ->
                     new PracticeEvidenceSourceOptionDTO(
                         source.kind().value(),

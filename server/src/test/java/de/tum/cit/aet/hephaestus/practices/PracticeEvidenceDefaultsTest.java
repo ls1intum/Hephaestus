@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -20,19 +19,13 @@ class PracticeEvidenceDefaultsTest {
 
     @ParameterizedTest
     @MethodSource("baselines")
-    void shouldCreateTheArtifactBaseline(
-        ArtifactKind artifact,
-        String profile,
-        List<String> required,
-        List<String> optional
-    ) {
+    void shouldCreateTheArtifactBaseline(ArtifactKind artifact, List<String> required, List<String> optional) {
         JsonMapper mapper = JsonMapper.builder().build();
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC());
 
         PracticeAutomatedReviewPolicy requirements = new PracticeEvidenceDefaults(catalogs).forArtifact(artifact);
 
         assertThat(requirements.sourceContractVersion()).isEqualTo(new SourceContractVersion("1.0.0"));
-        assertThat(requirements.evidenceProfile()).isEqualTo(new EvidenceProfileId(profile));
         assertThat(requirements.requiredEvidence())
             .extracting(item -> item.sourceKind().value())
             .containsExactlyElementsOf(required);
@@ -49,17 +42,11 @@ class PracticeEvidenceDefaultsTest {
         return Stream.of(
             Arguments.of(
                 ArtifactKinds.PULL_REQUEST,
-                "pull-request-review",
                 List.of("scm.pull-request.core", "scm.pull-request.diff"),
                 List.of("scm.pull-request.comments")
             ),
-            Arguments.of(ArtifactKinds.ISSUE, "issue-review", List.of("scm.issue.core"), List.of("scm.issue.comments")),
-            Arguments.of(
-                ArtifactKinds.CONVERSATION_THREAD,
-                "conversation-review",
-                List.of("slack.conversation.thread"),
-                List.of()
-            )
+            Arguments.of(ArtifactKinds.ISSUE, List.of("scm.issue.core"), List.of("scm.issue.comments")),
+            Arguments.of(ArtifactKinds.CONVERSATION_THREAD, List.of("slack.conversation.thread"), List.of())
         );
     }
 }

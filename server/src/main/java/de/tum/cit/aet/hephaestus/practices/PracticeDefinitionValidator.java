@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.HashSet;
@@ -78,40 +78,21 @@ public final class PracticeDefinitionValidator {
         }
     }
 
+    /**
+     * A practice may only demand evidence that could exist for the kind of thing it reviews.
+     *
+     * <p>The allow-list is the sources that declare they apply to this artifact kind, asked of the
+     * catalog each time rather than stored as a named profile. The named profile said the same thing in
+     * a second place, which meant the two could disagree, and only one of them was derived from what the
+     * sources actually claim about themselves.
+     */
     private void validateEvidence(ArtifactKind artifactKind, PracticeAutomatedReviewPolicy requirements) {
-        EvidenceProfile profile = sourceCatalogs.requireProfile(
+        Set<SourceKind> applicable = sourceCatalogs.requireSourcesFor(
             requirements.sourceContractVersion(),
-            requirements.evidenceProfile()
+            artifactKind.value()
         );
-        if (!profile.artifactKind().equals(artifactKind.value())) {
-            throw new IllegalArgumentException("Evidence profile is not available for the selected work type");
-        }
-        validateRequirements(profile, requirements, requirements.requiredEvidence());
-        validateOptionalRequirements(profile, requirements);
-    }
-
-    private void validateOptionalRequirements(EvidenceProfile profile, PracticeAutomatedReviewPolicy requirements) {
-        for (PracticeOptionalContextSource requirement : requirements.optionalContext()) {
-            sourceCatalogs.requireSource(requirements.sourceContractVersion(), requirement.sourceKind());
-            if (!profile.allows(requirement.sourceKind())) {
-                throw new IllegalArgumentException("Evidence source is not allowed by the selected profile");
-            }
-        }
-    }
-
-    private void validateRequirements(
-        EvidenceProfile profile,
-        PracticeAutomatedReviewPolicy automatedReviewPolicy,
-        List<PracticeEvidenceRequirement> sourceRequirements
-    ) {
-        for (PracticeEvidenceRequirement requirement : sourceRequirements) {
-            ArtifactSourceContract source = sourceCatalogs.requireSource(
-                automatedReviewPolicy.sourceContractVersion(),
-                requirement.sourceKind()
-            );
-            if (!profile.allows(requirement.sourceKind())) {
-                throw new IllegalArgumentException("Evidence source is not allowed by the selected profile");
-            }
+        for (PracticeEvidenceRequirement requirement : requirements.requiredEvidence()) {
+            ArtifactSourceContract source = requireApplicable(applicable, requirements, requirement.sourceKind());
             if (
                 requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
                 !source.completenessPolicy().supportsComplete()
@@ -119,5 +100,20 @@ public final class PracticeDefinitionValidator {
                 throw new IllegalArgumentException("Evidence source cannot satisfy COMPLETE requirements");
             }
         }
+        for (PracticeOptionalContextSource requirement : requirements.optionalContext()) {
+            requireApplicable(applicable, requirements, requirement.sourceKind());
+        }
+    }
+
+    private ArtifactSourceContract requireApplicable(
+        Set<SourceKind> applicable,
+        PracticeAutomatedReviewPolicy requirements,
+        SourceKind sourceKind
+    ) {
+        ArtifactSourceContract source = sourceCatalogs.requireSource(requirements.sourceContractVersion(), sourceKind);
+        if (!applicable.contains(sourceKind)) {
+            throw new IllegalArgumentException("Evidence source is not available for the selected work type");
+        }
+        return source;
     }
 }

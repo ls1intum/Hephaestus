@@ -9798,9 +9798,6 @@ components:
           $ref: "#/components/schemas/PracticeAutomatedReview"
           description: Automated review configuration; human review is a separate
             process
-        evidenceProfile:
-          type: string
-          description: Set of evidence sources allowed for this type of reviewed work
         insufficiencyReason:
           $ref: "#/components/schemas/PracticeEvidenceLimitation"
           description: Why this practice needs a human rather than automated review;
@@ -9834,7 +9831,6 @@ components:
           - SKIP_AUTOMATED_REVIEW
       required:
       - automatedReview
-      - evidenceProfile
       - knownLimitations
       - optionalContext
       - requiredEvidence

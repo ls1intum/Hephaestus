@@ -9,7 +9,6 @@
   "automatedReviewPolicy": {
     "pull-request-core-diff": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -40,7 +39,6 @@
     },
     "pull-request-core": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -62,7 +60,6 @@
     },
     "pull-request-core-diff-linked-work-items": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -97,7 +94,6 @@
     },
     "pull-request-core-review-threads": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -123,7 +119,6 @@
     },
     "pull-request-review-threads": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.review-threads",
@@ -145,7 +140,6 @@
     },
     "issue-core-comments": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "issue-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.issue.core",
@@ -171,7 +165,6 @@
     },
     "issue-core": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "issue-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.issue.core",
@@ -193,7 +186,6 @@
     },
     "pull-request-core-diff-comments-general-review-comments": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -232,7 +224,6 @@
     },
     "pull-request-core-comments-general-review-comments": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -262,7 +253,6 @@
     },
     "pull-request-core-diff-comments-general-review-comments-review-threads": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -305,7 +295,6 @@
     },
     "pull-request-diff": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.diff",
@@ -332,7 +321,6 @@
     },
     "pull-request-core-diff-linked-work-items-documents": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "pull-request-review",
       "requiredEvidence": [
         {
           "sourceKind": "scm.pull-request.core",
@@ -371,7 +359,6 @@
     },
     "conversation-thread": {
       "sourceContractVersion": "1.0.0",
-      "evidenceProfile": "conversation-review",
       "requiredEvidence": [
         {
           "sourceKind": "slack.conversation.thread",

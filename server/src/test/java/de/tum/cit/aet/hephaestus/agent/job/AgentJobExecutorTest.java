@@ -47,7 +47,6 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -643,12 +642,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             Instant now = Instant.parse("2026-08-03T10:00:00Z");
             SourceContractVersion version = new SourceContractVersion("1.0.0");
-            EvidenceProfileId profile = new EvidenceProfileId("pull-request-review");
+            String artifactKind = "scm.pull_request";
             SourceKind source = new SourceKind("scm.pull-request.diff");
             ArtifactSourceManifest manifest = new ArtifactSourceManifest(
                 version,
                 "a".repeat(64),
-                profile,
+                artifactKind,
                 now,
                 List.of(
                     new SourceCapture(
@@ -669,7 +668,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             AutomatedReviewReadinessReport readiness = new AutomatedReviewReadinessReport(
                 version,
                 "a".repeat(64),
-                profile,
+                artifactKind,
                 now,
                 now,
                 List.of(new AutomatedReviewReadinessDecision("example", now, false, List.of(), List.of(assessment)))

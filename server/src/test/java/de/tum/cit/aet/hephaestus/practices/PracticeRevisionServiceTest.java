@@ -67,7 +67,7 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         PracticeRevision appended = service.append(practice);
 
         assertThat(appended.getCriteria()).isEqualTo("Give specific feedback");
-        assertThat(appended.getReviewRuleFingerprint()).hasSize(67).startsWith("v2:");
+        assertThat(appended.getReviewRuleFingerprint()).hasSize(67).startsWith("v3:");
         assertThat(practice.getCurrentRevision()).isSameAs(appended);
     }
 
@@ -99,7 +99,6 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         practice.setAutomatedReviewPolicy(
             new PracticeAutomatedReviewPolicy(
                 practice.getAutomatedReviewPolicy().sourceContractVersion(),
-                practice.getAutomatedReviewPolicy().evidenceProfile(),
                 new PracticeAutomatedReview(
                     PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET

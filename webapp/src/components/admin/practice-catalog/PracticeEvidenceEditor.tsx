@@ -168,7 +168,6 @@ function matchesRecommendedEvidence(
 ) {
 	return (
 		value.sourceContractVersion === recommended.sourceContractVersion &&
-		value.evidenceProfile === recommended.evidenceProfile &&
 		value.whenEvidenceIsInsufficient === recommended.whenEvidenceIsInsufficient &&
 		deepEqual(value.requiredEvidence, recommended.requiredEvidence) &&
 		deepEqual(value.optionalContext, recommended.optionalContext)
@@ -238,7 +237,7 @@ export function PracticeEvidenceEditor({
 	disabled = false,
 }: PracticeEvidenceEditorProps) {
 	const [open, setOpen] = useState(Boolean(error));
-	const profileKey = `${value.sourceContractVersion}:${value.evidenceProfile}`;
+	const profileKey = `${value.sourceContractVersion}:${options.artifactKind}`;
 	const savedAutomatedRequirements = useRef<Map<string, PracticeAutomatedReviewPolicy>>(
 		new Map(value.automatedReview.mode === "NONE" ? [] : [[profileKey, value]]),
 	);

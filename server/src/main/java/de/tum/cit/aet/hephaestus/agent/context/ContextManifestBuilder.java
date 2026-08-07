@@ -145,14 +145,18 @@ public class ContextManifestBuilder {
         CaptureMetadata metadata
     ) {
         Instant capturedAt = clock.instant();
-        var profile = catalogs.requireProfile(plan.contractVersion(), plan.evidenceProfile());
-        if (!profile.allowedSources().containsAll(plan.selectedSources())) {
+        Set<SourceKind> applicableSources = catalogs.requireSourcesFor(
+            plan.contractVersion(),
+            plan.artifactKind().value()
+        );
+        if (!applicableSources.containsAll(plan.selectedSources())) {
             Set<SourceKind> disallowed = new HashSet<>(plan.selectedSources());
-            disallowed.removeAll(profile.allowedSources());
-            throw new IllegalArgumentException("Evidence plan contains sources outside profile: " + disallowed);
+            disallowed.removeAll(applicableSources);
+            throw new IllegalArgumentException(
+                "Evidence plan selects sources that do not apply to " + plan.artifactKind() + ": " + disallowed
+            );
         }
-        List<SourceCapture> captures = profile
-            .allowedSources()
+        List<SourceCapture> captures = applicableSources
             .stream()
             .sorted()
             .map(kind ->
@@ -176,7 +180,7 @@ public class ContextManifestBuilder {
         ArtifactSourceManifest manifest = new ArtifactSourceManifest(
             plan.contractVersion(),
             catalogs.catalogDigest(),
-            plan.evidenceProfile(),
+            plan.artifactKind().value(),
             capturedAt,
             captures
         );
@@ -208,7 +212,7 @@ public class ContextManifestBuilder {
         AutomatedReviewReadinessReport report = new AutomatedReviewReadinessReport(
             manifest.contractVersion(),
             manifest.catalogDigest(),
-            manifest.evidenceProfile(),
+            manifest.artifactKind(),
             manifest.capturedAt(),
             decidedAt,
             result.decisions()
@@ -257,7 +261,7 @@ public class ContextManifestBuilder {
         ArtifactSourceManifest restricted = new ArtifactSourceManifest(
             prepared.manifest().contractVersion(),
             prepared.manifest().catalogDigest(),
-            prepared.manifest().evidenceProfile(),
+            prepared.manifest().artifactKind(),
             prepared.manifest().capturedAt(),
             sources
         );
@@ -301,16 +305,16 @@ public class ContextManifestBuilder {
                     "), which this runtime no longer ships"
             );
         }
-        Set<SourceKind> expectedKinds = catalogs
-            .requireProfile(manifest.contractVersion(), manifest.evidenceProfile())
-            .allowedSources();
+        Set<SourceKind> expectedKinds = catalogs.requireSourcesFor(manifest.contractVersion(), manifest.artifactKind());
         Set<SourceKind> capturedKinds = manifest
             .sources()
             .stream()
             .map(SourceCapture::kind)
             .collect(java.util.stream.Collectors.toSet());
         if (!capturedKinds.equals(expectedKinds)) {
-            throw new IllegalArgumentException("Manifest source captures do not match its evidence profile");
+            throw new IllegalArgumentException(
+                "Manifest source captures do not match the sources its artifact kind applies to"
+            );
         }
         Map<SourceKind, SourceCapture> captures = new HashMap<>();
         manifest.sources().forEach(capture -> captures.put(capture.kind(), capture));
@@ -324,7 +328,7 @@ public class ContextManifestBuilder {
             }
             if (
                 !requirements.sourceContractVersion().equals(manifest.contractVersion()) ||
-                !requirements.evidenceProfile().equals(manifest.evidenceProfile())
+                !practice.getArtifactKind().value().equals(manifest.artifactKind())
             ) {
                 throw new IllegalArgumentException(
                     "Practice evidence contract does not match manifest: " + practice.getSlug()

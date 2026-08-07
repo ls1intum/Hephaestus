@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseBasis;
@@ -27,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "0d13e2f50319a1882b2f9122d7e50b8aa40b6b8e4b40858b906734de6a2cbb9b";
+        "7254db587214ef11ac898ec60ce9815607babcdcfe80cfc3d2dc2a2a69b5ede2";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -38,14 +37,10 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         assertThat(registry.current().version()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(registry.catalogDigest()).isEqualTo(VERSION_1_CATALOG_SHA256);
         assertThat(registry.current().sources()).hasSize(12);
-        assertThat(registry.current().profiles())
-            .extracting(profile -> profile.id().value())
-            .containsExactlyInAnyOrder("pull-request-review", "issue-review", "conversation-review");
-        assertThat(
-            registry
-                .requireProfile(new SourceContractVersion("1.0.0"), new EvidenceProfileId("pull-request-review"))
-                .allowedSources()
-        ).contains(new SourceKind("scm.repository.tree"), new SourceKind("scm.pull-request.diff"));
+        assertThat(registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.pull_request")).contains(
+            new SourceKind("scm.repository.tree"),
+            new SourceKind("scm.pull-request.diff")
+        );
         var repositoryTree = registry.requireSource(
             new SourceContractVersion("1.0.0"),
             new SourceKind("scm.repository.tree")
@@ -56,7 +51,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     }
 
     @Test
-    void shouldRejectUnknownVersionKindAndProfile() {
+    void shouldRejectUnknownVersionKindAndArtifactKind() {
         var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC());
 
         assertThatIllegalArgumentException().isThrownBy(() ->
@@ -66,7 +61,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             registry.requireSource(new SourceContractVersion("1.0.0"), new SourceKind("scm.unknown"))
         );
         assertThatIllegalArgumentException().isThrownBy(() ->
-            registry.requireProfile(new SourceContractVersion("1.0.0"), new EvidenceProfileId("unknown"))
+            registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "docs.document")
         );
     }
 

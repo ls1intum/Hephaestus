@@ -1,45 +1,21 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
-public record ArtifactSourceCatalog(
-    SourceContractVersion version,
-    List<ArtifactSourceContract> sources,
-    List<EvidenceProfile> profiles
-) {
+public record ArtifactSourceCatalog(SourceContractVersion version, List<ArtifactSourceContract> sources) {
     public ArtifactSourceCatalog {
         Objects.requireNonNull(version, "version");
         sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
-        profiles = List.copyOf(Objects.requireNonNull(profiles, "profiles"));
-        if (sources.isEmpty() || profiles.isEmpty()) {
-            throw new IllegalArgumentException("Artifact source catalog must contain sources and profiles");
+        if (sources.isEmpty()) {
+            throw new IllegalArgumentException("Artifact source catalog must contain sources");
         }
-
-        Map<SourceKind, ArtifactSourceContract> sourceIndex = indexSources(sources);
-        Map<EvidenceProfileId, EvidenceProfile> profileIndex = new HashMap<>();
-        for (EvidenceProfile profile : profiles) {
-            if (!version.equals(profile.version())) {
-                throw new IllegalArgumentException("Profile version does not match catalog: " + profile.id());
-            }
-            if (profileIndex.put(profile.id(), profile) != null) {
-                throw new IllegalArgumentException("Duplicate evidence profile: " + profile.id());
-            }
-            for (SourceKind kind : profile.allowedSources()) {
-                ArtifactSourceContract source = sourceIndex.get(kind);
-                if (source == null) {
-                    throw new IllegalArgumentException("Profile references unknown source: " + kind);
-                }
-                if (!source.appliesTo(profile.artifactKind())) {
-                    throw new IllegalArgumentException(
-                        "Source " + kind + " is incompatible with profile artifact " + profile.artifactKind()
-                    );
-                }
-            }
-        }
+        indexSources(sources);
     }
 
     public Optional<ArtifactSourceContract> source(SourceKind kind) {
@@ -49,11 +25,25 @@ public record ArtifactSourceCatalog(
             .findFirst();
     }
 
-    public Optional<EvidenceProfile> profile(EvidenceProfileId id) {
-        return profiles
-            .stream()
-            .filter(profile -> profile.id().equals(id))
-            .findFirst();
+    /**
+     * Every source that declares it applies to this artifact kind — the whole evidence surface a review
+     * of that kind can ever see.
+     *
+     * <p>This used to be stated a second time as a named {@code EvidenceProfile} listing its sources by
+     * hand. The two answers were required to agree and nothing made them: a profile could only ever
+     * repeat what the sources already say, or be wrong about it. Empty means nothing has declared itself
+     * usable for the kind, which callers treat as an unknown kind rather than as a review with no
+     * evidence.
+     */
+    public Set<SourceKind> sourcesFor(String artifactKind) {
+        Objects.requireNonNull(artifactKind, "artifactKind");
+        Set<SourceKind> kinds = new LinkedHashSet<>();
+        for (ArtifactSourceContract source : sources) {
+            if (source.appliesTo(artifactKind)) {
+                kinds.add(source.kind());
+            }
+        }
+        return Set.copyOf(kinds);
     }
 
     private static Map<SourceKind, ArtifactSourceContract> indexSources(List<ArtifactSourceContract> sources) {

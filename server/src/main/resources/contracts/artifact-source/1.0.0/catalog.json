@@ -400,43 +400,5 @@
 				"COLLECTION_ERROR"
 			]
 		}
-	],
-	"profiles": [
-		{
-			"id": "pull-request-review",
-			"version": "1.0.0",
-			"artifactKind": "scm.pull_request",
-			"allowedSources": [
-				"scm.pull-request.core",
-				"scm.pull-request.diff",
-				"scm.pull-request.comments",
-				"scm.repository.tree",
-				"scm.linked-work-items",
-				"scm.review-threads",
-				"scm.general-review-comments",
-				"workspace.project-inventory",
-				"outline.documents"
-			]
-		},
-		{
-			"id": "issue-review",
-			"version": "1.0.0",
-			"artifactKind": "scm.issue",
-			"allowedSources": [
-				"scm.issue.core",
-				"scm.issue.comments",
-				"workspace.project-inventory",
-				"outline.documents"
-			]
-		},
-		{
-			"id": "conversation-review",
-			"version": "1.0.0",
-			"artifactKind": "chat.conversation_thread",
-			"allowedSources": [
-				"slack.conversation.thread",
-				"workspace.project-inventory"
-			]
-		}
 	]
 }

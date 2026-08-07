@@ -29,7 +29,6 @@ class SourceContractValueTest {
     @Test
     void shouldRejectInvalidIdentifiersAndVersions() {
         assertThatIllegalArgumentException().isThrownBy(() -> new SourceKind("SCM_DIFF"));
-        assertThatIllegalArgumentException().isThrownBy(() -> new EvidenceProfileId("Pull Request"));
         assertThatIllegalArgumentException().isThrownBy(() -> new SourceContractVersion("1"));
     }
 
@@ -111,7 +110,7 @@ class SourceContractValueTest {
             new ArtifactSourceManifest(
                 new SourceContractVersion("1.0.0"),
                 "a".repeat(64),
-                new EvidenceProfileId("pull-request-review"),
+                "scm.pull_request",
                 now,
                 List.of()
             )

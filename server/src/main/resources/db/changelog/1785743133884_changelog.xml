@@ -1019,4 +1019,90 @@
         ]]></rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-21">
+        <preConditions onFail="MARK_RAN" onFailMessage="stored policies already carry no evidence profile">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM (
+                    SELECT 1 FROM practice WHERE jsonb_exists(automated_review_policy, 'evidenceProfile')
+                    UNION ALL
+                    SELECT 1 FROM practice_revision
+                    WHERE automated_review_policy IS NOT NULL
+                      AND jsonb_exists(automated_review_policy, 'evidenceProfile')
+                    UNION ALL
+                    SELECT 1 FROM curated_practice_override
+                    WHERE automated_review_policy IS NOT NULL
+                      AND jsonb_exists(automated_review_policy, 'evidenceProfile')
+                    LIMIT 1
+                ) AS any_profile
+            </sqlCheck>
+        </preConditions>
+        <comment>Drop the named evidence profile; the sources that apply are read off the artifact kind.</comment>
+        <sql splitStatements="false"><![CDATA[
+            -- A profile named exactly the set of sources that declare they apply to the practice's artifact
+            -- kind, so the column stored an answer the source catalog already gives. Leaving the key in place
+            -- is not harmless: the policy deserializer rejects unknown fields, so every stored practice would
+            -- fail to read back.
+            UPDATE practice
+            SET automated_review_policy = automated_review_policy - 'evidenceProfile'
+            WHERE jsonb_exists(automated_review_policy, 'evidenceProfile');
+            UPDATE curated_practice_override
+            SET automated_review_policy = automated_review_policy - 'evidenceProfile'
+            WHERE automated_review_policy IS NOT NULL
+              AND jsonb_exists(automated_review_policy, 'evidenceProfile');
+            -- A revision is immutable by trigger, and this is exactly the out-of-band act that trigger exists
+            -- to force somebody to write down. It comes off for the rewrite and goes straight back on.
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+            UPDATE practice_revision
+            SET automated_review_policy = automated_review_policy - 'evidenceProfile'
+            WHERE automated_review_policy IS NOT NULL
+              AND jsonb_exists(automated_review_policy, 'evidenceProfile');
+            -- The review-rule fingerprint digested the profile, so every stored one describes a rule set
+            -- computed from a field that no longer exists, under scheme v2. Left alone the admin catalog would
+            -- compare a v2 digest against a freshly computed v3 one and report every bundled practice as
+            -- locally edited. Clearing them hands the recomputation to the backfill that exists for exactly
+            -- this state (CatalogProvenanceBackfill#fingerprintMigratedRevisions), which is why the scope
+            -- matches that query's.
+            UPDATE practice_revision SET review_rule_fingerprint = NULL
+            WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                -- The profile is recoverable because it was derivable: one profile per artifact kind, which
+                -- both tables still carry. A row whose kind is not one of the three predates the vocabulary
+                -- move and had no profile to restore.
+                UPDATE practice
+                SET automated_review_policy = automated_review_policy || jsonb_build_object('evidenceProfile',
+                    CASE applies_to
+                        WHEN 'scm.pull_request' THEN 'pull-request-review'
+                        WHEN 'scm.issue' THEN 'issue-review'
+                        WHEN 'chat.conversation_thread' THEN 'conversation-review'
+                    END)
+                WHERE applies_to IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread');
+                UPDATE curated_practice_override
+                SET automated_review_policy = automated_review_policy || jsonb_build_object('evidenceProfile',
+                    CASE applies_to
+                        WHEN 'scm.pull_request' THEN 'pull-request-review'
+                        WHEN 'scm.issue' THEN 'issue-review'
+                        WHEN 'chat.conversation_thread' THEN 'conversation-review'
+                    END)
+                WHERE automated_review_policy IS NOT NULL
+                  AND applies_to IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread');
+                ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+                UPDATE practice_revision
+                SET automated_review_policy = automated_review_policy || jsonb_build_object('evidenceProfile',
+                    CASE applies_to
+                        WHEN 'scm.pull_request' THEN 'pull-request-review'
+                        WHEN 'scm.issue' THEN 'issue-review'
+                        WHEN 'chat.conversation_thread' THEN 'conversation-review'
+                    END)
+                WHERE automated_review_policy IS NOT NULL
+                  AND applies_to IN ('scm.pull_request', 'scm.issue', 'chat.conversation_thread');
+                UPDATE practice_revision SET review_rule_fingerprint = NULL
+                WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+                ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

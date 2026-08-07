@@ -2,13 +2,12 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptionsFixture;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.util.LinkedHashMap;
@@ -21,14 +20,14 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Two facts the shipped evidence vocabulary asserts about itself, held as tests rather than as a
- * paragraph in a design note.
+ * Facts the shipped evidence vocabulary asserts about itself, held as tests rather than as a paragraph
+ * in a design note.
  *
- * <p>Both are load-bearing: they are the entire argument for deleting {@code EvidenceProfile} and for
- * moving strictness out of the practice and into the source contract. A design decision justified by
- * "we looked and the data says X" decays the moment somebody adds a source, and the decay is silent —
- * the profile would quietly stop being derivable, or one practice would want a stricter diff than
- * another, and nothing would say so until the refactor that assumed otherwise was already written.
+ * <p>They are load-bearing: they are the argument for deleting {@code EvidenceProfile} and for moving
+ * strictness out of the practice and into the source contract. A design decision justified by "we looked
+ * and the data says X" decays the moment somebody adds a source, and the decay is silent — one practice
+ * would want a stricter diff than another, and nothing would say so until the refactor that assumed
+ * otherwise was already written.
  *
  * <p>If either of these fails, the correct response is <em>not</em> to relax the test. It is to decide
  * whether the new case is a genuine requirement — in which case the axis it needs must be reintroduced
@@ -47,31 +46,23 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     );
 
     /**
-     * Every evidence profile is exactly the set of sources that declare they apply to its artifact kind,
-     * which makes the profile a materialized view: it stores an answer the catalog already computes, and
-     * the only thing it can add is a way to be wrong about it.
+     * Every kind a practice can be authored against has at least one source that declares it applies.
+     *
+     * <p>This is what the named evidence profiles used to guarantee by existing: a kind with no profile
+     * could not be selected. Now that the allow-list is derived, the failure mode moves — a kind nothing
+     * supplies evidence for is authorable and refuses every review it triggers, at review time rather
+     * than at build time. Asking here makes it a build-time answer again.
      */
     @Test
-    void everyEvidenceProfileIsDerivableFromTheSourcesThemselves() {
-        ArtifactSourceCatalog catalog = registry.current();
-
-        Map<String, Set<SourceKind>> byArtifactKind = new LinkedHashMap<>();
-        for (ArtifactSourceContract source : catalog.sources()) {
-            for (String kind : source.artifactKinds()) {
-                byArtifactKind.computeIfAbsent(kind, k -> new LinkedHashSet<>()).add(source.kind());
-            }
-        }
-
-        assertThat(catalog.profiles()).isNotEmpty();
-        for (EvidenceProfile profile : catalog.profiles()) {
-            assertThat(profile.allowedSources())
+    void everyAuthorableArtifactKindHasEvidenceThatAppliesToIt() {
+        for (ArtifactKind kind : ArtifactKinds.authorable()) {
+            assertThat(registry.current().sourcesFor(kind.value()))
                 .as(
-                    "profile '%s' must equal {source | '%s' in source.artifactKinds}; a profile that " +
-                        "diverges is a second, hand-maintained answer to a question the catalog already answers",
-                    profile.id(),
-                    profile.artifactKind()
+                    "artifact kind '%s' can be authored against but no source declares it applies; a practice " +
+                        "written on it would refuse every review it triggered",
+                    kind
                 )
-                .isEqualTo(byArtifactKind.getOrDefault(profile.artifactKind(), Set.of()));
+                .isNotEmpty();
         }
     }
 

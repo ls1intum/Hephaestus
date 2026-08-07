@@ -54,6 +54,6 @@ class PracticeRevisionTest extends BaseUnitTest {
                 PracticeRevision::getAreaColor
             )
             .containsExactly("review-quality", "Review quality", "Review work", "MessageSquare", "cyan");
-        assertThat(revision.getReviewRuleFingerprint()).hasSize(67).startsWith("v2:");
+        assertThat(revision.getReviewRuleFingerprint()).hasSize(67).startsWith("v3:");
     }
 }

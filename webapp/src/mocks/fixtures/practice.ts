@@ -13,7 +13,6 @@ export const mockAuthorDeclaredEvidenceValidation = {
 
 export const mockPullRequestEvidence = {
 	sourceContractVersion: "1.0.0",
-	evidenceProfile: "pull-request-review",
 	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
@@ -38,7 +37,6 @@ export const mockPullRequestEvidence = {
 
 const mockIssueEvidence = {
 	sourceContractVersion: "1.0.0",
-	evidenceProfile: "issue-review",
 	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
@@ -57,7 +55,6 @@ const mockIssueEvidence = {
 
 const mockConversationEvidence = {
 	sourceContractVersion: "1.0.0",
-	evidenceProfile: "conversation-review",
 	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",

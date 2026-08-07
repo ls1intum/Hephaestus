@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -19,10 +18,6 @@ public record PracticeAutomatedReviewPolicy(
     @NotNull
     @Schema(description = "Exact contract version that defines source kinds and source-state semantics")
     SourceContractVersion sourceContractVersion,
-    @NonNull
-    @NotNull
-    @Schema(description = "Set of evidence sources allowed for this type of reviewed work")
-    EvidenceProfileId evidenceProfile,
     @NonNull
     @NotNull
     @Valid
@@ -57,7 +52,6 @@ public record PracticeAutomatedReviewPolicy(
 ) {
     public PracticeAutomatedReviewPolicy {
         Objects.requireNonNull(sourceContractVersion, "sourceContractVersion");
-        Objects.requireNonNull(evidenceProfile, "evidenceProfile");
         Objects.requireNonNull(automatedReview, "automatedReview");
         requiredEvidence = sortedRequirements(requiredEvidence, "requiredEvidence");
         optionalContext = Objects.requireNonNull(optionalContext, "optionalContext")

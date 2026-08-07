@@ -2,13 +2,12 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json",
 	"title": "Artifact source catalog",
-	"description": "Versioned definitions of the evidence sources and evidence profiles supported by Hephaestus.",
+	"description": "Versioned definitions of the evidence sources supported by Hephaestus.",
 	"type": "object",
 	"additionalProperties": false,
 	"required": [
 		"version",
-		"sources",
-		"profiles"
+		"sources"
 	],
 	"properties": {
 		"version": {
@@ -22,14 +21,6 @@
 				"$ref": "#/$defs/source"
 			},
 			"description": "Logical evidence sources with stable identifiers and governed capture semantics."
-		},
-		"profiles": {
-			"type": "array",
-			"minItems": 1,
-			"items": {
-				"$ref": "#/$defs/profile"
-			},
-			"description": "Allowed evidence sources for each type of reviewed work."
 		}
 	},
 	"$defs": {
@@ -190,45 +181,6 @@
 				}
 			},
 			"description": "Which completeness and valid-empty states this source can represent."
-		},
-		"profile": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": [
-				"id",
-				"version",
-				"artifactKind",
-				"allowedSources"
-			],
-			"properties": {
-				"id": {
-					"type": "string",
-					"pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
-					"description": "Stable machine identifier for this evidence profile."
-				},
-				"version": {
-					"const": "1.0.0",
-					"description": "Source contract that defines this profile."
-				},
-				"artifactKind": {
-					"enum": [
-						"scm.pull_request",
-						"scm.issue",
-						"chat.conversation_thread"
-					],
-					"description": "Type of reviewed work governed by this profile."
-				},
-				"allowedSources": {
-					"type": "array",
-					"minItems": 1,
-					"uniqueItems": true,
-					"items": {
-						"$ref": "#/$defs/sourceKind"
-					},
-					"description": "Source kinds a practice for this work type may reference."
-				}
-			},
-			"description": "The source allow-list for one type of reviewed work."
 		}
 	}
 }

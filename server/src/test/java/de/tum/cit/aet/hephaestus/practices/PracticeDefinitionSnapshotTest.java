@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
@@ -25,7 +24,6 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
         practice.setAutomatedReviewPolicy(
             new PracticeAutomatedReviewPolicy(
                 new SourceContractVersion("1.0.0"),
-                new EvidenceProfileId("pull-request-review"),
                 new PracticeAutomatedReview(
                     PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET

@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
@@ -17,11 +16,10 @@ import tools.jackson.databind.json.JsonMapper;
 class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     private static final SourceContractVersion VERSION = new SourceContractVersion("1.0.0");
-    private static final EvidenceProfileId PROFILE = new EvidenceProfileId("pull-request-review");
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
     private static final SourceKind PARTIAL = new SourceKind("outline.documents");
     private static final SourceKind TIMELESS = new SourceKind("scm.linked-work-items");
-    private static final SourceKind OUTSIDE_PROFILE = new SourceKind("scm.issue.core");
+    private static final SourceKind FOR_ANOTHER_KIND = new SourceKind("scm.issue.core");
 
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final PracticeDefinitionValidator validator = new PracticeDefinitionValidator(
@@ -66,10 +64,10 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     }
 
     @Test
-    void rejectsEvidenceOutsideSelectedProfile() {
+    void rejectsEvidenceThatCannotExistForTheReviewedKind() {
         PracticeAutomatedReviewPolicy requirements = requirements(
             new PracticeEvidenceRequirement(
-                OUTSIDE_PROFILE,
+                FOR_ANOTHER_KIND,
                 EvidenceCompletenessRequirement.COMPLETE,
                 EvidenceContentRequirement.NO_REQUIREMENT
             )
@@ -77,7 +75,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
         assertThatThrownBy(() -> validator.validate(definition(requirements)))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evidence source is not allowed by the selected profile");
+            .hasMessage("Evidence source is not available for the selected work type");
     }
 
     @Test
@@ -157,7 +155,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     private static PracticeAutomatedReviewPolicy requirements(PracticeEvidenceRequirement requirement) {
         return new PracticeAutomatedReviewPolicy(
             VERSION,
-            PROFILE,
             new PracticeAutomatedReview(
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
@@ -173,7 +170,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     private static PracticeAutomatedReviewPolicy withoutAutomatedReview() {
         return new PracticeAutomatedReviewPolicy(
             VERSION,
-            PROFILE,
             new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
             List.of(),
             List.of(),
@@ -186,7 +182,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     private static PracticeAutomatedReviewPolicy humanReview() {
         return new PracticeAutomatedReviewPolicy(
             VERSION,
-            PROFILE,
             new PracticeAutomatedReview(
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT

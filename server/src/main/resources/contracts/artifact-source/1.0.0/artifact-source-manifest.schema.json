@@ -8,7 +8,7 @@
 	"required": [
 		"contractVersion",
 		"catalogDigest",
-		"evidenceProfile",
+		"artifactKind",
 		"capturedAt",
 		"sources"
 	],
@@ -18,16 +18,16 @@
 			"description": "Source contract used to interpret every source state in this manifest."
 		},
 		"catalogDigest": {
-			"const": "0d13e2f50319a1882b2f9122d7e50b8aa40b6b8e4b40858b906734de6a2cbb9b",
+			"const": "7254db587214ef11ac898ec60ce9815607babcdcfe80cfc3d2dc2a2a69b5ede2",
 			"description": "SHA-256 digest of the exact source catalog used by the runtime."
 		},
-		"evidenceProfile": {
+		"artifactKind": {
 			"enum": [
-				"pull-request-review",
-				"issue-review",
-				"conversation-review"
+				"scm.pull_request",
+				"scm.issue",
+				"chat.conversation_thread"
 			],
-			"description": "Evidence profile selected for the reviewed work."
+			"description": "Kind of work this invocation reviewed, which fixes the evidence sources that apply."
 		},
 		"capturedAt": {
 			"type": "string",
@@ -515,12 +515,12 @@
 		{
 			"if": {
 				"properties": {
-					"evidenceProfile": {
-						"const": "pull-request-review"
+					"artifactKind": {
+						"const": "scm.pull_request"
 					}
 				},
 				"required": [
-					"evidenceProfile"
+					"artifactKind"
 				],
 				"type": "object"
 			},
@@ -657,12 +657,12 @@
 		{
 			"if": {
 				"properties": {
-					"evidenceProfile": {
-						"const": "issue-review"
+					"artifactKind": {
+						"const": "scm.issue"
 					}
 				},
 				"required": [
-					"evidenceProfile"
+					"artifactKind"
 				],
 				"type": "object"
 			},
@@ -734,12 +734,12 @@
 		{
 			"if": {
 				"properties": {
-					"evidenceProfile": {
-						"const": "conversation-review"
+					"artifactKind": {
+						"const": "chat.conversation_thread"
 					}
 				},
 				"required": [
-					"evidenceProfile"
+					"artifactKind"
 				],
 				"type": "object"
 			},

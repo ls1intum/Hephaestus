@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
@@ -18,6 +17,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
@@ -197,7 +197,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             );
             EvidencePlan plan = new EvidencePlan(
                 new SourceContractVersion("1.0.0"),
-                new EvidenceProfileId("pull-request-review"),
+                ArtifactKinds.PULL_REQUEST,
                 Set.of(new SourceKind("scm.pull-request.core"))
             );
 
@@ -247,7 +247,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
             EvidencePlan plan = new EvidencePlan(
                 new SourceContractVersion("1.0.0"),
-                new EvidenceProfileId("pull-request-review"),
+                ArtifactKinds.PULL_REQUEST,
                 Set.of(comments)
             );
             ContextRequest.PracticeReviewRequest request = reviewRequest();
@@ -312,7 +312,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
             EvidencePlan plan = new EvidencePlan(
                 new SourceContractVersion("1.0.0"),
-                new EvidenceProfileId("pull-request-review"),
+                ArtifactKinds.PULL_REQUEST,
                 Set.of(comments)
             );
             ContextRequest.PracticeReviewRequest request = reviewRequest();
@@ -380,7 +380,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
             EvidencePlan plan = new EvidencePlan(
                 new SourceContractVersion("1.0.0"),
-                new EvidenceProfileId("pull-request-review"),
+                ArtifactKinds.PULL_REQUEST,
                 Set.of(diff)
             );
 
@@ -433,7 +433,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
             EvidencePlan plan = new EvidencePlan(
                 new SourceContractVersion("1.0.0"),
-                new EvidenceProfileId("pull-request-review"),
+                ArtifactKinds.PULL_REQUEST,
                 Set.of(comments)
             );
 
@@ -482,7 +482,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
             EvidencePlan plan = new EvidencePlan(
                 new SourceContractVersion("1.0.0"),
-                new EvidenceProfileId("pull-request-review"),
+                ArtifactKinds.PULL_REQUEST,
                 Set.of(comments, core)
             );
 

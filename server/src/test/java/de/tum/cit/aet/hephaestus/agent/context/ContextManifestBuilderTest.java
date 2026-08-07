@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -34,6 +33,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.PracticeInsufficientEvidenceAction;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -207,7 +207,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         demandsSubstance.setAutomatedReviewPolicy(
             new PracticeAutomatedReviewPolicy(
                 policy.sourceContractVersion(),
-                policy.evidenceProfile(),
                 policy.automatedReview(),
                 List.of(
                     new PracticeEvidenceRequirement(
@@ -264,7 +263,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             practice.setAutomatedReviewPolicy(
                 new PracticeAutomatedReviewPolicy(
                     practice.getAutomatedReviewPolicy().sourceContractVersion(),
-                    practice.getAutomatedReviewPolicy().evidenceProfile(),
                     configurations.get(index),
                     assessmentAbsent ? List.of() : practice.getAutomatedReviewPolicy().requiredEvidence(),
                     assessmentAbsent ? List.of() : practice.getAutomatedReviewPolicy().optionalContext(),
@@ -392,7 +390,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ArtifactSourceManifest changedContract = new ArtifactSourceManifest(
             manifest.contractVersion(),
             "0".repeat(64),
-            manifest.evidenceProfile(),
+            manifest.artifactKind(),
             manifest.capturedAt(),
             manifest.sources()
         );
@@ -509,7 +507,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectSourcesOutsideTheSelectedProfile() {
+    void shouldRejectSourcesThatDoNotApplyToTheReviewedKind() {
         assertThatThrownBy(() ->
             builder.augment(
                 new LinkedHashMap<>(),
@@ -520,7 +518,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("outside profile");
+            .hasMessageContaining("do not apply to scm.pull_request");
     }
 
     @Test
@@ -543,8 +541,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             diff.useDecisionIds()
         );
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        when(catalogs.requireProfile(any(), any())).thenAnswer(invocation ->
-            realCatalogs.requireProfile(invocation.getArgument(0), invocation.getArgument(1))
+        when(catalogs.requireSourcesFor(any(), any())).thenAnswer(invocation ->
+            realCatalogs.requireSourcesFor(invocation.getArgument(0), invocation.getArgument(1))
         );
         when(catalogs.requireSource(any(), any())).thenAnswer(invocation -> {
             SourceKind kind = invocation.getArgument(1);
@@ -592,12 +590,12 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectManifestThatOmitsAProfileSource() {
-        ArtifactSourceManifest manifest = coreManifest(builder, "job-incomplete-profile", NOW);
+    void shouldRejectManifestThatOmitsAnApplicableSource() {
+        ArtifactSourceManifest manifest = coreManifest(builder, "job-incomplete-sources", NOW);
         ArtifactSourceManifest incomplete = new ArtifactSourceManifest(
             manifest.contractVersion(),
             manifest.catalogDigest(),
-            manifest.evidenceProfile(),
+            manifest.artifactKind(),
             manifest.capturedAt(),
             manifest
                 .sources()
@@ -610,7 +608,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             builder.checkAutomatedReviewReadinessAsOfNow(incomplete, List.of(practiceRequiring(CORE, "pr-core")))
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("do not match its evidence profile");
+            .hasMessageContaining("do not match the sources its artifact kind applies to");
     }
 
     @Test
@@ -724,11 +722,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     private static EvidencePlan plan(Set<SourceKind> sources) {
-        return new EvidencePlan(
-            new SourceContractVersion("1.0.0"),
-            new EvidenceProfileId("pull-request-review"),
-            sources
-        );
+        return new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST, sources);
     }
 
     private ContextManifestBuilder builderAt(Instant instant) {
@@ -751,7 +745,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     private static EvidencePlan conversationPlan() {
         return new EvidencePlan(
             new SourceContractVersion("1.0.0"),
-            new EvidenceProfileId("conversation-review"),
+            ArtifactKinds.CONVERSATION_THREAD,
             Set.of(CONVERSATION)
         );
     }
@@ -774,12 +768,12 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     private static Practice practiceRequiring(SourceKind sourceKind, String slug) {
         Practice practice = new Practice();
         practice.setSlug(slug);
+        practice.setArtifactKind(
+            sourceKind.equals(CONVERSATION) ? ArtifactKinds.CONVERSATION_THREAD : ArtifactKinds.PULL_REQUEST
+        );
         practice.setAutomatedReviewPolicy(
             new PracticeAutomatedReviewPolicy(
                 new SourceContractVersion("1.0.0"),
-                sourceKind.equals(CONVERSATION)
-                    ? new EvidenceProfileId("conversation-review")
-                    : new EvidenceProfileId("pull-request-review"),
                 new PracticeAutomatedReview(
                     PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET

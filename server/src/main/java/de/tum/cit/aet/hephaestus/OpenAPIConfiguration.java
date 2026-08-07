@@ -111,7 +111,6 @@ public class OpenAPIConfiguration {
         "EvidenceFreshnessRequirement",
         "ReviewClaimCurrentness",
         "SourceContractVersion",
-        "EvidenceProfileId",
         "SourceKind"
     );
     /**

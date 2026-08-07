@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -11,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
-    private static final String PINNED_DIGEST = "5f8725dac9f5c16596d8587df224004da1240c829fa692de4864f1f2ad25a37b";
+    private static final String PINNED_DIGEST = "4c0862a1135a3c1cf3cb86f467269e41dad201a3d0e4ce49bb4d3aa2fe02070c";
 
     @Test
     void shouldPinACanonicalDigestForAKnownPolicy() {
@@ -94,7 +93,6 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
     ) {
         return new PracticeAutomatedReviewPolicy(
             new SourceContractVersion("1.0.0"),
-            new EvidenceProfileId("pull-request-review"),
             automatedReview,
             required,
             List.of(),

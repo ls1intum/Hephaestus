@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -27,7 +26,6 @@ public class PracticeEvidenceDefaults {
     public PracticeAutomatedReviewPolicy forArtifact(ArtifactKind artifact) {
         if (ArtifactKinds.PULL_REQUEST.equals(artifact)) {
             return requirements(
-                "pull-request-review",
                 List.of(
                     requirement("scm.pull-request.core", EvidenceCompletenessRequirement.COMPLETE),
                     // A diff with no changes in it cannot support a judgement about how a change
@@ -45,7 +43,6 @@ public class PracticeEvidenceDefaults {
         }
         if (ArtifactKinds.ISSUE.equals(artifact)) {
             return requirements(
-                "issue-review",
                 List.of(requirement("scm.issue.core", EvidenceCompletenessRequirement.COMPLETE)),
                 List.of(optionalRequirement("scm.issue.comments")),
                 "IMPLEMENTATION_NOT_OBSERVED",
@@ -54,7 +51,6 @@ public class PracticeEvidenceDefaults {
         }
         if (ArtifactKinds.CONVERSATION_THREAD.equals(artifact)) {
             return requirements(
-                "conversation-review",
                 List.of(requirement("slack.conversation.thread", EvidenceCompletenessRequirement.COMPLETE)),
                 List.of(),
                 "PRIVATE_CONTEXT_NOT_OBSERVED",
@@ -65,7 +61,6 @@ public class PracticeEvidenceDefaults {
     }
 
     private PracticeAutomatedReviewPolicy requirements(
-        String profile,
         List<PracticeEvidenceRequirement> required,
         List<PracticeOptionalContextSource> optional,
         String limitationCode,
@@ -73,7 +68,6 @@ public class PracticeEvidenceDefaults {
     ) {
         return new PracticeAutomatedReviewPolicy(
             catalogs.current().version(),
-            new EvidenceProfileId(profile),
             new PracticeAutomatedReview(
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET

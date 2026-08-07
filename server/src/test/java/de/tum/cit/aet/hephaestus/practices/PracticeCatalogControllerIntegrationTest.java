@@ -157,7 +157,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     private static PracticeAutomatedReviewPolicy withoutAutomatedReview(PracticeAutomatedReviewPolicy evidence) {
         return new PracticeAutomatedReviewPolicy(
             evidence.sourceContractVersion(),
-            evidence.evidenceProfile(),
             new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
             List.of(),
             List.of(),

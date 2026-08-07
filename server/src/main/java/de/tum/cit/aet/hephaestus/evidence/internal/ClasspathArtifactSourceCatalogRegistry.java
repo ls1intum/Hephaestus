@@ -5,8 +5,6 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.CompletenessPolicy;
 import de.tum.cit.aet.hephaestus.evidence.ErasurePolicy;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfile;
-import de.tum.cit.aet.hephaestus.evidence.EvidenceProfileId;
 import de.tum.cit.aet.hephaestus.evidence.IdentityMode;
 import de.tum.cit.aet.hephaestus.evidence.IdentityPolicy;
 import de.tum.cit.aet.hephaestus.evidence.PrivacyClass;
@@ -120,13 +118,15 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     }
 
     @Override
-    public EvidenceProfile requireProfile(SourceContractVersion version, EvidenceProfileId id) {
+    public Set<SourceKind> requireSourcesFor(SourceContractVersion version, String artifactKind) {
         requireSupported(version);
-        return catalog
-            .profile(id)
-            .orElseThrow(() ->
-                new IllegalArgumentException("Unknown evidence profile for contract " + version + ": " + id)
+        Set<SourceKind> sources = catalog.sourcesFor(artifactKind);
+        if (sources.isEmpty()) {
+            throw new IllegalArgumentException(
+                "No evidence source in contract " + version + " applies to artifact kind: " + artifactKind
             );
+        }
+        return sources;
     }
 
     @Override
@@ -159,7 +159,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
 
     static ArtifactSourceCatalog parse(JsonNode root) {
         requireObject(root, "catalog");
-        rejectUnknown(root, Set.of("version", "sources", "profiles"), "catalog");
+        rejectUnknown(root, Set.of("version", "sources"), "catalog");
         SourceContractVersion version = new SourceContractVersion(requiredText(root, "version", "catalog"));
         if (!CURRENT_VERSION.equals(version)) {
             throw new IllegalStateException("Catalog resource has unexpected version: " + version);
@@ -169,11 +169,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         for (JsonNode node : requiredArray(root, "sources", "catalog")) {
             sources.add(parseSource(node));
         }
-        List<EvidenceProfile> profiles = new ArrayList<>();
-        for (JsonNode node : requiredArray(root, "profiles", "catalog")) {
-            profiles.add(parseProfile(node));
-        }
-        return new ArtifactSourceCatalog(version, sources, profiles);
+        return new ArtifactSourceCatalog(version, sources);
     }
 
     private static ArtifactSourceContract parseSource(JsonNode node) {
@@ -235,21 +231,6 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             ),
             enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", kind.toString()), "erasure policy"),
             textSet(node, "useDecisionIds", kind.toString())
-        );
-    }
-
-    private static EvidenceProfile parseProfile(JsonNode node) {
-        requireObject(node, "profile");
-        rejectUnknown(node, Set.of("id", "version", "artifactKind", "allowedSources"), "profile");
-        Set<SourceKind> allowedSources = new HashSet<>();
-        for (String source : textSet(node, "allowedSources", "profile")) {
-            allowedSources.add(new SourceKind(source));
-        }
-        return new EvidenceProfile(
-            new EvidenceProfileId(requiredText(node, "id", "profile")),
-            new SourceContractVersion(requiredText(node, "version", "profile")),
-            requiredText(node, "artifactKind", "profile"),
-            allowedSources
         );
     }
 
