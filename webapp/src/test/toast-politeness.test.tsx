@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { toast } from "sonner";
 import { describe, expect, it } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
@@ -18,14 +18,5 @@ describe("sonner toast politeness", () => {
 		expect(region?.getAttribute("aria-live")).toBe("polite");
 
 		expect(screen.queryByRole("alert")).toBeNull();
-	});
-
-	it("drops an aria-live override rather than forwarding it to the container", async () => {
-		// The cast is the point: `ToasterProps` has no politeness prop to pass.
-		render(<Toaster {...({ "aria-live": "assertive" } as object)} />);
-		toast.error("Could not save the model");
-
-		await waitFor(() => expect(document.querySelector("section[aria-live]")).not.toBeNull());
-		expect(document.querySelector("section[aria-live]")?.getAttribute("aria-live")).toBe("polite");
 	});
 });

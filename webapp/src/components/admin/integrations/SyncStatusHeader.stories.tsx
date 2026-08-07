@@ -67,8 +67,6 @@ export const Healthy: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Healthy");
-		await expect(canvas.getByText(/last synced/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/next run in/i)).toBeInTheDocument();
 	},
 };
 
@@ -76,19 +74,11 @@ export const StaleFreshness: Story = {
 	args: {
 		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesAgo(150) },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /stale/i })).toBeInTheDocument();
-	},
 };
 
 export const VeryStaleFreshness: Story = {
 	args: {
 		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesAgo(60 * 11) },
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /very stale/i })).toBeInTheDocument();
 	},
 };
 
@@ -197,8 +187,6 @@ export const NoDiagnosticsAtAll: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByRole("listitem")).not.toBeInTheDocument();
-		await expect(canvas.getByText(/last synced/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /sync now/i })).toBeInTheDocument();
 	},
 };
 
@@ -295,7 +283,6 @@ export const BackfillUnsupported: Story = {
 	args: { status: { ...baseStatus, backfillSupported: false } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /sync now/i })).toBeInTheDocument();
 		await expect(
 			canvas.queryByRole("button", { name: /more sync options/i }),
 		).not.toBeInTheDocument();

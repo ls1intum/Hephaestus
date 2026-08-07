@@ -58,11 +58,10 @@ export interface PracticeBindingsEditorProps {
 /**
  * The occasions a practice is reviewed on.
  *
- * <p>An occasion used to be two fields that could not disagree — one work type, one flat list of
- * trigger events — and the evidence for all of them lived on a policy shared by the practice. It is
- * now a list, because the two questions genuinely have different answers per occasion: reviewing a
- * change when it opens and reviewing it when it merges are different reviews reading different things.
- * The form shows them as separate cards rather than a merged list so that difference stays visible.
+ * <p>A list rather than one shared set of fields, because the two questions genuinely have different
+ * answers per occasion: reviewing a change when it opens and reviewing it when it merges are different
+ * reviews reading different things. The form shows them as separate cards rather than a merged list so
+ * that difference stays visible.
  */
 export function PracticeBindingsEditor({
 	options,

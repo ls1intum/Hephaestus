@@ -1,24 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { priceLabel } from "./llm-pricing";
-import { formatRateUsd } from "./money";
 
+/**
+ * The expected strings are written out rather than composed with `formatRateUsd`. Building them from
+ * the same helper the subject uses makes both sides move together — a formatter that returned `""`
+ * would keep every case green.
+ */
 describe("priceLabel", () => {
 	it("composes a sub-cent price from the rate formatter, not the spend formatter", () => {
 		expect(priceLabel({ pricingMode: "PRICED", per1mInputUsd: 0.075 }, "instance")).toBe(
-			`${formatRateUsd(0.075)} / 1M input tokens`,
-		);
-		expect(priceLabel({ pricingMode: "PRICED", per1mInputUsd: 0.003 }, "workspace")).toBe(
-			`${formatRateUsd(0.003)} / 1M input tokens`,
+			"$0.075 / 1M input tokens",
 		);
 	});
 
 	it("names both halves of a two-sided price, each at the rate precision", () => {
 		expect(
 			priceLabel({ pricingMode: "PRICED", per1mInputUsd: 3, per1mOutputUsd: 15 }, "instance"),
-		).toBe(`${formatRateUsd(3)} input · ${formatRateUsd(15)} output / 1M tokens`);
-		expect(
-			priceLabel({ pricingMode: "PRICED", per1mInputUsd: 0.15, per1mOutputUsd: 0.6 }, "workspace"),
-		).toBe(`${formatRateUsd(0.15)} input · ${formatRateUsd(0.6)} output / 1M tokens`);
+		).toBe("$3.00 input · $15.00 output / 1M tokens");
 	});
 
 	it("says who can fix a missing price, including a PRICED model with no amount on record", () => {

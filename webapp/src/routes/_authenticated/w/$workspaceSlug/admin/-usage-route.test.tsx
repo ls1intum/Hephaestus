@@ -48,6 +48,12 @@ async function renderUsageRoute(onPutBudget?: () => Promise<Response> | Response
 
 const capField = () => screen.getByLabelText(/Monthly cap/i);
 
+/**
+ * Only what is peculiar to *this* route. Where a rejection is reported — inline while the dialog is
+ * open, as a toast once it is gone — belongs to `BudgetAmountDialog` and is stated once, over the
+ * instance budget, in `-admin-usage-route.test.tsx`. Restating it here bought a second boot of the
+ * lazy admin layout and no second thing proved.
+ */
 describe("workspace AI usage route", () => {
 	it("does not re-show a dismissed rejection when the cap dialog is reopened", async () => {
 		const changeCap = await renderUsageRoute();
@@ -65,39 +71,5 @@ describe("workspace AI usage route", () => {
 		await screen.findByRole("button", { name: "Save cap" });
 		expect(screen.queryByText(REJECTION)).toBeNull();
 		expect(capField().getAttribute("aria-invalid")).toBe("false");
-	});
-
-	it("says so out loud when a cap write fails after the dialog was dismissed", async () => {
-		let releaseCapPut: (() => void) | undefined;
-		const slowPut = new Promise<void>((resolve) => {
-			releaseCapPut = resolve;
-		});
-		const changeCap = await renderUsageRoute(async () => {
-			await slowPut;
-			return rejected();
-		});
-
-		fireEvent.click(changeCap);
-		fireEvent.change(capField(), { target: { value: "999999999" } });
-		fireEvent.click(screen.getByRole("button", { name: "Save cap" }));
-
-		fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape" });
-		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-
-		releaseCapPut?.();
-
-		await screen.findByText("Couldn't save the cap");
-		screen.getByText(REJECTION);
-	});
-
-	it("reports a rejection inline, and only inline, while the dialog is open", async () => {
-		const changeCap = await renderUsageRoute();
-
-		fireEvent.click(changeCap);
-		fireEvent.change(capField(), { target: { value: "999999999" } });
-		fireEvent.click(screen.getByRole("button", { name: "Save cap" }));
-
-		await screen.findByText(REJECTION);
-		expect(screen.queryByText("Couldn't save the cap")).toBeNull();
 	});
 });

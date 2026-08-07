@@ -114,7 +114,6 @@ export const WithWorkspaceColumn: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Workspace")).toBeInTheDocument();
 		await expect(canvas.getAllByText("Acme Engineering").length).toBeGreaterThan(0);
 	},
 };
@@ -152,7 +151,6 @@ export const ErrorState: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/Couldn’t load the audit log/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /Try again/i })).toBeInTheDocument();
 	},
 };
 

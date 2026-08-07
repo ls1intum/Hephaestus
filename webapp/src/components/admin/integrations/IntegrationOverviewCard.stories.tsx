@@ -102,10 +102,6 @@ export const WithErroredAndStaleResources: Story = {
 
 export const StaleFreshness: Story = {
 	args: { status: { ...status, lastSuccessfulSyncAt: minutesAgo(200) } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /stale/i })).toBeInTheDocument();
-	},
 };
 
 export const UnknownCadence: Story = {

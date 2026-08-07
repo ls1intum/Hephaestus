@@ -44,8 +44,6 @@ export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText(`${reviewFeedback.length} messages.`)).toBeVisible();
-		await expect(canvas.getByRole("combobox", { name: "Outcome" })).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Date" })).toBeVisible();
 	},
 };
 

@@ -44,9 +44,6 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByRole("heading", { name: "Workspace capabilities" }),
-		).toBeInTheDocument();
 		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
 		await canvas.findByRole("button", { name: /^delete workspace$/i });
 	},

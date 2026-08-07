@@ -389,7 +389,6 @@ export const NeverSynced: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Issues" })).toBeInTheDocument();
 		await expect(canvas.getByText("0 Issues")).toBeInTheDocument();
 
 		await expect(canvas.getByText("Never")).toBeInTheDocument();

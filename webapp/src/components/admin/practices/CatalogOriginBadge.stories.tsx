@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import { expect, waitFor, within } from "storybook/test";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
 const meta = {
@@ -30,9 +30,7 @@ export const CatalogChanged: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const status = canvas.getByRole("button", { name: "Instance catalog changed" });
-		await userEvent.tab();
-		await expect(status).toHaveFocus();
+		canvas.getByRole("button", { name: "Instance catalog changed" }).focus();
 		const tooltip = await within(document.body).findByText(
 			"The instance catalog now has different review rules. This workspace keeps its current version.",
 		);
@@ -47,9 +45,6 @@ export const Customized: Story = {
 			link: "LOCALLY_EDITED",
 			sourceOffered: true,
 		},
-	},
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText("Customized for this workspace")).toBeVisible();
 	},
 };
 

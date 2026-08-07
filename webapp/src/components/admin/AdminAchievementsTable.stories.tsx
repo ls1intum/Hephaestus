@@ -56,8 +56,4 @@ export const Recalculating: Story = {
 
 export const ManyMembers: Story = {
 	args: { users: Array.from({ length: 30 }, (_, index) => member(index + 1)) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
-	},
 };

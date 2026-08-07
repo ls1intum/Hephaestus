@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { asDate } from "./dates";
 
 describe("asDate", () => {
+	// The instant, not merely the type: `toBeInstanceOf(Date)` is satisfied by `new Date(0)`.
 	it("parses the ISO string the SDK actually returns for a date field", () => {
-		expect(asDate("2026-07-24T10:30:00.000Z")).toBeInstanceOf(Date);
+		expect(asDate("2026-07-24T10:30:00.000Z")?.toISOString()).toBe("2026-07-24T10:30:00.000Z");
 	});
 
 	it("passes a real Date through untouched", () => {

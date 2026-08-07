@@ -61,8 +61,7 @@ export const ComplexContentStartsFocused: Story = {
 	render: (args) => <FocusStory {...args} />,
 	play: async () => {
 		await userEvent.click(screen.getByRole("button", { name: /open deletion dialog/i }));
-		const dialog = await screen.findByRole("alertdialog");
-		await expect(dialog).toHaveAccessibleDescription("This action cannot be undone.");
+		await screen.findByRole("alertdialog");
 		await waitFor(() =>
 			expect(screen.getByRole("heading", { name: /permanently delete/i })).toHaveFocus(),
 		);

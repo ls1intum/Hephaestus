@@ -1,4 +1,4 @@
-import { Folder, Package, Rocket } from "lucide-react";
+import { Folder, Package, Rocket, ShieldCheck } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { getAreaVisual, ICON_NAMES, iconLabel, iconSearchText, PILL } from "./area-visuals";
 
@@ -25,9 +25,12 @@ describe("areaVisuals", () => {
 		expect(visual.pill).toBe(PILL.sky);
 	});
 
+	// Naming the icon, not merely ruling out the fallback: `not.toBe(Folder)` is satisfied by any of
+	// the hundred icons in the set, so the whole keyword map could be shuffled and stay green.
 	it("derives an icon from keywords for an unknown admin-created slug", () => {
 		const security = getAreaVisual("security-hardening", "Security hardening");
-		expect(security.Icon).not.toBe(Folder);
+		expect(security.Icon).toBe(ShieldCheck);
+		expect(security.pill).toBe(PILL.red);
 	});
 
 	it("falls back to a neutral folder for a slug with no keyword match", () => {

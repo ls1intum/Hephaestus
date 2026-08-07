@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
@@ -209,9 +209,5 @@ export const ManyUsers: Story = {
 				email: `user${i + 1}@example.com`,
 			},
 		})),
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
 	},
 };

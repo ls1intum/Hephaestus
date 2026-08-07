@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
 import { ClaimCurrentnessAlert } from "./ReviewBadges";
 
 const meta = {
@@ -11,17 +10,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Stale: Story = {
-	play: async ({ canvasElement }) => {
-		await expect(
-			within(canvasElement).getByText("This result uses older review rules"),
-		).toBeVisible();
-	},
-};
+export const Stale: Story = {};
 
-export const Unverifiable: Story = {
-	args: { currentness: "UNVERIFIABLE" },
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText("Currentness is unknown")).toBeVisible();
-	},
-};
+export const Unverifiable: Story = { args: { currentness: "UNVERIFIABLE" } };

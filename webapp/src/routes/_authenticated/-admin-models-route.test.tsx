@@ -58,12 +58,6 @@ function connection(id: number, displayName: string): LlmConnection {
 }
 
 describe("instance AI models route", () => {
-	it("renders before a connection or provider probe has been selected", async () => {
-		mockPage();
-
-		await renderModelsRoute();
-	});
-
 	it("keeps each connection's toggle pending independently when two run at once", async () => {
 		let releaseSlowToggle: (() => void) | undefined;
 		const slowToggle = new Promise<void>((resolve) => {

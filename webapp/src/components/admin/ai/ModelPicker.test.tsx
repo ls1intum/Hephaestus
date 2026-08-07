@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AvailableLlmModel } from "@/api/types.gen";
-import { priceLabel } from "@/lib/llm-pricing";
 import { ModelPicker } from "./ModelPicker";
 
 const models: AvailableLlmModel[] = [
@@ -42,15 +41,17 @@ describe("ModelPicker", () => {
 		screen.getByText("Your models");
 	});
 
+	// The names are written out rather than interpolated through `priceLabel`, which is the helper the
+	// component itself calls: a composed expectation catches "the price is gone" and never "the price
+	// is wrong".
 	it("keeps the price in each option's accessible name", () => {
 		render(<ModelPicker availableModels={models} value={null} onChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole("combobox"));
 
-		for (const model of models) {
-			screen.getByRole("option", {
-				name: `${model.displayName} · ${model.connectionDisplayName} · ${priceLabel(model, "workspace")}`,
-			});
-		}
+		screen.getByRole("option", {
+			name: "GPT-5 · Organization endpoint · $1.00 input · $2.00 output / 1M tokens",
+		});
+		screen.getByRole("option", { name: "GPT-5 · Workspace endpoint · No metered API cost" });
 	});
 
 	it("marks the trigger invalid and links its description when asked to", () => {

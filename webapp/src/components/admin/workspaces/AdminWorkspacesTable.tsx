@@ -10,6 +10,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { asDate } from "@/lib/dates";
 
 export interface AdminWorkspacesTableProps {
 	workspaces: AdminWorkspaceView[];
@@ -24,12 +25,8 @@ function statusVariant(status: string): "secondary" | "destructive" | "outline" 
 	return "outline";
 }
 
-// The generated client types date fields as `Date`, but the response transformers aren't wired into
-// the SDK calls, so at runtime they arrive as ISO strings — coerce defensively (the established
-// pattern in SessionsSection / LinkedAccountsSection).
 function formatDate(value: AdminWorkspaceView["createdAt"]): string {
-	const date = value instanceof Date ? value : new Date(value);
-	return date.toLocaleDateString();
+	return asDate(value)?.toLocaleDateString() ?? "–";
 }
 
 /**
