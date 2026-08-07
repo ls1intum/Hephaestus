@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
@@ -193,6 +194,22 @@ final class FixtureIntegration {
         return () -> WIDGET;
     }
 
+    /** The catalog a practices-module surface sees when this fixture is the only registered domain. */
+    static ArtifactCatalog artifactCatalog() {
+        ArtifactDescriptor descriptor = descriptor();
+        return new ArtifactCatalog() {
+            @Override
+            public java.util.Collection<ArtifactDescriptor> all() {
+                return List.of(descriptor);
+            }
+
+            @Override
+            public Optional<ArtifactDescriptor> descriptorFor(ArtifactKind kind) {
+                return descriptor.kind().equals(kind) ? Optional.of(descriptor) : Optional.empty();
+            }
+        };
+    }
+
     /** Translates the fixture's stored trigger literals, exactly as a real domain module would. */
     static SignalVocabulary vocabulary() {
         Map<String, SignalName> byTrigger = Map.of(
@@ -210,6 +227,16 @@ final class FixtureIntegration {
             @Override
             public Set<String> triggerEventNames() {
                 return byTrigger.keySet();
+            }
+
+            @Override
+            public Optional<String> triggerEventFor(SignalName signal) {
+                return byTrigger
+                    .entrySet()
+                    .stream()
+                    .filter(entry -> entry.getValue().equals(signal))
+                    .map(Map.Entry::getKey)
+                    .findFirst();
             }
         };
     }

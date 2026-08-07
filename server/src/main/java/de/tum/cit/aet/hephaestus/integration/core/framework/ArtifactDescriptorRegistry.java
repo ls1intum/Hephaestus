@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.framework;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import java.util.Collection;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Component;
  * and the message names both offenders for the same reason.
  */
 @Component
-public class ArtifactDescriptorRegistry {
+public class ArtifactDescriptorRegistry implements ArtifactCatalog {
 
     private final Map<ArtifactKind, ArtifactDescriptor> byKind;
 
@@ -50,10 +51,12 @@ public class ArtifactDescriptorRegistry {
         return byKind.keySet();
     }
 
+    @Override
     public Collection<ArtifactDescriptor> all() {
         return byKind.values();
     }
 
+    @Override
     public Optional<ArtifactDescriptor> descriptorFor(ArtifactKind kind) {
         return Optional.ofNullable(byKind.get(kind));
     }

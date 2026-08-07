@@ -42,5 +42,10 @@ final class ScmEventSources {
         return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name), Stability.STABLE);
     }
 
+    /** As {@link #declare}, for a signal a new practice on this artifact should start out watching. */
+    static Signal declareRecommended(SignalName name, String displayName, Set<EventTypeKey> producedBy) {
+        return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name), Stability.STABLE, true);
+    }
+
     private ScmEventSources() {}
 }

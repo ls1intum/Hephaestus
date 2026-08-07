@@ -17,10 +17,16 @@ public class PracticeDefinitionOptionsService {
 
     private final ArtifactSourceCatalogRegistry catalogs;
     private final PracticeEvidenceDefaults defaults;
+    private final PracticeTriggerOptions triggerOptions;
 
-    public PracticeDefinitionOptionsService(ArtifactSourceCatalogRegistry catalogs, PracticeEvidenceDefaults defaults) {
+    public PracticeDefinitionOptionsService(
+        ArtifactSourceCatalogRegistry catalogs,
+        PracticeEvidenceDefaults defaults,
+        PracticeTriggerOptions triggerOptions
+    ) {
         this.catalogs = catalogs;
         this.defaults = defaults;
+        this.triggerOptions = triggerOptions;
     }
 
     public PracticeDefinitionOptionsDTO options() {
@@ -38,7 +44,8 @@ public class PracticeDefinitionOptionsService {
         EvidenceProfile profile = catalogs.requireProfile(catalog.version(), recommendedPolicy.evidenceProfile());
         return new PracticeWorkTypeDefinitionOptionsDTO(
             artifact,
-            TriggerEventCatalog.optionsFor(artifact)
+            triggerOptions
+                .optionsFor(artifact)
                 .stream()
                 .map(option ->
                     new PracticeTriggerEventOptionDTO(option.event(), option.displayName(), option.recommended())

@@ -12,7 +12,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SignalVocabulary;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignalVocabulary;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.TriggerEventCatalog;
+import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptions;
+import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptionsFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.HashSet;
 import java.util.List;
@@ -24,9 +25,9 @@ import org.junit.jupiter.api.Test;
  * The boot-time half of the coverage question: an authoring option that can never fire must stop the
  * application, because it is a mistake in the build rather than a fact about a deployment.
  *
- * <p>Checked against the trigger catalog rather than against stored practices on purpose. The catalog is
- * what an author is offered and it is identical on every instance, so a gap fails here and in CI instead
- * of on whichever installation first happened to pick the broken option.
+ * <p>Checked against the offered vocabulary rather than against stored practices on purpose. What an
+ * author is offered is identical on every instance, so a gap fails here and in CI instead of on
+ * whichever installation first happened to pick the broken option.
  */
 class PracticeSignalCoverageTest extends BaseUnitTest {
 
@@ -55,11 +56,13 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
 
     @Test
     void aTriggerNoDomainTranslatesRefusesToBoot() {
-        // A vocabulary bean that has forgotten a literal is the same failure as a missing producer: the
-        // option exists in the UI and resolves to nothing.
+        // A vocabulary that offers a literal it cannot itself translate is the same failure as a missing
+        // producer: the option exists in the UI and resolves to nothing.
+        SignalVocabulary inconsistent = inconsistentVocabulary();
         PracticeSignalCoverage coverage = new PracticeSignalCoverage(
             fixedCoverage(everySignalOfTheRealCatalog()),
-            List.of(emptyVocabulary()),
+            List.of(inconsistent),
+            triggerOptions(inconsistent),
             practices
         );
 
@@ -69,19 +72,30 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     }
 
     @Test
-    void theShippedCatalogIsNotEmpty() {
-        // Guards the tests above from passing vacuously if the catalog is ever emptied.
-        assertThat(TriggerEventCatalog.allEvents()).isNotEmpty();
+    void theShippedVocabularyIsNotEmpty() {
+        // Guards the tests above from passing vacuously if the vocabulary is ever emptied.
+        assertThat(triggerOptions(new ScmSignalVocabulary()).allEvents()).isNotEmpty();
     }
 
     private PracticeSignalCoverage coverage(Set<SignalName> covered) {
-        return new PracticeSignalCoverage(fixedCoverage(covered), List.of(new ScmSignalVocabulary()), practices);
+        ScmSignalVocabulary vocabulary = new ScmSignalVocabulary();
+        return new PracticeSignalCoverage(
+            fixedCoverage(covered),
+            List.of(vocabulary),
+            triggerOptions(vocabulary),
+            practices
+        );
+    }
+
+    /** Trigger options over the real SCM descriptors, which is what an author is actually offered. */
+    private static PracticeTriggerOptions triggerOptions(SignalVocabulary vocabulary) {
+        return PracticeTriggerOptionsFixture.with(vocabulary);
     }
 
     /** The signals the shipped manifests between them declare they raise, read off the real vocabulary. */
     private static Set<SignalName> everySignalOfTheRealCatalog() {
         Set<SignalName> signals = new HashSet<>();
-        for (String triggerEvent : TriggerEventCatalog.allEvents()) {
+        for (String triggerEvent : new ScmSignalVocabulary().triggerEventNames()) {
             ScmSignals.forTriggerEvent(triggerEvent).ifPresent(signals::add);
         }
         return signals;
@@ -106,7 +120,7 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
         };
     }
 
-    private static SignalVocabulary emptyVocabulary() {
+    private static SignalVocabulary inconsistentVocabulary() {
         return new SignalVocabulary() {
             @Override
             public Optional<SignalName> signalForTriggerEvent(String triggerEventName) {
@@ -115,7 +129,12 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
 
             @Override
             public Set<String> triggerEventNames() {
-                return Set.of();
+                return Set.of("PullRequestReady");
+            }
+
+            @Override
+            public Optional<String> triggerEventFor(SignalName signal) {
+                return Optional.empty();
             }
         };
     }

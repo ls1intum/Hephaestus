@@ -18,9 +18,14 @@ public final class PracticeDefinitionValidator {
     private static final Pattern DETECTOR_VOCAB = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
 
     private final ArtifactSourceCatalogRegistry sourceCatalogs;
+    private final PracticeTriggerOptions triggerOptions;
 
-    public PracticeDefinitionValidator(ArtifactSourceCatalogRegistry sourceCatalogs) {
+    public PracticeDefinitionValidator(
+        ArtifactSourceCatalogRegistry sourceCatalogs,
+        PracticeTriggerOptions triggerOptions
+    ) {
         this.sourceCatalogs = sourceCatalogs;
+        this.triggerOptions = triggerOptions;
     }
 
     public void validate(PracticeDefinition definition) {
@@ -37,7 +42,7 @@ public final class PracticeDefinitionValidator {
         validateEvidence(definition.artifactKind(), definition.automatedReviewPolicy());
     }
 
-    private static void validateTriggers(
+    private void validateTriggers(
         ArtifactKind artifactKind,
         List<String> triggerEvents,
         boolean canRunAutomatedReview
@@ -50,7 +55,7 @@ public final class PracticeDefinitionValidator {
                 "A practice Hephaestus cannot review cannot define events that start a review"
             );
         }
-        Set<String> allowed = TriggerEventCatalog.eligibleFor(artifactKind);
+        Set<String> allowed = triggerOptions.eligibleFor(artifactKind);
         if (
             canRunAutomatedReview && !ArtifactKinds.CONVERSATION_THREAD.equals(artifactKind) && triggerEvents.isEmpty()
         ) {

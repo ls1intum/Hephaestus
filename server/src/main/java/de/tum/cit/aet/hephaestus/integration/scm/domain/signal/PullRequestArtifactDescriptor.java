@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSo
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITLAB_MERGE_REQUEST;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITLAB_NOTE;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declare;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declareRecommended;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
@@ -30,8 +31,11 @@ import org.springframework.stereotype.Component;
 public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
-        declare(ScmSignals.PULL_REQUEST_OPENED, "Opened", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
-        declare(
+        // The first three are what a new practice starts out watching: the moments where work
+        // arrives to look at. A merge or a close is the end of the story rather than something to
+        // review, and a submitted review is about somebody else's conduct.
+        declareRecommended(ScmSignals.PULL_REQUEST_OPENED, "Opened", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
+        declareRecommended(
             ScmSignals.PULL_REQUEST_READY,
             "Marked ready for review",
             Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)
@@ -39,7 +43,7 @@ public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
         // GitHub only, and writing that down is the point. GitLab's webhook path emits no synchronize
         // event at all, so a practice watching "new commits are pushed" is silent on GitLab — until now
         // indistinguishable from a workspace where nobody pushes.
-        declare(ScmSignals.PULL_REQUEST_SYNCHRONIZED, "New commits pushed", Set.of(GITHUB_PULL_REQUEST)),
+        declareRecommended(ScmSignals.PULL_REQUEST_SYNCHRONIZED, "New commits pushed", Set.of(GITHUB_PULL_REQUEST)),
         // Three sources for one signal: GitHub has a dedicated review event, GitLab splits the same fact
         // across an approval on the merge request and a review note.
         declare(

@@ -19,7 +19,11 @@ class PracticeDefinitionOptionsServiceTest {
     @Test
     void exposesTheCurrentBaselineAndOnlyProfileCompatibleSources() {
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
-        var service = new PracticeDefinitionOptionsService(catalogs, new PracticeEvidenceDefaults(catalogs));
+        var service = new PracticeDefinitionOptionsService(
+            catalogs,
+            new PracticeEvidenceDefaults(catalogs),
+            PracticeTriggerOptionsFixture.real()
+        );
 
         PracticeDefinitionOptionsDTO result = service.options();
 
@@ -35,7 +39,9 @@ class PracticeDefinitionOptionsServiceTest {
             .filteredOn(option -> option.event().equals("PullRequestClosed"))
             .singleElement()
             .satisfies(option -> {
-                assertThat(option.displayName()).isEqualTo("Pull or merge request is closed without merging");
+                // The label is the domain's own, shown under a "Run mentoring when" legend that already
+                // names the work type — so it says what happened, not what it happened to.
+                assertThat(option.displayName()).isEqualTo("Closed without merging");
                 assertThat(option.recommended()).isFalse();
             });
         assertThat(pullRequests.supportedAutomatedReviewModes()).containsExactly(

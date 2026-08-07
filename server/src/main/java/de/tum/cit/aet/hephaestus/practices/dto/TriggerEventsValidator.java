@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.TriggerEventCatalog;
+import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptions;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.HashSet;
@@ -9,14 +9,21 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Validates that every element in a trigger events list is a known
- * {@link TriggerEventNames} constant, and that there are no duplicates.
+ * Validates that every element in a trigger events list is a literal some domain declares, and that
+ * there are no duplicates.
+ *
+ * <p>The allow-list is resolved per validation rather than held in a static, because it is now assembled
+ * from the registered domain vocabularies: a static would freeze whatever the first classload saw.
+ * Spring instantiates constraint validators through the application context, which is what makes the
+ * injection here work.
  */
 public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerEvents, List<String>> {
 
-    // Allow-list is derived from TriggerEventCatalog (the single source of truth for subscribable events)
-    // rather than duplicated here, so it cannot drift out of sync with the catalog.
-    static final Set<String> VALID_EVENTS = TriggerEventCatalog.allEvents();
+    private final PracticeTriggerOptions triggerOptions;
+
+    public TriggerEventsValidator(PracticeTriggerOptions triggerOptions) {
+        this.triggerOptions = triggerOptions;
+    }
 
     @Override
     public boolean isValid(List<String> value, ConstraintValidatorContext context) {
@@ -38,9 +45,10 @@ public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerE
             return false;
         }
 
+        Set<String> validEvents = triggerOptions.allEvents();
         Set<String> unknown = value
             .stream()
-            .filter(e -> !VALID_EVENTS.contains(e))
+            .filter(e -> !validEvents.contains(e))
             .collect(Collectors.toSet());
         if (!unknown.isEmpty()) {
             context.disableDefaultConstraintViolation();
@@ -49,7 +57,7 @@ public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerE
                     "Unknown trigger events: " +
                         String.join(", ", unknown) +
                         ". Valid events are: " +
-                        String.join(", ", VALID_EVENTS.stream().sorted().toList())
+                        String.join(", ", validEvents.stream().sorted().toList())
                 )
                 .addConstraintViolation();
             return false;

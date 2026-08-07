@@ -22,4 +22,11 @@ public interface SignalVocabulary {
 
     /** Every trigger-event literal this domain translates. */
     Set<String> triggerEventNames();
+
+    /**
+     * The literal a signal is authored as, empty when this domain has no literal for it. A signal with
+     * no literal is not offerable as a trigger — a review somebody asked for by hand is the standing
+     * example — and the authoring surface leaves it out rather than showing a switch that does nothing.
+     */
+    Optional<String> triggerEventFor(SignalName signal);
 }

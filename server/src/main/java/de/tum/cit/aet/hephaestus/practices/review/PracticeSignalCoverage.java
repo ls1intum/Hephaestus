@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SignalCoverage;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SignalVocabulary;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.TriggerEventCatalog;
+import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.TriggerEventMatcher;
 import jakarta.annotation.PostConstruct;
@@ -46,30 +46,33 @@ public class PracticeSignalCoverage {
 
     private final SignalCoverage coverage;
     private final List<SignalVocabulary> vocabularies;
+    private final PracticeTriggerOptions triggerOptions;
     private final PracticeRepository practices;
 
     public PracticeSignalCoverage(
         SignalCoverage coverage,
         List<SignalVocabulary> vocabularies,
+        PracticeTriggerOptions triggerOptions,
         PracticeRepository practices
     ) {
         this.coverage = coverage;
         this.vocabularies = vocabularies;
+        this.triggerOptions = triggerOptions;
         this.practices = practices;
     }
 
     /**
      * Refuses to start when the authoring vocabulary offers a trigger nothing can raise.
      *
-     * <p>Deliberately checks the catalog rather than the stored practices: the catalog is what an author
-     * is offered, it is compiled in, and it is the same on every deployment — so this fails on a
-     * developer's machine and in CI, not on the one instance that happened to have a practice using it.
+     * <p>Deliberately checks the offered vocabulary rather than the stored practices: what an author is
+     * offered is compiled in and the same on every deployment — so this fails on a developer's machine
+     * and in CI, not on the one instance that happened to have a practice using it.
      */
     @PostConstruct
     void validateAuthoringVocabulary() {
         List<String> violations = new ArrayList<>();
         Set<SignalName> compiled = coverage.compiledCoverage();
-        for (String triggerEvent : new TreeSet<>(TriggerEventCatalog.allEvents())) {
+        for (String triggerEvent : new TreeSet<>(triggerOptions.allEvents())) {
             Optional<SignalName> signal = signalFor(triggerEvent);
             if (signal.isEmpty()) {
                 violations.add(
@@ -96,7 +99,7 @@ public class PracticeSignalCoverage {
                     String.join("\n  - ", violations)
             );
         }
-        log.info("Practice trigger vocabulary covered: {} event(s)", TriggerEventCatalog.allEvents().size());
+        log.info("Practice trigger vocabulary covered: {} event(s)", triggerOptions.allEvents().size());
     }
 
     /**

@@ -25,4 +25,9 @@ public class ScmSignalVocabulary implements SignalVocabulary {
     public Set<String> triggerEventNames() {
         return ScmSignals.triggerEventNames();
     }
+
+    @Override
+    public Optional<String> triggerEventFor(SignalName signal) {
+        return ScmSignals.triggerEventFor(signal);
+    }
 }

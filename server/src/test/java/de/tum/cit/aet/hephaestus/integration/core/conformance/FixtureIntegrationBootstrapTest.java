@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.ReviewContractValida
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.review.DormantBinding;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeSignalCoverage;
@@ -147,7 +148,12 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
     private static PracticeSignalCoverage practiceCoverage(boolean connected, Practice... practices) {
         PracticeRepository repository = mock(PracticeRepository.class);
         when(repository.findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(List.of(practices));
-        return new PracticeSignalCoverage(coverage(connected), List.of(FixtureIntegration.vocabulary()), repository);
+        return new PracticeSignalCoverage(
+            coverage(connected),
+            List.of(FixtureIntegration.vocabulary()),
+            new PracticeTriggerOptions(FixtureIntegration.artifactCatalog(), List.of(FixtureIntegration.vocabulary())),
+            repository
+        );
     }
 
     private static Practice practiceBoundTo(String... triggerEvents) {

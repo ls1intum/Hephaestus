@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.signal;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITHUB_ISSUES;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITLAB_ISSUE;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declare;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declareRecommended;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
@@ -25,10 +26,11 @@ import org.springframework.stereotype.Component;
 public class IssueArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
-        declare(ScmSignals.ISSUE_OPENED, "Opened", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
+        // Opening and labelling are where an issue's text arrives or changes meaning; closing ends it.
+        declareRecommended(ScmSignals.ISSUE_OPENED, "Opened", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
         // GitLab has no native "labeled" action; its processor derives one per newly added label from the
         // update event, so both vendors really do raise this and the provenance is honest.
-        declare(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
+        declareRecommended(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
         declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
         declare(ScmSignals.ISSUE_REVIEW_REQUESTED, "Review requested by hand", Set.of())
     );

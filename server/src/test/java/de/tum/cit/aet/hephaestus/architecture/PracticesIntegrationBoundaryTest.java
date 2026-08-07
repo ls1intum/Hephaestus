@@ -60,9 +60,11 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
      * </ul>
      *
      * <p>One known blind spot, stated because a silent one would be worse: ArchUnit reads bytecode, and
-     * javac inlines {@code String} constants, so {@code TriggerEventCatalog}'s use of
-     * {@code ScmDomainEvent.TriggerEventNames} leaves no dependency to see. It is a real coupling and
-     * slice 6 removes it; this rule simply cannot be the thing that notices.
+     * javac inlines {@code String} constants, so a use of {@code ScmDomainEvent.TriggerEventNames} from
+     * this module would leave no dependency to see. Nothing in {@code src/main} does that any more —
+     * the trigger catalog that did was replaced by the {@code ArtifactCatalog} and {@code SignalVocabulary}
+     * ports — but this rule could not have been the thing that noticed, so do not read its silence as
+     * proof.
      */
     private static final Set<String> FROZEN_VIOLATIONS = Set.of(
         "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
