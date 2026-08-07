@@ -83,6 +83,18 @@ Update clients in the same deployment as the server and webapp. The old names ha
 Database values and columns migrate automatically. This change removes ambiguous uses of “active,” “support,” and
 “detection”; it does not change historical finding results.
 
+#### 🔴 The "Skip drafts" workspace setting is gone
+
+**Affected**: deployments that set `PRACTICE_REVIEW_SKIP_DRAFTS`, and workspaces that had "Skip
+drafts" switched on.
+
+Remove `PRACTICE_REVIEW_SKIP_DRAFTS` from your environment; it is no longer read, and the workspace
+toggle no longer appears. Whether a draft occasions a review is now stated by each practice's own
+occasions rather than by a switch that silenced all of them at once. One shipped practice ("Ready and
+traceable handoff") asks for drafts, so a workspace that previously skipped them will start seeing
+that practice's feedback on draft pull requests; no other practice reviews a draft. The stored
+per-workspace override is retained unread for one release and removed after that.
+
 #### 🔴 Outline connections require approved origins
 
 **Affected**: deployments that enable the Outline integration.

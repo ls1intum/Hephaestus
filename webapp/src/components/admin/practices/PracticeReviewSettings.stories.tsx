@@ -9,7 +9,6 @@ import { PracticeReviewSettings } from "./PracticeReviewSettings";
 
 const settings: PracticeReviewSettingsData = {
 	runForAllUsers: true,
-	skipDrafts: true,
 	deliverToMerged: false,
 	cooldownMinutes: 30,
 };

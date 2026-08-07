@@ -33,9 +33,7 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	cooldownMinutes: 30,
 	deliverToMerged: false,
 	runForAllUsers: true,
-	skipDrafts: true,
 	// Mix of explicit overrides (Reset to default) and inherited / undefined (Inherited from default).
-	skipDraftsOverride: true,
 	cooldownMinutesOverride: 30,
 	deliverToMergedOverride: undefined,
 	runForAllUsersOverride: undefined,

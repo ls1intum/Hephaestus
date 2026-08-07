@@ -21,7 +21,6 @@ const readyBinding: AgentBinding = {
 
 const settings: PracticeReviewSettingsData = {
 	runForAllUsers: true,
-	skipDrafts: true,
 	deliverToMerged: false,
 	cooldownMinutes: 15,
 };

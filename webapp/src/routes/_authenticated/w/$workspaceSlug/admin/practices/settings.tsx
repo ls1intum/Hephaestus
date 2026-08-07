@@ -173,9 +173,6 @@ function patchReviewSettings(
 ): PracticeReviewSettings {
 	return {
 		...settings,
-		...(patch.skipDrafts === undefined
-			? {}
-			: { skipDrafts: patch.skipDrafts, skipDraftsOverride: patch.skipDrafts }),
 		...(patch.deliverToMerged === undefined
 			? {}
 			: {

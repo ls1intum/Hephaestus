@@ -333,25 +333,6 @@ function ProjectReviewRulesCard({ policy }: Pick<PracticeReviewSettingsProps, "p
 			<CardContent className="space-y-4">
 				<Field orientation="horizontal">
 					<FieldContent>
-						<FieldLabel htmlFor="policy-skip-drafts">Skip drafts</FieldLabel>
-						<InheritedSettingHint
-							label="Skip drafts"
-							overridden={settings.skipDraftsOverride != null}
-							field="SKIP_DRAFTS"
-							inheritedValue={settings.skipDrafts ? "On" : "Off"}
-							policy={policy}
-						/>
-					</FieldContent>
-					<Switch
-						id="policy-skip-drafts"
-						checked={settings.skipDrafts}
-						disabled={policy.isSaving}
-						onCheckedChange={(checked) => policy.onUpdate({ skipDrafts: checked })}
-					/>
-				</Field>
-
-				<Field orientation="horizontal">
-					<FieldContent>
 						<FieldLabel htmlFor="policy-deliver-merged">Post feedback after merge</FieldLabel>
 						<InheritedSettingHint
 							label="Post feedback after merge"
