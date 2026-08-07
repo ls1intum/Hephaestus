@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
     void recordsAPublishAgainstTheMirrorRowAndItsContent() {
         when(ledger.record(any(), eq(OCCURRED_AT), eq(DiscoveredVia.EVENT))).thenReturn(true);
 
-        boolean recorded = recorder.record(
+        Optional<SignalKey> recorded = recorder.record(
             WORKSPACE_ID,
             snapshot(11L, "hash-a", null),
             "documents.publish",
@@ -51,12 +52,14 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
             DiscoveredVia.EVENT
         );
 
-        assertThat(recorded).isTrue();
         ArgumentCaptor<SignalKey> key = ArgumentCaptor.forClass(SignalKey.class);
         verify(ledger).record(key.capture(), eq(OCCURRED_AT), eq(DiscoveredVia.EVENT));
         assertThat(key.getValue().workspaceId()).isEqualTo(WORKSPACE_ID);
         assertThat(key.getValue().artifactId()).isEqualTo(11L);
         assertThat(key.getValue().signalName()).isEqualTo(DocsSignals.DOCUMENT_PUBLISHED);
+        // The key is handed back so the caller can offer this very occurrence for review and settle the
+        // row it just wrote; a boolean would have left it to reconstruct an identity it does not own.
+        assertThat(recorded).contains(key.getValue());
     }
 
     @Test
@@ -72,7 +75,7 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
                 OCCURRED_AT,
                 DiscoveredVia.EVENT
             )
-        ).isFalse();
+        ).isEmpty();
     }
 
     @Test
@@ -86,7 +89,7 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
                 OCCURRED_AT,
                 DiscoveredVia.EVENT
             )
-        ).isFalse();
+        ).isEmpty();
 
         verifyNoInteractions(ledger);
     }
@@ -96,7 +99,7 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
     void ignoresASubjectThatIsNotThere() {
         assertThat(
             recorder.record(WORKSPACE_ID, null, "documents.publish", OCCURRED_AT, DiscoveredVia.EVENT)
-        ).isFalse();
+        ).isEmpty();
         assertThat(
             recorder.record(
                 WORKSPACE_ID,
@@ -105,7 +108,7 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
                 OCCURRED_AT,
                 DiscoveredVia.EVENT
             )
-        ).isFalse();
+        ).isEmpty();
 
         verifyNoInteractions(ledger);
     }
@@ -121,7 +124,7 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
                 OCCURRED_AT,
                 DiscoveredVia.EVENT
             )
-        ).isFalse();
+        ).isEmpty();
 
         verify(ledger, never()).record(any(), any(), any());
     }

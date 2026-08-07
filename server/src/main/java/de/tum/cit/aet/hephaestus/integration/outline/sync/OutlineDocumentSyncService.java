@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentReviewTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
@@ -39,6 +41,7 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -97,6 +100,13 @@ public class OutlineDocumentSyncService {
     private final OutlineMirrorRetentionService retention;
     private final OutlineDocumentSignalRecorder signalRecorder;
 
+    /**
+     * Optional because the agent subsystem can be switched off (and is, in the worker and webhook roles),
+     * and a mirror that cannot ask for a review must still keep its ledger. The signal is recorded either
+     * way; only the offer is skipped, and the reaper picks the row up if an agent-capable node exists.
+     */
+    private final ObjectProvider<DocumentReviewTrigger> reviewTrigger;
+
     public OutlineDocumentSyncService(
         ConnectionService connectionService,
         OutlineApiClient outlineApiClient,
@@ -106,7 +116,8 @@ public class OutlineDocumentSyncService {
         OutlineProperties properties,
         OutlineMirrorWriter mirrorWriter,
         OutlineMirrorRetentionService retention,
-        OutlineDocumentSignalRecorder signalRecorder
+        OutlineDocumentSignalRecorder signalRecorder,
+        ObjectProvider<DocumentReviewTrigger> reviewTrigger
     ) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
@@ -117,6 +128,48 @@ public class OutlineDocumentSyncService {
         this.mirrorWriter = mirrorWriter;
         this.retention = retention;
         this.signalRecorder = signalRecorder;
+        this.reviewTrigger = reviewTrigger;
+    }
+
+    /**
+     * Record the occurrence, then offer it for review — the two halves of the same event, kept apart.
+     *
+     * <p>The offer runs outside any transaction of ours on purpose: submission opens one of its own and
+     * locks the workspace inside it. Never fails the sync: a mirror that could not ask for a review has
+     * still mirrored the document, and the ledger row it just wrote is what the reaper re-offers.
+     */
+    private void recordAndOffer(
+        long workspaceId,
+        @Nullable OutlineDocumentSnapshot document,
+        String eventName,
+        Instant occurredAt,
+        DiscoveredVia discoveredVia
+    ) {
+        Optional<SignalKey> recorded = signalRecorder.record(
+            workspaceId,
+            document,
+            eventName,
+            occurredAt,
+            discoveredVia
+        );
+        if (recorded.isEmpty()) {
+            return;
+        }
+        DocumentReviewTrigger trigger = reviewTrigger.getIfAvailable();
+        if (trigger == null) {
+            log.debug("No document review trigger on this node; signal recorded only: workspaceId={}", workspaceId);
+            return;
+        }
+        try {
+            trigger.onDocumentSignal(recorded.get(), discoveredVia);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Offering a document signal for review failed (signal recorded): workspaceId={}, signal={}",
+                workspaceId,
+                recorded.get().signalName(),
+                e
+            );
+        }
     }
 
     /**
@@ -383,7 +436,7 @@ public class OutlineDocumentSyncService {
                     mirrorWriter.updateDocument(workspaceId, ctx.connectionId(), documentId, doc ->
                         doc.setArchivedAt(archivedAt)
                     );
-                    signalRecorder.record(workspaceId, d, eventName, archivedAt, DiscoveredVia.EVENT);
+                    recordAndOffer(workspaceId, d, eventName, archivedAt, DiscoveredVia.EVENT);
                 });
             return;
         }
@@ -427,9 +480,7 @@ public class OutlineDocumentSyncService {
             // the document's hash, and the whole point of this signal is that the content just changed.
             documentRepository
                 .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)
-                .ifPresent(refreshed ->
-                    signalRecorder.record(workspaceId, refreshed, eventName, now, DiscoveredVia.EVENT)
-                );
+                .ifPresent(refreshed -> recordAndOffer(workspaceId, refreshed, eventName, now, DiscoveredVia.EVENT));
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }

@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -88,7 +89,8 @@ class ReviewContractViolationTest extends BaseUnitTest {
             ReviewContractValidator validator = new ReviewContractValidator(
                 new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor())),
                 new IntegrationMessageHandlerRegistry(List.of()),
-                List.of(FixtureIntegration.contextBuilder())
+                List.of(FixtureIntegration.contextBuilder()),
+                FixtureIntegration.executionCatalog()
             );
 
             List<String> violations = validator.validateContribution(
@@ -116,7 +118,8 @@ class ReviewContractViolationTest extends BaseUnitTest {
             ReviewContractValidator validator = new ReviewContractValidator(
                 new ArtifactDescriptorRegistry(List.of()),
                 new IntegrationMessageHandlerRegistry(List.of()),
-                List.of()
+                List.of(),
+                FixtureIntegration.executionCatalog()
             );
 
             List<String> violations = validator.validateContribution(
@@ -135,7 +138,8 @@ class ReviewContractViolationTest extends BaseUnitTest {
             ReviewContractValidator validator = new ReviewContractValidator(
                 new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor())),
                 new IntegrationMessageHandlerRegistry(List.of()),
-                List.of()
+                List.of(),
+                FixtureIntegration.executionCatalog()
             );
 
             assertThat(validator.validateDescriptors())
@@ -180,6 +184,38 @@ class ReviewContractViolationTest extends BaseUnitTest {
                 .singleElement()
                 .asString()
                 .contains("declares feedback lanes");
+        }
+
+        @Test
+        @DisplayName("a reviewable kind nothing can run a review of is refused")
+        void aReviewableKindWithNoWayToExecuteIsRefused() {
+            // The rule that would have caught docs.document. Every other check here passed for it: a
+            // descriptor, a context builder, a role, a lane, its limitations — and no job type, no
+            // handler, no submitter, so the practice bound to it read as live and fired never.
+            ReviewContractValidator validator = new ReviewContractValidator(
+                new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor())),
+                new IntegrationMessageHandlerRegistry(List.of()),
+                List.of(FixtureIntegration.contextBuilder()),
+                FixtureIntegration.noExecutionCatalog()
+            );
+
+            assertThat(validator.validateDescriptors())
+                .singleElement()
+                .asString()
+                .contains("no job type and handler can run a review of it");
+        }
+
+        @Test
+        @DisplayName("a kind that is not reviewable needs no way to run one")
+        void anUnreviewableKindIsNotAskedToBeExecutable() {
+            ReviewContractValidator validator = new ReviewContractValidator(
+                new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor(false, Set.of(), Set.of()))),
+                new IntegrationMessageHandlerRegistry(List.of()),
+                List.of(),
+                FixtureIntegration.noExecutionCatalog()
+            );
+
+            assertThat(validator.validateDescriptors()).isEmpty();
         }
 
         @Test
@@ -306,7 +342,8 @@ class ReviewContractViolationTest extends BaseUnitTest {
         return new ReviewContractValidator(
             new ArtifactDescriptorRegistry(List.of(descriptor)),
             new IntegrationMessageHandlerRegistry(handlers),
-            builders
+            builders,
+            FixtureIntegration.executionCatalog()
         );
     }
 }

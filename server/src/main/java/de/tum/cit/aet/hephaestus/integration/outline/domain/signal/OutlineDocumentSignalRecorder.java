@@ -46,11 +46,13 @@ public class OutlineDocumentSignalRecorder {
      *
      * @param document the mirror row as it stands <em>after</em> the refresh, so a content-shaped signal
      *                 is keyed on the content the review would actually read
-     * @return whether this occurrence was new; false means the same revision was already recorded, which
-     *         is what makes a redelivered webhook inert
+     * @return the ledger identity of the occurrence when it was new, empty when the same revision was
+     *         already recorded (which is what makes a redelivered webhook inert) or when the event carries
+     *         no signal at all. The key rather than a boolean because the caller's next move — offering the
+     *         occurrence for review — needs the identity to settle the very row this wrote.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean record(
+    public Optional<SignalKey> record(
         long workspaceId,
         @Nullable OutlineDocumentSnapshot document,
         @Nullable String outlineEventName,
@@ -58,11 +60,11 @@ public class OutlineDocumentSignalRecorder {
         DiscoveredVia discoveredVia
     ) {
         if (document == null || document.id() == null || document.isDeleted()) {
-            return false;
+            return Optional.empty();
         }
         Optional<SignalName> signal = DocsSignals.forOutlineEvent(outlineEventName);
         if (signal.isEmpty()) {
-            return false;
+            return Optional.empty();
         }
         Optional<SignalKey> key = DocsSignals.documentKey(
             workspaceId,
@@ -79,18 +81,19 @@ public class OutlineDocumentSignalRecorder {
                 document.id(),
                 signal.get()
             );
-            return false;
+            return Optional.empty();
         }
         boolean recorded = recorder.record(key.get(), occurredAt, discoveredVia);
-        if (recorded) {
-            log.debug(
-                "Recorded document signal: workspaceId={}, documentId={}, signal={}, via={}",
-                workspaceId,
-                document.id(),
-                signal.get(),
-                discoveredVia
-            );
+        if (!recorded) {
+            return Optional.empty();
         }
-        return recorded;
+        log.debug(
+            "Recorded document signal: workspaceId={}, documentId={}, signal={}, via={}",
+            workspaceId,
+            document.id(),
+            signal.get(),
+            discoveredVia
+        );
+        return key;
     }
 }

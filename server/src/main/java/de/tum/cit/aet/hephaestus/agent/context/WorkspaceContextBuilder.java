@@ -404,18 +404,18 @@ public class WorkspaceContextBuilder {
         }
     }
 
-    /** The job behind a PR/Issue/conversation review request, or {@code null} for the mentor-chat flow. */
+    /** The job behind any review request, or {@code null} for the mentor-chat flow. */
     private static @Nullable AgentJob reviewJob(ContextRequest request) {
-        if (request instanceof ContextRequest.PracticeReviewRequest pr) {
-            return pr.job();
-        }
-        if (request instanceof ContextRequest.IssueReviewRequest ir) {
-            return ir.job();
-        }
-        if (request instanceof ContextRequest.ConversationReviewRequest cr) {
-            return cr.job();
-        }
-        return null;
+        return switch (request) {
+            case ContextRequest.PracticeReviewRequest pr -> pr.job();
+            case ContextRequest.IssueReviewRequest ir -> ir.job();
+            case ContextRequest.ConversationReviewRequest cr -> cr.job();
+            case ContextRequest.DocumentReviewRequest dr -> dr.job();
+            // Mentor chat is synchronous and has no job. Exhaustive over the sealed type on purpose: an
+            // instanceof chain silently returned null for a variant it had not been told about, which is
+            // how DocumentReviewRequest came to be treated as the mentor flow.
+            case ContextRequest.MentorChatRequest ignored -> null;
+        };
     }
 
     /**

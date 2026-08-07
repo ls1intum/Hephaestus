@@ -151,7 +151,8 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
                     FixtureIntegration.handler(FixtureIntegration.SHIPMENT_EVENT)
                 )
             ),
-            List.of(FixtureIntegration.contextBuilder())
+            List.of(FixtureIntegration.contextBuilder()),
+            FixtureIntegration.executionCatalog()
         );
     }
 

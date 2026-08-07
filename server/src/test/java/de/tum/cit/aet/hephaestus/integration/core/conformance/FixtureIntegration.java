@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListen
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewExecutionCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
@@ -224,6 +225,23 @@ final class FixtureIntegration {
 
     static ReviewContextBuilder contextBuilder() {
         return () -> WIDGET;
+    }
+
+    /**
+     * The fixture's stand-in for a job type and a registered handler.
+     *
+     * <p>A widget has neither, and cannot: {@code AgentJobType} is a compiled enum in the agent module and
+     * the whole claim of this fixture is that no kind of ours needs to exist in {@code src/main}. So the
+     * executability the contract insists on is supplied here directly. That is not a hole — the rule under
+     * test is "a reviewable kind must be executable", and this is the fixture asserting that it is.
+     */
+    static ReviewExecutionCatalog executionCatalog() {
+        return () -> Set.of(WIDGET);
+    }
+
+    /** A build that can run nothing — for asserting the executability rule bites. */
+    static ReviewExecutionCatalog noExecutionCatalog() {
+        return Set::of;
     }
 
     /** The catalog a practices-module surface sees when this fixture is the only registered domain. */

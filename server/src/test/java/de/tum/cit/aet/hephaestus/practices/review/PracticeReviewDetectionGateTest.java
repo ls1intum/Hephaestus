@@ -885,4 +885,96 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
         }
     }
+
+    /**
+     * The gate reached by a kind that has no repository, no branch and no assignee.
+     *
+     * <p>Before this method existed, every entry point took a {@code PullRequest} or an {@code Issue}, so
+     * a repo-less kind could not be gated at all — it went straight to submission, and the difference
+     * between "no practice for this work" and "a practice bound to it and turned off" was lost. These
+     * tests use a document signal because that is the first kind to need it, but nothing in the method
+     * names one.
+     */
+    @Nested
+    class RepoLessSignalGate {
+
+        private static final SignalName DOCUMENT_PUBLISHED = SignalName.of("docs.document.published");
+
+        @Test
+        void detectsWhenAPracticeIsBoundToTheSignalAndAudible() {
+            Workspace workspace = createWorkspace();
+            when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
+                List.of(createPractice(DOCUMENT_PUBLISHED))
+            );
+
+            GateDecision decision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
+            assertThat(((GateDecision.Detect) decision).matchedPractices()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("a practice turned all the way down is a different answer from no practice at all")
+        void separatesSilencedFromAbsent() {
+            Workspace workspace = createWorkspace();
+            when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
+            Practice silenced = createPractice(DOCUMENT_PUBLISHED);
+            silenced.setReviewTier(PracticeReviewTier.OFF);
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(silenced));
+
+            GateDecision silencedDecision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+
+            assertThat(silencedDecision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) silencedDecision).resolvedSignalReason()).isEqualTo(
+                SignalStateReason.PRACTICE_TIER_OFF
+            );
+
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());
+            GateDecision absentDecision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+
+            assertThat(((GateDecision.Skip) absentDecision).resolvedSignalReason()).isEqualTo(
+                SignalStateReason.GATE_SKIPPED
+            );
+        }
+
+        @Test
+        void refusesWhenPracticesAreDisabledForTheWorkspace() {
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticesEnabled(false);
+
+            GateDecision decision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            verifyNoInteractions(practiceRepository);
+        }
+
+        @Test
+        void refusesWhenAutoTriggerIsOff() {
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
+
+            assertThat(gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO)).isInstanceOf(
+                GateDecision.Skip.class
+            );
+        }
+
+        @Test
+        @DisplayName("a repository-scoped workspace does not silence work that has no repository")
+        void reviewScopeDoesNotApplyToAKindWithoutARepository() {
+            // The scope names branches and repositories. A document has neither, so ANDing it on would
+            // silence every document in any workspace that had ever narrowed its SCM review scope — a
+            // refusal about one domain leaking into another.
+            Workspace workspace = createWorkspace();
+            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of("other/repo")));
+            when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
+                List.of(createPractice(DOCUMENT_PUBLISHED))
+            );
+
+            assertThat(gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO)).isInstanceOf(
+                GateDecision.Detect.class
+            );
+        }
+    }
 }

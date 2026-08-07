@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.context.providers.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -55,6 +57,7 @@ public class PracticeDetectionDeliveryService {
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
     private final ConversationSourceLiveness conversationSourceLiveness;
+    private final DocumentProjection documentProjection;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final ContentAddressedStore cas;
@@ -66,6 +69,7 @@ public class PracticeDetectionDeliveryService {
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
         ConversationSourceLiveness conversationSourceLiveness,
+        DocumentProjection documentProjection,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper,
         ContentAddressedStore cas,
@@ -76,6 +80,7 @@ public class PracticeDetectionDeliveryService {
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
         this.conversationSourceLiveness = conversationSourceLiveness;
+        this.documentProjection = documentProjection;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
         this.cas = cas;
@@ -643,6 +648,36 @@ public class PracticeDetectionDeliveryService {
                 );
             }
             return new Target(ArtifactKinds.CONVERSATION_THREAD, threadId, aboutUserId);
+        }
+        if (ArtifactKinds.DOCUMENT.value().equals(artifactKind)) {
+            // Repo-less, like a conversation: the subject is carried explicitly (about_user_id), resolved
+            // once at submission from the document's author. The document is re-read here only to confirm
+            // it still exists — a document erased or tombstoned while its review ran must not have
+            // observations filed against it, because nothing on any surface could then explain them.
+            JsonNode documentIdNode = metadata.get(DocumentContentSource.DOCUMENT_ID_METADATA_KEY);
+            if (documentIdNode == null || documentIdNode.isNull() || !documentIdNode.isNumber()) {
+                throw new JobDeliveryException(
+                    "Missing " +
+                        DocumentContentSource.DOCUMENT_ID_METADATA_KEY +
+                        " in job metadata: jobId=" +
+                        job.getId()
+                );
+            }
+            JsonNode aboutUserNode = metadata.get("about_user_id");
+            if (aboutUserNode == null || aboutUserNode.isNull() || !aboutUserNode.isNumber()) {
+                throw new JobDeliveryException("Missing about_user_id in job metadata: jobId=" + job.getId());
+            }
+            long documentId = documentIdNode.asLong();
+            boolean live = documentProjection
+                .documentById(job.getWorkspace().getId(), documentId)
+                .filter(document -> !document.deleted())
+                .isPresent();
+            if (!live) {
+                throw new JobDeliveryException(
+                    "Document target is gone: documentId=" + documentId + ", jobId=" + job.getId()
+                );
+            }
+            return new Target(ArtifactKinds.DOCUMENT, documentId, aboutUserNode.asLong());
         }
         if (ArtifactKinds.ISSUE.value().equals(artifactKind)) {
             JsonNode issueIdNode = metadata.get("issue_id");

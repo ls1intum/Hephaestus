@@ -13,4 +13,6 @@ public enum AgentJobType {
     ISSUE_REVIEW,
     /** Detection over a settled Slack conversation thread. */
     CONVERSATION_REVIEW,
+    /** Detection over one mirrored wiki document — its prose, its collection, and who wrote it. */
+    DOCUMENT_REVIEW,
 }

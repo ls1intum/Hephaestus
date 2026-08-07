@@ -35,6 +35,15 @@ public final class ArtifactKinds {
      */
     public static final ArtifactKind CONVERSATION_THREAD = ArtifactKind.of("chat.conversation_thread");
 
+    /**
+     * A written document — the prose itself, its collection and its authorship; no diff, no code.
+     *
+     * <p>Vendor-neutral although Outline is the only vendor that mirrors one today. The original is
+     * {@code DocsSignals.DOCUMENT} in {@code integration.outline}, and {@code ArtifactKindsAgreementTest}
+     * holds the two spellings to each other.
+     */
+    public static final ArtifactKind DOCUMENT = ArtifactKind.of("docs.document");
+
     private ArtifactKinds() {}
 
     /**

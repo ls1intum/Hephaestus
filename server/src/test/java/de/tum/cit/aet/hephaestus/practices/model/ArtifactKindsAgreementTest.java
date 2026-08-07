@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadArtifactDe
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocsSignals;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocumentArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
@@ -30,6 +32,7 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
         assertThat(ArtifactKinds.PULL_REQUEST).isEqualTo(ScmSignals.PULL_REQUEST);
         assertThat(ArtifactKinds.ISSUE).isEqualTo(ScmSignals.ISSUE);
         assertThat(ArtifactKinds.CONVERSATION_THREAD).isEqualTo(ChatSignals.CONVERSATION_THREAD);
+        assertThat(ArtifactKinds.DOCUMENT).isEqualTo(DocsSignals.DOCUMENT);
     }
 
     @Test
@@ -39,10 +42,13 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
         // and every signal name in every bundled practice's bindings. Re-spelling one without migrating
         // orphans every row already written under the old spelling.
         assertThat(
-            Stream.of(ArtifactKinds.PULL_REQUEST, ArtifactKinds.ISSUE, ArtifactKinds.CONVERSATION_THREAD).map(
-                ArtifactKind::value
-            )
-        ).containsExactly("scm.pull_request", "scm.issue", "chat.conversation_thread");
+            Stream.of(
+                ArtifactKinds.PULL_REQUEST,
+                ArtifactKinds.ISSUE,
+                ArtifactKinds.CONVERSATION_THREAD,
+                ArtifactKinds.DOCUMENT
+            ).map(ArtifactKind::value)
+        ).containsExactly("scm.pull_request", "scm.issue", "chat.conversation_thread", "docs.document");
     }
 
     @Test
@@ -51,7 +57,7 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
         assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.PULL_REQUEST)).isTrue();
         assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.ISSUE)).isFalse();
         assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.CONVERSATION_THREAD)).isFalse();
-        assertThat(ArtifactKinds.hasInlineLane(ArtifactKind.of("docs.document"))).isFalse();
+        assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.DOCUMENT)).isFalse();
     }
 
     @Test
@@ -65,7 +71,8 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
         for (ArtifactDescriptor descriptor : List.of(
             new PullRequestArtifactDescriptor(),
             new IssueArtifactDescriptor(),
-            new ConversationThreadArtifactDescriptor()
+            new ConversationThreadArtifactDescriptor(),
+            new DocumentArtifactDescriptor()
         )) {
             assertThat(ArtifactKinds.hasInlineLane(descriptor.kind()))
                 .as("ArtifactKinds and the descriptor disagree about the inline lane of '%s'", descriptor.kind())

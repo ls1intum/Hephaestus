@@ -254,7 +254,7 @@ export type LlmUsageByJobType = {
      * Confirmed spend on shared (instance) models for this job type, in USD.
      */
     instanceTotalCostUsd: number;
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'MENTOR_TURN';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'DOCUMENT_REVIEW' | 'MENTOR_TURN';
     outputTokens: number;
     /**
      * Spend on this workspace's own connected provider(s) for this job type, in USD.
@@ -3394,7 +3394,7 @@ export type AgentJob = {
     /**
      * Job type
      */
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'DOCUMENT_REVIEW';
     /**
      * Tokens read from prompt cache
      */

@@ -56,6 +56,9 @@ public final class PracticeTestEvidence {
         if (ArtifactKinds.CONVERSATION_THREAD.equals(artifactKind)) {
             return ChatSignals.CONVERSATION_THREAD_SETTLED;
         }
+        if (ArtifactKinds.DOCUMENT.equals(artifactKind)) {
+            return SignalName.of("docs.document.published");
+        }
         throw new IllegalArgumentException("Unsupported artifact kind: " + artifactKind);
     }
 
@@ -67,6 +70,8 @@ public final class PracticeTestEvidence {
             kinds = List.of("scm.issue.core");
         } else if (ArtifactKinds.CONVERSATION_THREAD.equals(artifactKind)) {
             kinds = List.of("slack.conversation.thread");
+        } else if (ArtifactKinds.DOCUMENT.equals(artifactKind)) {
+            kinds = List.of("docs.document.core");
         } else {
             throw new IllegalArgumentException("Unsupported artifact kind: " + artifactKind);
         }

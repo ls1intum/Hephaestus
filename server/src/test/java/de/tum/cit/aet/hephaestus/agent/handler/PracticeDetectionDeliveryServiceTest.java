@@ -74,6 +74,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private ConversationSourceLiveness conversationSourceLiveness;
 
     @Mock
+    private de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection documentProjection;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
@@ -100,6 +103,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             pullRequestRepository,
             issueRepository,
             conversationSourceLiveness,
+            documentProjection,
             eventPublisher,
             objectMapper,
             cas,

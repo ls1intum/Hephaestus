@@ -53,6 +53,17 @@ public enum SignalStateReason {
     /** The purse funding this binding is exhausted; it refills. */
     BUDGET_EXHAUSTED(SignalState.PENDING),
 
+    /**
+     * The artifact exists but nobody it could be attributed to resolves to a workspace member — the
+     * author has not linked the account this vendor knows them by.
+     *
+     * <p>Retryable, and that is the whole reason it is its own reason rather than a gate skip: linking an
+     * account is something the person can do afterwards, and when they do, every document of theirs that
+     * was passed over becomes reviewable without anything upstream having to happen again. Recording it as
+     * {@code GATE_SKIPPED} would make it terminal and lose that history silently.
+     */
+    SUBJECT_UNLINKED(SignalState.PENDING),
+
     /** The bound model left the catalog. An admin re-pointing the binding revives every pending signal. */
     MODEL_UNAVAILABLE(SignalState.PENDING),
 

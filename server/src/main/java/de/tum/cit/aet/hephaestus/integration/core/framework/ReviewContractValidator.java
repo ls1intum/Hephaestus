@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest.ReviewContribution;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewExecutionCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -41,6 +42,12 @@ import org.springframework.stereotype.Component;
  *   <li><b>Reviewability.</b> A kind declared reviewable must have a {@link ReviewContextBuilder}, at
  *       least one role to attribute to, and at least one lane to speak on — a review with no subject,
  *       no addressee, or nowhere to land is a job that can only fail after we have paid for it.
+ *   <li><b>Executability.</b> A kind declared reviewable must be one this build can actually <em>run</em> a
+ *       review of, per {@link ReviewExecutionCatalog}. Every rule above checks a declaration against
+ *       another declaration, and {@code docs.document} satisfied all of them for a whole slice while no
+ *       job type, no handler and no submitter existed — so a workspace with Outline connected saw the
+ *       bundled practice as live and it could never fire. That is the same shape of defect as a freshness
+ *       value with no producer: a claim nothing can falsify. This is the rule that falsifies it.
  *   <li><b>Lanes.</b> A delivered lane must be one the descriptor allows and one the manifest holds the
  *       matching {@link Capability} for, so "GitLab posts inline notes" cannot outlive the bean that
  *       posts them.
@@ -88,17 +95,23 @@ public class ReviewContractValidator {
     private final ArtifactDescriptorRegistry descriptors;
     private final IntegrationMessageHandlerRegistry handlers;
     private final Map<ArtifactKind, List<ReviewContextBuilder>> contextBuilders;
+    private final ReviewExecutionCatalog executionCatalog;
 
     public ReviewContractValidator(
         ArtifactDescriptorRegistry descriptors,
         IntegrationMessageHandlerRegistry handlers,
-        List<ReviewContextBuilder> contextBuilders
+        List<ReviewContextBuilder> contextBuilders,
+        ReviewExecutionCatalog executionCatalog
     ) {
         this.descriptors = descriptors;
         this.handlers = handlers;
         this.contextBuilders = contextBuilders
             .stream()
             .collect(Collectors.groupingBy(ReviewContextBuilder::artifactKind));
+        // Required, not optional. An optional catalog would mean the executability rule quietly stops
+        // applying in exactly the deployment where nothing runs reviews — which is the failure this rule
+        // exists to make impossible, reintroduced one level up.
+        this.executionCatalog = executionCatalog;
     }
 
     /** Rules about the domain's own declarations, independent of which vendors are enabled. */
@@ -124,6 +137,15 @@ public class ReviewContractValidator {
                 if (!contextBuilders.containsKey(kind)) {
                     violations.add(
                         kind + " is declared reviewable but no ReviewContextBuilder can assemble its review context"
+                    );
+                }
+                // Assembling a context is not running a review. A builder proves the evidence can be
+                // gathered; this proves something exists that would ever ask it to.
+                if (!executionCatalog.executableKinds().contains(kind)) {
+                    violations.add(
+                        kind +
+                            " is declared reviewable but no job type and handler can run a review of it — " +
+                            "a kind that can be authored against and never executed is silence by declaration"
                     );
                 }
                 if (descriptor.roles().isEmpty()) {

@@ -398,11 +398,12 @@ public class AgentJobService {
      * observations, which is how {@code SLACK_MESSAGE_THREAD} and {@code CONVERSATION_THREAD} came to
      * name the same thing.
      */
-    static ArtifactKind artifactKindFor(AgentJobType jobType) {
+    public static ArtifactKind artifactKindFor(AgentJobType jobType) {
         return switch (jobType) {
             case PULL_REQUEST_REVIEW -> ArtifactKinds.PULL_REQUEST;
             case ISSUE_REVIEW -> ArtifactKinds.ISSUE;
             case CONVERSATION_REVIEW -> ArtifactKinds.CONVERSATION_THREAD;
+            case DOCUMENT_REVIEW -> ArtifactKinds.DOCUMENT;
         };
     }
 

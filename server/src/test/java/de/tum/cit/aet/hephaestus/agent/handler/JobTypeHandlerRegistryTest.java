@@ -103,10 +103,23 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         );
     }
 
+    private JobTypeHandler documentReviewHandler() {
+        var parser = new PracticeDetectionResultParser(objectMapper);
+        var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
+        return new DocumentReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            envelopeWriter,
+            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            parser,
+            deliveryService
+        );
+    }
+
     /** A registry with the full handler set (every {@link AgentJobType} mapped). */
     private JobTypeHandlerRegistry fullRegistry() {
         return new JobTypeHandlerRegistry(
-            List.of(prReviewHandler(), issueReviewHandler(), conversationReviewHandler())
+            List.of(prReviewHandler(), issueReviewHandler(), conversationReviewHandler(), documentReviewHandler())
         );
     }
 
@@ -118,13 +131,17 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             var pr = prReviewHandler();
             var issue = issueReviewHandler();
             var conversation = conversationReviewHandler();
-            var registry = new JobTypeHandlerRegistry(List.of(pr, issue, conversation));
+            var document = documentReviewHandler();
+            var registry = new JobTypeHandlerRegistry(List.of(pr, issue, conversation, document));
 
             assertThat(registry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).isSameAs(pr);
             assertThat(registry.getHandler(AgentJobType.ISSUE_REVIEW)).isSameAs(issue);
             // Handler-registered contract: the conversation job type resolves to its handler, so a boot
             // with this bean set never trips the registry's "no handler registered" fail-fast.
             assertThat(registry.getHandler(AgentJobType.CONVERSATION_REVIEW)).isSameAs(conversation);
+            // Same for the document job type. It is also what ReviewContractValidator's executability rule
+            // reads: a reviewable kind with no handler here fails the boot rather than going quiet.
+            assertThat(registry.getHandler(AgentJobType.DOCUMENT_REVIEW)).isSameAs(document);
         }
 
         @Test

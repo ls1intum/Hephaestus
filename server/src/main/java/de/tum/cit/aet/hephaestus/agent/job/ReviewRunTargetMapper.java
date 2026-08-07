@@ -57,6 +57,20 @@ final class ReviewRunTargetMapper {
                 textValue(metadata, "slack_channel_name", null),
                 null
             );
+            // A document has no number and no repository; its collection is the nearest thing it has to a
+            // container, so it goes in the same slot a conversation's channel does. No URL: the mirror
+            // stores a slug, and the server it hangs off is connection state this mapper cannot reach —
+            // a link built from half of it would be a broken one.
+            case DOCUMENT_REVIEW -> new Target(
+                ArtifactKinds.DOCUMENT,
+                longValue(metadata, "docs_document_id"),
+                integrationKind,
+                null,
+                textValue(metadata, "title", "Document"),
+                null,
+                textValue(metadata, "docs_collection_name", null),
+                null
+            );
         };
     }
 

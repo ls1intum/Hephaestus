@@ -6902,6 +6902,7 @@ components:
           - PULL_REQUEST_REVIEW
           - ISSUE_REVIEW
           - CONVERSATION_REVIEW
+          - DOCUMENT_REVIEW
         llmCacheReadTokens:
           type: integer
           format: int32
@@ -9198,6 +9199,7 @@ components:
           - PULL_REQUEST_REVIEW
           - ISSUE_REVIEW
           - CONVERSATION_REVIEW
+          - DOCUMENT_REVIEW
           - MENTOR_TURN
         outputTokens:
           type: integer

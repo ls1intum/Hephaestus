@@ -232,7 +232,10 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         implementsSpiFromSameModule ||
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
-                        javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
+                        // Job type handlers implement the handler SPI; the review-execution catalog sits
+                        // with them because the question it answers — which kinds this build can run a
+                        // review of — is a fact about exactly this set of beans.
+                        javaClass.getPackageName().contains(".handler") ||
                         // Content sources are the agent's adapters onto a domain; one of them additionally
                         // declares ReviewContextBuilder so the integration framework can check that a
                         // reviewable artifact kind has something able to assemble its subject.

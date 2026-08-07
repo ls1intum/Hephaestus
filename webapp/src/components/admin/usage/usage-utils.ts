@@ -7,6 +7,7 @@ export const JOB_TYPE_LABELS: Record<LlmJobType, string> = {
 	PULL_REQUEST_REVIEW: "PR review",
 	ISSUE_REVIEW: "Issue review",
 	CONVERSATION_REVIEW: "Conversation review",
+	DOCUMENT_REVIEW: "Document review",
 	MENTOR_TURN: "Mentor turn",
 };
 

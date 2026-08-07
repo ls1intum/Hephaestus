@@ -170,6 +170,22 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
+    JobTypeHandler documentReviewHandler(
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService
+    ) {
+        return new DocumentReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            taskEnvelopeWriter,
+            practiceCatalogInjector,
+            resultParser,
+            deliveryService
+        );
+    }
+
+    @Bean
     JobTypeHandlerRegistry jobTypeHandlerRegistry(List<JobTypeHandler> handlers) {
         return new JobTypeHandlerRegistry(handlers);
     }

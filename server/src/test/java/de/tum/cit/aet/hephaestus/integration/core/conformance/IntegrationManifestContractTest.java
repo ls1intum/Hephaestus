@@ -150,14 +150,15 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
 
     /**
      * A validator wired with a handler for every event any supplied descriptor names, and a context
-     * builder for every reviewable kind. Those two are properties of the running application rather than
-     * of the manifest, and the real bootstrap checks them for real; supplying them here keeps this suite
-     * about the declaration.
+     * builder and a job type for every reviewable kind. Those are properties of the running application
+     * rather than of the manifest, and the real bootstrap checks them for real; supplying them here keeps
+     * this suite about the declaration.
      */
     private ReviewContractValidator validator() {
         List<ArtifactDescriptor> descriptors = descriptors();
         Set<EventTypeKey> producers = new LinkedHashSet<>();
         List<ReviewContextBuilder> builders = new ArrayList<>();
+        Set<ArtifactKind> executable = new LinkedHashSet<>();
         for (ArtifactDescriptor descriptor : descriptors) {
             for (Signal signal : descriptor.signals()) {
                 producers.addAll(signal.producedBy());
@@ -165,13 +166,15 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
             if (descriptor.reviewable()) {
                 ArtifactKind kind = descriptor.kind();
                 builders.add(() -> kind);
+                executable.add(kind);
             }
         }
         List<IntegrationMessageHandler> handlers = producers.stream().map(FixtureIntegration::handler).toList();
         return new ReviewContractValidator(
             new ArtifactDescriptorRegistry(descriptors),
             new IntegrationMessageHandlerRegistry(handlers),
-            builders
+            builders,
+            () -> executable
         );
     }
 

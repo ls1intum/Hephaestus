@@ -164,7 +164,8 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
             new ReviewContractValidator(
                 new ArtifactDescriptorRegistry(List.of()),
                 new IntegrationMessageHandlerRegistry(List.of()),
-                List.of()
+                List.of(),
+                Set::of
             ),
             webhookRoleEnabled
         );
