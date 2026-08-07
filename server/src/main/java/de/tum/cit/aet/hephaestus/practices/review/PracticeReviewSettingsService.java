@@ -39,7 +39,7 @@ public class PracticeReviewSettingsService {
         PracticeReviewSnapshot before = PracticeReviewSnapshot.of(settings);
         // Reset-to-inherit first, then the value patch, so a field can be reset and re-set in one request.
         settings.reset(req.reset());
-        settings.applyPatch(req.runForAllUsers(), req.skipDrafts(), req.deliverToMerged(), req.cooldownMinutes());
+        settings.applyPatch(req.runForAllUsers(), req.deliverToMerged(), req.cooldownMinutes());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
@@ -72,11 +72,9 @@ public class PracticeReviewSettingsService {
         PracticeReviewSettings s = workspace.getReviewSettings();
         return new PracticeReviewSettingsDTO(
             s.resolveRunForAllUsers(reviewProperties.runForAllUsers()),
-            s.resolveSkipDrafts(reviewProperties.skipDrafts()),
             s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
             s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
             s.getRunForAllUsers(),
-            s.getSkipDrafts(),
             s.getDeliverToMerged(),
             s.getCooldownMinutes()
         );

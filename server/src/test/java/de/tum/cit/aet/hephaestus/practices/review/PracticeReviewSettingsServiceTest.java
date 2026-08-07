@@ -29,10 +29,9 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     private Workspace workspace;
     private WorkspaceContext context;
 
-    // Fleet defaults: runForAll=false, skipDrafts=true, deliverToMerged=false, cooldown=15
+    // Fleet defaults: runForAll=false, deliverToMerged=false, cooldown=15
     private final PracticeReviewProperties reviewProperties = new PracticeReviewProperties(
         false,
-        true,
         false,
         15,
         false,
@@ -59,20 +58,19 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         PracticeReviewSettingsDTO view = service.getSettings(context);
 
         assertThat(view.runForAllUsers()).isTrue();
-        assertThat(view.skipDrafts()).isTrue();
         assertThat(view.cooldownMinutes()).isEqualTo(15);
         assertThat(view.runForAllUsersOverride()).isTrue();
-        assertThat(view.skipDraftsOverride()).isNull();
         assertThat(view.cooldownMinutesOverride()).isNull();
     }
 
     @Test
     void effectiveValueUsesOverrideOverPropertyWhenOverrideIsFalse() {
-        workspace.getReviewSettings().setSkipDrafts(false);
+        workspace.getReviewSettings().setDeliverToMerged(true);
 
         PracticeReviewSettingsDTO view = service.getSettings(context);
 
-        assertThat(view.skipDrafts()).isFalse();
+        assertThat(view.deliverToMerged()).isTrue();
+        assertThat(view.deliverToMergedOverride()).isTrue();
     }
 
     @Test
@@ -81,13 +79,13 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
-            new UpdatePracticeReviewSettingsRequestDTO(null, false, null, 30, null)
+            new UpdatePracticeReviewSettingsRequestDTO(null, true, 30, null)
         );
 
-        assertThat(workspace.getReviewSettings().getSkipDrafts()).isFalse();
+        assertThat(workspace.getReviewSettings().getDeliverToMerged()).isTrue();
         assertThat(workspace.getReviewSettings().getCooldownMinutes()).isEqualTo(30);
         assertThat(workspace.getReviewSettings().getRunForAllUsers()).isNull(); // untouched
-        assertThat(view.skipDrafts()).isFalse();
+        assertThat(view.deliverToMerged()).isTrue();
         assertThat(view.cooldownMinutes()).isEqualTo(30);
     }
 }

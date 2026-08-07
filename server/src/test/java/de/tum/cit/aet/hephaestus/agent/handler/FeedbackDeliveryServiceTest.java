@@ -540,22 +540,26 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             assertThat(body.getValue()).contains("Fix stuff.");
         }
 
+        /**
+         * A draft is not a reason to withhold. Whether a draft occasions a review is decided once, by the
+         * practice's binding, before the job is ever submitted; suppressing here as well meant the review
+         * that the binding deliberately asked for ran and told nobody.
+         */
         @Test
-        void skipsWhenPrDraft() {
+        void deliversToADraftBecauseTheBindingAlreadyDecidedItWasWorthReviewing() {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setDraft(true);
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_draft123");
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
-            verifyNoInteractions(commentPoster);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_DRAFT)
-            );
+            verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
+            var body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postFormattedBody(eq(job), body.capture());
+            assertThat(body.getValue()).contains("Fix stuff.");
         }
 
         @Test
@@ -1011,7 +1015,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private static PracticeReviewProperties reviewProperties(boolean progressFooter) {
-        return new PracticeReviewProperties(false, true, false, 15, progressFooter, false);
+        return new PracticeReviewProperties(false, false, 15, progressFooter, false);
     }
 
     private static TrendDelta resolvedTrend() {

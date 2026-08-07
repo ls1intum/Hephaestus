@@ -22,7 +22,13 @@ public enum FeedbackSuppressionReason {
     ARTIFACT_CLOSED,
     /** The target PR was already merged and merged-delivery is disabled for the workspace. */
     ARTIFACT_MERGED,
-    /** The target PR is a draft and draft-delivery is disabled for the workspace. */
+    /**
+     * Retired, and kept only so rows written before it was retired still read back.
+     *
+     * <p>Nothing produces it: whether a draft occasions a review is a property of the practice's
+     * binding, and a review the gate allowed to run is one whose result the author is meant to see.
+     */
+    @Deprecated
     ARTIFACT_DRAFT,
     /** The recipient disabled practice-feedback delivery. */
     RECIPIENT_OPTED_OUT,

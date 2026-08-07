@@ -818,7 +818,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 var practiceDetectionReadiness = mock(PracticeReviewReadiness.class);
                 var practiceRepository = mock(PracticeRepository.class);
                 var workspaceResolver = mock(WorkspaceResolver.class);
-                var properties = new PracticeReviewProperties(true, true, false, 15, false, false);
+                var properties = new PracticeReviewProperties(true, false, 15, false, false);
                 var realGate = new PracticeReviewDetectionGate(
                     properties,
                     userRoleChecker,

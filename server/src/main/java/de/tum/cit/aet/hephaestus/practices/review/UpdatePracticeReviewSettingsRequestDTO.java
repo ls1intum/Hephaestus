@@ -14,7 +14,6 @@ import java.util.Set;
 public record UpdatePracticeReviewSettingsRequestDTO(
     @Schema(description = "Run practice review for all developers (vs only the run_practice_review role)")
     Boolean runForAllUsers,
-    @Schema(description = "Skip practice review for draft PRs/MRs") Boolean skipDrafts,
     @Schema(description = "Deliver feedback to already-merged PRs/MRs") Boolean deliverToMerged,
     @Min(value = 0, message = "Cooldown must not be negative")
     @Max(value = 1440, message = "Cooldown must not exceed 1440 minutes")

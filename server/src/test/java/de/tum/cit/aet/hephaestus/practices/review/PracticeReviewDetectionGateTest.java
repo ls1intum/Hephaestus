@@ -61,7 +61,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, 15, false, false);
+        PracticeReviewProperties properties = new PracticeReviewProperties(false, false, 15, false, false);
         gate = new PracticeReviewDetectionGate(
             properties,
             userRoleChecker,
@@ -193,7 +193,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setDraft(true);
             Practice onDrafts = createDraftPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, onDrafts);
-            workspace.getReviewSettings().applyPatch(true, null, null, null);
+            workspace.getReviewSettings().applyPatch(true, null, null);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -208,7 +208,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setDraft(true);
             Practice onDrafts = createDraftPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL), onDrafts);
-            workspace.getReviewSettings().applyPatch(true, null, null, null);
+            workspace.getReviewSettings().applyPatch(true, null, null);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -221,7 +221,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Practice onDrafts = createDraftPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, onDrafts);
-            workspace.getReviewSettings().applyPatch(true, null, null, null);
+            workspace.getReviewSettings().applyPatch(true, null, null);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -419,7 +419,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
         @Test
         void detectWhenRunForAllUsers() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, 15, false, false);
+            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, false, 15, false, false);
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,

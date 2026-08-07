@@ -28,7 +28,16 @@ public class PracticeReviewSettings {
     @Nullable
     private Boolean runForAllUsers;
 
-    /** Skip practice review for draft PRs/MRs. */
+    /**
+     * Retired: whether a draft occasions a review is now a property of the practice's binding.
+     *
+     * <p>Nothing reads this. It was a fleet-wide veto on the whole practice set, applied before anything
+     * else, so a practice whose subject <em>is</em> the draft hand-over could never reach a draft — and
+     * once the gate stopped vetoing, this went on suppressing the delivery, so the review ran and told
+     * nobody. The column stays for one release under deprecate-then-remove; the mapping stays with it so
+     * the schema and the entity do not disagree in the meantime.
+     */
+    @Deprecated(forRemoval = true)
     @Column(name = "practice_skip_drafts")
     @Nullable
     private Boolean skipDrafts;
@@ -47,10 +56,6 @@ public class PracticeReviewSettings {
         return runForAllUsers != null ? runForAllUsers : fallback;
     }
 
-    public boolean resolveSkipDrafts(boolean fallback) {
-        return skipDrafts != null ? skipDrafts : fallback;
-    }
-
     public boolean resolveDeliverToMerged(boolean fallback) {
         return deliverToMerged != null ? deliverToMerged : fallback;
     }
@@ -62,12 +67,10 @@ public class PracticeReviewSettings {
     /** PATCH semantics: only non-null fields overwrite; null leaves the current value untouched. */
     public void applyPatch(
         @Nullable Boolean runForAllUsers,
-        @Nullable Boolean skipDrafts,
         @Nullable Boolean deliverToMerged,
         @Nullable Integer cooldownMinutes
     ) {
         if (runForAllUsers != null) this.runForAllUsers = runForAllUsers;
-        if (skipDrafts != null) this.skipDrafts = skipDrafts;
         if (deliverToMerged != null) this.deliverToMerged = deliverToMerged;
         if (cooldownMinutes != null) this.cooldownMinutes = cooldownMinutes;
     }
@@ -86,6 +89,8 @@ public class PracticeReviewSettings {
                     this.runForAllUsers = null;
                     yield true;
                 }
+                // Retired; the field it cleared is no longer read. The constant stays until the column
+                // goes, so a stored reset request written by an older client is still understood.
                 case SKIP_DRAFTS -> {
                     this.skipDrafts = null;
                     yield true;

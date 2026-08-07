@@ -12,7 +12,6 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param runForAllUsers      whether to run practice review for all PRs (true) or only for users
  *                            with the {@code run_practice_review} feature flag (false)
- * @param skipDrafts          whether to skip practice review for draft PRs
  * @param deliverToMerged     whether to deliver feedback to already-merged PRs
  * @param cooldownMinutes     minimum minutes between reviews for the same PR. 0 disables cooldown.
  * @param progressFooter      append the cross-run progress-delta footer (B1/B3) and post the re-review
@@ -24,7 +23,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
 public record PracticeReviewProperties(
     @DefaultValue("false") boolean runForAllUsers,
-    @DefaultValue("true") boolean skipDrafts,
     @DefaultValue("false") boolean deliverToMerged,
     @Min(0) @DefaultValue("15") int cooldownMinutes,
     @DefaultValue("false") boolean progressFooter,

@@ -104,14 +104,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.class
                 ),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(
-                    false,
-                    true,
-                    false,
-                    15,
-                    false,
-                    false
-                )
+                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(false, false, 15, false, false)
             )
         );
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));

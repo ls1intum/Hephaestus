@@ -12,13 +12,11 @@ import org.jspecify.annotations.NonNull;
 @Schema(description = "A workspace's practice-review policy: effective values plus raw overrides")
 public record PracticeReviewSettingsDTO(
     @NonNull @Schema(description = "Effective: run practice review for all developers") Boolean runForAllUsers,
-    @NonNull @Schema(description = "Effective: skip draft PRs/MRs") Boolean skipDrafts,
     @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs") Boolean deliverToMerged,
     @NonNull
     @Schema(description = "Effective: minimum minutes between reviews for the same PR")
     Integer cooldownMinutes,
     @Schema(description = "Raw override; null = inheriting the fleet default") Boolean runForAllUsersOverride,
-    @Schema(description = "Raw override; null = inheriting the fleet default") Boolean skipDraftsOverride,
     @Schema(description = "Raw override; null = inheriting the fleet default") Boolean deliverToMergedOverride,
     @Schema(description = "Raw override; null = inheriting the fleet default") Integer cooldownMinutesOverride
 ) {}

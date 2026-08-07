@@ -12,16 +12,10 @@ import org.jspecify.annotations.Nullable;
  */
 record PracticeReviewSnapshot(
     @Nullable Boolean runForAllUsers,
-    @Nullable Boolean skipDrafts,
     @Nullable Boolean deliverToMerged,
     @Nullable Integer cooldownMinutes
 ) implements ConfigAuditSnapshot {
     static PracticeReviewSnapshot of(PracticeReviewSettings s) {
-        return new PracticeReviewSnapshot(
-            s.getRunForAllUsers(),
-            s.getSkipDrafts(),
-            s.getDeliverToMerged(),
-            s.getCooldownMinutes()
-        );
+        return new PracticeReviewSnapshot(s.getRunForAllUsers(), s.getDeliverToMerged(), s.getCooldownMinutes());
     }
 }
