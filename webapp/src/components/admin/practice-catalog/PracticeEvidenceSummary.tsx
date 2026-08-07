@@ -184,7 +184,6 @@ export function PracticeEvidenceSummary({
 					{bindings.length > 0 ? (
 						bindings.map((binding, index) => (
 							<OccasionSummary
-								// An occasion has no id; its place in the list is its identity.
 								key={binding.signals.join(",") || index}
 								binding={binding}
 								index={index}

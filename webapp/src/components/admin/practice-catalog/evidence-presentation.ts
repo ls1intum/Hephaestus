@@ -18,9 +18,7 @@ export function evidenceSourceLabel(
 
 /**
  * What requiring this source demands of its capture. The source contract answers it, not the
- * practice: freshness used to be the other half of this sentence and was removed because nothing
- * could report a source as stale, and completeness followed it out of the practice because every
- * practice had already said the same thing about the same source.
+ * practice: how completely a source can be captured is a property of the source.
  */
 export function evidenceQualityLabel(
 	quality: PracticeEvidenceSourceOption["requiredQuality"] | undefined,

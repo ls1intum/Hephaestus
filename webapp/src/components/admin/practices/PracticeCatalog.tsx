@@ -54,10 +54,7 @@ import { CatalogOriginBadge } from "./CatalogOriginBadge";
 /**
  * How loud a practice is allowed to be, ascending. Every tier above "Off" runs the review and records
  * the measurement; they differ only in how far the result travels, which is the whole reason the
- * setting exists — turning a noisy practice down no longer costs the behaviour data.
- *
- * "Coach" says "mentor chat" rather than "quiet channels" on purpose: the private reflection surface
- * has no producer yet, so naming it here would promise the admin a delivery that never happens.
+ * setting exists — turning a noisy practice down does not cost the behaviour data.
  */
 const REVIEW_TIERS = [
 	{ value: "OFF", label: "Off", hint: "Not reviewed at all." },
@@ -428,8 +425,9 @@ function PracticeActions({
 	onDelete: (practice: Practice) => void;
 }) {
 	const canReview = canAttemptAutomatedReview(practice.automatedReviewPolicy, supportedModes);
-	// A practice whose policy cannot run an automated review can only ever be Off, so the control is
-	// frozen there rather than offering three tiers that would all be refused by the server.
+	// A practice whose policy cannot run an automated review has nowhere to go from Off, so the
+	// control is frozen there rather than offering three tiers the server would refuse. One already
+	// above Off keeps its control, because turning a practice down must never need a policy edit.
 	const tierChangeDisabled = pending || (practice.reviewTier === "OFF" && !canReview);
 	return (
 		<>

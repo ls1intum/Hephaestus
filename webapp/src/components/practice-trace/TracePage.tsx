@@ -13,9 +13,9 @@ import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import {
 	artifactKindIcon,
-	deliveryLabel,
 	DISCOVERED_VIA_DESCRIPTIONS,
 	DISCOVERED_VIA_LABELS,
+	deliveryLabel,
 	occurrenceDomId,
 	REVIEW_TIER_DESCRIPTIONS,
 	REVIEW_TIER_LABELS,

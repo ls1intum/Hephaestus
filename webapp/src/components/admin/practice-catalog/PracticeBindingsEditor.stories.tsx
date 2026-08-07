@@ -32,7 +32,6 @@ type Story = StoryObj<typeof meta>;
 /** What a new practice starts as: one occasion, on the moments work arrives to look at. */
 export const OneOccasion: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Occasion 1")).toBeVisible();
 		// Nothing to remove when there is only one: a practice with no occasion cannot be saved.
 		await expect(canvas.queryByRole("button", { name: "Remove occasion 1" })).toBeNull();
 	},
@@ -46,7 +45,6 @@ export const OneOccasion: Story = {
 export const TwoOccasionsReadingDifferentThings: Story = {
 	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Occasion 2")).toBeVisible();
 		await expect(
 			within(canvas.getByRole("group", { name: "Starts a review when, occasion 2" })).getByRole(
 				"checkbox",

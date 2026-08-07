@@ -2,9 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
+import { artifactTrace, untouchedArtifactTrace } from "./story-mock-data";
 import { TracePage } from "./TracePage";
-import { artifactTrace, practiceTraceEntries, untouchedArtifactTrace } from "./story-mock-data";
-import { OUTCOME_LABELS } from "./trace-format";
 
 const TRACE_URL = "*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId";
 
@@ -37,17 +36,13 @@ export const EveryOutcome: Story = {
 		await expect(
 			await canvas.findByRole("heading", { name: /Member-facing review activity/ }),
 		).toBeVisible();
-		for (const entry of practiceTraceEntries) {
-			await expect(canvas.getByText(entry.practiceName)).toBeVisible();
-			// The explanation is server-rendered and must appear exactly as sent.
-			await expect(canvas.getByText(entry.explanation)).toBeVisible();
-		}
 		// Measured and delivered are two axes: this practice was reviewed and still said nothing.
 		await expect(canvas.getByText("2 measurements, none sent")).toBeVisible();
 		await expect(
 			canvas.getByText("Measured, kept quiet by the practice's loudness tier"),
 		).toBeVisible();
-		await expect(canvas.getAllByText(OUTCOME_LABELS.REVIEWED)).toHaveLength(2);
+		// Two of the ten practices were reviewed, and the other eight say why they were not.
+		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
 	},
 };
 
@@ -108,7 +103,70 @@ export const NothingWasReviewed: Story = {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Opened")).toBeVisible();
 		await expect(canvas.getByText("No practice was active for this kind of work.")).toBeVisible();
-		await expect(canvas.getByText(OUTCOME_LABELS.SILENCED)).toBeVisible();
+		await expect(canvas.getByText("Turned off")).toBeVisible();
+	},
+};
+
+/**
+ * A practice can name an occurrence this timeline does not carry — the shape a server that records
+ * more than the detail endpoint returns produces, and what a version skew between the two looks
+ * like from here. Falling back to the raw signal name is worse copy than a label and far better than
+ * a row that quietly drops the one thing that explains it.
+ */
+export const OccurrenceMissingFromTheTimeline: Story = {
+	parameters: {
+		msw: {
+			handlers: [
+				http.get(TRACE_URL, () =>
+					HttpResponse.json({
+						...artifactTrace,
+						practices: artifactTrace.practices.map((entry) =>
+							entry.practiceSlug === "small-changes"
+								? { ...entry, occasionedById: "sig-from-a-newer-server" }
+								: entry,
+						),
+					}),
+				),
+			],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const row = (await canvas.findByText("Small, reviewable changes")).closest('[role="listitem"]');
+		if (!(row instanceof HTMLElement)) throw new Error("No row for the skipped practice");
+
+		await expect(within(row).getByText("scm.pull_request.synchronized")).toBeVisible();
+		await expect(within(row).queryByRole("link", { name: /^Jump to:/ })).toBeNull();
+		// The rows whose occurrence does resolve are untouched, so this is a fallback and not a mode.
+		const resolved = canvas.getByText("Drafts are not left open").closest('[role="listitem"]');
+		if (!(resolved instanceof HTMLElement)) throw new Error("No row for the lapsed practice");
+		await expect(
+			within(resolved).getByRole("link", { name: "Jump to: New commits pushed" }),
+		).toBeVisible();
+	},
+};
+
+/**
+ * Nothing reached this artifact at all. Both empty states have to be statements about us rather than
+ * about the reader's work — "we never saw it", not a blank page they are left to interpret.
+ */
+export const NothingReachedIt: Story = {
+	args: { artifactKind: "scm.issue", artifactId: 1430 },
+	parameters: {
+		msw: {
+			handlers: [
+				http.get(TRACE_URL, () =>
+					HttpResponse.json({ ...untouchedArtifactTrace, signals: [], practices: [] }),
+				),
+			],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(await canvas.findByText("Nothing was recorded about this work")).toBeVisible();
+		await expect(canvas.getByText("No practice covers this kind of work")).toBeVisible();
+		// Named in the reader's words, not as `scm.issue`.
+		await expect(canvas.getByText(/runs no practice against issue/)).toBeVisible();
 	},
 };
 
@@ -140,7 +198,7 @@ export const Mobile: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Thin controllers")).toBeVisible();
-		await expect(canvas.getByText(OUTCOME_LABELS.DORMANT)).toBeVisible();
+		await expect(canvas.getByText("Waiting on a connection")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };

@@ -66,6 +66,14 @@ export const ChooseARange: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/nothing is reviewed until you confirm/i)).toBeInTheDocument();
+		// Both pickers say what is chosen in the reader's words. A closed Base UI trigger falls back to
+		// printing the raw value, and "scm.pull_request" over "30" is not a decision anyone can check.
+		await expect(canvas.getByRole("combobox", { name: /Kind of work/ })).toHaveTextContent(
+			"Pull or merge requests",
+		);
+		await expect(canvas.getByRole("combobox", { name: /How far back/ })).toHaveTextContent(
+			"The last 30 days",
+		);
 		await expectNoPageOverflow();
 	},
 };

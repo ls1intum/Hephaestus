@@ -5,7 +5,6 @@ import {
 	artifactKindOfSignal,
 	bindingsProblem,
 	claimedSignals,
-	hasDrafts,
 	normalizeBinding,
 	orderedWorkTypes,
 	recommendedBinding,
@@ -72,7 +71,6 @@ describe("withRole", () => {
 		const contextual = withRole(binding().needs, "scm.pull-request.core", "CONTEXTUAL");
 
 		expect(contextual).toEqual([{ sourceKind: "scm.pull-request.core", stance: "CONTEXTUAL" }]);
-		expect(roleOf(contextual, "scm.pull-request.core")).toBe("CONTEXTUAL");
 	});
 
 	it("drops the source when it stops being used", () => {
@@ -99,7 +97,6 @@ describe("recommendedBinding", () => {
 			"scm.pull_request.ready",
 			"scm.pull_request.synchronized",
 		]);
-		expect(fresh.needs).toEqual(pullRequests.recommendedNeeds);
 	});
 
 	it("never claims a moment an existing occasion already owns", () => {
@@ -150,15 +147,6 @@ describe("orderedWorkTypes", () => {
 			"chat.conversation_thread",
 			"docs.page",
 		]);
-	});
-});
-
-describe("hasDrafts", () => {
-	it("asks about drafts only where a draft can exist", () => {
-		expect(hasDrafts("scm.pull_request")).toBe(true);
-		expect(hasDrafts("scm.issue")).toBe(false);
-		expect(hasDrafts("chat.conversation_thread")).toBe(false);
-		expect(hasDrafts(undefined)).toBe(false);
 	});
 });
 

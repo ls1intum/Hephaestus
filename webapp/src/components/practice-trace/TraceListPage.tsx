@@ -74,6 +74,12 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 			...(search.kind ? [search.kind] : []),
 		]),
 	];
+	// `items` is what lets the closed trigger show a choice's words. Without it Base UI has nothing to
+	// resolve the selected value against and prints the value itself — "scm.issue", not "Issues".
+	const kindItems = [
+		{ value: ALL_KINDS, label: "All work" },
+		...kinds.map((kind) => ({ value: kind, label: artifactKindPluralLabel(kind) })),
+	];
 	const hasFilter = Boolean(search.kind);
 
 	return (
@@ -100,6 +106,7 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 							Show
 						</Label>
 						<Select
+							items={kindItems}
 							value={search.kind ?? ALL_KINDS}
 							onValueChange={(value) =>
 								onSearchChange({
@@ -112,10 +119,9 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 								<SelectValue placeholder="All work" />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value={ALL_KINDS}>All work</SelectItem>
-								{kinds.map((kind) => (
-									<SelectItem key={kind} value={kind}>
-										{artifactKindPluralLabel(kind)}
+								{kindItems.map((kind) => (
+									<SelectItem key={kind.value} value={kind.value}>
+										{kind.label}
 									</SelectItem>
 								))}
 							</SelectContent>

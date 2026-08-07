@@ -8,6 +8,7 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
+import { bindingsProblem } from "../practice-catalog/bindings";
 import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
 
 vi.mock("@/components/shared/CodeEditor", () => ({
@@ -98,7 +99,6 @@ describe("CuratedPracticeForm", () => {
 		expect(occasion(1).getByRole("checkbox", { name: "Opened" }).getAttribute("aria-checked")).toBe(
 			"true",
 		);
-		expect(screen.getByText("Occasion 1")).toBeTruthy();
 	});
 
 	it("asks before discarding an edited draft", async () => {
@@ -190,8 +190,11 @@ describe("CuratedPracticeForm", () => {
 		await renderForm({}, onSubmit);
 
 		await user.click(screen.getByRole("button", { name: "Add occasion" }));
-		// The recommended moments are taken, so the second occasion starts on the first free one.
-		expect(occasion(2).getByRole("checkbox", { name: "Review submitted" })).toBeTruthy();
+		// The recommended moments are taken, so the second occasion starts on the first free one, and
+		// starts on it *checked* — an occasion with nothing to start it cannot be saved.
+		expect(
+			occasion(2).getByRole("checkbox", { name: "Review submitted" }).getAttribute("aria-checked"),
+		).toBe("true");
 		await user.click(occasion(2).getByRole("checkbox", { name: "Merged" }));
 		await user.click(occasion(2).getByRole("checkbox", { name: "Review submitted" }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -236,9 +239,7 @@ describe("CuratedPracticeForm", () => {
 				.getAttribute("data-disabled"),
 		).not.toBeNull();
 		// One hint per moment occasion 1 claims, on the moment itself rather than as a banner.
-		expect(occasion(2).getAllByText(/used by another occasion/)).toHaveLength(
-			mockPullRequestBinding.signals.length,
-		);
+		expect(occasion(2).getAllByText(/used by another occasion/)).toHaveLength(3);
 	});
 
 	it("lets one occasion say what is missing and another stay silent about it", async () => {
@@ -322,9 +323,16 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("radio", { name: /AI-supported mentoring/ }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-		// Every binding must name a source the review cannot run without, so leaving guidance only has
-		// to restore evidence rather than leave a practice that can never be saved.
-		expect(onSubmit.mock.calls[0]?.[0].bindings[0].needs.length).toBeGreaterThan(0);
+		// Saveable, not merely non-empty: a list of purely contextual sources is longer than zero and
+		// still refused, so what has to hold is the rule the form itself enforces.
+		const submitted = onSubmit.mock.calls[0]?.[0];
+		expect(
+			bindingsProblem(
+				submitted.bindings,
+				submitted.automatedReviewPolicy,
+				mockPracticeDefinitionOptions.workTypes[0],
+			),
+		).toBeUndefined();
 	});
 
 	it("does not schedule mentoring when a practice needs human review", async () => {

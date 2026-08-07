@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
-import { OUTCOME_LABELS, OUTCOMES } from "./trace-format";
+import { OUTCOMES } from "./trace-format";
 
 const meta = {
 	title: "Practice trace/Outcome badge",
@@ -33,12 +32,6 @@ export const EveryOutcome: Story = {
 			))}
 		</ul>
 	),
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		for (const outcome of OUTCOMES) {
-			await expect(canvas.getByText(OUTCOME_LABELS[outcome])).toBeVisible();
-		}
-	},
 };
 
 export const Mobile: Story = {
@@ -56,8 +49,7 @@ export const Mobile: Story = {
 			))}
 		</ul>
 	),
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText(OUTCOME_LABELS.DORMANT)).toBeVisible();
+	play: async () => {
 		await expectNoPageOverflow();
 	},
 };

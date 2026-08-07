@@ -48,6 +48,14 @@ export interface PracticeReviewBackfillProps {
  */
 const WORK_KINDS = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue] as const;
 
+// `items` is what lets the closed trigger show a choice's words. Without it Base UI has nothing to
+// resolve the selected value against and prints the value itself — "scm.pull_request", not "Pull or
+// merge requests".
+const WORK_KIND_ITEMS = WORK_KINDS.map((kind) => ({
+	value: kind as string,
+	label: artifactKindPluralLabel(kind),
+}));
+
 const WINDOWS = [
 	{ value: "7", label: "The last 7 days" },
 	{ value: "30", label: "The last 30 days" },
@@ -173,6 +181,7 @@ function EstimateCard({
 						</FieldDescription>
 					</FieldContent>
 					<Select
+						items={WORK_KIND_ITEMS}
 						value={artifactKind}
 						onValueChange={(value) => {
 							if (value) {
@@ -184,9 +193,9 @@ function EstimateCard({
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							{WORK_KINDS.map((kind) => (
-								<SelectItem key={kind} value={kind}>
-									{artifactKindPluralLabel(kind)}
+							{WORK_KIND_ITEMS.map((kind) => (
+								<SelectItem key={kind.value} value={kind.value}>
+									{kind.label}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -198,7 +207,7 @@ function EstimateCard({
 						<FieldLabel htmlFor="backfill-window">How far back</FieldLabel>
 						<FieldDescription>Counted from when the work was opened.</FieldDescription>
 					</FieldContent>
-					<Select value={days} onValueChange={(value) => setDays(value ?? days)}>
+					<Select items={WINDOWS} value={days} onValueChange={(value) => setDays(value ?? days)}>
 						<SelectTrigger id="backfill-window" className="w-56">
 							<SelectValue />
 						</SelectTrigger>
