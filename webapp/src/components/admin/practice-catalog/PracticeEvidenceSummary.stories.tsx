@@ -1,13 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { mockPracticeDefinitionOptions, mockPullRequestEvidence } from "@/mocks/fixtures/practice";
+import {
+	mockMergeBinding,
+	mockPracticeDefinitionOptions,
+	mockPullRequestBinding,
+	mockPullRequestPolicy,
+} from "@/mocks/fixtures/practice";
 import { PracticeEvidenceSummary } from "./PracticeEvidenceSummary";
 
 const meta = {
 	title: "Workspace admin/Practices/Evidence summary",
 	component: PracticeEvidenceSummary,
 	args: {
-		policy: mockPullRequestEvidence,
+		policy: mockPullRequestPolicy,
+		bindings: [mockPullRequestBinding, mockMergeBinding],
 		sources: mockPracticeDefinitionOptions.workTypes[0].allowedSources,
+		signals: mockPracticeDefinitionOptions.workTypes[0].signals,
 		workTypeLabel: "Pull or merge request",
 		validation: {
 			status: "STALE",
@@ -26,3 +33,16 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const StaleIndependentValidation: Story = {};
+
+/**
+ * One occasion, read back as the sentence it is. Merging both occasions' evidence into a single list
+ * would claim the practice always reads the review threads whole — which only the review at the merge
+ * does.
+ */
+export const OneOccasion: Story = {
+	args: { bindings: [mockPullRequestBinding] },
+};
+
+export const NoOccasion: Story = {
+	args: { bindings: [] },
+};

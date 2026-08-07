@@ -1,7 +1,9 @@
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeAutomatedReviewValidation,
+	PracticeBinding,
 	PracticeEvidenceSourceOption,
+	PracticeSignalOption,
 } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
@@ -29,61 +31,80 @@ const VALIDATION_VARIANTS: Record<
 	SUPERSEDED: "warning",
 };
 
-function RequiredEvidence({
-	needs,
-	sources,
-}: {
-	needs: PracticeAutomatedReviewPolicy["needs"];
-	sources: readonly PracticeEvidenceSourceOption[];
-}) {
-	const required = needs.filter((need) => need.stance === "REQUIRED");
-	if (required.length === 0) return <span>None</span>;
-	return (
-		<ul className="space-y-1">
-			{required.map((need) => (
-				<li key={need.sourceKind}>
-					<span>{evidenceSourceLabel(need.sourceKind, sources)}</span>
-					<span className="text-muted-foreground">
-						{" "}
-						·{" "}
-						{evidenceQualityLabel(
-							sources.find((source) => source.sourceKind === need.sourceKind)?.requiredQuality,
-						)}
-					</span>
-				</li>
-			))}
-		</ul>
-	);
+function signalLabel(signal: string, signals: readonly PracticeSignalOption[]) {
+	return signals.find((option) => option.signal === signal)?.displayName ?? signal;
 }
 
-function OptionalContext({
-	needs,
-	options,
-}: {
-	needs: PracticeAutomatedReviewPolicy["needs"];
-	options: readonly PracticeEvidenceSourceOption[];
-}) {
-	const contextual = needs.filter((need) => need.stance === "CONTEXTUAL");
-	if (contextual.length === 0) return <span>None</span>;
+interface OccasionSummaryProps {
+	binding: PracticeBinding;
+	index: number;
+	sources: readonly PracticeEvidenceSourceOption[];
+	signals: readonly PracticeSignalOption[];
+}
+
+/**
+ * One occasion, read back as the sentence it is: this review starts here, and reads these things.
+ *
+ * <p>Listing every occasion separately rather than merging their evidence into one set is the whole
+ * point of binding evidence to the occasion — a merged list would say the practice reads the review
+ * threads exhaustively without saying that only the review at the merge does.
+ */
+function OccasionSummary({ binding, index, sources, signals }: OccasionSummaryProps) {
+	const required = binding.needs.filter((need) => need.stance !== "CONTEXTUAL");
+	const contextual = binding.needs.filter((need) => need.stance === "CONTEXTUAL");
 	return (
-		<ul className="space-y-1">
-			{contextual.map((need) => (
-				<li key={need.sourceKind}>
-					<span>{evidenceSourceLabel(need.sourceKind, options)}</span>
-					<span className="text-muted-foreground">
-						{" "}
-						· Used when available; never blocks a review
-					</span>
-				</li>
-			))}
-		</ul>
+		<div className="rounded-md border p-3">
+			<p className="font-medium">
+				Occasion {index + 1}:{" "}
+				{binding.signals.map((signal) => signalLabel(signal, signals)).join(", ")}
+				{binding.onDrafts && (
+					<span className="font-normal text-muted-foreground"> · also while a draft</span>
+				)}
+			</p>
+			<dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[8rem_1fr]">
+				<dt className="text-muted-foreground">Must have</dt>
+				<dd>
+					{required.length > 0 ? (
+						<ul>
+							{required.map((need) => (
+								<li key={need.sourceKind}>
+									{evidenceSourceLabel(need.sourceKind, sources)}
+									<span className="text-muted-foreground">
+										{" · "}
+										{need.stance === "EXHAUSTIVE"
+											? "captured whole, so it can say what is missing"
+											: evidenceQualityLabel(
+													sources.find((source) => source.sourceKind === need.sourceKind)
+														?.requiredQuality,
+												)}
+									</span>
+								</li>
+							))}
+						</ul>
+					) : (
+						<span className="text-muted-foreground">Nothing</span>
+					)}
+				</dd>
+				<dt className="text-muted-foreground">May also use</dt>
+				<dd>
+					{contextual.length > 0 ? (
+						contextual.map((need) => evidenceSourceLabel(need.sourceKind, sources)).join(", ")
+					) : (
+						<span className="text-muted-foreground">Nothing</span>
+					)}
+				</dd>
+			</dl>
+		</div>
 	);
 }
 
 export interface PracticeEvidenceSummaryProps {
 	policy: PracticeAutomatedReviewPolicy;
+	/** The occasions this practice is reviewed on, each with the evidence that review reads. */
+	bindings: readonly PracticeBinding[];
 	validation: PracticeAutomatedReviewValidation;
 	sources: readonly PracticeEvidenceSourceOption[];
+	signals?: readonly PracticeSignalOption[];
 	workTypeLabel: string;
 	className?: string;
 }
@@ -135,8 +156,10 @@ export function PracticeAutomatedReviewValidationSummary({
 
 export function PracticeEvidenceSummary({
 	policy,
+	bindings,
 	validation,
 	sources,
+	signals = [],
 	workTypeLabel,
 	className,
 }: PracticeEvidenceSummaryProps) {
@@ -152,20 +175,27 @@ export function PracticeEvidenceSummary({
 				</dd>
 			</div>
 			<div>
-				<dt className="font-medium">Required evidence</dt>
-				<dd>
-					<RequiredEvidence needs={policy.needs} sources={sources} />
-				</dd>
-			</div>
-			<div>
-				<dt className="font-medium">Optional context</dt>
-				<dd>
-					<OptionalContext needs={policy.needs} options={sources} />
-				</dd>
-			</div>
-			<div>
 				<dt className="font-medium">When evidence requirements are not met</dt>
 				<dd className="text-muted-foreground">Skip this practice rather than guess</dd>
+			</div>
+			<div className="sm:col-span-2">
+				<dt className="font-medium">When it is reviewed, and what it reads</dt>
+				<dd className="mt-1 space-y-2">
+					{bindings.length > 0 ? (
+						bindings.map((binding, index) => (
+							<OccasionSummary
+								// An occasion has no id; its place in the list is its identity.
+								key={binding.signals.join(",") || index}
+								binding={binding}
+								index={index}
+								sources={sources}
+								signals={signals}
+							/>
+						))
+					) : (
+						<span className="text-muted-foreground">No occasion starts a review</span>
+					)}
+				</dd>
 			</div>
 			<div>
 				<dt className="font-medium">AI mentoring validation</dt>

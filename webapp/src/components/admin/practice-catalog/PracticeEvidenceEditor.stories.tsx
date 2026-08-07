@@ -1,16 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 import { expect, fn, within } from "storybook/test";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { mockPracticeDefinitionOptions, mockPullRequestBinding } from "@/mocks/fixtures/practice";
 import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 
-const pullRequestOptions = mockPracticeDefinitionOptions.workTypes[0];
+const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
 
 const meta = {
-	title: "Workspace admin/Practices/AI mentoring",
+	title: "Workspace admin/Practices/Occasion evidence",
 	component: PracticeEvidenceEditor,
 	args: {
-		options: pullRequestOptions,
-		value: pullRequestOptions.recommendedRequirements,
+		options: pullRequests,
+		needs: mockPullRequestBinding.needs,
+		idPrefix: "practice-binding-0",
+		occasionLabel: "occasion 1",
 		onChange: fn(),
 	},
 	parameters: { layout: "padded" },
@@ -20,83 +23,95 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const RecommendedSetup: Story = {};
+/** Holds the needs, for the stories that are about what happens when one of them changes. */
+function ControlledEvidence(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
+	const [needs, setNeeds] = useState(args.needs);
+	return <PracticeEvidenceEditor {...args} needs={needs} onChange={setNeeds} />;
+}
+
+/** The boundary reads back before anything is expanded: what must be there, and what may be. */
+export const RecommendedEvidence: Story = {};
 
 /**
- * Every evidence choice is a visible control rather than a menu: the three-way role is a radio
- * group, and each minimum-quality requirement is a checkbox rendered only where the source can
- * establish it. The pull-request record cannot demonstrate currentness, so it offers no freshness
- * checkbox, and an author is never shown an option that cannot be chosen.
+ * Every choice is a visible control rather than a menu. The three roles are a radio group, and the
+ * one thing EXHAUSTIVE adds to REQUIRED is offered as that thing — a follow-up claim, not a fourth
+ * role nobody could tell apart from the third.
  */
 export const EveryChoiceIsVisible: Story = {
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
 
-		const diff = canvas.getByRole("radiogroup", {
-			name: "Use in this practice for Code changes",
-		});
+		const diff = canvas.getByRole("radiogroup", { name: "Use Code changes in occasion 1" });
 		await expect(within(diff).getByRole("radio", { name: "Required" })).toBeChecked();
 		await expect(within(diff).getByRole("radio", { name: "Optional context" })).toBeVisible();
 		await expect(within(diff).getByRole("radio", { name: "Not used" })).toBeVisible();
 
-		await expect(canvas.getByRole("checkbox", { name: /not empty — Code changes/ })).toBeChecked();
+		// Offered only where the contract can promise a whole capture. The linked issues never can, so
+		// the control is absent rather than present-and-refused on save.
 		await expect(
-			canvas.getByRole("checkbox", { name: /fully captured.*Code changes/ }),
-		).toBeChecked();
-
-		// The pull-request record's freshness mode is NOT_APPLICABLE, so the control is absent rather
-		// than present-and-unselectable.
+			canvas.getByRole("checkbox", { name: /says what is missing from Code changes/ }),
+		).not.toBeChecked();
 		await expect(
-			canvas.getByRole("checkbox", { name: /fully captured.*Pull request details/ }),
-		).toBeChecked();
-		await expect(
-			canvas.queryByRole("checkbox", { name: /exact commit.*Pull request details/ }),
+			canvas.queryByRole("checkbox", { name: /says what is missing from Linked issues/ }),
 		).toBeNull();
-
-		await expect(canvas.queryByRole("combobox", { name: /Use in this practice/ })).toBeNull();
 	},
 };
 
-export const InvalidRule: Story = {
-	args: {
-		value: { ...pullRequestOptions.recommendedRequirements, needs: [] },
-		error: "Choose at least one required evidence source.",
+/** A source dropped to optional context loses the absence claim with it. */
+export const AbsenceClaimNeedsARequiredSource: Story = {
+	render: (args) => <ControlledEvidence {...args} />,
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
+		const comments = canvas.getByRole("radiogroup", {
+			name: "Use Inline review comments in occasion 1",
+		});
+		await expect(
+			canvas.getByRole("checkbox", { name: /says what is missing from Inline review comments/ }),
+		).toBeVisible();
+
+		await userEvent.click(within(comments).getByRole("radio", { name: "Optional context" }));
+
+		await expect(
+			canvas.queryByRole("checkbox", { name: /says what is missing from Inline review comments/ }),
+		).toBeNull();
 	},
 };
 
 /**
- * The reason a practice needs a human is its own field, so a limitation can never be mistaken for it.
- * Both are editable at once, and the limitation list is complete rather than missing its first entry.
+ * The occasion that licenses an absence claim: the review at the merge, which reads the review
+ * threads whole so it may say nobody resolved one.
  */
-export const HumanReviewReasonIsNotALimitation: Story = {
+export const ReadsASourceExhaustively: Story = {
 	args: {
-		value: {
-			...pullRequestOptions.recommendedRequirements,
-			automatedReview: {
-				mode: "LANGUAGE_MODEL",
-				evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
-			},
-			insufficiencyReason: {
-				code: "MENTOR_CONVERSATION_NOT_OBSERVED",
-				description: "The trade-off was agreed in a conversation Hephaestus cannot read.",
-			},
-			knownLimitations: [
-				{
-					code: "RUNTIME_BEHAVIOR_NOT_OBSERVED",
-					description: "Repository evidence does not establish behavior in a deployed runtime.",
-				},
-			],
-		},
+		needs: [
+			{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
+			{ sourceKind: "scm.review-threads", stance: "EXHAUSTIVE" },
+		],
 	},
-	play: async ({ canvas, userEvent }) => {
-		await expect(canvas.getByLabelText(/Why is human review needed/)).toHaveValue(
-			"The trade-off was agreed in a conversation Hephaestus cannot read.",
-		);
-		await userEvent.click(canvas.getByRole("button", { name: "Customize evidence" }));
-		await expect(
-			canvas.getByDisplayValue(
-				"Repository evidence does not establish behavior in a deployed runtime.",
-			),
-		).toBeVisible();
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/and nothing missing from it/)).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Use recommended evidence" })).toBeVisible();
 	},
+};
+
+/** Nothing required yet — the state the form refuses to save, shown as the author would meet it. */
+export const NothingRequiredYet: Story = {
+	args: { needs: [], invalid: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Nothing yet")).toBeVisible();
+		// The invalid state opens the source list, because the fix is not reachable from the summary.
+		await expect(canvas.getByRole("radiogroup", { name: /Use Code changes/ })).toBeVisible();
+	},
+};
+
+/** Under "Human review needed" the evidence is still authored, but nothing checks it. */
+export const RecordedButNotReviewed: Story = {
+	args: { canAttemptReview: false },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/nothing is reviewed while the practice asks/)).toBeVisible();
+	},
+};
+
+export const Disabled: Story = {
+	args: { disabled: true },
 };

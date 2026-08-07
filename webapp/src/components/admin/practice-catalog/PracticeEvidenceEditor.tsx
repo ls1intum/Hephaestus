@@ -1,597 +1,304 @@
 import deepEqual from "fast-deep-equal";
-import { ChevronRight, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { ChevronRight, RotateCcw } from "lucide-react";
+import { useState } from "react";
 import type {
-	PracticeAutomatedReviewPolicy,
-	PracticeEvidenceOutcome,
+	PracticeEvidenceRequirement,
 	PracticeEvidenceSourceOption,
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
-import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-catalog/PracticeEvidenceOutcomeSummary";
+import { type EvidenceRole, roleOf, withRole } from "@/components/admin/practice-catalog/bindings";
+import {
+	evidenceQualityLabel,
+	evidenceSourceLabel,
+} from "@/components/admin/practice-catalog/evidence-presentation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Field,
-	FieldContent,
 	FieldDescription,
-	FieldError,
 	FieldGroup,
 	FieldLabel,
 	FieldLegend,
 	FieldSet,
 	FieldTitle,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { evidenceQualityLabel, evidenceSourceLabel } from "./evidence-presentation";
 
-type EvidenceRole = "NOT_USED" | PracticeAutomatedReviewPolicy["needs"][number]["stance"];
-type MentoringSupport = "AI_SUPPORTED" | "HUMAN_CONTEXT_REQUIRED" | "GUIDANCE_ONLY";
-
+/**
+ * The three roles an author picks between. EXHAUSTIVE is deliberately not a fourth: it is REQUIRED
+ * plus one further claim, and it is offered as that claim rather than as a separate role — see
+ * {@link AbsenceClaim}.
+ */
 const EVIDENCE_ROLE_OPTIONS = [
 	{ value: "REQUIRED", label: "Required" },
 	{ value: "CONTEXTUAL", label: "Optional context" },
 	{ value: "NOT_USED", label: "Not used" },
-] satisfies Array<{ value: EvidenceRole; label: string }>;
+] satisfies Array<{ value: Exclude<EvidenceRole, "EXHAUSTIVE">; label: string }>;
 
-function mentoringSupportOf(requirements: PracticeAutomatedReviewPolicy): MentoringSupport {
-	if (requirements.automatedReview.mode === "NONE") return "GUIDANCE_ONLY";
-	if (requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
-		return "HUMAN_CONTEXT_REQUIRED";
-	}
-	return "AI_SUPPORTED";
-}
-
-function roleOf(requirements: PracticeAutomatedReviewPolicy, sourceKind: string): EvidenceRole {
-	return requirements.needs.find((need) => need.sourceKind === sourceKind)?.stance ?? "NOT_USED";
-}
-
-function withRole(
-	requirements: PracticeAutomatedReviewPolicy,
-	source: PracticeEvidenceSourceOption,
-	role: EvidenceRole,
-): PracticeAutomatedReviewPolicy {
-	// How strictly a source must be captured is the source contract's answer, so re-adding a source no
-	// longer has to recover a per-practice quality setting that could silently differ from it.
-	const needs = requirements.needs.filter((need) => need.sourceKind !== source.sourceKind);
-	if (role !== "NOT_USED") needs.push({ sourceKind: source.sourceKind, stance: role });
-	return { ...requirements, needs };
-}
-
-/**
- * Derived from the text, never random: the server digests code and text together, and that digest
- * decides whether a curated update changed review behaviour or only wording. Retyping the same
- * sentence must yield the same code.
- */
-function limitationCodeFor(description: string) {
-	const slug = description
-		.toUpperCase()
-		.replace(/[^A-Z0-9]+/g, "_")
-		.replace(/^_+|_+$/g, "")
-		.slice(0, 63);
-	return /^[A-Z][A-Z0-9_]{2,63}$/.test(slug) ? slug : `LIMITATION_${fnv1a(description)}`;
-}
-
-/** Deterministic, non-cryptographic fallback for text that cannot form a legal code. */
-function fnv1a(input: string) {
-	let hash = 0x811c9dc5;
-	for (let index = 0; index < input.length; index += 1) {
-		hash ^= input.charCodeAt(index);
-		hash = Math.imul(hash, 0x01000193) >>> 0;
-	}
-	return hash.toString(16).toUpperCase().padStart(8, "0");
-}
-
-function matchesRecommendedEvidence(
-	value: PracticeAutomatedReviewPolicy,
-	recommended: PracticeAutomatedReviewPolicy,
-) {
-	return (
-		value.sourceContractVersion === recommended.sourceContractVersion &&
-		value.whenEvidenceIsInsufficient === recommended.whenEvidenceIsInsufficient &&
-		deepEqual(value.needs, recommended.needs)
-	);
-}
-
-function humanReviewReasonIsMissing(requirements: PracticeAutomatedReviewPolicy) {
-	return (
-		requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" &&
-		requirements.insufficiencyReason !== undefined &&
-		!requirements.insufficiencyReason.description.trim()
-	);
-}
-
-export function practiceEvidenceErrorTarget(requirements: PracticeAutomatedReviewPolicy) {
-	return humanReviewReasonIsMissing(requirements)
-		? "practice-human-review-reason"
-		: "practice-evidence-heading";
-}
-
-export function practiceEvidenceError(requirements: PracticeAutomatedReviewPolicy) {
-	const noAutomatedReview = requirements.automatedReview.mode === "NONE";
-	if (
-		noAutomatedReview &&
-		(requirements.needs.length > 0 || requirements.knownLimitations.length > 0)
-	) {
-		return "Guidance only cannot require evidence or declare evidence limitations.";
-	}
-	if (!noAutomatedReview && !requirements.needs.some((need) => need.stance === "REQUIRED")) {
-		return "Choose at least one required evidence source.";
-	}
-	for (const limitation of requirements.knownLimitations) {
-		if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(limitation.code)) {
-			return "Limitation identifiers must use 3–64 uppercase letters, numbers, and underscores.";
-		}
-		if (!limitation.description.trim() || limitation.description.length > 500) {
-			return "Each limitation needs a description of 1–500 characters.";
-		}
-	}
-	if (
-		requirements.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT" &&
-		requirements.knownLimitations.length === 0
-	) {
-		return "Explain at least one limitation that requires additional context.";
-	}
-	return undefined;
+/** Which of the three radios is selected; an exhaustive stance is a required one. */
+function selectedRole(role: EvidenceRole): string {
+	return role === "EXHAUSTIVE" ? "REQUIRED" : role;
 }
 
 export interface PracticeEvidenceEditorProps {
+	/** The work type this occasion belongs to; supplies the sources it may read. */
 	options: PracticeWorkTypeDefinitionOptions;
-	value: PracticeAutomatedReviewPolicy;
-	/** How these requirements have turned out on recent reviews; omitted while creating a practice. */
-	outcome?: PracticeEvidenceOutcome;
-	onChange: (value: PracticeAutomatedReviewPolicy) => void;
-	error?: string;
+	/** One occasion's evidence — not the practice's. What a review reads depends on what started it. */
+	needs: PracticeEvidenceRequirement[];
+	onChange: (needs: PracticeEvidenceRequirement[]) => void;
+	/**
+	 * Whether a review will actually be attempted. Only changes the copy: an author who has said a
+	 * human is needed is still choosing what a future automated review would read.
+	 */
+	canAttemptReview?: boolean;
+	/** Prefix for control ids, so a form-level error can send focus into the right occasion. */
+	idPrefix: string;
+	/**
+	 * Which occasion this is, appended to every group's accessible name. Three occasions otherwise
+	 * present three identically named groups, and a screen-reader user cannot tell which is which.
+	 */
+	occasionLabel: string;
 	disabled?: boolean;
+	invalid?: boolean;
 }
 
+/**
+ * What one occasion's review reads.
+ *
+ * <p>Evidence hangs off the occasion rather than the practice because the two answers genuinely
+ * differ: a review that runs when a change is opened is reading what is in front of it, while the one
+ * that runs at the merge is the review that can say nobody ever resolved a thread.
+ */
 export function PracticeEvidenceEditor({
 	options,
-	value,
-	outcome,
+	needs,
 	onChange,
-	error,
+	canAttemptReview = true,
+	idPrefix,
+	occasionLabel,
 	disabled = false,
+	invalid = false,
 }: PracticeEvidenceEditorProps) {
-	const [open, setOpen] = useState(Boolean(error));
-	const profileKey = `${value.sourceContractVersion}:${options.artifactKind}`;
-	const savedAutomatedRequirements = useRef<Map<string, PracticeAutomatedReviewPolicy>>(
-		new Map(value.automatedReview.mode === "NONE" ? [] : [[profileKey, value]]),
-	);
-	const addLimitationButton = useRef<HTMLButtonElement>(null);
-	// Reveal the customization panel when a submit lands an error the user cannot see from the
-	// collapsed state. Adjusting during render rather than in an effect keeps it keyed on the error
-	// itself, so editing afterwards no longer re-opens the panel under the caret.
-	// https://react.dev/learn/you-might-not-need-an-effect
-	const [lastError, setLastError] = useState(error);
-	if (error !== lastError) {
-		setLastError(error);
-		if (error && !humanReviewReasonIsMissing(value)) setOpen(true);
+	// Open from the start when this occasion is already invalid — a form re-rendered into its error
+	// state never crosses the transition below, and the fix is not reachable from the collapsed summary.
+	const [open, setOpen] = useState(invalid);
+	// Reveal it when a later submit lands an error. Adjusting during render rather than in an effect
+	// keeps it keyed on the error itself, so editing afterwards no longer re-opens the panel under the
+	// caret. https://react.dev/learn/you-might-not-need-an-effect
+	const [lastInvalid, setLastInvalid] = useState(invalid);
+	if (invalid !== lastInvalid) {
+		setLastInvalid(invalid);
+		if (invalid) setOpen(true);
 	}
-	const focusLimitation = (focusTarget: string) => {
-		requestAnimationFrame(() => {
-			if (focusTarget === "add") {
-				addLimitationButton.current?.focus();
-			} else {
-				document.getElementById(`practice-limitation-description-${focusTarget}`)?.focus();
-			}
-		});
-	};
-	const requiredSources = value.needs
-		.filter((need) => need.stance === "REQUIRED")
-		.map((need) => ({
-			...need,
-			label: evidenceSourceLabel(need.sourceKind, options.allowedSources),
-			quality: options.allowedSources.find((source) => source.sourceKind === need.sourceKind)
-				?.requiredQuality,
-		}));
-	const optionalSources = value.needs
-		.filter((need) => need.stance === "CONTEXTUAL")
-		.map((need) => evidenceSourceLabel(need.sourceKind, options.allowedSources));
-	const mentoringSupport = mentoringSupportOf(value);
-	const supportsAiReview = options.supportedAutomatedReviewModes.includes("LANGUAGE_MODEL");
-	const noAutomatedReview = value.automatedReview.mode === "NONE";
-	const canAttemptReview = mentoringSupport === "AI_SUPPORTED" && supportsAiReview;
-	const humanReviewReasonMissing = humanReviewReasonIsMissing(value);
-	const showHumanReviewReasonError = Boolean(error) && humanReviewReasonMissing;
-	const usesRecommendedEvidence = matchesRecommendedEvidence(
-		value,
-		options.recommendedRequirements,
-	);
-	const updateMentoringSupport = (next: MentoringSupport) => {
-		if (next === "GUIDANCE_ONLY") {
-			if (!noAutomatedReview) savedAutomatedRequirements.current.set(profileKey, value);
-			onChange({
-				...value,
-				automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-				needs: [],
-				knownLimitations: [],
-			});
-			return;
-		}
-		const restored = noAutomatedReview
-			? (savedAutomatedRequirements.current.get(profileKey) ?? options.recommendedRequirements)
-			: value;
-		const needsHumanContext = next === "HUMAN_CONTEXT_REQUIRED";
-		onChange({
-			...restored,
-			automatedReview: {
-				mode: "LANGUAGE_MODEL",
-				evidenceSufficiency: needsHumanContext
-					? "DECLARED_EVIDENCE_INSUFFICIENT"
-					: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
-			},
-			knownLimitations: restored.knownLimitations.filter((limitation) =>
-				limitation.description.trim(),
-			),
-			insufficiencyReason: needsHumanContext
-				? (restored.insufficiencyReason ?? { code: limitationCodeFor(""), description: "" })
-				: undefined,
-		});
-	};
+	const required = needs.filter((need) => need.stance !== "CONTEXTUAL");
+	const contextual = needs.filter((need) => need.stance === "CONTEXTUAL");
+	const usesRecommendedNeeds = deepEqual(needs, options.recommendedNeeds);
 
 	return (
-		<section
-			className="space-y-4"
-			aria-labelledby="practice-evidence-heading"
-			aria-describedby={error ? "practice-evidence-error" : undefined}
+		<FieldSet
+			data-invalid={invalid || undefined}
+			aria-label={`What this review reads, ${occasionLabel}`}
 		>
-			<div>
-				<h2
-					id="practice-evidence-heading"
-					className="text-lg font-semibold"
-					tabIndex={-1}
-					aria-describedby={error ? "practice-evidence-error" : undefined}
-				>
-					How Hephaestus can help
-				</h2>
-				<p className="text-sm text-muted-foreground">
-					Choose the responsible level of support. This does not limit what a developer, peer, or
-					human mentor can observe.
+			<FieldLegend variant="label">What this review reads</FieldLegend>
+			<div
+				className="rounded-lg border bg-muted/30 p-3 text-sm"
+				id={`${idPrefix}-evidence`}
+				// Same reason as the signal group: reachable by a form-level error, not by Tab.
+				tabIndex={-1}
+			>
+				<dl className="grid gap-2 sm:grid-cols-[8rem_1fr]">
+					<dt className="font-medium text-muted-foreground">Must have</dt>
+					<dd>
+						{required.length > 0 ? (
+							<ul className="space-y-1">
+								{required.map((need) => (
+									<li key={need.sourceKind}>
+										{evidenceSourceLabel(need.sourceKind, options.allowedSources)}
+										{need.stance === "EXHAUSTIVE" && (
+											<span className="text-muted-foreground"> · and nothing missing from it</span>
+										)}
+									</li>
+								))}
+							</ul>
+						) : (
+							<span className="text-muted-foreground">Nothing yet</span>
+						)}
+					</dd>
+					<dt className="font-medium text-muted-foreground">May also use</dt>
+					<dd>
+						{contextual.length > 0 ? (
+							contextual
+								.map((need) => evidenceSourceLabel(need.sourceKind, options.allowedSources))
+								.join(", ")
+						) : (
+							<span className="text-muted-foreground">Nothing</span>
+						)}
+					</dd>
+				</dl>
+				<p className="mt-2 text-muted-foreground">
+					{canAttemptReview
+						? "Every source under “Must have” is checked before this review runs. Missing or incomplete evidence makes Hephaestus skip the practice instead of guessing."
+						: "Recorded for this occasion, but nothing is reviewed while the practice asks for a human."}
 				</p>
 			</div>
 
-			<RadioGroup
-				value={mentoringSupport}
-				onValueChange={(next) => {
-					if (next) updateMentoringSupport(next as MentoringSupport);
-				}}
-				className="gap-3"
-				aria-label="How Hephaestus supports this practice"
-			>
-				<FieldLabel htmlFor="practice-mentoring-ai-supported">
-					<Field orientation="horizontal" data-disabled={disabled || !supportsAiReview}>
-						<RadioGroupItem
-							id="practice-mentoring-ai-supported"
-							value="AI_SUPPORTED"
-							disabled={disabled || !supportsAiReview}
-						/>
-						<FieldContent>
-							<FieldTitle>AI-supported mentoring</FieldTitle>
-							<FieldDescription>
-								Hephaestus may review connected work and offer practice-focused guidance. It skips
-								the practice when required evidence is unavailable.
-								{!supportsAiReview && (
-									<> This work type has no AI review available on this instance.</>
-								)}
-							</FieldDescription>
-						</FieldContent>
-					</Field>
-				</FieldLabel>
-				<FieldLabel htmlFor="practice-mentoring-human-context">
-					<Field orientation="horizontal" data-disabled={disabled}>
-						<RadioGroupItem
-							id="practice-mentoring-human-context"
-							value="HUMAN_CONTEXT_REQUIRED"
-							disabled={disabled}
-						/>
-						<FieldContent>
-							<FieldTitle>Human review needed</FieldTitle>
-							<FieldDescription>
-								Connected work cannot support a responsible conclusion. Hephaestus steps back so a
-								developer, peer, or mentor can review it.
-							</FieldDescription>
-						</FieldContent>
-					</Field>
-				</FieldLabel>
-				<FieldLabel htmlFor="practice-mentoring-guidance-only">
-					<Field orientation="horizontal" data-disabled={disabled}>
-						<RadioGroupItem
-							id="practice-mentoring-guidance-only"
-							value="GUIDANCE_ONLY"
-							disabled={disabled}
-						/>
-						<FieldContent>
-							<FieldTitle>Guidance only</FieldTitle>
-							<FieldDescription>
-								Keep the criteria and guidance without asking Hephaestus to review this practice.
-							</FieldDescription>
-						</FieldContent>
-					</Field>
-				</FieldLabel>
-			</RadioGroup>
-
-			{mentoringSupport === "HUMAN_CONTEXT_REQUIRED" && value.insufficiencyReason && (
-				<Field data-invalid={showHumanReviewReasonError || undefined}>
-					<FieldLabel htmlFor="practice-human-review-reason">
-						Why is human review needed? *
-					</FieldLabel>
-					<Input
-						id="practice-human-review-reason"
+			<Collapsible open={open} onOpenChange={setOpen}>
+				<div className="flex flex-wrap items-center gap-2">
+					<CollapsibleTrigger
 						disabled={disabled}
-						value={value.insufficiencyReason.description}
-						onChange={(event) =>
-							onChange({
-								...value,
-								insufficiencyReason: {
-									code: limitationCodeFor(event.target.value),
-									description: event.target.value,
-								},
-							})
+						render={
+							<Button type="button" variant="outline" size="sm" disabled={disabled}>
+								<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
+								Choose sources
+							</Button>
 						}
-						maxLength={500}
-						aria-invalid={showHumanReviewReasonError || undefined}
-						aria-describedby={
-							showHumanReviewReasonError
-								? "practice-human-review-reason-error practice-human-review-reason-description"
-								: "practice-human-review-reason-description"
-						}
+						className="group"
 					/>
-					<FieldDescription id="practice-human-review-reason-description">
-						Name the context a person may have that the connected work cannot provide.
-					</FieldDescription>
-					{showHumanReviewReasonError && (
-						<FieldError id="practice-human-review-reason-error">
-							Say what a person can see here that the connected work cannot show.
-						</FieldError>
-					)}
-				</Field>
-			)}
-
-			{!noAutomatedReview && (
-				<div className="rounded-lg border p-4 text-sm">
-					<p className="font-medium">Evidence boundary</p>
-					<dl className="mt-3 grid gap-3 sm:grid-cols-[9rem_1fr]">
-						<dt className="font-medium text-muted-foreground">Must have</dt>
-						<dd>
-							{requiredSources.length > 0 ? (
-								<ul className="space-y-1">
-									{requiredSources.map((source) => (
-										<li key={source.sourceKind}>
-											{source.label} · {evidenceQualityLabel(source.quality)}
-										</li>
-									))}
-								</ul>
-							) : (
-								<span className="text-muted-foreground">No required source selected</span>
-							)}
-						</dd>
-						<dt className="font-medium text-muted-foreground">May also use</dt>
-						<dd>{optionalSources.join(", ") || "None"}</dd>
-						<dt className="font-medium text-muted-foreground">Cannot establish</dt>
-						<dd>
-							{value.knownLimitations.length > 0 ? (
-								<ul className="space-y-1">
-									{value.knownLimitations.map((limitation) => (
-										<li key={limitation.code}>
-											{limitation.description || "A limitation still needs a description"}
-										</li>
-									))}
-								</ul>
-							) : (
-								<span className="text-muted-foreground">No limitation documented</span>
-							)}
-						</dd>
-					</dl>
-					<p className="mt-3 text-muted-foreground">
-						{canAttemptReview
-							? "Hephaestus checks every required source before reviewing. Missing, incomplete, or outdated evidence makes it skip this practice instead of guessing."
-							: mentoringSupport === "AI_SUPPORTED"
-								? "No AI review is available for this work type on this instance, so these sources are recorded but nothing is reviewed."
-								: "Even when these sources are ready, Hephaestus does not have enough context. It skips this practice."}
-					</p>
-				</div>
-			)}
-
-			{!noAutomatedReview && (
-				<Collapsible open={open} onOpenChange={setOpen}>
-					<div className="flex flex-wrap items-center gap-2">
-						<CollapsibleTrigger
+					{!usesRecommendedNeeds && (
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
 							disabled={disabled}
-							render={
-								<Button type="button" variant="outline" disabled={disabled}>
-									<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
-									Customize evidence
-								</Button>
-							}
-							className="group"
-						/>
-						{!usesRecommendedEvidence && (
-							<Button
-								type="button"
-								variant="ghost"
+							onClick={() => onChange([...options.recommendedNeeds])}
+						>
+							<RotateCcw className="size-4" />
+							Use recommended evidence
+						</Button>
+					)}
+				</div>
+				<CollapsibleContent className="mt-3 space-y-3">
+					<FieldDescription>
+						Choosing a source does not collect or authorize it; instance governance and workspace
+						integrations control that separately.
+					</FieldDescription>
+					<FieldGroup className="gap-3">
+						{options.allowedSources.map((source) => (
+							<SourceRow
+								key={source.sourceKind}
+								source={source}
+								role={roleOf(needs, source.sourceKind)}
+								idPrefix={idPrefix}
+								occasionLabel={occasionLabel}
 								disabled={disabled}
-								onClick={() =>
-									onChange({
-										...options.recommendedRequirements,
-										automatedReview: value.automatedReview,
-										knownLimitations: value.knownLimitations,
-									})
-								}
-							>
-								<RotateCcw className="size-4" />
-								Use recommended evidence
-							</Button>
-						)}
-					</div>
-					<CollapsibleContent className="mt-4 space-y-6">
-						<div>
-							<p className="font-medium">Connected evidence</p>
-							<p className="text-sm text-muted-foreground">
-								Choose what Hephaestus must have and what may provide extra context. Selecting a
-								source does not collect or authorize it; instance governance and workspace
-								integrations control that separately.
-							</p>
-						</div>
-						{outcome && (
-							<PracticeEvidenceOutcomeSummary outcome={outcome} sources={options.allowedSources} />
-						)}
-						<FieldGroup className="gap-4">
-							{options.allowedSources.map((source) => {
-								const role = roleOf(value, source.sourceKind);
-								const sourceLabel = source.displayName;
-								return (
-									<div key={source.sourceKind} className="rounded-lg border p-4">
-										<div className="space-y-3">
-											<div>
-												<div className="flex flex-wrap items-center gap-2">
-													<p className="font-medium">{sourceLabel}</p>
-													<Badge variant="outline">
-														{evidenceQualityLabel(source.requiredQuality)}
-													</Badge>
-												</div>
-												<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>
-											</div>
-											<FieldSet>
-												<FieldLegend variant="label">
-													Use in this practice <span className="sr-only">for {sourceLabel}</span>
-												</FieldLegend>
-												<RadioGroup
-													value={role}
-													onValueChange={(nextRole) =>
-														nextRole && onChange(withRole(value, source, nextRole as EvidenceRole))
-													}
-													className="gap-2"
-													aria-label={`Use in this practice for ${sourceLabel}`}
-												>
-													{EVIDENCE_ROLE_OPTIONS.map((option) => (
-														<FieldLabel
-															key={option.value}
-															htmlFor={`practice-evidence-${source.sourceKind}-${option.value}`}
-															className="font-normal"
-														>
-															<Field
-																orientation="horizontal"
-																className="gap-2"
-																data-disabled={disabled}
-															>
-																<RadioGroupItem
-																	id={`practice-evidence-${source.sourceKind}-${option.value}`}
-																	value={option.value}
-																	disabled={disabled}
-																/>
-																<FieldTitle className="font-normal">{option.label}</FieldTitle>
-															</Field>
-														</FieldLabel>
-													))}
-												</RadioGroup>
-											</FieldSet>
-										</div>
-									</div>
-								);
-							})}
-						</FieldGroup>
+								onRoleChange={(role) => onChange(withRole(needs, source.sourceKind, role))}
+							/>
+						))}
+					</FieldGroup>
+				</CollapsibleContent>
+			</Collapsible>
+		</FieldSet>
+	);
+}
 
-						<div className="space-y-3">
-							<div>
-								<p className="font-medium">What this evidence cannot support</p>
-								<p className="text-sm text-muted-foreground">
-									State which claims these sources cannot support, even when every requirement
-									passes.
-								</p>
-							</div>
-							{/*
-							 * Under "Human review needed" the first limitation IS the reason, edited above under
-							 * its own label. Listing it again binds one value to two controls with contradictory
-							 * labels, only one of which carries the invalid state.
-							 */}
-							{value.knownLimitations.map((limitation, index) => {
-								// Identity for markup is the row's position; the code is derived from the text and
-								// would change under the caret on every keystroke.
-								const limitationId = String(index);
-								return (
-									<div
-										key={limitationId}
-										className="grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_auto]"
-									>
-										<Field>
-											<FieldLabel htmlFor={`practice-limitation-description-${limitationId}`}>
-												Description <span className="sr-only">for limitation {index + 1}</span>
-											</FieldLabel>
-											<Input
-												disabled={disabled}
-												id={`practice-limitation-description-${limitationId}`}
-												value={limitation.description}
-												onChange={(event) =>
-													onChange({
-														...value,
-														knownLimitations: value.knownLimitations.map((item, itemIndex) =>
-															itemIndex === index
-																? {
-																		...item,
-																		description: event.target.value,
-																		code: limitationCodeFor(event.target.value),
-																	}
-																: item,
-														),
-													})
-												}
-												maxLength={500}
-											/>
-										</Field>
-										<Button
-											type="button"
-											disabled={disabled}
-											variant="ghost"
-											size="icon-sm"
-											className="self-end"
-											onClick={() => {
-												const remaining = value.knownLimitations.filter(
-													(_, itemIndex) => itemIndex !== index,
-												);
-												const focusTarget =
-													remaining.length === 0
-														? "add"
-														: String(Math.min(index, remaining.length - 1));
-												onChange({
-													...value,
-													knownLimitations: remaining,
-												});
-												focusLimitation(focusTarget);
-											}}
-											aria-label={`Remove limitation ${index + 1}`}
-										>
-											<Trash2 className="size-4" />
-										</Button>
-									</div>
-								);
-							})}
-							<Button
-								ref={addLimitationButton}
-								type="button"
-								disabled={disabled}
-								variant="outline"
-								size="sm"
-								onClick={() => {
-									onChange({
-										...value,
-										knownLimitations: [
-											...value.knownLimitations,
-											{ code: limitationCodeFor(""), description: "" },
-										],
-									});
-									focusLimitation(String(value.knownLimitations.length));
-								}}
-							>
-								<Plus className="size-4" />
-								Add limitation
-							</Button>
-						</div>
-					</CollapsibleContent>
-				</Collapsible>
-			)}
-			{error && <FieldError id="practice-evidence-error">{error}</FieldError>}
-		</section>
+interface SourceRowProps {
+	source: PracticeEvidenceSourceOption;
+	role: EvidenceRole;
+	idPrefix: string;
+	occasionLabel: string;
+	disabled: boolean;
+	onRoleChange: (role: EvidenceRole) => void;
+}
+
+function SourceRow({
+	source,
+	role,
+	idPrefix,
+	occasionLabel,
+	disabled,
+	onRoleChange,
+}: SourceRowProps) {
+	const controlId = `${idPrefix}-source-${source.sourceKind}`;
+	const groupLabel = `Use ${source.displayName} in ${occasionLabel}`;
+	return (
+		<div className="rounded-lg border p-3">
+			<div className="flex flex-wrap items-center gap-2">
+				<p className="font-medium">{source.displayName}</p>
+				<Badge variant="outline">{evidenceQualityLabel(source.requiredQuality)}</Badge>
+			</div>
+			<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>
+			<FieldSet className="mt-2">
+				<FieldLegend variant="label" className="sr-only">
+					{groupLabel}
+				</FieldLegend>
+				<RadioGroup
+					value={selectedRole(role)}
+					onValueChange={(next) => {
+						// Leaving "Required" drops the absence claim with it: a source that is only optional
+						// context can never be the ground for saying something is not there.
+						if (next) onRoleChange(next as EvidenceRole);
+					}}
+					className="flex flex-wrap gap-x-4 gap-y-2"
+					aria-label={groupLabel}
+				>
+					{EVIDENCE_ROLE_OPTIONS.map((option) => (
+						<FieldLabel
+							key={option.value}
+							htmlFor={`${controlId}-${option.value}`}
+							className="font-normal"
+						>
+							<Field orientation="horizontal" className="gap-2" data-disabled={disabled}>
+								<RadioGroupItem
+									id={`${controlId}-${option.value}`}
+									value={option.value}
+									disabled={disabled}
+								/>
+								<FieldTitle className="font-normal">{option.label}</FieldTitle>
+							</Field>
+						</FieldLabel>
+					))}
+				</RadioGroup>
+				<AbsenceClaim
+					source={source}
+					role={role}
+					controlId={controlId}
+					disabled={disabled}
+					onRoleChange={onRoleChange}
+				/>
+			</FieldSet>
+		</div>
+	);
+}
+
+interface AbsenceClaimProps {
+	source: PracticeEvidenceSourceOption;
+	role: EvidenceRole;
+	controlId: string;
+	disabled: boolean;
+	onRoleChange: (role: EvidenceRole) => void;
+}
+
+/**
+ * The one thing EXHAUSTIVE adds to REQUIRED, asked as that thing.
+ *
+ * <p>Offered as a follow-up to "Required" rather than as a fourth role because that is what the stance
+ * is: the same source, read for the same review, with one further claim resting on the capture being
+ * whole. Absent — not present-and-unselectable — where the source contract can never promise a whole
+ * capture, since choosing it there is a request the server refuses.
+ */
+function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: AbsenceClaimProps) {
+	if (role === "CONTEXTUAL" || role === "NOT_USED") return null;
+	if (!source.supportsExhaustiveEvidence) return null;
+	const checkboxId = `${controlId}-exhaustive`;
+	return (
+		<Field orientation="horizontal" className="mt-2 gap-2" data-disabled={disabled}>
+			<Checkbox
+				id={checkboxId}
+				disabled={disabled}
+				checked={role === "EXHAUSTIVE"}
+				onCheckedChange={(checked) => onRoleChange(checked === true ? "EXHAUSTIVE" : "REQUIRED")}
+			/>
+			<FieldLabel htmlFor={checkboxId} className="font-normal">
+				<span>
+					This review says what is <em>missing</em> from {source.displayName}
+					<FieldDescription>
+						A partial capture then refuses the review: an incomplete list cannot tell “it is not
+						there” apart from “we did not fetch it”.
+					</FieldDescription>
+				</span>
+			</FieldLabel>
+		</Field>
 	);
 }

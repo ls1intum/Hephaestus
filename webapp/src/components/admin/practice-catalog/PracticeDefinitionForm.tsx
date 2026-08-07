@@ -4,22 +4,35 @@ import { ChevronRight, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
 import type {
 	PracticeAutomatedReviewPolicy,
+	PracticeBinding,
 	PracticeDefinitionOptions,
 	PracticeEvidenceOutcome,
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
 import {
-	FOCUS_ARTIFACT_OPTIONS,
+	artifactKindOfBindings,
+	bindingsProblem,
+	normalizeBindings,
+	orderedWorkTypes,
+	recommendedBinding,
+	workTypeOptionsFor,
+} from "@/components/admin/practice-catalog/bindings";
+import {
 	generateSlug,
 	isValidSlug,
-	type WorkArtifact,
+	workArtifactHint,
 } from "@/components/admin/practice-catalog/constants";
 import { canAttemptAutomatedReview } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
-	PracticeEvidenceEditor,
-	practiceEvidenceError,
-	practiceEvidenceErrorTarget,
-} from "@/components/admin/practice-catalog/PracticeEvidenceEditor";
+	PracticeBindingsEditor,
+	withoutEvidence,
+	withRecommendedEvidence,
+} from "@/components/admin/practice-catalog/PracticeBindingsEditor";
+import {
+	PracticeMentoringSupportEditor,
+	practicePolicyError,
+	practicePolicyErrorTarget,
+} from "@/components/admin/practice-catalog/PracticeMentoringSupportEditor";
 import { CodeEditor } from "@/components/shared/CodeEditor";
 import {
 	AlertDialog,
@@ -32,7 +45,6 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Field,
@@ -57,7 +69,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import { artifactKindLabel } from "@/lib/artifact-kinds";
 
 const NO_AREA = "__none__";
 
@@ -69,9 +81,9 @@ export interface PracticeDefinitionAreaOption {
 export interface PracticeDefinitionValue {
 	slug: string;
 	name: string;
-	artifactKind: WorkArtifact;
 	areaSlug?: string;
-	triggerEvents: string[];
+	/** The occasions this practice is reviewed on. The kind of work is read off their signals. */
+	bindings: PracticeBinding[];
 	criteria: string;
 	whyItMatters?: string;
 	whatGoodLooksLike?: string;
@@ -109,9 +121,8 @@ export type PracticeDefinitionFormProps =
 interface FormState {
 	name: string;
 	slug: string;
-	artifactKind: WorkArtifact;
 	areaSlug: string;
-	triggerEvents: string[];
+	bindings: PracticeBinding[];
 	criteria: string;
 	whyItMatters: string;
 	whatGoodLooksLike: string;
@@ -119,40 +130,48 @@ interface FormState {
 	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 }
 
-function definitionOptionsFor(
-	definitionOptions: PracticeDefinitionOptions,
-	artifactKind: WorkArtifact,
-): PracticeWorkTypeDefinitionOptions {
-	const options = definitionOptions.workTypes.find((item) => item.artifactKind === artifactKind);
-	if (!options) throw new Error(`Missing definition options for ${artifactKind}`);
-	return options;
+/** Everything a work type owns, stashed so switching away and back does not discard the work. */
+interface WorkTypeDraft {
+	bindings: PracticeBinding[];
+	precomputeScript: string;
+	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 }
 
 function initialState(
 	definitionOptions: PracticeDefinitionOptions,
 	initialData?: PracticeDefinitionValue,
 ): FormState {
-	const artifactKind = initialData?.artifactKind ?? ARTIFACT_KIND.pullRequest;
+	const fallback = orderedWorkTypes(definitionOptions)[0];
 	return {
 		name: initialData?.name ?? "",
 		slug: initialData?.slug ?? "",
-		artifactKind,
 		areaSlug: initialData?.areaSlug ?? NO_AREA,
-		triggerEvents: initialData
-			? [...initialData.triggerEvents]
-			: definitionOptionsFor(definitionOptions, artifactKind)
-					.triggerEvents.filter((event) => event.recommended)
-					.map((event) => event.event),
+		bindings: initialData
+			? normalizeBindings(initialData.bindings)
+			: fallback
+				? [recommendedBinding(fallback)]
+				: [],
 		criteria: initialData?.criteria ?? "",
 		whyItMatters: initialData?.whyItMatters ?? "",
 		whatGoodLooksLike: initialData?.whatGoodLooksLike ?? "",
 		precomputeScript: initialData?.precomputeScript ?? "",
 		automatedReviewPolicy:
-			initialData?.automatedReviewPolicy ??
-			definitionOptionsFor(definitionOptions, artifactKind).recommendedRequirements,
+			initialData?.automatedReviewPolicy ?? fallback?.recommendedPolicy ?? EMPTY_POLICY,
 	};
 }
 
+/** Only reachable on an instance that offers no reviewable work type at all. */
+const EMPTY_POLICY: PracticeAutomatedReviewPolicy = {
+	sourceContractVersion: "",
+	automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
+	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
+	knownLimitations: [],
+};
+
+/**
+ * The new work type's recommended frame, keeping the answer the author already gave about how far
+ * Hephaestus may go. Changing what is reviewed is not a decision to start reviewing it.
+ */
 function recommendedPolicyWithCurrentSupport(
 	recommended: PracticeAutomatedReviewPolicy,
 	current: PracticeAutomatedReviewPolicy,
@@ -161,7 +180,6 @@ function recommendedPolicyWithCurrentSupport(
 		return {
 			...recommended,
 			automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-			needs: [],
 			knownLimitations: [],
 		};
 	}
@@ -173,6 +191,7 @@ function recommendedPolicyWithCurrentSupport(
 				evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
 			},
 			knownLimitations: current.knownLimitations,
+			insufficiencyReason: current.insufficiencyReason,
 		};
 	}
 	return recommended;
@@ -193,26 +212,39 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
-	// Recorded history belongs to the work type the practice was reviewed under. Switching work type in
-	// the form changes which sources are even allowed, so the same rows would resolve to "Unknown source"
-	// and describe a work type the author is no longer editing.
-	const artifactKindUnchanged = initialData?.artifactKind === form.artifactKind;
-	const evidenceDrafts = useRef<Partial<Record<WorkArtifact, PracticeAutomatedReviewPolicy>>>({
-		[form.artifactKind]: form.automatedReviewPolicy,
-	});
-	const triggerDrafts = useRef<Partial<Record<WorkArtifact, string[]>>>({
-		[form.artifactKind]: form.triggerEvents,
-	});
-	const precomputeDrafts = useRef<Partial<Record<WorkArtifact, string>>>({
-		[form.artifactKind]: form.precomputeScript,
-	});
 	const [submitted, setSubmitted] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
-	const selectedDefinitionOptions = definitionOptionsFor(definitionOptions, form.artifactKind);
+	const workTypes = orderedWorkTypes(definitionOptions);
+	const artifactKind = artifactKindOfBindings(form.bindings);
+	const selectedWorkType = workTypeOptionsFor(definitionOptions, artifactKind);
+	// Recorded history belongs to the work type the practice was reviewed under. Switching work type in
+	// the form changes which sources are even allowed, so the same rows would resolve to "Unknown
+	// source" and describe a work type the author is no longer editing.
+	const workTypeUnchanged = artifactKindOfBindings(initialData?.bindings ?? []) === artifactKind;
+	// One stash per work type, replacing three parallel ones keyed the same way. They could never
+	// disagree usefully — an occasion, its evidence and the script that prepares it all belong to the
+	// same kind of work — and keeping them apart meant every switch had to remember to write all three.
+	const workTypeDrafts = useRef<Map<string, WorkTypeDraft>>(
+		new Map(
+			artifactKind
+				? [
+						[
+							artifactKind,
+							{
+								bindings: form.bindings,
+								precomputeScript: form.precomputeScript,
+								automatedReviewPolicy: form.automatedReviewPolicy,
+							},
+						],
+					]
+				: [],
+		),
+	);
 	const canRunMentoring = canAttemptAutomatedReview(
 		form.automatedReviewPolicy,
-		selectedDefinitionOptions.supportedAutomatedReviewModes,
+		selectedWorkType?.supportedAutomatedReviewModes ?? [],
 	);
+	const guidanceOnly = form.automatedReviewPolicy.automatedReview.mode === "NONE";
 	const isDirty = !deepEqual(form, initialState(definitionOptions, initialData));
 	const blocker = useBlocker({
 		shouldBlockFn: () => isDirty,
@@ -232,13 +264,52 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		});
 	};
 
-	const toggleTrigger = (trigger: string, checked: boolean) => {
+	const selectWorkType = (next: PracticeWorkTypeDefinitionOptions) => {
 		setForm((previous) => {
-			const triggerEvents = checked
-				? [...previous.triggerEvents, trigger]
-				: previous.triggerEvents.filter((value) => value !== trigger);
-			triggerDrafts.current[previous.artifactKind] = triggerEvents;
-			return { ...previous, triggerEvents };
+			const previousKind = artifactKindOfBindings(previous.bindings);
+			if (previousKind === next.artifactKind) return previous;
+			if (previousKind) {
+				workTypeDrafts.current.set(previousKind, {
+					bindings: previous.bindings,
+					precomputeScript: previous.precomputeScript,
+					automatedReviewPolicy: previous.automatedReviewPolicy,
+				});
+			}
+			const draft = workTypeDrafts.current.get(next.artifactKind);
+			const automatedReviewPolicy =
+				draft?.automatedReviewPolicy ??
+				recommendedPolicyWithCurrentSupport(next.recommendedPolicy, previous.automatedReviewPolicy);
+			const bindings = draft?.bindings ?? [recommendedBinding(next)];
+			return {
+				...previous,
+				automatedReviewPolicy,
+				bindings:
+					automatedReviewPolicy.automatedReview.mode === "NONE"
+						? withoutEvidence(bindings)
+						: bindings,
+				precomputeScript: draft?.precomputeScript ?? "",
+			};
+		});
+	};
+
+	// Evidence is forbidden outright while no review runs and mandatory as soon as one does, so the
+	// support choice has to reach into every occasion rather than leaving the author to fix each by
+	// hand and be refused on save.
+	const updatePolicy = (automatedReviewPolicy: PracticeAutomatedReviewPolicy) => {
+		setForm((previous) => {
+			const nowGuidanceOnly = automatedReviewPolicy.automatedReview.mode === "NONE";
+			const wasGuidanceOnly = previous.automatedReviewPolicy.automatedReview.mode === "NONE";
+			const bindings = nowGuidanceOnly
+				? withoutEvidence(previous.bindings)
+				: wasGuidanceOnly && selectedWorkType
+					? withRecommendedEvidence(previous.bindings, selectedWorkType)
+					: previous.bindings;
+			return {
+				...previous,
+				automatedReviewPolicy,
+				bindings,
+				precomputeScript: nowGuidanceOnly ? "" : previous.precomputeScript,
+			};
 		});
 	};
 
@@ -248,26 +319,22 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		submitted && mode === "create" && !isValidSlug(form.slug)
 			? "Use 3–64 lowercase letters, numbers, and single hyphens."
 			: undefined;
-	const triggerError =
-		submitted &&
-		canRunMentoring &&
-		form.artifactKind !== ARTIFACT_KIND.conversationThread &&
-		form.triggerEvents.length === 0
-			? "Select at least one trigger event"
-			: undefined;
 	const criteriaError =
 		submitted && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
 			: undefined;
-	const evidenceError = practiceEvidenceError(form.automatedReviewPolicy);
+	const policyError = practicePolicyError(form.automatedReviewPolicy);
+	const bindingsError = bindingsProblem(
+		form.bindings,
+		form.automatedReviewPolicy,
+		selectedWorkType,
+	);
 
 	const valid =
 		form.name.trim().length >= 3 &&
 		form.criteria.trim().length >= 3 &&
-		(!canRunMentoring ||
-			form.artifactKind === ARTIFACT_KIND.conversationThread ||
-			form.triggerEvents.length > 0) &&
-		!evidenceError &&
+		!policyError &&
+		!bindingsError &&
 		(mode === "edit" || isValidSlug(form.slug));
 
 	const handleSubmit = (event: React.FormEvent) => {
@@ -279,18 +346,14 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					? "practice-name"
 					: form.criteria.trim().length < 3
 						? "practice-criteria"
-						: evidenceError
-							? practiceEvidenceErrorTarget(form.automatedReviewPolicy)
-							: mode === "create" && !isValidSlug(form.slug)
-								? "practice-slug"
-								: canRunMentoring &&
-										form.artifactKind !== ARTIFACT_KIND.conversationThread &&
-										form.triggerEvents.length === 0
-									? `practice-trigger-${selectedDefinitionOptions.triggerEvents[0]?.event}`
+						: policyError
+							? practicePolicyErrorTarget(form.automatedReviewPolicy)
+							: bindingsError
+								? bindingsError.focusId
+								: mode === "create" && !isValidSlug(form.slug)
+									? "practice-slug"
 									: "practice-name";
-			if (firstInvalidId === "practice-slug" || firstInvalidId.startsWith("practice-trigger-")) {
-				setShowAdvanced(true);
-			}
+			if (firstInvalidId === "practice-slug") setShowAdvanced(true);
 			requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
 			return;
 		}
@@ -298,8 +361,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		props.onSubmit({
 			slug: form.slug,
 			name: form.name.trim(),
-			artifactKind: form.artifactKind,
-			triggerEvents: canRunMentoring ? form.triggerEvents : [],
+			bindings: normalizeBindings(form.bindings),
 			criteria: form.criteria.trim(),
 			...(form.areaSlug === NO_AREA ? {} : { areaSlug: form.areaSlug }),
 			...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
@@ -372,94 +434,34 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								{nameError && <FieldError id="practice-name-error">{nameError}</FieldError>}
 							</Field>
 
-							<div className="grid gap-4 sm:grid-cols-2">
-								<FieldSet>
-									<FieldLegend variant="label">Review this kind of work</FieldLegend>
-									<RadioGroup
-										value={form.artifactKind}
-										onValueChange={(value) =>
-											value &&
-											setForm((previous) => {
-												const artifactKind = value as WorkArtifact;
-												const nextOptions = definitionOptionsFor(definitionOptions, artifactKind);
-												evidenceDrafts.current[previous.artifactKind] =
-													previous.automatedReviewPolicy;
-												triggerDrafts.current[previous.artifactKind] = previous.triggerEvents;
-												precomputeDrafts.current[previous.artifactKind] = previous.precomputeScript;
-												const automatedReviewPolicy =
-													evidenceDrafts.current[artifactKind] ??
-													recommendedPolicyWithCurrentSupport(
-														nextOptions.recommendedRequirements,
-														previous.automatedReviewPolicy,
-													);
-												const canRunNext = canAttemptAutomatedReview(
-													automatedReviewPolicy,
-													nextOptions.supportedAutomatedReviewModes,
-												);
-												return {
-													...previous,
-													artifactKind,
-													automatedReviewPolicy,
-													triggerEvents: canRunNext
-														? (triggerDrafts.current[artifactKind] ??
-															nextOptions.triggerEvents
-																.filter((event) => event.recommended)
-																.map((event) => event.event))
-														: [],
-													precomputeScript: canRunNext
-														? (precomputeDrafts.current[artifactKind] ?? "")
-														: "",
-												};
-											})
-										}
-										className="gap-2"
-									>
-										{FOCUS_ARTIFACT_OPTIONS.map((option) => (
-											<FieldLabel key={option.value} htmlFor={`practice-artifact-${option.value}`}>
-												<Field orientation="horizontal">
-													<RadioGroupItem
-														id={`practice-artifact-${option.value}`}
-														value={option.value}
-													/>
-													<FieldContent>
-														<FieldTitle>{option.label}</FieldTitle>
-														<FieldDescription>{option.hint}</FieldDescription>
-													</FieldContent>
-												</Field>
-											</FieldLabel>
+							<Field>
+								<FieldLabel htmlFor="practice-area">Practice area</FieldLabel>
+								<Select
+									value={form.areaSlug}
+									onValueChange={(value) =>
+										setForm((previous) => ({ ...previous, areaSlug: value ?? NO_AREA }))
+									}
+								>
+									<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
+										<SelectValue>
+											{form.areaSlug === NO_AREA
+												? "Unassigned"
+												: areas.find((area) => area.slug === form.areaSlug)?.name}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value={NO_AREA}>Unassigned</SelectItem>
+										{areas.map((area) => (
+											<SelectItem key={area.slug} value={area.slug}>
+												{area.name}
+											</SelectItem>
 										))}
-									</RadioGroup>
-								</FieldSet>
-
-								<Field>
-									<FieldLabel htmlFor="practice-area">Practice area</FieldLabel>
-									<Select
-										value={form.areaSlug}
-										onValueChange={(value) =>
-											setForm((previous) => ({ ...previous, areaSlug: value ?? NO_AREA }))
-										}
-									>
-										<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
-											<SelectValue>
-												{form.areaSlug === NO_AREA
-													? "Unassigned"
-													: areas.find((area) => area.slug === form.areaSlug)?.name}
-											</SelectValue>
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value={NO_AREA}>Unassigned</SelectItem>
-											{areas.map((area) => (
-												<SelectItem key={area.slug} value={area.slug}>
-													{area.name}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									<FieldDescription id="practice-area-description">
-										Group this practice under an area.
-									</FieldDescription>
-								</Field>
-							</div>
+									</SelectContent>
+								</Select>
+								<FieldDescription id="practice-area-description">
+									Group this practice under an area.
+								</FieldDescription>
+							</Field>
 						</FieldGroup>
 					</section>
 
@@ -535,37 +537,83 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 					<Separator />
 
-					<PracticeEvidenceEditor
-						options={selectedDefinitionOptions}
+					<PracticeMentoringSupportEditor
 						value={form.automatedReviewPolicy}
-						outcome={artifactKindUnchanged ? evidenceOutcome : undefined}
+						recommended={selectedWorkType?.recommendedPolicy ?? form.automatedReviewPolicy}
+						supportedAutomatedReviewModes={selectedWorkType?.supportedAutomatedReviewModes ?? []}
 						disabled={formDisabled}
-						onChange={(automatedReviewPolicy) =>
-							setForm((previous) => {
-								evidenceDrafts.current[previous.artifactKind] = automatedReviewPolicy;
-								const canRunNext = canAttemptAutomatedReview(
-									automatedReviewPolicy,
-									selectedDefinitionOptions.supportedAutomatedReviewModes,
-								);
-								return {
-									...previous,
-									automatedReviewPolicy,
-									triggerEvents:
-										canRunNext && previous.triggerEvents.length === 0
-											? (triggerDrafts.current[previous.artifactKind] ??
-												selectedDefinitionOptions.triggerEvents
-													.filter((event) => event.recommended)
-													.map((event) => event.event))
-											: previous.triggerEvents,
-									precomputeScript:
-										canRunNext && !previous.precomputeScript
-											? (precomputeDrafts.current[previous.artifactKind] ?? "")
-											: previous.precomputeScript,
-								};
-							})
-						}
-						error={submitted ? evidenceError : undefined}
+						onChange={updatePolicy}
+						error={submitted ? policyError : undefined}
 					/>
+
+					<Separator />
+
+					<section className="space-y-4" aria-labelledby="practice-occasions-heading">
+						<div>
+							<h2 id="practice-occasions-heading" className="text-lg font-semibold">
+								When this practice is reviewed
+							</h2>
+							<p className="text-sm text-muted-foreground">
+								A practice is reviewed on occasions. Each one says what starts a review and what
+								that review reads — and those differ: the review at the merge can say a thread was
+								never resolved, while the review when the work arrived can only describe what is in
+								front of it.
+							</p>
+						</div>
+
+						<FieldSet>
+							<FieldLegend variant="label">Review this kind of work</FieldLegend>
+							<FieldDescription>
+								Every occasion belongs to the same kind of work. Changing it starts the occasions
+								again from the recommended ones.
+							</FieldDescription>
+							<RadioGroup
+								value={artifactKind ?? ""}
+								onValueChange={(value) => {
+									const next = workTypes.find((option) => option.artifactKind === value);
+									if (next) selectWorkType(next);
+								}}
+								className="gap-2"
+							>
+								{workTypes.map((option) => (
+									<FieldLabel
+										key={option.artifactKind}
+										htmlFor={`practice-artifact-${option.artifactKind}`}
+									>
+										<Field orientation="horizontal">
+											<RadioGroupItem
+												id={`practice-artifact-${option.artifactKind}`}
+												value={option.artifactKind}
+											/>
+											<FieldContent>
+												<FieldTitle>{artifactKindLabel(option.artifactKind)}</FieldTitle>
+												<FieldDescription>{workArtifactHint(option.artifactKind)}</FieldDescription>
+											</FieldContent>
+										</Field>
+									</FieldLabel>
+								))}
+							</RadioGroup>
+						</FieldSet>
+
+						{selectedWorkType ? (
+							<PracticeBindingsEditor
+								options={selectedWorkType}
+								bindings={form.bindings}
+								canAttemptReview={canRunMentoring}
+								guidanceOnly={guidanceOnly}
+								outcome={workTypeUnchanged ? evidenceOutcome : undefined}
+								disabled={formDisabled}
+								error={submitted ? bindingsError?.message : undefined}
+								errorFocusId={submitted ? bindingsError?.focusId : undefined}
+								onChange={(bindings) => setForm((previous) => ({ ...previous, bindings }))}
+							/>
+						) : (
+							<p className="text-sm text-muted-foreground">
+								This practice reviews {artifactKindLabel(artifactKind)}, which this instance no
+								longer offers. Choose a kind of work above to edit its occasions.
+							</p>
+						)}
+					</section>
 
 					{afterFields}
 
@@ -585,7 +633,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							<span>
 								<span className="block text-lg font-semibold">Technical settings</span>
 								<span className="block text-sm font-normal text-muted-foreground">
-									Identifier{canRunMentoring ? ", review timing, and static analysis" : ""}
+									Identifier{canRunMentoring ? " and static analysis" : ""}
 								</span>
 							</span>
 						</CollapsibleTrigger>
@@ -632,41 +680,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								</FieldDescription>
 								{slugError && <FieldError id="practice-slug-error">{slugError}</FieldError>}
 							</Field>
-
-							{canRunMentoring && form.artifactKind !== ARTIFACT_KIND.conversationThread && (
-								<FieldSet
-									data-invalid={triggerError ? "true" : undefined}
-									aria-invalid={Boolean(triggerError)}
-									aria-describedby={`practice-trigger-description${triggerError ? " practice-trigger-error" : ""}`}
-								>
-									<FieldLegend>Run mentoring when *</FieldLegend>
-									<FieldDescription id="practice-trigger-description">
-										Recommended events are selected automatically. Change them only when this
-										practice needs different timing.
-									</FieldDescription>
-									<FieldGroup data-slot="checkbox-group" className="grid gap-3 sm:grid-cols-2">
-										{selectedDefinitionOptions.triggerEvents.map((option) => (
-											<FieldLabel
-												key={option.event}
-												htmlFor={`practice-trigger-${option.event}`}
-												className="flex cursor-pointer items-center gap-2 text-sm font-normal"
-											>
-												<Checkbox
-													id={`practice-trigger-${option.event}`}
-													checked={form.triggerEvents.includes(option.event)}
-													onCheckedChange={(checked) =>
-														toggleTrigger(option.event, checked === true)
-													}
-												/>
-												{option.displayName}
-											</FieldLabel>
-										))}
-									</FieldGroup>
-									{triggerError && (
-										<FieldError id="practice-trigger-error">{triggerError}</FieldError>
-									)}
-								</FieldSet>
-							)}
 
 							{canRunMentoring && (
 								<div className="space-y-3">
