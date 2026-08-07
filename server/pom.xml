@@ -46,6 +46,12 @@
         <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
         <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
 
+        <!-- Fail fast on CI, where the first few failures are the whole story and the runner minutes
+             are not. Locally, `-Dhephaestus.surefire.skipAfterFailureCount=0` turns it off: past this
+             threshold surefire reports every remaining test as *Skipped*, so a run that is really
+             fixing N failures otherwise takes N/5 full builds to enumerate them. -->
+        <hephaestus.surefire.skipAfterFailureCount>5</hephaestus.surefire.skipAfterFailureCount>
+
         <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
         <openapi.server.port>38090</openapi.server.port>
 
@@ -990,7 +996,7 @@
                     <threadCount>4</threadCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
                     <!-- Fail fast on errors -->
-                    <skipAfterFailureCount>5</skipAfterFailureCount>
+                    <skipAfterFailureCount>${hephaestus.surefire.skipAfterFailureCount}</skipAfterFailureCount>
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>180</forkedProcessExitTimeoutInSeconds>
