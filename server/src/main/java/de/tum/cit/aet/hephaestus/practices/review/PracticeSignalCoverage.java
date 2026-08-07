@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -57,13 +56,20 @@ public class PracticeSignalCoverage {
     }
 
     /**
-     * Refuses to start when the authoring vocabulary offers a signal nothing can raise.
+     * Asserts that the authoring vocabulary offers no signal nothing can raise.
      *
-     * <p>Deliberately checks the offered vocabulary rather than the stored practices: what an author is
-     * offered is compiled in and the same on every deployment — so this fails on a developer's machine
-     * and in CI, not on the one instance that happened to have a practice using it.
+     * <p>Checks the offered vocabulary rather than the stored practices, and that is the whole point: what
+     * an author is offered is compiled in and identical on every deployment. So this is a fact about the
+     * build, and {@code PracticeSignalCoverageTest} — a {@code @Tag("unit")} test that calls exactly this
+     * method against the real options — is where it is established, before anything is deployed.
+     *
+     * <p>Deliberately <em>not</em> a {@code @PostConstruct}. This class is an ungated {@code @Service}, so
+     * a throw here would run in all three runtime roles and crash-loop the webhook pod — which exists
+     * precisely so that webhook reception survives an app-server failure, and whose missed push events
+     * cannot be redelivered. A compile-time fact must not be able to take down the one process whose job
+     * is to keep receiving while everything else is broken. The check is the same; the place it fails is
+     * CI, where it is free, instead of production, where it is not.
      */
-    @PostConstruct
     void validateAuthoringVocabulary() {
         List<String> violations = new ArrayList<>();
         Set<SignalName> compiled = coverage.compiledCoverage();

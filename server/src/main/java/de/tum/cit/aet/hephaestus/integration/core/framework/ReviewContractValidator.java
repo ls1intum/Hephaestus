@@ -61,7 +61,7 @@ public class ReviewContractValidator {
      * capability because it is ours: the reflection surface lives inside Hephaestus, and an integration
      * claiming to deliver there is claiming a surface it cannot reach.
      */
-    private static final Map<FeedbackLane, Capability> LANE_CAPABILITIES = new EnumMap<>(
+    static final Map<FeedbackLane, Capability> LANE_CAPABILITIES = new EnumMap<>(
         Map.of(
             FeedbackLane.IN_CONTEXT_SUMMARY,
             Capability.FEEDBACK_DELIVERY,
@@ -72,25 +72,19 @@ public class ReviewContractValidator {
         )
     );
 
-    /** Lanes that exist but that no integration can reach, because the surface is ours. */
-    private static final Set<FeedbackLane> HEPHAESTUS_OWNED_LANES = EnumSet.of(FeedbackLane.PROFILE);
-
-    static {
-        // The forward-compat guard, and the reason it runs at class-init rather than per manifest: a lane
-        // added to the enum without a rule here would otherwise be enforced only once some vendor happened
-        // to declare it — which is to say, discovered in production. Every lane must be classified as
-        // either deliverable-with-a-capability or ours.
-        Set<FeedbackLane> unclassified = EnumSet.allOf(FeedbackLane.class);
-        unclassified.removeAll(LANE_CAPABILITIES.keySet());
-        unclassified.removeAll(HEPHAESTUS_OWNED_LANES);
-        if (!unclassified.isEmpty()) {
-            throw new IllegalStateException(
-                "FeedbackLane values with no enforcement rule: " +
-                    unclassified +
-                    " — add each to LANE_CAPABILITIES or HEPHAESTUS_OWNED_LANES"
-            );
-        }
-    }
+    /**
+     * Lanes that exist but that no integration can reach, because the surface is ours.
+     *
+     * <p>Together with {@link #LANE_CAPABILITIES} this must classify every {@link FeedbackLane}: a lane
+     * added to the enum with no rule here would be enforced only once some vendor happened to declare it,
+     * which is to say discovered in production. That completeness used to be asserted in a static
+     * initializer. It is a fact about the build — the enum and both collections are compile-time
+     * constants, so the answer is identical on every deployment and cannot change at runtime — and
+     * asserting it at class-init only moved the discovery from CI to whichever pod first loaded the class.
+     * {@code ReviewContractLaneRulesTest} asserts it instead, where a failure costs a red build rather
+     * than a crash-looping process.
+     */
+    static final Set<FeedbackLane> HEPHAESTUS_OWNED_LANES = EnumSet.of(FeedbackLane.PROFILE);
 
     private final ArtifactDescriptorRegistry descriptors;
     private final IntegrationMessageHandlerRegistry handlers;
