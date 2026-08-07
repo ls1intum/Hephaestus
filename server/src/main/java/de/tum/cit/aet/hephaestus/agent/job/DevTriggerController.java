@@ -5,15 +5,12 @@ import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Dev-only REST endpoint for manually triggering PR/issue reviews.
  * Enabled by setting hephaestus.dev.trigger-enabled=true.
+ *
+ * <p><strong>Instance admins only.</strong> The property is the switch that makes the endpoint exist;
+ * it is not an access control. This route spends real LLM budget against any workspace id a caller
+ * names, so the property gates whether it is mounted and {@code app_admin} gates who may call it —
+ * anything less and enabling the flag on a reachable deployment hands unauthenticated callers a
+ * cross-workspace spend button bounded only by the monthly cap.
  *
  * <p>Two modes:
  * <ul>
@@ -52,7 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @ConditionalOnProperty(name = "hephaestus.dev.trigger-enabled", havingValue = "true")
-@PreAuthorize("permitAll()")
+@PreAuthorize("hasAuthority('app_admin')")
 @WorkspaceAgnostic("Dev-only endpoint; workspace ID passed as request parameter")
 public class DevTriggerController {
 
@@ -106,34 +109,17 @@ public class DevTriggerController {
         if (prepared == null || prepared.request() == null) {
             return prepared == null ? "No submission prepared" : prepared.message();
         }
-        // An explicit ask is its own occurrence, so it keys on a fresh run id and is never deduplicated
-        // against an earlier one: clicking trigger twice means two runs were asked for.
+        // Null signal key on purpose. A key minted per click is a key that never repeats, and
+        // AgentJobService only applies its in-flight deduplication when it has no key to trust
+        // (`signalKey == null`) — so a per-click key does not make the trigger idempotent, it disables
+        // the only deduplication this path has. Passing null restores it: a second click while the first
+        // review is still running joins that run instead of paying for a second one.
         return agentJobService.submitPrepared(
             workspaceId,
             prepared.jobType(),
             (JobSubmissionRequest) prepared.request(),
-            manualSignalKey(workspaceId, prepared)
+            null
         );
-    }
-
-    private static SignalKey manualSignalKey(Long workspaceId, Prepared prepared) {
-        return switch (prepared.request()) {
-            case PullRequestReviewSubmissionRequest pr -> ScmSignals.manualKey(
-                workspaceId,
-                pr.pullRequest().id(),
-                ScmSignals.PULL_REQUEST_REVIEW_REQUESTED,
-                UUID.randomUUID()
-            );
-            case IssueReviewSubmissionRequest issue -> ScmSignals.manualKey(
-                workspaceId,
-                issue.issueId(),
-                ScmSignals.ISSUE_REVIEW_REQUESTED,
-                UUID.randomUUID()
-            );
-            default -> throw new IllegalStateException(
-                "No signal declared for dev-triggered request: " + prepared.request()
-            );
-        };
     }
 
     private Prepared preparePullRequest(Long prId, @Nullable String signal) {

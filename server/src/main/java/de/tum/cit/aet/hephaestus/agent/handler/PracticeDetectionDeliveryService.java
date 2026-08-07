@@ -611,14 +611,40 @@ public class PracticeDetectionDeliveryService {
     ) {}
 
     /**
-     * Route the delivery target on the job's artifact. Issue and conversation jobs stamp
-     * {@code artifact_kind}; PR jobs omit it by convention (they carry only {@code pull_request_id}), so
-     * the missing discriminator defaults to a pull request.
+     * Route the delivery target on the job's artifact.
+     *
+     * <p>The discriminator is taken from the job row's own {@code artifact_kind} column first and only
+     * then from its metadata. The column is set by {@code AgentJobService} for every job from the job
+     * type, so it is present and authoritative even for the pull-request jobs that omit the metadata key
+     * by convention; the metadata copy is kept as the fallback because it is what jobs queued by older
+     * builds carry.
+     *
+     * <p>A kind neither source recognises is refused rather than defaulted. Falling through to
+     * pull-request handling — as this did — turns "this build cannot deliver that kind" into "Missing
+     * pull_request_id in job metadata", which sends whoever reads it looking for the wrong bug. The
+     * pull-request default now applies only where it is actually a fact: a job that names no kind at all.
      */
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
-        String artifactKind = metadata.has("artifact_kind")
-            ? metadata.get("artifact_kind").asString()
-            : ArtifactKinds.PULL_REQUEST.value();
+        String artifactKind =
+            job.getArtifactKind() != null
+                ? job.getArtifactKind().value()
+                : metadata.has("artifact_kind")
+                    ? metadata.get("artifact_kind").asString()
+                    : null;
+        if (artifactKind == null) {
+            // Predates the column and the metadata key alike, which means the event-driven PR path —
+            // the only producer that existed then.
+            artifactKind = ArtifactKinds.PULL_REQUEST.value();
+        } else if (
+            !ArtifactKinds.PULL_REQUEST.value().equals(artifactKind) &&
+            !ArtifactKinds.ISSUE.value().equals(artifactKind) &&
+            !ArtifactKinds.CONVERSATION_THREAD.value().equals(artifactKind) &&
+            !ArtifactKinds.DOCUMENT.value().equals(artifactKind)
+        ) {
+            throw new JobDeliveryException(
+                "No delivery route for artifact kind: kind=" + artifactKind + ", jobId=" + job.getId()
+            );
+        }
         if (ArtifactKinds.CONVERSATION_THREAD.value().equals(artifactKind)) {
             // Repo-less: the subject user is carried EXPLICITLY in metadata (about_user_id), not resolved
             // from an SCM artifact author. artifactId is the slack_thread aggregate id.

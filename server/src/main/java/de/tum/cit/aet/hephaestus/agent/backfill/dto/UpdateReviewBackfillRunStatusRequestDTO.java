@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.backfill.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -14,6 +15,7 @@ import org.jspecify.annotations.NonNull;
  */
 public record UpdateReviewBackfillRunStatusRequestDTO(
     @NonNull
+    @NotNull
     @Schema(
         description = "RUNNING confirms the estimate and starts the campaign; CANCELLED stops it for good",
         allowableValues = { "RUNNING", "CANCELLED" }
