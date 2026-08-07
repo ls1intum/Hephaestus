@@ -22,7 +22,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest.ReviewContribution;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
@@ -67,8 +66,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
                         ASSEMBLED,
                         "Widget assembled",
                         Set.of(new EventTypeKey(IntegrationKind.GITHUB, "repository.pull_request")),
-                        RevisionScheme.CONTENT_DIGEST,
-                        Stability.EXPERIMENTAL
+                        RevisionScheme.CONTENT_DIGEST
                     )
                 ),
                 true,

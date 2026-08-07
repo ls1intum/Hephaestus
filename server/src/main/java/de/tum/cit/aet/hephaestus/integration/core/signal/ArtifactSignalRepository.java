@@ -245,7 +245,10 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * signal it waits on is in the log would be a confidently wrong answer on the page whose entire job
      * is to be right about silence.
      *
-     * <p>Bounded by the size of the signal vocabulary, not by the number of rows.
+     * <p>The <em>result</em> is bounded by the signal vocabulary; the work is not. There is no index on
+     * {@code signal_name}, so this scans the workspace's ledger rows and distinct-ifies them — cheap on a
+     * young workspace, and worth an index before it is asked for on a hot path rather than once per
+     * dormancy report.
      */
     @Query("SELECT DISTINCT s.signalName FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId")
     List<String> findRecordedSignalNames(@Param("workspaceId") Long workspaceId);

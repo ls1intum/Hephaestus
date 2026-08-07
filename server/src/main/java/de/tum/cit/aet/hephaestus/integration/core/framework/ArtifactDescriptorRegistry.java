@@ -47,10 +47,6 @@ public class ArtifactDescriptorRegistry implements ArtifactCatalog {
             );
     }
 
-    public Set<ArtifactKind> registeredKinds() {
-        return byKind.keySet();
-    }
-
     @Override
     public Collection<ArtifactDescriptor> all() {
         return byKind.values();
@@ -59,14 +55,5 @@ public class ArtifactDescriptorRegistry implements ArtifactCatalog {
     @Override
     public Optional<ArtifactDescriptor> descriptorFor(ArtifactKind kind) {
         return Optional.ofNullable(byKind.get(kind));
-    }
-
-    /**
-     * The declared signal with this name, resolved through the kind its name already carries. Returns
-     * empty when the kind has no descriptor or the descriptor does not declare the name — the caller
-     * distinguishes those two by asking {@link #descriptorFor(ArtifactKind)} as well.
-     */
-    public Optional<Signal> signal(SignalName name) {
-        return descriptorFor(name.artifactKind()).flatMap(descriptor -> descriptor.signal(name));
     }
 }

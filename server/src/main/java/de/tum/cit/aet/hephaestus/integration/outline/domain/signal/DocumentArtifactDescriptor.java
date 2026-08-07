@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -110,13 +109,6 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
     }
 
     private static Signal declare(SignalName name, String displayName, boolean recommended) {
-        return new Signal(
-            name,
-            displayName,
-            Set.of(OUTLINE_DOCUMENT),
-            DocsSignals.revisionScheme(name),
-            Stability.EXPERIMENTAL,
-            recommended
-        );
+        return new Signal(name, displayName, Set.of(OUTLINE_DOCUMENT), DocsSignals.revisionScheme(name), recommended);
     }
 }

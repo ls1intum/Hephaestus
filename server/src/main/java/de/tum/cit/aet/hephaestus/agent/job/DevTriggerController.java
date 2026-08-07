@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -92,6 +93,10 @@ public class DevTriggerController {
     }
 
     @PostMapping("/api/dev/trigger-review")
+    @AuditExempt(
+        reason = "submits a review job; changes no configuration or access, and the run and its spend are " +
+            "already recorded on agent_job and the LLM usage ledger"
+    )
     public String triggerReview(
         @RequestParam @Nullable Long prId,
         @RequestParam @Nullable Long issueId,

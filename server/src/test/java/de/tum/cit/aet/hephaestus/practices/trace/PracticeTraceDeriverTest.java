@@ -144,7 +144,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             var entry = only(
                 practice(PracticeReviewTier.ENGAGE, READY),
                 List.of(triggered(READY, RUN)),
-                Map.of(RUN, new ReviewOutcome(RUN, ReviewRunState.COMPLETED, true, AT, Map.of())),
+                Map.of(RUN, new ReviewOutcome(ReviewRunState.COMPLETED, true, AT, Map.of())),
                 Map.of()
             );
 
@@ -247,13 +247,13 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             var running = only(
                 practice(PracticeReviewTier.ENGAGE, READY),
                 List.of(triggered(READY, RUN)),
-                Map.of(RUN, new ReviewOutcome(RUN, ReviewRunState.IN_PROGRESS, false, null, Map.of())),
+                Map.of(RUN, new ReviewOutcome(ReviewRunState.IN_PROGRESS, false, null, Map.of())),
                 Map.of()
             );
             var failed = only(
                 practice(PracticeReviewTier.ENGAGE, READY),
                 List.of(triggered(READY, RUN)),
-                Map.of(RUN, new ReviewOutcome(RUN, ReviewRunState.FAILED, false, AT, Map.of())),
+                Map.of(RUN, new ReviewOutcome(ReviewRunState.FAILED, false, AT, Map.of())),
                 Map.of()
             );
 
@@ -368,6 +368,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
     }
 
     private static ReviewOutcome completed(Map<String, PracticeReadinessOutcome> readiness) {
-        return new ReviewOutcome(RUN, ReviewRunState.COMPLETED, false, AT, readiness);
+        return new ReviewOutcome(ReviewRunState.COMPLETED, false, AT, readiness);
     }
 }

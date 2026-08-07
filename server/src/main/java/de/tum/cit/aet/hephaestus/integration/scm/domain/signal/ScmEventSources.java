@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import java.util.Set;
 
 /**
@@ -34,17 +33,16 @@ final class ScmEventSources {
      * The scheme is already stated once, next to the code that computes the revision; restating it in the
      * descriptor would let a signal be deduplicated by one rule and re-measured by another.
      *
-     * <p>Every SCM signal is {@link Stability#STABLE}: these names have been persisted in
-     * {@code practice.trigger_events} since long before they were signal names, so none of them is free to
-     * move regardless of what we would call it today.
+     * <p>None of these names is free to move: they have been persisted in
+     * {@code practice.trigger_events} since long before they were signal names.
      */
     static Signal declare(SignalName name, String displayName, Set<EventTypeKey> producedBy) {
-        return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name), Stability.STABLE);
+        return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name));
     }
 
     /** As {@link #declare}, for a signal a new practice on this artifact should start out watching. */
     static Signal declareRecommended(SignalName name, String displayName, Set<EventTypeKey> producedBy) {
-        return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name), Stability.STABLE, true);
+        return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name), true);
     }
 
     private ScmEventSources() {}

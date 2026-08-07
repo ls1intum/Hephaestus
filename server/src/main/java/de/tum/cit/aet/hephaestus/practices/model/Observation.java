@@ -78,17 +78,12 @@ public class Observation {
     private UUID agentJobId;
 
     /**
-     * The practice being evaluated. FK {@code fk_observation_practice}, {@code ON DELETE CASCADE}:
-     * deleting a practice removes its immutable observations at the DB level, since the cascade must hold
-     * for bulk/native deletes where Hibernate lifecycle callbacks never fire.
-     */
-    @NotNull
-    /**
      * The practice measured. Deliberately NOT cascade-deleted: an observation is an immutable
      * measurement and the substrate for longitudinal research, so pruning a practice from the
      * catalog must not erase the history of everyone ever measured against it. Retire practices
      * instead; hard deletion is reserved for workspace purge, which removes observations directly.
      */
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "practice_id", nullable = false, foreignKey = @ForeignKey(name = "fk_observation_practice"))
     private Practice practice;

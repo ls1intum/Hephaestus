@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -36,7 +35,6 @@ public class ConversationThreadArtifactDescriptor implements ArtifactDescriptor 
             // What is new about a settled thread is what was said in it, and a thread has no commits at
             // all — the same reason an issue's signals key on a content digest.
             RevisionScheme.CONTENT_DIGEST,
-            Stability.STABLE,
             true
         )
     );

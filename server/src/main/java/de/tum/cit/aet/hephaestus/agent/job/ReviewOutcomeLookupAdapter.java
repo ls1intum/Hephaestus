@@ -50,7 +50,6 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
             row.getOutput() != null &&
             ReviewRunOutcome.fromJobOutput(row.getOutput()) == ReviewRunOutcome.INSUFFICIENT_EVIDENCE;
         return new ReviewOutcome(
-            row.getId(),
             state(row.getStatus()),
             refusedEvidence,
             row.getCompletedAt(),

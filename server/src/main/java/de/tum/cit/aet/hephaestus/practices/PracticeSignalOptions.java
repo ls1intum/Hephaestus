@@ -68,19 +68,6 @@ public class PracticeSignalOptions {
     }
 
     /**
-     * Whether any registered domain declares this signal at all.
-     *
-     * <p>Asked of the descriptor rather than of a stored allow-list, so a signal whose kind has no
-     * descriptor is refused with the same answer as a misspelling — both mean nothing can raise it.
-     */
-    public boolean isDeclared(SignalName signal) {
-        return artifacts
-            .descriptorFor(signal.artifactKind())
-            .filter(d -> d.signal(signal).isPresent())
-            .isPresent();
-    }
-
-    /**
      * Whether any ingested event is declared to raise this signal.
      *
      * <p>False is a meaningful answer, not a gap: a settled conversation and a review somebody asked for

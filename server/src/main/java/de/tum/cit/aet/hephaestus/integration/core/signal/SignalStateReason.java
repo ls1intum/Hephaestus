@@ -15,9 +15,6 @@ public enum SignalStateReason {
     /** Rate limiting, not correctness. Retrying later would defeat the limit the workspace asked for. */
     COOLDOWN_ACTIVE(SignalState.SUPPRESSED),
 
-    /** Another submission for the same subject won the idempotency race; it carries the review. */
-    CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
-
     /**
      * The artifact falls outside the workspace's review scope — the wrong target branch, or a repository
      * the workspace syncs but does not review.
@@ -83,7 +80,13 @@ public enum SignalStateReason {
         return resultingState;
     }
 
-    /** True when the reaper should keep re-offering the signal. */
+    /**
+     * Whether this reason leaves the signal open for the reaper to re-offer.
+     *
+     * <p>A restatement of {@link #resultingState()}, not a second source of truth: the reaper selects on
+     * the stored state, so it never calls this. It exists so a test can say which of the two kinds of
+     * refusal a reason is without spelling out the comparison, which is the thing worth asserting.
+     */
     public boolean isRetryable() {
         return resultingState == SignalState.PENDING;
     }

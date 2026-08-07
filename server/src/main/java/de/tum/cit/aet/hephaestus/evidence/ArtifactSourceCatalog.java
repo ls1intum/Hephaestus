@@ -27,16 +27,6 @@ public record ArtifactSourceCatalog(SourceContractVersion version, List<Artifact
     }
 
     /**
-     * Every source that declares it applies to this artifact kind — the whole evidence surface a review
-     * of that kind can ever see.
-     *
-     * <p>This used to be stated a second time as a named {@code EvidenceProfile} listing its sources by
-     * hand. The two answers were required to agree and nothing made them: a profile could only ever
-     * repeat what the sources already say, or be wrong about it. Empty means nothing has declared itself
-     * usable for the kind, which callers treat as an unknown kind rather than as a review with no
-     * evidence.
-     */
-    /**
      * The sources a practice bound to this kind reads when its author has not said otherwise.
      *
      * <p>A subset of {@link #sourcesFor(String)}: everything applicable is what a review of the kind
@@ -58,6 +48,16 @@ public record ArtifactSourceCatalog(SourceContractVersion version, List<Artifact
         return List.copyOf(kinds);
     }
 
+    /**
+     * Every source that declares it applies to this artifact kind — the whole evidence surface a review
+     * of that kind can ever see.
+     *
+     * <p>This used to be stated a second time as a named {@code EvidenceProfile} listing its sources by
+     * hand. The two answers were required to agree and nothing made them: a profile could only ever
+     * repeat what the sources already say, or be wrong about it. Empty means nothing has declared itself
+     * usable for the kind, which callers treat as an unknown kind rather than as a review with no
+     * evidence.
+     */
     public Set<SourceKind> sourcesFor(String artifactKind) {
         Objects.requireNonNull(artifactKind, "artifactKind");
         Set<SourceKind> kinds = new LinkedHashSet<>();

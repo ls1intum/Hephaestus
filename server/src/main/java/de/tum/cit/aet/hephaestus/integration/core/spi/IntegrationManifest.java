@@ -94,17 +94,9 @@ public interface IntegrationManifest {
             return NONE;
         }
 
-        public Set<SignalName> raisedSignals(ArtifactKind kind) {
-            return raises.getOrDefault(kind, Set.of());
-        }
-
         /** Every signal this integration raises, across all kinds. */
         public Set<SignalName> allRaisedSignals() {
             return raises.values().stream().flatMap(Set::stream).collect(Collectors.toUnmodifiableSet());
-        }
-
-        public Set<FeedbackLane> deliveredLanes(ArtifactKind kind) {
-            return delivers.getOrDefault(kind, Set.of());
         }
 
         private static <V> Map<ArtifactKind, Set<V>> deepCopy(Map<ArtifactKind, Set<V>> source) {

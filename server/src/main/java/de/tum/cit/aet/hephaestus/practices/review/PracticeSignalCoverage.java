@@ -118,7 +118,7 @@ public class PracticeSignalCoverage {
             }
             Set<IntegrationKind> couldRaise = new LinkedHashSet<>();
             bound.forEach(signal -> couldRaise.addAll(coverage.raisedBy(signal)));
-            dormant.add(new DormantBinding(practice.getId(), practice.getSlug(), bound, couldRaise));
+            dormant.add(new DormantBinding(practice.getId(), bound, couldRaise));
         }
         return List.copyOf(dormant);
     }

@@ -29,7 +29,6 @@ public interface ReviewOutcomeLookup {
      *                             from having been considered and refused, and the only record of it
      */
     record ReviewOutcome(
-        @NonNull UUID reviewId,
         @NonNull ReviewRunState state,
         boolean insufficientEvidence,
         @Nullable Instant decidedAt,

@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewExecutionCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
@@ -89,20 +88,8 @@ final class FixtureIntegration {
     static ArtifactDescriptor descriptor(boolean reviewable, Set<ActorRole> roles, Set<FeedbackLane> lanes) {
         return descriptor(
             List.of(
-                new Signal(
-                    WIDGET_ASSEMBLED,
-                    "Widget assembled",
-                    Set.of(ASSEMBLY_EVENT),
-                    RevisionScheme.CONTENT_DIGEST,
-                    Stability.EXPERIMENTAL
-                ),
-                new Signal(
-                    WIDGET_SHIPPED,
-                    "Widget shipped",
-                    Set.of(SHIPMENT_EVENT),
-                    RevisionScheme.TERMINAL_STATE,
-                    Stability.EXPERIMENTAL
-                )
+                new Signal(WIDGET_ASSEMBLED, "Widget assembled", Set.of(ASSEMBLY_EVENT), RevisionScheme.CONTENT_DIGEST),
+                new Signal(WIDGET_SHIPPED, "Widget shipped", Set.of(SHIPMENT_EVENT), RevisionScheme.TERMINAL_STATE)
             ),
             reviewable,
             roles,

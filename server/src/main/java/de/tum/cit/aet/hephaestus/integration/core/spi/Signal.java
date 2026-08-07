@@ -27,7 +27,6 @@ import java.util.Set;
  *                    owning domain — provenance, not routing
  * @param revision    how a distinct occurrence is identified, declared per signal because a
  *                    description edit and a push are not the same kind of change
- * @param stability   whether this name is safe to bind to
  * @param recommendedForAuthoring whether a practice written against this artifact should start out
  *                    watching this signal — the domain's opinion, which the authoring surface
  *                    pre-selects and the author is free to overrule
@@ -37,24 +36,16 @@ public record Signal(
     String displayName,
     Set<EventTypeKey> producedBy,
     RevisionScheme revision,
-    Stability stability,
     boolean recommendedForAuthoring
 ) {
     /** A signal the authoring surface offers but does not pre-select. */
-    public Signal(
-        SignalName name,
-        String displayName,
-        Set<EventTypeKey> producedBy,
-        RevisionScheme revision,
-        Stability stability
-    ) {
-        this(name, displayName, producedBy, revision, stability, false);
+    public Signal(SignalName name, String displayName, Set<EventTypeKey> producedBy, RevisionScheme revision) {
+        this(name, displayName, producedBy, revision, false);
     }
 
     public Signal {
         Objects.requireNonNull(name, "signal name must not be null");
         Objects.requireNonNull(revision, "revision scheme must not be null");
-        Objects.requireNonNull(stability, "stability must not be null");
         if (displayName == null || displayName.isBlank()) {
             throw new IllegalArgumentException("signal " + name + " must have a display name");
         }
