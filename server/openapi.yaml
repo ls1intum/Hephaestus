@@ -9808,16 +9808,10 @@ components:
             requirement passes
           items:
             $ref: "#/components/schemas/PracticeEvidenceLimitation"
-        optionalContext:
+        needs:
           type: array
-          description: Sources that may add context but never block automated review
-            when absent
-          items:
-            $ref: "#/components/schemas/PracticeOptionalContextSource"
-        requiredEvidence:
-          type: array
-          description: Sources that must meet their quality requirements before automated
-            review may start
+          description: "Sources this practice reads, each with the stance it takes\
+            \ towards that source"
           items:
             $ref: "#/components/schemas/PracticeEvidenceRequirement"
         sourceContractVersion:
@@ -9832,8 +9826,7 @@ components:
       required:
       - automatedReview
       - knownLimitations
-      - optionalContext
-      - requiredEvidence
+      - needs
       - sourceContractVersion
       - whenEvidenceIsInsufficient
     PracticeAutomatedReviewValidation:
@@ -9960,26 +9953,23 @@ components:
       - reviewedCount
     PracticeEvidenceRequirement:
       type: object
-      description: Source and minimum capture quality required by a practice
+      description: A source a practice reads and the stance it takes towards it
       properties:
-        completeness:
-          type: string
-          enum:
-          - COMPLETE
-          - NO_REQUIREMENT
-        content:
-          type: string
-          enum:
-          - NON_EMPTY
-          - NO_REQUIREMENT
         sourceKind:
           type: string
+          description: Stable source identifier from the selected source contract
+        stance:
+          type: string
+          description: Whether an absent or degraded capture refuses the review
+          enum:
+          - REQUIRED
+          - CONTEXTUAL
       required:
-      - completeness
       - sourceKind
+      - stance
     PracticeEvidenceSourceOption:
       type: object
-      description: An evidence source allowed by the selected evidence profile
+      description: An evidence source a practice on this kind of work may read
       properties:
         description:
           type: string
@@ -9992,28 +9982,21 @@ components:
           - INTERNAL
           - PERSONAL
           - SENSITIVE_PERSONAL
+        requiredQuality:
+          type: string
+          description: What requiring this source demands of its capture; fixed by
+            the source contract
+          enum:
+          - ANY_CAPTURE
+          - COMPLETE
+          - COMPLETE_AND_NON_EMPTY
         sourceKind:
           type: string
-        supportsComplete:
-          type: boolean
-        supportsEmpty:
-          type: boolean
       required:
       - description
       - displayName
       - privacyClass
-      - sourceKind
-      - supportsComplete
-      - supportsEmpty
-    PracticeOptionalContextSource:
-      type: object
-      description: Source that may add context but never blocks automated review when
-        absent
-      properties:
-        sourceKind:
-          type: string
-          description: Stable source identifier from the selected source contract
-      required:
+      - requiredQuality
       - sourceKind
     PracticeReviewSettings:
       type: object

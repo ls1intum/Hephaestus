@@ -17,15 +17,11 @@ export const mockPullRequestEvidence = {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
-	requiredEvidence: [
-		{ sourceKind: "scm.pull-request.core", completeness: "COMPLETE" },
-		{
-			sourceKind: "scm.pull-request.diff",
-			completeness: "COMPLETE",
-			content: "NON_EMPTY",
-		},
+	needs: [
+		{ sourceKind: "scm.pull-request.comments", stance: "CONTEXTUAL" },
+		{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
+		{ sourceKind: "scm.pull-request.diff", stance: "REQUIRED" },
 	],
-	optionalContext: [{ sourceKind: "scm.pull-request.comments" }],
 	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
@@ -41,8 +37,10 @@ const mockIssueEvidence = {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
-	requiredEvidence: [{ sourceKind: "scm.issue.core", completeness: "COMPLETE" }],
-	optionalContext: [{ sourceKind: "scm.issue.comments" }],
+	needs: [
+		{ sourceKind: "scm.issue.comments", stance: "CONTEXTUAL" },
+		{ sourceKind: "scm.issue.core", stance: "REQUIRED" },
+	],
 	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
@@ -59,13 +57,7 @@ const mockConversationEvidence = {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
-	requiredEvidence: [
-		{
-			sourceKind: "slack.conversation.thread",
-			completeness: "COMPLETE",
-		},
-	],
-	optionalContext: [],
+	needs: [{ sourceKind: "slack.conversation.thread", stance: "REQUIRED" }],
 	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
@@ -112,24 +104,21 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Pull request details",
 					description: "Pull request metadata and commit subjects for the reviewed pull request.",
 					privacyClass: "PERSONAL",
-					supportsComplete: true,
-					supportsEmpty: false,
+					requiredQuality: "COMPLETE",
 				},
 				{
 					sourceKind: "scm.pull-request.diff",
 					displayName: "Code changes",
 					description: "Code changes in the reviewed pull request.",
 					privacyClass: "PERSONAL",
-					supportsComplete: true,
-					supportsEmpty: true,
+					requiredQuality: "COMPLETE_AND_NON_EMPTY",
 				},
 				{
 					sourceKind: "scm.pull-request.comments",
 					displayName: "Inline review comments",
 					description: "Inline review comments mirrored by the application.",
 					privacyClass: "PERSONAL",
-					supportsComplete: true,
-					supportsEmpty: true,
+					requiredQuality: "ANY_CAPTURE",
 				},
 			],
 		},
@@ -148,16 +137,14 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Issue details",
 					description: "Issue metadata and rendered description.",
 					privacyClass: "PERSONAL",
-					supportsComplete: true,
-					supportsEmpty: false,
+					requiredQuality: "COMPLETE",
 				},
 				{
 					sourceKind: "scm.issue.comments",
 					displayName: "Issue comments",
 					description: "Issue discussion comments.",
 					privacyClass: "PERSONAL",
-					supportsComplete: true,
-					supportsEmpty: true,
+					requiredQuality: "ANY_CAPTURE",
 				},
 			],
 		},
@@ -172,8 +159,7 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Slack thread",
 					description: "Ordered human messages from one Slack thread.",
 					privacyClass: "PERSONAL",
-					supportsComplete: true,
-					supportsEmpty: false,
+					requiredQuality: "COMPLETE",
 				},
 			],
 		},

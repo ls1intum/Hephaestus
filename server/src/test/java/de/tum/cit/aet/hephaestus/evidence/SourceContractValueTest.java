@@ -80,6 +80,48 @@ class SourceContractValueTest {
         assertThat(source(SourceAuthority.LOSSY_DERIVATION, IdentityMode.NOT_APPLICABLE, false)).isNotNull();
     }
 
+    /**
+     * A demand the source can never meet is a refusal written as a requirement: every review that
+     * required the source would be refused forever, for a reason no operator could act on. This used to
+     * be checked once per practice that named the source; stating the demand on the source means it can
+     * be checked once, where it cannot be got wrong twice.
+     */
+    @Test
+    void aSourceCannotDemandAQualityItCanNeverReport() {
+        assertThatIllegalArgumentException()
+            .isThrownBy(() -> source(RequiredCaptureQuality.COMPLETE, false, true))
+            .withMessageContaining("cannot report COMPLETE cannot demand it");
+        assertThatIllegalArgumentException()
+            .isThrownBy(() -> source(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY, true, false))
+            .withMessageContaining("cannot demand non-emptiness");
+
+        assertThat(source(RequiredCaptureQuality.ANY_CAPTURE, false, false)).isNotNull();
+        assertThat(source(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY, true, true)).isNotNull();
+    }
+
+    private static ArtifactSourceContract source(
+        RequiredCaptureQuality requiredQuality,
+        boolean supportsComplete,
+        boolean supportsEmpty
+    ) {
+        return new ArtifactSourceContract(
+            new SourceKind("scm.example.source"),
+            "Example",
+            "An example source.",
+            "Everything in scope.",
+            Set.of("scm.pull_request"),
+            supportsComplete ? SourceAuthority.SYNCHRONIZED_MIRROR : SourceAuthority.LOSSY_DERIVATION,
+            new IdentityPolicy(IdentityMode.NOT_APPLICABLE),
+            new CompletenessPolicy(supportsComplete, true, supportsEmpty),
+            requiredQuality,
+            PrivacyClass.INTERNAL,
+            Set.of(SourceAbsenceState.NOT_COLLECTED),
+            RetentionPolicy.AGENT_EVIDENCE_RETENTION,
+            ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
+            Set.of("use-example")
+        );
+    }
+
     private static ArtifactSourceContract source(
         SourceAuthority authority,
         IdentityMode freshness,
@@ -94,6 +136,7 @@ class SourceContractValueTest {
             authority,
             new IdentityPolicy(freshness),
             new CompletenessPolicy(supportsComplete, true, true),
+            RequiredCaptureQuality.ANY_CAPTURE,
             PrivacyClass.INTERNAL,
             Set.of(SourceAbsenceState.NOT_COLLECTED),
             RetentionPolicy.AGENT_EVIDENCE_RETENTION,

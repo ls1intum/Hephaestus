@@ -26,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "7254db587214ef11ac898ec60ce9815607babcdcfe80cfc3d2dc2a2a69b5ede2";
+        "c107ae804d0f25e3072e2899bded13174c2892a7ccaedb88a5bf15ac79b45565";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 

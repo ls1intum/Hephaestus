@@ -16,14 +16,23 @@ export function evidenceSourceLabel(
 	);
 }
 
+/**
+ * What requiring this source demands of its capture. The source contract answers it, not the
+ * practice: freshness used to be the other half of this sentence and was removed because nothing
+ * could report a source as stale, and completeness followed it out of the practice because every
+ * practice had already said the same thing about the same source.
+ */
 export function evidenceQualityLabel(
-	requirement: PracticeAutomatedReviewPolicy["requiredEvidence"][number],
+	quality: PracticeEvidenceSourceOption["requiredQuality"] | undefined,
 ) {
-	// Freshness used to be the other half of this sentence. It was removed because nothing could
-	// ever report a source as stale, so a practice demanding a current capture was demanding nothing.
-	return requirement.completeness === "COMPLETE"
-		? "Complete"
-		: "Available; partial or unknown completeness allowed";
+	switch (quality) {
+		case "COMPLETE_AND_NON_EMPTY":
+			return "Complete, and not empty";
+		case "COMPLETE":
+			return "Complete";
+		default:
+			return "Available; partial or unknown completeness allowed";
+	}
 }
 
 export function canAttemptAutomatedReview(

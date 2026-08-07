@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
-    private static final String PINNED_DIGEST = "4c0862a1135a3c1cf3cb86f467269e41dad201a3d0e4ce49bb4d3aa2fe02070c";
+    private static final String PINNED_DIGEST = "f4d80f6812a384a5a0cb0414b23863b9ad24b448f076fb0087a2035fb1356fce";
 
     @Test
     void shouldPinACanonicalDigestForAKnownPolicy() {
@@ -33,8 +33,8 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         // Asserted on the policy, not the digest: the policy sorts on construction, so two digests
         // taken from it are equal however the author declared the sources — including if the digest
         // itself became order-sensitive. The normalisation is the invariant worth pinning.
-        assertThat(requirements(List.of(diff, core)).requiredEvidence())
-            .isEqualTo(requirements(List.of(core, diff)).requiredEvidence())
+        assertThat(requirements(List.of(diff, core)).needs())
+            .isEqualTo(requirements(List.of(core, diff)).needs())
             .extracting(requirement -> requirement.sourceKind().value())
             .containsExactly("scm.pull-request.core", "scm.pull-request.diff");
     }
@@ -95,7 +95,6 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
             new SourceContractVersion("1.0.0"),
             automatedReview,
             required,
-            List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime behavior is outside scope.")),
             automatedReview.evidenceSufficiency() == PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
@@ -105,11 +104,7 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
     }
 
     private static PracticeEvidenceRequirement requirement(String sourceKind) {
-        return new PracticeEvidenceRequirement(
-            new SourceKind(sourceKind),
-            EvidenceCompletenessRequirement.COMPLETE,
-            EvidenceContentRequirement.NO_REQUIREMENT
-        );
+        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), EvidenceStance.REQUIRED);
     }
 
     private static PracticeAutomatedReview capability(

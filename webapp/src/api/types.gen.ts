@@ -983,22 +983,17 @@ export type UpdatePracticeRequest = {
 };
 
 /**
- * Source and minimum capture quality required by a practice
+ * A source a practice reads and the stance it takes towards it
  */
 export type PracticeEvidenceRequirement = {
-    completeness: 'COMPLETE' | 'NO_REQUIREMENT';
-    content?: 'NON_EMPTY' | 'NO_REQUIREMENT';
-    sourceKind: string;
-};
-
-/**
- * Source that may add context but never blocks automated review when absent
- */
-export type PracticeOptionalContextSource = {
     /**
      * Stable source identifier from the selected source contract
      */
     sourceKind: string;
+    /**
+     * Whether an absent or degraded capture refuses the review
+     */
+    stance: 'REQUIRED' | 'CONTEXTUAL';
 };
 
 /**
@@ -1046,13 +1041,9 @@ export type PracticeAutomatedReviewPolicy = {
      */
     knownLimitations: Array<PracticeEvidenceLimitation>;
     /**
-     * Sources that may add context but never block automated review when absent
+     * Sources this practice reads, each with the stance it takes towards that source
      */
-    optionalContext: Array<PracticeOptionalContextSource>;
-    /**
-     * Sources that must meet their quality requirements before automated review may start
-     */
-    requiredEvidence: Array<PracticeEvidenceRequirement>;
+    needs: Array<PracticeEvidenceRequirement>;
     /**
      * Exact contract version that defines source kinds and source-state semantics
      */
@@ -2727,15 +2718,17 @@ export type PracticeTriggerEventOption = {
 };
 
 /**
- * An evidence source allowed by the selected evidence profile
+ * An evidence source a practice on this kind of work may read
  */
 export type PracticeEvidenceSourceOption = {
     description: string;
     displayName: string;
     privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
+    /**
+     * What requiring this source demands of its capture; fixed by the source contract
+     */
+    requiredQuality: 'ANY_CAPTURE' | 'COMPLETE' | 'COMPLETE_AND_NON_EMPTY';
     sourceKind: string;
-    supportsComplete: boolean;
-    supportsEmpty: boolean;
 };
 
 /**

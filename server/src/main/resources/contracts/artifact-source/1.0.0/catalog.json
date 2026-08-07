@@ -18,6 +18,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": false
 			},
+			"requiredQuality": "COMPLETE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -51,6 +52,7 @@
 				"supportsPartial": false,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "COMPLETE_AND_NON_EMPTY",
 			"privacyClass": "INTERNAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -84,6 +86,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -117,6 +120,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "INTERNAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -150,6 +154,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": false
 			},
+			"requiredQuality": "COMPLETE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -183,6 +188,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -216,6 +222,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "COMPLETE",
 			"privacyClass": "SENSITIVE_PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -249,6 +256,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -282,6 +290,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -315,6 +324,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -350,6 +360,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
@@ -384,6 +395,7 @@
 				"supportsPartial": true,
 				"supportsEmpty": true
 			},
+			"requiredQuality": "ANY_CAPTURE",
 			"privacyClass": "PERSONAL",
 			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
 			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",

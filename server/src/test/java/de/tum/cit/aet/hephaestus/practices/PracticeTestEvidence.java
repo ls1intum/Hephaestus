@@ -37,15 +37,8 @@ public final class PracticeTestEvidence {
             ),
             kinds
                 .stream()
-                .map(kind ->
-                    new PracticeEvidenceRequirement(
-                        new SourceKind(kind),
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceContentRequirement.NO_REQUIREMENT
-                    )
-                )
+                .map(kind -> new PracticeEvidenceRequirement(new SourceKind(kind), EvidenceStance.REQUIRED))
                 .toList(),
-            List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             null

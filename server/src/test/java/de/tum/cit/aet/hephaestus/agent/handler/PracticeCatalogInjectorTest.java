@@ -209,8 +209,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
             new PracticeAutomatedReviewPolicy(
                 policy.sourceContractVersion(),
                 policy.automatedReview(),
-                policy.requiredEvidence(),
-                policy.optionalContext(),
+                policy.needs(),
                 policy.whenEvidenceIsInsufficient(),
                 List.of(
                     new PracticeEvidenceLimitation(

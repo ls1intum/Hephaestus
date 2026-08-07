@@ -22,37 +22,38 @@ public class PracticeEvidenceDefaults {
      * <p>An artifact kind is an open vocabulary, so the compiler no longer proves this covers every one;
      * an unknown kind throws rather than falling back to a pull request's requirements, because a
      * silently borrowed default would demand a diff of something that has none and refuse every review.
+     *
+     * <p>How strictly each source must be captured is no longer stated here — that belongs to the
+     * source contract, which every practice agreed with anyway.
      */
     public PracticeAutomatedReviewPolicy forArtifact(ArtifactKind artifact) {
         if (ArtifactKinds.PULL_REQUEST.equals(artifact)) {
             return requirements(
                 List.of(
-                    requirement("scm.pull-request.core", EvidenceCompletenessRequirement.COMPLETE),
-                    // A diff with no changes in it cannot support a judgement about how a change
-                    // was made; without this the model falls back to the title and description.
-                    requirement(
-                        "scm.pull-request.diff",
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceContentRequirement.NON_EMPTY
-                    )
+                    required("scm.pull-request.core"),
+                    // A diff is what a judgement about how a change was made is made from; its contract
+                    // demands a complete, non-empty capture for exactly that reason.
+                    required("scm.pull-request.diff"),
+                    // Required rather than contextual, which is where every one of the 36 shipped
+                    // practices that reads comments already put it. The stance is what separates "there
+                    // were no comments" from "we failed to collect the comments", and only the first of
+                    // those is a fact about a developer.
+                    required("scm.pull-request.comments")
                 ),
-                List.of(optionalRequirement("scm.pull-request.comments")),
                 "RUNTIME_BEHAVIOR_NOT_OBSERVED",
                 "Repository evidence does not establish behavior in a deployed runtime."
             );
         }
         if (ArtifactKinds.ISSUE.equals(artifact)) {
             return requirements(
-                List.of(requirement("scm.issue.core", EvidenceCompletenessRequirement.COMPLETE)),
-                List.of(optionalRequirement("scm.issue.comments")),
+                List.of(required("scm.issue.core"), required("scm.issue.comments")),
                 "IMPLEMENTATION_NOT_OBSERVED",
                 "Issue evidence does not establish whether the described work was implemented correctly."
             );
         }
         if (ArtifactKinds.CONVERSATION_THREAD.equals(artifact)) {
             return requirements(
-                List.of(requirement("slack.conversation.thread", EvidenceCompletenessRequirement.COMPLETE)),
-                List.of(),
+                List.of(required("slack.conversation.thread")),
                 "PRIVATE_CONTEXT_NOT_OBSERVED",
                 "The captured thread does not include decisions or context shared outside the conversation."
             );
@@ -61,8 +62,7 @@ public class PracticeEvidenceDefaults {
     }
 
     private PracticeAutomatedReviewPolicy requirements(
-        List<PracticeEvidenceRequirement> required,
-        List<PracticeOptionalContextSource> optional,
+        List<PracticeEvidenceRequirement> needs,
         String limitationCode,
         String limitationDescription
     ) {
@@ -72,30 +72,14 @@ public class PracticeEvidenceDefaults {
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
-            required,
-            optional,
+            needs,
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(new PracticeEvidenceLimitation(limitationCode, limitationDescription)),
             null
         );
     }
 
-    private static PracticeEvidenceRequirement requirement(
-        String sourceKind,
-        EvidenceCompletenessRequirement completeness
-    ) {
-        return requirement(sourceKind, completeness, EvidenceContentRequirement.NO_REQUIREMENT);
-    }
-
-    private static PracticeEvidenceRequirement requirement(
-        String sourceKind,
-        EvidenceCompletenessRequirement completeness,
-        EvidenceContentRequirement content
-    ) {
-        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), completeness, content);
-    }
-
-    private static PracticeOptionalContextSource optionalRequirement(String sourceKind) {
-        return new PracticeOptionalContextSource(new SourceKind(sourceKind));
+    private static PracticeEvidenceRequirement required(String sourceKind) {
+        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), EvidenceStance.REQUIRED);
     }
 }

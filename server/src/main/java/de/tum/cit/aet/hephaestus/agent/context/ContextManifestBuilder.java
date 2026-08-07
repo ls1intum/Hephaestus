@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.RequiredCaptureQuality;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
@@ -22,8 +23,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
-import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
-import de.tum.cit.aet.hephaestus.practices.EvidenceContentRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -348,30 +347,34 @@ public class ContextManifestBuilder {
                 }
             }
             List<SourceReadinessCheck> sourceChecks = new ArrayList<>();
-            for (var requirement : requirements.requiredEvidence()) {
-                SourceCapture capture = captures.get(requirement.sourceKind());
+            // Only sources the practice takes a REQUIRED stance on can refuse it. A contextual source is
+            // read when it is there and noted when it is not, which is a fact for the manifest to carry
+            // rather than a reason to withhold the review.
+            for (var need : requirements.requiredNeeds()) {
+                // How strictly the capture must have gone is the source's answer, not the practice's:
+                // every shipped practice demanded the same quality of the same source, and stating it per
+                // practice only created a way for two of them to disagree.
+                RequiredCaptureQuality quality = catalogs
+                    .requireSource(manifest.contractVersion(), need.sourceKind())
+                    .requiredQuality();
+                SourceCapture capture = captures.get(need.sourceKind());
                 boolean available = capture != null && capture.state() instanceof SourceCaptureState.Available;
                 SourceCompleteness completeness = available
                     ? ((SourceCaptureState.Available) capture.state()).completeness()
                     : SourceCompleteness.UNKNOWN;
                 List<SourceReadinessReason> reasons = new ArrayList<>();
                 if (!available) reasons.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
+                if (quality.demandsComplete() && completeness != SourceCompleteness.COMPLETE) reasons.add(
+                    SourceReadinessReason.SOURCE_INCOMPLETE
+                );
                 if (
-                    requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
-                    completeness != SourceCompleteness.COMPLETE
-                ) reasons.add(SourceReadinessReason.SOURCE_INCOMPLETE);
-                // Only demonstrated staleness skips the practice. UNKNOWN means the available
-                // watermarks cannot establish currentness, which is the ordinary case for a backfill,
-                // a replay, or a source with no watermark. An unanswerable question is not evidence
-                // that the copy is out of date.
-                if (
-                    requirement.content() == EvidenceContentRequirement.NON_EMPTY &&
+                    quality.demandsContent() &&
                     (!available ||
                         ((SourceCaptureState.Available) capture.state()).content() != SourceContentState.NON_EMPTY)
                 ) reasons.add(SourceReadinessReason.SOURCE_EMPTY);
                 sourceChecks.add(
                     new SourceReadinessCheck(
-                        requirement.sourceKind(),
+                        need.sourceKind(),
                         manifest.contractVersion(),
                         checkedAt,
                         temporalAnchor,

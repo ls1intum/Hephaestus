@@ -47,9 +47,9 @@ class PracticeDefinitionOptionsServiceTest {
         assertThat(pullRequests.supportedAutomatedReviewModes()).containsExactly(
             PracticeAutomatedReviewMode.LANGUAGE_MODEL
         );
-        assertThat(pullRequests.recommendedRequirements().requiredEvidence())
-            .extracting(requirement -> requirement.sourceKind().value())
-            .containsExactly("scm.pull-request.core", "scm.pull-request.diff");
+        assertThat(pullRequests.recommendedRequirements().needs())
+            .extracting(need -> need.sourceKind().value())
+            .containsExactly("scm.pull-request.comments", "scm.pull-request.core", "scm.pull-request.diff");
         assertThat(pullRequests.allowedSources())
             .extracting(PracticeEvidenceSourceOptionDTO::sourceKind)
             .contains("scm.pull-request.core", "scm.repository.tree")

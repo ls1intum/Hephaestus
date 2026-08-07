@@ -159,7 +159,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             evidence.sourceContractVersion(),
             new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
             List.of(),
-            List.of(),
             evidence.whenEvidenceIsInsufficient(),
             List.of(),
             null

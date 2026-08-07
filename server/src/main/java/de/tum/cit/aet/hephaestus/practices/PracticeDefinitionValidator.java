@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -79,41 +78,23 @@ public final class PracticeDefinitionValidator {
     }
 
     /**
-     * A practice may only demand evidence that could exist for the kind of thing it reviews.
+     * A practice may only read evidence that could exist for the kind of thing it reviews.
      *
      * <p>The allow-list is the sources that declare they apply to this artifact kind, asked of the
-     * catalog each time rather than stored as a named profile. The named profile said the same thing in
-     * a second place, which meant the two could disagree, and only one of them was derived from what the
-     * sources actually claim about themselves.
+     * catalog each time rather than stored as a named profile. What each source demands of its capture
+     * is no longer checked here at all: it is stated once in the source contract, and the contract
+     * refuses to state a demand the source can never satisfy.
      */
     private void validateEvidence(ArtifactKind artifactKind, PracticeAutomatedReviewPolicy requirements) {
         Set<SourceKind> applicable = sourceCatalogs.requireSourcesFor(
             requirements.sourceContractVersion(),
             artifactKind.value()
         );
-        for (PracticeEvidenceRequirement requirement : requirements.requiredEvidence()) {
-            ArtifactSourceContract source = requireApplicable(applicable, requirements, requirement.sourceKind());
-            if (
-                requirement.completeness() == EvidenceCompletenessRequirement.COMPLETE &&
-                !source.completenessPolicy().supportsComplete()
-            ) {
-                throw new IllegalArgumentException("Evidence source cannot satisfy COMPLETE requirements");
+        for (PracticeEvidenceRequirement need : requirements.needs()) {
+            sourceCatalogs.requireSource(requirements.sourceContractVersion(), need.sourceKind());
+            if (!applicable.contains(need.sourceKind())) {
+                throw new IllegalArgumentException("Evidence source is not available for the selected work type");
             }
         }
-        for (PracticeOptionalContextSource requirement : requirements.optionalContext()) {
-            requireApplicable(applicable, requirements, requirement.sourceKind());
-        }
-    }
-
-    private ArtifactSourceContract requireApplicable(
-        Set<SourceKind> applicable,
-        PracticeAutomatedReviewPolicy requirements,
-        SourceKind sourceKind
-    ) {
-        ArtifactSourceContract source = sourceCatalogs.requireSource(requirements.sourceContractVersion(), sourceKind);
-        if (!applicable.contains(sourceKind)) {
-            throw new IllegalArgumentException("Evidence source is not available for the selected work type");
-        }
-        return source;
     }
 }

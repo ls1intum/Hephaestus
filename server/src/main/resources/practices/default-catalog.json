@@ -9,20 +9,18 @@
   "automatedReviewPolicy": {
     "pull-request-core-diff": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
           "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
+          "stance": "REQUIRED"
         },
         {
           "sourceKind": "scm.pull-request.diff",
-          "completeness": "COMPLETE",
-          "content": "NON_EMPTY"
-        }
-      ],
-      "optionalContext": [
+          "stance": "REQUIRED"
+        },
         {
-          "sourceKind": "scm.repository.tree"
+          "sourceKind": "scm.repository.tree",
+          "stance": "CONTEXTUAL"
         }
       ],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
@@ -39,13 +37,12 @@
     },
     "pull-request-core": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
           "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
+          "stance": "REQUIRED"
         }
       ],
-      "optionalContext": [],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
       "knownLimitations": [
         {
@@ -60,24 +57,22 @@
     },
     "pull-request-core-diff-linked-work-items": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
+        {
+          "sourceKind": "scm.linked-work-items",
+          "stance": "REQUIRED"
+        },
         {
           "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
+          "stance": "REQUIRED"
         },
         {
           "sourceKind": "scm.pull-request.diff",
-          "completeness": "COMPLETE",
-          "content": "NON_EMPTY"
+          "stance": "REQUIRED"
         },
         {
-          "sourceKind": "scm.linked-work-items",
-          "completeness": "NO_REQUIREMENT"
-        }
-      ],
-      "optionalContext": [
-        {
-          "sourceKind": "scm.repository.tree"
+          "sourceKind": "scm.repository.tree",
+          "stance": "CONTEXTUAL"
         }
       ],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
@@ -94,17 +89,16 @@
     },
     "pull-request-core-review-threads": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
           "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
+          "stance": "REQUIRED"
         },
         {
           "sourceKind": "scm.review-threads",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
         }
       ],
-      "optionalContext": [],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
       "knownLimitations": [
         {
@@ -119,13 +113,12 @@
     },
     "pull-request-review-threads": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
           "sourceKind": "scm.review-threads",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
         }
       ],
-      "optionalContext": [],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
       "knownLimitations": [
         {
@@ -140,17 +133,16 @@
     },
     "issue-core-comments": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
-        {
-          "sourceKind": "scm.issue.core",
-          "completeness": "COMPLETE"
-        },
+      "needs": [
         {
           "sourceKind": "scm.issue.comments",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
+        },
+        {
+          "sourceKind": "scm.issue.core",
+          "stance": "REQUIRED"
         }
       ],
-      "optionalContext": [],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
       "knownLimitations": [
         {
@@ -165,13 +157,12 @@
     },
     "issue-core": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
           "sourceKind": "scm.issue.core",
-          "completeness": "COMPLETE"
+          "stance": "REQUIRED"
         }
       ],
-      "optionalContext": [],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
       "knownLimitations": [
         {
@@ -186,28 +177,26 @@
     },
     "pull-request-core-diff-comments-general-review-comments": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
-          "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
-        },
-        {
-          "sourceKind": "scm.pull-request.diff",
-          "completeness": "COMPLETE",
-          "content": "NON_EMPTY"
+          "sourceKind": "scm.general-review-comments",
+          "stance": "REQUIRED"
         },
         {
           "sourceKind": "scm.pull-request.comments",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
         },
         {
-          "sourceKind": "scm.general-review-comments",
-          "completeness": "NO_REQUIREMENT"
-        }
-      ],
-      "optionalContext": [
+          "sourceKind": "scm.pull-request.core",
+          "stance": "REQUIRED"
+        },
         {
-          "sourceKind": "scm.repository.tree"
+          "sourceKind": "scm.pull-request.diff",
+          "stance": "REQUIRED"
+        },
+        {
+          "sourceKind": "scm.repository.tree",
+          "stance": "CONTEXTUAL"
         }
       ],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
@@ -224,21 +213,20 @@
     },
     "pull-request-core-comments-general-review-comments": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
-          "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
+          "sourceKind": "scm.general-review-comments",
+          "stance": "REQUIRED"
         },
         {
           "sourceKind": "scm.pull-request.comments",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
         },
         {
-          "sourceKind": "scm.general-review-comments",
-          "completeness": "NO_REQUIREMENT"
+          "sourceKind": "scm.pull-request.core",
+          "stance": "REQUIRED"
         }
       ],
-      "optionalContext": [],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
       "knownLimitations": [
         {
@@ -253,32 +241,30 @@
     },
     "pull-request-core-diff-comments-general-review-comments-review-threads": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
-          "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
-        },
-        {
-          "sourceKind": "scm.pull-request.diff",
-          "completeness": "COMPLETE",
-          "content": "NON_EMPTY"
+          "sourceKind": "scm.general-review-comments",
+          "stance": "REQUIRED"
         },
         {
           "sourceKind": "scm.pull-request.comments",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
         },
         {
-          "sourceKind": "scm.general-review-comments",
-          "completeness": "NO_REQUIREMENT"
+          "sourceKind": "scm.pull-request.core",
+          "stance": "REQUIRED"
+        },
+        {
+          "sourceKind": "scm.pull-request.diff",
+          "stance": "REQUIRED"
+        },
+        {
+          "sourceKind": "scm.repository.tree",
+          "stance": "CONTEXTUAL"
         },
         {
           "sourceKind": "scm.review-threads",
-          "completeness": "NO_REQUIREMENT"
-        }
-      ],
-      "optionalContext": [
-        {
-          "sourceKind": "scm.repository.tree"
+          "stance": "REQUIRED"
         }
       ],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
@@ -295,16 +281,14 @@
     },
     "pull-request-diff": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
           "sourceKind": "scm.pull-request.diff",
-          "completeness": "COMPLETE",
-          "content": "NON_EMPTY"
-        }
-      ],
-      "optionalContext": [
+          "stance": "REQUIRED"
+        },
         {
-          "sourceKind": "scm.repository.tree"
+          "sourceKind": "scm.repository.tree",
+          "stance": "CONTEXTUAL"
         }
       ],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
@@ -321,28 +305,26 @@
     },
     "pull-request-core-diff-linked-work-items-documents": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
-          "sourceKind": "scm.pull-request.core",
-          "completeness": "COMPLETE"
-        },
-        {
-          "sourceKind": "scm.pull-request.diff",
-          "completeness": "COMPLETE",
-          "content": "NON_EMPTY"
+          "sourceKind": "outline.documents",
+          "stance": "REQUIRED"
         },
         {
           "sourceKind": "scm.linked-work-items",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
         },
         {
-          "sourceKind": "outline.documents",
-          "completeness": "NO_REQUIREMENT"
-        }
-      ],
-      "optionalContext": [
+          "sourceKind": "scm.pull-request.core",
+          "stance": "REQUIRED"
+        },
         {
-          "sourceKind": "scm.repository.tree"
+          "sourceKind": "scm.pull-request.diff",
+          "stance": "REQUIRED"
+        },
+        {
+          "sourceKind": "scm.repository.tree",
+          "stance": "CONTEXTUAL"
         }
       ],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
@@ -359,13 +341,12 @@
     },
     "conversation-thread": {
       "sourceContractVersion": "1.0.0",
-      "requiredEvidence": [
+      "needs": [
         {
           "sourceKind": "slack.conversation.thread",
-          "completeness": "NO_REQUIREMENT"
+          "stance": "REQUIRED"
         }
       ],
-      "optionalContext": [],
       "whenEvidenceIsInsufficient": "SKIP_AUTOMATED_REVIEW",
       "knownLimitations": [
         {

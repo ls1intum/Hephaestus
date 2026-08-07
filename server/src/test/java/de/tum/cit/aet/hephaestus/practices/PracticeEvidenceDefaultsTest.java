@@ -19,19 +19,16 @@ class PracticeEvidenceDefaultsTest {
 
     @ParameterizedTest
     @MethodSource("baselines")
-    void shouldCreateTheArtifactBaseline(ArtifactKind artifact, List<String> required, List<String> optional) {
+    void shouldCreateTheArtifactBaseline(ArtifactKind artifact, List<String> required) {
         JsonMapper mapper = JsonMapper.builder().build();
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC());
 
         PracticeAutomatedReviewPolicy requirements = new PracticeEvidenceDefaults(catalogs).forArtifact(artifact);
 
         assertThat(requirements.sourceContractVersion()).isEqualTo(new SourceContractVersion("1.0.0"));
-        assertThat(requirements.requiredEvidence())
+        assertThat(requirements.requiredNeeds())
             .extracting(item -> item.sourceKind().value())
             .containsExactlyElementsOf(required);
-        assertThat(requirements.optionalContext())
-            .extracting(item -> item.sourceKind().value())
-            .containsExactlyElementsOf(optional);
         assertThat(requirements.whenEvidenceIsInsufficient()).isEqualTo(
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW
         );
@@ -40,13 +37,16 @@ class PracticeEvidenceDefaultsTest {
 
     private static Stream<Arguments> baselines() {
         return Stream.of(
+            // Comments are REQUIRED, not contextual, and that is the deliberate resolution of a
+            // disagreement: the defaults offered them as optional context while all 36 shipped practices
+            // that read comments required them. Requiring them is what keeps "there were no comments"
+            // distinguishable from "we failed to collect the comments".
             Arguments.of(
                 ArtifactKinds.PULL_REQUEST,
-                List.of("scm.pull-request.core", "scm.pull-request.diff"),
-                List.of("scm.pull-request.comments")
+                List.of("scm.pull-request.comments", "scm.pull-request.core", "scm.pull-request.diff")
             ),
-            Arguments.of(ArtifactKinds.ISSUE, List.of("scm.issue.core"), List.of("scm.issue.comments")),
-            Arguments.of(ArtifactKinds.CONVERSATION_THREAD, List.of("slack.conversation.thread"), List.of())
+            Arguments.of(ArtifactKinds.ISSUE, List.of("scm.issue.comments", "scm.issue.core")),
+            Arguments.of(ArtifactKinds.CONVERSATION_THREAD, List.of("slack.conversation.thread"))
         );
     }
 }

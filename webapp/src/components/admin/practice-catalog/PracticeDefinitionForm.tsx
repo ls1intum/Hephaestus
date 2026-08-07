@@ -161,8 +161,7 @@ function recommendedPolicyWithCurrentSupport(
 		return {
 			...recommended,
 			automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-			requiredEvidence: [],
-			optionalContext: [],
+			needs: [],
 			knownLimitations: [],
 		};
 	}

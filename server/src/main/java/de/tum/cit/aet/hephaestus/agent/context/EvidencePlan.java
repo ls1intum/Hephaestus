@@ -42,8 +42,7 @@ public record EvidencePlan(
                     "Practices sharing one invocation must use the same source contract and artifact kind"
                 );
             }
-            requirements.requiredEvidence().forEach(requirement -> selected.add(requirement.sourceKind()));
-            requirements.optionalContext().forEach(requirement -> selected.add(requirement.sourceKind()));
+            requirements.needs().forEach(need -> selected.add(need.sourceKind()));
         }
         return new EvidencePlan(first.sourceContractVersion(), artifactKind, selected);
     }

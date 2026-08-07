@@ -10,7 +10,6 @@ import type {
 import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-catalog/PracticeEvidenceOutcomeSummary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Field,
@@ -27,12 +26,12 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { evidenceQualityLabel, evidenceSourceLabel } from "./evidence-presentation";
 
-type EvidenceRole = "NOT_USED" | "OPTIONAL" | "REQUIRED";
+type EvidenceRole = "NOT_USED" | PracticeAutomatedReviewPolicy["needs"][number]["stance"];
 type MentoringSupport = "AI_SUPPORTED" | "HUMAN_CONTEXT_REQUIRED" | "GUIDANCE_ONLY";
 
 const EVIDENCE_ROLE_OPTIONS = [
 	{ value: "REQUIRED", label: "Required" },
-	{ value: "OPTIONAL", label: "Optional context" },
+	{ value: "CONTEXTUAL", label: "Optional context" },
 	{ value: "NOT_USED", label: "Not used" },
 ] satisfies Array<{ value: EvidenceRole; label: string }>;
 
@@ -45,97 +44,19 @@ function mentoringSupportOf(requirements: PracticeAutomatedReviewPolicy): Mentor
 }
 
 function roleOf(requirements: PracticeAutomatedReviewPolicy, sourceKind: string): EvidenceRole {
-	if (requirements.requiredEvidence.some((requirement) => requirement.sourceKind === sourceKind)) {
-		return "REQUIRED";
-	}
-	if (requirements.optionalContext.some((requirement) => requirement.sourceKind === sourceKind)) {
-		return "OPTIONAL";
-	}
-	return "NOT_USED";
+	return requirements.needs.find((need) => need.sourceKind === sourceKind)?.stance ?? "NOT_USED";
 }
 
 function withRole(
 	requirements: PracticeAutomatedReviewPolicy,
 	source: PracticeEvidenceSourceOption,
 	role: EvidenceRole,
-	recommended: PracticeAutomatedReviewPolicy,
 ): PracticeAutomatedReviewPolicy {
-	const required = requirements.requiredEvidence.filter(
-		(requirement) => requirement.sourceKind !== source.sourceKind,
-	);
-	const optional = requirements.optionalContext.filter(
-		(requirement) => requirement.sourceKind !== source.sourceKind,
-	);
-	if (role === "REQUIRED") {
-		required.push({
-			sourceKind: source.sourceKind,
-			completeness: source.supportsComplete ? "COMPLETE" : "NO_REQUIREMENT",
-			// Whether an empty capture can be judged is an editorial call per source, not something
-			// the editor can infer, so re-adding a source restores the recommended answer rather
-			// than silently dropping to "an empty one will do".
-			content: recommendedContentFor(recommended, source.sourceKind),
-		});
-	}
-	if (role === "OPTIONAL") {
-		optional.push({ sourceKind: source.sourceKind });
-	}
-	return { ...requirements, requiredEvidence: required, optionalContext: optional };
-}
-
-function recommendedContentFor(
-	recommended: PracticeAutomatedReviewPolicy,
-	sourceKind: string,
-): PracticeAutomatedReviewPolicy["requiredEvidence"][number]["content"] {
-	return recommended.requiredEvidence.find((requirement) => requirement.sourceKind === sourceKind)
-		?.content;
-}
-
-/**
- * One requirement, as a checkbox. Each is a yes/no decision, and the caller renders only the
- * requirements the source can actually establish, so an option is never shown that cannot be chosen.
- */
-function RequirementCheckbox({
-	id,
-	label,
-	sourceLabel,
-	disabled,
-	checked,
-	onCheckedChange,
-}: {
-	id: string;
-	label: string;
-	sourceLabel: string;
-	disabled: boolean;
-	checked: boolean;
-	onCheckedChange: (checked: boolean) => void;
-}) {
-	// FieldLabel turns into a bordered, full-width column when it wraps a Field, which is the card
-	// treatment for a standalone choice. These sit inside one legend as a list, so they use the same
-	// shape as the trigger-event checkboxes: label, checkbox first, text beside it.
-	return (
-		<FieldLabel htmlFor={id} className="flex cursor-pointer items-center gap-2 font-normal">
-			<Checkbox
-				id={id}
-				disabled={disabled}
-				checked={checked}
-				onCheckedChange={(next) => onCheckedChange(next === true)}
-			/>
-			{label} <span className="sr-only">— {sourceLabel}</span>
-		</FieldLabel>
-	);
-}
-
-function patchRequirement(
-	requirements: PracticeAutomatedReviewPolicy,
-	sourceKind: string,
-	patch: Partial<PracticeAutomatedReviewPolicy["requiredEvidence"][number]>,
-): PracticeAutomatedReviewPolicy {
-	return {
-		...requirements,
-		requiredEvidence: requirements.requiredEvidence.map((item) =>
-			item.sourceKind === sourceKind ? { ...item, ...patch } : item,
-		),
-	};
+	// How strictly a source must be captured is the source contract's answer, so re-adding a source no
+	// longer has to recover a per-practice quality setting that could silently differ from it.
+	const needs = requirements.needs.filter((need) => need.sourceKind !== source.sourceKind);
+	if (role !== "NOT_USED") needs.push({ sourceKind: source.sourceKind, stance: role });
+	return { ...requirements, needs };
 }
 
 /**
@@ -169,8 +90,7 @@ function matchesRecommendedEvidence(
 	return (
 		value.sourceContractVersion === recommended.sourceContractVersion &&
 		value.whenEvidenceIsInsufficient === recommended.whenEvidenceIsInsufficient &&
-		deepEqual(value.requiredEvidence, recommended.requiredEvidence) &&
-		deepEqual(value.optionalContext, recommended.optionalContext)
+		deepEqual(value.needs, recommended.needs)
 	);
 }
 
@@ -192,13 +112,11 @@ export function practiceEvidenceError(requirements: PracticeAutomatedReviewPolic
 	const noAutomatedReview = requirements.automatedReview.mode === "NONE";
 	if (
 		noAutomatedReview &&
-		(requirements.requiredEvidence.length > 0 ||
-			requirements.optionalContext.length > 0 ||
-			requirements.knownLimitations.length > 0)
+		(requirements.needs.length > 0 || requirements.knownLimitations.length > 0)
 	) {
 		return "Guidance only cannot require evidence or declare evidence limitations.";
 	}
-	if (!noAutomatedReview && requirements.requiredEvidence.length === 0) {
+	if (!noAutomatedReview && !requirements.needs.some((need) => need.stance === "REQUIRED")) {
 		return "Choose at least one required evidence source.";
 	}
 	for (const limitation of requirements.knownLimitations) {
@@ -260,13 +178,17 @@ export function PracticeEvidenceEditor({
 			}
 		});
 	};
-	const requiredSources = value.requiredEvidence.map((requirement) => ({
-		...requirement,
-		label: evidenceSourceLabel(requirement.sourceKind, options.allowedSources),
-	}));
-	const optionalSources = value.optionalContext.map((requirement) =>
-		evidenceSourceLabel(requirement.sourceKind, options.allowedSources),
-	);
+	const requiredSources = value.needs
+		.filter((need) => need.stance === "REQUIRED")
+		.map((need) => ({
+			...need,
+			label: evidenceSourceLabel(need.sourceKind, options.allowedSources),
+			quality: options.allowedSources.find((source) => source.sourceKind === need.sourceKind)
+				?.requiredQuality,
+		}));
+	const optionalSources = value.needs
+		.filter((need) => need.stance === "CONTEXTUAL")
+		.map((need) => evidenceSourceLabel(need.sourceKind, options.allowedSources));
 	const mentoringSupport = mentoringSupportOf(value);
 	const supportsAiReview = options.supportedAutomatedReviewModes.includes("LANGUAGE_MODEL");
 	const noAutomatedReview = value.automatedReview.mode === "NONE";
@@ -283,8 +205,7 @@ export function PracticeEvidenceEditor({
 			onChange({
 				...value,
 				automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-				requiredEvidence: [],
-				optionalContext: [],
+				needs: [],
 				knownLimitations: [],
 			});
 			return;
@@ -438,7 +359,7 @@ export function PracticeEvidenceEditor({
 								<ul className="space-y-1">
 									{requiredSources.map((source) => (
 										<li key={source.sourceKind}>
-											{source.label} · {evidenceQualityLabel(source)}
+											{source.label} · {evidenceQualityLabel(source.quality)}
 										</li>
 									))}
 								</ul>
@@ -520,16 +441,15 @@ export function PracticeEvidenceEditor({
 							{options.allowedSources.map((source) => {
 								const role = roleOf(value, source.sourceKind);
 								const sourceLabel = source.displayName;
-								const requirement = value.requiredEvidence.find(
-									(item) => item.sourceKind === source.sourceKind,
-								);
 								return (
 									<div key={source.sourceKind} className="rounded-lg border p-4">
 										<div className="space-y-3">
 											<div>
 												<div className="flex flex-wrap items-center gap-2">
 													<p className="font-medium">{sourceLabel}</p>
-													{!source.supportsEmpty && <Badge variant="outline">Never empty</Badge>}
+													<Badge variant="outline">
+														{evidenceQualityLabel(source.requiredQuality)}
+													</Badge>
 												</div>
 												<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>
 											</div>
@@ -540,15 +460,7 @@ export function PracticeEvidenceEditor({
 												<RadioGroup
 													value={role}
 													onValueChange={(nextRole) =>
-														nextRole &&
-														onChange(
-															withRole(
-																value,
-																source,
-																nextRole as EvidenceRole,
-																options.recommendedRequirements,
-															),
-														)
+														nextRole && onChange(withRole(value, source, nextRole as EvidenceRole))
 													}
 													className="gap-2"
 													aria-label={`Use in this practice for ${sourceLabel}`}
@@ -576,53 +488,6 @@ export function PracticeEvidenceEditor({
 												</RadioGroup>
 											</FieldSet>
 										</div>
-										{requirement && (
-											<div className="mt-4 border-t pt-4">
-												<FieldSet>
-													<FieldLegend variant="label">
-														Only review when <span className="sr-only">{sourceLabel} is</span>
-													</FieldLegend>
-													<FieldDescription>
-														Hephaestus skips the practice when a checked requirement is not met.
-														Only the requirements this source can establish are shown.
-													</FieldDescription>
-													<div className="space-y-2">
-														{source.supportsComplete && (
-															<RequirementCheckbox
-																id={`practice-completeness-${source.sourceKind}`}
-																label="fully captured, not cut off by a size limit"
-																sourceLabel={sourceLabel}
-																disabled={disabled}
-																checked={requirement.completeness === "COMPLETE"}
-																onCheckedChange={(checked) =>
-																	onChange(
-																		patchRequirement(value, source.sourceKind, {
-																			completeness: checked ? "COMPLETE" : "NO_REQUIREMENT",
-																		}),
-																	)
-																}
-															/>
-														)}
-														{source.supportsEmpty && (
-															<RequirementCheckbox
-																id={`practice-content-${source.sourceKind}`}
-																label="not empty"
-																sourceLabel={sourceLabel}
-																disabled={disabled}
-																checked={requirement.content === "NON_EMPTY"}
-																onCheckedChange={(checked) =>
-																	onChange(
-																		patchRequirement(value, source.sourceKind, {
-																			content: checked ? "NON_EMPTY" : "NO_REQUIREMENT",
-																		}),
-																	)
-																}
-															/>
-														)}
-													</div>
-												</FieldSet>
-											</div>
-										)}
 									</div>
 								);
 							})}

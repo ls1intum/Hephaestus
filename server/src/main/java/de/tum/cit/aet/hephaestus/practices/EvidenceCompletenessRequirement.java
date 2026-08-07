@@ -1,6 +1,0 @@
-package de.tum.cit.aet.hephaestus.practices;
-
-public enum EvidenceCompletenessRequirement {
-    COMPLETE,
-    NO_REQUIREMENT,
-}

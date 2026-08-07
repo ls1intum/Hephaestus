@@ -30,19 +30,26 @@ const VALIDATION_VARIANTS: Record<
 };
 
 function RequiredEvidence({
-	requirements,
+	needs,
 	sources,
 }: {
-	requirements: PracticeAutomatedReviewPolicy["requiredEvidence"];
+	needs: PracticeAutomatedReviewPolicy["needs"];
 	sources: readonly PracticeEvidenceSourceOption[];
 }) {
-	if (requirements.length === 0) return <span>None</span>;
+	const required = needs.filter((need) => need.stance === "REQUIRED");
+	if (required.length === 0) return <span>None</span>;
 	return (
 		<ul className="space-y-1">
-			{requirements.map((requirement) => (
-				<li key={requirement.sourceKind}>
-					<span>{evidenceSourceLabel(requirement.sourceKind, sources)}</span>
-					<span className="text-muted-foreground"> · {evidenceQualityLabel(requirement)}</span>
+			{required.map((need) => (
+				<li key={need.sourceKind}>
+					<span>{evidenceSourceLabel(need.sourceKind, sources)}</span>
+					<span className="text-muted-foreground">
+						{" "}
+						·{" "}
+						{evidenceQualityLabel(
+							sources.find((source) => source.sourceKind === need.sourceKind)?.requiredQuality,
+						)}
+					</span>
 				</li>
 			))}
 		</ul>
@@ -50,18 +57,19 @@ function RequiredEvidence({
 }
 
 function OptionalContext({
-	sources,
+	needs,
 	options,
 }: {
-	sources: PracticeAutomatedReviewPolicy["optionalContext"];
+	needs: PracticeAutomatedReviewPolicy["needs"];
 	options: readonly PracticeEvidenceSourceOption[];
 }) {
-	if (sources.length === 0) return <span>None</span>;
+	const contextual = needs.filter((need) => need.stance === "CONTEXTUAL");
+	if (contextual.length === 0) return <span>None</span>;
 	return (
 		<ul className="space-y-1">
-			{sources.map((source) => (
-				<li key={source.sourceKind}>
-					<span>{evidenceSourceLabel(source.sourceKind, options)}</span>
+			{contextual.map((need) => (
+				<li key={need.sourceKind}>
+					<span>{evidenceSourceLabel(need.sourceKind, options)}</span>
 					<span className="text-muted-foreground">
 						{" "}
 						· Used when available; never blocks a review
@@ -146,13 +154,13 @@ export function PracticeEvidenceSummary({
 			<div>
 				<dt className="font-medium">Required evidence</dt>
 				<dd>
-					<RequiredEvidence requirements={policy.requiredEvidence} sources={sources} />
+					<RequiredEvidence needs={policy.needs} sources={sources} />
 				</dd>
 			</div>
 			<div>
 				<dt className="font-medium">Optional context</dt>
 				<dd>
-					<OptionalContext sources={policy.optionalContext} options={sources} />
+					<OptionalContext needs={policy.needs} options={sources} />
 				</dd>
 			</div>
 			<div>

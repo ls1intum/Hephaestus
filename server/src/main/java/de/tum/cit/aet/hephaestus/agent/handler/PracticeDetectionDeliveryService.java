@@ -280,8 +280,7 @@ public class PracticeDetectionDeliveryService {
             );
         }
         Set<SourceKind> declared = new HashSet<>();
-        requirements.requiredEvidence().forEach(requirement -> declared.add(requirement.sourceKind()));
-        requirements.optionalContext().forEach(requirement -> declared.add(requirement.sourceKind()));
+        requirements.needs().forEach(need -> declared.add(need.sourceKind()));
         for (JsonNode citation : citations) {
             JsonNode sourceKind = citation.path("sourceKind");
             JsonNode artifactPath = citation.path("artifactPath");

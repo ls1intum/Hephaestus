@@ -24,8 +24,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
-import de.tum.cit.aet.hephaestus.practices.EvidenceCompletenessRequirement;
-import de.tum.cit.aet.hephaestus.practices.EvidenceContentRequirement;
+import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReview;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
@@ -178,11 +177,12 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldDeclineWhenARequiredNonEmptySourceCapturedNothing() {
+    void shouldDeclineWhenASourceThatMustHoldSomethingCapturedNothing() {
         // A pull request really can produce an empty diff — a full revert, a force-push, a
-        // merge-commit-only range. The contract allows it, so availability, completeness and
-        // freshness all pass. Only the content requirement separates "there is nothing here to
-        // judge" from "I looked and it was fine".
+        // merge-commit-only range. The contract allows it, so availability and completeness both pass.
+        // Only the diff's declared COMPLETE_AND_NON_EMPTY separates "there is nothing here to judge"
+        // from "I looked and it was fine", and it now applies to every practice that requires the diff
+        // rather than to the ones that remembered to ask.
         Map<String, byte[]> files = new LinkedHashMap<>();
         String path = "inputs/context/diff.patch";
         files.put(path, new byte[0]);
@@ -202,39 +202,45 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             )
         );
 
-        Practice demandsSubstance = practiceRequiring(DIFF, "needs-substance");
-        PracticeAutomatedReviewPolicy policy = demandsSubstance.getAutomatedReviewPolicy();
-        demandsSubstance.setAutomatedReviewPolicy(
-            new PracticeAutomatedReviewPolicy(
-                policy.sourceContractVersion(),
-                policy.automatedReview(),
-                List.of(
-                    new PracticeEvidenceRequirement(
-                        DIFF,
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceContentRequirement.NON_EMPTY
-                    )
-                ),
-                policy.optionalContext(),
-                policy.whenEvidenceIsInsufficient(),
-                policy.knownLimitations(),
-                policy.insufficiencyReason()
-            )
-        );
-
         AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadinessAsOfNow(
             manifest,
-            List.of(demandsSubstance)
+            List.of(practiceRequiring(DIFF, "needs-substance"))
         );
+
         assertThat(refused.readyPractices()).isEmpty();
         assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).contains(
             SourceReadinessReason.SOURCE_EMPTY
         );
+    }
 
-        // The same empty capture is still reviewable for a practice that did not ask for substance.
+    /**
+     * The same empty capture of a source whose contract asks nothing of it is reviewable: emptiness is
+     * the answer there, not a gap in it.
+     */
+    @Test
+    void shouldReviewAnEmptyCaptureOfASourceThatMayBeEmpty() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        String path = "inputs/context/comments.json";
+        files.put(path, "[]".getBytes(StandardCharsets.UTF_8));
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(path, COMMENTS),
+            "job-empty-comments",
+            plan(Set.of(COMMENTS)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(COMMENTS, SourceCompleteness.COMPLETE),
+                Map.of(COMMENTS, SourceContentState.EMPTY),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(COMMENTS)
+            )
+        );
+
         assertThat(
             builder
-                .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiring(DIFF, "any-capture-will-do")))
+                .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiringComments()))
                 .readyPractices()
         ).hasSize(1);
     }
@@ -264,8 +270,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 new PracticeAutomatedReviewPolicy(
                     practice.getAutomatedReviewPolicy().sourceContractVersion(),
                     configurations.get(index),
-                    assessmentAbsent ? List.of() : practice.getAutomatedReviewPolicy().requiredEvidence(),
-                    assessmentAbsent ? List.of() : practice.getAutomatedReviewPolicy().optionalContext(),
+                    assessmentAbsent ? List.of() : practice.getAutomatedReviewPolicy().needs(),
                     practice.getAutomatedReviewPolicy().whenEvidenceIsInsufficient(),
                     assessmentAbsent
                         ? List.of()
@@ -534,6 +539,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             diff.authority(),
             diff.identityPolicy(),
             diff.completenessPolicy(),
+            diff.requiredQuality(),
             diff.privacyClass(),
             Set.of(SourceAbsenceState.UNAVAILABLE),
             diff.retentionPolicy(),
@@ -778,14 +784,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                     PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
-                List.of(
-                    new PracticeEvidenceRequirement(
-                        sourceKind,
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceContentRequirement.NO_REQUIREMENT
-                    )
-                ),
-                List.of(),
+                List.of(new PracticeEvidenceRequirement(sourceKind, EvidenceStance.REQUIRED)),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
                 List.of(),
                 null

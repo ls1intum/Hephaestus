@@ -29,13 +29,8 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
                 List.of(
-                    new PracticeEvidenceRequirement(
-                        new SourceKind("scm.pull-request.diff"),
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceContentRequirement.NO_REQUIREMENT
-                    )
+                    new PracticeEvidenceRequirement(new SourceKind("scm.pull-request.diff"), EvidenceStance.REQUIRED)
                 ),
-                List.of(),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
                 List.of(),
                 null

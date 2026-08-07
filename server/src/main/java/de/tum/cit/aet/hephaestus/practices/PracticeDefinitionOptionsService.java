@@ -64,8 +64,7 @@ public class PracticeDefinitionOptionsService {
                         source.displayName(),
                         source.description(),
                         source.privacyClass(),
-                        source.completenessPolicy().supportsComplete(),
-                        source.completenessPolicy().supportsEmpty()
+                        source.requiredQuality()
                     )
                 )
                 .toList()

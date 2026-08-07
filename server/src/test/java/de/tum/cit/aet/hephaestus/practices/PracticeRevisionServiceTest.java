@@ -106,11 +106,9 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
                 List.of(
                     new PracticeEvidenceRequirement(
                         new de.tum.cit.aet.hephaestus.evidence.SourceKind("scm.pull-request.diff"),
-                        EvidenceCompletenessRequirement.COMPLETE,
-                        EvidenceContentRequirement.NO_REQUIREMENT
+                        EvidenceStance.REQUIRED
                     )
                 ),
-                List.of(),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
                 List.of(),
                 null

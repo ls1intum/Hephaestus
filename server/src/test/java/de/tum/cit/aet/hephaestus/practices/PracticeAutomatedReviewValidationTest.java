@@ -75,14 +75,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
-            List.of(
-                new PracticeEvidenceRequirement(
-                    new SourceKind("scm.pull-request.diff"),
-                    EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceContentRequirement.NO_REQUIREMENT
-                )
-            ),
-            List.of(),
+            List.of(new PracticeEvidenceRequirement(new SourceKind("scm.pull-request.diff"), EvidenceStance.REQUIRED)),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             null

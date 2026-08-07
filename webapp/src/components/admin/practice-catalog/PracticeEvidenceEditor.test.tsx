@@ -40,10 +40,9 @@ describe("PracticeEvidenceEditor", () => {
 
 		expect(onChange).toHaveBeenCalledWith(
 			expect.objectContaining({
-				requiredEvidence: expect.arrayContaining([
-					expect.objectContaining({ sourceKind: "scm.pull-request.comments" }),
+				needs: expect.arrayContaining([
+					{ sourceKind: "scm.pull-request.comments", stance: "REQUIRED" },
 				]),
-				optionalContext: [],
 			}),
 		);
 	});
@@ -185,15 +184,14 @@ describe("PracticeEvidenceEditor", () => {
 	});
 
 	it("rejects invalid evidence rules", () => {
-		expect(
-			practiceEvidenceError({ ...options.recommendedRequirements, requiredEvidence: [] }),
-		).toBe("Choose at least one required evidence source.");
+		expect(practiceEvidenceError({ ...options.recommendedRequirements, needs: [] })).toBe(
+			"Choose at least one required evidence source.",
+		);
 		expect(
 			practiceEvidenceError({
 				...options.recommendedRequirements,
 				automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-				requiredEvidence: [],
-				optionalContext: [],
+				needs: [],
 				knownLimitations: [],
 			}),
 		).toBeUndefined();
@@ -204,7 +202,7 @@ describe("PracticeEvidenceEditor", () => {
 		function ControlledEditor() {
 			const [value, setValue] = useState<PracticeAutomatedReviewPolicy>({
 				...options.recommendedRequirements,
-				requiredEvidence: [],
+				needs: [],
 			});
 			return (
 				<PracticeEvidenceEditor

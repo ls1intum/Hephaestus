@@ -158,18 +158,11 @@ class PracticeCatalogInjector {
             entry.put("revisionId", p.getCurrentRevision().getId());
             entry.put("defectDetector", p.isDefectDetector());
             ArrayNode allowedSources = entry.putArray("allowedSources");
-            java.util.stream.Stream.concat(
-                p
-                    .getAutomatedReviewPolicy()
-                    .requiredEvidence()
-                    .stream()
-                    .map(requirement -> requirement.sourceKind().value()),
-                p
-                    .getAutomatedReviewPolicy()
-                    .optionalContext()
-                    .stream()
-                    .map(requirement -> requirement.sourceKind().value())
-            )
+            p
+                .getAutomatedReviewPolicy()
+                .needs()
+                .stream()
+                .map(need -> need.sourceKind().value())
                 .distinct()
                 .sorted()
                 .forEach(allowedSources::add);

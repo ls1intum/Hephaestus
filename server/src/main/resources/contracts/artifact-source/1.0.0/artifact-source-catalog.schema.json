@@ -41,6 +41,7 @@
 				"authority",
 				"identity",
 				"completeness",
+				"requiredQuality",
 				"privacyClass",
 				"supportedAbsenceStates",
 				"retentionPolicy",
@@ -96,6 +97,14 @@
 				"completeness": {
 					"$ref": "#/$defs/completeness",
 					"description": "Completeness and valid-empty states the source can represent."
+				},
+				"requiredQuality": {
+					"enum": [
+						"ANY_CAPTURE",
+						"COMPLETE",
+						"COMPLETE_AND_NON_EMPTY"
+					],
+					"description": "What a practice that requires this source is thereby requiring of the capture."
 				},
 				"privacyClass": {
 					"enum": [

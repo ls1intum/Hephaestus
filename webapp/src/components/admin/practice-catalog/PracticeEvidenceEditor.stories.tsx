@@ -59,7 +59,7 @@ export const EveryChoiceIsVisible: Story = {
 
 export const InvalidRule: Story = {
 	args: {
-		value: { ...pullRequestOptions.recommendedRequirements, requiredEvidence: [] },
+		value: { ...pullRequestOptions.recommendedRequirements, needs: [] },
 		error: "Choose at least one required evidence source.",
 	},
 };

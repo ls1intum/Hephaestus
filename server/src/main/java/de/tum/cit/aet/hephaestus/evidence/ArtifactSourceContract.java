@@ -13,6 +13,7 @@ public record ArtifactSourceContract(
     SourceAuthority authority,
     IdentityPolicy identityPolicy,
     CompletenessPolicy completenessPolicy,
+    RequiredCaptureQuality requiredQuality,
     PrivacyClass privacyClass,
     Set<SourceAbsenceState> supportedAbsenceStates,
     RetentionPolicy retentionPolicy,
@@ -47,6 +48,20 @@ public record ArtifactSourceContract(
         // of what a practice author asked about.
         if (authority == SourceAuthority.LOSSY_DERIVATION && completenessPolicy.supportsComplete()) {
             throw new IllegalArgumentException("A lossy derivation cannot report COMPLETE: " + kind);
+        }
+        Objects.requireNonNull(requiredQuality, "requiredQuality");
+        // Demanding a quality the source can never report is a refusal written as a requirement: every
+        // review that required the source would be refused, permanently and for a reason no operator
+        // could act on. Caught here so the contract cannot state it, rather than per practice.
+        if (requiredQuality.demandsComplete() && !completenessPolicy.supportsComplete()) {
+            throw new IllegalArgumentException("A source that cannot report COMPLETE cannot demand it: " + kind);
+        }
+        // A source that can never be validly empty already fails capture when it is, so demanding
+        // non-emptiness of it says nothing and hides which sources the demand is really about.
+        if (requiredQuality.demandsContent() && !completenessPolicy.supportsEmpty()) {
+            throw new IllegalArgumentException(
+                "A source that cannot be validly empty cannot demand non-emptiness: " + kind
+            );
         }
         Objects.requireNonNull(privacyClass, "privacyClass");
         supportedAbsenceStates = Set.copyOf(Objects.requireNonNull(supportedAbsenceStates, "supportedAbsenceStates"));

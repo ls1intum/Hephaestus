@@ -1105,4 +1105,125 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-22">
+        <preConditions onFail="MARK_RAN" onFailMessage="stored policies already declare evidence as needs">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM (
+                    SELECT 1 FROM practice WHERE jsonb_exists(automated_review_policy, 'requiredEvidence')
+                    UNION ALL
+                    SELECT 1 FROM practice_revision
+                    WHERE automated_review_policy IS NOT NULL
+                      AND jsonb_exists(automated_review_policy, 'requiredEvidence')
+                    UNION ALL
+                    SELECT 1 FROM curated_practice_override
+                    WHERE automated_review_policy IS NOT NULL
+                      AND jsonb_exists(automated_review_policy, 'requiredEvidence')
+                    LIMIT 1
+                ) AS any_split_evidence
+            </sqlCheck>
+        </preConditions>
+        <comment>One list of needs with a stance, and capture strictness read off the source contract.</comment>
+        <sql splitStatements="false"><![CDATA[
+            -- Two lists that differed only in whether an absent source refused the review, and a
+            -- completeness/content pair restated on every entry that every practice had already spelled
+            -- the same way for a given source. The stance survives as a word; the strictness moves to the
+            -- source contract, so it is dropped here rather than carried.
+            CREATE OR REPLACE FUNCTION migrate_policy_to_needs(policy jsonb)
+            RETURNS jsonb
+            LANGUAGE sql
+            IMMUTABLE
+            AS $migrate_needs$
+                SELECT (policy - 'requiredEvidence' - 'optionalContext') || jsonb_build_object('needs',
+                    COALESCE((
+                        SELECT jsonb_agg(need ORDER BY need->>'sourceKind')
+                        FROM (
+                            SELECT jsonb_build_object('sourceKind', entry->>'sourceKind',
+                                                      'stance', 'REQUIRED') AS need
+                            FROM jsonb_array_elements(COALESCE(policy->'requiredEvidence', '[]'::jsonb)) AS entry
+                            UNION ALL
+                            SELECT jsonb_build_object('sourceKind', entry->>'sourceKind',
+                                                      'stance', 'CONTEXTUAL') AS need
+                            FROM jsonb_array_elements(COALESCE(policy->'optionalContext', '[]'::jsonb)) AS entry
+                        ) AS needs
+                    ), '[]'::jsonb))
+            $migrate_needs$;
+
+            UPDATE practice
+            SET automated_review_policy = migrate_policy_to_needs(automated_review_policy)
+            WHERE jsonb_exists(automated_review_policy, 'requiredEvidence');
+            UPDATE curated_practice_override
+            SET automated_review_policy = migrate_policy_to_needs(automated_review_policy)
+            WHERE automated_review_policy IS NOT NULL
+              AND jsonb_exists(automated_review_policy, 'requiredEvidence');
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+            UPDATE practice_revision
+            SET automated_review_policy = migrate_policy_to_needs(automated_review_policy)
+            WHERE automated_review_policy IS NOT NULL
+              AND jsonb_exists(automated_review_policy, 'requiredEvidence');
+            -- Same reason as -21: the policy digest feeds the review-rule fingerprint, so every stored
+            -- one now describes a policy shape that no longer exists. CatalogProvenanceBackfill
+            -- recomputes them on the next boot.
+            UPDATE practice_revision SET review_rule_fingerprint = NULL
+            WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+            DROP FUNCTION migrate_policy_to_needs(jsonb);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                -- The stance is recoverable; the strictness is not, because it is no longer written per
+                -- practice anywhere. It is restored from the source contract as it stood when this
+                -- changeset ran, which is the same value every practice had stated — that equality is
+                -- what licensed moving it, and is pinned by EvidencePolicyRedundancyTest.
+                CREATE OR REPLACE FUNCTION restore_policy_evidence_lists(policy jsonb)
+                RETURNS jsonb
+                LANGUAGE sql
+                IMMUTABLE
+                AS $restore_lists$
+                    SELECT (policy - 'needs')
+                        || jsonb_build_object('requiredEvidence', COALESCE((
+                            SELECT jsonb_agg(
+                                CASE entry->>'sourceKind'
+                                    WHEN 'scm.pull-request.diff' THEN jsonb_build_object(
+                                        'sourceKind', entry->>'sourceKind',
+                                        'completeness', 'COMPLETE', 'content', 'NON_EMPTY')
+                                    WHEN 'scm.pull-request.core' THEN jsonb_build_object(
+                                        'sourceKind', entry->>'sourceKind', 'completeness', 'COMPLETE')
+                                    WHEN 'scm.issue.core' THEN jsonb_build_object(
+                                        'sourceKind', entry->>'sourceKind', 'completeness', 'COMPLETE')
+                                    WHEN 'slack.conversation.thread' THEN jsonb_build_object(
+                                        'sourceKind', entry->>'sourceKind', 'completeness', 'COMPLETE')
+                                    ELSE jsonb_build_object(
+                                        'sourceKind', entry->>'sourceKind', 'completeness', 'NO_REQUIREMENT')
+                                END ORDER BY entry->>'sourceKind')
+                            FROM jsonb_array_elements(COALESCE(policy->'needs', '[]'::jsonb)) AS entry
+                            WHERE entry->>'stance' = 'REQUIRED'
+                        ), '[]'::jsonb))
+                        || jsonb_build_object('optionalContext', COALESCE((
+                            SELECT jsonb_agg(jsonb_build_object('sourceKind', entry->>'sourceKind')
+                                             ORDER BY entry->>'sourceKind')
+                            FROM jsonb_array_elements(COALESCE(policy->'needs', '[]'::jsonb)) AS entry
+                            WHERE entry->>'stance' = 'CONTEXTUAL'
+                        ), '[]'::jsonb));
+                $restore_lists$;
+
+                UPDATE practice
+                SET automated_review_policy = restore_policy_evidence_lists(automated_review_policy)
+                WHERE jsonb_exists(automated_review_policy, 'needs');
+                UPDATE curated_practice_override
+                SET automated_review_policy = restore_policy_evidence_lists(automated_review_policy)
+                WHERE automated_review_policy IS NOT NULL
+                  AND jsonb_exists(automated_review_policy, 'needs');
+                ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+                UPDATE practice_revision
+                SET automated_review_policy = restore_policy_evidence_lists(automated_review_policy)
+                WHERE automated_review_policy IS NOT NULL
+                  AND jsonb_exists(automated_review_policy, 'needs');
+                UPDATE practice_revision SET review_rule_fingerprint = NULL
+                WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+                ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+                DROP FUNCTION restore_policy_evidence_lists(jsonb);
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

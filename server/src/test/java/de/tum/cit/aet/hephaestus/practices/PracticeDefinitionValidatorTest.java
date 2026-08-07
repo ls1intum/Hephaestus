@@ -17,7 +17,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     private static final SourceContractVersion VERSION = new SourceContractVersion("1.0.0");
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
-    private static final SourceKind PARTIAL = new SourceKind("outline.documents");
     private static final SourceKind TIMELESS = new SourceKind("scm.linked-work-items");
     private static final SourceKind FOR_ANOTHER_KIND = new SourceKind("scm.issue.core");
 
@@ -34,13 +33,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 definition(
                     List.of("PullRequestCreated", "PullRequestCreated"),
                     null,
-                    requirements(
-                        new PracticeEvidenceRequirement(
-                            DIFF,
-                            EvidenceCompletenessRequirement.COMPLETE,
-                            EvidenceContentRequirement.NO_REQUIREMENT
-                        )
-                    )
+                    requirements(new PracticeEvidenceRequirement(DIFF, EvidenceStance.REQUIRED))
                 )
             )
         )
@@ -51,11 +44,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     @Test
     void rejectsUnknownEvidenceSource() {
         PracticeAutomatedReviewPolicy requirements = requirements(
-            new PracticeEvidenceRequirement(
-                new SourceKind("scm.pull-request.unknown"),
-                EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceContentRequirement.NO_REQUIREMENT
-            )
+            new PracticeEvidenceRequirement(new SourceKind("scm.pull-request.unknown"), EvidenceStance.REQUIRED)
         );
 
         assertThatThrownBy(() -> validator.validate(definition(requirements)))
@@ -66,31 +55,12 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     @Test
     void rejectsEvidenceThatCannotExistForTheReviewedKind() {
         PracticeAutomatedReviewPolicy requirements = requirements(
-            new PracticeEvidenceRequirement(
-                FOR_ANOTHER_KIND,
-                EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceContentRequirement.NO_REQUIREMENT
-            )
+            new PracticeEvidenceRequirement(FOR_ANOTHER_KIND, EvidenceStance.REQUIRED)
         );
 
         assertThatThrownBy(() -> validator.validate(definition(requirements)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Evidence source is not available for the selected work type");
-    }
-
-    @Test
-    void rejectsImpossibleCompletenessRequirement() {
-        PracticeAutomatedReviewPolicy requirements = requirements(
-            new PracticeEvidenceRequirement(
-                PARTIAL,
-                EvidenceCompletenessRequirement.COMPLETE,
-                EvidenceContentRequirement.NO_REQUIREMENT
-            )
-        );
-
-        assertThatThrownBy(() -> validator.validate(definition(requirements)))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evidence source cannot satisfy COMPLETE requirements");
     }
 
     @Test
@@ -160,7 +130,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             List.of(requirement),
-            List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             null
@@ -171,7 +140,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         return new PracticeAutomatedReviewPolicy(
             VERSION,
             new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
-            List.of(),
             List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
@@ -186,14 +154,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
             ),
-            List.of(
-                new PracticeEvidenceRequirement(
-                    DIFF,
-                    EvidenceCompletenessRequirement.COMPLETE,
-                    EvidenceContentRequirement.NO_REQUIREMENT
-                )
-            ),
-            List.of(),
+            List.of(new PracticeEvidenceRequirement(DIFF, EvidenceStance.REQUIRED)),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice.")

@@ -8,8 +8,7 @@
   "required": [
     "sourceContractVersion",
     "automatedReview",
-    "requiredEvidence",
-    "optionalContext",
+    "needs",
     "whenEvidenceIsInsufficient",
     "knownLimitations"
   ],
@@ -79,20 +78,12 @@
         }
       ]
     },
-    "requiredEvidence": {
-      "title": "Required evidence",
-      "description": "Every source in this list must meet its quality requirements before automated review may start.",
+    "needs": {
+      "title": "Evidence needs",
+      "description": "Sources this practice reads, each with the stance it takes towards that source. How strictly a source must be captured is fixed by the source contract, not restated here.",
       "type": "array",
       "items": {
-        "$ref": "#/$defs/requirement"
-      }
-    },
-    "optionalContext": {
-      "title": "Optional context",
-      "description": "Sources that may add context but never block automated review when absent.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/optionalContextSource"
+        "$ref": "#/$defs/need"
       }
     },
     "whenEvidenceIsInsufficient": {
@@ -131,11 +122,7 @@
       },
       "then": {
         "properties": {
-          "requiredEvidence": {
-            "type": "array",
-            "maxItems": 0
-          },
-          "optionalContext": {
+          "needs": {
             "type": "array",
             "maxItems": 0
           },
@@ -147,9 +134,20 @@
       },
       "else": {
         "properties": {
-          "requiredEvidence": {
+          "needs": {
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "contains": {
+              "type": "object",
+              "properties": {
+                "stance": {
+                  "const": "REQUIRED"
+                }
+              },
+              "required": [
+                "stance"
+              ]
+            }
           }
         }
       }
@@ -184,13 +182,13 @@
     }
   ],
   "$defs": {
-    "requirement": {
-      "title": "Required evidence source",
+    "need": {
+      "title": "Evidence need",
       "type": "object",
       "additionalProperties": false,
       "required": [
         "sourceKind",
-        "completeness"
+        "stance"
       ],
       "properties": {
         "sourceKind": {
@@ -199,41 +197,16 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$"
         },
-        "completeness": {
-          "title": "Completeness requirement",
+        "stance": {
+          "title": "Stance",
           "enum": [
-            "COMPLETE",
-            "NO_REQUIREMENT"
+            "REQUIRED",
+            "CONTEXTUAL"
           ],
-          "description": "Minimum completeness the source must establish."
-        },
-        "content": {
-          "title": "Content requirement",
-          "enum": [
-            "NON_EMPTY",
-            "NO_REQUIREMENT"
-          ],
-          "description": "Whether a valid but empty capture is enough to judge. Absent means NO_REQUIREMENT."
+          "description": "REQUIRED refuses the review when the source is missing or below the quality its contract demands; CONTEXTUAL is used when present and never blocks."
         }
       },
-      "description": "Completeness, freshness, and content requirements for one blocking evidence source."
-    },
-    "optionalContextSource": {
-      "title": "Optional context source",
-      "description": "A source that may add context but never blocks automated review when absent.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "sourceKind"
-      ],
-      "properties": {
-        "sourceKind": {
-          "title": "Source kind",
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9-]*)+$",
-          "description": "Stable source identifier from the selected source contract."
-        }
-      }
+      "description": "One source this practice reads and how it relates to it."
     },
     "limitation": {
       "title": "Known limitation",

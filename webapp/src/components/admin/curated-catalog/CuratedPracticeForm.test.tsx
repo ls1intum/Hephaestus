@@ -150,8 +150,7 @@ describe("CuratedPracticeForm", () => {
 				triggerEvents: [],
 				automatedReviewPolicy: expect.objectContaining({
 					automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-					requiredEvidence: [],
-					optionalContext: [],
+					needs: [],
 					knownLimitations: [],
 				}),
 			}),

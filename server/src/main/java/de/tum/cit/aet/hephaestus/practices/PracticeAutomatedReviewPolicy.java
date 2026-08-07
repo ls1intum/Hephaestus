@@ -26,13 +26,8 @@ public record PracticeAutomatedReviewPolicy(
     @NonNull
     @NotNull
     @Valid
-    @Schema(description = "Sources that must meet their quality requirements before automated review may start")
-    List<PracticeEvidenceRequirement> requiredEvidence,
-    @NonNull
-    @NotNull
-    @Valid
-    @Schema(description = "Sources that may add context but never block automated review when absent")
-    List<PracticeOptionalContextSource> optionalContext,
+    @Schema(description = "Sources this practice reads, each with the stance it takes towards that source")
+    List<PracticeEvidenceRequirement> needs,
     @NonNull
     @NotNull
     @Schema(description = "Conservative action when required evidence does not pass")
@@ -53,43 +48,30 @@ public record PracticeAutomatedReviewPolicy(
     public PracticeAutomatedReviewPolicy {
         Objects.requireNonNull(sourceContractVersion, "sourceContractVersion");
         Objects.requireNonNull(automatedReview, "automatedReview");
-        requiredEvidence = sortedRequirements(requiredEvidence, "requiredEvidence");
-        optionalContext = Objects.requireNonNull(optionalContext, "optionalContext")
+        needs = Objects.requireNonNull(needs, "needs")
             .stream()
-            .sorted(Comparator.comparing(requirement -> requirement.sourceKind().value()))
+            .sorted(Comparator.comparing(need -> need.sourceKind().value()))
             .toList();
-        Set<String> requiredKinds = uniqueSourceKinds(
-            requiredEvidence
-                .stream()
-                .map(requirement -> requirement.sourceKind().value())
-                .toList(),
-            "requiredEvidence"
-        );
-        Set<String> optionalKinds = uniqueSourceKinds(
-            optionalContext
-                .stream()
-                .map(requirement -> requirement.sourceKind().value())
-                .toList(),
-            "optionalContext"
-        );
+        Set<String> seen = new HashSet<>();
+        for (PracticeEvidenceRequirement need : needs) {
+            if (!seen.add(need.sourceKind().value())) {
+                throw new IllegalArgumentException("needs contains duplicate source " + need.sourceKind());
+            }
+        }
         knownLimitations = Objects.requireNonNull(knownLimitations, "knownLimitations")
             .stream()
             .sorted(Comparator.comparing(PracticeEvidenceLimitation::code))
             .toList();
-        if (requiredKinds.stream().anyMatch(optionalKinds::contains)) {
-            throw new IllegalArgumentException("A source cannot be both required evidence and optional context");
-        }
         boolean automatedReviewDisabled = automatedReview.mode() == PracticeAutomatedReviewMode.NONE;
-        if (
-            automatedReviewDisabled &&
-            (!requiredEvidence.isEmpty() || !optionalContext.isEmpty() || !knownLimitations.isEmpty())
-        ) {
+        if (automatedReviewDisabled && (!needs.isEmpty() || !knownLimitations.isEmpty())) {
             throw new IllegalArgumentException(
                 "A practice without automated review cannot declare review evidence or limitations"
             );
         }
-        if (!automatedReviewDisabled && requiredEvidence.isEmpty()) {
-            throw new IllegalArgumentException("Automated review requires at least one evidence source");
+        // Contextual sources alone would let a review start having read nothing it must read, and every
+        // verdict it then produced would be about evidence it never established it had.
+        if (!automatedReviewDisabled && needs.stream().noneMatch(PracticeEvidenceRequirement::isRequired)) {
+            throw new IllegalArgumentException("Automated review requires at least one required evidence source");
         }
         Objects.requireNonNull(whenEvidenceIsInsufficient, "whenEvidenceIsInsufficient");
         Set<String> limitationCodes = new HashSet<>();
@@ -113,23 +95,8 @@ public record PracticeAutomatedReviewPolicy(
         }
     }
 
-    private static Set<String> uniqueSourceKinds(List<String> sourceKinds, String field) {
-        Set<String> kinds = new HashSet<>();
-        for (String kind : sourceKinds) {
-            if (!kinds.add(kind)) {
-                throw new IllegalArgumentException(field + " contains duplicate source " + kind);
-            }
-        }
-        return kinds;
-    }
-
-    private static List<PracticeEvidenceRequirement> sortedRequirements(
-        List<PracticeEvidenceRequirement> requirements,
-        String field
-    ) {
-        return Objects.requireNonNull(requirements, field)
-            .stream()
-            .sorted(Comparator.comparing(requirement -> requirement.sourceKind().value()))
-            .toList();
+    /** The sources a refusal can be about, in source order. */
+    public List<PracticeEvidenceRequirement> requiredNeeds() {
+        return needs.stream().filter(PracticeEvidenceRequirement::isRequired).toList();
     }
 }

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.evidence.ErasurePolicy;
 import de.tum.cit.aet.hephaestus.evidence.IdentityMode;
 import de.tum.cit.aet.hephaestus.evidence.IdentityPolicy;
 import de.tum.cit.aet.hephaestus.evidence.PrivacyClass;
+import de.tum.cit.aet.hephaestus.evidence.RequiredCaptureQuality;
 import de.tum.cit.aet.hephaestus.evidence.RetentionPolicy;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
 import de.tum.cit.aet.hephaestus.evidence.SourceAuthority;
@@ -185,6 +186,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 "authority",
                 "identity",
                 "completeness",
+                "requiredQuality",
                 "privacyClass",
                 "supportedAbsenceStates",
                 "retentionPolicy",
@@ -221,6 +223,11 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 requiredBoolean(completeness, "supportsComplete", kind.toString()),
                 requiredBoolean(completeness, "supportsPartial", kind.toString()),
                 requiredBoolean(completeness, "supportsEmpty", kind.toString())
+            ),
+            enumValue(
+                RequiredCaptureQuality.class,
+                requiredText(node, "requiredQuality", kind.toString()),
+                "required capture quality"
             ),
             enumValue(PrivacyClass.class, requiredText(node, "privacyClass", kind.toString()), "privacy class"),
             enumSet(SourceAbsenceState.class, node, "supportedAbsenceStates", kind.toString()),
