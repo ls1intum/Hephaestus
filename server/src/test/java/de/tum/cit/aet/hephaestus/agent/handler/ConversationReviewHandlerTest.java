@@ -145,6 +145,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             AgentJob job = conversationJob();
             Practice practice = new Practice();
             practice.setSlug("conversation-practice");
+            practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
             practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.CONVERSATION_THREAD));
             var revision = new PracticeRevision();
             ReflectionTestUtils.setField(revision, "id", 12L);

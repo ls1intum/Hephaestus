@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.regex.Pattern;
@@ -13,12 +14,14 @@ import tools.jackson.databind.json.JsonMapper;
 class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
+    private final ClasspathArtifactSourceCatalogRegistry catalogs = new ClasspathArtifactSourceCatalogRegistry(
+        objectMapper,
+        java.time.Clock.systemUTC()
+    );
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
         objectMapper,
-        new PracticeDefinitionValidator(
-            new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC()),
-            PracticeSignalOptionsFixture.real()
-        )
+        new PracticeDefinitionValidator(catalogs, PracticeSignalOptionsFixture.real()),
+        new PracticeEvidenceDefaults(catalogs)
     );
 
     @Test

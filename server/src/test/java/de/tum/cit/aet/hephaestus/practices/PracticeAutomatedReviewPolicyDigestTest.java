@@ -3,14 +3,21 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+/**
+ * The digest of the review frame.
+ *
+ * <p>What a review reads is no longer part of it — that moved to the bindings and is digested by
+ * {@code ReviewRuleFingerprint}, where {@code ReviewRuleFingerprintTest} holds it. What is left here is
+ * the frame: the contract version, whether a model runs, what happens when the evidence does not pass,
+ * and the claims it can never support.
+ */
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
-    private static final String PINNED_DIGEST = "f4d80f6812a384a5a0cb0414b23863b9ad24b448f076fb0087a2035fb1356fce";
+    private static final String PINNED_DIGEST = "ab525cda62e5d557e6c65899d711e8375572957f03c0d1ba220b632ae37086c6";
 
     @Test
     void shouldPinACanonicalDigestForAKnownPolicy() {
@@ -18,45 +25,15 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         // a wire format. Reordering the fields inside it, or changing how they are framed, silently
         // invalidates every stored fingerprint and marks every past review claim stale — with a green
         // suite, because the other tests here only compare digests to each other. This pins the value.
-        String digest = PracticeAutomatedReviewPolicyDigest.digest(
-            requirements(List.of(requirement("scm.pull-request.core"), requirement("scm.pull-request.diff")))
-        );
+        String digest = PracticeAutomatedReviewPolicyDigest.digest(policy());
 
         assertThat(digest).isEqualTo(PINNED_DIGEST);
     }
 
     @Test
-    void shouldBeStableAcrossDeclarationOrdering() {
-        PracticeEvidenceRequirement core = requirement("scm.pull-request.core");
-        PracticeEvidenceRequirement diff = requirement("scm.pull-request.diff");
-
-        // Asserted on the policy, not the digest: the policy sorts on construction, so two digests
-        // taken from it are equal however the author declared the sources — including if the digest
-        // itself became order-sensitive. The normalisation is the invariant worth pinning.
-        assertThat(requirements(List.of(diff, core)).needs())
-            .isEqualTo(requirements(List.of(core, diff)).needs())
-            .extracting(requirement -> requirement.sourceKind().value())
-            .containsExactly("scm.pull-request.core", "scm.pull-request.diff");
-    }
-
-    @Test
-    void shouldChangeWhenRequiredSourceChanges() {
-        String core = PracticeAutomatedReviewPolicyDigest.digest(
-            requirements(List.of(requirement("scm.pull-request.core")))
-        );
-        String diff = PracticeAutomatedReviewPolicyDigest.digest(
-            requirements(List.of(requirement("scm.pull-request.diff")))
-        );
-
-        assertThat(core).isNotEqualTo(diff);
-    }
-
-    @Test
     void shouldIncludeReviewModeAndEvidenceSupport() {
-        var required = List.of(requirement("scm.pull-request.diff"));
         String baseline = PracticeAutomatedReviewPolicyDigest.digest(
-            requirements(
-                required,
+            policy(
                 capability(
                     PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
@@ -66,8 +43,7 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
         assertThat(baseline).isNotEqualTo(
             PracticeAutomatedReviewPolicyDigest.digest(
-                requirements(
-                    required,
+                policy(
                     capability(
                         PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                         PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
@@ -77,9 +53,30 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         );
     }
 
-    private static PracticeAutomatedReviewPolicy requirements(List<PracticeEvidenceRequirement> required) {
-        return requirements(
-            required,
+    /**
+     * A limitation is a claim the practice will never make, so a review run under a policy that added
+     * one is not the same review as one run before it.
+     */
+    @Test
+    void shouldChangeWhenAKnownLimitationChanges() {
+        assertThat(PracticeAutomatedReviewPolicyDigest.digest(policy())).isNotEqualTo(
+            PracticeAutomatedReviewPolicyDigest.digest(
+                new PracticeAutomatedReviewPolicy(
+                    new SourceContractVersion("1.0.0"),
+                    capability(
+                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
+                    ),
+                    PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                    List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Something else entirely.")),
+                    null
+                )
+            )
+        );
+    }
+
+    private static PracticeAutomatedReviewPolicy policy() {
+        return policy(
             capability(
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
@@ -87,10 +84,7 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         );
     }
 
-    private static PracticeAutomatedReviewPolicy requirements(
-        List<PracticeEvidenceRequirement> required,
-        PracticeAutomatedReview automatedReview
-    ) {
+    private static PracticeAutomatedReviewPolicy policy(PracticeAutomatedReview automatedReview) {
         return new PracticeAutomatedReviewPolicy(
             new SourceContractVersion("1.0.0"),
             automatedReview,
@@ -100,10 +94,6 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
                 ? new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice.")
                 : null
         );
-    }
-
-    private static PracticeEvidenceRequirement requirement(String sourceKind) {
-        return new PracticeEvidenceRequirement(new SourceKind(sourceKind), EvidenceStance.REQUIRED);
     }
 
     private static PracticeAutomatedReview capability(

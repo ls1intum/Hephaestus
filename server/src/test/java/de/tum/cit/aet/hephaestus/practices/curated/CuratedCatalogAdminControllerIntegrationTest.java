@@ -668,7 +668,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
         assertThat(created).isNotNull();
         assertThat(created.definition().automatedReviewPolicy()).isEqualTo(
-            evidenceDefaults.forArtifact(source.artifactKind())
+            evidenceDefaults.policyFor(ArtifactKinds.PULL_REQUEST)
         );
     }
 

@@ -93,7 +93,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
             matching,
             shipped.criteria(),
             false,
-            evidenceDefaults.forArtifact(shipped.artifactKind()),
+            evidenceDefaults.policyFor(shipped.artifactKind()),
             v1Fingerprint
         );
 
@@ -203,7 +203,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 SHIPPED_SLUG,
                 shipped.name(),
                 shipped.artifactKind().value(),
-                triggerEventsJson(shipped),
+                bindingsJson(shipped),
                 criteria,
                 evidenceJson(evidence),
                 fingerprint == null ? null : SHIPPED_SLUG,
@@ -222,7 +222,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 SHIPPED_SLUG,
                 shipped.name(),
                 shipped.artifactKind().value(),
-                triggerEventsJson(shipped),
+                bindingsJson(shipped),
                 criteria,
                 evidenceJson(evidence),
                 shipped.areaSlug(),
@@ -242,7 +242,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                     SHIPPED_SLUG,
                     shipped.name(),
                     shipped.artifactKind().value(),
-                    triggerEventsJson(shipped),
+                    bindingsJson(shipped),
                     criteria,
                     evidenceJson(evidence),
                     shipped.areaSlug()
@@ -260,8 +260,9 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         });
     }
 
-    private static String triggerEventsJson(PracticeDefinition definition) {
-        return definition.triggerEventsJson().toString();
+    /** The bindings column, as the legacy rows this backfill reads carry it. */
+    private String bindingsJson(PracticeDefinition definition) {
+        return objectMapper.valueToTree(definition.bindings()).toString();
     }
 
     private String evidenceJson(PracticeDefinition definition) {

@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReview;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
@@ -290,6 +291,17 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                         : null
                 )
             );
+            if (assessmentAbsent) {
+                // A practice nobody automates reads nothing, so its bindings carry no evidence — the
+                // shape PracticeService leaves behind when automated review is switched off.
+                practice.setBindings(
+                    practice
+                        .getBindings()
+                        .stream()
+                        .map(binding -> new PracticeBinding(binding.signals(), List.of(), binding.onDrafts()))
+                        .toList()
+                );
+            }
 
             AutomatedReviewReadinessResult result = builder.checkAutomatedReviewReadinessAsOfNow(
                 manifest,

@@ -33,6 +33,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -598,7 +599,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             PullRequest pr = new PullRequest();
             pr.setId(5L);
             // headRefOid/headRefName/baseRefName all null → nothing to clone or diff.
-            assertThat(service.buildReviewRequest(pr, "PullRequestMerged")).isNull();
+            assertThat(service.buildReviewRequest(pr, ScmSignals.PULL_REQUEST_MERGED)).isNull();
         }
 
         @Test
@@ -613,18 +614,18 @@ class AgentJobServiceTest extends BaseUnitTest {
             repo.setNameWithOwner("owner/repo");
             pr.setRepository(repo);
 
-            var request = service.buildReviewRequest(pr, "PullRequestMerged");
+            var request = service.buildReviewRequest(pr, ScmSignals.PULL_REQUEST_MERGED);
 
             assertThat(request).isNotNull();
             assertThat(request.headRefOid()).isEqualTo("abc123");
-            assertThat(request.triggerSignal()).isEqualTo("PullRequestMerged");
+            assertThat(request.triggerSignal()).isEqualTo(ScmSignals.PULL_REQUEST_MERGED);
         }
 
         @Test
         void buildIssueRequestReturnsNullWhenRepositoryMissing() {
             Issue issue = new Issue();
             issue.setId(7L);
-            assertThat(service.buildIssueRequest(issue, "IssueClosed")).isNull();
+            assertThat(service.buildIssueRequest(issue, ScmSignals.ISSUE_CLOSED)).isNull();
         }
 
         @Test

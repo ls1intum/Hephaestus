@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -155,7 +156,7 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
                 "branch",
                 "sha",
                 "main",
-                "PullRequestReady"
+                ScmSignals.PULL_REQUEST_READY
             );
 
             assertThat(request.observationOrigin()).isEqualTo(ObservationOrigin.LIVE);

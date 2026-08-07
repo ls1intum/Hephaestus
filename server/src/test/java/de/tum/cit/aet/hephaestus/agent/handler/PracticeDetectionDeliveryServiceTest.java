@@ -114,6 +114,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         testPractice = new Practice();
         ReflectionTestUtils.setField(testPractice, "id", 10L);
         testPractice.setSlug("pr-description-quality");
+        testPractice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
         testPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         testPractice.setWorkspace(workspace);
 
@@ -150,6 +151,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getSlug()).thenReturn("pr-description-quality");
         lenient().when(revision.getPractice()).thenReturn(testPractice);
         lenient().when(revision.getAutomatedReviewPolicy()).thenReturn(testPractice.getAutomatedReviewPolicy());
+        // The evidence boundary is drawn from the revision's bindings: a citation to a source no
+        // binding of this occasion declared was never staged, so a quote from it cannot have been read.
+        lenient().when(revision.getBindings()).thenReturn(testPractice.getBindings());
         lenient().when(practiceRevisionRepository.findById(11L)).thenReturn(Optional.of(revision));
         lenient()
             .when(cas.get("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
@@ -241,6 +245,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getSlug()).thenReturn(practice.getSlug());
         lenient().when(revision.getPractice()).thenReturn(practice);
         lenient().when(revision.getAutomatedReviewPolicy()).thenReturn(practice.getAutomatedReviewPolicy());
+        lenient().when(revision.getBindings()).thenReturn(practice.getBindings());
         lenient().when(practiceRevisionRepository.findById(revisionId)).thenReturn(Optional.of(revision));
     }
 
@@ -638,6 +643,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
             otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
             admit(otherPractice, 22L);
 
@@ -809,6 +815,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
             otherPractice.setSlug("error-handling");
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
             otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
             admit(otherPractice, 22L);
 

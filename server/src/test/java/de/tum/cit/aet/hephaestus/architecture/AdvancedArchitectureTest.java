@@ -240,6 +240,11 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
                         javaClass.getPackageName().contains(".manifest") || // IntegrationManifest impls + bootstrap utilities
                         javaClass.getPackageName().contains(".registry") || // ConnectionPurgeContributor lives with the entity
+                        // An ArtifactDescriptor is a domain declaring what it is and what happens to it,
+                        // not an adapter onto somebody else's system. It belongs beside the artifact it
+                        // describes — a conversation thread is assembled by the agent module out of
+                        // ingested messages, so its descriptor lives there and not in a vendor package.
+                        javaClass.getSimpleName().endsWith("ArtifactDescriptor") ||
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider") ||
                         javaClass.getSimpleName().endsWith("Tracker") || // Rate limit trackers implement RateLimitTracker SPI

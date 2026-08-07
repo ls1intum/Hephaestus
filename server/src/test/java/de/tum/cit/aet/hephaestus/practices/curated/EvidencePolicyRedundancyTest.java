@@ -9,8 +9,10 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.util.LinkedHashMap;
@@ -39,9 +41,11 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
         objectMapper,
         Clock.systemUTC()
     );
+    private final PracticeSignalOptions signalOptions = PracticeSignalOptionsFixture.real();
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
         objectMapper,
-        new PracticeDefinitionValidator(registry, PracticeSignalOptionsFixture.real())
+        new PracticeDefinitionValidator(registry, signalOptions),
+        new PracticeEvidenceDefaults(registry)
     );
 
     /**
@@ -54,7 +58,7 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
      */
     @Test
     void everyAuthorableArtifactKindHasEvidenceThatAppliesToIt() {
-        for (ArtifactKind kind : ArtifactKinds.authorable()) {
+        for (ArtifactKind kind : signalOptions.authorableKinds()) {
             assertThat(registry.current().sourcesFor(kind.value()))
                 .as(
                     "artifact kind '%s' can be authored against but no source declares it applies; a practice " +
@@ -86,13 +90,18 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
             .forEach(practice ->
                 practice
                     .definition()
-                    .automatedReviewPolicy()
-                    .requiredNeeds()
-                    .forEach(need ->
-                        demanded.put(
-                            need.sourceKind(),
-                            catalog.source(need.sourceKind()).orElseThrow().requiredQuality()
-                        )
+                    .bindings()
+                    .forEach(binding ->
+                        binding
+                            .needs()
+                            .stream()
+                            .filter(PracticeEvidenceRequirement::refuses)
+                            .forEach(need ->
+                                demanded.put(
+                                    need.sourceKind(),
+                                    catalog.source(need.sourceKind()).orElseThrow().requiredQuality()
+                                )
+                            )
                     )
             );
 

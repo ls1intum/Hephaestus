@@ -3,10 +3,12 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
@@ -144,7 +146,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return new CreatePracticeRequestDTO(
             request.slug(),
             request.name(),
-            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+            automatedReview
+                ? PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST)
+                : PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST)
+                      .stream()
+                      .map(binding -> new PracticeBinding(binding.signals(), List.of(), binding.onDrafts()))
+                      .toList(),
             request.criteria(),
             automatedReview ? request.precomputeScript() : null,
             evidence,
@@ -162,6 +169,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             List.of(),
             null
         );
+    }
+
+    /** Every signal the practice is bound to, which is what the trigger-event list used to be. */
+    private static List<SignalName> signalsOf(PracticeDTO practice) {
+        return PracticeBinding.signalsOf(practice.bindings());
     }
 
     private Consumer<HttpHeaders> withCsrfForAnonymousWrite() {
@@ -325,7 +337,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.slug()).isEqualTo("target-practice");
             assertThat(result.name()).isEqualTo("Target Practice");
             assertThat(result.usedInNewReviews()).isTrue();
-            assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for target-practice");
             assertThat(result.createdAt()).isNotNull();
             assertThat(result.updatedAt()).isNotNull();
@@ -408,7 +420,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("new-practice");
             assertThat(result.name()).isEqualTo("Practice new-practice");
-            assertThat(result.triggerEvents()).containsExactly("PullRequestCreated", "ReviewSubmitted");
+            assertThat(signalsOf(result)).containsExactly(
+                ScmSignals.PULL_REQUEST_OPENED,
+                ScmSignals.PULL_REQUEST_REVIEWED
+            );
             assertThat(result.criteria()).isEqualTo("Detect if the PR follows best practices");
             assertThat(result.automatedReviewPolicy()).isEqualTo(
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
@@ -462,7 +477,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
             assertThat(result.usedInNewReviews()).isTrue();
             assertThat(result.automatedReviewPolicy()).isEqualTo(
-                evidenceDefaults.forArtifact(ArtifactKinds.PULL_REQUEST)
+                evidenceDefaults.policyFor(ArtifactKinds.PULL_REQUEST)
             );
         }
 
@@ -880,7 +895,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.name()).isEqualTo("Updated Name");
-            assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
             assertThat(result.usedInNewReviews()).isTrue();
             assertThat(result.areaSlug()).isEqualTo("existing-area");
@@ -918,7 +933,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.artifactKind()).isEqualTo(ArtifactKinds.ISSUE);
-            assertThat(result.automatedReviewPolicy()).isEqualTo(evidenceDefaults.forArtifact(ArtifactKinds.ISSUE));
+            assertThat(result.automatedReviewPolicy()).isEqualTo(evidenceDefaults.policyFor(ArtifactKinds.ISSUE));
         }
 
         @Test
@@ -944,7 +959,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.usedInNewReviews()).isFalse();
-            assertThat(result.triggerEvents()).isEmpty();
+            // The occasion survives — it is where the practice's kind comes from — but a practice
+            // nobody automates reads nothing, so the evidence goes with the automation that read it.
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
+            assertThat(result.bindings()).allSatisfy(binding -> assertThat(binding.needs()).isEmpty());
             assertThat(
                 practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), practice.getSlug())
@@ -988,7 +1006,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.name()).isEqualTo("New Name");
-            assertThat(result.triggerEvents()).containsExactly("ReviewSubmitted");
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_REVIEWED);
             assertThat(result.criteria()).isEqualTo("New prompt");
             assertThat(result.areaSlug()).isEqualTo("target-area");
 
@@ -2193,7 +2211,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.artifactKind()).isEqualTo(ArtifactKinds.CONVERSATION_THREAD);
-            assertThat(result.triggerEvents()).isEmpty();
+            // No ingested event raises it — a scheduler decides a thread has settled — but the occasion
+            // is now declared rather than left empty, which is what let these practices be reviewed
+            // with nothing in the catalog saying what started them.
+            assertThat(signalsOf(result)).containsExactly(ChatSignals.CONVERSATION_THREAD_SETTLED);
         }
     }
 
@@ -2210,11 +2231,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "learner-practice",
                 "Learner Practice",
-                List.of("PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
                 "INTERNAL detection rubric — must never reach a learner",
                 null,
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
-                null,
                 "Small, focused PRs are easier to review.",
                 "A PR that changes one thing and explains why in the description.",
                 null

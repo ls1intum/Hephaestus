@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -49,12 +51,27 @@ public record PracticeBinding(
     @Valid
     @Schema(description = "Sources a review occasioned this way reads, each with the stance it takes")
     List<PracticeEvidenceRequirement> needs,
-    @Schema(
-        description = "Whether an artifact still marked draft occasions this review",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
+    @Schema(description = "Whether an artifact still marked draft occasions this review; omit for false")
     boolean onDrafts
 ) {
+    /**
+     * Reads a binding that may not mention drafts at all.
+     *
+     * <p>Needed because the component is a primitive and Jackson refuses to guess one: without this,
+     * every binding in the bundled catalog and every binding a client posts would have to spell out
+     * {@code "onDrafts": false}. The default is stated once, here and in the javadoc above, rather than
+     * 36 times in the catalog — and a shape that must be written out is a shape that will be written
+     * out wrong.
+     */
+    @JsonCreator
+    static PracticeBinding fromJson(
+        @JsonProperty("signals") List<SignalName> signals,
+        @JsonProperty("needs") List<PracticeEvidenceRequirement> needs,
+        @JsonProperty("onDrafts") @Nullable Boolean onDrafts
+    ) {
+        return new PracticeBinding(signals, needs, Boolean.TRUE.equals(onDrafts));
+    }
+
     public PracticeBinding {
         // Sorted and de-duplicated on construction for the same reason the needs list is: these values
         // are digested into the review-rule fingerprint, and two authors writing the same binding in a

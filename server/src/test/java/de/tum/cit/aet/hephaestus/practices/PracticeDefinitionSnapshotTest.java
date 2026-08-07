@@ -47,7 +47,14 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
         assertThat(snapshot.precomputeScriptSha256()).isEqualTo(
             "93f0d05c1fdeaf00615a94221cd849ea93ce5a5d19e130931fc5766637a21bb3"
         );
-        assertThat(snapshot.triggerEvents()).containsExactly("PullRequestCreated", "ReviewSubmitted");
+        assertThat(snapshot.bindings())
+            .singleElement()
+            .satisfies(binding ->
+                assertThat(binding.signals()).containsExactly(
+                    ScmSignals.PULL_REQUEST_OPENED,
+                    ScmSignals.PULL_REQUEST_REVIEWED
+                )
+            );
         assertThat(json).doesNotContain("abc", "console.log");
     }
 }

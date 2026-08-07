@@ -17,7 +17,9 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestR
 import de.tum.cit.aet.hephaestus.integration.core.framework.ReviewContractValidator;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
@@ -26,9 +28,10 @@ import de.tum.cit.aet.hephaestus.practices.review.DormantBinding;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeSignalCoverage;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.node.JsonNodeFactory;
 
 /**
  * An artifact kind that exists nowhere in {@code src/main}, driven through the real machinery.
@@ -47,6 +50,9 @@ import tools.jackson.databind.node.JsonNodeFactory;
 class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 7L;
+
+    /** A second borrowed kind, for the one case that needs two integrations to differ in coverage. */
+    private static final IntegrationKind UNCONNECTED_KIND = IntegrationKind.SLACK;
 
     @Test
     void theRealBootstrapAcceptsAnIntegrationForAKindThatDoesNotExist() {
@@ -75,7 +81,10 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     @Test
     void aPracticeBoundToAnUncoveredSignalIsDormantWithAReason() {
-        PracticeSignalCoverage practiceCoverage = practiceCoverage(false, practiceBoundTo("WidgetAssembled"));
+        PracticeSignalCoverage practiceCoverage = practiceCoverage(
+            false,
+            practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED)
+        );
 
         List<DormantBinding> dormant = practiceCoverage.dormantBindings(WORKSPACE_ID);
 
@@ -89,7 +98,10 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     @Test
     void connectingTheIntegrationEndsTheDormancy() {
-        PracticeSignalCoverage practiceCoverage = practiceCoverage(true, practiceBoundTo("WidgetAssembled"));
+        PracticeSignalCoverage practiceCoverage = practiceCoverage(
+            true,
+            practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED)
+        );
 
         assertThat(practiceCoverage.dormantBindings(WORKSPACE_ID)).isEmpty();
     }
@@ -97,9 +109,18 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
     @Test
     void aPracticeStaysLiveWhileAnyOneOfItsSignalsIsCovered() {
         // A practice watching two things is not dormant because one of them is unreachable; reporting it
-        // as dormant would teach people that the dormancy report is noise.
-        Practice practice = practiceBoundTo("WidgetAssembled", "NothingRaisesThis");
-        PracticeSignalCoverage practiceCoverage = practiceCoverage(true, practice);
+        // as dormant would teach people that the dormancy report is noise. Two integrations raise one
+        // signal each here and only the first is connected, which is the only shape in which one
+        // practice's signals can differ in coverage.
+        PracticeRepository repository = mock(PracticeRepository.class);
+        when(repository.findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(
+            List.of(practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED))
+        );
+        PracticeSignalCoverage practiceCoverage = new PracticeSignalCoverage(
+            splitCoverage(),
+            new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
+            repository
+        );
 
         assertThat(practiceCoverage.dormantBindings(WORKSPACE_ID)).isEmpty();
     }
@@ -147,13 +168,45 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         );
     }
 
+    /**
+     * Two integrations about one artifact, one signal each, only the first connected — so a practice
+     * bound to both has one covered signal and one uncovered one.
+     */
+    private static DeclaredSignalCoverage splitCoverage() {
+        ConnectionService connections = mock(ConnectionService.class);
+        when(connections.findActive(WORKSPACE_ID, FixtureIntegration.KIND)).thenReturn(
+            Optional.of(mock(Connection.class))
+        );
+        when(connections.findActive(WORKSPACE_ID, UNCONNECTED_KIND)).thenReturn(Optional.empty());
+        return new DeclaredSignalCoverage(
+            new IntegrationManifestRegistry(
+                List.of(
+                    FixtureIntegration.manifest(
+                        FixtureIntegration.KIND,
+                        Set.of(),
+                        raises(FixtureIntegration.WIDGET_ASSEMBLED)
+                    ),
+                    FixtureIntegration.manifest(UNCONNECTED_KIND, Set.of(), raises(FixtureIntegration.WIDGET_SHIPPED))
+                )
+            ),
+            connections
+        );
+    }
+
+    private static IntegrationManifest.ReviewContribution raises(SignalName signal) {
+        return new IntegrationManifest.ReviewContribution(
+            Set.of(FixtureIntegration.WIDGET),
+            Map.of(FixtureIntegration.WIDGET, Set.of(signal)),
+            Map.of(FixtureIntegration.WIDGET, Set.of(FeedbackLane.IN_CONTEXT_SUMMARY))
+        );
+    }
+
     private static PracticeSignalCoverage practiceCoverage(boolean connected, Practice... practices) {
         PracticeRepository repository = mock(PracticeRepository.class);
         when(repository.findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(List.of(practices));
         return new PracticeSignalCoverage(
             coverage(connected),
-            List.of(FixtureIntegration.vocabulary()),
-            new PracticeSignalOptions(FixtureIntegration.artifactCatalog(), List.of(FixtureIntegration.vocabulary())),
+            new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
             repository
         );
     }

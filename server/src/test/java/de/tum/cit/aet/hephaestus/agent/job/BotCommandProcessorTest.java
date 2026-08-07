@@ -91,7 +91,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
             PullRequestReviewSubmissionRequest request = captor.getValue();
             assertThat(request.pullRequest().number()).isEqualTo(MR_NUMBER);
             assertThat(request.headRefOid()).isEqualTo("abc123");
-            assertThat(request.triggerEvent()).isNull();
+            assertThat(request.triggerSignal()).isNull();
         }
 
         @ParameterizedTest(name = "{0} is ignored")

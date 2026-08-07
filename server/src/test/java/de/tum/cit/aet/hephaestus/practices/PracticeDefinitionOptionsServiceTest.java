@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeWorkTypeDefinitionOptionsDTO;
@@ -27,16 +28,24 @@ class PracticeDefinitionOptionsServiceTest {
 
         PracticeDefinitionOptionsDTO result = service.options();
 
+        // Ordered by kind rather than by whichever descriptor bean happened to register first: bean
+        // order is not stable across builds, and an authoring picker that reshuffles between deploys is
+        // worse than one that is merely alphabetical.
         assertThat(result.workTypes())
             .extracting(PracticeWorkTypeDefinitionOptionsDTO::artifactKind)
-            .containsExactly(ArtifactKinds.PULL_REQUEST, ArtifactKinds.ISSUE, ArtifactKinds.CONVERSATION_THREAD);
-        PracticeWorkTypeDefinitionOptionsDTO pullRequests = result.workTypes().getFirst();
-        assertThat(pullRequests.triggerEvents())
+            .containsExactly(ArtifactKinds.CONVERSATION_THREAD, ArtifactKinds.ISSUE, ArtifactKinds.PULL_REQUEST);
+        PracticeWorkTypeDefinitionOptionsDTO pullRequests = result
+            .workTypes()
+            .stream()
+            .filter(workType -> workType.artifactKind().equals(ArtifactKinds.PULL_REQUEST))
+            .findFirst()
+            .orElseThrow();
+        assertThat(pullRequests.signals())
             .filteredOn(option -> option.recommended())
-            .extracting(option -> option.event())
-            .containsExactly("PullRequestCreated", "PullRequestReady", "PullRequestSynchronized");
-        assertThat(pullRequests.triggerEvents())
-            .filteredOn(option -> option.event().equals("PullRequestClosed"))
+            .extracting(option -> option.signal().value())
+            .containsExactly("scm.pull_request.opened", "scm.pull_request.ready", "scm.pull_request.synchronized");
+        assertThat(pullRequests.signals())
+            .filteredOn(option -> option.signal().equals(ScmSignals.PULL_REQUEST_CLOSED))
             .singleElement()
             .satisfies(option -> {
                 // The label is the domain's own, shown under a "Run mentoring when" legend that already
@@ -47,9 +56,9 @@ class PracticeDefinitionOptionsServiceTest {
         assertThat(pullRequests.supportedAutomatedReviewModes()).containsExactly(
             PracticeAutomatedReviewMode.LANGUAGE_MODEL
         );
-        assertThat(pullRequests.recommendedRequirements().needs())
+        assertThat(pullRequests.recommendedNeeds())
             .extracting(need -> need.sourceKind().value())
-            .containsExactly("scm.pull-request.comments", "scm.pull-request.core", "scm.pull-request.diff");
+            .containsExactly("scm.pull-request.core", "scm.pull-request.diff", "scm.pull-request.comments");
         assertThat(pullRequests.allowedSources())
             .extracting(PracticeEvidenceSourceOptionDTO::sourceKind)
             .contains("scm.pull-request.core", "scm.repository.tree")

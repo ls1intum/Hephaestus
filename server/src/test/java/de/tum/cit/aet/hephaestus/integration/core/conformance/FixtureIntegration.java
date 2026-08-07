@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.conformance;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
@@ -19,6 +20,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import io.nats.client.Message;
 import java.util.List;
 import java.util.Map;
@@ -59,9 +62,18 @@ final class FixtureIntegration {
     static final EventTypeKey ASSEMBLY_EVENT = new EventTypeKey(KIND, "fixture.assembly");
     static final EventTypeKey SHIPMENT_EVENT = new EventTypeKey(KIND, "fixture.shipment");
 
-    /** The stored trigger literal a practice binds to, mirroring how practices are still authored. */
-
     private FixtureIntegration() {}
+
+    /**
+     * The evidence a binding on a widget reads.
+     *
+     * <p>A source kind no contract in {@code src/main} declares, for the same reason the artifact kind
+     * is: a binding carries whatever its author wrote, and nothing between the author and the review
+     * checks it against a list of the sources that happen to exist today.
+     */
+    static PracticeEvidenceRequirement need() {
+        return new PracticeEvidenceRequirement(new SourceKind("fixture.widget.parts"), EvidenceStance.REQUIRED);
+    }
 
     /**
      * Two signals with different revision schemes on purpose: one keyed on what a person wrote, one
@@ -150,10 +162,22 @@ final class FixtureIntegration {
         Set<Capability> capabilities,
         IntegrationManifest.ReviewContribution contribution
     ) {
+        return manifest(KIND, capabilities, contribution);
+    }
+
+    /**
+     * The same fixture integration under a second kind, for the case where two integrations raise
+     * different signals about one artifact and only one of them is connected.
+     */
+    static IntegrationManifest manifest(
+        IntegrationKind integrationKind,
+        Set<Capability> capabilities,
+        IntegrationManifest.ReviewContribution contribution
+    ) {
         return new IntegrationManifest() {
             @Override
             public IntegrationKind kind() {
-                return KIND;
+                return integrationKind;
             }
 
             @Override

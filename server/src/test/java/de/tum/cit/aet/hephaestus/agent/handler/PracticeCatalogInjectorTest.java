@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,14 +63,14 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         return p;
     }
 
-    private AgentJob job(String triggerEvent) {
+    private AgentJob job(@Nullable SignalName signal) {
         Workspace ws = new Workspace();
         ws.setId(1L);
         AgentJob j = new AgentJob();
         j.setWorkspace(ws);
-        if (triggerEvent != null) {
+        if (signal != null) {
             var meta = objectMapper.createObjectNode();
-            meta.put("trigger_event", triggerEvent);
+            meta.put("signal", signal.value());
             j.setMetadata(meta);
         }
         return j;
@@ -93,7 +94,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job("PullRequestMerged"), ArtifactKinds.PULL_REQUEST);
+        injector.inject(files, job(ScmSignals.PULL_REQUEST_MERGED), ArtifactKinds.PULL_REQUEST);
 
         assertThat(files).containsKey(md("retrospective"));
         assertThat(files).doesNotContainKey(md("authoring"));
@@ -132,7 +133,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        assertThatThrownBy(() -> injector.inject(files, job("SomeEventNobodyDeclares"), ArtifactKinds.PULL_REQUEST))
+        assertThatThrownBy(() ->
+            injector.inject(files, job(SignalName.of("scm.pull_request.rebased")), ArtifactKinds.PULL_REQUEST)
+        )
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("No active scm.pull_request practices");
         assertThat(files).isEmpty();
@@ -262,7 +265,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("defectDetectorSlugs uses the exact admitted practice snapshot")
     void defectDetectorSlugsUsesSnapshot() {
-        AgentJob job = job("PullRequestCreated");
+        AgentJob job = job(ScmSignals.PULL_REQUEST_OPENED);
         var snapshot = objectMapper.createObjectNode();
         var practices = snapshot.putArray("practices");
         practices.addObject().put("slug", "authoring").put("defectDetector", true);
