@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,6 +36,28 @@ public record ArtifactSourceCatalog(SourceContractVersion version, List<Artifact
      * usable for the kind, which callers treat as an unknown kind rather than as a review with no
      * evidence.
      */
+    /**
+     * The sources a practice bound to this kind reads when its author has not said otherwise.
+     *
+     * <p>A subset of {@link #sourcesFor(String)}: everything applicable is what a review of the kind
+     * <em>could</em> see, this is what it starts with. Kept as a fact on each source contract, so a new
+     * artifact kind arrives with its starting evidence already stated and nothing has to be told about
+     * it separately.
+     *
+     * <p>In catalog order, which is best-established-first — the order an authoring surface shows as a
+     * starting point. Alphabetical would put a comment thread ahead of the artifact it hangs off.
+     */
+    public List<SourceKind> defaultSourcesFor(String artifactKind) {
+        Objects.requireNonNull(artifactKind, "artifactKind");
+        List<SourceKind> kinds = new ArrayList<>();
+        for (ArtifactSourceContract source : sources) {
+            if (source.isDefaultRequirement() && source.appliesTo(artifactKind)) {
+                kinds.add(source.kind());
+            }
+        }
+        return List.copyOf(kinds);
+    }
+
     public Set<SourceKind> sourcesFor(String artifactKind) {
         Objects.requireNonNull(artifactKind, "artifactKind");
         Set<SourceKind> kinds = new LinkedHashSet<>();

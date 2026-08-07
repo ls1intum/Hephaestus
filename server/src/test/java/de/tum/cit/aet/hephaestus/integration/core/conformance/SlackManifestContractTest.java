@@ -10,7 +10,7 @@ class SlackManifestContractTest extends IntegrationManifestContractTest {
 
     @Override
     protected IntegrationManifest manifest() {
-        return new SlackManifest();
+        return new SlackManifest(true);
     }
 
     @Override

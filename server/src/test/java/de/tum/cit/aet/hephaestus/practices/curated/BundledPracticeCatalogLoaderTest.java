@@ -21,7 +21,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
         objectMapper,
         new PracticeDefinitionValidator(catalogs, PracticeSignalOptionsFixture.real()),
-        new PracticeEvidenceDefaults(catalogs)
+        new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog())
     );
 
     @Test

@@ -32,7 +32,7 @@ class PracticeEvidenceDefaultsTest {
         // sorts what it is handed, because that list is what the fingerprint is taken over.
         JsonMapper mapper = JsonMapper.builder().build();
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC());
-        var defaults = new PracticeEvidenceDefaults(catalogs);
+        var defaults = new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog());
 
         assertThat(defaults.needsFor(artifact))
             .extracting(item -> item.sourceKind().value())
@@ -57,15 +57,17 @@ class PracticeEvidenceDefaultsTest {
     void shouldRefuseAKindItHasNoDefaultFor() {
         JsonMapper mapper = JsonMapper.builder().build();
         var defaults = new PracticeEvidenceDefaults(
-            new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC())
+            new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
+            PracticeSignalOptionsFixture.catalog()
         );
 
-        assertThatThrownBy(() -> defaults.needsFor(ArtifactKind.of("docs.document"))).isInstanceOf(
-            IllegalArgumentException.class
-        );
-        assertThatThrownBy(() -> defaults.policyFor(ArtifactKind.of("docs.document"))).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        // A kind no source contract and no descriptor declares. Deliberately spelled like a plausible
+        // future domain rather than as gibberish: the case that matters is the one where a kind is real
+        // to the person writing it and unknown to this build.
+        ArtifactKind undeclared = ArtifactKind.of("scm.deployment");
+
+        assertThatThrownBy(() -> defaults.needsFor(undeclared)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> defaults.policyFor(undeclared)).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static Stream<Arguments> baselines() {
@@ -79,7 +81,11 @@ class PracticeEvidenceDefaultsTest {
                 List.of("scm.pull-request.core", "scm.pull-request.diff", "scm.pull-request.comments")
             ),
             Arguments.of(ArtifactKinds.ISSUE, List.of("scm.issue.core", "scm.issue.comments")),
-            Arguments.of(ArtifactKinds.CONVERSATION_THREAD, List.of("slack.conversation.thread"))
+            Arguments.of(ArtifactKinds.CONVERSATION_THREAD, List.of("slack.conversation.thread")),
+            // The kind this module was never told about. It reaches a baseline here through the source
+            // contract's own `defaultRequirement`, and a limitation list through the descriptor — which
+            // is the whole claim of the contract, asserted on the one kind that arrived after it.
+            Arguments.of(ArtifactKind.of("docs.document"), List.of("docs.document.core"))
         );
     }
 }

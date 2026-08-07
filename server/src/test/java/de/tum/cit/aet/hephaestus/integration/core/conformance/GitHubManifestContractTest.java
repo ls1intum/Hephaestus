@@ -12,7 +12,7 @@ class GitHubManifestContractTest extends IntegrationManifestContractTest {
 
     @Override
     protected IntegrationManifest manifest() {
-        return new GitHubManifest();
+        return new GitHubManifest(true);
     }
 
     @Override

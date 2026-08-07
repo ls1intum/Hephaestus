@@ -22,7 +22,7 @@ class PracticeDefinitionOptionsServiceTest {
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
         var service = new PracticeDefinitionOptionsService(
             catalogs,
-            new PracticeEvidenceDefaults(catalogs),
+            new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
             PracticeSignalOptionsFixture.real()
         );
 
@@ -33,7 +33,12 @@ class PracticeDefinitionOptionsServiceTest {
         // worse than one that is merely alphabetical.
         assertThat(result.workTypes())
             .extracting(PracticeWorkTypeDefinitionOptionsDTO::artifactKind)
-            .containsExactly(ArtifactKinds.CONVERSATION_THREAD, ArtifactKinds.ISSUE, ArtifactKinds.PULL_REQUEST);
+            .containsExactly(
+                ArtifactKinds.CONVERSATION_THREAD,
+                ArtifactKind.of("docs.document"),
+                ArtifactKinds.ISSUE,
+                ArtifactKinds.PULL_REQUEST
+            );
         PracticeWorkTypeDefinitionOptionsDTO pullRequests = result
             .workTypes()
             .stream()
@@ -74,7 +79,7 @@ class PracticeDefinitionOptionsServiceTest {
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
         var service = new PracticeDefinitionOptionsService(
             catalogs,
-            new PracticeEvidenceDefaults(catalogs),
+            new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
             PracticeSignalOptionsFixture.real()
         );
 

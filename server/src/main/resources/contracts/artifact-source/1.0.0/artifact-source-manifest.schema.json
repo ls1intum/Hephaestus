@@ -18,14 +18,15 @@
 			"description": "Source contract used to interpret every source state in this manifest."
 		},
 		"catalogDigest": {
-			"const": "c107ae804d0f25e3072e2899bded13174c2892a7ccaedb88a5bf15ac79b45565",
+			"const": "56aa343939bfad72bee1ebc6a6a5f9b96b169fddd2dbd9f3fee325fb9a82faec",
 			"description": "SHA-256 digest of the exact source catalog used by the runtime."
 		},
 		"artifactKind": {
 			"enum": [
 				"scm.pull_request",
 				"scm.issue",
-				"chat.conversation_thread"
+				"chat.conversation_thread",
+				"docs.document"
 			],
 			"description": "Kind of work this invocation reviewed, which fixes the evidence sources that apply."
 		},
@@ -232,6 +233,22 @@
 					},
 					"minContains": 0,
 					"maxContains": 1
+				},
+				{
+					"contains": {
+						"type": "object",
+						"properties": {
+							"kind": {
+								"const": "docs.document.core",
+								"type": "string"
+							}
+						},
+						"required": [
+							"kind"
+						]
+					},
+					"minContains": 0,
+					"maxContains": 1
 				}
 			],
 			"description": "One explicit capture result for each source considered by the invocation."
@@ -260,7 +277,8 @@
 						"scm.review-threads",
 						"scm.general-review-comments",
 						"workspace.project-inventory",
-						"outline.documents"
+						"outline.documents",
+						"docs.document.core"
 					],
 					"description": "Logical source described by this capture."
 				},
@@ -768,6 +786,44 @@
 									"properties": {
 										"kind": {
 											"const": "workspace.project-inventory"
+										}
+									},
+									"required": [
+										"kind"
+									]
+								}
+							}
+						],
+						"type": "array"
+					}
+				},
+				"type": "object"
+			}
+		},
+		{
+			"if": {
+				"properties": {
+					"artifactKind": {
+						"const": "docs.document"
+					}
+				},
+				"required": [
+					"artifactKind"
+				],
+				"type": "object"
+			},
+			"then": {
+				"properties": {
+					"sources": {
+						"minItems": 1,
+						"maxItems": 1,
+						"allOf": [
+							{
+								"contains": {
+									"type": "object",
+									"properties": {
+										"kind": {
+											"const": "docs.document.core"
 										}
 									},
 									"required": [

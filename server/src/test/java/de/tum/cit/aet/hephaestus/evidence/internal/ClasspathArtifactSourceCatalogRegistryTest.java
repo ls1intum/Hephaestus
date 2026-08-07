@@ -26,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "c107ae804d0f25e3072e2899bded13174c2892a7ccaedb88a5bf15ac79b45565";
+        "0607390694430a6ee1c026144be3ebd2324d28f45358db7e7070bc34ce16daab";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -36,7 +36,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
         assertThat(registry.current().version()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(registry.catalogDigest()).isEqualTo(VERSION_1_CATALOG_SHA256);
-        assertThat(registry.current().sources()).hasSize(12);
+        assertThat(registry.current().sources()).hasSize(13);
         assertThat(registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.pull_request")).contains(
             new SourceKind("scm.repository.tree"),
             new SourceKind("scm.pull-request.diff")
@@ -61,7 +61,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             registry.requireSource(new SourceContractVersion("1.0.0"), new SourceKind("scm.unknown"))
         );
         assertThatIllegalArgumentException().isThrownBy(() ->
-            registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "docs.document")
+            registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.deployment")
         );
     }
 
@@ -91,7 +91,10 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             assertThat(decision.decidedAt()).isNotNull();
             assertThat(decision.expiresAt()).isNotNull();
             SourceUsePurpose purpose = decision.purpose();
-            assertThat(decision.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), purpose)).isTrue();
+            // Probed relative to the decision's own date rather than a fixed instant: a wall-clock
+            // constant here silently becomes an assertion that no decision was ever taken after it,
+            // and a source added later then fails this test for having a truthful date.
+            assertThat(decision.permitsAt(decision.decidedAt().plusSeconds(1), purpose)).isTrue();
         });
     }
 
@@ -116,6 +119,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 "scm.issue.core",
                 "scm.issue.comments",
                 "slack.conversation.thread",
+                "docs.document.core",
                 "scm.linked-work-items",
                 "scm.review-threads",
                 "scm.general-review-comments",

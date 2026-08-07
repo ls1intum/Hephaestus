@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
@@ -104,7 +105,8 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
         assertThat(options.authorableKinds()).containsExactlyInAnyOrder(
             ArtifactKinds.PULL_REQUEST,
             ArtifactKinds.ISSUE,
-            ArtifactKinds.CONVERSATION_THREAD
+            ArtifactKinds.CONVERSATION_THREAD,
+            new ArtifactKind("docs.document")
         );
     }
 }

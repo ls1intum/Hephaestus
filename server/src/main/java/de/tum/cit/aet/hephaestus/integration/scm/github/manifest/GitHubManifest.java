@@ -7,14 +7,24 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /** Per-kind capability declaration for GitHub. Disable with
  *  {@code hephaestus.integration.github.enabled=false}. */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.github.enabled", havingValue = "true", matchIfMissing = true)
 public class GitHubManifest implements IntegrationManifest {
+
+    private final boolean githubEnabled;
+
+    public GitHubManifest(@Value("${hephaestus.integration.github.enabled:true}") boolean githubEnabled) {
+        this.githubEnabled = githubEnabled;
+    }
+
+    @Override
+    public boolean enabled() {
+        return githubEnabled;
+    }
 
     @Override
     public IntegrationKind kind() {

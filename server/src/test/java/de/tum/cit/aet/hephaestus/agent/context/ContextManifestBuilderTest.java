@@ -598,6 +598,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             diff.description(),
             diff.selectionScope(),
             diff.artifactKinds(),
+            diff.isDefaultRequirement(),
             diff.authority(),
             diff.identityPolicy(),
             diff.completenessPolicy(),

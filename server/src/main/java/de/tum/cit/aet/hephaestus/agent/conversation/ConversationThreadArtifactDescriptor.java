@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import java.util.List;
@@ -71,6 +72,17 @@ public class ConversationThreadArtifactDescriptor implements ArtifactDescriptor 
     @Override
     public Set<FeedbackLane> lanes() {
         return Set.of(FeedbackLane.CONVERSATION, FeedbackLane.PROFILE);
+    }
+
+    /** A thread is one room. What was decided in another one, or in a call, is not in it. */
+    @Override
+    public List<ReviewLimitation> reviewLimitations() {
+        return List.of(
+            new ReviewLimitation(
+                "PRIVATE_CONTEXT_NOT_OBSERVED",
+                "The captured thread does not include decisions or context shared outside the conversation."
+            )
+        );
     }
 
     @Override

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadArtifactDe
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocumentArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
 import java.util.Collection;
@@ -12,6 +13,11 @@ import java.util.Optional;
 
 /**
  * The signal options a running server offers, assembled from the real shipped descriptors.
+ *
+ * <p>Names four vendor-side descriptor classes, which the practices module itself may not do. That is
+ * the point of it being test code: the boundary rule is checked over production classes, and this
+ * fixture exists precisely to assert that the production module reaches the same answer without ever
+ * naming them.
  *
  * <p>Deliberately the real ones rather than stubs: what an author may bind to is derived from the
  * shipped declarations, so a unit test built on invented options would stop testing the thing that can
@@ -22,7 +28,8 @@ public final class PracticeSignalOptionsFixture {
     private static final List<ArtifactDescriptor> DESCRIPTORS = List.of(
         new PullRequestArtifactDescriptor(),
         new IssueArtifactDescriptor(),
-        new ConversationThreadArtifactDescriptor()
+        new ConversationThreadArtifactDescriptor(),
+        new DocumentArtifactDescriptor()
     );
 
     private PracticeSignalOptionsFixture() {}

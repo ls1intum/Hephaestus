@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.sync;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
@@ -21,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.Sy
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -93,6 +95,7 @@ public class OutlineDocumentSyncService {
     private final OutlineProperties properties;
     private final OutlineMirrorWriter mirrorWriter;
     private final OutlineMirrorRetentionService retention;
+    private final OutlineDocumentSignalRecorder signalRecorder;
 
     public OutlineDocumentSyncService(
         ConnectionService connectionService,
@@ -102,7 +105,8 @@ public class OutlineDocumentSyncService {
         OutlineWebhookRegistrar webhookRegistrar,
         OutlineProperties properties,
         OutlineMirrorWriter mirrorWriter,
-        OutlineMirrorRetentionService retention
+        OutlineMirrorRetentionService retention,
+        OutlineDocumentSignalRecorder signalRecorder
     ) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
@@ -112,6 +116,7 @@ public class OutlineDocumentSyncService {
         this.properties = properties;
         this.mirrorWriter = mirrorWriter;
         this.retention = retention;
+        this.signalRecorder = signalRecorder;
     }
 
     /**
@@ -374,11 +379,12 @@ public class OutlineDocumentSyncService {
             Instant archivedAt = Instant.now();
             mirrored
                 .filter(d -> !d.isDeleted())
-                .ifPresent(d ->
+                .ifPresent(d -> {
                     mirrorWriter.updateDocument(workspaceId, ctx.connectionId(), documentId, doc ->
                         doc.setArchivedAt(archivedAt)
-                    )
-                );
+                    );
+                    signalRecorder.record(workspaceId, d, eventName, archivedAt, DiscoveredVia.EVENT);
+                });
             return;
         }
         try {
@@ -415,7 +421,15 @@ public class OutlineDocumentSyncService {
             }
             Map<String, OutlineDocumentSnapshot> existing = new HashMap<>();
             mirrored.ifPresent(d -> existing.put(documentId, d));
-            upsert(ctx, collection.get(), null, meta, existing, /* budget: single doc */ null, Instant.now());
+            Instant now = Instant.now();
+            upsert(ctx, collection.get(), null, meta, existing, /* budget: single doc */ null, now);
+            // Read the row back rather than recording from `mirrored`: a content-shaped signal is keyed on
+            // the document's hash, and the whole point of this signal is that the content just changed.
+            documentRepository
+                .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)
+                .ifPresent(refreshed ->
+                    signalRecorder.record(workspaceId, refreshed, eventName, now, DiscoveredVia.EVENT)
+                );
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }

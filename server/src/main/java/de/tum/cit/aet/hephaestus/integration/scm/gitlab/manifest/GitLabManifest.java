@@ -9,7 +9,6 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,8 +18,10 @@ import org.springframework.stereotype.Component;
  * <p>Feedback-delivery / inline-finding / approval capabilities are gated on the
  * {@code hephaestus.integration.gitlab.enabled} flag — the underlying GraphQL provider and the
  * channel beans share that flag, and the bootstrap demands matching SPI beans for any
- * declared capability. GitLab is opt-in (default off): the manifest is only present when the
- * flag is explicitly {@code true}, matching the gated beans.
+ * declared capability. GitLab is opt-in (default off), so the manifest reports {@link #enabled()}
+ * from that flag and the bootstrap skips the bean checks when it is off. The manifest bean itself is
+ * registered either way: what GitLab <em>could</em> raise is a fact about the build, and a workspace
+ * has to be able to read it in order to be told that connecting GitLab would wake a dormant practice.
  *
  * <p>No {@code RATE_LIMITED}: GitLab has no per-kind {@code RateLimitTracker} impl.
  * No {@code SCOPE_CHANGES}: GitLab has no install/uninstall/scope webhooks, so
@@ -28,13 +29,17 @@ import org.springframework.stereotype.Component;
  * capability would lie to the UI's practice-gating check.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabManifest implements IntegrationManifest {
 
     private final boolean gitlabStackEnabled;
 
     public GitLabManifest(@Value("${hephaestus.integration.gitlab.enabled:false}") boolean gitlabStackEnabled) {
         this.gitlabStackEnabled = gitlabStackEnabled;
+    }
+
+    @Override
+    public boolean enabled() {
+        return gitlabStackEnabled;
     }
 
     @Override

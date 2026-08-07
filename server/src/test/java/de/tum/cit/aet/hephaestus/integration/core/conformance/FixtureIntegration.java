@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListen
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
@@ -143,6 +144,16 @@ final class FixtureIntegration {
             @Override
             public boolean reviewable() {
                 return reviewable;
+            }
+
+            @Override
+            public List<ReviewLimitation> reviewLimitations() {
+                // A reviewable kind must name what its evidence cannot settle. The fixture reviews
+                // nothing real, so it says the one thing that is true of it — which is also the
+                // point: the rule is satisfiable by a kind the practices module has never heard of.
+                return List.of(
+                    new ReviewLimitation("FIXTURE_OBSERVES_NOTHING", "A fixture widget has no real work behind it.")
+                );
             }
         };
     }

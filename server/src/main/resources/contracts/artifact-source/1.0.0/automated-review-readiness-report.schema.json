@@ -19,14 +19,15 @@
       "description": "Source contract used to interpret the referenced manifest and source checks."
     },
     "catalogDigest": {
-      "const": "c107ae804d0f25e3072e2899bded13174c2892a7ccaedb88a5bf15ac79b45565",
+      "const": "56aa343939bfad72bee1ebc6a6a5f9b96b169fddd2dbd9f3fee325fb9a82faec",
       "description": "SHA-256 digest of the exact source catalog used by the runtime."
     },
     "artifactKind": {
       "enum": [
         "scm.pull_request",
         "scm.issue",
-        "chat.conversation_thread"
+        "chat.conversation_thread",
+        "docs.document"
       ],
       "description": "Kind of work this invocation reviewed, which fixes the evidence sources that apply."
     },
@@ -404,7 +405,8 @@
             "scm.review-threads",
             "scm.general-review-comments",
             "workspace.project-inventory",
-            "outline.documents"
+            "outline.documents",
+            "docs.document.core"
           ],
           "description": "Required logical source being checked."
         },
@@ -635,6 +637,62 @@
                                 "enum": [
                                   "slack.conversation.thread",
                                   "workspace.project-inventory"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "sourceKind"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "artifactKind": {
+            "const": "docs.document"
+          }
+        },
+        "required": [
+          "artifactKind"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "decisions": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/decision"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "sourceChecks": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/sourceCheck"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "sourceKind": {
+                                "enum": [
+                                  "docs.document.core"
                                 ]
                               }
                             },

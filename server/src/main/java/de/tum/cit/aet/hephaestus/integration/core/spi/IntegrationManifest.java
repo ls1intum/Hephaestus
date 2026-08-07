@@ -30,6 +30,28 @@ public interface IntegrationManifest {
     Set<Capability> declaredCapabilities();
 
     /**
+     * Whether this deployment has the integration switched on.
+     *
+     * <p>A manifest is registered whether or not its vendor is enabled, because what an integration
+     * <em>could</em> raise is a fact about the build and must read the same on every deployment. The
+     * manifests used to carry the feature flag as a {@code @ConditionalOnProperty}, which made
+     * {@code DeclaredSignalCoverage.compiledCoverage()} — the thing whose name promises it is compiled
+     * in — quietly vary with configuration: turning an integration off deleted its manifest bean, and
+     * every signal only that vendor raises then looked like a signal nothing in the build could raise.
+     * That is invisible while the one always-on vendor covers every signal, and fatal the moment a kind
+     * arrives whose only producer ships behind a flag.
+     *
+     * <p>What the flag still governs is the <em>wiring</em>: a disabled integration has no credential
+     * provider, no subject parser and no message handlers, so the bootstrap's per-capability bean checks
+     * and the provenance half of the review contract are skipped for it. Those rules are not thereby
+     * unenforced — {@code IntegrationManifestContractTest} runs the real validator against every shipped
+     * manifest at build time, and an ArchUnit rule fails the build if a manifest has no such test.
+     */
+    default boolean enabled() {
+        return true;
+    }
+
+    /**
      * What this integration contributes to practice review. Intentionally has no default: an integration
      * that contributes nothing must say {@link ReviewContribution#none()} out loud, because the
      * alternative — inheriting silence — is exactly how an integration ends up ingesting events that can

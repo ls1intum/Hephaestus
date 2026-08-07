@@ -38,6 +38,7 @@
 				"description",
 				"selectionScope",
 				"artifactKinds",
+				"defaultRequirement",
 				"authority",
 				"identity",
 				"completeness",
@@ -76,7 +77,8 @@
 						"enum": [
 							"scm.pull_request",
 							"scm.issue",
-							"chat.conversation_thread"
+							"chat.conversation_thread",
+							"docs.document"
 						]
 					},
 					"description": "Types of reviewed work for which this source is meaningful."
@@ -146,6 +148,10 @@
 						]
 					},
 					"description": "Non-available outcomes the runtime can represent for this source."
+				},
+				"defaultRequirement": {
+					"type": "boolean",
+					"description": "Whether a practice bound to one of this source's artifact kinds reads it unless its author says otherwise. The starting evidence of a kind, stated by the sources themselves rather than by a per-kind list somewhere that has to be edited when a kind is added."
 				}
 			},
 			"description": "Authority, capture, quality, privacy, retention, erasure, and absence semantics for one evidence source."

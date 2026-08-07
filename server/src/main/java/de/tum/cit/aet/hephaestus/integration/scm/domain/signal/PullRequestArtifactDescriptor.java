@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import java.util.List;
 import java.util.Set;
@@ -86,6 +87,20 @@ public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
     public Set<FeedbackLane> lanes() {
         // The only artifact carrying a diff, and therefore the only one that can take a positional note.
         return Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE);
+    }
+
+    /**
+     * A diff and its discussion say how a change was made; they say nothing about what the change then
+     * did when it ran. The one standing caveat every pull-request review carries.
+     */
+    @Override
+    public List<ReviewLimitation> reviewLimitations() {
+        return List.of(
+            new ReviewLimitation(
+                "RUNTIME_BEHAVIOR_NOT_OBSERVED",
+                "Repository evidence does not establish behavior in a deployed runtime."
+            )
+        );
     }
 
     @Override

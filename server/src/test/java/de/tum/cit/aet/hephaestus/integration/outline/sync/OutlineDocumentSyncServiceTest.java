@@ -113,7 +113,10 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             webhookRegistrar,
             properties,
             mirrorWriter,
-            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties)
+            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties),
+            org.mockito.Mockito.mock(
+                de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder.class
+            )
         );
     }
 

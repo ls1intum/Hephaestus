@@ -9,6 +9,7 @@
 			"artifactKinds": [
 				"scm.pull_request"
 			],
+			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -43,6 +44,7 @@
 			"artifactKinds": [
 				"scm.pull_request"
 			],
+			"defaultRequirement": true,
 			"authority": "DETERMINISTIC_DERIVATION",
 			"identity": {
 				"mode": "PINNED_IDENTITY"
@@ -77,6 +79,7 @@
 			"artifactKinds": [
 				"scm.pull_request"
 			],
+			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -111,6 +114,7 @@
 			"artifactKinds": [
 				"scm.pull_request"
 			],
+			"defaultRequirement": false,
 			"authority": "UPSTREAM_SNAPSHOT",
 			"identity": {
 				"mode": "PINNED_IDENTITY"
@@ -145,6 +149,7 @@
 			"artifactKinds": [
 				"scm.issue"
 			],
+			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -179,6 +184,7 @@
 			"artifactKinds": [
 				"scm.issue"
 			],
+			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -206,6 +212,41 @@
 			]
 		},
 		{
+			"kind": "docs.document.core",
+			"displayName": "Document under review",
+			"description": "The written document a review is about: its prose, title, collection, author, and upstream timestamps.",
+			"selectionScope": "One mirrored document, selected by the job, rendered whole. A document removed upstream or evicted from the local mirror is reported as UNAVAILABLE rather than as a document that said nothing.",
+			"artifactKinds": [
+				"docs.document"
+			],
+			"defaultRequirement": true,
+			"authority": "SYNCHRONIZED_MIRROR",
+			"identity": {
+				"mode": "NOT_APPLICABLE"
+			},
+			"completeness": {
+				"supportsComplete": true,
+				"supportsPartial": false,
+				"supportsEmpty": false
+			},
+			"requiredQuality": "COMPLETE",
+			"privacyClass": "PERSONAL",
+			"retentionPolicy": "AGENT_EVIDENCE_RETENTION",
+			"erasurePolicy": "WORKSPACE_AND_PERSON_ERASURE",
+			"useDecisionIds": [
+				"use-docs-document-core-automated-review",
+				"use-docs-document-core-feedback-delivery",
+				"use-docs-document-core-mentor-context",
+				"use-docs-document-core-operator-review"
+			],
+			"supportedAbsenceStates": [
+				"NOT_COLLECTED",
+				"UNAVAILABLE",
+				"REDACTED",
+				"COLLECTION_ERROR"
+			]
+		},
+		{
 			"kind": "slack.conversation.thread",
 			"displayName": "Slack thread",
 			"description": "One Slack thread in chronological order, read only from channels whose consent is active.",
@@ -213,6 +254,7 @@
 			"artifactKinds": [
 				"chat.conversation_thread"
 			],
+			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -247,6 +289,7 @@
 			"artifactKinds": [
 				"scm.pull_request"
 			],
+			"defaultRequirement": false,
 			"authority": "LOSSY_DERIVATION",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -281,6 +324,7 @@
 			"artifactKinds": [
 				"scm.pull_request"
 			],
+			"defaultRequirement": false,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -315,6 +359,7 @@
 			"artifactKinds": [
 				"scm.pull_request"
 			],
+			"defaultRequirement": false,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -351,6 +396,7 @@
 				"scm.issue",
 				"chat.conversation_thread"
 			],
+			"defaultRequirement": false,
 			"authority": "DETERMINISTIC_DERIVATION",
 			"identity": {
 				"mode": "NOT_APPLICABLE"
@@ -386,6 +432,7 @@
 				"scm.pull_request",
 				"scm.issue"
 			],
+			"defaultRequirement": false,
 			"authority": "LOSSY_DERIVATION",
 			"identity": {
 				"mode": "NOT_APPLICABLE"

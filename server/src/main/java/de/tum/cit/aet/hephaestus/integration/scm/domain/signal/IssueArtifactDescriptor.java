@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import java.util.List;
 import java.util.Set;
@@ -58,6 +59,17 @@ public class IssueArtifactDescriptor implements ArtifactDescriptor {
     @Override
     public Set<FeedbackLane> lanes() {
         return Set.of(FeedbackLane.IN_CONTEXT_SUMMARY);
+    }
+
+    /** An issue describes work; whether the work was then done correctly is not in it. */
+    @Override
+    public List<ReviewLimitation> reviewLimitations() {
+        return List.of(
+            new ReviewLimitation(
+                "IMPLEMENTATION_NOT_OBSERVED",
+                "Issue evidence does not establish whether the described work was implemented correctly."
+            )
+        );
     }
 
     @Override

@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * What one family of reviewable artifacts <em>is</em> — one bean per kind, contributed by the module
@@ -51,16 +50,23 @@ public interface ArtifactDescriptor {
      */
     boolean reviewable();
 
+    /**
+     * What a review of this kind can never settle, whatever its evidence.
+     *
+     * <p>Empty is legal only for a kind nothing reviews: {@code ReviewContractValidator} refuses to
+     * start when a descriptor calls itself reviewable and names no limit, because a kind whose evidence
+     * settles everything is a claim nobody can make, and the silence would be inherited by every
+     * practice written against it.
+     */
+    default List<ReviewLimitation> reviewLimitations() {
+        return List.of();
+    }
+
     /** The declared signal with this name, if this descriptor declares it at all. */
     default Optional<Signal> signal(SignalName name) {
         return signals()
             .stream()
             .filter(signal -> signal.name().equals(name))
             .findFirst();
-    }
-
-    /** The names of every declared signal. */
-    default Set<SignalName> signalNames() {
-        return signals().stream().map(Signal::name).collect(Collectors.toUnmodifiableSet());
     }
 }

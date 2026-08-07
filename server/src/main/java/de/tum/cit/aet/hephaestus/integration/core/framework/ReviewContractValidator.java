@@ -116,8 +116,8 @@ public class ReviewContractValidator {
                     );
                 }
             }
-            Set<SignalName> names = descriptor.signalNames();
-            if (names.size() != descriptor.signals().size()) {
+            long distinctNames = descriptor.signals().stream().map(Signal::name).distinct().count();
+            if (distinctNames != descriptor.signals().size()) {
                 violations.add(kind + " declares the same signal name twice");
             }
             if (descriptor.reviewable()) {
@@ -131,6 +131,17 @@ public class ReviewContractValidator {
                 }
                 if (descriptor.lanes().isEmpty()) {
                     violations.add(kind + " is declared reviewable but declares no lane to deliver feedback on");
+                }
+                // What the evidence cannot settle used to be a per-kind switch inside the practices
+                // module, which threw for any kind it had not been told about — so a new domain could
+                // declare itself reviewable here and only fail much later, at catalog load, with an
+                // error about practices rather than about the descriptor that omitted this.
+                if (descriptor.reviewLimitations().isEmpty()) {
+                    violations.add(
+                        kind +
+                            " is declared reviewable but names nothing its evidence cannot settle — " +
+                            "a kind whose evidence answers every question is not a claim anyone can make"
+                    );
                 }
             } else if (!descriptor.lanes().isEmpty()) {
                 violations.add(

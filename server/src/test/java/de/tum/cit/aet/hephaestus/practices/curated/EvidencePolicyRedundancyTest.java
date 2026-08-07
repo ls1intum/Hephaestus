@@ -48,7 +48,7 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
         objectMapper,
         new PracticeDefinitionValidator(registry, signalOptions),
-        new PracticeEvidenceDefaults(registry)
+        new PracticeEvidenceDefaults(registry, PracticeSignalOptionsFixture.catalog())
     );
 
     /**

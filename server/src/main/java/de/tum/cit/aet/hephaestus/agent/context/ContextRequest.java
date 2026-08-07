@@ -17,7 +17,8 @@ public sealed interface ContextRequest
         ContextRequest.PracticeReviewRequest,
         ContextRequest.IssueReviewRequest,
         ContextRequest.MentorChatRequest,
-        ContextRequest.ConversationReviewRequest
+        ContextRequest.ConversationReviewRequest,
+        ContextRequest.DocumentReviewRequest
 {
     /**
      * Build the materialised PR-review context: metadata, comments, diff, developer history.
@@ -35,6 +36,20 @@ public sealed interface ContextRequest
      */
     record IssueReviewRequest(AgentJob job) implements ContextRequest {
         public IssueReviewRequest {
+            Objects.requireNonNull(job, "job must not be null");
+        }
+    }
+
+    /**
+     * Build the materialised docs.document review context: one written document — its prose, its
+     * collection, who wrote it and when it last moved. NO diff, NO code, NO repository clone; the
+     * subject is the document itself rather than a change that happens to mention one, which is what
+     * separates this from the linked-document evidence a pull-request review reads. Carries the
+     * {@link AgentJob} the practice runner executes; the document is identified by
+     * {@code docs_document_id} in the job metadata, which is the mirror row the signal ledger recorded.
+     */
+    record DocumentReviewRequest(AgentJob job) implements ContextRequest {
+        public DocumentReviewRequest {
             Objects.requireNonNull(job, "job must not be null");
         }
     }

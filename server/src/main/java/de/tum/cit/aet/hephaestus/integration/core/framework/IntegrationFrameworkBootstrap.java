@@ -92,6 +92,16 @@ public class IntegrationFrameworkBootstrap {
         violations.addAll(reviewContract.validateDescriptors());
         for (IntegrationKind kind : manifests.registeredKinds()) {
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
+            if (!manifest.enabled()) {
+                // A disabled integration wires none of the beans these rules look for, so running them
+                // would only report the feature flag back as a wall of violations. The manifest is still
+                // registered — its ReviewContribution is what tells a workspace that connecting this
+                // vendor would light up a dormant practice, and that answer must not depend on whether
+                // this particular deployment happens to have it switched on. The rules skipped here are
+                // enforced at build time instead, by the per-manifest IntegrationManifestContractTest.
+                log.info("Integration {} is disabled; skipping its capability and provenance checks", kind);
+                continue;
+            }
             Set<Capability> declared = manifest.declaredCapabilities();
             checkRequired(kind, declared, violations);
             violations.addAll(reviewContract.validateContribution(manifest));

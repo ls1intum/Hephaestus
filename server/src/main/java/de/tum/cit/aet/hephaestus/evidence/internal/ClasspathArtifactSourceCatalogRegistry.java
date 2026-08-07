@@ -131,6 +131,12 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     }
 
     @Override
+    public List<SourceKind> requireDefaultSourcesFor(SourceContractVersion version, String artifactKind) {
+        requireSourcesFor(version, artifactKind);
+        return catalog.defaultSourcesFor(artifactKind);
+    }
+
+    @Override
     public SourceUseDecision requireUseDecision(SourceContractVersion version, String decisionId) {
         requireSupported(version);
         SourceUseDecision decision = useDecisions.get(decisionId);
@@ -183,6 +189,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 "description",
                 "selectionScope",
                 "artifactKinds",
+                "defaultRequirement",
                 "authority",
                 "identity",
                 "completeness",
@@ -217,6 +224,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
             requiredText(node, "description", kind.toString()),
             requiredText(node, "selectionScope", kind.toString()),
             textSet(node, "artifactKinds", kind.toString()),
+            requiredBoolean(node, "defaultRequirement", kind.toString()),
             enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
             new IdentityPolicy(identityMode),
             new CompletenessPolicy(

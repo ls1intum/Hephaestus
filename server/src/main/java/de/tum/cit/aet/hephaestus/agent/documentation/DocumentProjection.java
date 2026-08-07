@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.documentation;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
@@ -21,6 +22,18 @@ public interface DocumentProjection {
      * returned as a marker so a stale link resolves rather than silently vanishing.
      */
     List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs);
+
+    /**
+     * One document by the mirror's own primary key — the document a review is <em>about</em>, rather than one
+     * some other artifact happens to reference.
+     *
+     * <p>Keyed on the local id because that is what the signal ledger records as the artifact: a review is
+     * occasioned by {@code docs.document.published} against a row in this workspace's mirror, and asking for it
+     * back by the provider's id would mean carrying a second identity for no gain. Empty when the row is gone
+     * (erased, or the workspace no longer owns it), which the caller must report as an unavailable subject
+     * rather than as a document that said nothing.
+     */
+    Optional<ProjectedDocument> documentById(long workspaceId, long documentId);
 
     /**
      * The workspace's live mirrored documents ranked by full-text relevance to {@code queryText} — the

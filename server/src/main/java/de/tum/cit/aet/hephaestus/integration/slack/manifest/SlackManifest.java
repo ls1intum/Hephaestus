@@ -4,13 +4,23 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /** Per-kind capability declaration for Slack. */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackManifest implements IntegrationManifest {
+
+    private final boolean slackEnabled;
+
+    public SlackManifest(@Value("${hephaestus.integration.slack.enabled:false}") boolean slackEnabled) {
+        this.slackEnabled = slackEnabled;
+    }
+
+    @Override
+    public boolean enabled() {
+        return slackEnabled;
+    }
 
     @Override
     public IntegrationKind kind() {
