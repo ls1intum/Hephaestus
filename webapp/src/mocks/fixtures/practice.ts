@@ -1,6 +1,7 @@
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeAutomatedReviewValidation,
+	PracticeBinding,
 	PracticeDefinitionOptions,
 } from "@/api/types.gen";
 
@@ -11,17 +12,12 @@ export const mockAuthorDeclaredEvidenceValidation = {
 	reviewRuleFingerprint: `v2:${"0".repeat(64)}`,
 } satisfies PracticeAutomatedReviewValidation;
 
-export const mockPullRequestEvidence = {
+export const mockPullRequestPolicy = {
 	sourceContractVersion: "1.0.0",
 	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
-	needs: [
-		{ sourceKind: "scm.pull-request.comments", stance: "CONTEXTUAL" },
-		{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
-		{ sourceKind: "scm.pull-request.diff", stance: "REQUIRED" },
-	],
 	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
@@ -31,16 +27,12 @@ export const mockPullRequestEvidence = {
 	],
 } satisfies PracticeAutomatedReviewPolicy;
 
-const mockIssueEvidence = {
+const mockIssuePolicy = {
 	sourceContractVersion: "1.0.0",
 	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
-	needs: [
-		{ sourceKind: "scm.issue.comments", stance: "CONTEXTUAL" },
-		{ sourceKind: "scm.issue.core", stance: "REQUIRED" },
-	],
 	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
@@ -51,13 +43,12 @@ const mockIssueEvidence = {
 	],
 } satisfies PracticeAutomatedReviewPolicy;
 
-const mockConversationEvidence = {
+const mockConversationPolicy = {
 	sourceContractVersion: "1.0.0",
 	automatedReview: {
 		mode: "LANGUAGE_MODEL",
 		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 	},
-	needs: [{ sourceKind: "slack.conversation.thread", stance: "REQUIRED" }],
 	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 	knownLimitations: [
 		{
@@ -68,36 +59,77 @@ const mockConversationEvidence = {
 	],
 } satisfies PracticeAutomatedReviewPolicy;
 
+/** What a pull-request practice reviews when the author accepts every recommendation. */
+export const mockPullRequestBinding = {
+	signals: ["scm.pull_request.opened", "scm.pull_request.ready", "scm.pull_request.synchronized"],
+	needs: [
+		{ sourceKind: "scm.pull-request.comments", stance: "REQUIRED" },
+		{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
+		{ sourceKind: "scm.pull-request.diff", stance: "REQUIRED" },
+	],
+} satisfies PracticeBinding;
+
+/**
+ * The occasion the refactor exists for: the same practice, reviewed again at the merge, reading the
+ * review threads exhaustively so it may say nobody resolved one.
+ */
+export const mockMergeBinding = {
+	signals: ["scm.pull_request.merged"],
+	needs: [
+		{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
+		{ sourceKind: "scm.review-threads", stance: "EXHAUSTIVE" },
+	],
+} satisfies PracticeBinding;
+
+export const mockIssueBinding = {
+	signals: ["scm.issue.labeled", "scm.issue.opened"],
+	needs: [
+		{ sourceKind: "scm.issue.comments", stance: "REQUIRED" },
+		{ sourceKind: "scm.issue.core", stance: "REQUIRED" },
+	],
+} satisfies PracticeBinding;
+
+export const mockConversationBinding = {
+	signals: ["chat.conversation_thread.settled"],
+	needs: [{ sourceKind: "slack.conversation.thread", stance: "REQUIRED" }],
+} satisfies PracticeBinding;
+
 export const mockPracticeDefinitionOptions = {
 	workTypes: [
 		{
 			artifactKind: "scm.pull_request",
-			triggerEvents: [
+			signals: [
+				{ signal: "scm.pull_request.opened", displayName: "Opened", recommended: true },
 				{
-					event: "PullRequestCreated",
-					displayName: "Pull or merge request is opened",
+					signal: "scm.pull_request.ready",
+					displayName: "Marked ready for review",
 					recommended: true,
 				},
-				{ event: "PullRequestReady", displayName: "Marked ready for review", recommended: true },
 				{
-					event: "PullRequestSynchronized",
-					displayName: "New commits are pushed",
+					signal: "scm.pull_request.synchronized",
+					displayName: "New commits pushed",
 					recommended: true,
 				},
-				{ event: "ReviewSubmitted", displayName: "A review is submitted", recommended: false },
 				{
-					event: "PullRequestMerged",
-					displayName: "Pull or merge request is merged",
+					signal: "scm.pull_request.reviewed",
+					displayName: "Review submitted",
+					recommended: false,
+				},
+				{ signal: "scm.pull_request.merged", displayName: "Merged", recommended: false },
+				{
+					signal: "scm.pull_request.closed",
+					displayName: "Closed without merging",
 					recommended: false,
 				},
 				{
-					event: "PullRequestClosed",
-					displayName: "Pull or merge request is closed without merging",
+					signal: "scm.pull_request.review_requested",
+					displayName: "Review requested by hand",
 					recommended: false,
 				},
 			],
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
-			recommendedRequirements: mockPullRequestEvidence,
+			recommendedPolicy: mockPullRequestPolicy,
+			recommendedNeeds: mockPullRequestBinding.needs,
 			allowedSources: [
 				{
 					sourceKind: "scm.pull-request.core",
@@ -105,6 +137,7 @@ export const mockPracticeDefinitionOptions = {
 					description: "Pull request metadata and commit subjects for the reviewed pull request.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
+					supportsExhaustiveEvidence: true,
 				},
 				{
 					sourceKind: "scm.pull-request.diff",
@@ -112,6 +145,7 @@ export const mockPracticeDefinitionOptions = {
 					description: "Code changes in the reviewed pull request.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE_AND_NON_EMPTY",
+					supportsExhaustiveEvidence: true,
 				},
 				{
 					sourceKind: "scm.pull-request.comments",
@@ -119,18 +153,41 @@ export const mockPracticeDefinitionOptions = {
 					description: "Inline review comments mirrored by the application.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
+					supportsExhaustiveEvidence: true,
+				},
+				{
+					sourceKind: "scm.review-threads",
+					displayName: "Review threads",
+					description: "Review conversations and whether each one was resolved.",
+					privacyClass: "PERSONAL",
+					requiredQuality: "ANY_CAPTURE",
+					supportsExhaustiveEvidence: true,
+				},
+				{
+					sourceKind: "scm.linked-work-items",
+					displayName: "Linked issues",
+					description: "Issues this pull request references.",
+					privacyClass: "PERSONAL",
+					requiredQuality: "ANY_CAPTURE",
+					supportsExhaustiveEvidence: false,
 				},
 			],
 		},
 		{
 			artifactKind: "scm.issue",
-			triggerEvents: [
-				{ event: "IssueCreated", displayName: "Issue is opened", recommended: true },
-				{ event: "IssueLabeled", displayName: "Issue is labeled", recommended: true },
-				{ event: "IssueClosed", displayName: "Issue is closed", recommended: false },
+			signals: [
+				{ signal: "scm.issue.opened", displayName: "Opened", recommended: true },
+				{ signal: "scm.issue.labeled", displayName: "Labeled", recommended: true },
+				{ signal: "scm.issue.closed", displayName: "Closed", recommended: false },
+				{
+					signal: "scm.issue.review_requested",
+					displayName: "Review requested by hand",
+					recommended: false,
+				},
 			],
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
-			recommendedRequirements: mockIssueEvidence,
+			recommendedPolicy: mockIssuePolicy,
+			recommendedNeeds: mockIssueBinding.needs,
 			allowedSources: [
 				{
 					sourceKind: "scm.issue.core",
@@ -138,6 +195,7 @@ export const mockPracticeDefinitionOptions = {
 					description: "Issue metadata and rendered description.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
+					supportsExhaustiveEvidence: true,
 				},
 				{
 					sourceKind: "scm.issue.comments",
@@ -145,14 +203,22 @@ export const mockPracticeDefinitionOptions = {
 					description: "Issue discussion comments.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
+					supportsExhaustiveEvidence: true,
 				},
 			],
 		},
 		{
 			artifactKind: "chat.conversation_thread",
-			triggerEvents: [],
+			signals: [
+				{
+					signal: "chat.conversation_thread.settled",
+					displayName: "Discussion settled",
+					recommended: true,
+				},
+			],
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
-			recommendedRequirements: mockConversationEvidence,
+			recommendedPolicy: mockConversationPolicy,
+			recommendedNeeds: mockConversationBinding.needs,
 			allowedSources: [
 				{
 					sourceKind: "slack.conversation.thread",
@@ -160,6 +226,7 @@ export const mockPracticeDefinitionOptions = {
 					description: "Ordered human messages from one Slack thread.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
+					supportsExhaustiveEvidence: true,
 				},
 			],
 		},

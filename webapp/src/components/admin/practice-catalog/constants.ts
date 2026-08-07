@@ -1,30 +1,21 @@
-import {
-	ARTIFACT_KIND,
-	type ArtifactKindId,
-	artifactKindLabel,
-	artifactKindPluralLabel,
-} from "@/lib/artifact-kinds";
+import { ARTIFACT_KIND, type ArtifactKindId, artifactKindPluralLabel } from "@/lib/artifact-kinds";
 
 /** What a practice is authored against, as the server names it. */
 export type WorkArtifact = ArtifactKindId;
 
-export const FOCUS_ARTIFACT_OPTIONS = [
-	{
-		value: ARTIFACT_KIND.pullRequest,
-		label: artifactKindLabel(ARTIFACT_KIND.pullRequest),
-		hint: "Reviews work submitted in a pull or merge request",
-	},
-	{
-		value: ARTIFACT_KIND.issue,
-		label: artifactKindLabel(ARTIFACT_KIND.issue),
-		hint: "Reviews work described or discussed in an issue",
-	},
-	{
-		value: ARTIFACT_KIND.conversationThread,
-		label: artifactKindLabel(ARTIFACT_KIND.conversationThread),
-		hint: "Reviews messages in a conversation thread",
-	},
-] as const;
+const WORK_ARTIFACT_HINTS: Record<string, string> = {
+	[ARTIFACT_KIND.pullRequest]: "Reviews work submitted in a pull or merge request",
+	[ARTIFACT_KIND.issue]: "Reviews work described or discussed in an issue",
+	[ARTIFACT_KIND.conversationThread]: "Reviews messages in a conversation thread",
+};
+
+/**
+ * One line explaining what reviewing this kind of work means, or nothing for a kind this build has
+ * never heard of — which is offered anyway, under its own name, rather than hidden.
+ */
+export function workArtifactHint(kind: string): string | undefined {
+	return WORK_ARTIFACT_HINTS[kind];
+}
 
 export const WORK_ARTIFACT_FILTER_OPTIONS = [
 	{ value: ARTIFACT_KIND.pullRequest, label: artifactKindPluralLabel(ARTIFACT_KIND.pullRequest) },
