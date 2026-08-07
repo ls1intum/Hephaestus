@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import type {
 	AgentBinding,
 	PracticeReviewSettings as PracticeReviewSettingsData,
@@ -145,5 +145,114 @@ export const ReviewScopeNarrowed: Story = {
 	},
 	play: async () => {
 		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * The scope lists hold a draft of their own and are the only thing on this screen that does. Adding
+ * one entry has to send the *whole* narrowed scope, not just the branch that was typed — sending a
+ * patch of one list would silently drop the other and widen reviews to every repository.
+ */
+export const AddingATargetBranch: Story = {
+	args: {
+		policy: {
+			...policy,
+			onUpdate: fn(),
+			settings: {
+				...settings,
+				reviewScope: { targetBranches: [], repositories: ["acme/widgets"] },
+			},
+		},
+	},
+	play: async ({ args, canvas }) => {
+		await userEvent.type(canvas.getByLabelText("Target branches"), "  release/2026.1  ");
+		await userEvent.click(canvas.getByRole("button", { name: "Add to target branches" }));
+
+		// Trimmed on the way out: a name with a stray space matches no branch the gate ever sees.
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
+			reviewScope: { targetBranches: ["release/2026.1"], repositories: ["acme/widgets"] },
+		});
+	},
+};
+
+/** Enter is how a list like this is filled; reaching for the mouse between entries is the slow path. */
+export const EnterAddsTheEntry: Story = {
+	args: { policy: { ...policy, onUpdate: fn() } },
+	play: async ({ args, canvas }) => {
+		await userEvent.type(canvas.getByLabelText("Repositories"), "acme/gadgets{Enter}");
+
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
+			reviewScope: { targetBranches: [], repositories: ["acme/gadgets"] },
+		});
+	},
+};
+
+/**
+ * A repeated entry cannot be added. Saying so has to reach the input itself: the only other sign is
+ * the Add button quietly greying out, which announces nothing and explains less.
+ */
+export const RefusingADuplicate: Story = {
+	args: {
+		policy: {
+			...policy,
+			onUpdate: fn(),
+			settings: { ...settings, reviewScope: { targetBranches: ["main"], repositories: [] } },
+		},
+	},
+	play: async ({ args, canvas }) => {
+		const input = canvas.getByLabelText("Target branches");
+		await userEvent.type(input, "main");
+
+		await expect(input).toBeInvalid();
+		await expect(input).toHaveAccessibleDescription(/main is already listed\./);
+		await expect(canvas.getByRole("button", { name: "Add to target branches" })).toBeDisabled();
+
+		// Enter is the other way in, and it is refused on the same terms rather than sending a
+		// duplicate the server would have to reject.
+		await userEvent.type(input, "{Enter}");
+		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
+	},
+};
+
+export const RemovingATargetBranch: Story = {
+	args: {
+		policy: {
+			...policy,
+			onUpdate: fn(),
+			settings: {
+				...settings,
+				reviewScope: { targetBranches: ["main", "release/2026.1"], repositories: [] },
+			},
+		},
+	},
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Remove release/2026.1" }));
+
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
+			reviewScope: { targetBranches: ["main"], repositories: [] },
+		});
+	},
+};
+
+/**
+ * Widening back to everything is a reset rather than an empty save, and the words on the control open
+ * its accessible name so a voice-control user can activate what they can read (WCAG 2.2 SC 2.5.3).
+ */
+export const WideningTheScopeAgain: Story = {
+	args: {
+		policy: {
+			...policy,
+			onReset: fn(),
+			settings: {
+				...settings,
+				reviewScope: { targetBranches: ["main"], repositories: [] },
+			},
+		},
+	},
+	play: async ({ args, canvas }) => {
+		const reset = canvas.getByRole("button", { name: /^Review everything again/ });
+		await userEvent.click(reset);
+
+		await expect(args.policy.onReset).toHaveBeenCalledWith("REVIEW_SCOPE");
 	},
 };

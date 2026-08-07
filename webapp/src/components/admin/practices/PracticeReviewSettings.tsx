@@ -445,11 +445,14 @@ function ReviewScopeCard({ policy }: Pick<PracticeReviewSettingsProps, "policy">
 						variant="link"
 						size="sm"
 						className="h-auto p-0 text-xs"
-						aria-label="Use default for Review scope"
 						disabled={policy.isSaving}
 						onClick={() => policy.onReset("REVIEW_SCOPE")}
 					>
+						{/* The words on the button open its accessible name rather than being replaced by an
+						    `aria-label`, so someone driving this by voice can say what they can read and have
+						    it activate (WCAG 2.2 SC 2.5.3). The rest only says which card it belongs to. */}
 						Review everything again
+						<span className="sr-only"> — use the default for Review scope</span>
 					</Button>
 				) : (
 					<span className="text-muted-foreground text-xs">
@@ -481,6 +484,8 @@ function ScopeList({
 	const [draft, setDraft] = useState("");
 	const trimmed = draft.trim();
 	const duplicate = trimmed.length > 0 && values.includes(trimmed);
+	const descriptionId = `${id}-description`;
+	const errorId = `${id}-error`;
 
 	const add = () => {
 		if (trimmed.length === 0 || duplicate) return;
@@ -489,15 +494,17 @@ function ScopeList({
 	};
 
 	return (
-		<Field>
+		<Field data-invalid={duplicate || undefined}>
 			<FieldLabel htmlFor={id}>{label}</FieldLabel>
-			<FieldDescription>{description}</FieldDescription>
+			<FieldDescription id={descriptionId}>{description}</FieldDescription>
 			<div className="flex gap-2">
 				<Input
 					id={id}
 					value={draft}
 					placeholder={placeholder}
 					disabled={disabled}
+					aria-invalid={duplicate || undefined}
+					aria-describedby={duplicate ? `${descriptionId} ${errorId}` : descriptionId}
 					onChange={(event) => setDraft(event.target.value)}
 					onKeyDown={(event) => {
 						if (event.key === "Enter") {
@@ -511,10 +518,22 @@ function ScopeList({
 					disabled={disabled || trimmed.length === 0 || duplicate}
 					onClick={add}
 				>
+					{/* Two lists, so two buttons that would otherwise both answer to "Add". The visible word
+					    still opens the name, which is what a voice-control user says. */}
 					Add
+					<span className="sr-only"> to {label.toLowerCase()}</span>
 				</Button>
 			</div>
-			{duplicate ? <FieldError>{trimmed} is already listed.</FieldError> : null}
+			{/* The live region is on screen before it has anything to say. Inserting it together with its
+			    message is not reliably announced, and the only other sign that Add stopped working is the
+			    button quietly greying out — which nothing announces at all. */}
+			<div aria-live="polite" aria-atomic="true">
+				{duplicate ? (
+					<p id={errorId} className="font-normal text-destructive text-sm">
+						{trimmed} is already listed.
+					</p>
+				) : null}
+			</div>
 			{values.length > 0 ? (
 				<div className="space-y-2">
 					{values.map((value) => (
