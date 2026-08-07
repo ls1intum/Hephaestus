@@ -105,7 +105,8 @@ public class JobTypeHandlerConfiguration {
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
-        SecretDiffScanner secretDiffScanner
+        SecretDiffScanner secretDiffScanner,
+        PracticeTierGate practiceTierGate
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
@@ -117,7 +118,8 @@ public class JobTypeHandlerConfiguration {
             deliveryService,
             feedbackService,
             secretDiffScanner,
-            reactionSuppressionFilter
+            reactionSuppressionFilter,
+            practiceTierGate
         );
     }
 
@@ -129,7 +131,8 @@ public class JobTypeHandlerConfiguration {
         PullRequestCommentPoster commentPoster,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        PracticeFeedbackCommentFormatter commentFormatter
+        PracticeFeedbackCommentFormatter commentFormatter,
+        PracticeTierGate practiceTierGate
     ) {
         return new IssueReviewHandler(
             objectMapper,
@@ -141,7 +144,8 @@ public class JobTypeHandlerConfiguration {
             commentPoster,
             feedbackLedgerRecorder,
             deliveryPolicy,
-            commentFormatter
+            commentFormatter,
+            practiceTierGate
         );
     }
 

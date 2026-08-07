@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -45,9 +46,25 @@ public class PracticeService {
     private final PracticeEvidenceDefaults evidenceDefaults;
 
     @Transactional(readOnly = true)
-    public List<Practice> listPractices(WorkspaceContext ctx, Boolean usedInNewReviews) {
-        log.debug("Listing practices for workspace {} (usedInNewReviews={})", ctx.slug(), usedInNewReviews);
-        return practiceRepository.findByFilters(ctx.id(), usedInNewReviews);
+    public List<Practice> listPractices(WorkspaceContext ctx, @Nullable PracticeReviewTier reviewTier) {
+        log.debug("Listing practices for workspace {} (reviewTier={})", ctx.slug(), reviewTier);
+        return practiceRepository.findByFilters(ctx.id(), reviewTier);
+    }
+
+    /**
+     * Every practice this workspace actually reviews, at any tier above {@code OFF}.
+     *
+     * <p>Includes {@code MEASURE}. That tier promises the developer no <em>feedback</em>, not concealment:
+     * a practice we measure someone against and hide from them is the worse of the two failures, so the
+     * learner-facing catalogue lists what is observed while the tier still governs what is said.
+     */
+    @Transactional(readOnly = true)
+    public List<Practice> listReviewedPractices(WorkspaceContext ctx) {
+        return practiceRepository
+            .findByFilters(ctx.id(), null)
+            .stream()
+            .filter(p -> p.getReviewTier().admitsReview())
+            .toList();
     }
 
     @Transactional
@@ -192,7 +209,13 @@ public class PracticeService {
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
-        practice.setUsedInNewReviews(definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview());
+        // A practice whose policy cannot attempt an automated review starts silent rather than at the
+        // default tier: there is nothing for a louder tier to deliver.
+        practice.setReviewTier(
+            definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
+                ? PracticeReviewTier.DEFAULT
+                : PracticeReviewTier.OFF
+        );
         definitionValidator.validate(definition);
 
         try {
@@ -287,10 +310,10 @@ public class PracticeService {
         if (request.area() != null) {
             practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
         }
-        boolean wasUsedInNewReviews = practice.isUsedInNewReviews();
+        PracticeReviewTier tierBefore = practice.getReviewTier();
         applyDefinition(practice, afterDefinition);
         if (!afterDefinition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
-            practice.setUsedInNewReviews(false);
+            practice.setReviewTier(PracticeReviewTier.OFF);
         }
         definitionValidator.validate(afterDefinition);
         practice = practiceRepository.save(practice);
@@ -304,14 +327,14 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
-        if (wasUsedInNewReviews && !practice.isUsedInNewReviews()) {
+        if (tierBefore != practice.getReviewTier()) {
             configAudit.record(
                 ConfigAuditEntry.updated(
                     ConfigAuditEntityType.PRACTICE_USAGE,
                     practice.getId(),
                     ctx.id(),
-                    new PracticeUsageSnapshot(true),
-                    new PracticeUsageSnapshot(false)
+                    new PracticeUsageSnapshot(tierBefore),
+                    new PracticeUsageSnapshot(practice.getReviewTier())
                 )
             );
         }
@@ -320,37 +343,42 @@ public class PracticeService {
     }
 
     @Transactional
-    public Practice setUsedInNewReviews(WorkspaceContext ctx, String slug, boolean usedInNewReviews) {
+    public Practice setReviewTier(WorkspaceContext ctx, String slug, PracticeReviewTier reviewTier) {
         lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
-        if (practice.isUsedInNewReviews() == usedInNewReviews) {
+        PracticeReviewTier before = practice.getReviewTier();
+        if (before == reviewTier) {
             return practice;
         }
-        if (usedInNewReviews && !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
+        // Every tier above OFF starts a review, so every tier above OFF needs a policy that can run one.
+        if (
+            reviewTier.admitsReview() &&
+            !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
+        ) {
             throw new IllegalArgumentException(
                 "This practice cannot be used in automated reviews with its current review settings"
             );
         }
 
-        practice.setUsedInNewReviews(usedInNewReviews);
+        practice.setReviewTier(reviewTier);
         practice = practiceRepository.save(practice);
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_USAGE,
                 practice.getId(),
                 ctx.id(),
-                new PracticeUsageSnapshot(!usedInNewReviews),
-                new PracticeUsageSnapshot(usedInNewReviews)
+                new PracticeUsageSnapshot(before),
+                new PracticeUsageSnapshot(reviewTier)
             )
         );
         log.info(
-            "Set practice '{}' (slug={}) usedInNewReviews={} in workspace {}",
+            "Set practice '{}' (slug={}) reviewTier={} in workspace {}",
             practice.getName(),
             slug,
-            usedInNewReviews,
+            reviewTier,
             ctx.slug()
         );
         return practice;

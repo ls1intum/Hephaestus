@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -256,8 +257,9 @@ public class AgentJobService {
                 return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
             }
             if (
-                !practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
+                !practiceRepository.existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
                     workspace.getId(),
+                    PracticeReviewTier.OFF,
                     artifactKindFor(jobType)
                 )
             ) {

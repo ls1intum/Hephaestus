@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -84,7 +85,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a trigger event materialises only the practices that declare it")
     void filtersToTriggerMatchingPractices() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(
             List.of(
                 practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
@@ -105,7 +110,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a job with no trigger event keeps the full focus set (legacy / bot-command path)")
     void noTriggerEventKeepsFullSet() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(
             List.of(
                 practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
@@ -124,7 +133,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("a trigger event that matches nothing fails closed")
     void noMatchFailsClosed() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(
             List.of(
                 practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
@@ -147,7 +160,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         // Defense-in-depth: slugs are interpolated into filesystem paths, so a mis-seeded slug with a path
         // traversal must be rejected, not written to disk.
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(List.of(practice("../escape", ScmSignals.PULL_REQUEST_OPENED)));
 
         assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
@@ -169,7 +186,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @DisplayName("an empty active-practice set throws JobPreparationException")
     void emptyFocusSetThrows() {
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(List.of());
 
         assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
@@ -185,7 +206,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         Practice blankScript = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
         blankScript.setPrecomputeScript("   "); // blank → no .ts written
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(List.of(withScript, blankScript));
         Map<String, byte[]> files = new HashMap<>();
 
@@ -228,7 +253,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         );
         Practice unlimited = practice("retrospective", ScmSignals.PULL_REQUEST_OPENED);
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(List.of(limited, unlimited));
         Map<String, byte[]> files = new HashMap<>();
 
@@ -252,7 +281,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         Practice blankWhy = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
         blankWhy.setWhyItMatters("   ");
         when(
-            practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
+            practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                1L,
+                PracticeReviewTier.OFF,
+                ArtifactKinds.PULL_REQUEST
+            )
         ).thenReturn(List.of(withWhy, blankWhy));
 
         Map<String, String> why = injector.whyBySlug(1L, ArtifactKinds.PULL_REQUEST);

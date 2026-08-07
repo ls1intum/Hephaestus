@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Result of the practice review detection gate evaluation.
@@ -35,6 +37,21 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
      * The gate rejected: the practice review agent should NOT run.
      *
      * @param reason a short, human-readable reason for the skip (for logging/diagnostics)
+     * @param signalReason the controlled-vocabulary reason to record the refused signal under, or
+     *     {@code null} to let the caller keep its default of {@link SignalStateReason#GATE_SKIPPED}. Most
+     *     skips are diagnostic detail on one class of answer and stay null; a skip names a reason here
+     *     only when the class of answer itself differs — a practice silenced to {@code OFF} is a
+     *     different fact from "the gate declined", and only one of them is lifted by an admin.
      */
-    record Skip(String reason) implements GateDecision {}
+    record Skip(String reason, @Nullable SignalStateReason signalReason) implements GateDecision {
+        /** A skip that carries only diagnostic prose; the signal is recorded as {@code GATE_SKIPPED}. */
+        public Skip(String reason) {
+            this(reason, null);
+        }
+
+        /** The reason to record this refusal under, resolving the unnamed case to {@code GATE_SKIPPED}. */
+        public SignalStateReason resolvedSignalReason() {
+            return signalReason != null ? signalReason : SignalStateReason.GATE_SKIPPED;
+        }
+    }
 }

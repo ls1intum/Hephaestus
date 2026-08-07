@@ -36,6 +36,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -105,6 +106,13 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 ),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                 new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(false, false, 15, false, false)
+            ),
+            // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
+            // therefore admitted, so these tests exercise delivery rather than the tier.
+            new PracticeTierGate(
+                practiceRepository,
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
             )
         );
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));
@@ -191,7 +199,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria(criteria);
-        p.setUsedInNewReviews(true);
+        p.setReviewTier(PracticeReviewTier.ENGAGE);
         p.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
         p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         var revision = new PracticeRevision();
@@ -225,8 +233,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             .thenAnswer(invocation -> invocation.getArgument(0));
         lenient()
             .when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
+                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
                     WORKSPACE_ID,
+                    PracticeReviewTier.OFF,
                     ArtifactKinds.PULL_REQUEST
                 )
             )
@@ -313,8 +322,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
             ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
+                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
                     WORKSPACE_ID,
+                    PracticeReviewTier.OFF,
                     ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());
@@ -362,8 +372,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void rejectsMalformedSlug() {
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
+                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
                     WORKSPACE_ID,
+                    PracticeReviewTier.OFF,
                     ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
@@ -376,8 +387,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenNoActivePractices() {
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
+                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
                     WORKSPACE_ID,
+                    PracticeReviewTier.OFF,
                     ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(List.of());
@@ -408,8 +420,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
             ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
             when(
-                practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
+                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
                     WORKSPACE_ID,
+                    PracticeReviewTier.OFF,
                     ArtifactKinds.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());

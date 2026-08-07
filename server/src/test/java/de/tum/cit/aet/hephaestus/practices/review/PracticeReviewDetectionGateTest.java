@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -21,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -131,7 +133,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     private Practice createPractice(SignalName... signals) {
         Practice practice = new Practice();
         practice.setBindings(PracticeTestEvidence.bindings(signals));
-        practice.setUsedInNewReviews(true);
+        practice.setReviewTier(PracticeReviewTier.ENGAGE);
         return practice;
     }
 
@@ -143,7 +145,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 new PracticeBinding(List.of(signals), PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST), true)
             )
         );
-        practice.setUsedInNewReviews(true);
+        practice.setReviewTier(PracticeReviewTier.ENGAGE);
         return practice;
     }
 
@@ -151,7 +153,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         Workspace workspace = createWorkspace();
         when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
         when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-        when(practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(List.of(practices));
+        when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practices));
         return workspace;
     }
 
@@ -394,7 +396,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
             when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
                 List.of(matching1, matching2, nonMatching)
             );
 
@@ -707,6 +709,88 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Assertions.assertThrows(UnsupportedOperationException.class, () ->
                 detect.matchedPractices().add(new Practice())
             );
+        }
+    }
+
+    /**
+     * The loudness tier's admission half. OFF is the only tier that stops a review; MEASURE and COACH are
+     * as reviewed as ENGAGE and differ only in how far the result is allowed to travel, so their signals
+     * must reach the agent exactly like ENGAGE's do.
+     */
+    @Nested
+    class LoudnessTierAdmissionTests {
+
+        @Test
+        void detectsWhenTheOnlyBoundPracticeIsMeasuringSilently() {
+            PullRequest pr = createPullRequest();
+            Practice measured = createPractice(SIGNAL);
+            measured.setReviewTier(PracticeReviewTier.MEASURE);
+            Workspace workspace = setupThroughPracticeMatching(pr, measured);
+            workspace.getReviewSettings().setRunForAllUsers(true);
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
+            assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactly(measured);
+        }
+
+        @Test
+        void detectsWhenTheOnlyBoundPracticeCoaches() {
+            PullRequest pr = createPullRequest();
+            Practice coached = createPractice(SIGNAL);
+            coached.setReviewTier(PracticeReviewTier.COACH);
+            Workspace workspace = setupThroughPracticeMatching(pr, coached);
+            workspace.getReviewSettings().setRunForAllUsers(true);
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
+        }
+
+        @Test
+        void skipsAndNamesTheTierWhenEveryBoundPracticeIsOff() {
+            PullRequest pr = createPullRequest();
+            Practice silenced = createPractice(SIGNAL);
+            silenced.setReviewTier(PracticeReviewTier.OFF);
+            setupThroughPracticeMatching(pr, silenced);
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            GateDecision.Skip skip = (GateDecision.Skip) decision;
+            assertThat(skip.reason()).isEqualTo("every practice bound to this signal is off");
+            // The whole point of the separate reason: an admin turned this down, and can turn it back up.
+            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.PRACTICE_TIER_OFF);
+            assertThat(skip.resolvedSignalReason().isRetryable()).isTrue();
+        }
+
+        @Test
+        void keepsTheGenericReasonWhenNothingIsBoundAtAll() {
+            PullRequest pr = createPullRequest();
+            Practice other = createPractice(ScmSignals.PULL_REQUEST_MERGED);
+            other.setReviewTier(PracticeReviewTier.OFF);
+            setupThroughPracticeMatching(pr, other);
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            GateDecision.Skip skip = (GateDecision.Skip) decision;
+            assertThat(skip.reason()).isEqualTo("no matching practices");
+            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.GATE_SKIPPED);
+        }
+
+        @Test
+        void admitsOnlyTheLoudEnoughPracticesWhenTheSignalIsSharedWithAnOffOne() {
+            PullRequest pr = createPullRequest();
+            Practice silenced = createPractice(SIGNAL);
+            silenced.setReviewTier(PracticeReviewTier.OFF);
+            Practice engaged = createPractice(SIGNAL);
+            Workspace workspace = setupThroughPracticeMatching(pr, silenced, engaged);
+            workspace.getReviewSettings().setRunForAllUsers(true);
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactly(engaged);
         }
     }
 }

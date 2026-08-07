@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -85,9 +86,14 @@ public class PracticeCatalogContentSource implements ContentSource {
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // Active practices only — the mentor should not talk about practices the workspace
-        // has explicitly disabled.
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrue(workspaceId);
+        // Only the practices whose loudness tier admits the conversation channel. A MEASURE practice is
+        // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
+        // subject it is not allowed to raise; an OFF practice is not reviewed at all.
+        List<Practice> practices = practiceRepository
+            .findByWorkspaceId(workspaceId)
+            .stream()
+            .filter(p -> p.getReviewTier().delivers(FeedbackChannel.CONVERSATION))
+            .toList();
 
         ObjectNode root = objectMapper.createObjectNode();
         root.putObject("workspace").put("slug", workspace.getWorkspaceSlug());

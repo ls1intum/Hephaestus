@@ -100,6 +100,13 @@ public class FeedbackLedgerRecorder {
     /** The gate-suppressed unit (one per job) — clear of every other base. */
     private static final int GATE_SUPPRESSED_UNIT_ORDINAL = 5000;
 
+    /**
+     * Tier-withheld SUPPRESSED units start here — clear of every base above. Public so
+     * {@code PracticeTierGate} derives its positions from the one shared constant rather than a second
+     * literal, and so it can bound itself by {@link #UNIT_ORDINAL_BAND_WIDTH}.
+     */
+    public static final int TIER_WITHHELD_UNIT_ORDINAL_BASE = 6000;
+
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
@@ -534,7 +541,34 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSuppressed(AgentJob job, Observation finding, FeedbackSuppressionReason reason, int index) {
-        int unitOrdinal = SUPPRESSED_UNIT_ORDINAL_BASE + index;
+        recordSuppressedAt(job, finding, reason, SUPPRESSED_UNIT_ORDINAL_BASE + index);
+    }
+
+    /**
+     * Record a SUPPRESSED {@code IN_CONTEXT} unit for a locus the practice's loudness tier did not let
+     * reach the artifact — measured, recorded, deliberately unsaid. Sits in its own ordinal band
+     * ({@value #TIER_WITHHELD_UNIT_ORDINAL_BASE}+) so it never collides with the reaction-aware band.
+     * Best-effort like its sibling: REQUIRES_NEW, callers wrap in try/catch.
+     *
+     * @param index position within the band; the caller must keep it under
+     *     {@link #UNIT_ORDINAL_BAND_WIDTH} so the band cannot overflow into the next one
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordTierWithheld(AgentJob job, Observation finding, int index) {
+        recordSuppressedAt(
+            job,
+            finding,
+            FeedbackSuppressionReason.PRACTICE_TIER_QUIET,
+            TIER_WITHHELD_UNIT_ORDINAL_BASE + index
+        );
+    }
+
+    private void recordSuppressedAt(
+        AgentJob job,
+        Observation finding,
+        FeedbackSuppressionReason reason,
+        int unitOrdinal
+    ) {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), unitOrdinal)) {
             return; // already recorded (job retry)
         }
@@ -558,7 +592,7 @@ public class FeedbackLedgerRecorder {
         );
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), finding.getId(), EvidenceRole.PRIMARY.name(), 0);
         log.info(
-            "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, recurrenceKey={}",
+            "Feedback suppressed: jobId={}, unit={}, reason={}, recurrenceKey={}",
             job.getId(),
             feedback.getId(),
             reason,

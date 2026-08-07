@@ -113,7 +113,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         // signal each here and only the first is connected, which is the only shape in which one
         // practice's signals can differ in coverage.
         PracticeRepository repository = mock(PracticeRepository.class);
-        when(repository.findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(
+        when(repository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED))
         );
         PracticeSignalCoverage practiceCoverage = new PracticeSignalCoverage(
@@ -203,7 +203,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     private static PracticeSignalCoverage practiceCoverage(boolean connected, Practice... practices) {
         PracticeRepository repository = mock(PracticeRepository.class);
-        when(repository.findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(List.of(practices));
+        when(repository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practices));
         return new PracticeSignalCoverage(
             coverage(connected),
             new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),

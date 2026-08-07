@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,9 +14,10 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Decides which of a cycle's observations are eligible for conversational delivery. An observation is
- * {@link ConversationRoutingDecision#ADMIT admitted} to the CONVERSATION channel iff ALL of: author-targeted, a
- * {@link Assessment#BAD} problem, has no natural inline anchor, and does not share a {@code recurrence_key} with a
- * DELIVERED IN_CONTEXT unit for the same recipient. Every other case is a named, testable non-admission reason.
+ * {@link ConversationRoutingDecision#ADMIT admitted} to the CONVERSATION channel iff ALL of: its practice's loudness
+ * tier admits the conversation channel, author-targeted, a {@link Assessment#BAD} problem, has no natural inline
+ * anchor, and does not share a {@code recurrence_key} with a DELIVERED IN_CONTEXT unit for the same recipient. Every
+ * other case is a named, testable non-admission reason.
  *
  * <p>Pure routing - it reads the feedback ledger but writes nothing. The {@link ConversationalFeedbackPreparer}
  * turns the admitted set into PREPARED units.
@@ -41,6 +44,14 @@ public class FeedbackChannelRouter {
 
     /** Route a single observation. See the class javadoc for the admission predicate. */
     public ConversationRoutingDecision route(Observation observation, long workspaceId, RoutingContext context) {
+        // The workspace's standing loudness policy for this practice, asked first: it is the cheapest test
+        // and the most decisive one, because a practice at MEASURE has nothing to say on ANY channel. The
+        // practice is a mandatory association and the caller routes inside a transaction, so this resolves
+        // one lazy proxy per DISTINCT practice, not per observation.
+        Practice practice = observation.getPractice();
+        if (practice != null && !practice.getReviewTier().delivers(FeedbackChannel.CONVERSATION)) {
+            return ConversationRoutingDecision.PRACTICE_TIER_QUIET;
+        }
         // Reviewer-targeted delivery: deferred (ADR-0021-C2).
         if (context.recipientRole() != RecipientRole.AUTHOR) {
             return ConversationRoutingDecision.REVIEWER_DEFERRED;

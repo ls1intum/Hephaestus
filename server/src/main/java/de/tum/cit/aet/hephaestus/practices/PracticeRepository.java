@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -21,14 +22,30 @@ import org.springframework.transaction.annotation.Transactional;
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
+    /**
+     * Every practice of the workspace, at any tier — including {@code OFF}.
+     *
+     * <p>The detection gate reads the whole set rather than a pre-filtered one so it can tell "nothing is
+     * bound to this signal" apart from "something is bound and its workspace turned it off", which are
+     * different answers to "why did nothing happen" and now get different recorded reasons. A workspace's
+     * catalogue is tens of rows, so the filter is cheaper in the JVM than a second query would be.
+     */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndUsedInNewReviewsTrue(Long workspaceId);
+    List<Practice> findByWorkspaceId(Long workspaceId);
 
-    /** Practices included in new reviews for one work type. */
+    /** Practices that a new review may include for one work type, i.e. everything above {@code OFF}. */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
+    List<Practice> findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+        Long workspaceId,
+        PracticeReviewTier excludedTier,
+        ArtifactKind artifactKind
+    );
 
-    boolean existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
+    boolean existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
+        Long workspaceId,
+        PracticeReviewTier excludedTier,
+        ArtifactKind artifactKind
+    );
 
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
@@ -70,8 +87,8 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findSourceAlignedV1Practices();
 
     /**
-     * Lists practices for a workspace with an optional review-participation filter.
-     * Null filter values are ignored (match all).
+     * Lists practices for a workspace with an optional loudness-tier filter.
+     * A null filter is ignored (match every tier).
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     @Query(
@@ -79,13 +96,13 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         SELECT p FROM Practice p
         LEFT JOIN FETCH p.area a
         WHERE p.workspace.id = :workspaceId
-        AND (:usedInNewReviews IS NULL OR p.usedInNewReviews = :usedInNewReviews)
+        AND (:reviewTier IS NULL OR p.reviewTier = :reviewTier)
         ORDER BY a.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
         """
     )
     List<Practice> findByFilters(
         @Param("workspaceId") Long workspaceId,
-        @Param("usedInNewReviews") Boolean usedInNewReviews
+        @Param("reviewTier") @Nullable PracticeReviewTier reviewTier
     );
 
     /** Deletes all practices for the workspace. Cascades to observation via ON DELETE CASCADE. */

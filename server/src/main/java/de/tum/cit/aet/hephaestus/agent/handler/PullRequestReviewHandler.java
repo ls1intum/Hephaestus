@@ -94,6 +94,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final FeedbackDeliveryService feedbackService;
     private final SecretDiffScanner secretDiffScanner;
     private final ReactionSuppressionFilter reactionSuppressionFilter;
+    private final PracticeTierGate practiceTierGate;
 
     PullRequestReviewHandler(
         JsonMapper objectMapper,
@@ -105,7 +106,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
         SecretDiffScanner secretDiffScanner,
-        ReactionSuppressionFilter reactionSuppressionFilter
+        ReactionSuppressionFilter reactionSuppressionFilter,
+        PracticeTierGate practiceTierGate
     ) {
         this.objectMapper = objectMapper;
         this.cas = cas;
@@ -117,6 +119,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.feedbackService = feedbackService;
         this.secretDiffScanner = secretDiffScanner;
         this.reactionSuppressionFilter = reactionSuppressionFilter;
+        this.practiceTierGate = practiceTierGate;
     }
 
     @Override
@@ -430,7 +433,22 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
         // deliver() because recurrence_key is persisted there; before compose() so the drop reaches both the
         // summary and the inline notes.
-        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, scopedFindings);
+        // Loudness tier BEFORE the reaction filter: the workspace's standing policy on how loud a practice
+        // may be settles first, so a finding the workspace already chose not to place on the artifact is
+        // never also charged to the developer's own per-locus reaction history.
+        List<PracticeDetectionResultParser.ValidatedFinding> loudEnough = practiceTierGate.admitInContext(
+            job,
+            scopedFindings
+        );
+        if (loudEnough.isEmpty() && !scopedFindings.isEmpty()) {
+            // Every practice that had something to say is measuring quietly. The observations are persisted
+            // and the SUPPRESSED rows are written; there is nothing left to post, and posting an empty
+            // summary would be the noise the tier was turned down to avoid.
+            log.info("All {} findings withheld by loudness tier: jobId={}", scopedFindings.size(), job.getId());
+            return;
+        }
+
+        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, loudEnough);
         List<PracticeDetectionResultParser.ValidatedFinding> deliverable = reactions.deliverable();
         if (deliverable.isEmpty() && !scopedFindings.isEmpty()) {
             // Everything this run was already reacted away — a SUCCESS (the student told us to stop nagging),

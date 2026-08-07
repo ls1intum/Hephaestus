@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -58,7 +59,7 @@ class PracticeCatalogInjector {
      */
     Map<String, String> whyBySlug(Long workspaceId, ArtifactKind focus) {
         return practiceRepository
-            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(workspaceId, focus)
+            .findByWorkspaceIdAndReviewTierNotAndArtifactKind(workspaceId, PracticeReviewTier.OFF, focus)
             .stream()
             .filter(p -> p.getWhyItMatters() != null && !p.getWhyItMatters().isBlank())
             .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
@@ -116,7 +117,7 @@ class PracticeCatalogInjector {
         }
         Long workspaceId = job.getWorkspace().getId();
         List<Practice> practices = practiceRepository
-            .findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(workspaceId, focus)
+            .findByWorkspaceIdAndReviewTierNotAndArtifactKind(workspaceId, PracticeReviewTier.OFF, focus)
             .stream()
             .sorted(Comparator.comparing(Practice::getSlug))
             .toList();

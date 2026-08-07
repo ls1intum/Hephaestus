@@ -96,7 +96,11 @@ public class PracticeSignalCoverage {
     public List<DormantBinding> dormantBindings(long workspaceId) {
         Set<SignalName> connected = coverage.connectedCoverage(workspaceId);
         List<DormantBinding> dormant = new ArrayList<>();
-        for (Practice practice : practices.findByWorkspaceIdAndUsedInNewReviewsTrue(workspaceId)) {
+        for (Practice practice : practices.findByWorkspaceId(workspaceId)) {
+            if (!practice.getReviewTier().admitsReview()) {
+                // A practice nobody reviews cannot have a dormant binding; reporting one would be noise.
+                continue;
+            }
             Set<SignalName> bound = signalsOf(practice);
             if (bound.isEmpty() || bound.stream().anyMatch(signal -> !raisedByAnIngestedEvent(signal))) {
                 // Nothing to wait for: a signal an ingested event never carries is raised from inside

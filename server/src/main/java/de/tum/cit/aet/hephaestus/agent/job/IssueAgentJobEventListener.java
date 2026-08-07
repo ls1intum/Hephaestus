@@ -156,7 +156,7 @@ public class IssueAgentJobEventListener {
                         triggerEventName,
                         skip.reason()
                     );
-                    signalRecorder.markRefused(key, SignalStateReason.GATE_SKIPPED);
+                    signalRecorder.markRefused(key, skip.resolvedSignalReason());
                 }
                 case GateDecision.Detect detect -> submitJob(issue, detect, key);
             }

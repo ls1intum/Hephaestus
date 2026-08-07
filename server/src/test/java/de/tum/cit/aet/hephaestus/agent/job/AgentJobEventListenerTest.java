@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -875,10 +876,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Practice practice = new Practice();
             practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-            practice.setUsedInNewReviews(true);
-            when(fixture.practiceRepository().findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(
-                List.of(practice)
-            );
+            practice.setReviewTier(PracticeReviewTier.ENGAGE);
+            when(fixture.practiceRepository().findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
 
             setupCollaborationPR();
             when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -905,10 +904,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             // Practice only matches ReviewSubmitted, not PullRequestCreated
             Practice practice = new Practice();
             practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED));
-            practice.setUsedInNewReviews(true);
-            when(fixture.practiceRepository().findByWorkspaceIdAndUsedInNewReviewsTrue(WORKSPACE_ID)).thenReturn(
-                List.of(practice)
-            );
+            practice.setReviewTier(PracticeReviewTier.ENGAGE);
+            when(fixture.practiceRepository().findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
 
             setupCollaborationPR();
 

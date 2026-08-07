@@ -16,10 +16,11 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeUsageRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -93,7 +94,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Detect prompt for " + slug);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        practice.setUsedInNewReviews(active);
+        practice.setReviewTier(active ? PracticeReviewTier.ENGAGE : PracticeReviewTier.OFF);
         return practiceRepository.save(practice);
     }
 
@@ -281,7 +282,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?usedInNewReviews=true", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?reviewTier=ENGAGE", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -340,7 +341,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("target-practice");
             assertThat(result.name()).isEqualTo("Target Practice");
-            assertThat(result.usedInNewReviews()).isTrue();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for target-practice");
             assertThat(result.createdAt()).isNotNull();
@@ -432,7 +433,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.automatedReviewPolicy()).isEqualTo(
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
             );
-            assertThat(result.usedInNewReviews()).isTrue();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
             assertThat(result.id()).isNotNull();
             assertThat(result.createdAt()).isNotNull();
             assertThat(result.updatedAt()).isNotNull();
@@ -443,7 +444,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             );
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("Practice new-practice");
-            assertThat(persisted.get().isUsedInNewReviews()).isTrue();
+            assertThat(persisted.get().getReviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
         }
 
         @Test
@@ -479,7 +480,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("minimal-practice");
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
-            assertThat(result.usedInNewReviews()).isTrue();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
             assertThat(result.automatedReviewPolicy()).isEqualTo(
                 evidenceDefaults.policyFor(ArtifactKinds.PULL_REQUEST)
             );
@@ -506,7 +507,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.usedInNewReviews()).isFalse();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.OFF);
         }
 
         @Test
@@ -916,7 +917,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.name()).isEqualTo("Updated Name");
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
-            assertThat(result.usedInNewReviews()).isTrue();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
             assertThat(result.areaSlug()).isEqualTo("existing-area");
         }
 
@@ -977,7 +978,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.usedInNewReviews()).isFalse();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.OFF);
             // The occasion survives — it is where the practice's kind comes from — but a practice
             // nobody automates reads nothing, so the evidence goes with the automation that read it.
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
@@ -986,8 +987,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), practice.getSlug())
                     .orElseThrow()
-                    .isUsedInNewReviews()
-            ).isFalse();
+                    .getReviewTier()
+            ).isEqualTo(PracticeReviewTier.OFF);
         }
 
         @Test
@@ -1521,7 +1522,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     @Nested
-    @DisplayName("PATCH /practices/{practiceSlug}/used-in-new-reviews")
+    @DisplayName("PATCH /practices/{practiceSlug}/review-tier")
     class SetUsedInNewReviews {
 
         @Test
@@ -1532,10 +1533,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "deactivate-me")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "deactivate-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeUsageRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1544,14 +1545,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.usedInNewReviews()).isFalse();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.OFF);
 
             Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(
                 workspace.getId(),
                 "deactivate-me"
             );
             assertThat(persisted).isPresent();
-            assertThat(persisted.get().isUsedInNewReviews()).isFalse();
+            assertThat(persisted.get().getReviewTier()).isEqualTo(PracticeReviewTier.OFF);
         }
 
         @Test
@@ -1562,10 +1563,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "activate-me")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "activate-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeUsageRequestDTO(true))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.ENGAGE))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1574,7 +1575,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.usedInNewReviews()).isTrue();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
         }
 
         @Test
@@ -1587,10 +1588,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "no-automated-review")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "no-automated-review")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeUsageRequestDTO(true))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.ENGAGE))
                 .exchange()
                 .expectStatus()
                 .isBadRequest();
@@ -1605,10 +1606,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "already-active")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "already-active")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeUsageRequestDTO(true))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.ENGAGE))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1617,7 +1618,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.usedInNewReviews()).isTrue();
+            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
         }
 
         @Test
@@ -1628,10 +1629,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "non-existent")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "non-existent")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeUsageRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isNotFound();
@@ -1646,10 +1647,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "forbidden-toggle")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "forbidden-toggle")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeUsageRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isForbidden();
@@ -1663,10 +1664,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "null-active")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "null-active")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"usedInNewReviews\": null}")
+                .bodyValue("{\"reviewTier\": null}")
                 .exchange()
                 .expectStatus()
                 .isBadRequest();
@@ -1677,10 +1678,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturnUnauthorized() {
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/used-in-new-reviews", workspace.getWorkspaceSlug(), "any-slug")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "any-slug")
                 .headers(withCsrfForAnonymousWrite())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeUsageRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

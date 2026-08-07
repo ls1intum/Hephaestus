@@ -55,6 +55,7 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PracticeFeedbackCommentFormatter commentFormatter;
+    private final PracticeTierGate practiceTierGate;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -66,7 +67,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         PullRequestCommentPoster commentPoster,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        PracticeFeedbackCommentFormatter commentFormatter
+        PracticeFeedbackCommentFormatter commentFormatter,
+        PracticeTierGate practiceTierGate
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -78,6 +80,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.deliveryPolicy = deliveryPolicy;
         this.commentFormatter = commentFormatter;
+        this.practiceTierGate = practiceTierGate;
     }
 
     @Override
@@ -243,12 +246,23 @@ public class IssueReviewHandler implements JobTypeHandler {
             coercedFindings.set(i, coercedFindings.get(i).withKeys(keysByFinding.get(coercedFindings.get(i))));
         }
 
+        // Only practices at ENGAGE reach the issue itself; everything below is measured and recorded but
+        // stays off the artifact, with a SUPPRESSED ledger row of its own.
+        List<PracticeDetectionResultParser.ValidatedFinding> loudEnough = practiceTierGate.admitInContext(
+            job,
+            coercedFindings
+        );
+        if (loudEnough.isEmpty()) {
+            log.info("All {} findings withheld by loudness tier: jobId={}", coercedFindings.size(), job.getId());
+            return;
+        }
+
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), ArtifactKinds.ISSUE);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
-            coercedFindings,
+            loudEnough,
             ArtifactKinds.ISSUE,
             whyBySlug
         );

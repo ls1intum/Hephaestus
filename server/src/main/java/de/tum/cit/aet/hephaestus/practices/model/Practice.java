@@ -42,7 +42,7 @@ import org.hibernate.type.SqlTypes;
         columnNames = { "workspace_id", "slug" }
     ),
     indexes = {
-        @Index(name = "idx_practice_workspace_usage", columnList = "workspace_id, used_in_new_reviews"),
+        @Index(name = "idx_practice_workspace_tier", columnList = "workspace_id, review_tier"),
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
         @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
         @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
@@ -171,8 +171,18 @@ public class Practice {
     @ToString.Exclude
     private PracticeAutomatedReviewPolicy automatedReviewPolicy;
 
-    @Column(name = "used_in_new_reviews", nullable = false)
-    private boolean usedInNewReviews = true;
+    /**
+     * How loud this practice is allowed to be in this workspace: whether it is reviewed at all, and how
+     * far the result of that review may travel. Widens the boolean it replaced, which could only say
+     * "reviewed and delivered everywhere" or "not reviewed" and so made silencing a noisy practice cost
+     * the measurement too.
+     *
+     * @see PracticeReviewTier
+     */
+    @Column(name = "review_tier", nullable = false, length = PracticeReviewTier.MAX_LENGTH)
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ENGAGE'")
+    private PracticeReviewTier reviewTier = PracticeReviewTier.DEFAULT;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

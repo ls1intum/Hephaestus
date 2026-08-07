@@ -36,4 +36,11 @@ public enum FeedbackSuppressionReason {
     EMPTY_AFTER_SANITIZE,
     /** The instance-wide silent-mode brake was engaged, so nothing was posted anywhere. */
     INSTANCE_SILENCED,
+    /**
+     * The practice's loudness tier does not admit this channel, so the finding was measured and recorded
+     * but never said out loud. Produced under {@code MEASURE} (no channel) and {@code COACH} (conversation
+     * only, so nothing lands on the artifact). Written rather than dropped so that "we saw it and chose to
+     * stay quiet" reads differently from "we missed it" in every downstream evaluation.
+     */
+    PRACTICE_TIER_QUIET,
 }

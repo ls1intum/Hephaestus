@@ -76,7 +76,7 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
         switch (practiceReviewDetectionGate.evaluate(pr, key.signalName(), TriggerMode.AUTO)) {
             case GateDecision.Skip skip -> {
                 log.debug("Pending signal now skipped by practice gate: prId={}, reason={}", pr.getId(), skip.reason());
-                signalRecorder.markRefused(key, SignalStateReason.GATE_SKIPPED);
+                signalRecorder.markRefused(key, skip.resolvedSignalReason());
             }
             case GateDecision.Detect detect -> agentJobService.submit(
                 detect.workspace().getId(),

@@ -36,6 +36,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -124,7 +125,13 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.getFeatures().setPracticesEnabled(true);
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         lenient()
-            .when(practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(anyLong(), any()))
+            .when(
+                practiceRepository.existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                    anyLong(),
+                    eq(PracticeReviewTier.OFF),
+                    any()
+                )
+            )
             .thenReturn(true);
 
         enabledBinding = new WorkspaceAgentBinding();
@@ -259,8 +266,9 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldNotSubmitWithoutAnActivePracticeForTheReviewedWork() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(
-                practiceRepository.existsByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
+                practiceRepository.existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
                     1L,
+                    PracticeReviewTier.OFF,
                     ArtifactKinds.CONVERSATION_THREAD
                 )
             ).thenReturn(false);

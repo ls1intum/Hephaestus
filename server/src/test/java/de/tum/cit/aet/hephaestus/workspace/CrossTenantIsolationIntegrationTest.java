@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -162,7 +163,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         practice.setName("Practice of " + ws.getWorkspaceSlug());
         practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setUsedInNewReviews(true);
+        practice.setReviewTier(PracticeReviewTier.ENGAGE);
         practice = practiceRepository.save(practice);
 
         AgentJob job = new AgentJob();

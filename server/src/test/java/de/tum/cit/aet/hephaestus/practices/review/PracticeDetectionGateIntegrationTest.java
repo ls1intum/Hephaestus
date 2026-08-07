@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -164,7 +165,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         p.setName(name);
         p.setCriteria("Test " + slug);
         p.setBindings(PracticeTestEvidence.bindings(signals.toArray(SignalName[]::new)));
-        p.setUsedInNewReviews(active);
+        p.setReviewTier(active ? PracticeReviewTier.ENGAGE : PracticeReviewTier.OFF);
         return practiceRepository.save(p);
     }
 

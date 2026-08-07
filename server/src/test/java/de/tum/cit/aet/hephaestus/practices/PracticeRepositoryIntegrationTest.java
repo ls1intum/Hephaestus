@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -54,7 +55,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         void savesAndRetrieves() {
             Practice practice = createPractice("test-slug", "Test Practice");
             practice.setCriteria("Check for quality");
-            practice.setUsedInNewReviews(false);
+            practice.setReviewTier(PracticeReviewTier.OFF);
 
             Practice saved = practiceRepository.save(practice);
 
@@ -67,7 +68,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getName()).isEqualTo("Test Practice");
             assertThat(found.getBindings()).isEqualTo(saved.getBindings());
             assertThat(found.getCriteria()).isEqualTo("Check for quality");
-            assertThat(found.isUsedInNewReviews()).isFalse();
+            assertThat(found.getReviewTier()).isEqualTo(PracticeReviewTier.OFF);
         }
     }
 
@@ -106,11 +107,11 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         void findsActivePracticesOnly() {
             Practice active = createPractice("active", "Active");
             Practice inactive = createPractice("inactive", "Inactive");
-            inactive.setUsedInNewReviews(false);
+            inactive.setReviewTier(PracticeReviewTier.OFF);
             practiceRepository.save(active);
             practiceRepository.save(inactive);
 
-            List<Practice> result = practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrue(workspace.getId());
+            List<Practice> result = practiceRepository.findByWorkspaceId(workspace.getId());
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getSlug()).isEqualTo("active");

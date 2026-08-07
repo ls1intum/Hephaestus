@@ -11,8 +11,9 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeUsageRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -69,7 +70,7 @@ public class PracticeCatalogController {
     @GetMapping
     @Operation(
         summary = "List practice definitions",
-        description = "Returns workspace practice definitions, optionally filtered by review participation"
+        description = "Returns workspace practice definitions, optionally filtered by loudness tier"
     )
     @ApiResponse(
         responseCode = "200",
@@ -79,20 +80,21 @@ public class PracticeCatalogController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<List<PracticeDTO>> listPractices(
         WorkspaceContext workspaceContext,
-        @RequestParam(name = "usedInNewReviews", required = false) @Parameter(
-            description = "Filter by whether new reviews include the practice"
-        ) Boolean usedInNewReviews
+        @RequestParam(name = "reviewTier", required = false) @Parameter(
+            description = "Filter to practices at exactly this loudness tier"
+        ) PracticeReviewTier reviewTier
     ) {
         List<PracticeDTO> practices = presenter.presentPractices(
-            practiceService.listPractices(workspaceContext, usedInNewReviews)
+            practiceService.listPractices(workspaceContext, reviewTier)
         );
         return ResponseEntity.ok(practices);
     }
 
     @GetMapping("/learner")
     @Operation(
-        summary = "List practices used in new reviews, learner-facing",
-        description = "Returns the learner-facing name, area, rationale, and example for practices used in new reviews"
+        summary = "List reviewed practices, learner-facing",
+        description = "Returns the learner-facing name, area, rationale, and example for every practice the " +
+            "workspace reviews (any loudness tier above OFF)"
     )
     @ApiResponse(
         responseCode = "200",
@@ -102,7 +104,7 @@ public class PracticeCatalogController {
     @SecurityRequirements
     public ResponseEntity<List<LearnerPracticeDTO>> listLearnerPractices(WorkspaceContext workspaceContext) {
         List<LearnerPracticeDTO> practices = practiceService
-            .listPractices(workspaceContext, true)
+            .listReviewedPractices(workspaceContext)
             .stream()
             .map(LearnerPracticeDTO::from)
             .toList();
@@ -225,11 +227,15 @@ public class PracticeCatalogController {
         return ResponseEntity.ok(presenter.present(practice));
     }
 
-    @PatchMapping("/{practiceSlug}/used-in-new-reviews")
-    @Operation(summary = "Choose whether new reviews include a practice")
+    @PatchMapping("/{practiceSlug}/review-tier")
+    @Operation(
+        summary = "Set how loud a practice is",
+        description = "OFF stops the review entirely; MEASURE keeps measuring in silence; COACH adds the " +
+            "mentor conversation; ENGAGE also places feedback on the artifact"
+    )
     @ApiResponse(
         responseCode = "200",
-        description = "Review participation updated",
+        description = "Loudness tier updated",
         content = @Content(schema = @Schema(implementation = PracticeDTO.class))
     )
     @ApiResponse(
@@ -242,16 +248,12 @@ public class PracticeCatalogController {
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_USAGE")
-    public ResponseEntity<PracticeDTO> setUsedInNewReviews(
+    public ResponseEntity<PracticeDTO> setReviewTier(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
-        @Valid @RequestBody UpdatePracticeUsageRequestDTO request
+        @Valid @RequestBody UpdatePracticeReviewTierRequestDTO request
     ) {
-        Practice practice = practiceService.setUsedInNewReviews(
-            workspaceContext,
-            practiceSlug,
-            request.usedInNewReviews()
-        );
+        Practice practice = practiceService.setReviewTier(workspaceContext, practiceSlug, request.reviewTier());
         return ResponseEntity.ok(presenter.present(practice));
     }
 

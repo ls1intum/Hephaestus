@@ -68,7 +68,7 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
                     issue.getId(),
                     skip.reason()
                 );
-                signalRecorder.markRefused(key, SignalStateReason.GATE_SKIPPED);
+                signalRecorder.markRefused(key, skip.resolvedSignalReason());
             }
             case GateDecision.Detect detect -> agentJobService.submit(
                 detect.workspace().getId(),

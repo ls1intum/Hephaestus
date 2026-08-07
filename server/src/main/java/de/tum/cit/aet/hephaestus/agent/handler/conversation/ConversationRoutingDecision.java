@@ -16,4 +16,9 @@ public enum ConversationRoutingDecision {
     ALREADY_DELIVERED_IN_CONTEXT,
     /** Reviewer-targeted - deferred (ADR-0021-C2). */
     REVIEWER_DEFERRED,
+    /**
+     * The practice's loudness tier does not admit the conversation channel - it is at OFF or MEASURE, so it
+     * is measured and recorded but never raised in a mentor turn.
+     */
+    PRACTICE_TIER_QUIET,
 }

@@ -27,6 +27,18 @@ public enum SignalStateReason {
     /** No enabled practice-review binding, or it lost its enablement between discovery and submission. */
     BINDING_DISABLED(SignalState.PENDING),
 
+    /**
+     * A practice IS bound to this signal, and every one that is sits at loudness tier {@code OFF} — the
+     * workspace turned the review down to silence rather than never having asked for it.
+     *
+     * <p>Separate from {@link #NO_ACTIVE_PRACTICE} on purpose: that reason means the workspace has no
+     * practice for this work at all, while this one means it has one and chose not to run it. Collapsing
+     * them would make "we are deliberately not reviewing this" indistinguishable from "nobody ever set
+     * this up", which are the two answers an operator most needs told apart. Retryable, because raising
+     * the tier lifts it without the artifact changing.
+     */
+    PRACTICE_TIER_OFF(SignalState.PENDING),
+
     /** The purse funding this binding is exhausted; it refills. */
     BUDGET_EXHAUSTED(SignalState.PENDING),
 

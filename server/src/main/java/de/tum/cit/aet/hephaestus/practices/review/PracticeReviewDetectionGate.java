@@ -2,12 +2,14 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -40,7 +42,7 @@ import org.springframework.stereotype.Service;
  *   <li>(2a) Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
  *   <li>(2b) Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
  *   <li>(3) No runnable practice config for workspace → SKIP</li>
- *   <li>(4) No practice used in new reviews is bound to this signal in this draft state → SKIP</li>
+ *   <li>(4) No practice above tier {@code OFF} is bound to this signal in this draft state → SKIP</li>
  *   <li>(5) {@code runForAllUsers} setting → DETECT (bypass role check)</li>
  *   <li>(6) No assignee → SKIP</li>
  *   <li>(7) Role checker unhealthy → SKIP</li>
@@ -181,8 +183,24 @@ public class PracticeReviewDetectionGate {
         //    veto that ran ahead of everything: with drafts skipped by default, the draft-specific
         //    criteria several practices are largely made of could never be reached. Whether a draft is
         //    worth reviewing is a property of the occasion, so the binding is where it is now answered.
-        List<Practice> matchedPractices = findMatchingPractices(workspace.getId(), signal, draft);
-        if (matchedPractices.isEmpty()) {
+        //    Admission then applies the loudness tier: OFF is the one tier that stops the review, so
+        //    MEASURE and COACH still get here and still record their observations.
+        SignalMatch match = findMatchingPractices(workspace.getId(), signal, draft);
+        if (match.admitted().isEmpty()) {
+            // A practice bound to this signal but turned all the way down is a deliberate act, not an
+            // empty catalogue; recording the two under one reason would make them unanswerable apart.
+            if (match.silencedByTier()) {
+                log.debug(
+                    "Practice review gate: SKIP, reason=allBoundPracticesOff, prId={}, signal={}, workspaceId={}",
+                    reviewable.getId(),
+                    signal,
+                    workspace.getId()
+                );
+                return new GateDecision.Skip(
+                    "every practice bound to this signal is off",
+                    SignalStateReason.PRACTICE_TIER_OFF
+                );
+            }
             log.debug(
                 "Practice review gate: SKIP, reason=noMatchingPractices, prId={}, signal={}, draft={}, workspaceId={}",
                 reviewable.getId(),
@@ -194,6 +212,7 @@ public class PracticeReviewDetectionGate {
                 draft ? "no practices bound to this signal on drafts" : "no matching practices"
             );
         }
+        List<Practice> matchedPractices = match.admitted();
 
         // 5. Run-for-all bypass: skip role check entirely (per-workspace override, falls back to property)
         if (workspace.getReviewSettings().resolveRunForAllUsers(properties.runForAllUsers())) {
@@ -286,9 +305,18 @@ public class PracticeReviewDetectionGate {
         return new GateDecision.Skip("no assignee with role: " + PRACTICE_REVIEW_ROLE);
     }
 
-    private List<Practice> findMatchingPractices(Long workspaceId, SignalName signal, boolean draft) {
-        return practiceRepository
-            .findByWorkspaceIdAndUsedInNewReviewsTrue(workspaceId)
+    /**
+     * The practices this signal occasions, split by whether their tier lets a review start.
+     *
+     * @param admitted the practices to review — bound to the signal and above {@link PracticeReviewTier#OFF}
+     * @param silencedByTier whether at least one practice WAS bound to the signal and sat at {@code OFF},
+     *     which is what lets the caller record "deliberately silenced" rather than "nothing bound"
+     */
+    private record SignalMatch(List<Practice> admitted, boolean silencedByTier) {}
+
+    private SignalMatch findMatchingPractices(Long workspaceId, SignalName signal, boolean draft) {
+        List<Practice> bound = practiceRepository
+            .findByWorkspaceId(workspaceId)
             .stream()
             .filter(p ->
                 p
@@ -297,6 +325,11 @@ public class PracticeReviewDetectionGate {
                     .anyMatch(binding -> binding.occasionedBy(signal, draft))
             )
             .toList();
+        List<Practice> admitted = bound
+            .stream()
+            .filter(p -> p.getReviewTier().admitsReview())
+            .toList();
+        return new SignalMatch(admitted, admitted.isEmpty() && !bound.isEmpty());
     }
 
     private void logSkippedDueToUnhealthy(Issue reviewable) {

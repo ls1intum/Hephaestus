@@ -1580,4 +1580,75 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-24">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.review_tier already present">
+            <not><columnExists tableName="practice" columnName="review_tier"/></not>
+        </preConditions>
+        <comment>Widen the on/off switch into a loudness tier, so turning a practice down keeps measuring it.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- add-backfill-drop, exactly as this file already did for is_active -> used_in_new_reviews and
+            -- trigger_events -> bindings. The boolean it replaces was introduced by THIS changelog and has
+            -- never been released, so there is no deployed schema in which the old name has to survive.
+            ALTER TABLE practice ADD COLUMN review_tier VARCHAR(16);
+            -- Both existing states map exactly and without judgement: a practice that was used in new reviews
+            -- was reviewed AND delivered everywhere, which is ENGAGE; one that was not was not reviewed at
+            -- all, which is OFF. MEASURE and COACH are new expressive room, never a re-reading of old data.
+            UPDATE practice SET review_tier = CASE WHEN used_in_new_reviews THEN 'ENGAGE' ELSE 'OFF' END;
+            ALTER TABLE practice ALTER COLUMN review_tier SET NOT NULL;
+            ALTER TABLE practice ALTER COLUMN review_tier SET DEFAULT 'ENGAGE';
+            ALTER TABLE practice ADD CONSTRAINT chk_practice_review_tier
+                CHECK (review_tier IN ('OFF', 'MEASURE', 'COACH', 'ENGAGE'));
+            -- The gate reads (workspace_id, tier); the index it replaces covered the boolean this widens.
+            DROP INDEX IF EXISTS idx_practice_workspace_usage;
+            CREATE INDEX IF NOT EXISTS idx_practice_workspace_tier ON practice (workspace_id, review_tier);
+            ALTER TABLE practice DROP COLUMN used_in_new_reviews;
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE practice ADD COLUMN used_in_new_reviews BOOLEAN;
+            -- The inverse of the forward map is lossy in one direction only: MEASURE and COACH are states the
+            -- boolean cannot express. They collapse to TRUE rather than FALSE because both of them DO review
+            -- the practice, and the boolean's only true meaning was "review this"; sending them to FALSE would
+            -- silently stop a measurement the workspace asked for.
+            UPDATE practice SET used_in_new_reviews = (review_tier <> 'OFF');
+            ALTER TABLE practice ALTER COLUMN used_in_new_reviews SET NOT NULL;
+            ALTER TABLE practice ALTER COLUMN used_in_new_reviews SET DEFAULT TRUE;
+            DROP INDEX IF EXISTS idx_practice_workspace_tier;
+            CREATE INDEX IF NOT EXISTS idx_practice_workspace_usage ON practice (workspace_id, used_in_new_reviews);
+            ALTER TABLE practice DROP CONSTRAINT IF EXISTS chk_practice_review_tier;
+            ALTER TABLE practice DROP COLUMN review_tier;
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-25">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback suppression reasons already admit PRACTICE_TIER_QUIET">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_feedback_suppression_reason'
+                  AND pg_get_constraintdef(oid) LIKE '%PRACTICE_TIER_QUIET%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit "the practice was measured but its tier kept it quiet" as a withholding rationale.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
+                CHECK (suppression_reason IS NULL OR suppression_reason IN (
+                    'VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE',
+                    'CONVERSATION_EXPIRED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED',
+                    'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE', 'INSTANCE_SILENCED',
+                    'PRACTICE_TIER_QUIET'));
+        ]]></sql>
+        <rollback><![CDATA[
+            -- Rolling the vocabulary back makes these rows unrepresentable. Deleting them is the honest
+            -- move: every remaining reason would assert something the run did not decide, and the
+            -- observation each row points at is untouched, so nothing measured is lost with them.
+            DELETE FROM feedback WHERE suppression_reason = 'PRACTICE_TIER_QUIET';
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
+                CHECK (suppression_reason IS NULL OR suppression_reason IN (
+                    'VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE',
+                    'CONVERSATION_EXPIRED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED',
+                    'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE', 'INSTANCE_SILENCED'));
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

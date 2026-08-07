@@ -31,6 +31,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
@@ -386,6 +388,47 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
         assertThat(flips).isEqualTo(1);
         verify(feedbackRepository).markConversationDelivered(eq(fidA), any());
+    }
+
+    /**
+     * The loudness tier's conversation half. MEASURE promises silence on every channel, so it must be
+     * refused here — and refused with a NAMED reason, because "the workspace turned this practice down" is
+     * a different answer to "why did nothing happen" than "there was nothing worth raising".
+     */
+    @ParameterizedTest
+    @MethodSource("tierRoutingCases")
+    void routerAppliesTheLoudnessTierBeforeAnythingElse(PracticeReviewTier tier, ConversationRoutingDecision expected) {
+        Observation observation = problem(null, null);
+        Practice practice = new Practice();
+        practice.setReviewTier(tier);
+        lenient().when(observation.getPractice()).thenReturn(practice);
+
+        assertThat(router().route(observation, WS, RoutingContext.author())).isEqualTo(expected);
+    }
+
+    static Stream<Arguments> tierRoutingCases() {
+        return Stream.of(
+            arguments(PracticeReviewTier.OFF, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
+            arguments(PracticeReviewTier.MEASURE, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
+            arguments(PracticeReviewTier.COACH, ConversationRoutingDecision.ADMIT),
+            arguments(PracticeReviewTier.ENGAGE, ConversationRoutingDecision.ADMIT)
+        );
+    }
+
+    /**
+     * A tier-quiet observation is refused even when it is reviewer-targeted, i.e. the tier is asked first.
+     * That ordering matters for the trace view: the standing workspace policy is the more useful answer.
+     */
+    @Test
+    void tierIsAskedBeforeTheReviewerDeferral() {
+        Observation observation = problem(null, null);
+        Practice practice = new Practice();
+        practice.setReviewTier(PracticeReviewTier.MEASURE);
+        lenient().when(observation.getPractice()).thenReturn(practice);
+
+        assertThat(router().route(observation, WS, RoutingContext.reviewer())).isEqualTo(
+            ConversationRoutingDecision.PRACTICE_TIER_QUIET
+        );
     }
 
     private Observation problem(ObjectNode evidence, String recurrenceKey) {

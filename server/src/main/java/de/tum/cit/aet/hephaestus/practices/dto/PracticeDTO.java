@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewValidation;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -33,7 +34,12 @@ public record PracticeDTO(
     @NonNull @Schema(description = "Position within its area (lowest first); ties broken by name") Integer displayOrder,
     @Nullable @Schema(description = "Developer-facing rationale (learner layer)") String whyItMatters,
     @Nullable @Schema(description = "Developer-facing exemplar (learner layer)") String whatGoodLooksLike,
-    @NonNull @Schema(description = "Whether new reviews include this practice") Boolean usedInNewReviews,
+    @NonNull
+    @Schema(
+        description = "How loud this practice is: OFF = not reviewed · MEASURE = reviewed and recorded, " +
+            "silent · COACH = also raised in the mentor conversation · ENGAGE = also placed on the artifact"
+    )
+    PracticeReviewTier reviewTier,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the practice was last updated") Instant updatedAt,
     @Nullable CatalogOriginDTO catalogOrigin
@@ -53,7 +59,7 @@ public record PracticeDTO(
             practice.getDisplayOrder(),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
-            practice.isUsedInNewReviews(),
+            practice.getReviewTier(),
             practice.getCreatedAt(),
             practice.getUpdatedAt(),
             catalogOrigin
