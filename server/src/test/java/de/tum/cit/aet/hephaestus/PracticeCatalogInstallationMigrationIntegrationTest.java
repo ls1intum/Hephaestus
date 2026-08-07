@@ -68,13 +68,18 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             "UPDATE practice SET source_curated_slug = 'second-practice', " +
                 "source_curated_fingerprint = repeat('c', 64) WHERE id = 136302"
         );
+        // Asserted here rather than at the end of the chain: later change sets deliberately clear the
+        // review-rule fingerprint, so a stored one is no longer observable once they have run, and
+        // asserting the versioning afterwards would only ever prove the clearing.
+        updateThrough("1785743133884-5");
+        assertHistoricalFingerprintsVersioned();
         seedLegacyAuditVocabulary();
         try (Liquibase liquibase = liquibase()) {
             liquibase.update(contexts());
         }
 
         assertMarkerRepair();
-        assertHistoricalFingerprintsVersioned();
+        assertHistoricalFingerprintsClearedForRecomputation();
         assertAuditHistoryPreserved();
         assertEmptyCatalogBootstrap();
         assertWorkspaceRevisionBackfill();
@@ -123,13 +128,37 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         ).isEqualTo("1");
     }
 
+    /** Straight after {@code -5}, which stamps a scheme onto every fingerprint stored without one. */
     private static void assertHistoricalFingerprintsVersioned() throws SQLException {
         assertThat(
             scalar(
-                "SELECT review_rule_fingerprint FROM practice_revision " +
+                "SELECT detection_fingerprint FROM practice_revision " +
                     "WHERE practice_id = 136301 ORDER BY revision_number DESC LIMIT 1"
             )
         ).isEqualTo("v1:" + "a".repeat(64));
+        assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302")).isEqualTo(
+            "v1:" + "c".repeat(64)
+        );
+    }
+
+    /**
+     * After the whole chain: every stored review-rule fingerprint is gone, on purpose.
+     *
+     * <p>The vocabulary moves rewrote the artifact kind and the bindings that the fingerprint digests, so
+     * each stored one described a rule set written in a spelling that no longer exists. Left in place the
+     * admin catalog would compare a stale digest against a freshly computed one and report every bundled
+     * practice as locally edited; cleared, the recomputation is handed to the backfill that runs at boot.
+     *
+     * <p>The provenance fingerprint is untouched by that: it identifies which bundled definition a copy
+     * came from, which no rename changes.
+     */
+    private static void assertHistoricalFingerprintsClearedForRecomputation() throws SQLException {
+        assertThat(
+            scalar(
+                "SELECT count(*)::text FROM practice_revision " +
+                    "WHERE practice_id = 136301 AND slug IS NOT NULL AND review_rule_fingerprint IS NOT NULL"
+            )
+        ).isEqualTo("0");
         assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302")).isEqualTo(
             "v1:" + "c".repeat(64)
         );
@@ -171,7 +200,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                   AND revision.slug = practice.slug
                   AND revision.name = practice.name
                   AND revision.applies_to = practice.applies_to
-                  AND revision.trigger_events = practice.trigger_events
+                  AND revision.bindings = practice.bindings
                   AND revision.criteria = practice.criteria
                   AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
                   AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
@@ -275,7 +304,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         assertThatThrownBy(() ->
             execute(
                 "UPDATE practice SET automated_review_policy = " +
-                    "jsonb_set(automated_review_policy, '{evidenceProfile}', '\"issue-review\"') WHERE id = 136301"
+                    "jsonb_set(automated_review_policy, '{whenEvidenceIsInsufficient}', '\"NEVER\"') WHERE id = 136301"
             )
         )
             .isInstanceOf(SQLException.class)
@@ -284,10 +313,10 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             execute(
                 """
                 INSERT INTO practice (
-                    workspace_id, slug, name, applies_to, display_order, trigger_events,
+                    workspace_id, slug, name, applies_to, display_order, bindings,
                     criteria, automated_review_policy, used_in_new_reviews, created_at
                 ) VALUES (
-                    136103, 'missing-current-revision', 'Missing revision', 'PULL_REQUEST', 3,
+                    136103, 'missing-current-revision', 'Missing revision', 'scm.pull_request', 3,
                     '[]'::jsonb, 'criteria', '{}'::jsonb, true, now()
                 )
                 """
@@ -313,11 +342,15 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("practice revisions are immutable");
 
+        // The current revision only. The vocabulary moves cleared the fingerprint on every stored
+        // revision, so "whichever one is still null" now names more than one row, and the point here is
+        // that a fingerprint can be written once and then not again.
         execute(
             """
             UPDATE practice_revision
             SET review_rule_fingerprint = ('v2:' || repeat('a', 64))
-            WHERE practice_id = 136301 AND slug IS NOT NULL AND review_rule_fingerprint IS NULL
+            WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)
+              AND review_rule_fingerprint IS NULL
             """
         );
         assertThat(
@@ -345,7 +378,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, criteria, created_at,
-                    slug, name, applies_to, trigger_events, precompute_script,
+                    slug, name, applies_to, bindings, precompute_script,
                     why_it_matters, what_good_looks_like,
                     area_slug, area_name, area_description, area_icon, area_color,
                     review_rule_fingerprint, automated_review_policy
@@ -357,7 +390,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                        practice.slug,
                        practice.name,
                        practice.applies_to,
-                       practice.trigger_events,
+                       practice.bindings,
                        practice.precompute_script,
                        practice.why_it_matters,
                        practice.what_good_looks_like,
@@ -441,21 +474,25 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         assertThat(
             scalar(
                 """
-                            SELECT count(*)::text
-                            FROM practice_revision
-                            WHERE practice_id IN (136301, 136302)
-                              AND automated_review_policy IS NOT NULL
-                              AND automated_review_policy ? 'sourceContractVersion'
-                              AND automated_review_policy ? 'evidenceProfile'
-                              AND automated_review_policy #>> '{automatedReview,mode}' = 'LANGUAGE_MODEL'
-                              AND automated_review_policy #>> '{automatedReview,evidenceSufficiency}' =
-                                  'SUFFICIENT_WHEN_REQUIREMENTS_MET'
-                              AND jsonb_typeof(automated_review_policy -> 'requiredEvidence') = 'array'
-                              AND jsonb_array_length(automated_review_policy -> 'requiredEvidence') > 0
-                              AND jsonb_typeof(automated_review_policy -> 'optionalContext') = 'array'
-                              AND NOT automated_review_policy ? 'profile'
-                              AND NOT automated_review_policy ? 'detectorCapability'
+                SELECT count(*)::text
+                FROM practice_revision
+                WHERE practice_id IN (136301, 136302)
+                  AND automated_review_policy IS NOT NULL
+                  AND automated_review_policy ? 'sourceContractVersion'
+                  AND automated_review_policy #>> '{automatedReview,mode}' = 'LANGUAGE_MODEL'
+                  AND automated_review_policy #>> '{automatedReview,evidenceSufficiency}' =
+                      'SUFFICIENT_WHEN_REQUIREMENTS_MET'
+                  -- The sources a review reads live on the bindings now, because what a review needs
+                  -- depends on what occasioned it. Every spelling the policy ever carried them under is
+                  -- gone from it, and a re-applied chain must leave none behind.
+                  AND NOT automated_review_policy ? 'needs'
+                  AND NOT automated_review_policy ? 'requiredEvidence'
+                  AND NOT automated_review_policy ? 'optionalContext'
+                  AND NOT automated_review_policy ? 'evidenceProfile'
+                  AND NOT automated_review_policy ? 'profile'
+                  AND NOT automated_review_policy ? 'detectorCapability'
                   AND NOT automated_review_policy ? 'optionalEvidence'
+                  AND jsonb_path_exists(bindings, '$[*].signals')
                 """
             )
         ).isEqualTo("1");

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -99,12 +100,11 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.workTypes[2].artifactKind")
-            .isEqualTo("chat.conversation_thread")
-            .jsonPath("$.workTypes[2].recommendedRequirements.requiredEvidence[0].sourceKind")
-            .isEqualTo("slack.conversation.thread")
-            .jsonPath("$.workTypes[2].allowedSources[0].displayName")
-            .isEqualTo("Slack thread");
+            // Selected by kind rather than by position; the list is ordered by the registered domains.
+            .jsonPath("$.workTypes[?(@.artifactKind == 'chat.conversation_thread')].recommendedNeeds[0].sourceKind")
+            .value(contains("slack.conversation.thread"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'chat.conversation_thread')].allowedSources[0].displayName")
+            .value(contains("Slack thread"));
     }
 
     @Test
@@ -140,7 +140,9 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedPracticeDTO before = getPractice();
         CuratedPracticeRequestDTO body = new CuratedPracticeRequestDTO(
             before.definition().name(),
-            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+            // The shipped bindings, unchanged: they feed the review-rule fingerprint, so substituting
+            // an equivalent-looking set would make this a change to what Hephaestus reviews.
+            before.definition().bindings(),
             before.definition().criteria(),
             before.definition().precomputeScript(),
             before.definition().automatedReviewPolicy(),

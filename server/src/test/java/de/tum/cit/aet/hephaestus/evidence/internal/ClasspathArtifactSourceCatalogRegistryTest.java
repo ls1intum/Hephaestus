@@ -228,6 +228,36 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             .withMessageContaining("must match the catalog exactly");
     }
 
+    /**
+     * A source whose decisions leave one product purpose unapproved is refused, even though every
+     * decision it does name exists and nothing is orphaned.
+     *
+     * <p>The two checks either side of this one both fail on a mismatched id set, which is the easy
+     * mistake. This is the quiet one: the catalog and the decisions agree with each other and disagree
+     * with the product, so a source reaches a purpose it was never approved for.
+     */
+    @Test
+    void shouldRejectASourceThatLacksADecisionForOnePurpose() throws IOException {
+        JsonNode catalogNode = read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE).deepCopy();
+        var useDecisionIds = (tools.jackson.databind.node.ArrayNode) catalogNode
+            .path("sources")
+            .get(0)
+            .path("useDecisionIds");
+        String dropped = useDecisionIds.get(useDecisionIds.size() - 1).asString();
+        useDecisionIds.remove(useDecisionIds.size() - 1);
+        var catalog = ClasspathArtifactSourceCatalogRegistry.parse(catalogNode);
+        var decisions = new HashMap<>(
+            ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
+            )
+        );
+        decisions.remove(dropped);
+
+        assertThatIllegalStateException()
+            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
+            .withMessageContaining("do not cover every product purpose");
+    }
+
     @Test
     void shouldRejectOrphanUseDecision() throws IOException {
         var catalog = ClasspathArtifactSourceCatalogRegistry.parse(

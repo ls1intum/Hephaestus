@@ -40,10 +40,16 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .expectStatus()
             .isOk()
             .expectBody()
+            .jsonPath("$.deliverToMergedOverride")
+            .doesNotExist()
+            .jsonPath("$.deliverToMerged")
+            .isEqualTo(false)
+            // Whether a draft occasions a review is a property of the practice's binding now, so the
+            // fleet-wide veto is gone from the policy — not merely defaulted, absent.
+            .jsonPath("$.skipDrafts")
+            .doesNotExist()
             .jsonPath("$.skipDraftsOverride")
             .doesNotExist()
-            .jsonPath("$.skipDrafts")
-            .isEqualTo(true)
             // Feature flags aren't review policy and already live on the workspace itself.
             .jsonPath("$.practicesEnabled")
             .doesNotExist()
@@ -79,31 +85,31 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("skipDrafts", false))
+            .bodyValue(Map.of("deliverToMerged", true))
             .exchange()
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.skipDraftsOverride")
-            .isEqualTo(false)
-            .jsonPath("$.skipDrafts")
-            .isEqualTo(false);
+            .jsonPath("$.deliverToMergedOverride")
+            .isEqualTo(true)
+            .jsonPath("$.deliverToMerged")
+            .isEqualTo(true);
 
-        // Reset to inherit — the fleet default for skipDrafts is true.
+        // Reset to inherit — the fleet default for deliverToMerged is false.
         webTestClient
             .patch()
             .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("reset", List.of("SKIP_DRAFTS")))
+            .bodyValue(Map.of("reset", List.of("DELIVER_TO_MERGED")))
             .exchange()
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.skipDraftsOverride")
+            .jsonPath("$.deliverToMergedOverride")
             .doesNotExist()
-            .jsonPath("$.skipDrafts")
-            .isEqualTo(true);
+            .jsonPath("$.deliverToMerged")
+            .isEqualTo(false);
     }
 
     @Test

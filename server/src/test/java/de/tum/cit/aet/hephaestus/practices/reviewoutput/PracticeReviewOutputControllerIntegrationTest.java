@@ -434,7 +434,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .jsonPath("$.content[0].title")
                 .isEqualTo("This run");
 
-            getOk(FINDINGS + "?artifactKind=PULL_REQUEST&artifactId=9", workspace.getWorkspaceSlug())
+            getOk(FINDINGS + "?artifactKind=scm.pull_request&artifactId=9", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].title")
@@ -710,7 +710,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             );
 
             expectResolvedPullRequestArtifact(
-                FINDINGS + "?artifactKind=PULL_REQUEST&artifactId={id}",
+                FINDINGS + "?artifactKind=scm.pull_request&artifactId={id}",
                 "$.content[0].artifact",
                 workspace.getWorkspaceSlug(),
                 artifactId
@@ -722,7 +722,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 observationId
             );
             expectResolvedPullRequestArtifact(
-                FEEDBACK + "?artifactKind=PULL_REQUEST&artifactId={id}",
+                FEEDBACK + "?artifactKind=scm.pull_request&artifactId={id}",
                 "$.content[0].artifact",
                 workspace.getWorkspaceSlug(),
                 artifactId
@@ -988,11 +988,11 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .build()
             );
 
-            getOk(FEEDBACK + "?artifactKind=ISSUE", workspace.getWorkspaceSlug())
+            getOk(FEEDBACK + "?artifactKind=scm.issue", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(2);
 
-            getOk(FEEDBACK + "?artifactKind=ISSUE&artifactId=99", workspace.getWorkspaceSlug())
+            getOk(FEEDBACK + "?artifactKind=scm.issue&artifactId=99", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].bodyPreview")

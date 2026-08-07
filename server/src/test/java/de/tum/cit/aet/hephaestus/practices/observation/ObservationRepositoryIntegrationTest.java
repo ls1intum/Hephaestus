@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.ObjectMapper;
 
@@ -363,10 +365,17 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class CascadeDeleteTests {
+    class PracticeRemovalTests {
 
+        /**
+         * Removing a practice from the catalog is refused while anything was ever measured against it.
+         *
+         * <p>The foreign key used to cascade, so pruning the catalog silently erased the recorded history
+         * of everyone who had ever been measured against that practice — the substrate the whole product
+         * exists to build. Practices retire; measurements persist, and the database is what enforces it.
+         */
         @Test
-        void cascadesFromPracticeSelectively() {
+        void refusesToRemoveAPracticeThatHasBeenMeasuredAgainst() {
             // Create a second practice with its own finding
             Practice otherPractice = new Practice();
             otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
@@ -421,13 +430,15 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            practiceRepository.deleteById(practice.getId());
-            practiceRepository.flush();
+            Long measuredPracticeId = practice.getId();
+            assertThatThrownBy(() -> {
+                practiceRepository.deleteById(measuredPracticeId);
+                practiceRepository.flush();
+            }).isInstanceOf(DataIntegrityViolationException.class);
 
-            // Only the finding for the deleted practice should be gone
-            List<Observation> remaining = observationRepository.findAll();
-            assertThat(remaining).hasSize(1);
-            assertThat(remaining.get(0).getOccurrenceKey()).isEqualTo("cascade-key-2");
+            assertThat(observationRepository.findAll())
+                .extracting(Observation::getOccurrenceKey)
+                .containsExactlyInAnyOrder("cascade-key-1", "cascade-key-2");
         }
     }
 

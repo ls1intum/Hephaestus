@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 
 import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -193,14 +195,16 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.workTypes[0].artifactKind")
-            .isEqualTo("scm.pull_request")
-            .jsonPath("$.workTypes[0].recommendedRequirements.requiredEvidence[1].sourceKind")
-            .isEqualTo("scm.pull-request.diff")
-            .jsonPath("$.workTypes[0].allowedSources[0].displayName")
-            .isEqualTo("Pull request details")
-            .jsonPath("$.workTypes[0].allowedSources[0].description")
-            .isNotEmpty();
+            // Selected by kind rather than by position: the list is whatever the registered domains
+            // declare reviewable, so an index would pin the wrong thing the first time a domain is added.
+            .jsonPath("$.workTypes[*].artifactKind")
+            .value(containsInAnyOrder("scm.pull_request", "scm.issue", "chat.conversation_thread"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].recommendedNeeds[1].sourceKind")
+            .value(contains("scm.pull-request.diff"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].allowedSources[0].displayName")
+            .value(contains("Pull request details"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].allowedSources[0].description")
+            .exists();
     }
 
     @Nested
@@ -670,9 +674,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             return Stream.of("INVALID_SLUG", "bad-slug-", "bad--slug", "-bad-slug", "ab", "a".repeat(65));
         }
 
+        /**
+         * An unknown signal is refused by the practice validator, not by bean validation: whether a
+         * signal exists is a question only the registered domains can answer, so the answer arrives as
+         * a message about the request rather than as a field error.
+         */
         @Test
         @WithAdminUser
-        void shouldReturn400ForInvalidTriggerEvents() {
+        void shouldReturn400ForASignalNoDomainDeclares() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
@@ -685,7 +694,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                         false
                     )
                 ),
-                null,
+                // Everything else valid, or bean validation answers first and the signal is never reached.
+                "Reviewable criteria",
                 null,
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
@@ -707,22 +717,28 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(problem).isNotNull();
-            assertThat(problem.getTitle()).isEqualTo("Validation failed");
-            assertThat(problem.getProperties().get("errors"))
-                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                .containsKey("triggerEvents");
+            assertThat(problem.getTitle()).isEqualTo("Invalid workspace request");
+            assertThat(problem.getDetail()).isEqualTo("Choose signals declared for the selected work type");
         }
 
+        /**
+         * Naming the same signal twice is normalised, not refused.
+         *
+         * <p>A binding sorts and de-duplicates its signals on construction, because the list is digested
+         * into the review-rule fingerprint and two authors writing the same occasion in a different order
+         * must not read as two different rules. This used to assert a rejection and got one — for the
+         * unrelated reason that the request carried no criteria.
+         */
         @Test
         @WithAdminUser
-        void shouldReturn400ForDuplicateTriggerEvents() {
+        void shouldStoreARepeatedSignalOnce() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
                 "dup-events",
                 "Name",
                 PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_OPENED),
-                null,
+                "Reviewable criteria",
                 null,
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
@@ -738,7 +754,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isBadRequest();
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.bindings[0].signals")
+                .value(contains(ScmSignals.PULL_REQUEST_OPENED.value()));
         }
 
         @Test
@@ -1915,7 +1934,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .extracting(PracticeBinding::signals, as(InstanceOfAssertFactories.list(SignalName.class)))
                 .containsExactly(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_REVIEWED);
             assertThat(revisions.get(0).getCriteria()).isEqualTo("Detect if the PR follows best practices");
-            assertThat(revisions.get(0).getReviewRuleFingerprint()).hasSize(67).startsWith("v2:");
+            assertThat(revisions.get(0).getReviewRuleFingerprint()).hasSize(67).startsWith("v3:");
             assertThat(revisions.get(0).getCreatedAt()).isNotNull();
         }
 
@@ -2104,54 +2123,30 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
+    /**
+     * What replaced "the triggers must match the declared focus".
+     *
+     * <p>There is no pair to keep compatible any more: a practice's artifact kind is read off its
+     * signals, so a PR signal makes it a PR practice and there is nothing left to contradict. The two
+     * rejections this class used to assert are gone with the second spelling that made them possible.
+     * What can still be wrong is naming signals about two different kinds of work at once, and that a
+     * practice cannot be reviewed as both.
+     */
     @Nested
-    @DisplayName("Trigger events must be compatible with the practice focus")
-    class TriggerFocusCompatibility {
+    @DisplayName("A practice's kind of work comes from its signals")
+    class ArtifactKindFromSignals {
 
         @Test
         @WithAdminUser
-        @DisplayName("PATCH artifactKind=ISSUE on a PR practice with PR-only triggers → 400 (merged-state check)")
-        void changingFocusToIssueWithStalePrTriggersIsRejected() {
-            ensureAdminMembership(workspace);
-            persistPractice("focus-flip", "Focus Flip", true);
-
-            var request = new UpdatePracticeRequestDTO(null, null, null, null, null, null, null, null, null);
-
-            ProblemDetail problem = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "focus-flip")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest()
-                .expectBody(ProblemDetail.class)
-                .returnResult()
-                .getResponseBody();
-
-            assertThat(problem).isNotNull();
-            assertThat(problem.getStatus()).isEqualTo(400);
-            assertThat(problem.getDetail()).isEqualTo("Choose review events available for the selected work type");
-            assertThat(
-                practiceRepository
-                    .findByWorkspaceIdAndSlug(workspace.getId(), "focus-flip")
-                    .orElseThrow()
-                    .getArtifactKind()
-            ).isEqualTo(ArtifactKinds.PULL_REQUEST);
-        }
-
-        @Test
-        @WithAdminUser
-        @DisplayName("create an ISSUE practice with a PR-only trigger event → 400")
-        void creatingIssuePracticeWithPrTriggerIsRejected() {
+        @DisplayName("a pull-request signal makes it a pull-request practice, whatever the policy names")
+        void readsTheKindOffTheSignalRatherThanTheDeclaredPolicy() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
-                "issue-with-pr-trigger",
-                "Issue With PR Trigger",
+                "kind-from-signal",
+                "Kind From Signal",
                 PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED),
-                "Detect something",
+                "Review something",
                 null,
                 PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE),
                 null,
@@ -2159,7 +2154,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null
             );
 
-            ProblemDetail problem = webTestClient
+            webTestClient
                 .post()
                 .uri(BASE_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -2167,17 +2162,51 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isBadRequest()
-                .expectBody(ProblemDetail.class)
-                .returnResult()
-                .getResponseBody();
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.artifactKind")
+                .isEqualTo(ArtifactKinds.PULL_REQUEST.value());
 
-            assertThat(problem).isNotNull();
-            assertThat(problem.getStatus()).isEqualTo(400);
-            assertThat(problem.getDetail()).isEqualTo("Choose review events available for the selected work type");
             assertThat(
-                practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "issue-with-pr-trigger")
-            ).isEmpty();
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "kind-from-signal")
+                    .orElseThrow()
+                    .getArtifactKind()
+            ).isEqualTo(ArtifactKinds.PULL_REQUEST);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("one practice cannot be about two kinds of work at once → 400")
+        void refusesBindingsThatDisagreeAboutTheKindOfWork() {
+            ensureAdminMembership(workspace);
+
+            var request = new CreatePracticeRequestDTO(
+                "two-minds",
+                "Two Minds",
+                List.of(
+                    PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED).getFirst(),
+                    PracticeTestEvidence.bindings(ScmSignals.ISSUE_OPENED).getFirst()
+                ),
+                "Review something",
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+
+            assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "two-minds")).isEmpty();
         }
 
         @Test

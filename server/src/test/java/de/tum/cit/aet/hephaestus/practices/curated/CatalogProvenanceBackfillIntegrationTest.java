@@ -136,10 +136,10 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
             jdbcTemplate.update(
                 """
                 INSERT INTO practice_revision (
-                    practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
+                    practice_id, revision_number, slug, name, applies_to, bindings, criteria,
                     automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
                 )
-                SELECT id, 0, slug, name, applies_to, trigger_events, criteria,
+                SELECT id, 0, slug, name, applies_to, bindings, criteria,
                        NULL, 'Reviewers need context', ?, NULL, now()
                 FROM practice WHERE workspace_id = ?
                 """,
@@ -191,7 +191,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
             Long practiceId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO practice (
-                    workspace_id, practice_area_id, slug, name, applies_to, display_order, trigger_events,
+                    workspace_id, practice_area_id, slug, name, applies_to, display_order, bindings,
                     criteria, automated_review_policy, why_it_matters, source_curated_slug,
                     source_curated_fingerprint, used_in_new_reviews, created_at
                 ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, true, now())
@@ -212,7 +212,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
             Long revisionId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO practice_revision (
-                    practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
+                    practice_id, revision_number, slug, name, applies_to, bindings, criteria,
                     automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
                 ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, now())
                 RETURNING id
@@ -232,7 +232,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 revisionId = jdbcTemplate.queryForObject(
                     """
                     INSERT INTO practice_revision (
-                        practice_id, revision_number, slug, name, applies_to, trigger_events, criteria,
+                        practice_id, revision_number, slug, name, applies_to, bindings, criteria,
                         automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
                     ) VALUES (?, 2, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, NULL, now())
                     RETURNING id
