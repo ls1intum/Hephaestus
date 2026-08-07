@@ -62,6 +62,8 @@ export interface PracticeEvidenceEditorProps {
 	occasionLabel: string;
 	disabled?: boolean;
 	invalid?: boolean;
+	/** The id of the form-level message about this occasion, when this group is the one it names. */
+	errorId?: string;
 }
 
 /**
@@ -80,6 +82,7 @@ export function PracticeEvidenceEditor({
 	occasionLabel,
 	disabled = false,
 	invalid = false,
+	errorId,
 }: PracticeEvidenceEditorProps) {
 	// Open from the start when this occasion is already invalid — a form re-rendered into its error
 	// state never crosses the transition below, and the fix is not reachable from the collapsed summary.
@@ -99,6 +102,7 @@ export function PracticeEvidenceEditor({
 	return (
 		<FieldSet
 			data-invalid={invalid || undefined}
+			aria-describedby={errorId}
 			aria-label={`What this review reads, ${occasionLabel}`}
 		>
 			<FieldLegend variant="label">What this review reads</FieldLegend>

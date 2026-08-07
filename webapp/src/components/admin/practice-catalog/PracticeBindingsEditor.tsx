@@ -29,6 +29,15 @@ import {
 	FieldSet,
 } from "@/components/ui/field";
 
+/**
+ * The one error this editor shows, and the id the control it names points at.
+ *
+ * <p>Rendering the message is not enough on its own: an author who submits an invalid form is sent to
+ * the control that has to change, and unless that control is described by the message, what they hear
+ * on arrival is the group's name and nothing about what is wrong with it.
+ */
+const BINDINGS_ERROR_ID = "practice-bindings-error";
+
 export interface PracticeBindingsEditorProps {
 	/** The work type every binding belongs to; supplies the signals and sources they may name. */
 	options: PracticeWorkTypeDefinitionOptions;
@@ -94,6 +103,7 @@ export function PracticeBindingsEditor({
 							canAttemptReview={canAttemptReview}
 							guidanceOnly={guidanceOnly}
 							errorFocusId={belongsToBinding(errorFocusId, index) ? errorFocusId : undefined}
+							errorId={error ? BINDINGS_ERROR_ID : undefined}
 							disabled={disabled}
 							onChange={(next) => replaceAt(index, next)}
 							onRemove={() => onChange(bindings.filter((_, other) => other !== index))}
@@ -107,6 +117,9 @@ export function PracticeBindingsEditor({
 					type="button"
 					variant="outline"
 					size="sm"
+					aria-describedby={
+						error && errorFocusId === ADD_BINDING_ID ? BINDINGS_ERROR_ID : undefined
+					}
 					disabled={disabled || !canAdd}
 					onClick={() =>
 						onChange([
@@ -126,7 +139,7 @@ export function PracticeBindingsEditor({
 					</p>
 				)}
 			</div>
-			{error && <FieldError id="practice-bindings-error">{error}</FieldError>}
+			{error && <FieldError id={BINDINGS_ERROR_ID}>{error}</FieldError>}
 		</div>
 	);
 }
@@ -141,6 +154,8 @@ interface BindingCardProps {
 	guidanceOnly: boolean;
 	/** The control this occasion must send focus to, when the invalid one is in this occasion. */
 	errorFocusId?: string;
+	/** The id of the form-level message, so the control focus lands on is described by it. */
+	errorId?: string;
 	disabled: boolean;
 	onChange: (binding: PracticeBinding) => void;
 	onRemove: () => void;
@@ -155,6 +170,7 @@ function BindingCard({
 	canAttemptReview,
 	guidanceOnly,
 	errorFocusId,
+	errorId,
 	disabled,
 	onChange,
 	onRemove,
@@ -201,6 +217,7 @@ function BindingCard({
 
 			<FieldSet
 				data-invalid={signalsInvalid || undefined}
+				aria-describedby={signalsInvalid ? errorId : undefined}
 				id={bindingFieldId(index, "signals")}
 				// Focusable only programmatically: a form-level error sends focus here so the occasion it
 				// names is the one the author lands in, but the group stays out of the tab order.
@@ -275,6 +292,7 @@ function BindingCard({
 					canAttemptReview={canAttemptReview}
 					disabled={disabled}
 					invalid={evidenceInvalid}
+					errorId={evidenceInvalid ? errorId : undefined}
 					onChange={(needs) => onChange({ ...binding, needs })}
 				/>
 			)}

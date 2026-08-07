@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import {
 	mockConversationBinding,
 	mockIssueBinding,
@@ -7,6 +7,7 @@ import {
 	mockPracticeDefinitionOptions,
 	mockPullRequestBinding,
 } from "@/mocks/fixtures/practice";
+import { ADD_BINDING_ID } from "./bindings";
 import { PracticeBindingsEditor } from "./PracticeBindingsEditor";
 
 const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
@@ -145,6 +146,11 @@ export const WithRecentOutcomes: Story = {
 	},
 };
 
+/**
+ * A submit sends focus to the control that has to change. The message has to travel with it: on its
+ * own it is text somewhere else on a long form, and an author who lands in the group hears its name
+ * and nothing about what is wrong.
+ */
 export const Invalid: Story = {
 	args: {
 		bindings: [{ signals: [], needs: [] }],
@@ -153,8 +159,74 @@ export const Invalid: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("No moment chosen yet")).toBeVisible();
-		await expect(canvas.getByRole("alert")).toHaveTextContent(
-			"Choose when this occasion starts a review.",
+		await expect(
+			canvas.getByRole("group", { name: "Starts a review when, occasion 1" }),
+		).toHaveAccessibleDescription("Choose when this occasion starts a review.");
+		// Only the faulted group carries it — describing every group with it would make the message
+		// mean "something on this form is wrong" rather than "this is the thing to change".
+		await expect(
+			canvas.getByRole("group", { name: "What this review reads, occasion 1" }),
+		).not.toHaveAccessibleDescription("Choose when this occasion starts a review.");
+	},
+};
+
+/** With no occasion at all there is no group to fault, so the message rides the action that fixes it. */
+export const NoOccasionAtAll: Story = {
+	args: {
+		bindings: [],
+		error: "Add at least one occasion that starts a review.",
+		errorFocusId: ADD_BINDING_ID,
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Add occasion" })).toHaveAccessibleDescription(
+			"Add at least one occasion that starts a review.",
 		);
+	},
+};
+
+/**
+ * The write path, which nothing exercised: adding an occasion, choosing a moment for it, and removing
+ * it again. Each reports the whole list back, because the editor holds no state of its own.
+ */
+export const AddingAnOccasion: Story = {
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Add occasion" }));
+
+		// Every recommended moment already belongs to occasion 1, so the new one takes the first still
+		// free rather than a moment the server would refuse for being bound twice.
+		await expect(args.onChange).toHaveBeenCalledWith([
+			mockPullRequestBinding,
+			{ signals: ["scm.pull_request.reviewed"], needs: mockPullRequestBinding.needs },
+		]);
+	},
+};
+
+export const ChoosingAMoment: Story = {
+	play: async ({ args, canvas }) => {
+		const group = within(canvas.getByRole("group", { name: "Starts a review when, occasion 1" }));
+		await userEvent.click(group.getByRole("checkbox", { name: "Review submitted" }));
+
+		// Sorted on the way out, the way the server stores it: unsorted, reloading an untouched
+		// practice and saving nothing would come back looking edited.
+		await expect(args.onChange).toHaveBeenCalledWith([
+			{
+				signals: [
+					"scm.pull_request.opened",
+					"scm.pull_request.ready",
+					"scm.pull_request.reviewed",
+					"scm.pull_request.synchronized",
+				],
+				needs: mockPullRequestBinding.needs,
+			},
+		]);
+	},
+};
+
+export const RemovingAnOccasion: Story = {
+	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Remove occasion 2" }));
+
+		await expect(args.onChange).toHaveBeenCalledWith([mockPullRequestBinding]);
 	},
 };
