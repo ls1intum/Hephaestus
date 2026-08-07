@@ -166,6 +166,48 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     )
     List<WorkspaceAggregate> aggregateByWorkspace(@Param("from") Instant from, @Param("to") Instant to);
 
+    /**
+     * Mean cost of one <em>review</em> of this job type, over reviews this window could price in full.
+     *
+     * <p>Deliberately not derived from {@link #aggregateByJobType}: a row in this table is one
+     * <em>attempt</em>, not one review, and the unique key is {@code (source_type, source_id,
+     * source_attempt)}. Dividing a workspace's spend by its attempt count reports a fraction of the truth
+     * — a third of it on a review that took three attempts — and it is wrong in the direction that
+     * matters, because it under-quotes exactly the retry-heavy workspaces whose campaigns cost the most.
+     * Grouping by the source first makes the denominator "reviews" and puts each review's retries into
+     * its own cost, which is what a campaign will actually be billed.
+     *
+     * <p>A review with any unpriced attempt is dropped from numerator and denominator together, so an
+     * instance with a half-priced catalogue reports the mean of what it could price rather than a mean
+     * dragged toward zero by attempts it could not.
+     */
+    @Query(
+        value = """
+        SELECT COALESCE(SUM(r.review_cost), 0) AS totalCostUsd, COUNT(*) AS reviews
+        FROM (
+            SELECT e.source_type, e.source_id, SUM(e.cost_usd) AS review_cost
+            FROM llm_usage_event e
+            WHERE e.workspace_id = :workspaceId AND e.job_type = :jobType
+              AND e.occurred_at >= :from AND e.occurred_at < :to
+            GROUP BY e.source_type, e.source_id
+            HAVING COUNT(*) FILTER (WHERE e.cost_usd IS NULL) = 0
+        ) r
+        """,
+        nativeQuery = true
+    )
+    ReviewCostAggregate aggregateCostPerReview(
+        @Param("workspaceId") Long workspaceId,
+        @Param("jobType") String jobType,
+        @Param("from") Instant from,
+        @Param("to") Instant to
+    );
+
+    /** Both purses summed: a forecast is about the work, not about who pays for it. */
+    interface ReviewCostAggregate {
+        BigDecimal getTotalCostUsd();
+        long getReviews();
+    }
+
     interface JobTypeAggregate {
         String getJobType();
         BigDecimal getPricedTotalCostUsd();

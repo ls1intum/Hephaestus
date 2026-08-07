@@ -89,8 +89,12 @@ public class ReviewBackfillDriver {
             try {
                 advance(run);
             } catch (RuntimeException e) {
-                // One campaign's failure must not stop the others. The run keeps its state and its cursor,
-                // so the next tick retries exactly where this one gave up.
+                // One campaign's failure must not stop the others. What lands here is a whole-run failure
+                // — the scope query, or a losing optimistic-lock write because somebody changed the run
+                // under us — not a single artifact's, which `advance` walks past itself. The run keeps its
+                // persisted cursor, so the next tick re-reads it and resumes from the last batch that
+                // committed; the work between that cursor and the failure is re-offered, and the ledger's
+                // unique key is what keeps re-offering from re-reviewing.
                 log.warn("Review backfill batch failed: runId={}", run.getId(), e);
             }
         }
@@ -141,7 +145,25 @@ public class ReviewBackfillDriver {
         int passed = 0;
         long cursor = run.getCursorArtifactId() == null ? 0L : run.getCursorArtifactId();
         for (Long artifactId : batch) {
-            ReviewBackfillSubmitter.Outcome outcome = submitter.offer(run, artifactId);
+            ReviewBackfillSubmitter.Outcome outcome;
+            try {
+                outcome = submitter.offer(run, artifactId);
+            } catch (RuntimeException e) {
+                // The cursor advances past a failure on purpose. Each offer is REQUIRES_NEW, so this
+                // artifact's failure has already unwound by itself and nothing behind it is at risk — but
+                // if the batch aborted here the cursor would never be written, and the next tick would
+                // re-walk these same ids and fail on this same artifact. A deterministically failing
+                // artifact would freeze the campaign for good, with the run still reading RUNNING and its
+                // counts never moving. One artifact is allowed to be unreviewable; a campaign is not
+                // allowed to stop because of it.
+                log.warn(
+                    "Review backfill artifact failed, walking past it: runId={}, artifactId={}",
+                    run.getId(),
+                    artifactId,
+                    e
+                );
+                outcome = null;
+            }
             if (outcome == ReviewBackfillSubmitter.Outcome.SUBMITTED) {
                 submitted++;
             } else {

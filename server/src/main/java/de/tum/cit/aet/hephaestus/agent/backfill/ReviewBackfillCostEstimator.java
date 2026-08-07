@@ -42,27 +42,30 @@ public class ReviewBackfillCostEstimator {
      * not about who pays. Unpriced runs are excluded from the denominator as well as the numerator, so an
      * instance with a half-priced catalogue reports the mean of what it could price rather than a mean
      * dragged toward zero by rows it could not.
+     *
+     * <p>The denominator is reviews, not usage rows. A usage row is one attempt, and a review that
+     * retried twice writes three of them — so dividing by rows would quote a third of the real price to
+     * the workspaces most likely to retry. This is the number an admin confirms a spend against, so its
+     * error must not be in the cheap direction.
      */
     @Transactional(readOnly = true)
     public @Nullable BigDecimal meanCostPerReviewUsd(Long workspaceId, AgentJobType jobType) {
         Instant to = Instant.now();
         Instant from = to.minus(properties.costHistoryWindow());
-        String wanted = LlmUsageJobType.from(jobType).name();
-        for (LlmUsageEventRepository.JobTypeAggregate row : usageRepository.aggregateByJobType(workspaceId, from, to)) {
-            if (!wanted.equals(row.getJobType())) {
-                continue;
-            }
-            long priced = row.getEvents() - row.getUnpricedEventCount();
-            if (priced <= 0) {
-                return null;
-            }
-            BigDecimal total = nullToZero(row.getPricedTotalCostUsd()).add(nullToZero(row.getByoTotalCostUsd()));
-            if (total.signum() <= 0) {
-                return null;
-            }
-            return total.divide(BigDecimal.valueOf(priced), 6, RoundingMode.HALF_UP);
+        LlmUsageEventRepository.ReviewCostAggregate row = usageRepository.aggregateCostPerReview(
+            workspaceId,
+            LlmUsageJobType.from(jobType).name(),
+            from,
+            to
+        );
+        if (row == null || row.getReviews() <= 0) {
+            return null;
         }
-        return null;
+        BigDecimal total = nullToZero(row.getTotalCostUsd());
+        if (total.signum() <= 0) {
+            return null;
+        }
+        return total.divide(BigDecimal.valueOf(row.getReviews()), 6, RoundingMode.HALF_UP);
     }
 
     /** The campaign's forecast, or {@code null} when the per-review cost is unknown. */
