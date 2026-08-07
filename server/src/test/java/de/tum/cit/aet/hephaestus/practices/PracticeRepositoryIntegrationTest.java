@@ -103,18 +103,41 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     @Nested
     class QueryTests {
 
+        /**
+         * The gate reads the whole catalogue, at every tier, on purpose: it has to tell "nothing is bound
+         * to this signal" apart from "something is bound and the workspace turned it off", which are
+         * different answers to "why did nothing happen" and get different recorded reasons.
+         */
         @Test
-        void findsActivePracticesOnly() {
-            Practice active = createPractice("active", "Active");
-            Practice inactive = createPractice("inactive", "Inactive");
-            inactive.setReviewTier(PracticeReviewTier.OFF);
-            practiceRepository.save(active);
-            practiceRepository.save(inactive);
+        void findsEveryPracticeOfTheWorkspaceWhateverItsTier() {
+            Practice loud = createPractice("loud", "Loud");
+            Practice silent = createPractice("silent", "Silent");
+            silent.setReviewTier(PracticeReviewTier.OFF);
+            practiceRepository.save(loud);
+            practiceRepository.save(silent);
 
             List<Practice> result = practiceRepository.findByWorkspaceId(workspace.getId());
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getSlug()).isEqualTo("active");
+            assertThat(result).extracting(Practice::getSlug).containsExactlyInAnyOrder("loud", "silent");
+        }
+
+        @Test
+        void reviewTierFilteredQueryExcludesOnlyTheSilencedOnes() {
+            Practice loud = createPractice("loud", "Loud");
+            Practice measured = createPractice("measured", "Measured");
+            measured.setReviewTier(PracticeReviewTier.MEASURE);
+            Practice silent = createPractice("silent", "Silent");
+            silent.setReviewTier(PracticeReviewTier.OFF);
+            practiceRepository.saveAll(List.of(loud, measured, silent));
+
+            List<Practice> result = practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+                workspace.getId(),
+                PracticeReviewTier.OFF,
+                loud.getArtifactKind()
+            );
+
+            // MEASURE is included: it still runs a review, and the agent needs its criteria to run one.
+            assertThat(result).extracting(Practice::getSlug).containsExactlyInAnyOrder("loud", "measured");
         }
 
         @Test

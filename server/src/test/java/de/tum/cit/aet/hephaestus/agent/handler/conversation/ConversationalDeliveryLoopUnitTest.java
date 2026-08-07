@@ -31,7 +31,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -99,7 +98,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     private FeedbackChannelRouter router() {
-        return new FeedbackChannelRouter(feedbackRepository);
+        return new FeedbackChannelRouter(feedbackRepository, observationRepository);
     }
 
     private ConversationalFeedbackPreparer preparer() {
@@ -191,7 +190,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             }
         };
 
-        assertThat(router().route(obs, WS, ctx)).isEqualTo(expected);
+        assertThat(router().route(obs, PracticeReviewTier.ENGAGE, WS, ctx)).isEqualTo(expected);
     }
 
     @Test
@@ -399,11 +398,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @MethodSource("tierRoutingCases")
     void routerAppliesTheLoudnessTierBeforeAnythingElse(PracticeReviewTier tier, ConversationRoutingDecision expected) {
         Observation observation = problem(null, null);
-        Practice practice = new Practice();
-        practice.setReviewTier(tier);
-        lenient().when(observation.getPractice()).thenReturn(practice);
 
-        assertThat(router().route(observation, WS, RoutingContext.author())).isEqualTo(expected);
+        assertThat(router().route(observation, tier, WS, RoutingContext.author())).isEqualTo(expected);
     }
 
     static Stream<Arguments> tierRoutingCases() {
@@ -422,12 +418,22 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Test
     void tierIsAskedBeforeTheReviewerDeferral() {
         Observation observation = problem(null, null);
-        Practice practice = new Practice();
-        practice.setReviewTier(PracticeReviewTier.MEASURE);
-        lenient().when(observation.getPractice()).thenReturn(practice);
 
-        assertThat(router().route(observation, WS, RoutingContext.reviewer())).isEqualTo(
+        assertThat(router().route(observation, PracticeReviewTier.MEASURE, WS, RoutingContext.reviewer())).isEqualTo(
             ConversationRoutingDecision.PRACTICE_TIER_QUIET
+        );
+    }
+
+    /**
+     * A tier the projection could not resolve must not silence the observation: a lookup miss is our
+     * problem, and withholding coaching over it would be a refusal nobody asked for.
+     */
+    @Test
+    void anUnresolvedTierLeavesTheRemainingRulesInCharge() {
+        Observation observation = problem(null, null);
+
+        assertThat(router().route(observation, null, WS, RoutingContext.author())).isEqualTo(
+            ConversationRoutingDecision.ADMIT
         );
     }
 

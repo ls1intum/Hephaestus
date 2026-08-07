@@ -5,10 +5,15 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -26,30 +31,50 @@ import tools.jackson.databind.JsonNode;
 public class FeedbackChannelRouter {
 
     private final FeedbackRepository feedbackRepository;
+    private final ObservationRepository observationRepository;
 
-    public FeedbackChannelRouter(FeedbackRepository feedbackRepository) {
+    public FeedbackChannelRouter(FeedbackRepository feedbackRepository, ObservationRepository observationRepository) {
         this.feedbackRepository = feedbackRepository;
+        this.observationRepository = observationRepository;
     }
 
     /** The observations from {@code observations} that are eligible for conversational delivery, order preserved. */
     public List<Observation> admit(List<Observation> observations, long workspaceId, RoutingContext context) {
+        Map<UUID, PracticeReviewTier> tiers = tiersFor(observations);
         List<Observation> admitted = new ArrayList<>();
         for (Observation observation : observations) {
-            if (route(observation, workspaceId, context) == ConversationRoutingDecision.ADMIT) {
+            ConversationRoutingDecision decision = route(
+                observation,
+                tiers.get(observation.getId()),
+                workspaceId,
+                context
+            );
+            if (decision == ConversationRoutingDecision.ADMIT) {
                 admitted.add(observation);
             }
         }
         return admitted;
     }
 
-    /** Route a single observation. See the class javadoc for the admission predicate. */
-    public ConversationRoutingDecision route(Observation observation, long workspaceId, RoutingContext context) {
-        // The workspace's standing loudness policy for this practice, asked first: it is the cheapest test
-        // and the most decisive one, because a practice at MEASURE has nothing to say on ANY channel. The
-        // practice is a mandatory association and the caller routes inside a transaction, so this resolves
-        // one lazy proxy per DISTINCT practice, not per observation.
-        Practice practice = observation.getPractice();
-        if (practice != null && !practice.getReviewTier().delivers(FeedbackChannel.CONVERSATION)) {
+    /**
+     * Route a single observation. See the class javadoc for the admission predicate.
+     *
+     * @param tier the loudness tier of the observation's practice, or {@code null} when it could not be
+     *     resolved. Passed in rather than read off {@code observation.getPractice()} on purpose: that
+     *     association is lazy, so reading it here would make the routing rule depend on whether the
+     *     caller happens to hold a session — correct inside the delivery listener's transaction and
+     *     broken for every other caller. A null tier lets the remaining rules decide, because refusing
+     *     on a failed lookup would silently withhold coaching the developer was owed.
+     */
+    public ConversationRoutingDecision route(
+        Observation observation,
+        @Nullable PracticeReviewTier tier,
+        long workspaceId,
+        RoutingContext context
+    ) {
+        // The workspace's standing loudness policy for this practice, asked first: it is the cheapest
+        // test and the most decisive one, because a practice at MEASURE has nothing to say on ANY channel.
+        if (tier != null && !tier.delivers(FeedbackChannel.CONVERSATION)) {
             return ConversationRoutingDecision.PRACTICE_TIER_QUIET;
         }
         // Reviewer-targeted delivery: deferred (ADR-0021-C2).
@@ -78,6 +103,22 @@ public class FeedbackChannelRouter {
             return ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT;
         }
         return ConversationRoutingDecision.ADMIT;
+    }
+
+    /**
+     * One projection query for the whole cycle's tiers. An observation with no id yet is simply absent
+     * from the map, which the null-tier rule above already covers.
+     */
+    private Map<UUID, PracticeReviewTier> tiersFor(List<Observation> observations) {
+        List<UUID> ids = observations.stream().map(Observation::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, PracticeReviewTier> tiers = new HashMap<>();
+        for (var row : observationRepository.practiceReviewTiersFor(ids)) {
+            tiers.put(row.getObservationId(), row.getReviewTier());
+        }
+        return tiers;
     }
 
     private static boolean hasNaturalInlineAnchor(Observation observation) {

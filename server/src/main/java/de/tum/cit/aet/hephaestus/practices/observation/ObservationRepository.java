@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
@@ -767,5 +768,30 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Long getSuperseded();
         Long getSuppressed();
         Long getFailed();
+    }
+
+    /**
+     * The loudness tier of each observation's practice, resolved in ONE query rather than by walking the
+     * lazy {@code Observation.practice} association.
+     *
+     * <p>The association is deliberately not used for this. The conversational router receives
+     * observations that may already be detached, and traversing a lazy proxy there made the router's
+     * correctness depend on the caller's session — it worked in production only because the listener
+     * happens to hold a transaction, and failed the moment anything else called it. A projection is
+     * session-independent, so the rule holds wherever it is applied.
+     */
+    @Query(
+        """
+        SELECT o.id AS observationId, o.practice.reviewTier AS reviewTier
+        FROM Observation o
+        WHERE o.id IN :observationIds
+        """
+    )
+    List<ObservationPracticeTier> practiceReviewTiersFor(@Param("observationIds") Collection<UUID> observationIds);
+
+    /** One observation's practice tier, without loading either entity. */
+    interface ObservationPracticeTier {
+        UUID getObservationId();
+        PracticeReviewTier getReviewTier();
     }
 }
