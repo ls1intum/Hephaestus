@@ -5,6 +5,7 @@ import {
 	ChevronRight,
 	CircleDollarSign,
 	ClipboardCheck,
+	History,
 	LayoutGridIcon,
 	ListChecks,
 	Map as MapIcon,
@@ -66,8 +67,11 @@ export function NavAdmin({
 	const onReviews = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/reviews", fuzzy: true }),
 	);
+	const onBackfill = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/practices/backfill", fuzzy: true }),
+	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
-	const onCatalog = onSection && !onReviewSettings && !onReviews;
+	const onCatalog = onSection && !onReviewSettings && !onReviews && !onBackfill;
 
 	const onIntegrationsScm = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/scm", fuzzy: true }),
@@ -215,6 +219,17 @@ export function NavAdmin({
 						>
 							<SlidersHorizontal />
 							<span>Review settings</span>
+						</SidebarMenuSubButton>
+					</SidebarMenuSubItem>
+					<SidebarMenuSubItem>
+						<SidebarMenuSubButton
+							isActive={onBackfill}
+							render={
+								<Link to="/w/$workspaceSlug/admin/practices/backfill" params={{ workspaceSlug }} />
+							}
+						>
+							<History />
+							<span>Review past work</span>
 						</SidebarMenuSubButton>
 					</SidebarMenuSubItem>
 				</AdminNavSection>

@@ -109,7 +109,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             ),
             // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
             // therefore admitted, so these tests exercise delivery rather than the tier.
-            new PracticeTierGate(
+            new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)

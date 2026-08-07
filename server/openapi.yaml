@@ -46,6 +46,8 @@ tags:
     Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
      slugged routes live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
+- description: Bounded campaigns that review work which already existed
+  name: Practice Review Backfill
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
@@ -367,6 +369,7 @@ paths:
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
+            - REVIEW_BACKFILL_RUN
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -2335,6 +2338,7 @@ paths:
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
+            - REVIEW_BACKFILL_RUN
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -4275,6 +4279,143 @@ paths:
       summary: Create a new practice definition
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/backfill-runs:
+    get:
+      operationId: listBackfillRuns
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Campaigns returned
+      summary: List this workspace's recent backfill campaigns
+      tags:
+      - Practice Review Backfill
+    post:
+      description: Creates a run awaiting confirmation. Submits nothing and spends
+        nothing.
+      operationId: preflightBackfillRun
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewBackfillRunRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Scope enumerated and priced
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The window is inverted, too long, or covers too many artifacts"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: A campaign is already under way for this workspace
+      summary: Enumerate and price a backfill campaign
+      tags:
+      - Practice Review Backfill
+  /workspaces/{workspaceSlug}/practices/backfill-runs/{runId}:
+    get:
+      operationId: getBackfillRun
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Campaign returned
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such campaign in this workspace
+      summary: "Get one backfill campaign, including its live progress"
+      tags:
+      - Practice Review Backfill
+  /workspaces/{workspaceSlug}/practices/backfill-runs/{runId}/status:
+    patch:
+      description: RUNNING authorises the estimated spend and starts the campaign;
+        CANCELLED stops it for good.
+      operationId: updateBackfillRunStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReviewBackfillRunStatusRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Campaign updated
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The campaign cannot make that transition from its current state
+      summary: Confirm or cancel a backfill campaign
+      tags:
+      - Practice Review Backfill
   /workspaces/{workspaceSlug}/practices/definition-options:
     get:
       description: "Returns available review events, recommended requirements, and\
@@ -4822,6 +4963,7 @@ paths:
             - EMPTY_AFTER_SANITIZE
             - INSTANCE_SILENCED
             - PRACTICE_TIER_QUIET
+            - BACKFILL_QUIET
       - in: query
         name: channel
         required: false
@@ -7188,6 +7330,7 @@ components:
           - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
           - WORKSPACE_BYO_LLM_BUDGET
+          - REVIEW_BACKFILL_RUN
           - WORKSPACE_LLM_CONNECTION
           - WORKSPACE_LLM_MODEL
         id:
@@ -7743,6 +7886,31 @@ components:
           minLength: 0
       required:
       - action
+    CreateReviewBackfillRunRequest:
+      type: object
+      description: |-
+        Ask for a campaign to be enumerated and costed. Creates nothing that spends money: the run comes back
+         awaiting confirmation, and only a subsequent status change starts it.
+      properties:
+        artifactKind:
+          type: string
+          description: Kind of work to review
+          enum:
+          - scm.pull_request
+          - scm.issue
+          example: scm.pull_request
+        fromAt:
+          type: string
+          format: date-time
+          description: "Window start, inclusive, over the artifact's creation time"
+        toAt:
+          type: string
+          format: date-time
+          description: "Window end, exclusive"
+      required:
+      - artifactKind
+      - fromAt
+      - toAt
     CreateWorkspaceLlmConnectionRequest:
       type: object
       description: Connect your own AI provider
@@ -10881,6 +11049,82 @@ components:
       - id
       - title
       - type
+    ReviewBackfillRun:
+      type: object
+      description: "A campaign as an admin sees it — before confirming, while it runs,\
+        \ and after it ends."
+      properties:
+        artifactKind:
+          type: string
+        confirmedByAccountId:
+          type: integer
+          format: int64
+          description: Who authorised the spend; absent until the run is confirmed
+        createdAt:
+          type: string
+          format: date-time
+        estimatedArtifacts:
+          type: integer
+          format: int32
+        estimatedCostUsd:
+          type: number
+          format: decimal
+          description: Forecast total spend in USD; absent when the workspace has
+            no priced review history
+        finishedAt:
+          type: string
+          format: date-time
+        fromAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        passedCount:
+          type: integer
+          format: int32
+          description: |-
+            artifacts walked past without one: already measured at their current state, or
+                 refused by the review gate. Together with <code>submittedCount</code> this is how far the walk has got.
+        pauseReason:
+          type: string
+          description: Set only while the run is PAUSED
+          enum:
+          - BUDGET_EXHAUSTED
+          - BINDING_DISABLED
+          - WORKSPACE_UNAVAILABLE
+        requestedByAccountId:
+          type: integer
+          format: int64
+        startedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+          - AWAITING_CONFIRMATION
+          - RUNNING
+          - PAUSED
+          - COMPLETED
+          - CANCELLED
+        submittedCount:
+          type: integer
+          format: int32
+          description: artifacts for which a review job was created
+        toAt:
+          type: string
+          format: date-time
+      required:
+      - artifactKind
+      - createdAt
+      - estimatedArtifacts
+      - fromAt
+      - id
+      - passedCount
+      - requestedByAccountId
+      - status
+      - submittedCount
+      - toAt
     ReviewBoundFeedback:
       type: object
       description: A message composed from a finding
@@ -10935,6 +11179,7 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - PRACTICE_TIER_QUIET
+          - BACKFILL_QUIET
       required:
       - agentJobId
       - channel
@@ -11087,6 +11332,7 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - PRACTICE_TIER_QUIET
+          - BACKFILL_QUIET
       required:
       - agentJobId
       - bodyTruncated
@@ -11195,6 +11441,7 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - PRACTICE_TIER_QUIET
+          - BACKFILL_QUIET
         threadKey:
           type: string
           description: Cross-run continuity key tying successive deliveries together
@@ -12450,6 +12697,26 @@ components:
             from leaderboard calculations
       required:
       - hiddenFromContributions
+    UpdateReviewBackfillRunStatusRequest:
+      type: object
+      description: |-
+        The one lifecycle transition an admin can ask for.
+
+         <p><code>RUNNING</code> is the confirmation: it is the point at which somebody accepts the estimate they
+         were shown and authorises the spend. <code>CANCELLED</code> stops a campaign for good. Every other
+         transition — pausing on an exhausted budget, resuming when it clears, completing at the end of the
+         scope — belongs to the driver, and is refused here so the state on screen always reflects something
+         the system decided or something a person did, never a mixture.
+      properties:
+        status:
+          type: string
+          description: RUNNING confirms the estimate and starts the campaign; CANCELLED
+            stops it for good
+          enum:
+          - RUNNING
+          - CANCELLED
+      required:
+      - status
     UpdateSilentModeRequest:
       type: object
       properties:

@@ -16,4 +16,15 @@ public enum DiscoveredVia {
 
     /** A human asked for the review. */
     MANUAL,
+
+    /**
+     * A bounded, confirmed campaign swept artifacts that already existed when it started.
+     *
+     * <p>Kept apart from {@link #MANUAL} even though an admin asked for both: a backfill is a bulk
+     * sweep whose corpus was selected with hindsight, and folding thousands of its rows into the
+     * requested-by-hand population would destroy the health measurement this column exists for. It is
+     * the discovery counterpart of {@code ObservationOrigin.BACKFILL}, which carries the same split
+     * into the measurement layer.
+     */
+    BACKFILL,
 }

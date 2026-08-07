@@ -77,6 +77,7 @@ export function PracticeReviewSettings({
 			<ProjectReviewStatusCard workspaceSlug={workspaceSlug} model={model} workspace={workspace} />
 			<ReviewTimingCard workspace={workspace} policy={policy} />
 			<ProjectReviewRulesCard policy={policy} />
+			<ReviewScopeCard policy={policy} />
 		</div>
 	);
 }
@@ -389,6 +390,154 @@ function ProjectReviewRulesCard({ policy }: Pick<PracticeReviewSettingsProps, "p
 				</Field>
 			</CardContent>
 		</Card>
+	);
+}
+
+/**
+ * Which of a workspace's work is reviewed at all.
+ *
+ * <p>Two independent lists, both exact matches and both empty by default, because empty has to mean
+ * "everything": a workspace that has never expressed an opinion must not silently review nothing. There
+ * are no wildcards — a pattern language here would be a promise the gate cannot keep, since it holds the
+ * pull request row and not the diff.
+ */
+function ReviewScopeCard({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
+	const scope = policy.settings.reviewScope;
+	const targetBranches = scope?.targetBranches ?? [];
+	const repositories = scope?.repositories ?? [];
+	const restricted = targetBranches.length > 0 || repositories.length > 0;
+
+	const update = (next: { targetBranches?: string[]; repositories?: string[] }) =>
+		policy.onUpdate({ reviewScope: { targetBranches, repositories, ...next } });
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>
+					<h2>Review scope</h2>
+				</CardTitle>
+				<CardDescription>
+					Narrow reviews to particular target branches or repositories. Leave both empty to review
+					everything this workspace monitors.
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-6">
+				<ScopeList
+					id="scope-branches"
+					label="Target branches"
+					description="A pull request is reviewed only if it targets one of these. Issues are unaffected. Exact names — no wildcards."
+					placeholder="main"
+					values={targetBranches}
+					disabled={policy.isSaving}
+					onChange={(next) => update({ targetBranches: next })}
+				/>
+				<ScopeList
+					id="scope-repositories"
+					label="Repositories"
+					description="Only work in these repositories is reviewed. Use the full owner/name."
+					placeholder="acme/widgets"
+					values={repositories}
+					disabled={policy.isSaving}
+					onChange={(next) => update({ repositories: next })}
+				/>
+				{restricted ? (
+					<Button
+						variant="link"
+						size="sm"
+						className="h-auto p-0 text-xs"
+						aria-label="Use default for Review scope"
+						disabled={policy.isSaving}
+						onClick={() => policy.onReset("REVIEW_SCOPE")}
+					>
+						Review everything again
+					</Button>
+				) : (
+					<span className="text-muted-foreground text-xs">
+						Default: every repository and every target branch
+					</span>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function ScopeList({
+	id,
+	label,
+	description,
+	placeholder,
+	values,
+	disabled,
+	onChange,
+}: {
+	id: string;
+	label: string;
+	description: string;
+	placeholder: string;
+	values: string[];
+	disabled: boolean;
+	onChange: (next: string[]) => void;
+}) {
+	const [draft, setDraft] = useState("");
+	const trimmed = draft.trim();
+	const duplicate = trimmed.length > 0 && values.includes(trimmed);
+
+	const add = () => {
+		if (trimmed.length === 0 || duplicate) return;
+		onChange([...values, trimmed]);
+		setDraft("");
+	};
+
+	return (
+		<Field>
+			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+			<FieldDescription>{description}</FieldDescription>
+			<div className="flex gap-2">
+				<Input
+					id={id}
+					value={draft}
+					placeholder={placeholder}
+					disabled={disabled}
+					onChange={(event) => setDraft(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Enter") {
+							event.preventDefault();
+							add();
+						}
+					}}
+				/>
+				<Button
+					variant="outline"
+					disabled={disabled || trimmed.length === 0 || duplicate}
+					onClick={add}
+				>
+					Add
+				</Button>
+			</div>
+			{duplicate ? <FieldError>{trimmed} is already listed.</FieldError> : null}
+			{values.length > 0 ? (
+				<div className="space-y-2">
+					{values.map((value) => (
+						<Item key={value} variant="outline" size="sm">
+							<ItemContent>
+								<ItemTitle className="font-mono">{value}</ItemTitle>
+							</ItemContent>
+							<ItemActions>
+								<Button
+									variant="ghost"
+									size="sm"
+									aria-label={`Remove ${value}`}
+									disabled={disabled}
+									onClick={() => onChange(values.filter((entry) => entry !== value))}
+								>
+									Remove
+								</Button>
+							</ItemActions>
+						</Item>
+					))}
+				</div>
+			) : null}
+		</Field>
 	);
 }
 

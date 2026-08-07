@@ -56,6 +56,16 @@ public enum ConfigAuditEntityType {
     /** Historical only — see {@link #WORKSPACE_LLM_BUDGET}. */
     WORKSPACE_BYO_LLM_BUDGET,
 
+    /**
+     * A campaign to review work that already existed, and the decision to let it spend.
+     *
+     * <p>On this trail rather than treated as ordinary activity because a backfill is the one action a
+     * workspace admin can take that commits a month's LLM budget in a single request. "Who authorised
+     * reviewing the last six months, and what were they told it would cost?" has to be answerable from
+     * the record, not reconstructed from job rows.
+     */
+    REVIEW_BACKFILL_RUN,
+
     WORKSPACE_LLM_CONNECTION,
     /** A model on a workspace's own BYO connection, including its inline price and enablement. */
     WORKSPACE_LLM_MODEL,

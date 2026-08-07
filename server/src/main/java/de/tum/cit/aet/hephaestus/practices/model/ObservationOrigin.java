@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+
 /**
  * How a measurement came to be taken — the provenance axis a trend line must never mix.
  *
@@ -27,7 +29,34 @@ public enum ObservationOrigin {
     MANUAL,
     /**
      * Taken by a sweep over artifacts that already existed when the sweep started. Sound as a snapshot,
-     * unusable as a trend against LIVE rows, and the reason this column exists before anything writes it.
+     * unusable as a trend against LIVE rows.
      */
-    BACKFILL,
+    BACKFILL;
+
+    /**
+     * Whether a measurement of this provenance may be <em>said out loud</em> on the given channel.
+     *
+     * <p>The second half of the delivery predicate; {@link PracticeReviewTier#delivers} is the first,
+     * and a unit travels only where <em>both</em> admit it. The two axes answer different questions and
+     * are deliberately not merged: the tier is the workspace's standing policy on how loud a practice
+     * may be, and this is a fact about the measurement itself.
+     *
+     * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#PROFILE} and to nothing else. Posting a
+     * backfilled finding in context would comment on a merged pull request — notifying everyone
+     * subscribed to it about work nobody can act on any more — and raising it in a mentor turn would
+     * coach a developer about a decision they made months ago as though it were today's. Aggregating it
+     * on the recipient's own dashboard is the one delivery that is honest about being retrospective.
+     *
+     * <p><strong>PROFILE has no producer</strong> (see {@link PracticeReviewTier#delivers}), so the
+     * conjunction is empty for every tier and a backfilled observation is, today, measured and delivered
+     * nowhere. That is stated as a derivation rather than as {@code return false}: the day somebody
+     * builds a PROFILE producer, the tier's own tripwire fires first and this rule is already correct.
+     */
+    public boolean delivers(FeedbackChannel channel) {
+        return switch (this) {
+            // The tier alone decides for a measurement taken of work as it happened or on request.
+            case LIVE, MANUAL -> true;
+            case BACKFILL -> channel == FeedbackChannel.PROFILE;
+        };
+    }
 }

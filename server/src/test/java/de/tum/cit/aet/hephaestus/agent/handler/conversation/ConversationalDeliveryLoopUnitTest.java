@@ -31,6 +31,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -191,6 +192,21 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         };
 
         assertThat(router().route(obs, PracticeReviewTier.ENGAGE, WS, ctx)).isEqualTo(expected);
+    }
+
+    /**
+     * Coaching a developer in a mentor turn about a decision they made months ago presents retrospective
+     * measurement as though it were today's work. Asked before the tier, because it needs no lookup and
+     * no per-practice dial can undo it.
+     */
+    @Test
+    void aBackfilledObservationIsNeverRaisedInAMentorTurn() {
+        Observation obs = problem(null, null);
+        lenient().when(obs.getOrigin()).thenReturn(ObservationOrigin.BACKFILL);
+
+        assertThat(router().route(obs, PracticeReviewTier.ENGAGE, WS, RoutingContext.author())).isEqualTo(
+            ConversationRoutingDecision.BACKFILL_QUIET
+        );
     }
 
     @Test
@@ -453,6 +469,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
         lenient().when(o.getEvidence()).thenReturn(evidence);
         lenient().when(o.getRecurrenceKey()).thenReturn(recurrenceKey);
+        lenient().when(o.getOrigin()).thenReturn(ObservationOrigin.LIVE);
         return o;
     }
 
@@ -463,6 +480,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient().when(o.getAssessment()).thenReturn(Assessment.GOOD);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
         lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
+        lenient().when(o.getOrigin()).thenReturn(ObservationOrigin.LIVE);
         return o;
     }
 
@@ -473,6 +491,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient().when(o.getAssessment()).thenReturn(null);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
         lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
+        lenient().when(o.getOrigin()).thenReturn(ObservationOrigin.LIVE);
         return o;
     }
 }

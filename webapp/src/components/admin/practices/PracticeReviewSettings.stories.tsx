@@ -115,3 +115,35 @@ export const TriggersOff: Story = {
 export const ReviewsPaused: Story = {
 	args: { workspace: { ...workspace, enabled: false } },
 };
+
+/** Empty means everything — a workspace that has never expressed an opinion must not review nothing. */
+export const ReviewScopeUnrestricted: Story = {
+	args: {
+		policy: {
+			...policy,
+			settings: { ...settings, reviewScope: { targetBranches: [], repositories: [] } },
+		},
+	},
+};
+
+export const ReviewScopeNarrowed: Story = {
+	args: {
+		policy: {
+			...policy,
+			settings: {
+				...settings,
+				reviewScope: {
+					targetBranches: ["main", "release/2026.1"],
+					repositories: ["acme/widgets", "acme/gadgets"],
+				},
+			},
+		},
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 1440] },
+	},
+	play: async () => {
+		await expectNoPageOverflow();
+	},
+};

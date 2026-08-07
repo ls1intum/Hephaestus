@@ -102,7 +102,7 @@ public class FeedbackLedgerRecorder {
 
     /**
      * Tier-withheld SUPPRESSED units start here — clear of every base above. Public so
-     * {@code PracticeTierGate} derives its positions from the one shared constant rather than a second
+     * {@code InContextDeliveryGate} derives its positions from the one shared constant rather than a second
      * literal, and so it can bound itself by {@link #UNIT_ORDINAL_BAND_WIDTH}.
      */
     public static final int TIER_WITHHELD_UNIT_ORDINAL_BASE = 6000;
@@ -545,22 +545,20 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
-     * Record a SUPPRESSED {@code IN_CONTEXT} unit for a locus the practice's loudness tier did not let
-     * reach the artifact — measured, recorded, deliberately unsaid. Sits in its own ordinal band
+     * Record a SUPPRESSED {@code IN_CONTEXT} unit for a locus that was measured and recorded but not let
+     * through to the artifact — deliberately unsaid. Sits in its own ordinal band
      * ({@value #TIER_WITHHELD_UNIT_ORDINAL_BASE}+) so it never collides with the reaction-aware band.
      * Best-effort like its sibling: REQUIRES_NEW, callers wrap in try/catch.
      *
+     * @param reason which of the two withholding rules fired — the practice's loudness tier, or the
+     *     observation's backfill provenance. Passed in rather than fixed because the two are undone by
+     *     different acts and an evaluation has to be able to tell them apart.
      * @param index position within the band; the caller must keep it under
      *     {@link #UNIT_ORDINAL_BAND_WIDTH} so the band cannot overflow into the next one
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordTierWithheld(AgentJob job, Observation finding, int index) {
-        recordSuppressedAt(
-            job,
-            finding,
-            FeedbackSuppressionReason.PRACTICE_TIER_QUIET,
-            TIER_WITHHELD_UNIT_ORDINAL_BASE + index
-        );
+    public void recordWithheld(AgentJob job, Observation finding, FeedbackSuppressionReason reason, int index) {
+        recordSuppressedAt(job, finding, reason, TIER_WITHHELD_UNIT_ORDINAL_BASE + index);
     }
 
     private void recordSuppressedAt(

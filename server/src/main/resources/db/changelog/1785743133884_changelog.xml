@@ -1679,4 +1679,179 @@
         ]]></rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-27">
+        <preConditions onFail="MARK_RAN" onFailMessage="signal discovery modes already admit BACKFILL">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_artifact_signal_discovered_via'
+                  AND pg_get_constraintdef(oid) LIKE '%BACKFILL%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit a confirmed backfill campaign as a way a signal came to be known.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- Kept apart from MANUAL although a person asked for both. discovered_via is a health
+            -- measurement -- a sustained SYNC rate on a signal that should arrive live means something
+            -- upstream is broken -- and folding thousands of campaign rows into the requested-by-hand
+            -- population would destroy it for exactly the workspaces most likely to run a campaign.
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS ck_artifact_signal_discovered_via;
+            ALTER TABLE artifact_signal ADD CONSTRAINT ck_artifact_signal_discovered_via
+                CHECK (discovered_via IN ('EVENT','SYNC','MANUAL','BACKFILL'));
+        ]]></sql>
+        <rollback><![CDATA[
+            -- Narrowing the vocabulary makes these rows unrepresentable. Deleting them is the honest
+            -- move and is safe: a signal row is a record that an occurrence was seen and settled, so
+            -- removing it returns the occurrence to "never seen" -- which, without the campaign that
+            -- recorded it, is the truth. The reviews it triggered keep their own rows.
+            DELETE FROM artifact_signal WHERE discovered_via = 'BACKFILL';
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS ck_artifact_signal_discovered_via;
+            ALTER TABLE artifact_signal ADD CONSTRAINT ck_artifact_signal_discovered_via
+                CHECK (discovered_via IN ('EVENT','SYNC','MANUAL'));
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-28">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback suppression reasons already admit BACKFILL_QUIET">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_feedback_suppression_reason'
+                  AND pg_get_constraintdef(oid) LIKE '%BACKFILL_QUIET%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit "measured by a backfill, and no channel it is entitled to has a producer" as a withholding rationale.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
+                CHECK (suppression_reason IS NULL OR suppression_reason IN (
+                    'VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE',
+                    'CONVERSATION_EXPIRED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED',
+                    'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE', 'INSTANCE_SILENCED',
+                    'PRACTICE_TIER_QUIET', 'BACKFILL_QUIET'));
+        ]]></sql>
+        <rollback><![CDATA[
+            DELETE FROM feedback WHERE suppression_reason = 'BACKFILL_QUIET';
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
+                CHECK (suppression_reason IS NULL OR suppression_reason IN (
+                    'VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE',
+                    'CONVERSATION_EXPIRED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED',
+                    'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE', 'INSTANCE_SILENCED',
+                    'PRACTICE_TIER_QUIET'));
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-29">
+        <preConditions onFail="MARK_RAN" onFailMessage="audit entity types already admit REVIEW_BACKFILL_RUN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%REVIEW_BACKFILL_RUN%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Put "who authorised a backfill, and what were they told it would cost" on the configuration audit trail.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT IF EXISTS ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE', 'PRACTICE_USAGE',
+                    'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                    'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET', 'REVIEW_BACKFILL_RUN',
+                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                ));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+            DO $rollback$
+            BEGIN
+                -- The trail is append-only by trigger, so a row written under this value can only be
+                -- left where it is; narrowing the constraint under it would make the table unreadable
+                -- to its own guard. Warn and keep the wider vocabulary.
+                IF EXISTS (SELECT 1 FROM config_audit_event WHERE entity_type = 'REVIEW_BACKFILL_RUN') THEN
+                    RAISE WARNING 'The audit entity-type constraint remains widened because append-only history contains REVIEW_BACKFILL_RUN rows';
+                    RETURN;
+                END IF;
+
+                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN (
+                        'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE', 'PRACTICE_USAGE',
+                        'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                        'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                        'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                        'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                    ));
+            END
+            $rollback$;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-30">
+        <preConditions onFail="MARK_RAN" onFailMessage="review_backfill_run already present">
+            <not><tableExists tableName="review_backfill_run"/></not>
+        </preConditions>
+        <comment>A bounded, confirmed campaign to review work that already existed.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            CREATE TABLE review_backfill_run (
+                id                     UUID PRIMARY KEY,
+                workspace_id           BIGINT       NOT NULL,
+                artifact_kind          VARCHAR(64)  NOT NULL,
+                from_at                TIMESTAMPTZ  NOT NULL,
+                to_at                  TIMESTAMPTZ  NOT NULL,
+                status                 VARCHAR(24)  NOT NULL,
+                pause_reason           VARCHAR(32),
+                estimated_artifacts    INTEGER      NOT NULL,
+                -- Nullable, and null means "we could not price this". Never defaulted to zero: a zero on
+                -- the confirmation screen reads as "free", which is the one thing this number must never
+                -- say when it does not know.
+                estimated_cost_usd     NUMERIC(12,4),
+                cursor_artifact_id     BIGINT,
+                submitted_count        INTEGER      NOT NULL DEFAULT 0,
+                passed_count           INTEGER      NOT NULL DEFAULT 0,
+                requested_by_account_id BIGINT      NOT NULL,
+                confirmed_by_account_id BIGINT,
+                created_at             TIMESTAMPTZ  NOT NULL,
+                started_at             TIMESTAMPTZ,
+                finished_at            TIMESTAMPTZ,
+                updated_at             TIMESTAMPTZ  NOT NULL,
+                CONSTRAINT fk_review_backfill_run_workspace FOREIGN KEY (workspace_id)
+                    REFERENCES workspace (id) ON DELETE CASCADE,
+                CONSTRAINT ck_review_backfill_run_status
+                    CHECK (status IN ('AWAITING_CONFIRMATION','RUNNING','PAUSED','COMPLETED','CANCELLED')),
+                CONSTRAINT ck_review_backfill_run_pause_reason
+                    CHECK (pause_reason IS NULL OR pause_reason IN
+                        ('BUDGET_EXHAUSTED','BINDING_DISABLED','WORKSPACE_UNAVAILABLE')),
+                -- A pause reason is meaningful only while paused, and a paused run without one is a run
+                -- nobody can be told how to resume.
+                CONSTRAINT ck_review_backfill_run_pause_coherent
+                    CHECK ((status = 'PAUSED') = (pause_reason IS NOT NULL)),
+                CONSTRAINT ck_review_backfill_run_window CHECK (from_at < to_at),
+                CONSTRAINT ck_review_backfill_run_counts
+                    CHECK (estimated_artifacts >= 0 AND submitted_count >= 0 AND passed_count >= 0),
+                -- Never authorised without a name against it.
+                CONSTRAINT ck_review_backfill_run_confirmed
+                    CHECK (status = 'AWAITING_CONFIRMATION' OR status = 'CANCELLED'
+                           OR confirmed_by_account_id IS NOT NULL)
+            );
+
+            CREATE INDEX idx_review_backfill_run_workspace ON review_backfill_run (workspace_id, created_at);
+            CREATE INDEX idx_review_backfill_run_status ON review_backfill_run (status);
+
+            -- One campaign under way per workspace, enforced here and not only in the service: two
+            -- overlapping campaigns each read the other's ledger rows as "already covered", so neither
+            -- covers the scope its estimate described and the confirmation the admin gave describes
+            -- neither run.
+            CREATE UNIQUE INDEX uq_review_backfill_run_active
+                ON review_backfill_run (workspace_id)
+                WHERE status IN ('RUNNING', 'PAUSED');
+        ]]></sql>
+        <rollback><![CDATA[
+            DROP TABLE IF EXISTS review_backfill_run;
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

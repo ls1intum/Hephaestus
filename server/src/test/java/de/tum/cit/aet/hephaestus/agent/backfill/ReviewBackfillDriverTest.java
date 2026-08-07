@@ -1,0 +1,212 @@
+package de.tum.cit.aet.hephaestus.agent.backfill;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+
+/**
+ * The campaign walk, and the one property the whole design rests on: a run that cannot afford to
+ * continue <em>stops</em>, leaving the artifacts it has not reached still owed. A run that thinned
+ * itself instead would leave a baseline where "not reviewed" and "reviewed, nothing found" are the same
+ * absence.
+ */
+@DisplayName("Review backfill driver")
+class ReviewBackfillDriverTest extends BaseUnitTest {
+
+    private static final long WORKSPACE_ID = 3L;
+
+    @Mock
+    private ReviewBackfillRunRepository runRepository;
+
+    @Mock
+    private ReviewBackfillScopeRepository scopeRepository;
+
+    @Mock
+    private ReviewBackfillSubmitter submitter;
+
+    @Mock
+    private WorkspaceAgentBindingRepository bindingRepository;
+
+    @Mock
+    private LlmBudgetService llmBudgetService;
+
+    private final ReviewBackfillProperties properties = new ReviewBackfillProperties(
+        3,
+        Duration.ofDays(400),
+        5000,
+        Duration.ofDays(90)
+    );
+
+    private ReviewBackfillDriver driver() {
+        return new ReviewBackfillDriver(
+            runRepository,
+            scopeRepository,
+            submitter,
+            bindingRepository,
+            llmBudgetService,
+            properties
+        );
+    }
+
+    @Test
+    void aBatchAdvancesTheCursorToTheLastArtifactItOffered() {
+        ReviewBackfillRun run = running();
+        fundedAndEnabled();
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any())).thenReturn(
+            List.of(10L, 11L, 12L)
+        );
+        when(submitter.offer(eq(run), anyLong())).thenReturn(ReviewBackfillSubmitter.Outcome.SUBMITTED);
+
+        driver().advance(run);
+
+        assertThat(run.getCursorArtifactId()).isEqualTo(12L);
+        assertThat(run.getSubmittedCount()).isEqualTo(3);
+        assertThat(run.getPassedCount()).isZero();
+        assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.RUNNING);
+    }
+
+    /** An artifact already measured at its current state, or refused by the gate, is not a gap. */
+    @Test
+    void anArtifactWalkedPastIsCountedRatherThanForgotten() {
+        ReviewBackfillRun run = running();
+        fundedAndEnabled();
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any())).thenReturn(
+            List.of(10L, 11L)
+        );
+        when(submitter.offer(run, 10L)).thenReturn(ReviewBackfillSubmitter.Outcome.SUBMITTED);
+        when(submitter.offer(run, 11L)).thenReturn(ReviewBackfillSubmitter.Outcome.PASSED);
+
+        driver().advance(run);
+
+        assertThat(run.getSubmittedCount()).isEqualTo(1);
+        assertThat(run.getPassedCount()).isEqualTo(1);
+    }
+
+    /**
+     * The core guarantee. The purse is checked before the batch, and when it is empty nothing is offered
+     * and the cursor does not move — so every artifact past it is still owed and will be reviewed when
+     * the budget returns.
+     */
+    @Test
+    void anExhaustedBudgetPausesTheRunWithoutMovingTheCursor() {
+        ReviewBackfillRun run = running();
+        run.setCursorArtifactId(9L);
+        enabledBinding();
+        when(llmBudgetService.blockSubmission(any(), any(), any())).thenReturn(true);
+
+        driver().advance(run);
+
+        assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.PAUSED);
+        assertThat(run.getPauseReason()).isEqualTo(ReviewBackfillPauseReason.BUDGET_EXHAUSTED);
+        assertThat(run.getCursorArtifactId()).isEqualTo(9L);
+        Mockito.verifyNoInteractions(submitter);
+        verify(scopeRepository, never()).findPullRequestIds(anyLong(), any(), any(), anyLong(), any());
+    }
+
+    @Test
+    void aWorkspaceWithNoEnabledBindingPausesRatherThanFailing() {
+        ReviewBackfillRun run = running();
+        when(
+            bindingRepository.findByWorkspaceIdAndPurposeWithModels(WORKSPACE_ID, AgentPurpose.PRACTICE_REVIEW)
+        ).thenReturn(Optional.empty());
+
+        driver().advance(run);
+
+        assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.PAUSED);
+        assertThat(run.getPauseReason()).isEqualTo(ReviewBackfillPauseReason.BINDING_DISABLED);
+    }
+
+    /** No re-confirmation: the estimate the admin approved covered the whole scope, and pausing did not change it. */
+    @Test
+    void aPausedRunResumesByItselfOnceTheBudgetReturns() {
+        ReviewBackfillRun run = running();
+        run.transitionTo(ReviewBackfillStatus.PAUSED, ReviewBackfillPauseReason.BUDGET_EXHAUSTED);
+        fundedAndEnabled();
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any())).thenReturn(List.of(5L));
+        when(submitter.offer(eq(run), anyLong())).thenReturn(ReviewBackfillSubmitter.Outcome.SUBMITTED);
+
+        driver().advance(run);
+
+        assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.RUNNING);
+        assertThat(run.getPauseReason()).isNull();
+        assertThat(run.getCursorArtifactId()).isEqualTo(5L);
+    }
+
+    @Test
+    void anEmptyBatchMeansTheScopeIsCoveredAndTheRunIsComplete() {
+        ReviewBackfillRun run = running();
+        run.setCursorArtifactId(99L);
+        fundedAndEnabled();
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(99L), any())).thenReturn(List.of());
+
+        driver().advance(run);
+
+        assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.COMPLETED);
+        assertThat(run.getFinishedAt()).isNotNull();
+    }
+
+    @Test
+    void aCancelledRunIsNotAdvanced() {
+        ReviewBackfillRun run = running();
+        run.transitionTo(ReviewBackfillStatus.CANCELLED, null);
+
+        driver().advance(run);
+
+        Mockito.verifyNoInteractions(submitter, scopeRepository, llmBudgetService, bindingRepository);
+    }
+
+    private void enabledBinding() {
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setEnabled(true);
+        when(
+            bindingRepository.findByWorkspaceIdAndPurposeWithModels(WORKSPACE_ID, AgentPurpose.PRACTICE_REVIEW)
+        ).thenReturn(Optional.of(binding));
+    }
+
+    private void fundedAndEnabled() {
+        enabledBinding();
+        when(llmBudgetService.blockSubmission(any(), any(), any())).thenReturn(false);
+    }
+
+    private ReviewBackfillRun running() {
+        Workspace workspace = new Workspace();
+        workspace.setId(WORKSPACE_ID);
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.getFeatures().setPracticesEnabled(true);
+
+        ReviewBackfillRun run = new ReviewBackfillRun();
+        run.setId(UUID.randomUUID());
+        run.setWorkspace(workspace);
+        run.setArtifactKind(ArtifactKinds.PULL_REQUEST.value());
+        run.setFromAt(Instant.parse("2026-07-01T00:00:00Z"));
+        run.setToAt(Instant.parse("2026-08-01T00:00:00Z"));
+        run.setStatus(ReviewBackfillStatus.RUNNING);
+        run.setEstimatedArtifacts(3);
+        run.setRequestedByAccountId(1L);
+        run.setConfirmedByAccountId(1L);
+        run.setCreatedAt(Instant.now());
+        run.setUpdatedAt(Instant.now());
+        return run;
+    }
+}

@@ -83,7 +83,10 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
                     issue.getState() != null ? issue.getState().name() : "OPEN",
                     issue.getHtmlUrl(),
                     issue.getUpdatedAt(),
-                    key.signalName()
+                    key.signalName(),
+                    // See PullRequestSignalResubmitter: the ledger row's discovery mode is the only thing
+                    // that still remembers which population this review was meant to measure.
+                    SignalOrigins.observationOriginOf(signal.getDiscoveredVia())
                 ),
                 key
             );

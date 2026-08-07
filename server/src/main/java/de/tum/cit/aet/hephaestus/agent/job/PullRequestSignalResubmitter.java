@@ -86,7 +86,11 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
                     pr.getHeadRefName(),
                     pr.getHeadRefOid(),
                     pr.getBaseRefName(),
-                    key.signalName()
+                    key.signalName(),
+                    // Carried from the ledger row rather than defaulted: a re-offered signal keeps the
+                    // population it was discovered for, so a campaign's budget-deferred tail cannot land
+                    // in the live series hours after the campaign paused.
+                    SignalOrigins.observationOriginOf(signal.getDiscoveredVia())
                 ),
                 key
             );

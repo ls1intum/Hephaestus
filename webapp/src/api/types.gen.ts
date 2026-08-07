@@ -940,6 +940,22 @@ export type UpdateSilentModeRequest = {
 };
 
 /**
+ * The one lifecycle transition an admin can ask for.
+ *
+ * <p><code>RUNNING</code> is the confirmation: it is the point at which somebody accepts the estimate they
+ * were shown and authorises the spend. <code>CANCELLED</code> stops a campaign for good. Every other
+ * transition — pausing on an exhausted budget, resuming when it clears, completing at the end of the
+ * scope — belongs to the driver, and is refused here so the state on screen always reflects something
+ * the system decided or something a person did, never a mixture.
+ */
+export type UpdateReviewBackfillRunStatusRequest = {
+    /**
+     * RUNNING confirms the estimate and starts the campaign; CANCELLED stops it for good
+     */
+    status: 'RUNNING' | 'CANCELLED';
+};
+
+/**
  * Request to update repository contribution visibility settings in a workspace
  */
 export type UpdateRepositorySettingsRequest = {
@@ -1949,7 +1965,7 @@ export type ReviewBoundFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
 };
 
 /**
@@ -2119,7 +2135,7 @@ export type ReviewFeedbackDetail = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
     /**
      * Cross-run continuity key tying successive deliveries together
      */
@@ -2204,7 +2220,44 @@ export type ReviewFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
+};
+
+/**
+ * A campaign as an admin sees it — before confirming, while it runs, and after it ends.
+ */
+export type ReviewBackfillRun = {
+    artifactKind: string;
+    /**
+     * Who authorised the spend; absent until the run is confirmed
+     */
+    confirmedByAccountId?: number;
+    createdAt: Date;
+    estimatedArtifacts: number;
+    /**
+     * Forecast total spend in USD; absent when the workspace has no priced review history
+     */
+    estimatedCostUsd?: number;
+    finishedAt?: Date;
+    fromAt: Date;
+    id: string;
+    /**
+     * artifacts walked past without one: already measured at their current state, or
+     * refused by the review gate. Together with <code>submittedCount</code> this is how far the walk has got.
+     */
+    passedCount: number;
+    /**
+     * Set only while the run is PAUSED
+     */
+    pauseReason?: 'BUDGET_EXHAUSTED' | 'BINDING_DISABLED' | 'WORKSPACE_UNAVAILABLE';
+    requestedByAccountId: number;
+    startedAt?: Date;
+    status: 'AWAITING_CONFIRMATION' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+    /**
+     * artifacts for which a review job was created
+     */
+    submittedCount: number;
+    toAt: Date;
 };
 
 /**
@@ -3230,7 +3283,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -4459,6 +4512,25 @@ export type CreateWorkspaceLlmConnectionRequest = {
 };
 
 /**
+ * Ask for a campaign to be enumerated and costed. Creates nothing that spends money: the run comes back
+ * awaiting confirmation, and only a subsequent status change starts it.
+ */
+export type CreateReviewBackfillRunRequest = {
+    /**
+     * Kind of work to review
+     */
+    artifactKind: 'scm.pull_request' | 'scm.issue';
+    /**
+     * Window start, inclusive, over the artifact's creation time
+     */
+    fromAt: Date;
+    /**
+     * Window end, exclusive
+     */
+    toAt: Date;
+};
+
+/**
  * Submit a reaction to a delivered feedback unit
  */
 export type CreateReaction = {
@@ -5205,7 +5277,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -6997,7 +7069,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -8647,6 +8719,123 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
+export type ListBackfillRunsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs';
+};
+
+export type ListBackfillRunsResponses = {
+    /**
+     * Campaigns returned
+     */
+    200: Array<ReviewBackfillRun>;
+};
+
+export type ListBackfillRunsResponse = ListBackfillRunsResponses[keyof ListBackfillRunsResponses];
+
+export type PreflightBackfillRunData = {
+    body: CreateReviewBackfillRunRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs';
+};
+
+export type PreflightBackfillRunErrors = {
+    /**
+     * The window is inverted, too long, or covers too many artifacts
+     */
+    400: ProblemDetail;
+    /**
+     * A campaign is already under way for this workspace
+     */
+    409: ProblemDetail;
+};
+
+export type PreflightBackfillRunError = PreflightBackfillRunErrors[keyof PreflightBackfillRunErrors];
+
+export type PreflightBackfillRunResponses = {
+    /**
+     * Scope enumerated and priced
+     */
+    201: ReviewBackfillRun;
+};
+
+export type PreflightBackfillRunResponse = PreflightBackfillRunResponses[keyof PreflightBackfillRunResponses];
+
+export type GetBackfillRunData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        runId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}';
+};
+
+export type GetBackfillRunErrors = {
+    /**
+     * No such campaign in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetBackfillRunError = GetBackfillRunErrors[keyof GetBackfillRunErrors];
+
+export type GetBackfillRunResponses = {
+    /**
+     * Campaign returned
+     */
+    200: ReviewBackfillRun;
+};
+
+export type GetBackfillRunResponse = GetBackfillRunResponses[keyof GetBackfillRunResponses];
+
+export type UpdateBackfillRunStatusData = {
+    body: UpdateReviewBackfillRunStatusRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        runId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}/status';
+};
+
+export type UpdateBackfillRunStatusErrors = {
+    /**
+     * The campaign cannot make that transition from its current state
+     */
+    409: ProblemDetail;
+};
+
+export type UpdateBackfillRunStatusError = UpdateBackfillRunStatusErrors[keyof UpdateBackfillRunStatusErrors];
+
+export type UpdateBackfillRunStatusResponses = {
+    /**
+     * Campaign updated
+     */
+    200: ReviewBackfillRun;
+};
+
+export type UpdateBackfillRunStatusResponse = UpdateBackfillRunStatusResponses[keyof UpdateBackfillRunStatusResponses];
+
 export type GetPracticeDefinitionOptionsData = {
     body?: never;
     path: {
@@ -9044,7 +9233,7 @@ export type ListPracticeReviewFeedbackData = {
         page?: number;
         size?: number;
         deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
         channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
         agentJobId?: string;
         /**

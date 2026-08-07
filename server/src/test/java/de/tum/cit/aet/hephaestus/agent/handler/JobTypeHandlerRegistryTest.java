@@ -56,7 +56,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             feedbackService,
             new SecretDiffScanner(),
             org.mockito.Mockito.mock(ReactionSuppressionFilter.class),
-            new PracticeTierGate(
+            new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
@@ -80,7 +80,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             new PracticeFeedbackCommentFormatter(
                 new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
             ),
-            new PracticeTierGate(
+            new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)

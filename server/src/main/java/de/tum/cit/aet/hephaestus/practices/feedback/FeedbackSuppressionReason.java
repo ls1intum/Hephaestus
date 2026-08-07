@@ -43,4 +43,14 @@ public enum FeedbackSuppressionReason {
      * stay quiet" reads differently from "we missed it" in every downstream evaluation.
      */
     PRACTICE_TIER_QUIET,
+    /**
+     * The observation came from a backfill campaign, whose only entitled channel has no producer, so it
+     * was measured and recorded but never said out loud.
+     *
+     * <p>Distinct from {@link #PRACTICE_TIER_QUIET} because the two are undone by different acts: a tier
+     * is a dial an admin can turn, while this reason disappears only when somebody builds the profile
+     * surface. Collapsing them would make "we chose to be quiet about this practice" unanswerable apart
+     * from "nothing we built can say this yet".
+     */
+    BACKFILL_QUIET,
 }

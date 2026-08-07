@@ -21,4 +21,10 @@ public enum ConversationRoutingDecision {
      * is measured and recorded but never raised in a mentor turn.
      */
     PRACTICE_TIER_QUIET,
+    /**
+     * The observation came from a backfill campaign. Coaching a developer in a mentor turn about a
+     * decision they made months ago presents retrospective measurement as though it were today's work;
+     * a backfilled observation is measured and recorded, and raised nowhere.
+     */
+    BACKFILL_QUIET,
 }

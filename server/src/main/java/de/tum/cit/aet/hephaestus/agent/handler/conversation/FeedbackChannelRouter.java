@@ -19,10 +19,10 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Decides which of a cycle's observations are eligible for conversational delivery. An observation is
- * {@link ConversationRoutingDecision#ADMIT admitted} to the CONVERSATION channel iff ALL of: its practice's loudness
- * tier admits the conversation channel, author-targeted, a {@link Assessment#BAD} problem, has no natural inline
- * anchor, and does not share a {@code recurrence_key} with a DELIVERED IN_CONTEXT unit for the same recipient. Every
- * other case is a named, testable non-admission reason.
+ * {@link ConversationRoutingDecision#ADMIT admitted} to the CONVERSATION channel iff ALL of: its provenance admits the
+ * conversation channel, its practice's loudness tier admits the conversation channel, author-targeted, a
+ * {@link Assessment#BAD} problem, has no natural inline anchor, and does not share a {@code recurrence_key} with a
+ * DELIVERED IN_CONTEXT unit for the same recipient. Every other case is a named, testable non-admission reason.
  *
  * <p>Pure routing - it reads the feedback ledger but writes nothing. The {@link ConversationalFeedbackPreparer}
  * turns the admitted set into PREPARED units.
@@ -72,8 +72,14 @@ public class FeedbackChannelRouter {
         long workspaceId,
         RoutingContext context
     ) {
-        // The workspace's standing loudness policy for this practice, asked first: it is the cheapest
-        // test and the most decisive one, because a practice at MEASURE has nothing to say on ANY channel.
+        // How the measurement was taken, asked first: it needs no lookup at all, and no per-practice dial
+        // can make a months-old finding worth raising as though the developer could still act on it.
+        if (!observation.getOrigin().delivers(FeedbackChannel.CONVERSATION)) {
+            return ConversationRoutingDecision.BACKFILL_QUIET;
+        }
+        // The workspace's standing loudness policy for this practice, asked next: it is the cheapest
+        // remaining test and the most decisive one, because a practice at MEASURE has nothing to say on
+        // ANY channel.
         if (tier != null && !tier.delivers(FeedbackChannel.CONVERSATION)) {
             return ConversationRoutingDecision.PRACTICE_TIER_QUIET;
         }

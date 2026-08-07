@@ -13,8 +13,10 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -29,11 +31,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * The in-context half of the loudness tier: which findings are allowed to land on the artifact, and what
- * is written down about the ones that are not.
+ * The in-context delivery predicate: which findings are allowed to land on the artifact, and what is
+ * written down about the ones that are not. Two rules apply — the practice's loudness tier and the run's
+ * provenance — and this holds both to their reasons.
  */
-@DisplayName("Loudness tier, in-context channel")
-class PracticeTierGateTest extends BaseUnitTest {
+@DisplayName("In-context delivery admission")
+class InContextDeliveryGateTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 4L;
     private static final UUID JOB_ID = UUID.randomUUID();
@@ -47,8 +50,8 @@ class PracticeTierGateTest extends BaseUnitTest {
     @Mock
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
 
-    private PracticeTierGate gate() {
-        return new PracticeTierGate(practiceRepository, observationRepository, feedbackLedgerRecorder);
+    private InContextDeliveryGate gate() {
+        return new InContextDeliveryGate(practiceRepository, observationRepository, feedbackLedgerRecorder);
     }
 
     @Test
@@ -83,7 +86,7 @@ class PracticeTierGateTest extends BaseUnitTest {
 
         assertThat(admitted).containsExactly(loud);
         // Written down, not dropped: a later evaluation must be able to tell a deliberate quiet from a miss.
-        verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordTierWithheld(any(), any(), anyInt());
+        verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordWithheld(any(), any(), any(), anyInt());
     }
 
     /**
@@ -98,7 +101,7 @@ class PracticeTierGateTest extends BaseUnitTest {
         ValidatedFinding stranger = finding("not-in-the-catalogue", "occ-9");
 
         assertThat(gate().admitInContext(job(), List.of(stranger))).containsExactly(stranger);
-        verify(feedbackLedgerRecorder, never()).recordTierWithheld(any(), any(), anyInt());
+        verify(feedbackLedgerRecorder, never()).recordWithheld(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -109,7 +112,7 @@ class PracticeTierGateTest extends BaseUnitTest {
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(List.of());
 
         assertThat(gate().admitInContext(job(), List.of(finding("measured", null)))).isEmpty();
-        verify(feedbackLedgerRecorder, never()).recordTierWithheld(any(), any(), anyInt());
+        verify(feedbackLedgerRecorder, never()).recordWithheld(any(), any(), any(), anyInt());
     }
 
     /** A ledger failure is telemetry loss, never delivery loss: the surviving findings still go out. */
@@ -122,10 +125,51 @@ class PracticeTierGateTest extends BaseUnitTest {
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
         doThrow(new IllegalStateException("ledger down"))
             .when(feedbackLedgerRecorder)
-            .recordTierWithheld(any(), any(), eq(0));
+            .recordWithheld(any(), any(), any(), eq(0));
         ValidatedFinding loud = finding("loud", "occ-2");
 
         assertThat(gate().admitInContext(job(), List.of(finding("measured", "occ-1"), loud))).containsExactly(loud);
+    }
+
+    /**
+     * A campaign's findings never reach the artifact. Posting one would comment on a pull request merged
+     * months ago and notify everyone still subscribed to it about work nobody can act on.
+     */
+    @Test
+    void aBackfilledRunSaysNothingOnTheArtifactWhateverTheTierIs() {
+        List<Observation> persisted = List.of(observation("occ-1"), observation("occ-2"));
+        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+        ValidatedFinding loud = finding("loud", "occ-1");
+        ValidatedFinding alsoLoud = finding("also-loud", "occ-2");
+
+        assertThat(gate().admitInContext(backfillJob(), List.of(loud, alsoLoud))).isEmpty();
+        // Never even asks for the tiers: no dial can make a retrospective finding actionable in place.
+        verifyNoInteractions(practiceRepository);
+        verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordWithheld(
+            any(),
+            any(),
+            eq(FeedbackSuppressionReason.BACKFILL_QUIET),
+            anyInt()
+        );
+    }
+
+    /** The two withholding rules are separately answerable, which is why they are separately recorded. */
+    @Test
+    void aTierWithheldFindingIsRecordedUnderTheTierNotTheProvenance() {
+        when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
+            List.of(practice("measured", PracticeReviewTier.MEASURE))
+        );
+        // Built BEFORE the stubbing call: see measuringAndCoachingPracticesAreWithheldFromTheArtifact.
+        List<Observation> persisted = List.of(observation("occ-1"));
+        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+
+        assertThat(gate().admitInContext(job(), List.of(finding("measured", "occ-1")))).isEmpty();
+        verify(feedbackLedgerRecorder).recordWithheld(
+            any(),
+            any(),
+            eq(FeedbackSuppressionReason.PRACTICE_TIER_QUIET),
+            eq(0)
+        );
     }
 
     @Test
@@ -136,6 +180,17 @@ class PracticeTierGateTest extends BaseUnitTest {
 
         assertThat(gate().admitInContext(job, List.of(finding))).containsExactly(finding);
         verifyNoInteractions(practiceRepository);
+    }
+
+    /** A job stamped the way {@code ReviewBackfillSubmitter} stamps one. */
+    private AgentJob backfillJob() {
+        AgentJob job = job();
+        job.setMetadata(
+            new tools.jackson.databind.ObjectMapper()
+                .createObjectNode()
+                .put(PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY, ObservationOrigin.BACKFILL.name())
+        );
+        return job;
     }
 
     private AgentJob job() {

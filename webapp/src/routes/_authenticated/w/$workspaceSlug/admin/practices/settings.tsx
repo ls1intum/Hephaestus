@@ -191,5 +191,8 @@ function patchReviewSettings(
 					cooldownMinutes: patch.cooldownMinutes,
 					cooldownMinutesOverride: patch.cooldownMinutes,
 				}),
+		// The scope has no separate "override" key: it replaces wholesale and an empty scope already
+		// means "unrestricted", so the effective value is the only value there is.
+		...(patch.reviewScope === undefined ? {} : { reviewScope: patch.reviewScope }),
 	};
 }

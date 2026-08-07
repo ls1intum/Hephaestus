@@ -19,13 +19,18 @@ import org.jspecify.annotations.Nullable;
  * @param headRefName source branch name (e.g. {@code "feature/my-feature"})
  * @param headRefOid  head commit SHA
  * @param baseRefName target branch name (e.g. {@code "main"})
+ * @param observationOrigin which population this run's observations belong to; {@code null} defaults to
+ *     the rule below. Explicit because the default cannot see a backfill: a campaign replays the signal
+ *     the artifact's current state would have raised, so its request carries a trigger signal and would
+ *     otherwise be filed as LIVE.
  */
 public record PullRequestReviewSubmissionRequest(
     ScmEventPayload.PullRequestData pullRequest,
     String headRefName,
     String headRefOid,
     String baseRefName,
-    @Nullable SignalName triggerSignal
+    @Nullable SignalName triggerSignal,
+    ObservationOrigin observationOrigin
 ) implements JobSubmissionRequest {
     public PullRequestReviewSubmissionRequest {
         Objects.requireNonNull(pullRequest, "pullRequest must not be null");
@@ -42,17 +47,24 @@ public record PullRequestReviewSubmissionRequest(
         if (baseRefName.isBlank()) {
             throw new IllegalArgumentException("baseRefName must not be blank");
         }
+        if (observationOrigin == null) {
+            // A run with no lifecycle event behind it was asked for by a person — the bot command and the
+            // gate-bypass dev path are the two — so its observations are a self-selected sample and are
+            // recorded as such. Reviews people request are not a random draw from the work: they are
+            // requested about work somebody was already unsure of.
+            observationOrigin = triggerSignal == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
+        }
     }
 
-    /**
-     * A run with no lifecycle event behind it was asked for by a person — the bot command and the
-     * gate-bypass dev path are the two — so its observations are a self-selected sample and are recorded
-     * as such. Reviews people request are not a random draw from the work: they are requested about work
-     * somebody was already unsure of.
-     */
-    @Override
-    public ObservationOrigin observationOrigin() {
-        return triggerSignal == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
+    /** Constructor for the event-driven and resubmission paths, which take the origin rule as it stands. */
+    public PullRequestReviewSubmissionRequest(
+        ScmEventPayload.PullRequestData pullRequest,
+        String headRefName,
+        String headRefOid,
+        String baseRefName,
+        @Nullable SignalName triggerSignal
+    ) {
+        this(pullRequest, headRefName, headRefOid, baseRefName, triggerSignal, null);
     }
 
     /**
@@ -65,6 +77,6 @@ public record PullRequestReviewSubmissionRequest(
         String headRefOid,
         String baseRefName
     ) {
-        this(pullRequest, headRefName, headRefOid, baseRefName, null);
+        this(pullRequest, headRefName, headRefOid, baseRefName, null, null);
     }
 }

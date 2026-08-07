@@ -33,6 +33,10 @@ public class LedgerSignalRecorder implements SignalRecorder {
         // A reconciliation pass knows that something happened, not that it is the right one to act on
         // it, so it may only ever add a row; a live or requested observation may additionally take over
         // one nobody has decided yet.
+        //
+        // A BACKFILL deliberately takes the second branch, and that is the whole mechanism: a first sync
+        // leaves thousands of rows RECORDED-but-undecided precisely so it does not fire thousands of
+        // reviews, and a confirmed campaign is the thing that is finally entitled to claim them.
         int affected =
             discoveredVia == DiscoveredVia.SYNC
                 ? repository.insertIfAbsent(key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now)

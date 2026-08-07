@@ -17,6 +17,7 @@ const PATHS = [
 	"w/$workspaceSlug/admin/practices/$practiceSlug",
 	"w/$workspaceSlug/admin/practices/settings",
 	"w/$workspaceSlug/admin/practices/reviews",
+	"w/$workspaceSlug/admin/practices/backfill",
 	"w/$workspaceSlug/admin/integrations",
 	"w/$workspaceSlug/admin/integrations/scm",
 ] as const;
@@ -61,6 +62,7 @@ describe("NavAdmin", () => {
 		["/w/acme/admin/practices/new", "Practice setup"],
 		["/w/acme/admin/practices/clean-code", "Practice setup"],
 		["/w/acme/admin/practices/settings", "Review settings"],
+		["/w/acme/admin/practices/backfill", "Review past work"],
 		["/w/acme/admin/integrations/scm", "GitHub"],
 	])("marks only the destination for %s as current", async (path, currentLabel) => {
 		renderNavigation(path);

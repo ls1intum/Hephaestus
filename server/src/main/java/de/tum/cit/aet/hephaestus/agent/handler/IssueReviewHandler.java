@@ -55,7 +55,7 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PracticeFeedbackCommentFormatter commentFormatter;
-    private final PracticeTierGate practiceTierGate;
+    private final InContextDeliveryGate inContextDeliveryGate;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -68,7 +68,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
         PracticeFeedbackCommentFormatter commentFormatter,
-        PracticeTierGate practiceTierGate
+        InContextDeliveryGate inContextDeliveryGate
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -80,7 +80,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.deliveryPolicy = deliveryPolicy;
         this.commentFormatter = commentFormatter;
-        this.practiceTierGate = practiceTierGate;
+        this.inContextDeliveryGate = inContextDeliveryGate;
     }
 
     @Override
@@ -248,7 +248,7 @@ public class IssueReviewHandler implements JobTypeHandler {
 
         // Only practices at ENGAGE reach the issue itself; everything below is measured and recorded but
         // stays off the artifact, with a SUPPRESSED ledger row of its own.
-        List<PracticeDetectionResultParser.ValidatedFinding> loudEnough = practiceTierGate.admitInContext(
+        List<PracticeDetectionResultParser.ValidatedFinding> loudEnough = inContextDeliveryGate.admitInContext(
             job,
             coercedFindings
         );

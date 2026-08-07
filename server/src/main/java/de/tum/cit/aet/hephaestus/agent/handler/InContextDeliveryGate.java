@@ -4,7 +4,10 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Val
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -18,32 +21,39 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Applies each practice's loudness tier to the in-context channel: a finding reaches the artifact only if
- * its practice is at {@link PracticeReviewTier#ENGAGE}.
+ * Decides which findings reach the artifact itself, by applying {@link FeedbackAdmission} to the
+ * {@link FeedbackChannel#IN_CONTEXT} channel: a finding is posted only if its practice's loudness tier
+ * admits the channel <em>and</em> the run's provenance does.
  *
- * <p>Runs strictly AFTER the findings are persisted and stamped with their observation keys, which is the
- * whole point of the tier — {@code MEASURE} and {@code COACH} are measured and recorded exactly like
- * {@code ENGAGE}, and differ only in how far the result travels. Nothing here can affect the behaviour
- * time series; it only decides what is said.
+ * <p>Runs strictly AFTER the findings are persisted and stamped with their observation keys, which is
+ * the whole point of both rules — {@code MEASURE}, {@code COACH} and a backfill are measured and
+ * recorded exactly like an engaged live run, and differ only in how far the result travels. Nothing here
+ * can affect the behaviour time series; it only decides what is said.
  *
- * <p>Each withheld finding gets a SUPPRESSED ledger row ({@code PRACTICE_TIER_QUIET}) rather than being
- * dropped in silence, so a later evaluation can tell a deliberate quiet from a detection miss. Writing
- * the row is best-effort: a ledger failure never blocks the delivery of the findings that survived.
+ * <p>The provenance rule is what keeps a backfill campaign from commenting on merged pull requests:
+ * every subscriber to a months-old pull request would be notified about work nobody can act on. It is
+ * checked once for the whole job rather than per finding, because a job has exactly one origin.
  *
- * <p><strong>An unrecognised practice slug is kept.</strong> A finding whose slug is not in the
- * workspace's catalogue was never persisted as an observation either, so there is no tier to consult and
- * no row to write; withholding it would silently drop feedback on the strength of a lookup miss.
+ * <p>Each withheld finding gets a SUPPRESSED ledger row — {@code PRACTICE_TIER_QUIET} or
+ * {@code BACKFILL_QUIET}, whichever rule fired — rather than being dropped in silence, so a later
+ * evaluation can tell a deliberate quiet from a detection miss. Writing the row is best-effort: a ledger
+ * failure never blocks the delivery of the findings that survived.
+ *
+ * <p><strong>An unrecognised practice slug is kept</strong> when only the tier would have withheld it. A
+ * finding whose slug is not in the workspace's catalogue was never persisted as an observation either,
+ * so there is no tier to consult and no row to write; withholding it would silently drop feedback on the
+ * strength of a lookup miss. The provenance rule has no such escape hatch — it needs no lookup.
  */
 @Component
-class PracticeTierGate {
+class InContextDeliveryGate {
 
-    private static final Logger log = LoggerFactory.getLogger(PracticeTierGate.class);
+    private static final Logger log = LoggerFactory.getLogger(InContextDeliveryGate.class);
 
     private final PracticeRepository practiceRepository;
     private final ObservationRepository observationRepository;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
 
-    PracticeTierGate(
+    InContextDeliveryGate(
         PracticeRepository practiceRepository,
         ObservationRepository observationRepository,
         FeedbackLedgerRecorder feedbackLedgerRecorder
@@ -54,16 +64,30 @@ class PracticeTierGate {
     }
 
     /**
-     * The subset of {@code findings} whose practice tier admits the in-context channel, in the order given.
+     * The subset of {@code findings} that may be placed on the artifact, in the order given.
      *
-     * <p>Returns {@code findings} unchanged when the job has no workspace or every practice is at
-     * {@code ENGAGE} — the overwhelmingly common case, which costs one catalogue read and no writes.
+     * <p>Returns {@code findings} unchanged when the job has no workspace or everything is admitted —
+     * the overwhelmingly common case, which costs one catalogue read and no writes.
      */
     @Transactional(readOnly = true)
     List<ValidatedFinding> admitInContext(AgentJob job, List<ValidatedFinding> findings) {
         if (findings.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
             return findings;
         }
+        ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
+        if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
+            // One decision for the whole job: a run has a single provenance, and no per-practice dial can
+            // make a retrospective finding actionable on the artifact it is about.
+            log.info(
+                "Provenance withheld all {} finding(s) from the artifact: origin={}, jobId={}",
+                findings.size(),
+                origin,
+                job.getId()
+            );
+            recordWithheld(job, findings, FeedbackSuppressionReason.BACKFILL_QUIET);
+            return List.of();
+        }
+
         Map<String, PracticeReviewTier> tierBySlug = new HashMap<>();
         for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
             tierBySlug.put(practice.getSlug(), practice.getReviewTier());
@@ -72,8 +96,9 @@ class PracticeTierGate {
         List<ValidatedFinding> admitted = new ArrayList<>(findings.size());
         List<ValidatedFinding> withheld = new ArrayList<>();
         for (ValidatedFinding finding : findings) {
-            PracticeReviewTier tier = tierBySlug.get(finding.practiceSlug());
-            if (tier == null || tier.delivers(FeedbackChannel.IN_CONTEXT)) {
+            if (
+                FeedbackAdmission.delivers(origin, tierBySlug.get(finding.practiceSlug()), FeedbackChannel.IN_CONTEXT)
+            ) {
                 admitted.add(finding);
             } else {
                 withheld.add(finding);
@@ -88,11 +113,11 @@ class PracticeTierGate {
             findings.size(),
             job.getId()
         );
-        recordWithheld(job, withheld);
+        recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_TIER_QUIET);
         return admitted;
     }
 
-    private void recordWithheld(AgentJob job, List<ValidatedFinding> withheld) {
+    private void recordWithheld(AgentJob job, List<ValidatedFinding> withheld, FeedbackSuppressionReason reason) {
         Map<String, Observation> byOccurrence = new HashMap<>();
         for (Observation observation : observationRepository.findByAgentJobId(job.getId())) {
             byOccurrence.put(observation.getOccurrenceKey(), observation);
@@ -103,7 +128,7 @@ class PracticeTierGate {
             // which the (agent_job_id, position) guard would then read as "already recorded" and drop.
             if (index >= FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
                 log.warn(
-                    "Tier-withheld ledger band full at {} rows; remaining withheld findings are unrecorded: jobId={}",
+                    "Withheld-feedback ledger band full at {} rows; remaining withheld findings are unrecorded: jobId={}",
                     index,
                     job.getId()
                 );
@@ -118,9 +143,9 @@ class PracticeTierGate {
                 continue;
             }
             try {
-                feedbackLedgerRecorder.recordTierWithheld(job, observation, index++);
+                feedbackLedgerRecorder.recordWithheld(job, observation, reason, index++);
             } catch (RuntimeException e) {
-                log.warn("Tier-withheld ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
+                log.warn("Withheld-feedback ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
             }
         }
     }

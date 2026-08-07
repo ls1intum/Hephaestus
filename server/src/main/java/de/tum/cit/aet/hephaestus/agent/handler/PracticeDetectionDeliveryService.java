@@ -96,8 +96,8 @@ public class PracticeDetectionDeliveryService {
      * existed. Falling back rather than failing is right for exactly one reason: every job that predates the
      * key came from the event-driven path, so LIVE is the true value and not a guess.
      */
-    private static ObservationOrigin originOf(JsonNode metadata) {
-        JsonNode node = metadata.get(ORIGIN_METADATA_KEY);
+    public static ObservationOrigin originOf(@Nullable JsonNode metadata) {
+        JsonNode node = metadata == null ? null : metadata.get(ORIGIN_METADATA_KEY);
         if (node == null || !node.isString()) {
             return ObservationOrigin.LIVE;
         }

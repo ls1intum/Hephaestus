@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent;
 
+import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelInUseException;
@@ -27,6 +28,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(basePackageClasses = AgentControllerAdvice.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AgentControllerAdvice {
+
+    @ExceptionHandler(ReviewBackfillConflictException.class)
+    ProblemDetail handleReviewBackfillConflict(ReviewBackfillConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "review-backfill-conflict", "Review backfill conflict", exception);
+    }
 
     @ExceptionHandler(AgentJobStateConflictException.class)
     ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {
