@@ -1,3 +1,26 @@
+/**
+ * Checks the *published* artifact-source contract: the JSON Schemas, and the two catalogs they describe.
+ *
+ * What this deliberately does not check: the semantics. Nothing in the JVM reads these schemas — the
+ * server parses the same JSON with hand-written Jackson code and enforces every rule itself, against the
+ * shipped resources, under unit test: `ArtifactSourceContract` refuses a source whose authority, identity,
+ * completeness and required quality disagree; `ClasspathArtifactSourceCatalogRegistry` refuses use
+ * decisions that do not cover every purpose; `SourceCapture` refuses an absent source carrying artifacts;
+ * `PracticeDefinitionValidator` refuses a practice reading a source that cannot apply to what it reviews,
+ * and `BundledPracticeCatalogLoaderTest` runs the shipped catalog through it. Restating any of that here
+ * would buy a second opinion that can only drift from the one that decides.
+ *
+ * So this owns what nothing in the JVM does:
+ *
+ *   - the schemas compile, are documented, and actually reject what they claim to reject;
+ *   - they pin the exact catalog bytes they were written against;
+ *   - their per-artifact-kind evidence allow-lists are checked against the catalog rather than trusted
+ *     as a copy of it — they are the one place a new source has to be repeated, so they are the one
+ *     place it will be forgotten;
+ *   - the bundled practice catalog satisfies its own schema, which the loader cannot tell you: Jackson
+ *     reads the fields it knows and says nothing about a retired one left behind;
+ *   - every precompute script on disk belongs to a practice, and every practice's script is on disk.
+ */
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
@@ -6,16 +29,15 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const contractsRoot = path.join(
-	root,
-	"server/src/main/resources/contracts/artifact-source",
-);
+const contractsRoot = path.join(root, "server/src/main/resources/contracts/artifact-source");
 const contractVersions = (await readdir(contractsRoot, { withFileTypes: true }))
 	.filter((entry) => entry.isDirectory())
 	.map((entry) => entry.name)
 	.sort();
 if (contractVersions.length === 0) throw new Error("No artifact-source contract versions found");
 const readJson = async (file) => JSON.parse(await readFile(file, "utf8"));
+const schemaId = (version, file) =>
+	`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/${file}`;
 
 const requireDescription = (value, label) => {
 	if (typeof value?.description !== "string" || value.description.trim() === "") {
@@ -23,6 +45,13 @@ const requireDescription = (value, label) => {
 	}
 };
 
+/**
+ * Every published name explains itself.
+ *
+ * A source contract is read by practice authors and by whoever has to decide, months later, whether a
+ * field still means what it says. An undocumented property is the first step of the rot this whole
+ * contract exists to prevent.
+ */
 const validateSchemaDocumentation = (schema, label) => {
 	if (typeof schema.title !== "string" || schema.title.trim() === "") {
 		throw new Error(`${label} needs a title`);
@@ -35,13 +64,6 @@ const validateSchemaDocumentation = (schema, label) => {
 		requireDescription(definition, `${label} definition '${name}'`);
 		for (const [propertyName, property] of Object.entries(definition.properties ?? {})) {
 			requireDescription(property, `${label} definition '${name}.${propertyName}'`);
-		}
-	}
-	const arrayItem = schema.properties?.decisions?.items;
-	if (arrayItem?.properties) {
-		requireDescription(arrayItem, `${label} decision`);
-		for (const [name, property] of Object.entries(arrayItem.properties)) {
-			requireDescription(property, `${label} decision property '${name}'`);
 		}
 	}
 };
@@ -68,9 +90,9 @@ const defaultCatalogSchema = await readJson(defaultCatalogSchemaPath);
 validateSchemaDocumentation(defaultCatalogSchema, "practices/default-catalog.schema.json");
 ajv.addSchema(defaultCatalogSchema);
 
-const validate = (schemaId, value, label) => {
-	if (!ajv.validate(schemaId, value)) {
-		throw new Error(`${label} violates ${schemaId}: ${ajv.errorsText(ajv.errors)}`);
+const validate = (id, value, label) => {
+	if (!ajv.validate(id, value)) {
+		throw new Error(`${label} violates ${id}: ${ajv.errorsText(ajv.errors)}`);
 	}
 };
 
@@ -82,560 +104,302 @@ const rejectDuplicateProperty = (values, property, label) => {
 	}
 };
 
-const validateManifestSemantics = (value, label) => {
-	rejectDuplicateProperty(value.sources, "kind", `${label} source`);
-	for (const source of value.sources) {
-		rejectDuplicateProperty(source.artifacts, "path", `${label} source '${source.kind}' artifact path`);
-		if (source.state.availability !== "AVAILABLE" && source.artifacts.length > 0) {
-			throw new Error(`${label} unavailable source '${source.kind}' contains artifacts`);
+const expectRejection = (id, value, label) => {
+	if (ajv.validate(id, value)) throw new Error(`${label}`);
+};
+
+const sameSet = (actual, expected) => {
+	const left = [...new Set(actual)].sort();
+	const right = [...new Set(expected)].sort();
+	return left.length === right.length && left.every((value, index) => value === right[index]);
+};
+
+/**
+ * The schemas that travel with a run repeat the catalog: every source kind, every artifact kind, and
+ * which sources may appear for which kind. That repetition is unavoidable — a JSON Schema cannot read
+ * another file — so it is checked rather than trusted. A source added to the catalog and forgotten here
+ * is a source the runtime can capture and the manifest schema rejects, which surfaces as a failed run
+ * long after the commit that caused it.
+ */
+const validateSchemasTrackTheCatalog = async (version, catalog) => {
+	const sourceKinds = catalog.sources.map((source) => source.kind);
+	const artifactKinds = [...new Set(catalog.sources.flatMap((source) => source.artifactKinds))];
+	const sourcesFor = (artifactKind) =>
+		catalog.sources
+			.filter((source) => source.artifactKinds.includes(artifactKind))
+			.map((source) => source.kind);
+
+	const catalogSchema = await readJson(
+		path.join(contractsRoot, version, "artifact-source-catalog.schema.json"),
+	);
+	// A kind the schema lets a source claim but no source supplies is a kind a practice can be authored
+	// against and no review can ever read evidence for.
+	const declarable = catalogSchema.$defs.source.properties.artifactKinds.items.enum;
+	if (!sameSet(declarable, artifactKinds)) {
+		throw new Error(
+			`${version} catalog schema allows artifact kinds no source supplies: ${declarable.filter((kind) => !artifactKinds.includes(kind)).join(", ") || "(none)"}`,
+		);
+	}
+
+	for (const [file, artifactKindPath] of [
+		["artifact-source-manifest.schema.json", (schema) => schema.properties.artifactKind.enum],
+		[
+			"automated-review-readiness-report.schema.json",
+			(schema) => schema.properties.artifactKind.enum,
+		],
+	]) {
+		const schema = await readJson(path.join(contractsRoot, version, file));
+		if (!sameSet(artifactKindPath(schema), artifactKinds)) {
+			throw new Error(`${version}/${file} does not list exactly the catalog's artifact kinds`);
 		}
-		if (
-			source.state.availability === "AVAILABLE" &&
-			source.state.content === "NON_EMPTY" &&
-			source.artifacts.length === 0
-		) {
-			throw new Error(`${label} non-empty source '${source.kind}' contains no artifacts`);
+	}
+
+	// Checked through Ajv rather than by walking the schema, so a restructured conditional that still
+	// enforces the same allow-list keeps passing and one that quietly stops enforcing it does not.
+	const digest = catalogDigests.get(version);
+	const manifestId = schemaId(version, "artifact-source-manifest.schema.json");
+	const readinessId = schemaId(version, "automated-review-readiness-report.schema.json");
+	const capturedAt = "2026-08-03T00:00:00Z";
+	const absent = { availability: "NOT_COLLECTED", reasonCode: "MINIMIZED" };
+	const manifestOf = (artifactKind, kinds) => ({
+		contractVersion: version,
+		catalogDigest: digest,
+		artifactKind,
+		capturedAt,
+		sources: kinds.map((kind) => ({ kind, state: absent, artifacts: [] })),
+	});
+	const readinessOf = (artifactKind, kind) => ({
+		contractVersion: version,
+		catalogDigest: digest,
+		artifactKind,
+		manifestCapturedAt: capturedAt,
+		decidedAt: capturedAt,
+		decisions: [
+			{
+				practiceSlug: "example",
+				decidedAt: capturedAt,
+				ready: true,
+				reasonCodes: [],
+				sourceChecks: [
+					{
+						sourceKind: kind,
+						sourceContractVersion: version,
+						checkedAt: capturedAt,
+						temporalAnchor: capturedAt,
+						meetsRequirements: true,
+						reasonCodes: [],
+					},
+				],
+			},
+		],
+	});
+
+	for (const artifactKind of artifactKinds) {
+		const applicable = sourcesFor(artifactKind);
+		validate(manifestId, manifestOf(artifactKind, applicable), `${version} ${artifactKind} manifest`);
+		// A manifest enumerates every source that could have applied, including the ones it did not
+		// collect. Dropping one is how "we chose not to look" becomes indistinguishable from silence.
+		expectRejection(
+			manifestId,
+			manifestOf(artifactKind, applicable.slice(1)),
+			`${version}/artifact-source-manifest.schema.json accepted a ${artifactKind} manifest missing '${applicable[0]}'`,
+		);
+		for (const kind of sourceKinds) {
+			const applies = applicable.includes(kind);
+			if (!applies) {
+				expectRejection(
+					manifestId,
+					manifestOf(artifactKind, [kind, ...applicable.slice(1)]),
+					`${version}/artifact-source-manifest.schema.json accepted '${kind}' for ${artifactKind}`,
+				);
+			}
+			const label = `${version}/automated-review-readiness-report.schema.json`;
+			if (applies) {
+				validate(readinessId, readinessOf(artifactKind, kind), `${label} ${artifactKind}/${kind}`);
+			} else {
+				expectRejection(
+					readinessId,
+					readinessOf(artifactKind, kind),
+					`${label} accepted a source check on '${kind}' for ${artifactKind}`,
+				);
+			}
 		}
+	}
+
+	// The rejection paths that are not about the allow-list, exercised against the same fixtures.
+	const pullRequestKind = artifactKinds.find((kind) => sourcesFor(kind).length > 1) ?? artifactKinds[0];
+	const applicable = sourcesFor(pullRequestKind);
+	const manifest = manifestOf(pullRequestKind, applicable);
+	const available = {
+		availability: "AVAILABLE",
+		content: "NON_EMPTY",
+		completeness: "COMPLETE",
+		facts: { capturedAt },
+	};
+	const artifact = { path: "context.json", mediaType: "application/json", sha256: "b".repeat(64), bytes: 1 };
+	const withFirstSource = (state, artifacts) => ({
+		...manifest,
+		sources: [{ kind: applicable[0], state, artifacts }, ...manifest.sources.slice(1)],
+	});
+	validate(manifestId, withFirstSource(available, [artifact]), `${version} available-source manifest`);
+	for (const [label, invalid] of [
+		["an empty source list", { ...manifest, sources: [] }],
+		["an unknown source kind", manifestOf(pullRequestKind, ["scm.unknown.source", ...applicable.slice(1)])],
+		["a duplicate source capture", { ...manifest, sources: [...manifest.sources, { ...manifest.sources[0] }] }],
+		["a wrong catalog digest", { ...manifest, catalogDigest: "a".repeat(64) }],
+		["an absent source carrying artifacts", withFirstSource(absent, [artifact])],
+		["an escaping artifact path", withFirstSource(available, [{ ...artifact, path: "../secret" }])],
+		["a non-canonical artifact path", withFirstSource(available, [{ ...artifact, path: "./context.json" }])],
+	]) {
+		expectRejection(manifestId, invalid, `${version}/artifact-source-manifest.schema.json accepted ${label}`);
+	}
+
+	const readiness = readinessOf(pullRequestKind, applicable[0]);
+	const decision = readiness.decisions[0];
+	const check = decision.sourceChecks[0];
+	const withDecision = (overrides) => ({ ...readiness, decisions: [{ ...decision, ...overrides }] });
+	// A practice can be skipped before any source is read at all — nothing to review it with, or the
+	// author declaring the evidence insufficient. That says nothing about the sources, so it carries no
+	// source checks and must still carry a reason.
+	validate(
+		readinessId,
+		withDecision({ ready: false, reasonCodes: ["NO_AUTOMATED_REVIEW"], sourceChecks: [] }),
+		`${version} skipped-practice readiness`,
+	);
+	for (const [label, overrides] of [
+		["a ready decision with no source check", { sourceChecks: [] }],
+		["a duplicate source check", { sourceChecks: [check, { ...check }] }],
+		[
+			"a ready decision over a failed source check",
+			{ sourceChecks: [{ ...check, meetsRequirements: false, reasonCodes: ["SOURCE_NOT_AVAILABLE"] }] },
+		],
+		["a skipped practice with no reason", { ready: false }],
+		["a failed source check with no reason", { ready: false, sourceChecks: [{ ...check, meetsRequirements: false }] }],
+		["a passing source check carrying a reason", { sourceChecks: [{ ...check, reasonCodes: ["SOURCE_INCOMPLETE"] }] }],
+	]) {
+		expectRejection(
+			readinessId,
+			withDecision(overrides),
+			`${version}/automated-review-readiness-report.schema.json accepted ${label}`,
+		);
 	}
 };
 
-const validateReadinessSemantics = (value, label) => {
-	rejectDuplicateProperty(value.decisions, "practiceSlug", `${label} practice`);
-	for (const decision of value.decisions) {
-		if (decision.decidedAt !== value.decidedAt) {
-			throw new Error(`${label} practice '${decision.practiceSlug}' uses a different decision time`);
-		}
-		rejectDuplicateProperty(
-			decision.sourceChecks,
-			"sourceKind",
-			`${label} practice '${decision.practiceSlug}' source check`,
-		);
-		if (new Set(decision.reasonCodes).size !== decision.reasonCodes.length) {
-			throw new Error(`${label} practice '${decision.practiceSlug}' repeats a reason code`);
-		}
-		for (const sourceCheck of decision.sourceChecks) {
-			if (new Set(sourceCheck.reasonCodes).size !== sourceCheck.reasonCodes.length) {
-				throw new Error(`${label} source check '${sourceCheck.sourceKind}' repeats a reason code`);
-			}
-			if (sourceCheck.meetsRequirements !== (sourceCheck.reasonCodes.length === 0)) {
-				throw new Error(`${label} source check '${sourceCheck.sourceKind}' has inconsistent reason codes`);
-			}
-		}
-		if (
-			decision.ready !==
-			(decision.reasonCodes.length === 0 &&
-				decision.sourceChecks.every((sourceCheck) => sourceCheck.meetsRequirements))
-		) {
-			throw new Error(`${label} practice '${decision.practiceSlug}' has an inconsistent ready outcome`);
-		}
+/**
+ * The policy schema describes a shape that only ever exists in memory and in the database, so nothing
+ * on disk exercises it. These fixtures are what keeps it honest; `PracticeAutomatedReviewPolicySchemaTest`
+ * is what keeps it in step with the record it describes.
+ */
+const validatePolicySchema = (version) => {
+	const id = schemaId(version, "practice-automated-review-policy.schema.json");
+	const reviewed = {
+		sourceContractVersion: version,
+		automatedReview: { mode: "LANGUAGE_MODEL", evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET" },
+		whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
+		knownLimitations: [
+			{ code: "RUNTIME_BEHAVIOR_NOT_OBSERVED", description: "Repository evidence does not establish runtime behaviour." },
+		],
+	};
+	const reason = { code: "NEEDS_A_PERSON", description: "Judging this needs context no source carries." };
+	validate(id, reviewed, `${version} reviewed-practice policy`);
+	validate(
+		id,
+		{ ...reviewed, automatedReview: { ...reviewed.automatedReview, evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT" }, insufficiencyReason: reason },
+		`${version} declared-insufficient policy`,
+	);
+	validate(
+		id,
+		{ ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" }, knownLimitations: [] },
+		`${version} human-only policy`,
+	);
+	for (const [label, invalid] of [
+		["a review mode with no sufficiency verdict", { ...reviewed, automatedReview: { mode: "LANGUAGE_MODEL", evidenceSufficiency: "NONE" } }],
+		["a practice it does not review claiming sufficient evidence", { ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET" }, knownLimitations: [] }],
+		["limitations on a practice it does not review", { ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" } }],
+		// The reason a person is needed is the one field an operator asked about; folding it back into
+		// the limitation list is how it stopped being answerable the first time.
+		["insufficient evidence with no reason a person is needed", { ...reviewed, automatedReview: { ...reviewed.automatedReview, evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT" } }],
+		["a reason a person is needed on a practice it does review", { ...reviewed, insufficiencyReason: reason }],
+		["a retired evidence profile", { ...reviewed, evidenceProfile: "pull-request-review" }],
+		// The sources a review reads moved onto the bindings, because they depend on what occasioned it.
+		["evidence needs on the policy", { ...reviewed, needs: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }] }],
+		["a limitation with no code", { ...reviewed, knownLimitations: [{ description: "…" }] }],
+	]) {
+		expectRejection(id, invalid, `${version}/practice-automated-review-policy.schema.json accepted ${label}`);
 	}
 };
 
 const catalogDigests = new Map();
-
-/**
- * What a source's authority forbids it from claiming.
- *
- * Extracted so both rules can be exercised against a deliberately broken source below: a guard whose
- * failure path is never run is indistinguishable from one that cannot fail.
- */
-function assertSourceAuthorityInvariants(version, source) {
-	// Only a source read straight from upstream, or derived from one without discarding anything, can
-	// be anchored to an identity that cannot change under it. A mirror reflects upstream state that
-	// moves independently of the capture, so calling it pinned would let a copy that has since drifted
-	// satisfy a CURRENT requirement.
-	if (
-		source.freshness.mode === "PINNED_IDENTITY" &&
-		source.authority !== "UPSTREAM_SNAPSHOT" &&
-		source.authority !== "DETERMINISTIC_DERIVATION"
-	) {
-		throw new Error(`${version} source '${source.kind}' pins an identity it cannot pin (${source.authority})`);
-	}
-	// A lossy derivation is a bounded summary of its subject, not the subject, so it cannot answer "is
-	// all of it here?" — and a practice author who requires COMPLETE is asking exactly that.
-	if (source.authority === "LOSSY_DERIVATION" && source.completeness.supportsComplete) {
-		throw new Error(`${version} source '${source.kind}' is a lossy derivation and cannot report COMPLETE`);
-	}
-}
 
 const validateContractVersion = async (version) => {
 	const versionDir = path.join(contractsRoot, version);
 	const catalogBytes = await readFile(path.join(versionDir, "catalog.json"));
 	const catalog = JSON.parse(catalogBytes);
 	const catalogDigest = createHash("sha256").update(catalogBytes).digest("hex");
+	// Both runtime records name the catalog they were interpreted under by digest, so a catalog edit
+	// that leaves them behind must fail here rather than produce records nobody can interpret.
 	for (const schemaFile of [
 		"artifact-source-manifest.schema.json",
 		"automated-review-readiness-report.schema.json",
 	]) {
 		const schema = await readJson(path.join(versionDir, schemaFile));
 		if (schema.properties.catalogDigest.const !== catalogDigest) {
-			throw new Error(`${version}/${schemaFile} does not pin the catalog digest`);
+			throw new Error(
+				`${version}/${schemaFile} pins ${schema.properties.catalogDigest.const} but the catalog hashes to ${catalogDigest}`,
+			);
 		}
 	}
 	catalogDigests.set(version, catalogDigest);
-	const decisionCatalog = await readJson(path.join(versionDir, "source-use-decisions.json"));
+
+	validate(schemaId(version, "artifact-source-catalog.schema.json"), catalog, `${version}/catalog.json`);
+	rejectDuplicateProperty(catalog.sources, "kind", `${version} source kind`);
 	validate(
-		`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/artifact-source-catalog.schema.json`,
-		catalog,
-		`${version}/catalog.json`,
-	);
-	validate(
-		`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/source-use-decisions.schema.json`,
-		decisionCatalog,
+		schemaId(version, "source-use-decisions.schema.json"),
+		await readJson(path.join(versionDir, "source-use-decisions.json")),
 		`${version}/source-use-decisions.json`,
 	);
 
-	rejectDuplicateProperty(catalog.sources, "kind", `${version} source kind`);
-	rejectDuplicateProperty(catalog.profiles, "id", `${version} profile`);
-	rejectDuplicateProperty(decisionCatalog.decisions, "id", `${version} source-use decision`);
-
-	const versionSources = new Map(catalog.sources.map((source) => [source.kind, source]));
-	const decisions = new Map(decisionCatalog.decisions.map((decision) => [decision.id, decision]));
-	for (const profile of catalog.profiles) {
-		for (const kind of profile.allowedSources) {
-			const source = versionSources.get(kind);
-			if (!source) throw new Error(`${version} profile '${profile.id}' references unknown source '${kind}'`);
-			if (!source.artifactTypes.includes(profile.artifactType)) {
-				throw new Error(`${version} profile '${profile.id}' uses '${kind}' for an unsupported artifact type`);
-			}
-		}
-	}
-	for (const source of catalog.sources) assertSourceAuthorityInvariants(version, source);
-	const sourceUsePurposes = new Set([
-		"AUTOMATED_PRACTICE_REVIEW",
-		"PRACTICE_FEEDBACK_DELIVERY",
-		"CONVERSATIONAL_MENTORING",
-		"OPERATOR_EVIDENCE_REVIEW",
-	]);
-	for (const source of catalog.sources) {
-		const covered = new Set();
-		for (const decisionId of source.useDecisionIds) {
-			const decision = decisions.get(decisionId);
-			if (!decision) throw new Error(`${version} source '${source.kind}' references unknown decision '${decisionId}'`);
-			if (decision.sourceKind !== source.kind || decision.retentionPolicy !== source.retentionPolicy || decision.erasurePolicy !== source.erasurePolicy) {
-				throw new Error(`${version} decision '${decision.id}' does not match source '${source.kind}'`);
-			}
-			if (covered.has(decision.purpose) || !sourceUsePurposes.has(decision.purpose)) {
-				throw new Error(`${version} decision '${decision.id}' has an invalid or duplicate purpose`);
-			}
-			covered.add(decision.purpose);
-		}
-		if (covered.size !== sourceUsePurposes.size) throw new Error(`${version} source '${source.kind}' lacks a product-use decision`);
-	}
-	const referencedDecisions = new Set(catalog.sources.flatMap((source) => source.useDecisionIds));
-	for (const decision of decisionCatalog.decisions) {
-		if (!referencedDecisions.has(decision.id)) {
-			throw new Error(`${version} decision '${decision.id}' is not referenced by a source`);
-		}
-	}
+	await validateSchemasTrackTheCatalog(version, catalog);
+	validatePolicySchema(version);
 	return catalog;
 };
 
-const catalogs = new Map();
-for (const version of contractVersions) catalogs.set(version, await validateContractVersion(version));
+for (const version of contractVersions) await validateContractVersion(version);
 
-const sourceCatalog = catalogs.get("1.0.0");
-const sourceCatalogDigest = catalogDigests.get("1.0.0");
-const practiceCatalog = await readJson(
-	path.join(root, "server/src/main/resources/practices/default-catalog.json"),
-);
+const practiceCatalogPath = path.join(root, "server/src/main/resources/practices/default-catalog.json");
+const practiceCatalog = await readJson(practiceCatalogPath);
 validate(defaultCatalogSchema.$id, practiceCatalog, "practices/default-catalog.json");
-const sources = new Map(sourceCatalog.sources.map((source) => [source.kind, source]));
-const profiles = new Map(sourceCatalog.profiles.map((profile) => [profile.id, profile]));
 
-const triggerEventsByArtifactType = {
-	PULL_REQUEST: new Set([
-		"PullRequestCreated",
-		"PullRequestReady",
-		"PullRequestSynchronized",
-		"ReviewSubmitted",
-		"PullRequestMerged",
-		"PullRequestClosed",
-	]),
-	ISSUE: new Set(["IssueCreated", "IssueLabeled", "IssueClosed"]),
-	CONVERSATION_THREAD: new Set(),
-};
 const precomputeResourcePrefix = "practices/precompute/";
 const precomputeScripts = new Set(
 	(await readdir(path.join(root, "server/src/main/resources/practices/precompute")))
 		.filter((file) => file.endsWith(".ts"))
 		.map((file) => precomputeResourcePrefix + file),
 );
-
-const validatePracticeCatalogSemantics = () => {
-	const areaSlugs = new Set();
-	const practiceSlugs = new Set();
-	const referencedPolicies = new Set();
-	const referencedPrecomputeScripts = new Set();
-	for (const area of practiceCatalog.areas) {
-		if (areaSlugs.has(area.slug)) throw new Error(`default-catalog.json duplicates area '${area.slug}'`);
-		areaSlugs.add(area.slug);
-		for (const practice of area.practices) {
-			if (practiceSlugs.has(practice.slug)) {
-				throw new Error(`default-catalog.json duplicates practice '${practice.slug}'`);
-			}
-			practiceSlugs.add(practice.slug);
-			const policy = practiceCatalog.automatedReviewPolicy[practice.automatedReviewPolicyId];
-			if (!policy) {
-				throw new Error(
-					`default-catalog.json practice '${practice.slug}' references unknown automated-review setup '${practice.automatedReviewPolicyId}'`,
-				);
-			}
-			referencedPolicies.add(practice.automatedReviewPolicyId);
-			const profile = profiles.get(policy.evidenceProfile);
-			if (profile?.artifactType !== practice.artifactType) {
-				throw new Error(
-					`default-catalog.json practice '${practice.slug}' uses evidence for '${profile?.artifactType ?? "an unknown work type"}'`,
-				);
-			}
-			const preamble = practice.preamble ?? practice.artifactType;
-			if (!practiceCatalog.criteriaPreambles[preamble]) {
-				throw new Error(`default-catalog.json practice '${practice.slug}' references unknown preamble '${preamble}'`);
-			}
-			const allowedTriggers = triggerEventsByArtifactType[practice.artifactType];
-			const incompatibleTrigger = practice.triggerEvents.find((event) => !allowedTriggers.has(event));
-			if (incompatibleTrigger) {
-				throw new Error(
-					`default-catalog.json practice '${practice.slug}' uses incompatible trigger '${incompatibleTrigger}'`,
-				);
-			}
-			const automatedReview = policy.automatedReview.mode !== "NONE";
-			if (!automatedReview && practice.triggerEvents.length > 0) {
-				throw new Error(
-					`default-catalog.json practice '${practice.slug}' starts reviews without automated review`,
-				);
-			}
-			if (
-				automatedReview &&
-				practice.artifactType !== "CONVERSATION_THREAD" &&
-				practice.triggerEvents.length === 0
-			) {
-				throw new Error(`default-catalog.json practice '${practice.slug}' has no review trigger`);
-			}
-			if (practice.precomputeScript) {
-				const expectedPath = `${precomputeResourcePrefix}${practice.slug}.ts`;
-				if (practice.precomputeScript !== expectedPath) {
-					throw new Error(
-						`default-catalog.json practice '${practice.slug}' must use precompute script '${expectedPath}'`,
-					);
-				}
-				if (!precomputeScripts.has(practice.precomputeScript)) {
-					throw new Error(
-						`default-catalog.json practice '${practice.slug}' references missing precompute script '${practice.precomputeScript}'`,
-					);
-				}
-				if (!automatedReview) {
-					throw new Error(
-						`default-catalog.json practice '${practice.slug}' precomputes without automated review`,
-					);
-				}
-				referencedPrecomputeScripts.add(practice.precomputeScript);
-			}
+const referencedPrecomputeScripts = new Set();
+for (const area of practiceCatalog.areas) {
+	for (const practice of area.practices) {
+		if (!practice.precomputeScript) continue;
+		// The loader checks the script exists. Nothing checks it belongs to the practice that names it,
+		// and a script named after a slug is the only thing that keeps the pair findable from either side.
+		const expected = `${precomputeResourcePrefix}${practice.slug}.ts`;
+		if (practice.precomputeScript !== expected) {
+			throw new Error(
+				`default-catalog.json practice '${practice.slug}' must name its precompute script '${expected}'`,
+			);
 		}
-	}
-	if (practiceSlugs.size === 0) {
-		throw new Error("default-catalog.json must define at least one practice");
-	}
-	for (const policyId of Object.keys(practiceCatalog.automatedReviewPolicy)) {
-		if (!referencedPolicies.has(policyId)) {
-			throw new Error(`default-catalog.json automated-review setup '${policyId}' is unused`);
+		if (!precomputeScripts.has(expected)) {
+			throw new Error(`default-catalog.json practice '${practice.slug}' names a missing precompute script`);
 		}
-	}
-	for (const script of precomputeScripts) {
-		if (!referencedPrecomputeScripts.has(script)) {
-			throw new Error(`precompute script '${script}' is not declared by a bundled practice`);
-		}
-	}
-};
-
-validatePracticeCatalogSemantics();
-
-const validateEvidenceSemantics = (requirements, label) => {
-	const profile = profiles.get(requirements.evidenceProfile);
-	if (!profile) throw new Error(`${label} references unknown profile '${requirements.evidenceProfile}'`);
-	const requiredKinds = new Set();
-	const optionalKinds = new Set();
-	for (const requirement of requirements.requiredEvidence) {
-		const source = sources.get(requirement.sourceKind);
-		if (!source) throw new Error(`${label} references unknown source '${requirement.sourceKind}'`);
-		if (!profile.allowedSources.includes(requirement.sourceKind))
-			throw new Error(`${label} references source outside profile '${requirement.sourceKind}'`);
-		if (requiredKinds.has(requirement.sourceKind))
-			throw new Error(`${label} duplicates '${requirement.sourceKind}'`);
-		requiredKinds.add(requirement.sourceKind);
-		if (requirement.completeness === "COMPLETE" && !source.completeness.supportsComplete)
-			throw new Error(`${label} requires impossible COMPLETE evidence from '${requirement.sourceKind}'`);
-		if (requirement.freshness === "CURRENT" && source.freshness.mode === "NOT_APPLICABLE")
-			throw new Error(`${label} requires impossible CURRENT evidence from '${requirement.sourceKind}'`);
-	}
-	for (const requirement of requirements.optionalContext) {
-		if (!sources.has(requirement.sourceKind))
-			throw new Error(`${label} references unknown source '${requirement.sourceKind}'`);
-		if (!profile.allowedSources.includes(requirement.sourceKind))
-			throw new Error(`${label} references source outside profile '${requirement.sourceKind}'`);
-		if (optionalKinds.has(requirement.sourceKind))
-			throw new Error(`${label} duplicates '${requirement.sourceKind}'`);
-		if (requiredKinds.has(requirement.sourceKind))
-			throw new Error(`${label} makes '${requirement.sourceKind}' both required and optional`);
-		optionalKinds.add(requirement.sourceKind);
-	}
-};
-
-for (const [name, requirements] of Object.entries(practiceCatalog.automatedReviewPolicy)) {
-	validate(
-		"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json",
-		requirements,
-		`default-catalog.json automatedReviewPolicy.${name}`,
-	);
-	validateEvidenceSemantics(requirements, `default-catalog.json automatedReviewPolicy.${name}`);
-}
-
-const evidenceSchema =
-	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json";
-const invalidOptional = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
-invalidOptional.optionalContext = [
-	{
-		sourceKind: invalidOptional.requiredEvidence[0].sourceKind,
-		completeness: "COMPLETE",
-		freshness: "CURRENT",
-	},
-];
-if (ajv.validate(evidenceSchema, invalidOptional)) {
-	throw new Error("practice evidence schema accepted quality constraints on an optional source");
-}
-
-const unexplainedAdditionalContext = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
-unexplainedAdditionalContext.automatedReview.evidenceSufficiency = "DECLARED_EVIDENCE_INSUFFICIENT";
-unexplainedAdditionalContext.knownLimitations = [];
-if (ajv.validate(evidenceSchema, unexplainedAdditionalContext)) {
-	throw new Error("practice evidence schema accepted unexplained additional context");
-}
-
-const withoutAutomatedReview = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
-withoutAutomatedReview.automatedReview = { mode: "NONE", evidenceSufficiency: "NONE" };
-withoutAutomatedReview.requiredEvidence = [];
-withoutAutomatedReview.optionalContext = [];
-withoutAutomatedReview.knownLimitations = [];
-validate(evidenceSchema, withoutAutomatedReview, "valid no-automated-review requirements fixture");
-
-const expectSchemaRejection = (label, mutate) => {
-	const requirements = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
-	mutate(requirements);
-	if (ajv.validate(evidenceSchema, requirements)) {
-		throw new Error(`practice evidence schema accepted ${label}`);
-	}
-};
-
-expectSchemaRejection("legacy observability property", (requirements) => {
-	requirements.observability = "LANGUAGE_MODEL";
-	delete requirements.automatedReview;
-});
-for (const [legacyName, currentName] of [
-	["profile", "evidenceProfile"],
-	["required", "requiredEvidence"],
-	["optional", "optionalContext"],
-	["detectorCapability", "automatedReview"],
-	["onUnsatisfied", "whenEvidenceIsInsufficient"],
-	["blindSpots", "knownLimitations"],
-]) {
-	expectSchemaRejection(`legacy '${legacyName}' property`, (requirements) => {
-		requirements[legacyName] = requirements[currentName];
-		delete requirements[currentName];
-	});
-}
-expectSchemaRejection("legacy limitation summary", (requirements) => {
-	requirements.knownLimitations[0].summary = requirements.knownLimitations[0].description;
-	delete requirements.knownLimitations[0].description;
-});
-expectSchemaRejection("legacy semantic review mode", (requirements) => {
-	requirements.automatedReview.mode = "SEMANTIC";
-});
-expectSchemaRejection("incoherent automated review", (requirements) => {
-	requirements.automatedReview = {
-		mode: "NONE",
-		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
-	};
-});
-expectSchemaRejection("review evidence on a no-automated-review practice", (requirements) => {
-	requirements.automatedReview = { mode: "NONE", evidenceSufficiency: "NONE" };
-});
-expectSchemaRejection("automated review without required evidence", (requirements) => {
-	requirements.requiredEvidence = [];
-});
-
-const expectSemanticRejection = (mutate, expected) => {
-	const requirements = structuredClone(Object.values(practiceCatalog.automatedReviewPolicy)[0]);
-	mutate(requirements);
-	try {
-		validateEvidenceSemantics(requirements, "adversarial requirements");
-	} catch (error) {
-		if (String(error).includes(expected)) return;
-		throw error;
-	}
-	throw new Error(`semantic validator accepted ${expected}`);
-};
-
-expectSemanticRejection((d) => (d.requiredEvidence[0].sourceKind = "scm.unknown"), "unknown source");
-expectSemanticRejection((d) => (d.requiredEvidence[0].sourceKind = "scm.issue.core"), "outside profile");
-expectSemanticRejection((d) => d.requiredEvidence.push(structuredClone(d.requiredEvidence[0])), "duplicates");
-expectSemanticRejection((requirements) =>
-	requirements.optionalContext.push({ sourceKind: requirements.requiredEvidence[0].sourceKind }), "both required and optional");
-expectSemanticRejection((d) => {
-	d.requiredEvidence[0] = { sourceKind: "outline.documents", completeness: "COMPLETE", freshness: "NO_REQUIREMENT" };
-}, "impossible COMPLETE");
-expectSemanticRejection((d) => {
-	d.requiredEvidence[0] = { sourceKind: "scm.pull-request.comments", completeness: "NO_REQUIREMENT", freshness: "CURRENT" };
-}, "impossible CURRENT");
-
-const manifestSchema =
-	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json";
-const manifest = {
-	contractVersion: "1.0.0",
-	catalogDigest: sourceCatalogDigest,
-	evidenceProfile: "pull-request-review",
-	capturedAt: "2026-08-03T00:00:00Z",
-	sources: profiles.get("pull-request-review").allowedSources.map((kind) => ({
-		kind,
-		state:
-			kind === "scm.pull-request.diff"
-				? {
-						availability: "AVAILABLE",
-						content: "EMPTY",
-						completeness: "COMPLETE",
-						facts: {
-							capturedAt: "2026-08-03T00:00:00Z",
-							immutableIdentity: "0123456789abcdef0123456789abcdef01234567",
-						},
-					}
-				: { availability: "NOT_COLLECTED", reasonCode: "MINIMIZED" },
-		artifacts: [],
-	})),
-};
-validate(manifestSchema, manifest, "valid manifest fixture");
-validateManifestSemantics(manifest, "valid manifest fixture");
-for (const [label, invalid] of [
-	["empty source list", { ...manifest, sources: [] }],
-	["unknown source kind", { ...manifest, sources: [{ ...manifest.sources[0], kind: "scm.unknown.source" }, ...manifest.sources.slice(1)] }],
-	["unknown profile", { ...manifest, evidenceProfile: "unknown-review" }],
-	["duplicate source capture", { ...manifest, sources: [...manifest.sources, structuredClone(manifest.sources[0])] }],
-	["wrong catalog digest", { ...manifest, catalogDigest: "a".repeat(64) }],
-	["unsafe artifact path", {
-		...manifest,
-		sources: [{ ...manifest.sources[0], state: { ...manifest.sources[0].state, content: "NON_EMPTY" }, artifacts: [{ path: "../secret", mediaType: "text/plain", sha256: "b".repeat(64), bytes: 1 }] }, ...manifest.sources.slice(1)],
-	}],
-	["non-canonical artifact path", {
-		...manifest,
-		sources: [{ ...manifest.sources[0], state: { ...manifest.sources[0].state, content: "NON_EMPTY" }, artifacts: [{ path: "./context.json", mediaType: "application/json", sha256: "b".repeat(64), bytes: 1 }] }, ...manifest.sources.slice(1)],
-	}],
-]) {
-	if (ajv.validate(manifestSchema, invalid)) throw new Error(`manifest schema accepted ${label}`);
-}
-const duplicateArtifactPath = structuredClone(manifest);
-duplicateArtifactPath.sources[0].artifacts = [
-	{ path: "context.json", mediaType: "application/json", sha256: "b".repeat(64), bytes: 1 },
-	{ path: "context.json", mediaType: "application/json", sha256: "c".repeat(64), bytes: 2 },
-];
-try {
-	validateManifestSemantics(duplicateArtifactPath, "adversarial manifest");
-	throw new Error("manifest semantic validator accepted duplicate artifact paths");
-} catch (error) {
-	if (!String(error).includes("duplicates 'context.json'")) throw error;
-}
-
-const readinessSchema =
-	"https://hephaestus.aet.cit.tum.de/contracts/artifact-source/1.0.0/automated-review-readiness-report.schema.json";
-const sourceCheck = {
-	sourceKind: "scm.pull-request.diff",
-	sourceContractVersion: "1.0.0",
-	checkedAt: "2026-08-03T00:00:00Z",
-	temporalAnchor: "2026-08-03T00:00:00Z",
-	freshness: "CURRENT",
-	meetsRequirements: true,
-	reasonCodes: [],
-};
-const readiness = {
-	contractVersion: "1.0.0",
-	catalogDigest: sourceCatalogDigest,
-	evidenceProfile: "pull-request-review",
-	manifestCapturedAt: "2026-08-03T00:00:00Z",
-	decidedAt: "2026-08-03T00:00:00Z",
-	decisions: [
-		{
-			practiceSlug: "example",
-			decidedAt: "2026-08-03T00:00:00Z",
-			ready: true,
-			reasonCodes: [],
-			sourceChecks: [sourceCheck],
-		},
-	],
-};
-validate(readinessSchema, readiness, "valid readiness fixture");
-validateReadinessSemantics(readiness, "valid readiness fixture");
-const skippedReview = {
-	...readiness,
-	decisions: [
-		{
-			...readiness.decisions[0],
-			ready: false,
-			reasonCodes: ["NO_AUTOMATED_REVIEW"],
-			sourceChecks: [],
-		},
-	],
-};
-validate(readinessSchema, skippedReview, "valid skipped-review fixture");
-validateReadinessSemantics(skippedReview, "valid skipped-review fixture");
-for (const [label, decision] of [
-	["zero source checks", { ...readiness.decisions[0], sourceChecks: [] }],
-	["duplicate source check", { ...readiness.decisions[0], sourceChecks: [sourceCheck, structuredClone(sourceCheck)] }],
-	["ready with failed source check", { ...readiness.decisions[0], sourceChecks: [{ ...sourceCheck, meetsRequirements: false, reasonCodes: ["SOURCE_NOT_CURRENT"] }] }],
-	["skipped without reason", { ...readiness.decisions[0], ready: false }],
-	["rejection without reason", { ...readiness.decisions[0], ready: false, sourceChecks: [{ ...sourceCheck, meetsRequirements: false }] }],
-]) {
-	if (ajv.validate(readinessSchema, { ...readiness, decisions: [decision] }))
-		throw new Error(`readiness schema accepted ${label}`);
-}
-const wrongProfileSourceCheck = {
-	...readiness,
-	decisions: [{ ...readiness.decisions[0], sourceChecks: [{ ...sourceCheck, sourceKind: "scm.issue.core" }] }],
-};
-if (ajv.validate(readinessSchema, wrongProfileSourceCheck)) {
-	throw new Error("readiness schema accepted a source check outside the selected profile");
-}
-const duplicatePractice = {
-	...readiness,
-	decisions: [readiness.decisions[0], { ...structuredClone(readiness.decisions[0]), decidedAt: "2026-08-03T00:00:01Z" }],
-};
-try {
-	validateReadinessSemantics(duplicatePractice, "adversarial readiness");
-	throw new Error("readiness semantic validator accepted duplicate practices");
-} catch (error) {
-	if (!String(error).includes("duplicates 'example'")) throw error;
-}
-const inconsistentDecisionTime = structuredClone(readiness);
-inconsistentDecisionTime.decisions[0].decidedAt = "2026-08-03T00:00:01Z";
-try {
-	validateReadinessSemantics(inconsistentDecisionTime, "adversarial readiness");
-	throw new Error("readiness semantic validator accepted inconsistent decision times");
-} catch (error) {
-	if (!String(error).includes("different decision time")) throw error;
-}
-
-for (const [label, broken, expected] of [
-	[
-		"a mirror claiming a pinned identity",
-		{ kind: "x.mirror", authority: "SYNCHRONIZED_MIRROR", freshness: { mode: "PINNED_IDENTITY" }, completeness: { supportsComplete: false } },
-		"pins an identity it cannot pin",
-	],
-	[
-		"a lossy derivation claiming completeness",
-		{ kind: "x.lossy", authority: "LOSSY_DERIVATION", freshness: { mode: "NOT_APPLICABLE" }, completeness: { supportsComplete: true } },
-		"cannot report COMPLETE",
-	],
-]) {
-	try {
-		assertSourceAuthorityInvariants("1.0.0", broken);
-		throw new Error(`source invariants accepted ${label}`);
-	} catch (error) {
-		if (!String(error).includes(expected)) throw error;
+		referencedPrecomputeScripts.add(expected);
 	}
 }
+for (const script of precomputeScripts) {
+	if (!referencedPrecomputeScripts.has(script)) {
+		throw new Error(`precompute script '${script}' is not named by any bundled practice`);
+	}
+}
+
+console.log(
+	`Artifact-source contracts: ${contractVersions.length} version(s) validated (${contractVersions.join(", ")}); ${practiceCatalog.areas.flatMap((area) => area.practices).length} bundled practices satisfy their schema.`,
+);

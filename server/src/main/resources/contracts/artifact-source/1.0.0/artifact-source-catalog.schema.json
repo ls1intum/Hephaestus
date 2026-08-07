@@ -91,8 +91,8 @@
 					"description": "Relationship between the captured representation and its origin."
 				},
 				"identity": {
-					"$ref": "#/$defs/freshness",
-					"description": "Policy used to evaluate whether a capture is current enough."
+					"$ref": "#/$defs/identity",
+					"description": "Whether a capture of this source can be anchored to an identity that cannot drift."
 				},
 				"completeness": {
 					"$ref": "#/$defs/completeness",
