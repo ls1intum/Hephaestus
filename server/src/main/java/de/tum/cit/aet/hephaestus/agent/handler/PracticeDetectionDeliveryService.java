@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -147,7 +147,7 @@ public class PracticeDetectionDeliveryService {
                         job.getId()
                 );
             }
-            enforceEvidenceBoundary(finding, revision.getAutomatedReviewPolicy(), evidenceBoundary, job);
+            enforceEvidenceBoundary(finding, revision, evidenceBoundary, job);
         }
 
         ObservationOrigin origin = originOf(metadata);
@@ -260,11 +260,11 @@ public class PracticeDetectionDeliveryService {
 
     private void enforceEvidenceBoundary(
         ValidatedFinding finding,
-        @Nullable PracticeAutomatedReviewPolicy requirements,
+        PracticeRevision revision,
         EvidenceBoundary boundary,
         AgentJob job
     ) {
-        if (requirements == null) {
+        if (revision.getAutomatedReviewPolicy() == null || revision.getBindings() == null) {
             throw new JobDeliveryException(
                 "Practice has no evidence requirements: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
             );
@@ -279,8 +279,13 @@ public class PracticeDetectionDeliveryService {
                     job.getId()
             );
         }
+        // Only what the bindings this occasion matched declared. A citation to a source another
+        // binding of the same practice reads is still out of bounds here: that source was never staged
+        // for this run, so a quote from it cannot have been read.
         Set<SourceKind> declared = new HashSet<>();
-        requirements.needs().forEach(need -> declared.add(need.sourceKind()));
+        PracticeBinding.needsFor(revision.getBindings(), PracticeCatalogInjector.signalOf(job)).forEach(need ->
+            declared.add(need.sourceKind())
+        );
         for (JsonNode citation : citations) {
             JsonNode sourceKind = citation.path("sourceKind");
             JsonNode artifactPath = citation.path("artifactPath");

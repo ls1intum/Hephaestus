@@ -4,8 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
@@ -36,8 +37,8 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         practice.setId(42L);
         practice.setSlug("clear-feedback");
         practice.setName("Clear feedback");
-        practice.setArtifactKind(ArtifactKinds.PULL_REQUEST);
-        practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Give specific feedback");
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         when(practiceRepository.findByIdForUpdate(42L)).thenReturn(Optional.of(practice));
@@ -96,22 +97,21 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
         String before = service.append(practice).getReviewRuleFingerprint();
 
-        practice.setAutomatedReviewPolicy(
-            new PracticeAutomatedReviewPolicy(
-                practice.getAutomatedReviewPolicy().sourceContractVersion(),
-                new PracticeAutomatedReview(
-                    PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                    PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-                ),
-                List.of(
-                    new PracticeEvidenceRequirement(
-                        new de.tum.cit.aet.hephaestus.evidence.SourceKind("scm.pull-request.diff"),
-                        EvidenceStance.REQUIRED
+        // Evidence is declared per binding now, so this is where an evidence edit lands. The
+        // fingerprint has to follow it: a review that reads a different set of sources is a
+        // different rule, and a stale digest would report it as the shipped one.
+        practice.setBindings(
+            List.of(
+                PracticeBinding.on(
+                    ScmSignals.PULL_REQUEST_OPENED,
+                    List.of(
+                        new PracticeEvidenceRequirement(
+                            new SourceKind("scm.pull-request.core"),
+                            EvidenceStance.REQUIRED
+                        ),
+                        new PracticeEvidenceRequirement(new SourceKind("scm.review-threads"), EvidenceStance.CONTEXTUAL)
                     )
-                ),
-                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-                List.of(),
-                null
+                )
             )
         );
 

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -108,12 +109,13 @@ public class WorkspaceContextBuilder {
         ArtifactSourceManifest manifest,
         List<Practice> practices,
         String jobId,
-        Instant temporalAnchor
+        Instant temporalAnchor,
+        @Nullable SignalName signal
     ) {
         if (manifestBuilder == null) {
             throw new IllegalStateException("Evidence readiness requires a manifest builder");
         }
-        return manifestBuilder.prepareAutomatedReviewReadiness(manifest, practices, jobId, temporalAnchor);
+        return manifestBuilder.prepareAutomatedReviewReadiness(manifest, practices, jobId, temporalAnchor, signal);
     }
 
     public PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {

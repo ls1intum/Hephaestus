@@ -6,9 +6,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeTriggerEventOptionDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeSignalOptionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeWorkTypeDefinitionOptionsDTO;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -18,22 +17,23 @@ public class PracticeDefinitionOptionsService {
 
     private final ArtifactSourceCatalogRegistry catalogs;
     private final PracticeEvidenceDefaults defaults;
-    private final PracticeTriggerOptions triggerOptions;
+    private final PracticeSignalOptions signalOptions;
 
     public PracticeDefinitionOptionsService(
         ArtifactSourceCatalogRegistry catalogs,
         PracticeEvidenceDefaults defaults,
-        PracticeTriggerOptions triggerOptions
+        PracticeSignalOptions signalOptions
     ) {
         this.catalogs = catalogs;
         this.defaults = defaults;
-        this.triggerOptions = triggerOptions;
+        this.signalOptions = signalOptions;
     }
 
     public PracticeDefinitionOptionsDTO options() {
         ArtifactSourceCatalog catalog = catalogs.current();
         return new PracticeDefinitionOptionsDTO(
-            ArtifactKinds.authorable()
+            signalOptions
+                .authorableKinds()
                 .stream()
                 .map(artifact -> options(catalog, artifact))
                 .toList()
@@ -41,18 +41,16 @@ public class PracticeDefinitionOptionsService {
     }
 
     private PracticeWorkTypeDefinitionOptionsDTO options(ArtifactSourceCatalog catalog, ArtifactKind artifact) {
-        PracticeAutomatedReviewPolicy recommendedPolicy = defaults.forArtifact(artifact);
         Set<SourceKind> applicable = catalogs.requireSourcesFor(catalog.version(), artifact.value());
         return new PracticeWorkTypeDefinitionOptionsDTO(
             artifact,
-            triggerOptions
+            signalOptions
                 .optionsFor(artifact)
                 .stream()
-                .map(option ->
-                    new PracticeTriggerEventOptionDTO(option.event(), option.displayName(), option.recommended())
-                )
+                .map(option -> new PracticeSignalOptionDTO(option.signal(), option.displayName(), option.recommended()))
                 .toList(),
-            recommendedPolicy,
+            defaults.policyFor(artifact),
+            defaults.needsFor(artifact),
             List.of(PracticeAutomatedReviewMode.LANGUAGE_MODEL),
             catalog
                 .sources()

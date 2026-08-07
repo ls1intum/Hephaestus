@@ -158,7 +158,9 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
                     org.mockito.Mockito.mock(ArtifactSourceManifest.class)
                 )
             );
-            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any())).thenReturn(
+            when(
+                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
+            ).thenReturn(
                 new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
                     List.of(practice),
                     mock(AutomatedReviewReadinessReport.class)

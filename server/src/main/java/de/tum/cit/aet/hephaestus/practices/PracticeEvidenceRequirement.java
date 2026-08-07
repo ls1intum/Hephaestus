@@ -24,9 +24,14 @@ public record PracticeEvidenceRequirement(
         Objects.requireNonNull(stance, "stance");
     }
 
-    /** Derived, never serialized: the stance is the stored fact and an is-getter would ship a second one. */
+    /**
+     * Whether an absent or inadequate capture of this source refuses the review.
+     *
+     * <p>Derived, never serialized: the stance is the stored fact and a second accessor for it would
+     * ship a second one.
+     */
     @JsonIgnore
-    public boolean isRequired() {
-        return stance == EvidenceStance.REQUIRED;
+    public boolean refuses() {
+        return stance.refuses();
     }
 }

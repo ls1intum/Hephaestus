@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -154,14 +155,14 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    private Practice createPractice(String slug, String name, List<String> triggerEvents, boolean active) {
+    private Practice createPractice(String slug, String name, List<SignalName> signals, boolean active) {
         Practice p = new Practice();
         p.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);
-        p.setTriggerEvents(OBJECT_MAPPER.valueToTree(triggerEvents));
+        p.setBindings(PracticeTestEvidence.bindings(signals.toArray(SignalName[]::new)));
         p.setUsedInNewReviews(active);
         return practiceRepository.save(p);
     }
@@ -217,10 +218,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void matchesByTriggerEvent() {
-            createPractice("pr-quality", "PR Quality", List.of("PullRequestCreated"), true);
+            createPractice("pr-quality", "PR Quality", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -230,11 +231,11 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void excludesInactive() {
-            createPractice("active-one", "Active", List.of("PullRequestCreated"), true);
-            createPractice("inactive-one", "Inactive", List.of("PullRequestCreated"), false);
+            createPractice("active-one", "Active", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
+            createPractice("inactive-one", "Inactive", List.of(ScmSignals.PULL_REQUEST_OPENED), false);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -244,22 +245,27 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void excludesMismatchedEvents() {
-            createPractice("review-only", "Review Only", List.of("ReviewSubmitted"), true);
+            createPractice("review-only", "Review Only", List.of(ScmSignals.PULL_REQUEST_REVIEWED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
         }
 
         @Test
         void matchesMultiple() {
-            createPractice("practice-a", "Practice A", List.of("PullRequestCreated"), true);
-            createPractice("practice-b", "Practice B", List.of("PullRequestCreated", "ReviewSubmitted"), true);
-            createPractice("practice-c", "Practice C", List.of("ReviewSubmitted"), true);
+            createPractice("practice-a", "Practice A", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
+            createPractice(
+                "practice-b",
+                "Practice B",
+                List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_REVIEWED),
+                true
+            );
+            createPractice("practice-c", "Practice C", List.of(ScmSignals.PULL_REQUEST_REVIEWED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -276,10 +282,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         @Test
         void skipsNoBinding() {
             agentBindingRepository.deleteAll();
-            createPractice("no-config", "No Config", List.of("PullRequestCreated"), true);
+            createPractice("no-config", "No Config", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-review agent");
@@ -289,10 +295,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         void skipsUnavailableModelWithoutPoisoningTheReadTransaction() {
             workspaceModel.setEnabled(false);
             workspaceLlmModelRepository.saveAndFlush(workspaceModel);
-            createPractice("unavailable-model", "Unavailable model", List.of("PullRequestCreated"), true);
+            createPractice("unavailable-model", "Unavailable model", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-review agent");
@@ -300,10 +306,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void skipsNoMatchingPractices() {
-            createPractice("wrong-event", "Wrong Event", List.of("ReviewSubmitted"), true);
+            createPractice("wrong-event", "Wrong Event", List.of(ScmSignals.PULL_REQUEST_REVIEWED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("practices");
@@ -311,10 +317,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void skipsDraft() {
-            createPractice("draft-skip", "Draft Skip", List.of("PullRequestCreated"), true);
+            createPractice("draft-skip", "Draft Skip", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
             PullRequest pr = createPullRequest(true, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("draft");
@@ -326,10 +332,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void resolvesFromRepoOwner() {
-            createPractice("resolved", "Resolved", List.of("PullRequestCreated"), true);
+            createPractice("resolved", "Resolved", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -338,7 +344,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void skipsUnresolvableWorkspace() {
-            createPractice("orphan", "Orphan", List.of("PullRequestCreated"), true);
+            createPractice("orphan", "Orphan", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
 
             Repository unknownRepo = new Repository();
             unknownRepo.setNativeId(3099L);
@@ -352,7 +358,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
             pr.setRepository(unknownRepo);
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, ScmSignals.PULL_REQUEST_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("workspace");

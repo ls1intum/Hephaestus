@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.model;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,6 +22,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,7 +33,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
-import tools.jackson.databind.JsonNode;
 
 @Entity
 @Table(
@@ -77,8 +78,16 @@ public class Practice {
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
+    /**
+     * The kind of artifact this practice reviews.
+     *
+     * <p>A projection, not a fact: {@link #setBindings} derives it from the signals bound to, which
+     * already carry it as a prefix. It stays a column because two repository queries filter on it and a
+     * JSONB predicate over {@link #bindings} would be neither indexable nor readable.
+     */
     @Column(name = "applies_to", nullable = false, length = ArtifactKind.MAX_LENGTH)
     @ColumnDefault("'scm.pull_request'")
+    @Setter(lombok.AccessLevel.NONE)
     private ArtifactKind artifactKind = ArtifactKinds.PULL_REQUEST;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -105,14 +114,19 @@ public class Practice {
     private int displayOrder = 0;
 
     /**
-     * The domain events that gate detection for this practice (e.g. {@code PullRequestCreated},
-     * {@code ReviewSubmitted}), stored as a JSONB array. The trigger gate fires detection only when the
-     * incoming event is in this set, so the rule's lifecycle is bound to the artifact events it cares about.
+     * The occasions this practice is reviewed on, and the evidence each occasion's review reads, stored
+     * as a JSONB array. The detection gate starts a review only when the observed signal is bound here,
+     * so the rule's lifecycle is bound to the signals it cares about — and, since a signal name carries
+     * its artifact kind, this list is also where {@link #artifactKind} comes from.
+     *
+     * <p>The column is {@code bindings} rather than {@code on} because {@code ON} is reserved SQL. The
+     * authoring file spells it {@code on}, which is what an author writes and reads.
      */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "bindings", columnDefinition = "jsonb", nullable = false)
     @ToString.Exclude
-    private JsonNode triggerEvents;
+    @Setter(lombok.AccessLevel.NONE)
+    private List<PracticeBinding> bindings = List.of();
 
     /**
      * The detection rubric the agent evaluates the artifact against — the rule's normative text, never shown
@@ -165,6 +179,16 @@ public class Practice {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /**
+     * Sets the occasions this practice is reviewed on, and re-derives {@link #artifactKind} from them.
+     *
+     * <p>The only writer of the kind, so the projection cannot drift from the bindings it projects.
+     */
+    public void setBindings(List<PracticeBinding> bindings) {
+        this.bindings = List.copyOf(bindings);
+        this.artifactKind = PracticeBinding.artifactKindOf(this.bindings);
+    }
 
     @PrePersist
     public void prePersist() {

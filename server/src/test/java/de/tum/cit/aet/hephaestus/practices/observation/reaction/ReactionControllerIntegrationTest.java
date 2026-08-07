@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -93,7 +94,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
 
         // Agent job is a required FK for the observation.

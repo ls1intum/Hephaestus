@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SignalVocabulary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Stability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import io.nats.client.Message;
@@ -61,8 +60,6 @@ final class FixtureIntegration {
     static final EventTypeKey SHIPMENT_EVENT = new EventTypeKey(KIND, "fixture.shipment");
 
     /** The stored trigger literal a practice binds to, mirroring how practices are still authored. */
-    static final String WIDGET_ASSEMBLED_TRIGGER = "WidgetAssembled";
-    static final String WIDGET_SHIPPED_TRIGGER = "WidgetShipped";
 
     private FixtureIntegration() {}
 
@@ -206,37 +203,6 @@ final class FixtureIntegration {
             @Override
             public Optional<ArtifactDescriptor> descriptorFor(ArtifactKind kind) {
                 return descriptor.kind().equals(kind) ? Optional.of(descriptor) : Optional.empty();
-            }
-        };
-    }
-
-    /** Translates the fixture's stored trigger literals, exactly as a real domain module would. */
-    static SignalVocabulary vocabulary() {
-        Map<String, SignalName> byTrigger = Map.of(
-            WIDGET_ASSEMBLED_TRIGGER,
-            WIDGET_ASSEMBLED,
-            WIDGET_SHIPPED_TRIGGER,
-            WIDGET_SHIPPED
-        );
-        return new SignalVocabulary() {
-            @Override
-            public Optional<SignalName> signalForTriggerEvent(String triggerEventName) {
-                return Optional.ofNullable(byTrigger.get(triggerEventName));
-            }
-
-            @Override
-            public Set<String> triggerEventNames() {
-                return byTrigger.keySet();
-            }
-
-            @Override
-            public Optional<String> triggerEventFor(SignalName signal) {
-                return byTrigger
-                    .entrySet()
-                    .stream()
-                    .filter(entry -> entry.getValue().equals(signal))
-                    .map(Map.Entry::getKey)
-                    .findFirst();
             }
         };
     }

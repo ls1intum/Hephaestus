@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -29,14 +29,14 @@ public record CreatePracticeRequestDTO(
     @Schema(description = "Human-readable name", example = "PR Description Quality")
     String name,
 
-    @NotNull(message = "Trigger events are required")
-    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
-    @ValidTriggerEvents
+    @NotNull(message = "At least one binding is required")
+    @Size(min = 1, max = 10, message = "A practice must declare between 1 and 10 bindings")
+    @Valid
     @Schema(
-        description = "Events that start a practice review; empty for scheduled conversation reviews",
-        example = "[\"PullRequestCreated\", \"ReviewSubmitted\"]"
+        description = "Occasions this practice is reviewed on, each with the evidence that review reads. " +
+            "The kind of work reviewed is read off the signals."
     )
-    List<String> triggerEvents,
+    List<PracticeBinding> bindings,
 
     @NotBlank(message = "Criteria is required")
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
@@ -52,18 +52,10 @@ public record CreatePracticeRequestDTO(
 
     @Valid
     @Schema(
-        description = "Versioned evidence required before Hephaestus may review work; " +
-            "omit to use the recommended requirements for the selected work type"
+        description = "Versioned review settings; omit to use the recommended ones for the work type the bindings name"
     )
     @Nullable
     PracticeAutomatedReviewPolicy automatedReviewPolicy,
-
-    @Schema(
-        description = "Kind of reviewed work. Defaults to scm.pull_request when omitted.",
-        example = "scm.pull_request"
-    )
-    @Nullable
-    ArtifactKind artifactKind,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Schema(description = "Plain-language rationale shown to the developer")

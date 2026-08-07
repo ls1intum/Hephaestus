@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -372,13 +373,13 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     private Practice savePractice(Workspace workspace) {
         Practice practice = new Practice();
-        practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("erasure-practice-" + workspace.getId());
         practice.setName("Erasure Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         return practiceRepository.save(practice);
     }
 

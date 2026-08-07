@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,7 +31,7 @@ class PendingSignalReaperTest extends BaseUnitTest {
     private static ArtifactSignal pendingSignal(String artifactKind, String signalName) {
         ArtifactSignal signal = new ArtifactSignal();
         signal.setId(UUID.randomUUID());
-        signal.setArtifactKind(artifactKind);
+        signal.setBindings(PracticeTestEvidence.bindings(artifactKind));
         signal.setArtifactId(42L);
         signal.setSignalName(signalName);
         signal.setRevision("sha~abc123");

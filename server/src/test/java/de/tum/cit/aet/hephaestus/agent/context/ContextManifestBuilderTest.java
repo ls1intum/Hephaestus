@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.PracticeInsufficientEvidenceAction;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -270,7 +271,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 new PracticeAutomatedReviewPolicy(
                     practice.getAutomatedReviewPolicy().sourceContractVersion(),
                     configurations.get(index),
-                    assessmentAbsent ? List.of() : practice.getAutomatedReviewPolicy().needs(),
                     practice.getAutomatedReviewPolicy().whenEvidenceIsInsufficient(),
                     assessmentAbsent
                         ? List.of()
@@ -314,7 +314,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         assertThat(
             builder
-                .checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")), NOW)
+                .checkAutomatedReviewReadiness(manifest, List.of(practiceRequiring(CORE, "pr-core")), NOW, null)
                 .readyPractices()
         ).hasSize(1);
     }
@@ -324,10 +324,15 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-replay", NOW);
         List<Practice> practices = List.of(practiceRequiring(CORE, "pr-core"));
 
-        var original = builder.checkAutomatedReviewReadiness(manifest, practices, NOW);
+        var original = builder.checkAutomatedReviewReadiness(manifest, practices, NOW, null);
         // Re-evaluated much later against the recorded evidence and the recorded anchor. Readiness is
         // a pure function of those inputs, so the result must be identical.
-        var replayed = builderAt(NOW.plusSeconds(90 * 86_400)).checkAutomatedReviewReadiness(manifest, practices, NOW);
+        var replayed = builderAt(NOW.plusSeconds(90 * 86_400)).checkAutomatedReviewReadiness(
+            manifest,
+            practices,
+            NOW,
+            null
+        );
 
         assertThat(replayed.readyPractices()).hasSameElementsAs(original.readyPractices());
         assertThat(replayed.decisions().getFirst().ready()).isEqualTo(original.decisions().getFirst().ready());
@@ -348,7 +353,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                     // practice's required source is demonstrably absent.
                     List.of(practiceRequiringComments()),
                     "job-refused",
-                    NOW
+                    NOW,
+                    null
                 )
                 .readyPractices()
         ).isEmpty();
@@ -440,7 +446,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         Practice practice = practiceRequiring(CORE, "pr-core");
         assertThat(
             laterBuilder
-                .prepareAutomatedReviewReadiness(manifest, List.of(practice), "job-future-watermark", NOW)
+                .prepareAutomatedReviewReadiness(manifest, List.of(practice), "job-future-watermark", NOW, null)
                 .readyPractices()
         ).containsExactly(practice);
     }
@@ -475,7 +481,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         assertThat(
             delayedBuilder
-                .prepareAutomatedReviewReadiness(manifest, List.of(practice), "job-delayed", NOW)
+                .prepareAutomatedReviewReadiness(manifest, List.of(practice), "job-delayed", NOW, null)
                 .readyPractices()
         ).containsExactly(practice);
         JsonNode sourceCheck = mapper
@@ -772,10 +778,22 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     private static Practice practiceRequiring(SourceKind sourceKind, String slug) {
+        return practiceRequiring(sourceKind, slug, EvidenceStance.REQUIRED);
+    }
+
+    private static Practice practiceRequiring(SourceKind sourceKind, String slug, EvidenceStance stance) {
+        boolean conversation = sourceKind.equals(CONVERSATION);
         Practice practice = new Practice();
         practice.setSlug(slug);
-        practice.setArtifactKind(
-            sourceKind.equals(CONVERSATION) ? ArtifactKinds.CONVERSATION_THREAD : ArtifactKinds.PULL_REQUEST
+        practice.setBindings(
+            List.of(
+                PracticeBinding.on(
+                    PracticeTestEvidence.defaultSignal(
+                        conversation ? ArtifactKinds.CONVERSATION_THREAD : ArtifactKinds.PULL_REQUEST
+                    ),
+                    List.of(new PracticeEvidenceRequirement(sourceKind, stance))
+                )
+            )
         );
         practice.setAutomatedReviewPolicy(
             new PracticeAutomatedReviewPolicy(
@@ -784,7 +802,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                     PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
                 ),
-                List.of(new PracticeEvidenceRequirement(sourceKind, EvidenceStance.REQUIRED)),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
                 List.of(),
                 null

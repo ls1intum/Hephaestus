@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
@@ -294,13 +295,13 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     private Practice savePractice(Workspace ws) {
         Practice p = new Practice();
-        p.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
+        p.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
         p.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         p.setWorkspace(ws);
         p.setSlug("retain-practice-" + ws.getId());
         p.setName("Retention Practice");
         p.setCriteria("Test description");
-        p.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+        p.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         return practiceRepository.save(p);
     }
 

@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -227,7 +228,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);
-        p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        p.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         p = practiceRepository.saveAndFlush(p);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(p, 1));
         p.setCurrentRevision(revision);

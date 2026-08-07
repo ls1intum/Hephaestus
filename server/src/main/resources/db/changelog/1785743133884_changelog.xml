@@ -1226,4 +1226,358 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-23">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.bindings already present">
+            <columnExists tableName="practice" columnName="trigger_events"/>
+        </preConditions>
+        <comment>One list of bindings: what occasions a review, and what that review reads.</comment>
+        <!-- Schema first, rows second, in both directions: an UPDATE on practice queues a deferred
+             constraint-trigger event and Postgres will not ALTER a table that has one pending. -->
+        <sql splitStatements="false"><![CDATA[
+            -- Both plpgsql bodies name the column as text, so a rename leaves them referring to a column
+            -- that no longer exists; they are recreated below. The trigger's own UPDATE OF list and the
+            -- CHECK expressions are catalog references and follow the rename by themselves, but the two
+            -- CHECKs are dropped and re-added anyway so the constraint reads in the new vocabulary
+            -- rather than being a renamed relic nobody can grep for.
+            ALTER TABLE practice_revision
+                DROP CONSTRAINT IF EXISTS ck_practice_revision_definition_shape,
+                DROP CONSTRAINT IF EXISTS ck_practice_revision_trigger_events;
+            ALTER TABLE curated_practice_override
+                DROP CONSTRAINT IF EXISTS ck_curated_practice_override_shape,
+                DROP CONSTRAINT IF EXISTS ck_curated_practice_override_trigger_events;
+
+            ALTER TABLE practice RENAME COLUMN trigger_events TO bindings;
+            ALTER TABLE practice_revision RENAME COLUMN trigger_events TO bindings;
+            ALTER TABLE curated_practice_override RENAME COLUMN trigger_events TO bindings;
+
+            ALTER TABLE practice_revision
+                ADD CONSTRAINT ck_practice_revision_definition_shape
+                    CHECK (
+                        (
+                            slug IS NULL
+                            AND name IS NULL
+                            AND applies_to IS NULL
+                            AND bindings IS NULL
+                            AND review_rule_fingerprint IS NULL
+                        )
+                        OR (
+                            slug IS NOT NULL
+                            AND name IS NOT NULL
+                            AND applies_to IS NOT NULL
+                            AND bindings IS NOT NULL
+                        )
+                    ),
+                ADD CONSTRAINT ck_practice_revision_bindings
+                    CHECK (bindings IS NULL OR jsonb_typeof(bindings) = 'array');
+            ALTER TABLE curated_practice_override
+                ADD CONSTRAINT ck_curated_practice_override_shape
+                    CHECK (
+                        (name IS NULL AND applies_to IS NULL AND bindings IS NULL AND criteria IS NULL
+                            AND precompute_script IS NULL AND why_it_matters IS NULL
+                            AND what_good_looks_like IS NULL AND area_slug IS NULL AND based_on_digest IS NULL)
+                        OR (name IS NOT NULL AND applies_to IS NOT NULL AND bindings IS NOT NULL
+                            AND criteria IS NOT NULL)
+                    ),
+                ADD CONSTRAINT ck_curated_practice_override_bindings
+                    CHECK (bindings IS NULL OR jsonb_typeof(bindings) = 'array');
+
+            CREATE OR REPLACE FUNCTION enforce_practice_revision_immutability()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $immutable_revision$
+            BEGIN
+                IF NEW.practice_id = OLD.practice_id
+                   AND NEW.revision_number = OLD.revision_number
+                   AND NEW.created_at = OLD.created_at
+                   AND NEW.slug IS NOT DISTINCT FROM OLD.slug
+                   AND NEW.name IS NOT DISTINCT FROM OLD.name
+                   AND NEW.applies_to IS NOT DISTINCT FROM OLD.applies_to
+                   AND NEW.bindings IS NOT DISTINCT FROM OLD.bindings
+                   AND NEW.criteria = OLD.criteria
+                   AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
+                   AND NEW.automated_review_policy IS NOT DISTINCT FROM OLD.automated_review_policy
+                   AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
+                   AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
+                   AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
+                   AND NEW.area_name IS NOT DISTINCT FROM OLD.area_name
+                   AND NEW.area_description IS NOT DISTINCT FROM OLD.area_description
+                   AND NEW.area_icon IS NOT DISTINCT FROM OLD.area_icon
+                   AND NEW.area_color IS NOT DISTINCT FROM OLD.area_color
+                   AND (
+                       NEW.review_rule_fingerprint IS NOT DISTINCT FROM OLD.review_rule_fingerprint
+                       OR OLD.review_rule_fingerprint IS NULL
+                   )
+                THEN
+                    RETURN NEW;
+                END IF;
+                RAISE EXCEPTION 'practice revisions are immutable' USING ERRCODE = '55000';
+            END;
+            $immutable_revision$;
+
+            CREATE OR REPLACE FUNCTION enforce_practice_current_revision_projection()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $current_projection$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM practice practice
+                    JOIN practice_revision revision
+                      ON revision.id = practice.current_revision_id
+                     AND revision.practice_id = practice.id
+                    LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+                    WHERE practice.id = NEW.id
+                      AND revision.slug = practice.slug
+                      AND revision.name = practice.name
+                      AND revision.applies_to = practice.applies_to
+                      AND revision.bindings = practice.bindings
+                      AND revision.criteria = practice.criteria
+                      AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
+                      AND revision.automated_review_policy = practice.automated_review_policy
+                      AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
+                      AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                      AND revision.area_slug IS NOT DISTINCT FROM area.slug
+                ) THEN
+                    RAISE EXCEPTION 'practice current revision does not match its current projection'
+                        USING ERRCODE = '23514';
+                END IF;
+                RETURN NULL;
+            END;
+            $current_projection$;
+
+            -- One binding carrying every signal the practice used to be triggered by, reading exactly
+            -- what its named policy used to require. Nothing a practice reviewed changes here; only
+            -- where it is written down. A stored trigger-event literal outside the nine the authoring
+            -- vocabulary allowed is dropped, and a row left with none falls back to the artifact kind's
+            -- opening signal so it stays loadable and still says what it is about.
+            CREATE OR REPLACE FUNCTION migrate_practice_bindings(kind text, events jsonb, policy jsonb)
+            RETURNS jsonb
+            LANGUAGE sql
+            IMMUTABLE
+            AS $migrate_bindings$
+                SELECT jsonb_build_array(jsonb_build_object(
+                    'signals', COALESCE((
+                        SELECT jsonb_agg(signal ORDER BY signal)
+                        FROM (
+                            SELECT CASE event
+                            WHEN 'PullRequestCreated' THEN 'scm.pull_request.opened'
+                            WHEN 'PullRequestReady' THEN 'scm.pull_request.ready'
+                            WHEN 'PullRequestSynchronized' THEN 'scm.pull_request.synchronized'
+                            WHEN 'ReviewSubmitted' THEN 'scm.pull_request.reviewed'
+                            WHEN 'PullRequestMerged' THEN 'scm.pull_request.merged'
+                            WHEN 'PullRequestClosed' THEN 'scm.pull_request.closed'
+                            WHEN 'IssueCreated' THEN 'scm.issue.opened'
+                            WHEN 'IssueLabeled' THEN 'scm.issue.labeled'
+                            WHEN 'IssueClosed' THEN 'scm.issue.closed'
+                        END AS signal
+                            FROM jsonb_array_elements_text(COALESCE(events, '[]'::jsonb)) AS event
+                        ) AS mapped
+                        WHERE signal IS NOT NULL
+                    ), jsonb_build_array(CASE kind
+                        WHEN 'chat.conversation_thread' THEN 'chat.conversation_thread.settled'
+                        WHEN 'scm.issue' THEN 'scm.issue.opened'
+                        ELSE 'scm.pull_request.opened'
+                    END)),
+                    'needs', COALESCE(policy->'needs', '[]'::jsonb),
+                    'onDrafts', false
+                ))
+            $migrate_bindings$;
+
+            UPDATE practice
+            SET bindings = migrate_practice_bindings(applies_to, bindings, automated_review_policy),
+                automated_review_policy = automated_review_policy - 'needs'
+            WHERE jsonb_typeof(bindings) = 'array'
+              AND NOT jsonb_path_exists(bindings, '$[*].signals');
+            UPDATE curated_practice_override
+            SET bindings = migrate_practice_bindings(applies_to, bindings, automated_review_policy),
+                automated_review_policy = automated_review_policy - 'needs'
+            WHERE bindings IS NOT NULL
+              AND jsonb_typeof(bindings) = 'array'
+              AND NOT jsonb_path_exists(bindings, '$[*].signals');
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+            UPDATE practice_revision
+            SET bindings = migrate_practice_bindings(applies_to, bindings, automated_review_policy),
+                automated_review_policy = automated_review_policy - 'needs'
+            WHERE bindings IS NOT NULL
+              AND jsonb_typeof(bindings) = 'array'
+              AND NOT jsonb_path_exists(bindings, '$[*].signals');
+            -- Same reason as -21 and -22: the bindings and the policy both feed the review-rule
+            -- fingerprint, so every stored one now describes a rule set written in a shape that no
+            -- longer exists. CatalogProvenanceBackfill recomputes them on the next boot.
+            UPDATE practice_revision SET review_rule_fingerprint = NULL
+            WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+            DROP FUNCTION migrate_practice_bindings(text, jsonb, jsonb);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                -- The signals map back to their literals and the needs go back onto the policy as the
+                -- union across bindings, which is what one shared policy could express. Per-binding
+                -- evidence and the draft flag have no pre-binding spelling and are dropped; that is the
+                -- capability this changeset adds, so losing it on the way back is the whole point.
+                CREATE OR REPLACE FUNCTION restore_practice_trigger_events(bindings jsonb)
+                RETURNS jsonb
+                LANGUAGE sql
+                IMMUTABLE
+                AS $restore_events$
+                    SELECT COALESCE((
+                        SELECT jsonb_agg(DISTINCT event)
+                        FROM (
+                            SELECT CASE signal
+                            WHEN 'scm.pull_request.opened' THEN 'PullRequestCreated'
+                            WHEN 'scm.pull_request.ready' THEN 'PullRequestReady'
+                            WHEN 'scm.pull_request.synchronized' THEN 'PullRequestSynchronized'
+                            WHEN 'scm.pull_request.reviewed' THEN 'ReviewSubmitted'
+                            WHEN 'scm.pull_request.merged' THEN 'PullRequestMerged'
+                            WHEN 'scm.pull_request.closed' THEN 'PullRequestClosed'
+                            WHEN 'scm.issue.opened' THEN 'IssueCreated'
+                            WHEN 'scm.issue.labeled' THEN 'IssueLabeled'
+                            WHEN 'scm.issue.closed' THEN 'IssueClosed'
+                        END AS event
+                            FROM jsonb_array_elements(COALESCE(bindings, '[]'::jsonb)) AS binding,
+                                 jsonb_array_elements_text(binding->'signals') AS signal
+                        ) AS mapped
+                        WHERE event IS NOT NULL
+                    ), '[]'::jsonb)
+                $restore_events$;
+
+                CREATE OR REPLACE FUNCTION restore_policy_needs(policy jsonb, bindings jsonb)
+                RETURNS jsonb
+                LANGUAGE sql
+                IMMUTABLE
+                AS $restore_needs$
+                    SELECT policy || jsonb_build_object('needs', COALESCE((
+                        SELECT jsonb_agg(DISTINCT need ORDER BY need)
+                        FROM jsonb_array_elements(COALESCE(bindings, '[]'::jsonb)) AS binding,
+                             jsonb_array_elements(binding->'needs') AS need
+                    ), '[]'::jsonb))
+                $restore_needs$;
+
+                UPDATE practice
+                SET automated_review_policy = restore_policy_needs(automated_review_policy, bindings),
+                    bindings = restore_practice_trigger_events(bindings)
+                WHERE jsonb_path_exists(bindings, '$[*].signals');
+                UPDATE curated_practice_override
+                SET automated_review_policy = restore_policy_needs(automated_review_policy, bindings),
+                    bindings = restore_practice_trigger_events(bindings)
+                WHERE bindings IS NOT NULL AND jsonb_path_exists(bindings, '$[*].signals');
+                ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+                UPDATE practice_revision
+                SET automated_review_policy = restore_policy_needs(automated_review_policy, bindings),
+                    bindings = restore_practice_trigger_events(bindings)
+                WHERE bindings IS NOT NULL AND jsonb_path_exists(bindings, '$[*].signals');
+                UPDATE practice_revision SET review_rule_fingerprint = NULL
+                WHERE slug IS NOT NULL AND automated_review_policy IS NOT NULL;
+                ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+                DROP FUNCTION restore_practice_trigger_events(jsonb);
+                DROP FUNCTION restore_policy_needs(jsonb, jsonb);
+
+                ALTER TABLE practice_revision
+                    DROP CONSTRAINT IF EXISTS ck_practice_revision_definition_shape,
+                    DROP CONSTRAINT IF EXISTS ck_practice_revision_bindings;
+                ALTER TABLE curated_practice_override
+                    DROP CONSTRAINT IF EXISTS ck_curated_practice_override_shape,
+                    DROP CONSTRAINT IF EXISTS ck_curated_practice_override_bindings;
+
+                ALTER TABLE practice RENAME COLUMN bindings TO trigger_events;
+                ALTER TABLE practice_revision RENAME COLUMN bindings TO trigger_events;
+                ALTER TABLE curated_practice_override RENAME COLUMN bindings TO trigger_events;
+
+                ALTER TABLE practice_revision
+                    ADD CONSTRAINT ck_practice_revision_definition_shape
+                        CHECK (
+                            (
+                                slug IS NULL
+                                AND name IS NULL
+                                AND applies_to IS NULL
+                                AND trigger_events IS NULL
+                                AND review_rule_fingerprint IS NULL
+                            )
+                            OR (
+                                slug IS NOT NULL
+                                AND name IS NOT NULL
+                                AND applies_to IS NOT NULL
+                                AND trigger_events IS NOT NULL
+                            )
+                        ),
+                    ADD CONSTRAINT ck_practice_revision_trigger_events
+                        CHECK (trigger_events IS NULL OR jsonb_typeof(trigger_events) = 'array');
+                ALTER TABLE curated_practice_override
+                    ADD CONSTRAINT ck_curated_practice_override_shape
+                        CHECK (
+                            (name IS NULL AND applies_to IS NULL AND trigger_events IS NULL AND criteria IS NULL
+                                AND precompute_script IS NULL AND why_it_matters IS NULL
+                                AND what_good_looks_like IS NULL AND area_slug IS NULL AND based_on_digest IS NULL)
+                            OR (name IS NOT NULL AND applies_to IS NOT NULL AND trigger_events IS NOT NULL
+                                AND criteria IS NOT NULL)
+                        ),
+                    ADD CONSTRAINT ck_curated_practice_override_trigger_events
+                        CHECK (trigger_events IS NULL OR jsonb_typeof(trigger_events) = 'array');
+
+                CREATE OR REPLACE FUNCTION enforce_practice_revision_immutability()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $immutable_revision$
+                BEGIN
+                    IF NEW.practice_id = OLD.practice_id
+                       AND NEW.revision_number = OLD.revision_number
+                       AND NEW.created_at = OLD.created_at
+                       AND NEW.slug IS NOT DISTINCT FROM OLD.slug
+                       AND NEW.name IS NOT DISTINCT FROM OLD.name
+                       AND NEW.applies_to IS NOT DISTINCT FROM OLD.applies_to
+                       AND NEW.trigger_events IS NOT DISTINCT FROM OLD.trigger_events
+                       AND NEW.criteria = OLD.criteria
+                       AND NEW.precompute_script IS NOT DISTINCT FROM OLD.precompute_script
+                       AND NEW.automated_review_policy IS NOT DISTINCT FROM OLD.automated_review_policy
+                       AND NEW.why_it_matters IS NOT DISTINCT FROM OLD.why_it_matters
+                       AND NEW.what_good_looks_like IS NOT DISTINCT FROM OLD.what_good_looks_like
+                       AND NEW.area_slug IS NOT DISTINCT FROM OLD.area_slug
+                       AND NEW.area_name IS NOT DISTINCT FROM OLD.area_name
+                       AND NEW.area_description IS NOT DISTINCT FROM OLD.area_description
+                       AND NEW.area_icon IS NOT DISTINCT FROM OLD.area_icon
+                       AND NEW.area_color IS NOT DISTINCT FROM OLD.area_color
+                       AND (
+                           NEW.review_rule_fingerprint IS NOT DISTINCT FROM OLD.review_rule_fingerprint
+                           OR OLD.review_rule_fingerprint IS NULL
+                       )
+                    THEN
+                        RETURN NEW;
+                    END IF;
+                    RAISE EXCEPTION 'practice revisions are immutable' USING ERRCODE = '55000';
+                END;
+                $immutable_revision$;
+                CREATE OR REPLACE FUNCTION enforce_practice_current_revision_projection()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $current_projection$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM practice practice
+                        JOIN practice_revision revision
+                          ON revision.id = practice.current_revision_id
+                         AND revision.practice_id = practice.id
+                        LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+                        WHERE practice.id = NEW.id
+                          AND revision.slug = practice.slug
+                          AND revision.name = practice.name
+                          AND revision.applies_to = practice.applies_to
+                          AND revision.trigger_events = practice.trigger_events
+                          AND revision.criteria = practice.criteria
+                          AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
+                          AND revision.automated_review_policy = practice.automated_review_policy
+                          AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
+                          AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                          AND revision.area_slug IS NOT DISTINCT FROM area.slug
+                    ) THEN
+                        RAISE EXCEPTION 'practice current revision does not match its current projection'
+                            USING ERRCODE = '23514';
+                    END IF;
+                    RETURN NULL;
+                END;
+                $current_projection$;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

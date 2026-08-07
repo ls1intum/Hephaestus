@@ -1,17 +1,22 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.JsonNode;
 
+/**
+ * A practice as its author wrote it.
+ *
+ * <p>{@code artifactKind} is not a field. It is read off {@link #bindings()}, whose signal names carry
+ * it as a prefix — the practice used to state it three times (on itself, on its evidence profile, and
+ * implicitly in its trigger events) and a pairwise validator held the three together.
+ */
 public record PracticeDefinition(
     String name,
-    ArtifactKind artifactKind,
-    List<String> triggerEvents,
+    List<PracticeBinding> bindings,
     String criteria,
     @Nullable String precomputeScript,
     PracticeAutomatedReviewPolicy automatedReviewPolicy,
@@ -23,10 +28,27 @@ public record PracticeDefinition(
 
     public PracticeDefinition {
         Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(artifactKind, "artifactKind");
-        triggerEvents = List.copyOf(Objects.requireNonNull(triggerEvents, "triggerEvents").stream().sorted().toList());
+        bindings = List.copyOf(Objects.requireNonNull(bindings, "bindings"));
+        // Refused rather than defaulted: with no binding there is no artifact kind to read off, so a
+        // practice that names none is not an unbound practice but an unanswerable one.
+        PracticeBinding.artifactKindOf(bindings);
+        rejectDuplicateSignals(bindings);
         Objects.requireNonNull(criteria, "criteria");
         Objects.requireNonNull(automatedReviewPolicy, "automatedReviewPolicy");
+        boolean automatedReviewDisabled =
+            automatedReviewPolicy.automatedReview().mode() == PracticeAutomatedReviewMode.NONE;
+        for (PracticeBinding binding : bindings) {
+            if (automatedReviewDisabled && !binding.needs().isEmpty()) {
+                throw new IllegalArgumentException("A practice without automated review cannot declare evidence");
+            }
+            // Contextual sources alone would let a review start having read nothing it must read, and
+            // every verdict it then produced would be about evidence it never established it had.
+            if (!automatedReviewDisabled && binding.needs().stream().noneMatch(PracticeEvidenceRequirement::refuses)) {
+                throw new IllegalArgumentException(
+                    "Automated review requires at least one required evidence source per binding"
+                );
+            }
+        }
         precomputeScript = blankToNull(precomputeScript);
         whyItMatters = blankToNull(whyItMatters);
         whatGoodLooksLike = blankToNull(whatGoodLooksLike);
@@ -35,8 +57,7 @@ public record PracticeDefinition(
     public static PracticeDefinition from(Practice practice) {
         return new PracticeDefinition(
             practice.getName(),
-            practice.getArtifactKind(),
-            TriggerEventsConverter.toList(practice.getTriggerEvents()),
+            practice.getBindings(),
             practice.getCriteria(),
             practice.getPrecomputeScript(),
             practice.getAutomatedReviewPolicy(),
@@ -46,8 +67,9 @@ public record PracticeDefinition(
         );
     }
 
-    public JsonNode triggerEventsJson() {
-        return TriggerEventsConverter.toJsonNode(triggerEvents);
+    /** The kind of artifact this practice reviews, read off its bindings. */
+    public ArtifactKind artifactKind() {
+        return PracticeBinding.artifactKindOf(bindings);
     }
 
     @Override
@@ -55,8 +77,7 @@ public record PracticeDefinition(
         return ReviewRuleFingerprint.of(
             slug,
             name,
-            artifactKind,
-            triggerEvents,
+            bindings,
             criteria,
             precomputeScript,
             automatedReviewPolicy,
@@ -71,6 +92,22 @@ public record PracticeDefinition(
 
     public String exactFingerprint(String slug) {
         return "v1:" + digest(slug);
+    }
+
+    /**
+     * One signal, one binding. Two bindings on the same signal would have to be merged by whoever read
+     * them, and the two candidate merges — union the evidence, or take the first — are not the same
+     * review; refusing the shape means nobody has to guess which was meant.
+     */
+    private static void rejectDuplicateSignals(List<PracticeBinding> bindings) {
+        java.util.Set<SignalName> seen = new java.util.HashSet<>();
+        for (PracticeBinding binding : bindings) {
+            for (SignalName signal : binding.signals()) {
+                if (!seen.add(signal)) {
+                    throw new IllegalArgumentException("Signal " + signal + " is bound twice");
+                }
+            }
+        }
     }
 
     private static String blankToNull(@Nullable String value) {

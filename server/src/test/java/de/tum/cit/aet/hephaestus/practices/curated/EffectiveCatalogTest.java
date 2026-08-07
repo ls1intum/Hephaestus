@@ -19,8 +19,7 @@ class EffectiveCatalogTest extends BaseUnitTest {
         var retiredArea = new CatalogEntry<>("quality", areaDefinition, areaDefinition, null, null, true, 0, null);
         PracticeDefinition definition = new PracticeDefinition(
             "Small PRs",
-            ArtifactKinds.PULL_REQUEST,
-            List.of("PullRequestCreated"),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             "Criteria",
             null,
             PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),

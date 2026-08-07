@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionReques
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
@@ -27,9 +28,9 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Two modes:
  * <ul>
- *   <li><b>Bypass</b> (no {@code triggerEvent}): submits a review directly, skipping the detection gate.
+ *   <li><b>Bypass</b> (no {@code signal}): submits a review directly, skipping the detection gate.
  *       Use to force a review regardless of practice trigger config.</li>
- *   <li><b>Gate-routed</b> (with {@code triggerEvent}): loads the artifact and runs
+ *   <li><b>Gate-routed</b> (with {@code signal}): loads the artifact and runs
  *       {@link PracticeReviewDetectionGate} with the given event name (e.g. {@code PullRequestMerged},
  *       {@code IssueClosed}) before submitting — exactly what the production listener would do. This is
  *       the ONLY way to validate RETROSPECTIVE (merged/closed) detection on a SYNCED mirror, where real
@@ -45,8 +46,8 @@ import org.springframework.web.bind.annotation.RestController;
  * Usage:
  * <pre>
  *   POST /api/dev/trigger-review?prId=...&amp;workspaceId=...                              (bypass)
- *   POST /api/dev/trigger-review?prId=...&amp;workspaceId=...&amp;triggerEvent=PullRequestMerged  (gate)
- *   POST /api/dev/trigger-review?issueId=...&amp;workspaceId=...&amp;triggerEvent=IssueClosed      (gate)
+ *   POST /api/dev/trigger-review?prId=...&amp;workspaceId=...&amp;signal=scm.pull_request.merged  (gate)
+ *   POST /api/dev/trigger-review?issueId=...&amp;workspaceId=...&amp;signal=scm.issue.closed      (gate)
  * </pre>
  */
 @RestController
@@ -92,14 +93,14 @@ public class DevTriggerController {
         @RequestParam @Nullable Long prId,
         @RequestParam @Nullable Long issueId,
         @RequestParam @Nullable Long workspaceId,
-        @RequestParam @Nullable String triggerEvent
+        @RequestParam @Nullable String signal
     ) {
         if (workspaceId == null || (prId == null && issueId == null)) {
             return "Error: workspaceId and one of prId / issueId are required";
         }
 
         Prepared prepared = transactionTemplate.execute(status ->
-            issueId != null ? prepareIssue(issueId, triggerEvent) : preparePullRequest(prId, triggerEvent)
+            issueId != null ? prepareIssue(issueId, signal) : preparePullRequest(prId, signal)
         );
 
         if (prepared == null || prepared.request() == null) {
@@ -135,33 +136,35 @@ public class DevTriggerController {
         };
     }
 
-    private Prepared preparePullRequest(Long prId, @Nullable String triggerEvent) {
+    private Prepared preparePullRequest(Long prId, @Nullable String signal) {
         PullRequest pr = artifactLoader.findPullRequestForGate(prId).orElse(null);
         if (pr == null) {
             return Prepared.done("PR not found: " + prId);
         }
-        if (triggerEvent != null && !triggerEvent.isBlank()) {
-            GateDecision decision = detectionGate.evaluate(pr, triggerEvent, TriggerMode.AUTO);
+        SignalName triggerSignal = signal == null || signal.isBlank() ? null : SignalName.of(signal);
+        if (triggerSignal != null) {
+            GateDecision decision = detectionGate.evaluate(pr, triggerSignal, TriggerMode.AUTO);
             if (decision instanceof GateDecision.Skip skip) {
-                return Prepared.done("Gate skipped (" + triggerEvent + "): " + skip.reason());
+                return Prepared.done("Gate skipped (" + triggerSignal + "): " + skip.reason());
             }
         }
-        PullRequestReviewSubmissionRequest request = agentJobService.buildReviewRequest(pr, triggerEvent);
+        PullRequestReviewSubmissionRequest request = agentJobService.buildReviewRequest(pr, triggerSignal);
         return request == null ? Prepared.done("PR missing branch info: prId=" + pr.getId()) : Prepared.review(request);
     }
 
-    private Prepared prepareIssue(Long issueId, @Nullable String triggerEvent) {
+    private Prepared prepareIssue(Long issueId, @Nullable String signal) {
         Issue issue = artifactLoader.findIssueForGate(issueId).orElse(null);
         if (issue == null) {
             return Prepared.done("Issue not found: " + issueId);
         }
-        if (triggerEvent != null && !triggerEvent.isBlank()) {
-            GateDecision decision = detectionGate.evaluateIssue(issue, triggerEvent, TriggerMode.AUTO);
+        SignalName triggerSignal = signal == null || signal.isBlank() ? null : SignalName.of(signal);
+        if (triggerSignal != null) {
+            GateDecision decision = detectionGate.evaluateIssue(issue, triggerSignal, TriggerMode.AUTO);
             if (decision instanceof GateDecision.Skip skip) {
-                return Prepared.done("Gate skipped (" + triggerEvent + "): " + skip.reason());
+                return Prepared.done("Gate skipped (" + triggerSignal + "): " + skip.reason());
             }
         }
-        IssueReviewSubmissionRequest request = agentJobService.buildIssueRequest(issue, triggerEvent);
+        IssueReviewSubmissionRequest request = agentJobService.buildIssueRequest(issue, triggerSignal);
         return request == null
             ? Prepared.done("Issue missing repository: issueId=" + issue.getId())
             : Prepared.issue(request);

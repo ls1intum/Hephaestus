@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,8 +28,12 @@ public class BundledPracticeCatalogLoader {
 
     private final BundledPracticeCatalog catalog;
 
-    BundledPracticeCatalogLoader(JsonMapper objectMapper, PracticeDefinitionValidator definitionValidator) {
-        this.catalog = parse(objectMapper, definitionValidator);
+    BundledPracticeCatalogLoader(
+        JsonMapper objectMapper,
+        PracticeDefinitionValidator definitionValidator,
+        PracticeEvidenceDefaults evidenceDefaults
+    ) {
+        this.catalog = parse(objectMapper, definitionValidator, evidenceDefaults);
     }
 
     BundledPracticeCatalog catalog() {
@@ -36,7 +42,8 @@ public class BundledPracticeCatalogLoader {
 
     private static BundledPracticeCatalog parse(
         JsonMapper objectMapper,
-        PracticeDefinitionValidator definitionValidator
+        PracticeDefinitionValidator definitionValidator,
+        PracticeEvidenceDefaults evidenceDefaults
     ) {
         JsonNode root = readCatalog(objectMapper);
         List<BundledEntry<AreaDefinition>> areas = new ArrayList<>();
@@ -79,7 +86,15 @@ public class BundledPracticeCatalogLoader {
                 practices.add(
                     new BundledEntry<>(
                         slug,
-                        definition(objectMapper, definitionValidator, root, areaSlug, practiceNode, slug),
+                        definition(
+                            objectMapper,
+                            definitionValidator,
+                            evidenceDefaults,
+                            root,
+                            areaSlug,
+                            practiceNode,
+                            slug
+                        ),
                         practicePosition++
                     )
                 );
@@ -94,24 +109,14 @@ public class BundledPracticeCatalogLoader {
     private static PracticeDefinition definition(
         JsonMapper objectMapper,
         PracticeDefinitionValidator definitionValidator,
+        PracticeEvidenceDefaults evidenceDefaults,
         JsonNode catalog,
         String areaSlug,
         JsonNode node,
         String slug
     ) {
-        ArtifactKind artifactKind = ArtifactKind.of(requiredText(node, "artifactKind"));
-        JsonNode triggersNode = node.path("triggerEvents");
-        if (!triggersNode.isArray()) {
-            throw new IllegalStateException("bundled practice triggerEvents must be an array: " + slug);
-        }
-        List<String> rawTriggerEvents = new ArrayList<>();
-        triggersNode.forEach(trigger -> {
-            if (!trigger.isString()) {
-                throw new IllegalStateException("bundled practice trigger event must be text: " + slug);
-            }
-            rawTriggerEvents.add(trigger.asString());
-        });
-        List<String> triggerEvents = rawTriggerEvents.stream().sorted().toList();
+        List<PracticeBinding> bindings = bindings(objectMapper, evidenceDefaults, node, slug);
+        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         String preambleKey = text(node, "preamble");
         if (preambleKey == null) {
             preambleKey = artifactKind.value();
@@ -121,11 +126,13 @@ public class BundledPracticeCatalogLoader {
         String whatGoodLooksLike = text(node, "whatGoodLooksLike");
         PracticeDefinition definition = new PracticeDefinition(
             requiredText(node, "name"),
-            artifactKind,
-            triggerEvents,
+            bindings,
             criteria,
             loadPrecomputeScript(node, slug),
-            automatedReviewPolicy(objectMapper, catalog, node, slug),
+            // Every one of the thirteen named policies this replaced turned out to be, once the evidence
+            // moved onto the bindings, exactly the kind's default: same contract, same mode, same limits.
+            // A bundled practice that wanted a different frame would have to say so, and none does.
+            evidenceDefaults.policyFor(artifactKind),
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
@@ -134,24 +141,50 @@ public class BundledPracticeCatalogLoader {
         return definition;
     }
 
-    private static PracticeAutomatedReviewPolicy automatedReviewPolicy(
+    /**
+     * Reads the {@code on} list.
+     *
+     * <p>A bare string is a binding on that signal reading the kind's default evidence — which is what
+     * almost every practice wants, and spelling it out 36 times would only invite the copies to drift.
+     * An object says what the review reads instead, and is how a practice that must establish an
+     * <em>absence</em> declares the exhaustive capture that licenses the claim.
+     */
+    private static List<PracticeBinding> bindings(
         JsonMapper objectMapper,
-        JsonNode catalog,
+        PracticeEvidenceDefaults evidenceDefaults,
         JsonNode node,
         String slug
     ) {
-        String automatedReviewPolicyId = requiredText(node, "automatedReviewPolicyId");
-        JsonNode automatedReviewPolicy = catalog.path("automatedReviewPolicy").get(automatedReviewPolicyId);
-        if (automatedReviewPolicy == null || !automatedReviewPolicy.isObject()) {
-            throw new IllegalStateException(
-                "unknown bundled practice automated-review policy: " + automatedReviewPolicyId
-            );
+        JsonNode on = node.path("on");
+        if (!on.isArray() || on.isEmpty()) {
+            throw new IllegalStateException("bundled practice must declare a non-empty 'on' array: " + slug);
         }
-        try {
-            return objectMapper.treeToValue(automatedReviewPolicy, PracticeAutomatedReviewPolicy.class);
-        } catch (RuntimeException exception) {
-            throw new IllegalStateException("invalid bundled practice evidence: " + slug, exception);
+        List<PracticeBinding> bindings = new ArrayList<>();
+        for (JsonNode entry : on) {
+            if (entry.isString()) {
+                SignalName signal = SignalName.of(entry.asString());
+                bindings.add(PracticeBinding.on(signal, evidenceDefaults.needsFor(signal.artifactKind())));
+                continue;
+            }
+            if (!entry.isObject()) {
+                throw new IllegalStateException("bundled practice binding must be a signal name or object: " + slug);
+            }
+            PracticeBinding binding;
+            try {
+                binding = objectMapper.treeToValue(entry, PracticeBinding.class);
+            } catch (RuntimeException exception) {
+                throw new IllegalStateException("invalid bundled practice binding: " + slug, exception);
+            }
+            if (binding.needs().isEmpty()) {
+                binding = new PracticeBinding(
+                    binding.signals(),
+                    evidenceDefaults.needsFor(binding.artifactKind()),
+                    binding.onDrafts()
+                );
+            }
+            bindings.add(binding);
         }
+        return List.copyOf(bindings);
     }
 
     private static @Nullable String loadPrecomputeScript(JsonNode node, String slug) {

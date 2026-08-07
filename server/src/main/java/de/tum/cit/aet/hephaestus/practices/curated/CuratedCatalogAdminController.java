@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionOptionsService;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
@@ -457,7 +458,7 @@ public class CuratedCatalogAdminController {
     private PracticeDefinition definition(CuratedPracticeRequestDTO request) {
         var evidence =
             request.automatedReviewPolicy() == null
-                ? evidenceDefaults.forArtifact(request.artifactKind())
+                ? evidenceDefaults.policyFor(PracticeBinding.artifactKindOf(request.bindings()))
                 : request.automatedReviewPolicy();
         return request.definition(evidence);
     }

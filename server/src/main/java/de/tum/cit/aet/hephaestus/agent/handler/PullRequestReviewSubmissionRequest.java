@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -24,7 +25,7 @@ public record PullRequestReviewSubmissionRequest(
     String headRefName,
     String headRefOid,
     String baseRefName,
-    @Nullable String triggerEvent
+    @Nullable SignalName triggerSignal
 ) implements JobSubmissionRequest {
     public PullRequestReviewSubmissionRequest {
         Objects.requireNonNull(pullRequest, "pullRequest must not be null");
@@ -51,11 +52,11 @@ public record PullRequestReviewSubmissionRequest(
      */
     @Override
     public ObservationOrigin observationOrigin() {
-        return triggerEvent == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
+        return triggerSignal == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
     }
 
     /**
-     * Constructor for callers that do not carry a trigger event (the gate-bypass dev path and the
+     * Constructor for callers with no signal behind the run (the gate-bypass dev path and the
      * bot-command path); the job then runs the full focus-active practice set.
      */
     public PullRequestReviewSubmissionRequest(

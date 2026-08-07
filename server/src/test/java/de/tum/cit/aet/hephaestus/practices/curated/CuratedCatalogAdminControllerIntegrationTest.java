@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaDTO;
@@ -139,8 +140,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedPracticeDTO before = getPractice();
         CuratedPracticeRequestDTO body = new CuratedPracticeRequestDTO(
             before.definition().name(),
-            before.definition().artifactKind(),
-            before.definition().triggerEvents(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             before.definition().criteria(),
             before.definition().precomputeScript(),
             before.definition().automatedReviewPolicy(),
@@ -644,8 +644,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         var source = definitionOf(template, "Server baseline criteria");
         var request = new CuratedPracticeRequestDTO(
             source.name(),
-            source.artifactKind(),
-            source.triggerEvents(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             source.criteria(),
             source.precomputeScript(),
             null,
@@ -925,8 +924,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedPracticeDTO edited = getPractice();
         CuratedPracticeRequestDTO guidanceEdit = new CuratedPracticeRequestDTO(
             edited.definition().name(),
-            edited.definition().artifactKind(),
-            edited.definition().triggerEvents(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             edited.definition().criteria(),
             edited.definition().precomputeScript(),
             edited.definition().automatedReviewPolicy(),
@@ -972,12 +970,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     private static CuratedPracticeRequestDTO definitionOf(CuratedPracticeDTO practice, String criteria) {
         return new CuratedPracticeRequestDTO(
             practice.definition().name(),
-            practice.definition().artifactKind() == null
-                ? ArtifactKinds.PULL_REQUEST
-                : practice.definition().artifactKind(),
-            practice.definition().triggerEvents() == null
-                ? List.of("PullRequestCreated")
-                : practice.definition().triggerEvents(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             criteria,
             practice.definition().precomputeScript(),
             practice.definition().automatedReviewPolicy(),

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -121,7 +122,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCriteria("Criteria for " + slug);
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setUsedInNewReviews(true);
         return practiceRepository.save(practice);
     }

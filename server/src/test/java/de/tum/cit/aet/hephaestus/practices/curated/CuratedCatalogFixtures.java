@@ -14,8 +14,7 @@ final class CuratedCatalogFixtures {
     static PracticeDefinition practice(String name, String criteria, String whyItMatters) {
         return new PracticeDefinition(
             name,
-            ArtifactKinds.PULL_REQUEST,
-            List.of("PullRequestCreated"),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             criteria,
             null,
             PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),

@@ -1,9 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.dto.ValidTriggerEvents;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -20,13 +19,12 @@ public record CuratedPracticeRequestDTO(
     @NonNull
     String name,
 
-    @NonNull @NotNull(message = "Artifact type is required") ArtifactKind artifactKind,
-
-    @NotNull(message = "Trigger events are required")
-    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
-    @ValidTriggerEvents
+    @NotNull(message = "At least one binding is required")
+    @Size(min = 1, max = 10, message = "A practice must declare between 1 and 10 bindings")
+    @Valid
+    @Schema(description = "Occasions this practice is reviewed on; the kind of work is read off the signals")
     @NonNull
-    List<String> triggerEvents,
+    List<PracticeBinding> bindings,
 
     @NotBlank(message = "Criteria is required")
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
@@ -56,8 +54,7 @@ public record CuratedPracticeRequestDTO(
     public PracticeDefinition definition(PracticeAutomatedReviewPolicy resolvedEvidence) {
         return new PracticeDefinition(
             name,
-            artifactKind,
-            triggerEvents,
+            bindings,
             criteria,
             precomputeScript,
             resolvedEvidence,

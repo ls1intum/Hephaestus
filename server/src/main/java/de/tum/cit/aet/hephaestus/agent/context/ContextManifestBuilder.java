@@ -23,7 +23,9 @@ import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.io.IOException;
@@ -201,9 +203,15 @@ public class ContextManifestBuilder {
         ArtifactSourceManifest manifest,
         List<Practice> practices,
         String jobId,
-        Instant temporalAnchor
+        Instant temporalAnchor,
+        @Nullable SignalName signal
     ) {
-        AutomatedReviewReadinessResult result = checkAutomatedReviewReadiness(manifest, practices, temporalAnchor);
+        AutomatedReviewReadinessResult result = checkAutomatedReviewReadiness(
+            manifest,
+            practices,
+            temporalAnchor,
+            signal
+        );
         if (result.decisions().isEmpty()) {
             throw new IllegalArgumentException("Cannot persist an empty automated-review readiness report");
         }
@@ -279,13 +287,18 @@ public class ContextManifestBuilder {
         ArtifactSourceManifest manifest,
         List<Practice> practices
     ) {
-        return checkAutomatedReviewReadiness(manifest, practices, clock.instant());
+        return checkAutomatedReviewReadiness(manifest, practices, clock.instant(), null);
     }
 
+    /**
+     * @param signal what occasioned the review, which decides which of each practice's bindings speaks
+     *               for it; {@code null} means nobody named an occasion and every binding does
+     */
     public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices,
-        Instant temporalAnchor
+        Instant temporalAnchor,
+        @Nullable SignalName signal
     ) {
         Objects.requireNonNull(temporalAnchor, "temporalAnchor");
         // A manifest recorded under a source contract this runtime no longer ships is unreplayable
@@ -347,10 +360,14 @@ public class ContextManifestBuilder {
                 }
             }
             List<SourceReadinessCheck> sourceChecks = new ArrayList<>();
-            // Only sources the practice takes a REQUIRED stance on can refuse it. A contextual source is
-            // read when it is there and noted when it is not, which is a fact for the manifest to carry
-            // rather than a reason to withhold the review.
-            for (var need : requirements.requiredNeeds()) {
+            // Only the bindings this occasion matched speak here, and within them only the sources the
+            // practice takes a refusing stance on.
+            for (var need : PracticeBinding.needsFor(practice.getBindings(), signal)) {
+                if (!need.refuses()) {
+                    // A contextual source is read when it is there and noted when it is not, which is a
+                    // fact for the manifest to carry rather than a reason to withhold the review.
+                    continue;
+                }
                 // How strictly the capture must have gone is the source's answer, not the practice's:
                 // every shipped practice demanded the same quality of the same source, and stating it per
                 // practice only created a way for two of them to disagree.

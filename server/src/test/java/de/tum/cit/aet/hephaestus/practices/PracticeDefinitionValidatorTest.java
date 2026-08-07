@@ -23,7 +23,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final PracticeDefinitionValidator validator = new PracticeDefinitionValidator(
         new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
-        PracticeTriggerOptionsFixture.real()
+        PracticeSignalOptionsFixture.real()
     );
 
     @Test
@@ -111,8 +111,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     ) {
         return new PracticeDefinition(
             "Focused review",
-            ArtifactKinds.PULL_REQUEST,
-            triggerEvents,
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             "Assess the review",
             precomputeScript,
             requirements,
@@ -129,7 +128,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
-            List.of(requirement),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             null
@@ -140,7 +138,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         return new PracticeAutomatedReviewPolicy(
             VERSION,
             new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
-            List.of(),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             null
@@ -154,7 +151,6 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
             ),
-            List.of(new PracticeEvidenceRequirement(DIFF, EvidenceStance.REQUIRED)),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice.")

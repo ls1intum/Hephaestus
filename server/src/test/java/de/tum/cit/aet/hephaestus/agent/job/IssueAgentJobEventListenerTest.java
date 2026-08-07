@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -240,7 +240,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             Issue issue = createIssue(Issue.State.OPEN);
             when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
             when(
-                practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO)
+                practiceReviewDetectionGate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Skip("no matching practices"));
 
             listener.onIssueCreated(event);
@@ -260,7 +260,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
-            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_CREATED);
+            assertThat(captureSubmission(WORKSPACE_ID).triggerSignal()).isEqualTo(ScmSignals.ISSUE_OPENED);
         }
 
         @Test
@@ -275,7 +275,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             workspace.setId(42L);
             var detect = new GateDecision.Detect(workspace, List.of());
             when(
-                practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO)
+                practiceReviewDetectionGate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO)
             ).thenReturn(detect);
             when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
@@ -353,7 +353,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(new ScmDomainEvent.IssueCreated(issueData, webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO);
+            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO);
         }
 
         @Test
@@ -363,7 +363,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueLabeled(new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluateIssue(issue, TriggerEventNames.ISSUE_LABELED, TriggerMode.AUTO);
+            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_LABELED, TriggerMode.AUTO);
         }
 
         @Test
@@ -373,9 +373,9 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             Issue issue = createIssue(Issue.State.OPEN);
             when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
-            when(
-                practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO)
-            ).thenThrow(new RuntimeException("DB connectivity error"));
+            when(practiceReviewDetectionGate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO)).thenThrow(
+                new RuntimeException("DB connectivity error")
+            );
 
             // Should not throw — outer catch handles gate exceptions
             listener.onIssueCreated(event);
@@ -394,7 +394,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
             when(
-                practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO)
+                practiceReviewDetectionGate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
             when(agentJobService.submit(any(), any(), any(), any())).thenThrow(
                 new RuntimeException("submission failed")
@@ -418,15 +418,15 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
             when(
-                practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO)
+                practiceReviewDetectionGate.evaluateIssue(issue, ScmSignals.ISSUE_CLOSED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
             when(agentJobService.submit(any(), any(), any(), any())).thenReturn(Optional.empty());
 
             var issueData = createIssueData(Issue.State.CLOSED);
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO);
-            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_CLOSED);
+            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_CLOSED, TriggerMode.AUTO);
+            assertThat(captureSubmission(WORKSPACE_ID).triggerSignal()).isEqualTo(ScmSignals.ISSUE_CLOSED);
         }
 
         @Test
@@ -457,7 +457,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             listener.onIssueLabeled(event);
 
             var request = captureSubmission(WORKSPACE_ID);
-            assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_LABELED);
+            assertThat(request.triggerSignal()).isEqualTo(ScmSignals.ISSUE_LABELED);
             assertThat(request.issueId()).isEqualTo(ISSUE_ID);
         }
 

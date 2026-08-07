@@ -5,10 +5,11 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.TriggerEventMatcher;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -35,6 +36,9 @@ import tools.jackson.databind.node.ObjectNode;
  * issue-focus practices — so a diff-anchored practice never reaches an issue (and vice-versa).
  */
 class PracticeCatalogInjector {
+
+    /** Job-metadata key naming the signal that occasioned the review. */
+    static final String SIGNAL_METADATA_KEY = "signal";
 
     private static final Logger log = LoggerFactory.getLogger(PracticeCatalogInjector.class);
 
@@ -116,11 +120,16 @@ class PracticeCatalogInjector {
             .stream()
             .sorted(Comparator.comparing(Practice::getSlug))
             .toList();
-        String triggerEvent = triggerEventOf(job);
-        if (triggerEvent != null) {
+        SignalName signal = signalOf(job);
+        if (signal != null) {
             practices = practices
                 .stream()
-                .filter(p -> TriggerEventMatcher.matches(p.getTriggerEvents(), triggerEvent))
+                .filter(p ->
+                    p
+                        .getBindings()
+                        .stream()
+                        .anyMatch(binding -> binding.matches(signal))
+                )
                 .toList();
         }
         if (practices.isEmpty()) {
@@ -158,9 +167,10 @@ class PracticeCatalogInjector {
             entry.put("revisionId", p.getCurrentRevision().getId());
             entry.put("defectDetector", p.isDefectDetector());
             ArrayNode allowedSources = entry.putArray("allowedSources");
-            p
-                .getAutomatedReviewPolicy()
-                .needs()
+            // Only what the bindings this occasion matched actually read. A practice bound to both a
+            // merge and an opening may read a decision record on one and not the other; listing the
+            // union would tell the model it may cite evidence this run never staged.
+            PracticeBinding.needsFor(p.getBindings(), signalOf(job))
                 .stream()
                 .map(need -> need.sourceKind().value())
                 .distinct()
@@ -224,18 +234,24 @@ class PracticeCatalogInjector {
         return section.toString();
     }
 
-    /** The lifecycle trigger event stored on the job by the handler, or {@code null} if absent. */
+    /**
+     * The signal that occasioned this job, or {@code null} when nobody named one.
+     *
+     * <p>Null is the gate-bypass path — a review somebody asked for by hand — and it means every active
+     * practice of the kind runs, reading everything any of its bindings reads. Narrowing that to one
+     * binding would answer a narrower question than the one asked.
+     */
     @Nullable
-    private static String triggerEventOf(AgentJob job) {
+    static SignalName signalOf(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             return null;
         }
-        JsonNode node = metadata.get("trigger_event");
-        if (node == null || node.isNull() || node.isMissingNode()) {
+        JsonNode node = metadata.get(SIGNAL_METADATA_KEY);
+        if (node == null || !node.isString()) {
             return null;
         }
-        String event = node.asString();
-        return (event == null || event.isBlank()) ? null : event;
+        String value = node.asString();
+        return (value == null || value.isBlank()) ? null : SignalName.of(value);
     }
 }

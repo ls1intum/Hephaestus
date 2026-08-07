@@ -2,14 +2,15 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -17,7 +18,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.JsonNode;
 
 @Entity
 @Table(name = "curated_practice_override")
@@ -34,12 +34,13 @@ public class CuratedPracticeOverride {
     @Column(name = "name", length = 128)
     private @Nullable String name;
 
+    /** Projection of {@link #bindings}, kept for the same reason {@code practice.applies_to} is. */
     @Column(name = "applies_to", length = ArtifactKind.MAX_LENGTH)
     private @Nullable ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "trigger_events", columnDefinition = "jsonb")
-    private @Nullable JsonNode triggerEvents;
+    @Column(name = "bindings", columnDefinition = "jsonb")
+    private @Nullable List<PracticeBinding> bindings;
 
     @Column(name = "criteria", columnDefinition = "TEXT")
     private @Nullable String criteria;
@@ -89,7 +90,7 @@ public class CuratedPracticeOverride {
         if (
             name == null ||
             artifactKind == null ||
-            triggerEvents == null ||
+            bindings == null ||
             criteria == null ||
             automatedReviewPolicy == null
         ) {
@@ -97,8 +98,7 @@ public class CuratedPracticeOverride {
         }
         return new PracticeDefinition(
             name,
-            artifactKind,
-            TriggerEventsConverter.toList(triggerEvents),
+            bindings,
             criteria,
             precomputeScript,
             automatedReviewPolicy,
@@ -111,7 +111,7 @@ public class CuratedPracticeOverride {
     public void write(PracticeDefinition definition, @Nullable String acceptedBundledDigest, Instant now) {
         this.name = definition.name();
         this.artifactKind = definition.artifactKind();
-        this.triggerEvents = definition.triggerEventsJson();
+        this.bindings = definition.bindings();
         this.criteria = definition.criteria();
         this.precomputeScript = definition.precomputeScript();
         this.automatedReviewPolicy = definition.automatedReviewPolicy();
@@ -125,7 +125,7 @@ public class CuratedPracticeOverride {
     public void clearDefinition(Instant now) {
         this.name = null;
         this.artifactKind = null;
-        this.triggerEvents = null;
+        this.bindings = null;
         this.criteria = null;
         this.precomputeScript = null;
         this.automatedReviewPolicy = null;

@@ -148,7 +148,7 @@ public class IssueAgentJobEventListener {
                 return;
             }
 
-            switch (practiceReviewDetectionGate.evaluateIssue(issue, triggerEventName, TriggerMode.AUTO)) {
+            switch (practiceReviewDetectionGate.evaluateIssue(issue, key.signalName(), TriggerMode.AUTO)) {
                 case GateDecision.Skip skip -> {
                     log.debug(
                         "Issue agent job skipped by practice gate: issueId={}, event={}, reason={}",
@@ -158,7 +158,7 @@ public class IssueAgentJobEventListener {
                     );
                     signalRecorder.markRefused(key, SignalStateReason.GATE_SKIPPED);
                 }
-                case GateDecision.Detect detect -> submitJob(issue, detect, triggerEventName, key);
+                case GateDecision.Detect detect -> submitJob(issue, detect, key);
             }
         } catch (Exception e) {
             log.error("Failed to handle issue event: issueId={}, event={}", issueData.id(), triggerEventName, e);
@@ -196,7 +196,7 @@ public class IssueAgentJobEventListener {
         ).orElse(null);
     }
 
-    private void submitJob(Issue issue, GateDecision.Detect detect, String triggerEventName, SignalKey signalKey) {
+    private void submitJob(Issue issue, GateDecision.Detect detect, SignalKey signalKey) {
         IssueReviewSubmissionRequest request = new IssueReviewSubmissionRequest(
             issue.getId(),
             issue.getNumber(),
@@ -207,15 +207,15 @@ public class IssueAgentJobEventListener {
             issue.getState() != null ? issue.getState().name() : "OPEN",
             issue.getHtmlUrl(),
             issue.getUpdatedAt(),
-            triggerEventName
+            signalKey.signalName()
         );
         agentJobService
             .submit(detect.workspace().getId(), AgentJobType.ISSUE_REVIEW, request, signalKey)
             .ifPresent(job ->
                 log.info(
-                    "Submitted issue review job: issueId={}, event={}, workspaceId={}, jobId={}",
+                    "Submitted issue review job: issueId={}, signal={}, workspaceId={}, jobId={}",
                     issue.getId(),
-                    triggerEventName,
+                    signalKey.signalName(),
                     detect.workspace().getId(),
                     job.getId()
                 )

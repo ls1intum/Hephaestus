@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
@@ -766,13 +767,13 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         private UUID seedDerivedConversation(Workspace workspace, long threadId) {
             User owner = persistUser("conv-" + workspace.getId() + "-subject");
             Practice practice = new Practice();
-            practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
+            practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
             practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
             practice.setWorkspace(workspace);
             practice.setSlug("conv-practice-" + workspace.getId());
             practice.setName("Conversation Practice");
             practice.setCriteria("Test description");
-            practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+            practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practice = practiceRepository.save(practice);
 
             AgentJob job = new AgentJob();

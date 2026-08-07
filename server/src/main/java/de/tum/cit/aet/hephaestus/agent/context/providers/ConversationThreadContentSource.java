@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -14,6 +15,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +43,17 @@ import tools.jackson.databind.node.ObjectNode;
  * does not name a thread is a preparation failure.
  */
 @Component
-public class ConversationThreadContentSource implements EvidenceSource {
+public class ConversationThreadContentSource implements EvidenceSource, ReviewContextBuilder {
+
+    /**
+     * The declared proof that a conversation review context can be assembled. The integration framework
+     * checks this against every descriptor that calls itself reviewable, so the kind cannot be opened for
+     * practices before anything can materialise its subject.
+     */
+    @Override
+    public ArtifactKind artifactKind() {
+        return ChatSignals.CONVERSATION_THREAD;
+    }
 
     private static final SourceKind KIND = new SourceKind("slack.conversation.thread");
 

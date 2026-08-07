@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import java.time.Instant;
 import java.util.Objects;
@@ -16,7 +17,7 @@ public record IssueReviewSubmissionRequest(
     String state,
     @Nullable String url,
     @Nullable Instant updatedAt,
-    @Nullable String triggerEvent
+    @Nullable SignalName triggerSignal
 ) implements JobSubmissionRequest {
     public IssueReviewSubmissionRequest {
         Objects.requireNonNull(repositoryFullName, "repositoryFullName must not be null");
@@ -36,9 +37,9 @@ public record IssueReviewSubmissionRequest(
         }
     }
 
-    /** Same rule as a pull-request review: no lifecycle event behind it means a person asked. */
+    /** Same rule as a pull-request review: no signal behind it means a person asked. */
     @Override
     public ObservationOrigin observationOrigin() {
-        return triggerEvent == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
+        return triggerSignal == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
     }
 }

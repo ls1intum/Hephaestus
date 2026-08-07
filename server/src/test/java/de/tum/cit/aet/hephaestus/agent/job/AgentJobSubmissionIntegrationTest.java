@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -95,7 +96,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         practice.setSlug("submit-test");
         practice.setName("Submit test");
         practice.setCriteria("Review the pull request");
-        practice.setTriggerEvents(OBJECT_MAPPER.createArrayNode().add("PullRequestCreated"));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practiceRepository.save(practice);
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("submit-test"));

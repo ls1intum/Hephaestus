@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.model;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.ReviewRuleFingerprint;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,6 +18,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -28,7 +29,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Complete practice definition used to reproduce historical observations.
@@ -82,9 +82,9 @@ public class PracticeRevision {
     private ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "trigger_events", columnDefinition = "jsonb")
+    @Column(name = "bindings", columnDefinition = "jsonb")
     @ToString.Exclude
-    private JsonNode triggerEvents;
+    private List<PracticeBinding> bindings;
 
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude
@@ -137,7 +137,7 @@ public class PracticeRevision {
         this.slug = Objects.requireNonNull(practice.getSlug(), "practice.slug");
         this.name = Objects.requireNonNull(practice.getName(), "practice.name");
         this.artifactKind = Objects.requireNonNull(practice.getArtifactKind(), "practice.artifactKind");
-        this.triggerEvents = Objects.requireNonNull(practice.getTriggerEvents(), "practice.triggerEvents").deepCopy();
+        this.bindings = List.copyOf(Objects.requireNonNull(practice.getBindings(), "practice.bindings"));
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
         this.precomputeScript = practice.getPrecomputeScript();
         this.automatedReviewPolicy = Objects.requireNonNull(
@@ -154,24 +154,14 @@ public class PracticeRevision {
             this.areaIcon = area.getIcon();
             this.areaColor = area.getColor();
         }
-        this.reviewRuleFingerprint = ReviewRuleFingerprint.of(
-            slug,
-            name,
-            artifactKind,
-            TriggerEventsConverter.toList(triggerEvents),
-            criteria,
-            precomputeScript,
-            automatedReviewPolicy,
-            areaSlug
-        );
+        this.reviewRuleFingerprint = computeReviewRuleFingerprint();
     }
 
     public String computeReviewRuleFingerprint() {
         return ReviewRuleFingerprint.of(
             slug,
             name,
-            artifactKind,
-            TriggerEventsConverter.toList(triggerEvents),
+            bindings,
             criteria,
             precomputeScript,
             automatedReviewPolicy,

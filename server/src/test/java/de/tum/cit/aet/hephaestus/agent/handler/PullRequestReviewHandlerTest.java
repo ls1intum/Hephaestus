@@ -199,7 +199,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setName(name);
         p.setCriteria(criteria);
         p.setUsedInNewReviews(true);
-        p.setArtifactKind(ArtifactKinds.PULL_REQUEST);
+        p.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
         p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         var revision = new PracticeRevision();
         ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
@@ -225,7 +225,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             )
             .thenReturn(prepared(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8))));
         lenient()
-            .when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any()))
+            .when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any()))
             .thenAnswer(invocation -> readiness(invocation.getArgument(1)));
         lenient()
             .when(workspaceContextBuilder.restrictTo(any(), any()))
@@ -316,9 +316,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     any(EvidencePlan.class)
                 )
             ).thenReturn(prepared(Map.of("inputs/context/metadata.json", metadataBytes)));
-            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any())).thenAnswer(
-                invocation -> readiness(invocation.getArgument(1))
-            );
+            when(
+                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
+            ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
             when(
                 practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     WORKSPACE_ID,
@@ -411,9 +411,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             providerFiles.put("inputs/context/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
             providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.prepare(any(), any())).thenReturn(prepared(providerFiles));
-            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any())).thenAnswer(
-                invocation -> readiness(invocation.getArgument(1))
-            );
+            when(
+                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
+            ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
             when(
                 practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(
                     WORKSPACE_ID,

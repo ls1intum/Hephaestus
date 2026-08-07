@@ -110,7 +110,6 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
         return new PracticeAutomatedReviewPolicy(
             VERSION,
             automatedReview,
-            needs,
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             knownLimitations,
             null

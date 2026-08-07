@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -104,12 +105,12 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (r.url() != null) {
             metadata.put("issue_url", r.url());
         }
-        if (r.triggerEvent() != null) {
-            metadata.put("trigger_event", r.triggerEvent());
+        if (r.triggerSignal() != null) {
+            metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, r.triggerSignal().value());
         }
 
         String version = r.updatedAt() != null ? String.valueOf(r.updatedAt().toEpochMilli()) : "0";
-        String phase = r.triggerEvent() != null ? r.triggerEvent() : "manual";
+        String phase = r.triggerSignal() != null ? r.triggerSignal().value() : "manual";
         String idempotencyKey =
             "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + phase + ":" + version;
         return new JobSubmission(metadata, idempotencyKey);
@@ -121,17 +122,19 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
+        SignalName signal = PracticeCatalogInjector.signalOf(job);
         List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.ISSUE);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.IssueReviewRequest(job),
-            EvidencePlan.compile(practices)
+            EvidencePlan.compile(practices, signal)
         );
         var artifactSourceManifest = prepared.manifest();
         var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
             prepared.manifest(),
             practices,
             job.getId().toString(),
-            job.getCreatedAt()
+            job.getCreatedAt(),
+            signal
         );
         List<Practice> eligible = practices;
         practices = readiness.readyPractices();
@@ -165,7 +168,7 @@ public class IssueReviewHandler implements JobTypeHandler {
                 )
             );
         }
-        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
+        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices, signal));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, ArtifactKinds.ISSUE, practices);

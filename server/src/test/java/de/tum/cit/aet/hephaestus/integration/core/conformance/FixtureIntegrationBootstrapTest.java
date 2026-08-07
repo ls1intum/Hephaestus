@@ -16,9 +16,11 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationFramework
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ReviewContractValidator;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptions;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.review.DormantBinding;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeSignalCoverage;
@@ -151,20 +153,16 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         return new PracticeSignalCoverage(
             coverage(connected),
             List.of(FixtureIntegration.vocabulary()),
-            new PracticeTriggerOptions(FixtureIntegration.artifactCatalog(), List.of(FixtureIntegration.vocabulary())),
+            new PracticeSignalOptions(FixtureIntegration.artifactCatalog(), List.of(FixtureIntegration.vocabulary())),
             repository
         );
     }
 
-    private static Practice practiceBoundTo(String... triggerEvents) {
+    private static Practice practiceBoundTo(SignalName... signals) {
         Practice practice = new Practice();
         practice.setId(1L);
         practice.setSlug("assemble-widgets-carefully");
-        var events = JsonNodeFactory.instance.arrayNode();
-        for (String triggerEvent : triggerEvents) {
-            events.add(triggerEvent);
-        }
-        practice.setTriggerEvents(events);
+        practice.setBindings(List.of(new PracticeBinding(List.of(signals), List.of(FixtureIntegration.need()), false)));
         return practice;
     }
 

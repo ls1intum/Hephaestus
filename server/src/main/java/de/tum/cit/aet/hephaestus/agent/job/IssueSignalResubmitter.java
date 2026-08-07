@@ -54,12 +54,6 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void resubmit(ArtifactSignal signal) {
         SignalKey key = signal.key();
-        String triggerEventName = ScmSignals.triggerEventFor(key.signalName()).orElse(null);
-        if (triggerEventName == null) {
-            log.debug("No trigger event to replay for pending signal: signal={}", key.signalName());
-            return;
-        }
-
         Issue issue = issueRepository.findByIdWithRepositoryAndAssignees(key.artifactId()).orElse(null);
         if (issue == null || issue.getRepository() == null) {
             log.debug("Pending signal has no reviewable issue left: issueId={}", key.artifactId());
@@ -67,7 +61,7 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
             return;
         }
 
-        switch (practiceReviewDetectionGate.evaluateIssue(issue, triggerEventName, TriggerMode.AUTO)) {
+        switch (practiceReviewDetectionGate.evaluateIssue(issue, key.signalName(), TriggerMode.AUTO)) {
             case GateDecision.Skip skip -> {
                 log.debug(
                     "Pending signal now skipped by practice gate: issueId={}, reason={}",
@@ -89,7 +83,7 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
                     issue.getState() != null ? issue.getState().name() : "OPEN",
                     issue.getHtmlUrl(),
                     issue.getUpdatedAt(),
-                    triggerEventName
+                    key.signalName()
                 ),
                 key
             );

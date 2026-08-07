@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.ClearablePracticeField;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -238,25 +237,27 @@ public class PracticeService {
         PracticeDefinition beforeDefinition = PracticeDefinition.from(practice);
 
         Set<ClearablePracticeField> fieldsToClear = request.clear() == null ? Set.of() : request.clear();
-        ArtifactKind artifactKind =
-            request.artifactKind() == null ? beforeDefinition.artifactKind() : request.artifactKind();
+        List<PracticeBinding> bindings = request.bindings() == null ? beforeDefinition.bindings() : request.bindings();
+        // The kind is read off the bindings, so "the author moved this practice to another kind of
+        // work" is a question about the new bindings rather than a separate field to compare.
+        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         PracticeAutomatedReviewPolicy automatedReviewPolicy =
             request.automatedReviewPolicy() != null
                 ? request.automatedReviewPolicy()
                 : artifactKind.equals(beforeDefinition.artifactKind())
                     ? beforeDefinition.automatedReviewPolicy()
-                    : evidenceDefaults.forArtifact(artifactKind);
+                    : evidenceDefaults.policyFor(artifactKind);
         boolean removesAutomatedReview =
             request.automatedReviewPolicy() != null &&
             !automatedReviewPolicy.automatedReview().canAttemptAutomatedReview();
+        if (removesAutomatedReview) {
+            // A practice nobody automates still says what occasions it — that is where its kind comes
+            // from — but it reads nothing, so the evidence goes with the automation that read it.
+            bindings = bindings.stream().map(PracticeService::withoutEvidence).toList();
+        }
         PracticeDefinition afterDefinition = new PracticeDefinition(
             request.name() == null ? beforeDefinition.name() : request.name(),
-            artifactKind,
-            request.triggerEvents() == null
-                ? removesAutomatedReview
-                    ? List.of()
-                    : beforeDefinition.triggerEvents()
-                : request.triggerEvents(),
+            bindings,
             request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
             removesAutomatedReview && request.precomputeScript() == null
                 ? null
@@ -376,16 +377,14 @@ public class PracticeService {
     }
 
     private PracticeDefinition definition(CreatePracticeRequestDTO request) {
-        ArtifactKind artifactKind =
-            request.artifactKind() == null ? ArtifactKinds.PULL_REQUEST : request.artifactKind();
+        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(request.bindings());
         return new PracticeDefinition(
             request.name(),
-            artifactKind,
-            request.triggerEvents(),
+            request.bindings(),
             request.criteria(),
             request.precomputeScript(),
             request.automatedReviewPolicy() == null
-                ? evidenceDefaults.forArtifact(artifactKind)
+                ? evidenceDefaults.policyFor(artifactKind)
                 : request.automatedReviewPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
@@ -393,10 +392,13 @@ public class PracticeService {
         );
     }
 
+    private static PracticeBinding withoutEvidence(PracticeBinding binding) {
+        return new PracticeBinding(binding.signals(), List.of(), binding.onDrafts());
+    }
+
     private static void applyDefinition(Practice practice, PracticeDefinition definition) {
         practice.setName(definition.name());
-        practice.setArtifactKind(definition.artifactKind());
-        practice.setTriggerEvents(definition.triggerEventsJson());
+        practice.setBindings(definition.bindings());
         practice.setCriteria(definition.criteria());
         practice.setPrecomputeScript(definition.precomputeScript());
         practice.setAutomatedReviewPolicy(definition.automatedReviewPolicy());

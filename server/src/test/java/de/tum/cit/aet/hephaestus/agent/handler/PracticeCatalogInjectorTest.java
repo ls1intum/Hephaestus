@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -47,7 +49,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         injector = new PracticeCatalogInjector(objectMapper, practiceRepository);
     }
 
-    private Practice practice(String slug, String... triggerEvents) {
+    private Practice practice(String slug, SignalName... signals) {
         Practice p = new Practice();
         p.setSlug(slug);
         p.setName(slug);
@@ -56,11 +58,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         var revision = new PracticeRevision();
         ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
         p.setCurrentRevision(revision);
-        ArrayNode arr = objectMapper.createArrayNode();
-        for (String e : triggerEvents) {
-            arr.add(e);
-        }
-        p.setTriggerEvents(arr);
+        p.setBindings(PracticeTestEvidence.bindings(signals));
         return p;
     }
 
@@ -88,9 +86,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
             practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(
             List.of(
-                practice("authoring", "PullRequestCreated"),
-                practice("retrospective", "PullRequestMerged"),
-                practice("reviewer", "ReviewSubmitted")
+                practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
+                practice("retrospective", ScmSignals.PULL_REQUEST_MERGED),
+                practice("reviewer", ScmSignals.PULL_REQUEST_REVIEWED)
             )
         );
         Map<String, byte[]> files = new HashMap<>();
@@ -108,7 +106,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         when(
             practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(
-            List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
+            List.of(
+                practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
+                practice("retrospective", ScmSignals.PULL_REQUEST_MERGED)
+            )
         );
         Map<String, byte[]> files = new HashMap<>();
 
@@ -124,7 +125,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         when(
             practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(
-            List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
+            List.of(
+                practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
+                practice("retrospective", ScmSignals.PULL_REQUEST_MERGED)
+            )
         );
         Map<String, byte[]> files = new HashMap<>();
 
@@ -141,7 +145,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         // traversal must be rejected, not written to disk.
         when(
             practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
-        ).thenReturn(List.of(practice("../escape", "PullRequestCreated")));
+        ).thenReturn(List.of(practice("../escape", ScmSignals.PULL_REQUEST_OPENED)));
 
         assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
@@ -173,9 +177,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("inject writes index.json, the per-slug + bundled criteria, and skips blank precompute scripts")
     void injectWritesCatalogArtifactsAndSkipsBlankPrecompute() {
-        Practice withScript = practice("authoring", "PullRequestCreated");
+        Practice withScript = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
         withScript.setPrecomputeScript("export default () => ({});");
-        Practice blankScript = practice("retrospective", "PullRequestMerged");
+        Practice blankScript = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
         blankScript.setPrecomputeScript("   "); // blank → no .ts written
         when(
             practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
@@ -203,13 +207,12 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("staged criteria tell the model which claims the evidence cannot support")
     void injectAppendsKnownLimitationsToCriteria() {
-        Practice limited = practice("authoring", "PullRequestCreated");
+        Practice limited = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
         PracticeAutomatedReviewPolicy policy = limited.getAutomatedReviewPolicy();
         limited.setAutomatedReviewPolicy(
             new PracticeAutomatedReviewPolicy(
                 policy.sourceContractVersion(),
                 policy.automatedReview(),
-                policy.needs(),
                 policy.whenEvidenceIsInsufficient(),
                 List.of(
                     new PracticeEvidenceLimitation(
@@ -220,7 +223,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
                 null
             )
         );
-        Practice unlimited = practice("retrospective", "PullRequestCreated");
+        Practice unlimited = practice("retrospective", ScmSignals.PULL_REQUEST_OPENED);
         when(
             practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)
         ).thenReturn(List.of(limited, unlimited));
@@ -241,9 +244,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("whyBySlug keeps populated principles and omits blank ones")
     void whyBySlugOmitsBlankPrinciples() {
-        Practice withWhy = practice("authoring", "PullRequestCreated");
+        Practice withWhy = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
         withWhy.setWhyItMatters("Clear descriptions help reviewers.");
-        Practice blankWhy = practice("retrospective", "PullRequestMerged");
+        Practice blankWhy = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
         blankWhy.setWhyItMatters("   ");
         when(
             practiceRepository.findByWorkspaceIdAndUsedInNewReviewsTrueAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)

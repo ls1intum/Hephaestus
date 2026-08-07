@@ -5,20 +5,19 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SignalCoverage;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SignalVocabulary;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignalVocabulary;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptions;
-import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptionsFixture;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,71 +31,57 @@ import org.junit.jupiter.api.Test;
 class PracticeSignalCoverageTest extends BaseUnitTest {
 
     private final PracticeRepository practices = mock(PracticeRepository.class);
+    private final PracticeSignalOptions options = PracticeSignalOptionsFixture.real();
 
     @Test
-    void everyTriggerAnAuthorCanPickIsBackedByTheShippedIntegrations() {
-        // The real vocabulary against a coverage that mirrors what GitHub and GitLab actually declare.
-        PracticeSignalCoverage coverage = coverage(everySignalOfTheRealCatalog());
-
-        assertThatCode(coverage::validateAuthoringVocabulary).doesNotThrowAnyException();
+    @DisplayName("every signal an author can bind to is one the shipped integrations declare they raise")
+    void everySignalAnAuthorCanPickIsBackedByTheShippedIntegrations() {
+        assertThatCode(coverage(everyIngestedSignal())::validateAuthoringVocabulary).doesNotThrowAnyException();
     }
 
     @Test
-    void aTriggerNoIntegrationCanRaiseRefusesToBoot() {
-        Set<SignalName> covered = everySignalOfTheRealCatalog();
+    @DisplayName("a signal no integration can raise refuses to boot")
+    void aSignalNoIntegrationCanRaiseRefusesToBoot() {
+        Set<SignalName> covered = everyIngestedSignal();
         covered.remove(ScmSignals.PULL_REQUEST_SYNCHRONIZED);
-        PracticeSignalCoverage coverage = coverage(covered);
 
-        assertThatThrownBy(coverage::validateAuthoringVocabulary)
+        assertThatThrownBy(coverage(covered)::validateAuthoringVocabulary)
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("PullRequestSynchronized")
             .hasMessageContaining("scm.pull_request.synchronized")
             .hasMessageContaining("would never fire");
     }
 
     @Test
-    void aTriggerNoDomainTranslatesRefusesToBoot() {
-        // A vocabulary that offers a literal it cannot itself translate is the same failure as a missing
-        // producer: the option exists in the UI and resolves to nothing.
-        SignalVocabulary inconsistent = inconsistentVocabulary();
-        PracticeSignalCoverage coverage = new PracticeSignalCoverage(
-            fixedCoverage(everySignalOfTheRealCatalog()),
-            List.of(inconsistent),
-            triggerOptions(inconsistent),
-            practices
+    @DisplayName("a signal raised from inside Hephaestus is not held to integration coverage")
+    void aSignalNoIngestedEventCarriesIsNotAGap() {
+        // A settled conversation and a review somebody asked for by hand are raised by a scheduler and
+        // by a person. Demanding an integration behind them would fail the boot for telling the truth,
+        // which is the failure mode this check exists to prevent, inverted.
+        Set<SignalName> covered = everyIngestedSignal();
+        assertThat(covered).doesNotContain(
+            ChatSignals.CONVERSATION_THREAD_SETTLED,
+            ScmSignals.PULL_REQUEST_REVIEW_REQUESTED
         );
 
-        assertThatThrownBy(coverage::validateAuthoringVocabulary)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("no domain module translates it to a signal");
+        assertThatCode(coverage(covered)::validateAuthoringVocabulary).doesNotThrowAnyException();
     }
 
     @Test
+    @DisplayName("the shipped vocabulary is not empty")
     void theShippedVocabularyIsNotEmpty() {
-        // Guards the tests above from passing vacuously if the vocabulary is ever emptied.
-        assertThat(triggerOptions(new ScmSignalVocabulary()).allEvents()).isNotEmpty();
+        // Guards the tests above from passing vacuously if the descriptors are ever emptied.
+        assertThat(options.eligibleFor(ScmSignals.PULL_REQUEST)).isNotEmpty();
     }
 
     private PracticeSignalCoverage coverage(Set<SignalName> covered) {
-        ScmSignalVocabulary vocabulary = new ScmSignalVocabulary();
-        return new PracticeSignalCoverage(
-            fixedCoverage(covered),
-            List.of(vocabulary),
-            triggerOptions(vocabulary),
-            practices
-        );
+        return new PracticeSignalCoverage(fixedCoverage(covered), options, practices);
     }
 
-    /** Trigger options over the real SCM descriptors, which is what an author is actually offered. */
-    private static PracticeTriggerOptions triggerOptions(SignalVocabulary vocabulary) {
-        return PracticeTriggerOptionsFixture.with(vocabulary);
-    }
-
-    /** The signals the shipped manifests between them declare they raise, read off the real vocabulary. */
-    private static Set<SignalName> everySignalOfTheRealCatalog() {
+    /** Every signal an author can bind to that some ingested event is declared to raise. */
+    private Set<SignalName> everyIngestedSignal() {
         Set<SignalName> signals = new HashSet<>();
-        for (String triggerEvent : new ScmSignalVocabulary().triggerEventNames()) {
-            ScmSignals.forTriggerEvent(triggerEvent).ifPresent(signals::add);
+        for (ArtifactKind kind : options.authorableKinds()) {
+            options.eligibleFor(kind).stream().filter(options::producedByIngestion).forEach(signals::add);
         }
         return signals;
     }
@@ -116,25 +101,6 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
             @Override
             public Set<IntegrationKind> raisedBy(SignalName signal) {
                 return covered.contains(signal) ? Set.of(IntegrationKind.GITHUB) : Set.of();
-            }
-        };
-    }
-
-    private static SignalVocabulary inconsistentVocabulary() {
-        return new SignalVocabulary() {
-            @Override
-            public Optional<SignalName> signalForTriggerEvent(String triggerEventName) {
-                return Optional.empty();
-            }
-
-            @Override
-            public Set<String> triggerEventNames() {
-                return Set.of("PullRequestReady");
-            }
-
-            @Override
-            public Optional<String> triggerEventFor(SignalName signal) {
-                return Optional.empty();
             }
         };
     }

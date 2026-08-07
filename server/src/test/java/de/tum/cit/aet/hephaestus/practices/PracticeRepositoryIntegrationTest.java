@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -42,7 +43,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCriteria("Default criteria for " + slug);
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         return practice;
     }
 
@@ -64,7 +65,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             Practice found = practiceRepository.findById(saved.getId()).orElseThrow();
             assertThat(found.getSlug()).isEqualTo("test-slug");
             assertThat(found.getName()).isEqualTo("Test Practice");
-            assertThat(found.getTriggerEvents().toString()).contains("PullRequestCreated");
+            assertThat(found.getBindings()).isEqualTo(saved.getBindings());
             assertThat(found.getCriteria()).isEqualTo("Check for quality");
             assertThat(found.isUsedInNewReviews()).isFalse();
         }

@@ -24,5 +24,10 @@ public enum EvidenceStance {
     REQUIRED,
 
     /** Used when present, noted when absent, never a reason to refuse. */
-    CONTEXTUAL,
+    CONTEXTUAL;
+
+    /** Whether an absent or inadequate capture of a source held this way refuses the review. */
+    public boolean refuses() {
+        return this == REQUIRED;
+    }
 }

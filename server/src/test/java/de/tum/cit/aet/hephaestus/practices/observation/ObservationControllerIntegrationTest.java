@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
@@ -97,7 +98,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         practice.setSlug(slug);
         practice.setName(name);
         practice.setCriteria("Description for " + slug);
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setUsedInNewReviews(true);
         practice = practiceRepository.saveAndFlush(practice);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
@@ -505,7 +506,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Desc");
-            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice.setUsedInNewReviews(true);
             otherPractice = practiceRepository.save(otherPractice);
 
@@ -1088,7 +1089,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             otherPractice.setSlug("ws2-practice");
             otherPractice.setName("WS2 Practice");
             otherPractice.setCriteria("Desc");
-            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice.setUsedInNewReviews(true);
             otherPractice = practiceRepository.save(otherPractice);
 

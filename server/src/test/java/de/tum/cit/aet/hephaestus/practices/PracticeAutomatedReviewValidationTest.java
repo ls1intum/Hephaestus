@@ -35,8 +35,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
         PracticeDefinition original = definition(requirements());
         PracticeDefinition revised = new PracticeDefinition(
             original.name(),
-            original.artifactKind(),
-            original.triggerEvents(),
+            original.bindings(),
             original.criteria(),
             original.precomputeScript(),
             original.automatedReviewPolicy(),
@@ -75,7 +74,6 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
-            List.of(new PracticeEvidenceRequirement(new SourceKind("scm.pull-request.diff"), EvidenceStance.REQUIRED)),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(),
             null
@@ -85,8 +83,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
     private static PracticeDefinition definition(PracticeAutomatedReviewPolicy requirements) {
         return new PracticeDefinition(
             "Focused review",
-            ArtifactKinds.PULL_REQUEST,
-            List.of("PullRequestCreated"),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             "Assess whether the change stays focused.",
             null,
             requirements,

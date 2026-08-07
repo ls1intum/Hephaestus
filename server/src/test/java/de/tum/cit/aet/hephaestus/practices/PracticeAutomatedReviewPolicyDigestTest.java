@@ -94,7 +94,6 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         return new PracticeAutomatedReviewPolicy(
             new SourceContractVersion("1.0.0"),
             automatedReview,
-            required,
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime behavior is outside scope.")),
             automatedReview.evidenceSufficiency() == PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT

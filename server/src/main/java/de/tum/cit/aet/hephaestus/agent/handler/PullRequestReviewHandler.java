@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -151,20 +152,20 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // metadata.title / metadata.body. Without these the practices silently can't evaluate.
         metadata.put("title", pullRequestData.title());
         metadata.put("body", pullRequestData.body());
-        // The lifecycle event that triggered this job. When present, the catalog injector materialises
-        // ONLY the practices whose triggerEvents include it — so an authoring practice is not re-litigated
-        // on a fixup push and a retrospective practice runs only at merge. Null = run the full focus set
-        // (the gate-bypass dev path / bot command).
-        if (submissionRequest.triggerEvent() != null) {
-            metadata.put("trigger_event", submissionRequest.triggerEvent());
+        // The signal that occasioned this job. When present, the catalog injector materialises ONLY the
+        // practices bound to it, reading only what those bindings read — so an authoring practice is not
+        // re-litigated on a fixup push and a retrospective practice runs only at merge. Null = run the
+        // full focus set (the gate-bypass dev path / bot command).
+        if (submissionRequest.triggerSignal() != null) {
+            metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, submissionRequest.triggerSignal().value());
         }
 
-        // The trigger-event PHASE is part of the key: an authoring review (Created/Ready), a push
-        // re-scan (Synchronized), a reviewer pass (ReviewSubmitted) and a retrospective (Merged) of the
-        // SAME head SHA are DIFFERENT reviews over different practice sets — a retrospective must never be
-        // deduped/cooled-down against an earlier authoring job for the same commit. Phase sits BEFORE the
-        // SHA so extractCooldownKeyPrefix scopes cooldown per (pr, phase).
-        String phase = submissionRequest.triggerEvent() != null ? submissionRequest.triggerEvent() : "manual";
+        // The occasion is part of the key: an authoring review (opened/ready), a push re-scan
+        // (synchronized), a reviewer pass (reviewed) and a retrospective (merged) of the SAME head SHA are
+        // DIFFERENT reviews over different practice sets — a retrospective must never be deduped or
+        // cooled down against an earlier authoring job for the same commit. It sits BEFORE the SHA so
+        // extractCooldownKeyPrefix scopes cooldown per (pr, occasion).
+        String phase = submissionRequest.triggerSignal() != null ? submissionRequest.triggerSignal().value() : "manual";
         String idempotencyKey =
             "pr_review:" +
             pullRequestData.repository().nameWithOwner() +
@@ -188,17 +189,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
 
+        SignalName signal = PracticeCatalogInjector.signalOf(job);
         List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.PracticeReviewRequest(job),
-            EvidencePlan.compile(practices)
+            EvidencePlan.compile(practices, signal)
         );
         var artifactSourceManifest = prepared.manifest();
         var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
             prepared.manifest(),
             practices,
             job.getId().toString(),
-            job.getCreatedAt()
+            job.getCreatedAt(),
+            signal
         );
         List<Practice> eligible = practices;
         practices = readiness.readyPractices();
@@ -232,7 +235,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 )
             );
         }
-        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
+        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices, signal));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
 
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));

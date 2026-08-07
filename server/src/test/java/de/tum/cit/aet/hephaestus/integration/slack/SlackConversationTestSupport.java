@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
@@ -141,13 +142,13 @@ public final class SlackConversationTestSupport {
     /** Saves a minimal {@link Practice} owned by the given workspace, slugged so repeated calls do not collide. */
     public static Practice newPractice(PracticeRepository practiceRepository, Workspace workspace, String slugPrefix) {
         Practice practice = new Practice();
-        practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug(slugPrefix + "-" + UUID.randomUUID());
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         return practiceRepository.save(practice);
     }
 

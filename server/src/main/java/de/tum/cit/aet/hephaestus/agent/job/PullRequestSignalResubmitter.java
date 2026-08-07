@@ -66,14 +66,6 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void resubmit(ArtifactSignal signal) {
         SignalKey key = signal.key();
-        String triggerEventName = ScmSignals.triggerEventFor(key.signalName()).orElse(null);
-        if (triggerEventName == null) {
-            // An explicitly requested run names no domain event to re-evaluate. Replaying it without
-            // the ask that occasioned it would be inventing a request nobody made, so it lapses.
-            log.debug("No trigger event to replay for pending signal: signal={}", key.signalName());
-            return;
-        }
-
         PullRequest pr = pullRequestRepository.findByIdWithAllForGate(key.artifactId()).orElse(null);
         if (pr == null || pr.getHeadRefName() == null || pr.getHeadRefOid() == null || pr.getBaseRefName() == null) {
             log.debug("Pending signal has no reviewable pull request left: prId={}", key.artifactId());
@@ -81,7 +73,7 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
             return;
         }
 
-        switch (practiceReviewDetectionGate.evaluate(pr, triggerEventName, TriggerMode.AUTO)) {
+        switch (practiceReviewDetectionGate.evaluate(pr, key.signalName(), TriggerMode.AUTO)) {
             case GateDecision.Skip skip -> {
                 log.debug("Pending signal now skipped by practice gate: prId={}, reason={}", pr.getId(), skip.reason());
                 signalRecorder.markRefused(key, SignalStateReason.GATE_SKIPPED);
@@ -94,7 +86,7 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
                     pr.getHeadRefName(),
                     pr.getHeadRefOid(),
                     pr.getBaseRefName(),
-                    triggerEventName
+                    key.signalName()
                 ),
                 key
             );

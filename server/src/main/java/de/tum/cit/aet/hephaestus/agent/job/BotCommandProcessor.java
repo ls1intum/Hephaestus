@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
-
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
@@ -11,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -138,10 +137,11 @@ public class BotCommandProcessor {
                 return;
             }
 
-            // PullRequestCreated is used deliberately: it matches the broadest set of practices.
+            // scm.pull_request.opened deliberately: it is the occasion the broadest set of practices
+            // is bound to, and a bot command is an ask to review the change as a whole.
             GateDecision decision = practiceReviewDetectionGate.evaluate(
                 pr,
-                TriggerEventNames.PULL_REQUEST_CREATED,
+                ScmSignals.PULL_REQUEST_OPENED,
                 TriggerMode.MANUAL
             );
 

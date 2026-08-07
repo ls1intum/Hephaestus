@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -18,7 +18,9 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("focused-reviews");
         practice.setName("Focused reviews");
-        practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("ReviewSubmitted", "PullRequestCreated")));
+        practice.setBindings(
+            PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED, ScmSignals.PULL_REQUEST_OPENED)
+        );
         practice.setCriteria("abc");
         practice.setPrecomputeScript("console.log('x')");
         practice.setAutomatedReviewPolicy(
@@ -27,9 +29,6 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
                 new PracticeAutomatedReview(
                     PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                     PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-                ),
-                List.of(
-                    new PracticeEvidenceRequirement(new SourceKind("scm.pull-request.diff"), EvidenceStance.REQUIRED)
                 ),
                 PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
                 List.of(),

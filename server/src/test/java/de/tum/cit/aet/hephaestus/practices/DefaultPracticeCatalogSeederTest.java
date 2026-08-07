@@ -129,8 +129,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         AreaDefinition area = new AreaDefinition("Packaging work", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
             "Small PRs",
-            ArtifactKinds.PULL_REQUEST,
-            List.of("PullRequestCreated"),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             "Seed criteria",
             null,
             PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),

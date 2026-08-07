@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
@@ -76,13 +77,13 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         );
         setUpWorkspaceAndRecipient("conv-consent-gate-test");
         practice = new Practice();
-        practice.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.saveAndFlush(practice);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
@@ -125,7 +126,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     @Test
     @DisplayName("Slack consent does not suppress an otherwise-authorized pull-request observation")
     void nonSlackArtifactFactAlwaysSurfaces() {
-        practice.setArtifactKind(ArtifactKinds.PULL_REQUEST);
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 2));
         practice.setCurrentRevision(revision);

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -19,6 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.util.LinkedHashMap;
@@ -100,6 +102,10 @@ public class ConversationReviewHandler implements JobTypeHandler {
         metadata.put("slack_thread_ts", r.slackThreadTs());
         metadata.put("slack_last_ts", r.lastTs());
         metadata.put("about_user_id", r.aboutUserId());
+        // A settled thread is the one occasion a conversation practice is reviewed on. The scheduler
+        // decides it, so no ingested event carries it — but the job still records what occasioned it,
+        // because that is what selects the practices and the evidence their bindings read.
+        metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, ChatSignals.CONVERSATION_THREAD_SETTLED.value());
 
         // Trailing segment is the disposable freshness (lastTs): AgentJobService.extractCooldownKeyPrefix
         // strips only it, so cooldown scopes on (channel, thread, subject) — a late reply that advances lastTs
@@ -125,20 +131,22 @@ public class ConversationReviewHandler implements JobTypeHandler {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
+        SignalName signal = PracticeCatalogInjector.signalOf(job);
         List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(
             job,
             ArtifactKinds.CONVERSATION_THREAD
         );
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.ConversationReviewRequest(job),
-            EvidencePlan.compile(practices)
+            EvidencePlan.compile(practices, signal)
         );
         var artifactSourceManifest = prepared.manifest();
         var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
             prepared.manifest(),
             practices,
             job.getId().toString(),
-            job.getCreatedAt()
+            job.getCreatedAt(),
+            signal
         );
         List<Practice> eligible = practices;
         practices = readiness.readyPractices();
@@ -172,7 +180,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
                 )
             );
         }
-        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices));
+        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices, signal));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, ArtifactKinds.CONVERSATION_THREAD, practices);

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.dto;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewValidation;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,7 +17,9 @@ public record PracticeDTO(
     @NonNull @Schema(description = "Practice ID") Long id,
     @NonNull @Schema(description = "URL-safe identifier unique within workspace") String slug,
     @NonNull @Schema(description = "Human-readable name") String name,
-    @NonNull @Schema(description = "Domain events that start a practice review") List<String> triggerEvents,
+    @NonNull
+    @Schema(description = "Occasions this practice is reviewed on, each with the evidence that review reads")
+    List<PracticeBinding> bindings,
     @NonNull @Schema(description = "Practice review criteria") String criteria,
     @Nullable
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
@@ -24,7 +27,7 @@ public record PracticeDTO(
     @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
     @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
     @NonNull
-    @Schema(description = "Kind of work this practice reviews", example = "scm.pull_request")
+    @Schema(description = "Kind of work this practice reviews, read off its bindings", example = "scm.pull_request")
     ArtifactKind artifactKind,
     @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
     @NonNull @Schema(description = "Position within its area (lowest first); ties broken by name") Integer displayOrder,
@@ -40,7 +43,7 @@ public record PracticeDTO(
             practice.getId(),
             practice.getSlug(),
             practice.getName(),
-            TriggerEventsConverter.toList(practice.getTriggerEvents()),
+            practice.getBindings(),
             practice.getCriteria(),
             practice.getPrecomputeScript(),
             practice.getAutomatedReviewPolicy(),

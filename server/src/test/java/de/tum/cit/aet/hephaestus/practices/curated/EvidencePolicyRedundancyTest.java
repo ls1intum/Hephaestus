@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
-import de.tum.cit.aet.hephaestus.practices.PracticeTriggerOptionsFixture;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -41,7 +41,7 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     );
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
         objectMapper,
-        new PracticeDefinitionValidator(registry, PracticeTriggerOptionsFixture.real())
+        new PracticeDefinitionValidator(registry, PracticeSignalOptionsFixture.real())
     );
 
     /**

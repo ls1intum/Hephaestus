@@ -22,7 +22,7 @@ class PracticeDefinitionOptionsServiceTest {
         var service = new PracticeDefinitionOptionsService(
             catalogs,
             new PracticeEvidenceDefaults(catalogs),
-            PracticeTriggerOptionsFixture.real()
+            PracticeSignalOptionsFixture.real()
         );
 
         PracticeDefinitionOptionsDTO result = service.options();

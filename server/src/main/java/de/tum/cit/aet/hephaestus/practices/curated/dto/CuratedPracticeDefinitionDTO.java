@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated.dto;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewValidation;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
@@ -13,7 +14,7 @@ import org.jspecify.annotations.Nullable;
 public record CuratedPracticeDefinitionDTO(
     @NonNull String name,
     @NonNull ArtifactKind artifactKind,
-    @NonNull List<String> triggerEvents,
+    @NonNull List<PracticeBinding> bindings,
     @NonNull String criteria,
     @Nullable String precomputeScript,
     @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
@@ -26,7 +27,7 @@ public record CuratedPracticeDefinitionDTO(
         return new CuratedPracticeDefinitionDTO(
             definition.name(),
             definition.artifactKind(),
-            definition.triggerEvents(),
+            definition.bindings(),
             definition.criteria(),
             definition.precomputeScript(),
             definition.automatedReviewPolicy(),

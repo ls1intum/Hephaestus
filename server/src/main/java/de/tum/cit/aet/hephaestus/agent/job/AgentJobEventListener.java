@@ -186,7 +186,7 @@ public class AgentJobEventListener {
                 return;
             }
 
-            switch (practiceReviewDetectionGate.evaluate(pr, triggerEventName, TriggerMode.AUTO)) {
+            switch (practiceReviewDetectionGate.evaluate(pr, key.signalName(), TriggerMode.AUTO)) {
                 case GateDecision.Skip skip -> {
                     log.debug(
                         "Agent job skipped by practice gate: prNumber={}, repoName={}, event={}, reason={}",
@@ -197,7 +197,7 @@ public class AgentJobEventListener {
                     );
                     signalRecorder.markRefused(key, SignalStateReason.GATE_SKIPPED);
                 }
-                case GateDecision.Detect detect -> submitJob(prData, pr, detect, triggerEventName, key);
+                case GateDecision.Detect detect -> submitJob(prData, pr, detect, key);
             }
         } catch (Exception e) {
             log.error(
@@ -299,7 +299,6 @@ public class AgentJobEventListener {
         ScmEventPayload.PullRequestData prData,
         PullRequest pr,
         GateDecision.Detect detect,
-        String triggerEventName,
         SignalKey signalKey
     ) {
         PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
@@ -307,7 +306,7 @@ public class AgentJobEventListener {
             pr.getHeadRefName(),
             pr.getHeadRefOid(),
             pr.getBaseRefName(),
-            triggerEventName
+            signalKey.signalName()
         );
 
         try {
@@ -315,20 +314,20 @@ public class AgentJobEventListener {
                 .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, signalKey)
                 .ifPresent(job ->
                     log.info(
-                        "Agent job submitted: jobId={}, prNumber={}, repoName={}, event={}, matchedPractices={}",
+                        "Agent job submitted: jobId={}, prNumber={}, repoName={}, signal={}, matchedPractices={}",
                         job.getId(),
                         prData.number(),
                         repositoryNameOf(prData),
-                        triggerEventName,
+                        signalKey.signalName(),
                         detect.matchedPractices().size()
                     )
                 );
         } catch (Exception e) {
             log.error(
-                "Failed to submit agent job: prNumber={}, repoName={}, event={}",
+                "Failed to submit agent job: prNumber={}, repoName={}, signal={}",
                 prData.number(),
                 repositoryNameOf(prData),
-                triggerEventName,
+                signalKey.signalName(),
                 e
             );
         }

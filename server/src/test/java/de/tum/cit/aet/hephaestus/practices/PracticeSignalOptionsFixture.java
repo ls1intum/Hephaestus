@@ -1,50 +1,55 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SignalVocabulary;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignalVocabulary;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * The trigger options a running server offers, assembled from the real SCM descriptors and vocabulary.
+ * The signal options a running server offers, assembled from the real shipped descriptors.
  *
- * <p>Deliberately the real ones rather than stubs: what an author may pick is now derived from the
+ * <p>Deliberately the real ones rather than stubs: what an author may bind to is derived from the
  * shipped declarations, so a unit test built on invented options would stop testing the thing that can
  * actually break.
  */
-public final class PracticeTriggerOptionsFixture {
+public final class PracticeSignalOptionsFixture {
 
     private static final List<ArtifactDescriptor> DESCRIPTORS = List.of(
         new PullRequestArtifactDescriptor(),
-        new IssueArtifactDescriptor()
+        new IssueArtifactDescriptor(),
+        new ConversationThreadArtifactDescriptor()
     );
 
-    private PracticeTriggerOptionsFixture() {}
+    private PracticeSignalOptionsFixture() {}
 
-    public static PracticeTriggerOptions real() {
-        return with(new ScmSignalVocabulary());
+    public static PracticeSignalOptions real() {
+        return new PracticeSignalOptions(catalog());
     }
 
-    public static PracticeTriggerOptions with(SignalVocabulary... vocabularies) {
-        return new PracticeTriggerOptions(catalog(), List.of(vocabularies));
+    public static PracticeSignalOptions with(ArtifactDescriptor... descriptors) {
+        return new PracticeSignalOptions(catalog(List.of(descriptors)));
     }
 
     public static ArtifactCatalog catalog() {
+        return catalog(DESCRIPTORS);
+    }
+
+    public static ArtifactCatalog catalog(List<ArtifactDescriptor> descriptors) {
         return new ArtifactCatalog() {
             @Override
             public Collection<ArtifactDescriptor> all() {
-                return DESCRIPTORS;
+                return descriptors;
             }
 
             @Override
             public Optional<ArtifactDescriptor> descriptorFor(ArtifactKind kind) {
-                return DESCRIPTORS.stream()
+                return descriptors
+                    .stream()
                     .filter(descriptor -> descriptor.kind().equals(kind))
                     .findFirst();
             }

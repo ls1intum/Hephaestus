@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import java.util.List;
 
 /**
  * The artifact kinds this build can author a practice against, and the last place the practices module
@@ -14,10 +13,10 @@ import java.util.List;
  * ({@code core.spi}, {@code core.signal}) and on nothing that implements it, which is the boundary that
  * lets a new domain become bindable without an edit here.
  *
- * <p>The list shrinks to nothing in slice 6. Once a practice declares the signals it watches, its kind
- * is read off the signal-name prefix and the set of authorable kinds is whatever the registered
- * {@code ArtifactDescriptor}s declare — at which point naming three of them in the practices module is
- * the thing that would be wrong.
+ * <p>The list of kinds an author may choose used to be here too. It was a claim about domains this
+ * module does not own, kept true by whoever remembered to edit it; it is now derived from the
+ * registered {@code ArtifactDescriptor}s by {@code PracticeSignalOptions}, so a kind becomes authorable
+ * by being declared rather than by being listed here.
  */
 public final class ArtifactKinds {
 
@@ -36,23 +35,19 @@ public final class ArtifactKinds {
      */
     public static final ArtifactKind CONVERSATION_THREAD = ArtifactKind.of("chat.conversation_thread");
 
-    private static final List<ArtifactKind> AUTHORABLE = List.of(PULL_REQUEST, ISSUE, CONVERSATION_THREAD);
-
     private ArtifactKinds() {}
-
-    /** The kinds the authoring surfaces offer, in the order they are offered. */
-    public static List<ArtifactKind> authorable() {
-        return AUTHORABLE;
-    }
 
     /**
      * Whether feedback about this kind has a diff-anchored inline lane. Only a pull request does: a
      * finding can be posted there as a positional note, while every other kind expands its findings in
      * the summary/thread surface.
      *
-     * <p>The authority for this is the kind's {@code ArtifactDescriptor}, which states it as
-     * {@code FeedbackLane.IN_CONTEXT_INLINE}. Delivery reads it here because the composer is static and
-     * has no registry to ask; slice 6 moves the answer to the descriptor and deletes this method.
+     * <p>The authority is the kind's {@code ArtifactDescriptor}, which states it as
+     * {@code FeedbackLane.IN_CONTEXT_INLINE}; this is a second statement of it, and
+     * {@code ArtifactKindsAgreementTest} holds the two to each other so they cannot drift. It survives
+     * because {@code DeliveryComposer} is a static composer with no registry to ask, and making it a
+     * bean is a change to the delivery path rather than to what a practice declares — it belongs in its
+     * own slice, not smuggled into this one.
      */
     public static boolean hasInlineLane(ArtifactKind kind) {
         return PULL_REQUEST.equals(kind);

@@ -9,9 +9,7 @@ public final class PracticeAutomatedReviewPolicyDigest {
             .add(requirements.sourceContractVersion().value())
             .add(requirements.automatedReview().mode().name())
             .add(requirements.automatedReview().evidenceSufficiency().name())
-            .add(requirements.whenEvidenceIsInsufficient().name())
-            .addInt(requirements.needs().size());
-        requirements.needs().forEach(need -> add(digest, need));
+            .add(requirements.whenEvidenceIsInsufficient().name());
         digest.addInt(requirements.knownLimitations().size());
         requirements
             .knownLimitations()
@@ -19,9 +17,5 @@ public final class PracticeAutomatedReviewPolicyDigest {
         PracticeEvidenceLimitation reason = requirements.insufficiencyReason();
         digest.add(reason == null ? "" : reason.code()).add(reason == null ? "" : reason.description());
         return digest.hex();
-    }
-
-    private static void add(CanonicalDigest digest, PracticeEvidenceRequirement need) {
-        digest.add(need.sourceKind().value()).add(need.stance().name());
     }
 }

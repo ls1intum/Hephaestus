@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -113,7 +114,7 @@ public class AgentJobService {
      * via {@link #submitPrepared}. Null when the branch refs needed to clone/diff are absent.
      */
     @Nullable
-    PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable String triggerEvent) {
+    PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable SignalName triggerSignal) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
             return null;
         }
@@ -123,13 +124,13 @@ public class AgentJobService {
             pr.getHeadRefName(),
             pr.getHeadRefOid(),
             pr.getBaseRefName(),
-            triggerEvent
+            triggerSignal
         );
     }
 
     /** Issue-shaped companion to {@link #buildReviewRequest}, with the same session requirement. */
     @Nullable
-    IssueReviewSubmissionRequest buildIssueRequest(Issue issue, @Nullable String triggerEvent) {
+    IssueReviewSubmissionRequest buildIssueRequest(Issue issue, @Nullable SignalName triggerSignal) {
         if (issue.getRepository() == null) {
             return null;
         }
@@ -144,7 +145,7 @@ public class AgentJobService {
             issue.getState() != null ? issue.getState().name() : "OPEN",
             issue.getHtmlUrl(),
             issue.getUpdatedAt(),
-            triggerEvent
+            triggerSignal
         );
     }
 

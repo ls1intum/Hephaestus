@@ -2,18 +2,15 @@ package de.tum.cit.aet.hephaestus.practices.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.JsonNodeFactory;
 
 class PracticeRevisionTest extends BaseUnitTest {
 
     @Test
     void shouldSnapshotCompleteDefinitionAndArea() {
-        ArrayNode triggers = JsonNodeFactory.instance.arrayNode().add("PullRequestCreated");
         PracticeArea area = new PracticeArea();
         area.setSlug("review-quality");
         area.setName("Review quality");
@@ -23,8 +20,7 @@ class PracticeRevisionTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("clear-feedback");
         practice.setName("Clear feedback");
-        practice.setArtifactKind(ArtifactKinds.PULL_REQUEST);
-        practice.setTriggerEvents(triggers);
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Detect clear feedback");
         practice.setPrecomputeScript("export default {}");
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
@@ -33,13 +29,14 @@ class PracticeRevisionTest extends BaseUnitTest {
         practice.setArea(area);
 
         PracticeRevision revision = new PracticeRevision(practice, 3);
-        triggers.add("ReviewSubmitted");
+        // The revision copies the list; a later edit to the practice's bindings must not reach it.
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED));
 
         assertThat(revision.getRevisionNumber()).isEqualTo(3);
         assertThat(revision.getSlug()).isEqualTo("clear-feedback");
         assertThat(revision.getName()).isEqualTo("Clear feedback");
         assertThat(revision.getArtifactKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
-        assertThat(TriggerEventsConverter.toList(revision.getTriggerEvents())).containsExactly("PullRequestCreated");
+        assertThat(revision.getBindings()).isEqualTo(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         assertThat(revision.getCriteria()).isEqualTo("Detect clear feedback");
         assertThat(revision.getPrecomputeScript()).isEqualTo("export default {}");
         assertThat(revision.getAutomatedReviewPolicy()).isEqualTo(practice.getAutomatedReviewPolicy());

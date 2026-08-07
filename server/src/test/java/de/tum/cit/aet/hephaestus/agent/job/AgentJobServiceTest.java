@@ -617,7 +617,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
             assertThat(request).isNotNull();
             assertThat(request.headRefOid()).isEqualTo("abc123");
-            assertThat(request.triggerEvent()).isEqualTo("PullRequestMerged");
+            assertThat(request.triggerSignal()).isEqualTo("PullRequestMerged");
         }
 
         @Test

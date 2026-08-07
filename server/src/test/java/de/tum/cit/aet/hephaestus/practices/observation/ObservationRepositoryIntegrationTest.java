@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -103,7 +104,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
 
         agentJob = new AgentJob();
@@ -298,7 +299,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceB.setSlug("practice-b");
             practiceB.setName("Practice B");
             practiceB.setCriteria("Workspace B practice");
-            practiceB.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            practiceB.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practiceB = practiceRepository.save(practiceB);
 
             AgentJob agentJobB = new AgentJob();
@@ -373,7 +374,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Other description");
-            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice = practiceRepository.save(otherPractice);
 
             // Finding on the practice to be deleted
@@ -694,7 +695,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Other criteria");
-            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();

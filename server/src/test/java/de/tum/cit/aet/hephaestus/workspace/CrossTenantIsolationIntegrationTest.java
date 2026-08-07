@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
@@ -160,7 +161,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         practice.setSlug(practiceSlug);
         practice.setName("Practice of " + ws.getWorkspaceSlug());
         practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setUsedInNewReviews(true);
         practice = practiceRepository.save(practice);
 

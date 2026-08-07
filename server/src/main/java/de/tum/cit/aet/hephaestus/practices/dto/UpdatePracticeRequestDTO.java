@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -19,11 +19,11 @@ public record UpdatePracticeRequestDTO(
     @Nullable
     String name,
 
-    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
-    @ValidTriggerEvents
-    @Schema(description = "Events that start a practice review; empty for scheduled conversation reviews")
+    @Size(min = 1, max = 10, message = "A practice must declare between 1 and 10 bindings")
+    @Valid
+    @Schema(description = "Replacement occasions and their evidence; omit to leave them unchanged")
     @Nullable
-    List<String> triggerEvents,
+    List<PracticeBinding> bindings,
 
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Criteria must not be blank")
@@ -41,12 +41,11 @@ public record UpdatePracticeRequestDTO(
 
     @Valid
     @Schema(
-        description = "Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactKind changes"
+        description = "Replacement review settings; omit to preserve them, or to take the recommended ones " +
+            "when the bindings move the practice to a different kind of work"
     )
     @Nullable
     PracticeAutomatedReviewPolicy automatedReviewPolicy,
-
-    @Schema(description = "Kind of reviewed work", example = "scm.issue") @Nullable ArtifactKind artifactKind,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Why-it-matters must not be blank")
