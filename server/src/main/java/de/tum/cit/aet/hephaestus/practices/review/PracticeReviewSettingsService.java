@@ -40,6 +40,7 @@ public class PracticeReviewSettingsService {
         // Reset-to-inherit first, then the value patch, so a field can be reset and re-set in one request.
         settings.reset(req.reset());
         settings.applyPatch(req.runForAllUsers(), req.deliverToMerged(), req.cooldownMinutes());
+        settings.applyScope(req.reviewScope());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
@@ -76,7 +77,8 @@ public class PracticeReviewSettingsService {
             s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
             s.getRunForAllUsers(),
             s.getDeliverToMerged(),
-            s.getCooldownMinutes()
+            s.getCooldownMinutes(),
+            s.resolveReviewScope()
         );
     }
 }

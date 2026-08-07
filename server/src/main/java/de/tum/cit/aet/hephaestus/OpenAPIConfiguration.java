@@ -114,7 +114,11 @@ public class OpenAPIConfiguration {
         "EvidenceFreshnessRequirement",
         "ReviewClaimCurrentness",
         "SourceContractVersion",
-        "SourceKind"
+        "SourceKind",
+        // The workspace review scope is the shape an admin edits directly on the settings resource; a
+        // client that cannot see it cannot render, let alone change, the scope. Domain type by choice,
+        // like PracticeBinding: it is the same value the gate reads, not a transport copy of it.
+        "WorkspaceReviewScope"
     );
     /**
      * Domain objects to include by specific suffix (like AchievementProgress records)

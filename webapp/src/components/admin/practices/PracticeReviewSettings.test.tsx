@@ -23,6 +23,7 @@ const settings: PracticeReviewSettingsData = {
 	runForAllUsers: true,
 	deliverToMerged: false,
 	cooldownMinutes: 15,
+	reviewScope: { targetBranches: [], repositories: [] },
 };
 
 function renderSettings(props: Partial<React.ComponentProps<typeof PracticeReviewSettings>> = {}) {

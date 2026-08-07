@@ -11,6 +11,7 @@ const settings: PracticeReviewSettingsData = {
 	runForAllUsers: true,
 	deliverToMerged: false,
 	cooldownMinutes: 30,
+	reviewScope: { targetBranches: [], repositories: [] },
 };
 
 const readyBinding: AgentBinding = {

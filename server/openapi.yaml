@@ -4204,7 +4204,7 @@ paths:
   /workspaces/{workspaceSlug}/practices:
     get:
       description: "Returns workspace practice definitions, optionally filtered by\
-        \ review participation"
+        \ loudness tier"
       operationId: listPractices
       parameters:
       - description: Workspace slug
@@ -4214,12 +4214,17 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Filter by whether new reviews include the practice
+      - description: Filter to practices at exactly this loudness tier
         in: query
-        name: usedInNewReviews
+        name: reviewTier
         required: false
         schema:
-          type: boolean
+          type: string
+          enum:
+          - "OFF"
+          - MEASURE
+          - COACH
+          - ENGAGE
       responses:
         "200":
           content:
@@ -4393,7 +4398,7 @@ paths:
   /workspaces/{workspaceSlug}/practices/learner:
     get:
       description: "Returns the learner-facing name, area, rationale, and example\
-        \ for practices used in new reviews"
+        \ for every practice the workspace reviews (any loudness tier above OFF)"
       operationId: listLearnerPractices
       parameters:
       - description: Workspace slug
@@ -4413,7 +4418,7 @@ paths:
                   $ref: "#/components/schemas/LearnerPractice"
           description: Learner practices returned
       security: []
-      summary: "List practices used in new reviews, learner-facing"
+      summary: "List reviewed practices, learner-facing"
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/observations:
@@ -4816,6 +4821,7 @@ paths:
             - RECIPIENT_OPTED_OUT
             - EMPTY_AFTER_SANITIZE
             - INSTANCE_SILENCED
+            - PRACTICE_TIER_QUIET
       - in: query
         name: channel
         required: false
@@ -5281,9 +5287,11 @@ paths:
       summary: Place a practice in the catalog
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/{practiceSlug}/used-in-new-reviews:
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier:
     patch:
-      operationId: setUsedInNewReviews
+      description: OFF stops the review entirely; MEASURE keeps measuring in silence;
+        COACH adds the mentor conversation; ENGAGE also places feedback on the artifact
+      operationId: setReviewTier
       parameters:
       - description: Workspace slug
         in: path
@@ -5301,7 +5309,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdatePracticeUsageRequest"
+              $ref: "#/components/schemas/UpdatePracticeReviewTierRequest"
         required: true
       responses:
         "200":
@@ -5309,14 +5317,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Practice"
-          description: Review participation updated
+          description: Loudness tier updated
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
-      summary: Choose whether new reviews include a practice
+      summary: Set how loud a practice is
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
@@ -9684,6 +9692,16 @@ components:
           type: string
           description: TypeScript/Bun precompute script for static analysis before
             AI review
+        reviewTier:
+          type: string
+          description: "How loud this practice is: OFF = not reviewed · MEASURE =\
+            \ reviewed and recorded, silent · COACH = also raised in the mentor conversation\
+            \ · ENGAGE = also placed on the artifact"
+          enum:
+          - "OFF"
+          - MEASURE
+          - COACH
+          - ENGAGE
         slug:
           type: string
           description: URL-safe identifier unique within workspace
@@ -9691,9 +9709,6 @@ components:
           type: string
           format: date-time
           description: Timestamp when the practice was last updated
-        usedInNewReviews:
-          type: boolean
-          description: Whether new reviews include this practice
         whatGoodLooksLike:
           type: string
           description: Developer-facing exemplar (learner layer)
@@ -9710,9 +9725,9 @@ components:
       - displayOrder
       - id
       - name
+      - reviewTier
       - slug
       - updatedAt
-      - usedInNewReviews
     PracticeArea:
       type: object
       description: A practice area grouping related practices into a learning objective
@@ -10032,6 +10047,12 @@ components:
         deliverToMergedOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
+        reviewScope:
+          $ref: "#/components/schemas/WorkspaceReviewScope"
+          description: "Which work is reviewed at all, ANDed onto every practice binding.\
+            \ Empty lists mean no restriction on that axis. Exact names only — no\
+            \ patterns, and no path scope (changed paths are not known where the decision\
+            \ is made)."
         runForAllUsers:
           type: boolean
           description: "Effective: run practice review for all developers"
@@ -10041,6 +10062,7 @@ components:
       required:
       - cooldownMinutes
       - deliverToMerged
+      - reviewScope
       - runForAllUsers
     PracticeSignalOption:
       type: object
@@ -10912,6 +10934,7 @@ components:
           - RECIPIENT_OPTED_OUT
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
+          - PRACTICE_TIER_QUIET
       required:
       - agentJobId
       - channel
@@ -11063,6 +11086,7 @@ components:
           - RECIPIENT_OPTED_OUT
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
+          - PRACTICE_TIER_QUIET
       required:
       - agentJobId
       - bodyTruncated
@@ -11170,6 +11194,7 @@ components:
           - RECIPIENT_OPTED_OUT
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
+          - PRACTICE_TIER_QUIET
         threadKey:
           type: string
           description: Cross-run continuity key tying successive deliveries together
@@ -12387,20 +12412,33 @@ components:
             - SKIP_DRAFTS
             - DELIVER_TO_MERGED
             - COOLDOWN_MINUTES
+            - REVIEW_SCOPE
           uniqueItems: true
+        reviewScope:
+          $ref: "#/components/schemas/WorkspaceReviewScope"
+          description: "Replaces the review scope wholesale (the lists ARE the setting,\
+            \ so a merge could only ever add). Null leaves it unchanged; two empty\
+            \ lists clear it back to unrestricted."
         runForAllUsers:
           type: boolean
           description: Run practice review for all developers (vs only the run_practice_review
             role)
-    UpdatePracticeUsageRequest:
+    UpdatePracticeReviewTierRequest:
       type: object
-      description: Request to choose whether new reviews include a practice
+      description: Request to set how loud a practice is allowed to be in this workspace
       properties:
-        usedInNewReviews:
-          type: boolean
-          description: Whether new reviews should include the practice
+        reviewTier:
+          type: string
+          description: "OFF = not reviewed · MEASURE = reviewed and recorded, silent\
+            \ · COACH = also raised in the mentor conversation · ENGAGE = also placed\
+            \ on the artifact"
+          enum:
+          - "OFF"
+          - MEASURE
+          - COACH
+          - ENGAGE
       required:
-      - usedInNewReviews
+      - reviewTier
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in
@@ -13217,6 +13255,58 @@ components:
         gitlab:
           $ref: "#/components/schemas/GitLabProvider"
           description: "GitLab workspace provider config, null if not available"
+    WorkspaceReviewScope:
+      type: object
+      description: |-
+        The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
+
+         <p>It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
+         what</em>. A trunk is named <code>main</code> here, <code>master</code> there and <code>develop</code> somewhere
+         else; that is a deployment fact about one workspace, so a centrally curated catalogue cannot carry it
+         and a practice that tried would be wrong for most installations. Dependabot draws the same line with
+         <code>target-branch</code>.
+
+         <p><strong>The vocabulary is closed and deliberately tiny: two exact-match lists.</strong> An empty
+         or absent list means "no restriction on this axis" — the scope only ever narrows, never widens, so a
+         workspace that never touches it behaves exactly as before. Both lists must match for an artifact to
+         be in scope; within a list, any entry matches.
+
+         <h2>What this cannot express, and why</h2>
+
+         <ul>
+           <li><strong>Changed paths.</strong> Not offered, because it is not decidable where the decision is
+               made. The detection gate holds the <code>PullRequest</code> row, not the diff; changed paths do not
+               exist until the evidence stage, by which point the review has been admitted and paid for. A
+               path scope here would be a predicate that quietly never narrows anything, which is worse than
+               its absence.
+           <li><strong>Branch patterns.</strong> Exact names only. A glob is a small language, and a small
+               language is the thing that grows; exact names are unambiguous today and adding patterns later
+               stays backward compatible, whereas taking them away would not.
+           <li><strong>Anything else at all.</strong> The two keys are the whole vocabulary, and the vocabulary
+               is enforced at the column by <code>chk_workspace_review_scope</code>, not by this type: an extra key —
+               <code>paths</code> being the obvious temptation — fails the write. It is stated there rather than as a
+               Jackson annotation because the column outlives any one version of the code that reads it, and
+               because a reader configured to ignore unknown fields would otherwise drop the key in silence and
+               leave a workspace believing a restriction was in force.
+           <li><strong>Branch scope on an issue.</strong> An issue has no target branch, so
+               {@link de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope#targetBranches #targetBranches} cannot narrow issue review — only {@link de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope#repositories #repositories} does. Stated
+               rather than silently ignored.
+         </ul>
+      properties:
+        repositories:
+          type: array
+          description: |-
+            exact <code>owner/name</code> repository identifiers. Empty = every monitored
+                 repository. This narrows <em>review</em> within the set the workspace already syncs; it never
+                 adds one.
+          items:
+            type: string
+        targetBranches:
+          type: array
+          description: exact target-branch names (a PR's base ref). Empty = every
+            branch.
+          items:
+            type: string
     WorkspaceTeamRepositorySettings:
       type: object
       description: Repository contribution visibility settings for a specific team

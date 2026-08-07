@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -29,6 +30,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -791,6 +793,96 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
             assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactly(engaged);
+        }
+    }
+
+    /**
+     * The workspace review scope's half: which of the workspace's work is reviewed at all. A binding names
+     * a signal and cannot name the trunk it fires against, so this is where "we only review merges into
+     * main" is expressible at all.
+     */
+    @Nested
+    class ReviewScopeTests {
+
+        @Test
+        void admitsAPullRequestTargetingAScopedBranch() {
+            PullRequest pr = createPullRequest();
+            pr.setBaseRefName("main");
+            Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
+            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            workspace.getReviewSettings().setRunForAllUsers(true);
+
+            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Detect.class);
+        }
+
+        @Test
+        void refusesAPullRequestTargetingABranchOutsideTheScope() {
+            PullRequest pr = createPullRequest();
+            pr.setBaseRefName("develop");
+            Workspace workspace = createWorkspace();
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            GateDecision.Skip skip = (GateDecision.Skip) decision;
+            assertThat(skip.reason()).isEqualTo("outside the workspace review scope");
+            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
+            // Terminal, not pending: the branch the artifact targeted will not change, so re-offering it
+            // would be the reaper re-deciding a decision that cannot come out differently.
+            assertThat(skip.resolvedSignalReason().isRetryable()).isFalse();
+        }
+
+        /** Cheap enough to sit ahead of every query — no catalogue read happens for out-of-scope work. */
+        @Test
+        void refusesBeforePayingForAnyPracticeLookup() {
+            PullRequest pr = createPullRequest();
+            pr.setBaseRefName("develop");
+            Workspace workspace = createWorkspace();
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+
+            gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            verifyNoInteractions(practiceRepository);
+            verifyNoInteractions(practiceDetectionReadiness);
+        }
+
+        @Test
+        void refusesARepositoryTheWorkspaceSyncsButDoesNotReview() {
+            PullRequest pr = createPullRequest();
+            pr.setBaseRefName("main");
+            Workspace workspace = createWorkspace();
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of(), List.of("ls1intum/Artemis")));
+
+            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Skip.class);
+        }
+
+        /**
+         * An issue has no target branch, so a branch scope must not silently stop issue review. Only the
+         * repository axis can narrow it — which is the documented limit, pinned here.
+         */
+        @Test
+        void aBranchScopeDoesNotNarrowIssueReview() {
+            Issue issue = new Issue();
+            issue.setId(7L);
+            issue.setAssignees(new HashSet<>());
+            Repository repo = new Repository();
+            repo.setNameWithOwner("ls1intum/Hephaestus");
+            issue.setRepository(repo);
+            Workspace workspace = createWorkspace();
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
+            Practice issuePractice = createPractice(ScmSignals.ISSUE_OPENED);
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(issuePractice));
+            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            workspace.getReviewSettings().setRunForAllUsers(true);
+
+            GateDecision decision = gate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
         }
     }
 }

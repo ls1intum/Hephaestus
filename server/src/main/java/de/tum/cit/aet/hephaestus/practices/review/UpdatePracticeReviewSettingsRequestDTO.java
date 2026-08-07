@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -19,5 +20,10 @@ public record UpdatePracticeReviewSettingsRequestDTO(
     @Max(value = 1440, message = "Cooldown must not exceed 1440 minutes")
     @Schema(description = "Minimum minutes between reviews for the same PR; 0 disables the cooldown")
     Integer cooldownMinutes,
+    @Schema(
+        description = "Replaces the review scope wholesale (the lists ARE the setting, so a merge could " +
+            "only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted."
+    )
+    WorkspaceReviewScope reviewScope,
     @Schema(description = "Fields to reset to the inherited fleet default") Set<PracticeReviewField> reset
 ) {}

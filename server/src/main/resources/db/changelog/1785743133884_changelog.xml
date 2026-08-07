@@ -1651,4 +1651,32 @@
         ]]></rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-26">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.practice_review_scope already present">
+            <not><columnExists tableName="workspace" columnName="practice_review_scope"/></not>
+        </preConditions>
+        <comment>Let a workspace say which of its work is reviewed at all: target branches and repositories.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- Nullable with no default, and null means unrestricted. Not a NOT NULL empty object: the two
+            -- are indistinguishable to every reader, and a default would put a row on every workspace that
+            -- has never expressed an opinion, turning "never configured" into "configured to nothing".
+            ALTER TABLE workspace ADD COLUMN practice_review_scope JSONB;
+            -- The shape is enforced here as well as in the deserializer, because the column outlives any
+            -- one version of the code that reads it: exactly the two known keys, each an array of strings.
+            ALTER TABLE workspace ADD CONSTRAINT chk_workspace_review_scope
+                CHECK (practice_review_scope IS NULL OR (
+                    jsonb_typeof(practice_review_scope) = 'object'
+                    AND practice_review_scope - 'targetBranches' - 'repositories' = '{}'::jsonb
+                    AND (NOT jsonb_exists(practice_review_scope, 'targetBranches')
+                         OR jsonb_typeof(practice_review_scope -> 'targetBranches') = 'array')
+                    AND (NOT jsonb_exists(practice_review_scope, 'repositories')
+                         OR jsonb_typeof(practice_review_scope -> 'repositories') = 'array')
+                ));
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE workspace DROP CONSTRAINT IF EXISTS chk_workspace_review_scope;
+            ALTER TABLE workspace DROP COLUMN IF EXISTS practice_review_scope;
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

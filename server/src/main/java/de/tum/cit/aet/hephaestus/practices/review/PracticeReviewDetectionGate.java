@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.springframework.stereotype.Service;
  * <ol>
  *   <li>(1) Workspace resolution → SKIP if not found (first, so per-workspace settings drive the gates below)</li>
  *   <li>(2a) Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
+ *   <li>(2a-bis) Workspace review scope (target branch / repository) → SKIP if the artifact is outside it</li>
  *   <li>(2b) Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
  *   <li>(3) No runnable practice config for workspace → SKIP</li>
  *   <li>(4) No practice above tier {@code OFF} is bound to this signal in this draft state → SKIP</li>
@@ -142,6 +144,28 @@ public class PracticeReviewDetectionGate {
                 workspace.getId()
             );
             return new GateDecision.Skip("practices disabled for workspace");
+        }
+
+        // 2a-bis. Workspace review scope: which of this workspace's work is reviewed at all. ANDed onto
+        //    every binding, because a binding names a signal and cannot name the trunk it fires against —
+        //    a trunk is called main here and develop there, so a curated catalogue cannot know it. Checked
+        //    right after the feature flag and before anything that costs a query.
+        WorkspaceReviewScope scope = workspace.getReviewSettings().resolveReviewScope();
+        if (!scope.isUnrestricted()) {
+            // Only a pull request has a target branch; an issue passes the branch axis by construction.
+            String targetBranch = reviewable instanceof PullRequest pr ? pr.getBaseRefName() : null;
+            if (!scope.admits(nameWithOwner, targetBranch)) {
+                log.debug(
+                    "Practice review gate: SKIP, reason=outOfReviewScope, prId={}, repo={}, targetBranch={}",
+                    reviewable.getId(),
+                    nameWithOwner,
+                    targetBranch
+                );
+                return new GateDecision.Skip(
+                    "outside the workspace review scope",
+                    SignalStateReason.OUT_OF_REVIEW_SCOPE
+                );
+            }
         }
 
         // 2b. Trigger-mode-specific workspace setting

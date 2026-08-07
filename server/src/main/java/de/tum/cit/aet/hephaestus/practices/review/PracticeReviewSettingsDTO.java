@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 
@@ -18,5 +19,12 @@ public record PracticeReviewSettingsDTO(
     Integer cooldownMinutes,
     @Schema(description = "Raw override; null = inheriting the fleet default") Boolean runForAllUsersOverride,
     @Schema(description = "Raw override; null = inheriting the fleet default") Boolean deliverToMergedOverride,
-    @Schema(description = "Raw override; null = inheriting the fleet default") Integer cooldownMinutesOverride
+    @Schema(description = "Raw override; null = inheriting the fleet default") Integer cooldownMinutesOverride,
+    @NonNull
+    @Schema(
+        description = "Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean " +
+            "no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths " +
+            "are not known where the decision is made)."
+    )
+    WorkspaceReviewScope reviewScope
 ) {}

@@ -67,7 +67,7 @@ const meta = {
 		onDeleteArea: fn(),
 		onReorderAreas: fn(),
 		onSetAreaVisual: fn(),
-		onSetPracticeUsedInNewReviews: fn(),
+		onSetPracticeReviewTier: fn(),
 		onDeletePractice: fn(),
 		onPlacePractice: fn(),
 	},
@@ -356,5 +356,36 @@ export const BlockedDestinationDrag: Story = {
 		]);
 
 		await expect(args.onPlacePractice).not.toHaveBeenCalled();
+	},
+};
+
+/**
+ * The four loudness tiers side by side. The badge names every tier except Engage, because Engage is the
+ * default and a badge on every row would say nothing; the tiers that DO carry one are exactly the ones
+ * where a developer will see less than they might expect, which is what an admin needs to spot at a
+ * glance. Measure is the tier this control exists for: reviewed and recorded, and completely silent.
+ */
+export const LoudnessTiers: Story = {
+	args: {
+		areas: mockAreas,
+		practices: [
+			{ ...mockPractices[0], slug: "loud", name: "Engage", reviewTier: "ENGAGE" as const },
+			{ ...mockPractices[0], slug: "coached", name: "Coach", reviewTier: "COACH" as const },
+			{ ...mockPractices[0], slug: "measured", name: "Measure", reviewTier: "MEASURE" as const },
+			{ ...mockPractices[0], slug: "silent", name: "Off", reviewTier: "OFF" as const },
+		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
+	},
+	play: async ({ canvas }) => {
+		// Each row's control reads back the tier it is at, so the four are distinguishable on sight.
+		for (const tier of ["Engage", "Coach", "Measure", "Off"]) {
+			await expect(canvas.getByLabelText(`How loud ${tier} is`)).toHaveTextContent(tier);
+		}
+		// Engage is the default and carries no badge; the three quieter tiers each announce themselves,
+		// because those are the rows where a developer will see less than the practice's name suggests.
+		const badges = canvas.getAllByText(/^(Off|Measure|Coach)$/, {
+			selector: '[data-slot="badge"]',
+		});
+		await expect(badges).toHaveLength(3);
+		await expectNoPageOverflow();
 	},
 };

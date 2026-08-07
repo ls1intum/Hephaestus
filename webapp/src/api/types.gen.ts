@@ -45,6 +45,55 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
+ * The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
+ *
+ * <p>It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
+ * what</em>. A trunk is named <code>main</code> here, <code>master</code> there and <code>develop</code> somewhere
+ * else; that is a deployment fact about one workspace, so a centrally curated catalogue cannot carry it
+ * and a practice that tried would be wrong for most installations. Dependabot draws the same line with
+ * <code>target-branch</code>.
+ *
+ * <p><strong>The vocabulary is closed and deliberately tiny: two exact-match lists.</strong> An empty
+ * or absent list means "no restriction on this axis" — the scope only ever narrows, never widens, so a
+ * workspace that never touches it behaves exactly as before. Both lists must match for an artifact to
+ * be in scope; within a list, any entry matches.
+ *
+ * <h2>What this cannot express, and why</h2>
+ *
+ * <ul>
+ * <li><strong>Changed paths.</strong> Not offered, because it is not decidable where the decision is
+ * made. The detection gate holds the <code>PullRequest</code> row, not the diff; changed paths do not
+ * exist until the evidence stage, by which point the review has been admitted and paid for. A
+ * path scope here would be a predicate that quietly never narrows anything, which is worse than
+ * its absence.
+ * <li><strong>Branch patterns.</strong> Exact names only. A glob is a small language, and a small
+ * language is the thing that grows; exact names are unambiguous today and adding patterns later
+ * stays backward compatible, whereas taking them away would not.
+ * <li><strong>Anything else at all.</strong> The two keys are the whole vocabulary, and the vocabulary
+ * is enforced at the column by <code>chk_workspace_review_scope</code>, not by this type: an extra key —
+ * <code>paths</code> being the obvious temptation — fails the write. It is stated there rather than as a
+ * Jackson annotation because the column outlives any one version of the code that reads it, and
+ * because a reader configured to ignore unknown fields would otherwise drop the key in silence and
+ * leave a workspace believing a restriction was in force.
+ * <li><strong>Branch scope on an issue.</strong> An issue has no target branch, so
+ * {@link de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope#targetBranches #targetBranches} cannot narrow issue review — only {@link de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope#repositories #repositories} does. Stated
+ * rather than silently ignored.
+ * </ul>
+ */
+export type WorkspaceReviewScope = {
+    /**
+     * exact <code>owner/name</code> repository identifiers. Empty = every monitored
+     * repository. This narrows <em>review</em> within the set the workspace already syncs; it never
+     * adds one.
+     */
+    repositories?: Array<string>;
+    /**
+     * exact target-branch names (a PR's base ref). Empty = every branch.
+     */
+    targetBranches?: Array<string>;
+};
+
+/**
  * Available workspace creation providers and their configuration
  */
 export type WorkspaceProviders = {
@@ -901,13 +950,13 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
- * Request to choose whether new reviews include a practice
+ * Request to set how loud a practice is allowed to be in this workspace
  */
-export type UpdatePracticeUsageRequest = {
+export type UpdatePracticeReviewTierRequest = {
     /**
-     * Whether new reviews should include the practice
+     * OFF = not reviewed · MEASURE = reviewed and recorded, silent · COACH = also raised in the mentor conversation · ENGAGE = also placed on the artifact
      */
-    usedInNewReviews: boolean;
+    reviewTier: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
 };
 
 /**
@@ -925,7 +974,11 @@ export type UpdatePracticeReviewSettingsRequest = {
     /**
      * Fields to reset to the inherited fleet default
      */
-    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES'>;
+    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE'>;
+    /**
+     * Replaces the review scope wholesale (the lists ARE the setting, so a merge could only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted.
+     */
+    reviewScope?: WorkspaceReviewScope;
     /**
      * Run practice review for all developers (vs only the run_practice_review role)
      */
@@ -1896,7 +1949,7 @@ export type ReviewBoundFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET';
 };
 
 /**
@@ -2066,7 +2119,7 @@ export type ReviewFeedbackDetail = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET';
     /**
      * Cross-run continuity key tying successive deliveries together
      */
@@ -2151,7 +2204,7 @@ export type ReviewFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET';
 };
 
 /**
@@ -2769,6 +2822,10 @@ export type PracticeReviewSettings = {
      */
     deliverToMergedOverride?: boolean;
     /**
+     * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
+     */
+    reviewScope: WorkspaceReviewScope;
+    /**
      * Effective: run practice review for all developers
      */
     runForAllUsers: boolean;
@@ -2969,6 +3026,10 @@ export type Practice = {
      */
     precomputeScript?: string;
     /**
+     * How loud this practice is: OFF = not reviewed · MEASURE = reviewed and recorded, silent · COACH = also raised in the mentor conversation · ENGAGE = also placed on the artifact
+     */
+    reviewTier: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
+    /**
      * URL-safe identifier unique within workspace
      */
     slug: string;
@@ -2976,10 +3037,6 @@ export type Practice = {
      * Timestamp when the practice was last updated
      */
     updatedAt: Date;
-    /**
-     * Whether new reviews include this practice
-     */
-    usedInNewReviews: boolean;
     /**
      * Developer-facing exemplar (learner layer)
      */
@@ -8540,9 +8597,9 @@ export type ListPracticesData = {
     };
     query?: {
         /**
-         * Filter by whether new reviews include the practice
+         * Filter to practices at exactly this loudness tier
          */
-        usedInNewReviews?: boolean;
+        reviewTier?: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
     };
     url: '/workspaces/{workspaceSlug}/practices';
 };
@@ -8987,7 +9044,7 @@ export type ListPracticeReviewFeedbackData = {
         page?: number;
         size?: number;
         deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET'>;
         channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
         agentJobId?: string;
         /**
@@ -9310,8 +9367,8 @@ export type PlacePracticeResponses = {
 
 export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
 
-export type SetUsedInNewReviewsData = {
-    body: UpdatePracticeUsageRequest;
+export type SetReviewTierData = {
+    body: UpdatePracticeReviewTierRequest;
     path: {
         /**
          * Workspace slug
@@ -9320,26 +9377,26 @@ export type SetUsedInNewReviewsData = {
         practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/used-in-new-reviews';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier';
 };
 
-export type SetUsedInNewReviewsErrors = {
+export type SetReviewTierErrors = {
     /**
      * Practice not found
      */
     404: ProblemDetail;
 };
 
-export type SetUsedInNewReviewsError = SetUsedInNewReviewsErrors[keyof SetUsedInNewReviewsErrors];
+export type SetReviewTierError = SetReviewTierErrors[keyof SetReviewTierErrors];
 
-export type SetUsedInNewReviewsResponses = {
+export type SetReviewTierResponses = {
     /**
-     * Review participation updated
+     * Loudness tier updated
      */
     200: Practice;
 };
 
-export type SetUsedInNewReviewsResponse = SetUsedInNewReviewsResponses[keyof SetUsedInNewReviewsResponses];
+export type SetReviewTierResponse = SetReviewTierResponses[keyof SetReviewTierResponses];
 
 export type GetUserProfileData = {
     body?: never;

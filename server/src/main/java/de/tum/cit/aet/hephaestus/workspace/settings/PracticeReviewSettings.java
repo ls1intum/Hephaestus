@@ -5,6 +5,8 @@ import jakarta.persistence.Embeddable;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -52,6 +54,20 @@ public class PracticeReviewSettings {
     @Nullable
     private Integer cooldownMinutes;
 
+    /**
+     * Which of the workspace's work is reviewed at all — ANDed onto every practice binding.
+     *
+     * <p>Unlike the fields above this has no fleet default to inherit: a trunk name is a fact about ONE
+     * deployment, so there is nothing sensible for an instance-wide setting to say. {@code null} means
+     * unrestricted, and {@link #resolveReviewScope()} is the single reader.
+     *
+     * @see WorkspaceReviewScope
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "practice_review_scope", columnDefinition = "jsonb")
+    @Nullable
+    private WorkspaceReviewScope reviewScope;
+
     public boolean resolveRunForAllUsers(boolean fallback) {
         return runForAllUsers != null ? runForAllUsers : fallback;
     }
@@ -64,6 +80,11 @@ public class PracticeReviewSettings {
         return cooldownMinutes != null ? cooldownMinutes : fallback;
     }
 
+    /** The configured review scope, or {@link WorkspaceReviewScope#UNRESTRICTED} when none is set. */
+    public WorkspaceReviewScope resolveReviewScope() {
+        return reviewScope != null ? reviewScope : WorkspaceReviewScope.UNRESTRICTED;
+    }
+
     /** PATCH semantics: only non-null fields overwrite; null leaves the current value untouched. */
     public void applyPatch(
         @Nullable Boolean runForAllUsers,
@@ -73,6 +94,16 @@ public class PracticeReviewSettings {
         if (runForAllUsers != null) this.runForAllUsers = runForAllUsers;
         if (deliverToMerged != null) this.deliverToMerged = deliverToMerged;
         if (cooldownMinutes != null) this.cooldownMinutes = cooldownMinutes;
+    }
+
+    /**
+     * Replace the review scope wholesale. Deliberately not a merge: the lists ARE the setting, so
+     * "remove develop" has to be expressible, and a merging patch could only ever add.
+     */
+    public void applyScope(@Nullable WorkspaceReviewScope scope) {
+        if (scope != null) {
+            this.reviewScope = scope.isUnrestricted() ? null : scope;
+        }
     }
 
     /** Clear the named fields back to {@code null} (inherit the fleet default). */
@@ -101,6 +132,10 @@ public class PracticeReviewSettings {
                 }
                 case COOLDOWN_MINUTES -> {
                     this.cooldownMinutes = null;
+                    yield true;
+                }
+                case REVIEW_SCOPE -> {
+                    this.reviewScope = null;
                     yield true;
                 }
             };

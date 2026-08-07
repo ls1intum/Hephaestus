@@ -92,18 +92,18 @@ describe("practice catalog cache updates", () => {
 
 	it("supports empty destinations and structural-only rollback", () => {
 		const practices = [
-			{ ...practice("moving", "quality", 0), usedInNewReviews: true },
+			{ ...practice("moving", "quality", 0), reviewTier: "ENGAGE" as const },
 			practice("remaining", "quality", 1),
 		];
 		const snapshot = practicePlacementSnapshot(practices, "moving", null);
 		const moved = placePractice(practices, "moving", null, 0).map((item) =>
-			item.slug === "moving" ? { ...item, usedInNewReviews: false } : item,
+			item.slug === "moving" ? { ...item, reviewTier: "OFF" as const } : item,
 		);
 
 		const restored = applyPracticePlacements(moved, snapshot);
 
 		expect(restored.find(({ slug }) => slug === "moving")).toMatchObject({
-			usedInNewReviews: false,
+			reviewTier: "OFF",
 			areaSlug: "quality",
 			displayOrder: 0,
 		});
@@ -113,7 +113,7 @@ describe("practice catalog cache updates", () => {
 	it("reconciles only fields owned by the edit request", () => {
 		const updated = {
 			...practice("edited", "delivery", 4),
-			usedInNewReviews: false,
+			reviewTier: "OFF" as const,
 			name: "Updated",
 		};
 

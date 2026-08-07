@@ -31,6 +31,7 @@ export const mockAvailableModels: AvailableLlmModel[] = [
 
 export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	cooldownMinutes: 30,
+	reviewScope: { targetBranches: [], repositories: [] },
 	deliverToMerged: false,
 	runForAllUsers: true,
 	// Mix of explicit overrides (Reset to default) and inherited / undefined (Inherited from default).

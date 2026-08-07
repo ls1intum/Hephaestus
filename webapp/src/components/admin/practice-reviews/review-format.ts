@@ -60,6 +60,7 @@ export const SUPPRESSION_REASON_LABELS: Record<FeedbackSuppressionReason, string
 	ARTIFACT_DRAFT: "The reviewed work was a draft",
 	RECIPIENT_OPTED_OUT: "The developer opted out of AI feedback",
 	EMPTY_AFTER_SANITIZE: "No deliverable content remained after sanitisation",
+	PRACTICE_TIER_QUIET: "Measured, kept quiet by the practice's loudness tier",
 	INSTANCE_SILENCED: "Instance-wide silent mode was engaged",
 };
 

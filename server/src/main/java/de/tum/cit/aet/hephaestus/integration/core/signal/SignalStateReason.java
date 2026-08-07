@@ -18,6 +18,17 @@ public enum SignalStateReason {
     /** Another submission for the same subject won the idempotency race; it carries the review. */
     CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
 
+    /**
+     * The artifact falls outside the workspace's review scope — the wrong target branch, or a repository
+     * the workspace syncs but does not review.
+     *
+     * <p>Terminal rather than pending, unlike the tier reasons: the facts it turns on belong to the
+     * artifact and do not change. A merge request that targeted {@code develop} will still have targeted
+     * {@code develop} tomorrow, so re-offering it would be the reaper burning cycles on a decision that
+     * cannot come out differently. Widening the scope changes what happens NEXT, not what already did.
+     */
+    OUT_OF_REVIEW_SCOPE(SignalState.SUPPRESSED),
+
     WORKSPACE_INACTIVE(SignalState.PENDING),
 
     PRACTICES_DISABLED(SignalState.PENDING),

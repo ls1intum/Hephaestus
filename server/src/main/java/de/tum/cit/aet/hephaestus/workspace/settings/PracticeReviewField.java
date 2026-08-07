@@ -6,4 +6,6 @@ public enum PracticeReviewField {
     SKIP_DRAFTS,
     DELIVER_TO_MERGED,
     COOLDOWN_MINUTES,
+    /** Clears the branch/repository review scope back to unrestricted. */
+    REVIEW_SCOPE,
 }

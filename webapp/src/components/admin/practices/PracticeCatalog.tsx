@@ -51,6 +51,25 @@ import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
+/**
+ * How loud a practice is allowed to be, ascending. Every tier above "Off" runs the review and records
+ * the measurement; they differ only in how far the result travels, which is the whole reason the
+ * setting exists — turning a noisy practice down no longer costs the behaviour data.
+ *
+ * "Coach" says "mentor chat" rather than "quiet channels" on purpose: the private reflection surface
+ * has no producer yet, so naming it here would promise the admin a delivery that never happens.
+ */
+const REVIEW_TIERS = [
+	{ value: "OFF", label: "Off", hint: "Not reviewed at all." },
+	{ value: "MEASURE", label: "Measure", hint: "Reviewed and recorded. Nobody is told anything." },
+	{ value: "COACH", label: "Coach", hint: "Also raised in the developer's mentor chat." },
+	{ value: "ENGAGE", label: "Engage", hint: "Also posted on the pull request or issue." },
+] as const satisfies readonly { value: Practice["reviewTier"]; label: string; hint: string }[];
+
+function reviewTierLabel(tier: Practice["reviewTier"]): string {
+	return REVIEW_TIERS.find((entry) => entry.value === tier)?.label ?? tier;
+}
+
 export type FocusFilter = "ALL" | KnownArtifactKind;
 
 export interface PracticeCatalogPendingState {
@@ -76,7 +95,7 @@ export interface PracticeCatalogProps {
 	onDeleteArea: (slug: string) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
-	onSetPracticeUsedInNewReviews: (slug: string, usedInNewReviews: boolean) => void;
+	onSetPracticeReviewTier: (slug: string, reviewTier: Practice["reviewTier"]) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
 }
@@ -100,7 +119,7 @@ export function PracticeCatalog({
 	onDeleteArea,
 	onReorderAreas,
 	onSetAreaVisual,
-	onSetPracticeUsedInNewReviews,
+	onSetPracticeReviewTier,
 	onDeletePractice,
 	onPlacePractice,
 }: PracticeCatalogProps) {
@@ -202,7 +221,7 @@ export function PracticeCatalog({
 						areas={areas}
 						move={move}
 						pending={pending.practiceSlugs.has(practice.slug)}
-						onSetUsedInNewReviews={onSetPracticeUsedInNewReviews}
+						onSetReviewTier={onSetPracticeReviewTier}
 						onDelete={onDeletePractice}
 					/>
 				)}
@@ -396,7 +415,7 @@ function PracticeActions({
 	areas,
 	move,
 	pending,
-	onSetUsedInNewReviews,
+	onSetReviewTier,
 	onDelete,
 }: {
 	practice: Practice;
@@ -405,22 +424,37 @@ function PracticeActions({
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
 	pending: boolean;
-	onSetUsedInNewReviews: (slug: string, usedInNewReviews: boolean) => void;
+	onSetReviewTier: (slug: string, reviewTier: Practice["reviewTier"]) => void;
 	onDelete: (practice: Practice) => void;
 }) {
 	const canReview = canAttemptAutomatedReview(practice.automatedReviewPolicy, supportedModes);
-	const usageChangeDisabled = pending || (!practice.usedInNewReviews && !canReview);
+	// A practice whose policy cannot run an automated review can only ever be Off, so the control is
+	// frozen there rather than offering three tiers that would all be refused by the server.
+	const tierChangeDisabled = pending || (practice.reviewTier === "OFF" && !canReview);
 	return (
 		<>
-			<Switch
-				className="hidden sm:inline-flex"
-				checked={practice.usedInNewReviews}
-				onCheckedChange={(usedInNewReviews) =>
-					onSetUsedInNewReviews(practice.slug, usedInNewReviews)
+			<Select
+				items={REVIEW_TIERS}
+				value={practice.reviewTier}
+				onValueChange={(value) =>
+					value && onSetReviewTier(practice.slug, value as Practice["reviewTier"])
 				}
-				disabled={usageChangeDisabled}
-				aria-label={`Use ${practice.name} in new reviews`}
-			/>
+				disabled={tierChangeDisabled}
+			>
+				<SelectTrigger
+					className="hidden w-32 sm:inline-flex"
+					aria-label={`How loud ${practice.name} is`}
+				>
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{REVIEW_TIERS.map((tier) => (
+						<SelectItem key={tier.value} value={tier.value}>
+							{tier.label}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
 			<DropdownMenu>
 				<DropdownMenuTrigger
 					render={
@@ -445,12 +479,20 @@ function PracticeActions({
 					>
 						Edit practice
 					</DropdownMenuItem>
-					<DropdownMenuItem
-						disabled={usageChangeDisabled}
-						onClick={() => onSetUsedInNewReviews(practice.slug, !practice.usedInNewReviews)}
-					>
-						{practice.usedInNewReviews ? "Stop using in new reviews" : "Use in new reviews"}
-					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuGroup>
+						<DropdownMenuLabel>How loud</DropdownMenuLabel>
+						{REVIEW_TIERS.map((tier) => (
+							<DropdownMenuItem
+								key={tier.value}
+								disabled={tierChangeDisabled || practice.reviewTier === tier.value}
+								onClick={() => onSetReviewTier(practice.slug, tier.value)}
+							>
+								{tier.label}
+								<span className="ml-auto pl-4 text-xs text-muted-foreground">{tier.hint}</span>
+							</DropdownMenuItem>
+						))}
+					</DropdownMenuGroup>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
 						<DropdownMenuLabel>Order</DropdownMenuLabel>
@@ -572,7 +614,9 @@ function PracticeRowDetails({
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
-				{!practice.usedInNewReviews && <Badge variant="outline">Not used in new reviews</Badge>}
+				{practice.reviewTier !== "ENGAGE" && (
+					<Badge variant="outline">{reviewTierLabel(practice.reviewTier)}</Badge>
+				)}
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</ItemDescription>

@@ -135,10 +135,10 @@ function PracticeCatalogRoute() {
 					onSetAreaVisual={(areaSlug, patch) =>
 						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: patch })
 					}
-					onSetPracticeUsedInNewReviews={(practiceSlug, usedInNewReviews) =>
-						catalog.setUsedInNewReviews.mutate({
+					onSetPracticeReviewTier={(practiceSlug, reviewTier) =>
+						catalog.setReviewTier.mutate({
 							path: { workspaceSlug, practiceSlug },
-							body: { usedInNewReviews },
+							body: { reviewTier },
 						})
 					}
 					onDeletePractice={setDeletingPractice}

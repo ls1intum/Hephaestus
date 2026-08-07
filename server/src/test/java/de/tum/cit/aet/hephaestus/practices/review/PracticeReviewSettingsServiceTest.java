@@ -11,6 +11,9 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,7 +82,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
-            new UpdatePracticeReviewSettingsRequestDTO(null, true, 30, null)
+            new UpdatePracticeReviewSettingsRequestDTO(null, true, 30, null, null)
         );
 
         assertThat(workspace.getReviewSettings().getDeliverToMerged()).isTrue();
@@ -87,5 +90,54 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         assertThat(workspace.getReviewSettings().getRunForAllUsers()).isNull(); // untouched
         assertThat(view.deliverToMerged()).isTrue();
         assertThat(view.cooldownMinutes()).isEqualTo(30);
+    }
+
+    @Test
+    void updatePracticeReviewReplacesTheReviewScopeWholesale() {
+        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main", "develop"), List.of()));
+
+        PracticeReviewSettingsDTO view = service.updatePracticeReview(
+            context,
+            new UpdatePracticeReviewSettingsRequestDTO(
+                null,
+                null,
+                null,
+                new WorkspaceReviewScope(List.of("main"), List.of()),
+                null
+            )
+        );
+
+        // Replaced, not merged: the lists ARE the setting, so dropping "develop" has to be expressible.
+        assertThat(view.reviewScope().targetBranches()).containsExactly("main");
+    }
+
+    @Test
+    void twoEmptyListsClearTheScopeBackToUnrestricted() {
+        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+
+        PracticeReviewSettingsDTO view = service.updatePracticeReview(
+            context,
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, WorkspaceReviewScope.UNRESTRICTED, null)
+        );
+
+        assertThat(view.reviewScope().isUnrestricted()).isTrue();
+        // Stored as null rather than an empty object: "never configured" and "configured to nothing" are
+        // the same fact, and keeping two spellings of it invites readers to distinguish them.
+        assertThat(workspace.getReviewSettings().getReviewScope()).isNull();
+    }
+
+    @Test
+    void namingReviewScopeInResetClearsIt() {
+        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+
+        service.updatePracticeReview(
+            context,
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, Set.of(PracticeReviewField.REVIEW_SCOPE))
+        );
+
+        assertThat(workspace.getReviewSettings().getReviewScope()).isNull();
     }
 }
