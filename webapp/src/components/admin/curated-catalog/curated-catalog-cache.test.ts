@@ -40,7 +40,7 @@ const catalog = {
 		{
 			slug: "one",
 			name: "One",
-			artifactType: "ISSUE",
+			artifactKind: "scm.issue",
 			automatedReview,
 			areaSlug: "a",
 			position: 0,
@@ -50,7 +50,7 @@ const catalog = {
 		{
 			slug: "two",
 			name: "Two",
-			artifactType: "ISSUE",
+			artifactKind: "scm.issue",
 			automatedReview,
 			areaSlug: "a",
 			position: 1,
@@ -60,7 +60,7 @@ const catalog = {
 		{
 			slug: "three",
 			name: "Three",
-			artifactType: "ISSUE",
+			artifactKind: "scm.issue",
 			automatedReview,
 			areaSlug: "b",
 			position: 0,

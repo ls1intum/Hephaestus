@@ -3,10 +3,7 @@ import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
-import {
-	WORK_ARTIFACT_FILTER_OPTIONS,
-	WORK_ARTIFACT_LABELS,
-} from "@/components/admin/practice-catalog/constants";
+import { WORK_ARTIFACT_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import {
 	automatedReviewUnavailableLabel,
 	canAttemptAutomatedReview,
@@ -50,10 +47,11 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
-export type FocusFilter = "ALL" | Practice["artifactType"];
+export type FocusFilter = "ALL" | KnownArtifactKind;
 
 export interface PracticeCatalogPendingState {
 	areaSlugs: ReadonlySet<string>;
@@ -109,7 +107,7 @@ export function PracticeCatalog({
 	const [renamingArea, setRenamingArea] = useState<PracticeArea | null>(null);
 	const visiblePracticeSlugs = new Set(
 		practices
-			.filter((practice) => focusFilter === "ALL" || practice.artifactType === focusFilter)
+			.filter((practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter)
 			.map((practice) => practice.slug),
 	);
 	const forceOpenAreaSlugs =
@@ -122,7 +120,7 @@ export function PracticeCatalog({
 						.filter((slug): slug is string => Boolean(slug)),
 				);
 	const supportedModesFor = (practice: Practice) =>
-		definitionOptions.workTypes.find((option) => option.artifactType === practice.artifactType)
+		definitionOptions.workTypes.find((option) => option.artifactKind === practice.artifactKind)
 			?.supportedAutomatedReviewModes ?? [];
 
 	return (
@@ -286,7 +284,7 @@ function CatalogToolbar({
 						value={filter.value}
 						className={cn(
 							"min-w-0",
-							filter.value === "PULL_REQUEST" &&
+							filter.value === ARTIFACT_KIND.pullRequest &&
 								"h-auto min-h-7 whitespace-normal py-1 sm:whitespace-nowrap",
 						)}
 					>
@@ -573,7 +571,7 @@ function PracticeRowDetails({
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<span>{WORK_ARTIFACT_LABELS[practice.artifactType]}</span>
+				<span>{artifactKindLabel(practice.artifactKind)}</span>
 				{!practice.usedInNewReviews && <Badge variant="outline">Not used in new reviews</Badge>}
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />

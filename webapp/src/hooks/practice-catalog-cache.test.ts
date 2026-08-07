@@ -134,8 +134,8 @@ describe("practice catalog cache updates", () => {
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});
-		expect(selectPracticePatch(updated, { artifactType: "PULL_REQUEST" })).toEqual({
-			artifactType: "PULL_REQUEST",
+		expect(selectPracticePatch(updated, { artifactKind: "scm.pull_request" })).toEqual({
+			artifactKind: "scm.pull_request",
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});

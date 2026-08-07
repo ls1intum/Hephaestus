@@ -55,7 +55,7 @@ describe("practice catalog route", () => {
 			),
 		);
 
-		renderRouteAt("/w/acme/admin/practices?focus=ISSUE");
+		renderRouteAt("/w/acme/admin/practices?focus=scm.issue");
 
 		await screen.findByText("Clear the filter to reorder practices.", {}, ROUTE_RENDER_WAIT);
 	});

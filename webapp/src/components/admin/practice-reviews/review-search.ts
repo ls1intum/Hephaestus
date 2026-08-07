@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ARTIFACT_KIND_VALUES, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { dayAfterInstant, dayStartInstant, fromDayParam } from "@/lib/date-range-search";
 import { multiValue, narrowToEnum } from "@/lib/search-params";
 import type {
@@ -32,10 +33,7 @@ const enumValues = <T extends string>(allowed: readonly T[]) =>
 
 const scope = {
 	agentJobId: uuidParam,
-	artifactType: z
-		.enum(["PULL_REQUEST", "ISSUE", "CONVERSATION_THREAD"])
-		.optional()
-		.catch(undefined),
+	artifactKind: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
 	artifactId: positiveId,
 	from: day,
 	to: day,
@@ -86,7 +84,7 @@ export type RunsSearch = z.infer<typeof runsSearchSchema>;
 
 export type ReviewScopeSearch = {
 	agentJobId?: string;
-	artifactType?: "PULL_REQUEST" | "ISSUE" | "CONVERSATION_THREAD";
+	artifactKind?: KnownArtifactKind;
 	artifactId?: number;
 	from?: string;
 	to?: string;
@@ -95,8 +93,8 @@ export type ReviewScopeSearch = {
 export function reviewScopeSearch(search: ReviewScopeSearch): ReviewScopeSearch {
 	return {
 		agentJobId: search.agentJobId,
-		artifactType: search.artifactType,
-		artifactId: search.artifactType ? search.artifactId : undefined,
+		artifactKind: search.artifactKind,
+		artifactId: search.artifactKind ? search.artifactId : undefined,
 		from: search.from,
 		to: search.to,
 	};
@@ -107,8 +105,8 @@ function scopeQuery(search: ReviewScopeSearch) {
 	const to = fromDayParam(search.to);
 	return {
 		agentJobId: search.agentJobId,
-		artifactType: search.artifactType,
-		artifactId: search.artifactType ? search.artifactId : undefined,
+		artifactKind: search.artifactKind,
+		artifactId: search.artifactKind ? search.artifactId : undefined,
 		from: from ? dayStartInstant(from) : undefined,
 		to: to ? dayAfterInstant(to) : undefined,
 	};

@@ -32,7 +32,7 @@ export const Conversation: Story = {
 	args: {
 		artifact: {
 			id: 81,
-			type: "CONVERSATION_THREAD",
+			type: "chat.conversation_thread",
 			provider: "SLACK",
 			channelName: "engineering",
 			title: "Architecture review follow-up",

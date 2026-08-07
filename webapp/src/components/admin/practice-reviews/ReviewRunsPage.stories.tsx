@@ -21,7 +21,7 @@ const reviews: ReviewRunSummary[] = [
 		status: "RUNNING",
 		target: {
 			id: 43,
-			type: "PULL_REQUEST",
+			type: "scm.pull_request",
 			provider: "GITLAB",
 			number: 17,
 			repositoryName: "team/service",

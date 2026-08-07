@@ -71,7 +71,7 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 			search.assessment?.length ||
 			search.severity?.length ||
 			search.agentJobId ||
-			search.artifactType ||
+			search.artifactKind ||
 			search.subjectUserId ||
 			search.from ||
 			search.to,
@@ -86,7 +86,7 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 			assessment: undefined,
 			severity: undefined,
 			agentJobId: undefined,
-			artifactType: undefined,
+			artifactKind: undefined,
 			artifactId: undefined,
 			subjectUserId: undefined,
 			from: undefined,
@@ -174,15 +174,15 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 						onClear={() => patchFilter({ subjectUserId: undefined })}
 					/>
 				)}
-				{search.artifactType && (
+				{search.artifactKind && (
 					<ReferenceFilterPill
 						label="Reviewed work"
 						value={reviewArtifactScopeLabel(
-							search.artifactType,
+							search.artifactKind,
 							search.artifactId,
 							findings[0]?.artifact,
 						)}
-						onClear={() => patchFilter({ artifactType: undefined, artifactId: undefined })}
+						onClear={() => patchFilter({ artifactKind: undefined, artifactId: undefined })}
 					/>
 				)}
 			</FilterToolbar>

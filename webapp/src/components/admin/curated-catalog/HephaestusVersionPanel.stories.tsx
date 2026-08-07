@@ -18,7 +18,7 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 
 const shipped = {
 	name: "Say what changed and why",
-	artifactType: "PULL_REQUEST" as const,
+	artifactKind: "scm.pull_request" as const,
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "The updated default criteria.",
 	whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",

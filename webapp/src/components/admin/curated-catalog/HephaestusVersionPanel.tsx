@@ -52,7 +52,7 @@ const AREA_FIELDS = {
 
 const PRACTICE_FIELDS = {
 	name: "Name",
-	artifactType: "Work reviewed",
+	artifactKind: "Work reviewed",
 	areaSlug: "Area",
 	triggerEvents: "Starts a review when",
 	criteria: "What to look for",
@@ -86,7 +86,7 @@ function displayValue(
 	if (field === "triggerEvents" && Array.isArray(value) && value.length === 0) {
 		return "No automatic trigger";
 	}
-	if (field === "artifactType") {
+	if (field === "artifactKind") {
 		return (
 			FOCUS_ARTIFACT_OPTIONS.find((option) => option.value === value)?.label ?? words(String(value))
 		);
@@ -124,7 +124,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 	const shippedDefinitionOptions =
 		props.kind === "practice" && shippedPractice
 			? props.definitionOptions.workTypes.find(
-					(option) => option.artifactType === shippedPractice.artifactType,
+					(option) => option.artifactKind === shippedPractice.artifactKind,
 				)
 			: undefined;
 	const headingId = useId();
@@ -185,7 +185,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 															sources={shippedDefinitionOptions.allowedSources}
 															workTypeLabel={
 																FOCUS_ARTIFACT_OPTIONS.find(
-																	(option) => option.value === shippedPractice.artifactType,
+																	(option) => option.value === shippedPractice.artifactKind,
 																)?.label ?? "Reviewed work"
 															}
 														/>

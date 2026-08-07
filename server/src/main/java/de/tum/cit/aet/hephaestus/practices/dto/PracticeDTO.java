@@ -23,7 +23,9 @@ public record PracticeDTO(
     String precomputeScript,
     @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
     @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
-    @NonNull @Schema(description = "Type of work this practice reviews") ArtifactKind artifactKind,
+    @NonNull
+    @Schema(description = "Kind of work this practice reviews", example = "scm.pull_request")
+    ArtifactKind artifactKind,
     @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
     @NonNull @Schema(description = "Position within its area (lowest first); ties broken by name") Integer displayOrder,
     @Nullable @Schema(description = "Developer-facing rationale (learner layer)") String whyItMatters,

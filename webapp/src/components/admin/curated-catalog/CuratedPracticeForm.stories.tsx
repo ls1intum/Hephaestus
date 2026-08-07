@@ -17,7 +17,7 @@ const areas = [
 const initialData = {
 	slug: "clear-pr-description",
 	name: "Write a clear pull request description",
-	artifactType: "PULL_REQUEST" as const,
+	artifactKind: "scm.pull_request" as const,
 	areaSlug: "communication",
 	triggerEvents: ["PullRequestCreated", "PullRequestReady"],
 	criteria: "Review whether the description explains the purpose, approach, and testing.",
@@ -103,7 +103,7 @@ export const HephaestusUpdateAvailable: Story = {
 			},
 			shipped: {
 				name: "Say what changed and why",
-				artifactType: "PULL_REQUEST",
+				artifactKind: "scm.pull_request",
 				triggerEvents: ["PullRequestCreated"],
 				criteria: "The updated default criteria",
 				automatedReviewPolicy: mockPullRequestEvidence,

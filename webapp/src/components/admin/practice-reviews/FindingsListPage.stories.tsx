@@ -45,7 +45,7 @@ const meta = {
 							name: "Thin controllers",
 							areaSlug: "code-quality",
 							active: true,
-							artifactType: "PULL_REQUEST",
+							artifactKind: "scm.pull_request",
 							criteria: "Keep controllers focused on transport concerns.",
 							displayOrder: 0,
 							triggerEvents: [],

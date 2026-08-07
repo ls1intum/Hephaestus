@@ -30,7 +30,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
-		artifactType: "PULL_REQUEST",
+		artifactKind: "scm.pull_request",
 		artifactId: 42,
 	},
 } satisfies Meta<typeof ReviewTargetPage>;

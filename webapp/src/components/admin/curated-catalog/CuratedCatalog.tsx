@@ -8,7 +8,6 @@ import type {
 } from "@/api/types.gen";
 import {
 	WORK_ARTIFACT_FILTER_OPTIONS,
-	WORK_ARTIFACT_LABELS,
 	type WorkArtifact,
 } from "@/components/admin/practice-catalog/constants";
 import {
@@ -39,6 +38,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { artifactKindLabel, isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 import { CuratedCatalogTree } from "./CuratedCatalogTree";
@@ -114,7 +114,7 @@ export function CuratedCatalog({
 				practice.status.state === "UPDATE_WAITING" ||
 				(practice.status.state === "NO_LONGER_SHIPPED" && practice.effectivelyOffered)) &&
 			matchesStatus(practice.effectivelyOffered) &&
-			(artifact === "ALL" || practice.artifactType === artifact) &&
+			(artifact === "ALL" || practice.artifactKind === artifact) &&
 			matches(
 				[
 					practice.name,
@@ -437,13 +437,14 @@ function CatalogFilters({
 				onValueChange={(value) =>
 					onSearchChange({
 						...search,
-						artifact: value === "ALL" ? undefined : (value as WorkArtifact),
+						// The search schema validates the kind, so only one this build knows may reach the URL.
+						artifact: value === "ALL" || !isKnownArtifactKind(value) ? undefined : value,
 					})
 				}
 			>
 				<SelectTrigger className="w-full lg:w-52" aria-label="Filter by work type">
 					<SelectValue>
-						{artifact === "ALL" ? "All work types" : WORK_ARTIFACT_LABELS[artifact]}
+						{artifact === "ALL" ? "All work types" : artifactKindLabel(artifact)}
 					</SelectValue>
 				</SelectTrigger>
 				<SelectContent>

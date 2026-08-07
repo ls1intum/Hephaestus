@@ -1,35 +1,38 @@
-import type { Practice } from "@/api/types.gen";
+import {
+	ARTIFACT_KIND,
+	type ArtifactKindId,
+	artifactKindLabel,
+	artifactKindPluralLabel,
+} from "@/lib/artifact-kinds";
 
-export type WorkArtifact = NonNullable<Practice["artifactType"]>;
-
-export const WORK_ARTIFACT_LABELS = {
-	PULL_REQUEST: "Pull or merge request",
-	ISSUE: "Issue",
-	CONVERSATION_THREAD: "Conversation",
-} satisfies Record<WorkArtifact, string>;
+/** What a practice is authored against, as the server names it. */
+export type WorkArtifact = ArtifactKindId;
 
 export const FOCUS_ARTIFACT_OPTIONS = [
 	{
-		value: "PULL_REQUEST",
-		label: WORK_ARTIFACT_LABELS.PULL_REQUEST,
+		value: ARTIFACT_KIND.pullRequest,
+		label: artifactKindLabel(ARTIFACT_KIND.pullRequest),
 		hint: "Reviews work submitted in a pull or merge request",
 	},
 	{
-		value: "ISSUE",
-		label: WORK_ARTIFACT_LABELS.ISSUE,
+		value: ARTIFACT_KIND.issue,
+		label: artifactKindLabel(ARTIFACT_KIND.issue),
 		hint: "Reviews work described or discussed in an issue",
 	},
 	{
-		value: "CONVERSATION_THREAD",
-		label: WORK_ARTIFACT_LABELS.CONVERSATION_THREAD,
+		value: ARTIFACT_KIND.conversationThread,
+		label: artifactKindLabel(ARTIFACT_KIND.conversationThread),
 		hint: "Reviews messages in a conversation thread",
 	},
 ] as const;
 
 export const WORK_ARTIFACT_FILTER_OPTIONS = [
-	{ value: "PULL_REQUEST", label: "Pull or merge requests" },
-	{ value: "ISSUE", label: "Issues" },
-	{ value: "CONVERSATION_THREAD", label: "Conversations" },
+	{ value: ARTIFACT_KIND.pullRequest, label: artifactKindPluralLabel(ARTIFACT_KIND.pullRequest) },
+	{ value: ARTIFACT_KIND.issue, label: artifactKindPluralLabel(ARTIFACT_KIND.issue) },
+	{
+		value: ARTIFACT_KIND.conversationThread,
+		label: artifactKindPluralLabel(ARTIFACT_KIND.conversationThread),
+	},
 ] as const;
 
 export function generateSlug(name: string): string {

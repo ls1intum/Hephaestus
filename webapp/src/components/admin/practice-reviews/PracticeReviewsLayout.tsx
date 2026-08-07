@@ -61,11 +61,11 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 	const scope = {
 		agentJobId:
 			"jobId" in params ? params.jobId : "agentJobId" in search ? search.agentJobId : undefined,
-		artifactType:
-			"artifactType" in params && typeof params.artifactType === "string"
-				? reviewArtifactTypeFromSlug(params.artifactType)
-				: "artifactType" in search
-					? search.artifactType
+		artifactKind:
+			"artifactKind" in params && typeof params.artifactKind === "string"
+				? reviewArtifactTypeFromSlug(params.artifactKind)
+				: "artifactKind" in search
+					? search.artifactKind
 					: undefined,
 		artifactId: Number.isSafeInteger(artifactId) ? artifactId : undefined,
 		from: "from" in search ? search.from : undefined,
@@ -85,7 +85,7 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 	);
 	const targetActive = Boolean(
 		matchRoute({
-			to: "/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId",
+			to: "/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId",
 			fuzzy: true,
 		}),
 	);

@@ -54,7 +54,7 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 	return {
 		slug: practice.slug,
 		name: practice.name,
-		artifactType: practice.artifactType,
+		artifactKind: practice.artifactKind,
 		triggerEvents: practice.triggerEvents,
 		criteria: practice.criteria,
 		...(practice.areaSlug ? { areaSlug: practice.areaSlug } : {}),
@@ -94,7 +94,7 @@ export function PracticeForm(props: PracticeFormProps) {
 				name: definition.name,
 				criteria: definition.criteria,
 				triggerEvents: definition.triggerEvents,
-				artifactType: definition.artifactType,
+				artifactKind: definition.artifactKind,
 				whyItMatters: definition.whyItMatters,
 				whatGoodLooksLike: definition.whatGoodLooksLike,
 				precomputeScript: definition.precomputeScript,

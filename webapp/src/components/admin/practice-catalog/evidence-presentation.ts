@@ -19,16 +19,11 @@ export function evidenceSourceLabel(
 export function evidenceQualityLabel(
 	requirement: PracticeAutomatedReviewPolicy["requiredEvidence"][number],
 ) {
-	if (requirement.completeness === "COMPLETE" && requirement.freshness === "CURRENT") {
-		return "Complete and current";
-	}
-	if (requirement.completeness === "COMPLETE") {
-		return "Complete; no freshness requirement";
-	}
-	if (requirement.freshness === "CURRENT") {
-		return "Current; partial or unknown completeness allowed";
-	}
-	return "Available; no completeness or freshness requirement";
+	// Freshness used to be the other half of this sentence. It was removed because nothing could
+	// ever report a source as stale, so a practice demanding a current capture was demanding nothing.
+	return requirement.completeness === "COMPLETE"
+		? "Complete"
+		: "Available; partial or unknown completeness allowed";
 }
 
 export function canAttemptAutomatedReview(

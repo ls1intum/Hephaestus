@@ -945,11 +945,11 @@ export type UpdatePracticeRequest = {
      */
     area?: BindPracticeAreaRequest;
     /**
-     * Type of reviewed work
+     * Kind of reviewed work
      */
-    artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind?: string;
     /**
-     * Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactType changes
+     * Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactKind changes
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
@@ -988,7 +988,6 @@ export type UpdatePracticeRequest = {
 export type PracticeEvidenceRequirement = {
     completeness: 'COMPLETE' | 'NO_REQUIREMENT';
     content?: 'NON_EMPTY' | 'NO_REQUIREMENT';
-    freshness: 'CURRENT' | 'NO_REQUIREMENT';
     sourceKind: string;
 };
 
@@ -1740,7 +1739,7 @@ export type ReviewRunTarget = {
     provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     repositoryName?: string;
     title: string;
-    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    type: string;
     url?: string;
 };
 
@@ -1944,7 +1943,7 @@ export type ReviewArtifact = {
      */
     repositoryName?: string;
     title: string;
-    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    type: string;
     /**
      * Provider URL, when one is available
      */
@@ -2288,7 +2287,7 @@ export type ReflectionItem = {
     /**
      * The kind of work this is about (PR / issue)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
@@ -2709,7 +2708,7 @@ export type ProbeLlmConnectionRequest = {
  */
 export type PracticeWorkTypeDefinitionOptions = {
     allowedSources: Array<PracticeEvidenceSourceOption>;
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     recommendedRequirements: PracticeAutomatedReviewPolicy;
     supportedAutomatedReviewModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
     triggerEvents: Array<PracticeTriggerEventOption>;
@@ -2733,7 +2732,6 @@ export type PracticeEvidenceSourceOption = {
     privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
     sourceKind: string;
     supportsComplete: boolean;
-    supportsCurrent: boolean;
     supportsEmpty: boolean;
 };
 
@@ -2804,7 +2802,7 @@ export type PracticeEvidenceBlocker = {
     /**
      * Readiness reason recorded for that source or practice
      */
-    reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_NOT_CURRENT' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT';
+    reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT';
     /**
      * Reviews this blocker affected
      */
@@ -2931,9 +2929,9 @@ export type Practice = {
      */
     areaSlug?: string;
     /**
-     * Type of work this practice reviews
+     * Kind of work this practice reviews
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
     catalogOrigin?: CatalogOrigin;
@@ -3071,7 +3069,7 @@ export type ObservationList = {
     /**
      * Artifact type (e.g. PULL_REQUEST)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
@@ -3481,7 +3479,7 @@ export type ObservationDetail = {
     /**
      * Artifact type (e.g. PULL_REQUEST)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
@@ -4155,7 +4153,7 @@ export type CurrentUserView = {
 
 export type CuratedPracticeSummary = {
     areaSlug?: string;
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     automatedReview: PracticeAutomatedReview;
     effectivelyOffered: boolean;
     name: string;
@@ -4179,7 +4177,7 @@ export type CatalogEntryStatus = {
  */
 export type CuratedPracticeRequest = {
     areaSlug?: string;
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     /**
      * Evidence requirements; omit to use the recommended requirements for the selected work type
      */
@@ -4197,7 +4195,7 @@ export type CuratedPracticeRequest = {
  */
 export type CuratedPracticeDefinition = {
     areaSlug?: string;
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
     criteria: string;
@@ -4411,9 +4409,9 @@ export type CreatePracticeRequest = {
      */
     areaSlug?: string | null;
     /**
-     * Type of reviewed work. Defaults to PULL_REQUEST when omitted.
+     * Kind of reviewed work. Defaults to scm.pull_request when omitted.
      */
-    artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind?: string;
     /**
      * Versioned evidence required before Hephaestus may review work; omit to use the recommended requirements for the selected work type
      */
@@ -8981,9 +8979,12 @@ export type ListPracticeReviewFeedbackData = {
         suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED'>;
         channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
         agentJobId?: string;
-        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
         /**
-         * Artifact ID; requires artifactType
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
          */
         artifactId?: number;
         recipientUserId?: number;
@@ -9069,9 +9070,12 @@ export type ListPracticeReviewFindingsData = {
         assessment?: Array<'GOOD' | 'BAD'>;
         severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         agentJobId?: string;
-        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
         /**
-         * Artifact ID; requires artifactType
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
          */
         artifactId?: number;
         subjectUserId?: number;

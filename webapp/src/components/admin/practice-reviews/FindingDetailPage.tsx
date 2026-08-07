@@ -81,6 +81,8 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 		);
 	}
 	const finding = query.data;
+	// No slug means a kind this build has no route for; the artifact still renders, unlinked.
+	const artifactSlug = finding.artifact ? reviewArtifactTypeSlug(finding.artifact.type) : undefined;
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
@@ -102,17 +104,19 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 					<ReviewPerson person={finding.subject} display="full" />
 					<div className="min-w-0 space-y-2">
 						<ReviewArtifactLink artifact={finding.artifact} display="full" />
-						<Link
-							className="text-xs font-medium underline"
-							to="/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId"
-							params={{
-								workspaceSlug,
-								artifactType: reviewArtifactTypeSlug(finding.artifact.type),
-								artifactId: String(finding.artifact.id),
-							}}
-						>
-							View all findings and feedback for this work
-						</Link>
+						{artifactSlug && (
+							<Link
+								className="text-xs font-medium underline"
+								to="/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId"
+								params={{
+									workspaceSlug,
+									artifactKind: artifactSlug,
+									artifactId: String(finding.artifact.id),
+								}}
+							>
+								View all findings and feedback for this work
+							</Link>
+						)}
 					</div>
 				</div>
 			</header>

@@ -82,7 +82,7 @@ const mockConversationEvidence = {
 export const mockPracticeDefinitionOptions = {
 	workTypes: [
 		{
-			artifactType: "PULL_REQUEST",
+			artifactKind: "scm.pull_request",
 			triggerEvents: [
 				{
 					event: "PullRequestCreated",
@@ -137,7 +137,7 @@ export const mockPracticeDefinitionOptions = {
 			],
 		},
 		{
-			artifactType: "ISSUE",
+			artifactKind: "scm.issue",
 			triggerEvents: [
 				{ event: "IssueCreated", displayName: "Issue is opened", recommended: true },
 				{ event: "IssueLabeled", displayName: "Issue is labeled", recommended: true },
@@ -165,7 +165,7 @@ export const mockPracticeDefinitionOptions = {
 			],
 		},
 		{
-			artifactType: "CONVERSATION_THREAD",
+			artifactKind: "chat.conversation_thread",
 			triggerEvents: [],
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedRequirements: mockConversationEvidence,

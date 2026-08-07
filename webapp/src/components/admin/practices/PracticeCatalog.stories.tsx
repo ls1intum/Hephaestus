@@ -32,7 +32,7 @@ const practices = [
 	},
 	{
 		...mockUnassignedPractice,
-		artifactType: "ISSUE" as const,
+		artifactKind: "scm.issue" as const,
 	},
 ];
 
@@ -91,7 +91,7 @@ export const Populated: Story = {
 };
 
 export const Filtered: Story = {
-	args: { focusFilter: "ISSUE" },
+	args: { focusFilter: "scm.issue" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Clear the filter to reorder practices.")).toBeVisible();

@@ -8,7 +8,7 @@ import type {
 
 export const reviewArtifact: ReviewArtifact = {
 	id: 42,
-	type: "PULL_REQUEST",
+	type: "scm.pull_request",
 	provider: "GITHUB",
 	number: 1423,
 	repositoryName: "ls1intum/Hephaestus",
@@ -132,7 +132,7 @@ export const reviewFindingDetail: ReviewFindingDetail = {
 			{
 				sourceKind: "scm.pull-request.diff",
 				artifactPath: "inputs/context/diff.patch",
-				path: "webapp/src/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId.tsx",
+				path: "webapp/src/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId.tsx",
 				side: "NEW",
 				startLine: 1,
 				endLine: 1,

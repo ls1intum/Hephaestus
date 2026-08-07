@@ -46,7 +46,7 @@ public record UpdatePracticeRequestDTO(
     @Nullable
     PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
-    @Schema(description = "Type of reviewed work", example = "ISSUE") @Nullable ArtifactKind artifactKind,
+    @Schema(description = "Kind of reviewed work", example = "scm.issue") @Nullable ArtifactKind artifactKind,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Why-it-matters must not be blank")

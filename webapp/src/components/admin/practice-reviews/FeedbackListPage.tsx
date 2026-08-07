@@ -60,7 +60,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 			search.suppressionReason?.length ||
 			search.channel?.length ||
 			search.agentJobId ||
-			search.artifactType ||
+			search.artifactKind ||
 			search.recipientUserId ||
 			search.from ||
 			search.to,
@@ -73,7 +73,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 			suppressionReason: undefined,
 			channel: undefined,
 			agentJobId: undefined,
-			artifactType: undefined,
+			artifactKind: undefined,
 			artifactId: undefined,
 			recipientUserId: undefined,
 			from: undefined,
@@ -143,15 +143,15 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 						onClear={() => patchFilter({ recipientUserId: undefined })}
 					/>
 				)}
-				{search.artifactType && (
+				{search.artifactKind && (
 					<ReferenceFilterPill
 						label="Reviewed work"
 						value={reviewArtifactScopeLabel(
-							search.artifactType,
+							search.artifactKind,
 							search.artifactId,
 							feedback[0]?.artifact,
 						)}
-						onClear={() => patchFilter({ artifactType: undefined, artifactId: undefined })}
+						onClear={() => patchFilter({ artifactKind: undefined, artifactId: undefined })}
 					/>
 				)}
 			</FilterToolbar>

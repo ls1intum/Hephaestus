@@ -57,6 +57,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
 
 const NO_AREA = "__none__";
 
@@ -68,7 +69,7 @@ export interface PracticeDefinitionAreaOption {
 export interface PracticeDefinitionValue {
 	slug: string;
 	name: string;
-	artifactType: WorkArtifact;
+	artifactKind: WorkArtifact;
 	areaSlug?: string;
 	triggerEvents: string[];
 	criteria: string;
@@ -108,7 +109,7 @@ export type PracticeDefinitionFormProps =
 interface FormState {
 	name: string;
 	slug: string;
-	artifactType: WorkArtifact;
+	artifactKind: WorkArtifact;
 	areaSlug: string;
 	triggerEvents: string[];
 	criteria: string;
@@ -120,10 +121,10 @@ interface FormState {
 
 function definitionOptionsFor(
 	definitionOptions: PracticeDefinitionOptions,
-	artifactType: WorkArtifact,
+	artifactKind: WorkArtifact,
 ): PracticeWorkTypeDefinitionOptions {
-	const options = definitionOptions.workTypes.find((item) => item.artifactType === artifactType);
-	if (!options) throw new Error(`Missing definition options for ${artifactType}`);
+	const options = definitionOptions.workTypes.find((item) => item.artifactKind === artifactKind);
+	if (!options) throw new Error(`Missing definition options for ${artifactKind}`);
 	return options;
 }
 
@@ -131,15 +132,15 @@ function initialState(
 	definitionOptions: PracticeDefinitionOptions,
 	initialData?: PracticeDefinitionValue,
 ): FormState {
-	const artifactType = initialData?.artifactType ?? "PULL_REQUEST";
+	const artifactKind = initialData?.artifactKind ?? ARTIFACT_KIND.pullRequest;
 	return {
 		name: initialData?.name ?? "",
 		slug: initialData?.slug ?? "",
-		artifactType,
+		artifactKind,
 		areaSlug: initialData?.areaSlug ?? NO_AREA,
 		triggerEvents: initialData
 			? [...initialData.triggerEvents]
-			: definitionOptionsFor(definitionOptions, artifactType)
+			: definitionOptionsFor(definitionOptions, artifactKind)
 					.triggerEvents.filter((event) => event.recommended)
 					.map((event) => event.event),
 		criteria: initialData?.criteria ?? "",
@@ -148,7 +149,7 @@ function initialState(
 		precomputeScript: initialData?.precomputeScript ?? "",
 		automatedReviewPolicy:
 			initialData?.automatedReviewPolicy ??
-			definitionOptionsFor(definitionOptions, artifactType).recommendedRequirements,
+			definitionOptionsFor(definitionOptions, artifactKind).recommendedRequirements,
 	};
 }
 
@@ -196,19 +197,19 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	// Recorded history belongs to the work type the practice was reviewed under. Switching work type in
 	// the form changes which sources are even allowed, so the same rows would resolve to "Unknown source"
 	// and describe a work type the author is no longer editing.
-	const artifactTypeUnchanged = initialData?.artifactType === form.artifactType;
+	const artifactKindUnchanged = initialData?.artifactKind === form.artifactKind;
 	const evidenceDrafts = useRef<Partial<Record<WorkArtifact, PracticeAutomatedReviewPolicy>>>({
-		[form.artifactType]: form.automatedReviewPolicy,
+		[form.artifactKind]: form.automatedReviewPolicy,
 	});
 	const triggerDrafts = useRef<Partial<Record<WorkArtifact, string[]>>>({
-		[form.artifactType]: form.triggerEvents,
+		[form.artifactKind]: form.triggerEvents,
 	});
 	const precomputeDrafts = useRef<Partial<Record<WorkArtifact, string>>>({
-		[form.artifactType]: form.precomputeScript,
+		[form.artifactKind]: form.precomputeScript,
 	});
 	const [submitted, setSubmitted] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
-	const selectedDefinitionOptions = definitionOptionsFor(definitionOptions, form.artifactType);
+	const selectedDefinitionOptions = definitionOptionsFor(definitionOptions, form.artifactKind);
 	const canRunMentoring = canAttemptAutomatedReview(
 		form.automatedReviewPolicy,
 		selectedDefinitionOptions.supportedAutomatedReviewModes,
@@ -237,7 +238,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			const triggerEvents = checked
 				? [...previous.triggerEvents, trigger]
 				: previous.triggerEvents.filter((value) => value !== trigger);
-			triggerDrafts.current[previous.artifactType] = triggerEvents;
+			triggerDrafts.current[previous.artifactKind] = triggerEvents;
 			return { ...previous, triggerEvents };
 		});
 	};
@@ -251,7 +252,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const triggerError =
 		submitted &&
 		canRunMentoring &&
-		form.artifactType !== "CONVERSATION_THREAD" &&
+		form.artifactKind !== ARTIFACT_KIND.conversationThread &&
 		form.triggerEvents.length === 0
 			? "Select at least one trigger event"
 			: undefined;
@@ -265,7 +266,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		form.name.trim().length >= 3 &&
 		form.criteria.trim().length >= 3 &&
 		(!canRunMentoring ||
-			form.artifactType === "CONVERSATION_THREAD" ||
+			form.artifactKind === ARTIFACT_KIND.conversationThread ||
 			form.triggerEvents.length > 0) &&
 		!evidenceError &&
 		(mode === "edit" || isValidSlug(form.slug));
@@ -284,7 +285,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							: mode === "create" && !isValidSlug(form.slug)
 								? "practice-slug"
 								: canRunMentoring &&
-										form.artifactType !== "CONVERSATION_THREAD" &&
+										form.artifactKind !== ARTIFACT_KIND.conversationThread &&
 										form.triggerEvents.length === 0
 									? `practice-trigger-${selectedDefinitionOptions.triggerEvents[0]?.event}`
 									: "practice-name";
@@ -298,7 +299,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		props.onSubmit({
 			slug: form.slug,
 			name: form.name.trim(),
-			artifactType: form.artifactType,
+			artifactKind: form.artifactKind,
 			triggerEvents: canRunMentoring ? form.triggerEvents : [],
 			criteria: form.criteria.trim(),
 			...(form.areaSlug === NO_AREA ? {} : { areaSlug: form.areaSlug }),
@@ -376,18 +377,18 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								<FieldSet>
 									<FieldLegend variant="label">Review this kind of work</FieldLegend>
 									<RadioGroup
-										value={form.artifactType}
+										value={form.artifactKind}
 										onValueChange={(value) =>
 											value &&
 											setForm((previous) => {
-												const artifactType = value as WorkArtifact;
-												const nextOptions = definitionOptionsFor(definitionOptions, artifactType);
-												evidenceDrafts.current[previous.artifactType] =
+												const artifactKind = value as WorkArtifact;
+												const nextOptions = definitionOptionsFor(definitionOptions, artifactKind);
+												evidenceDrafts.current[previous.artifactKind] =
 													previous.automatedReviewPolicy;
-												triggerDrafts.current[previous.artifactType] = previous.triggerEvents;
-												precomputeDrafts.current[previous.artifactType] = previous.precomputeScript;
+												triggerDrafts.current[previous.artifactKind] = previous.triggerEvents;
+												precomputeDrafts.current[previous.artifactKind] = previous.precomputeScript;
 												const automatedReviewPolicy =
-													evidenceDrafts.current[artifactType] ??
+													evidenceDrafts.current[artifactKind] ??
 													recommendedPolicyWithCurrentSupport(
 														nextOptions.recommendedRequirements,
 														previous.automatedReviewPolicy,
@@ -398,16 +399,16 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 												);
 												return {
 													...previous,
-													artifactType,
+													artifactKind,
 													automatedReviewPolicy,
 													triggerEvents: canRunNext
-														? (triggerDrafts.current[artifactType] ??
+														? (triggerDrafts.current[artifactKind] ??
 															nextOptions.triggerEvents
 																.filter((event) => event.recommended)
 																.map((event) => event.event))
 														: [],
 													precomputeScript: canRunNext
-														? (precomputeDrafts.current[artifactType] ?? "")
+														? (precomputeDrafts.current[artifactKind] ?? "")
 														: "",
 												};
 											})
@@ -538,11 +539,11 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					<PracticeEvidenceEditor
 						options={selectedDefinitionOptions}
 						value={form.automatedReviewPolicy}
-						outcome={artifactTypeUnchanged ? evidenceOutcome : undefined}
+						outcome={artifactKindUnchanged ? evidenceOutcome : undefined}
 						disabled={formDisabled}
 						onChange={(automatedReviewPolicy) =>
 							setForm((previous) => {
-								evidenceDrafts.current[previous.artifactType] = automatedReviewPolicy;
+								evidenceDrafts.current[previous.artifactKind] = automatedReviewPolicy;
 								const canRunNext = canAttemptAutomatedReview(
 									automatedReviewPolicy,
 									selectedDefinitionOptions.supportedAutomatedReviewModes,
@@ -552,14 +553,14 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									automatedReviewPolicy,
 									triggerEvents:
 										canRunNext && previous.triggerEvents.length === 0
-											? (triggerDrafts.current[previous.artifactType] ??
+											? (triggerDrafts.current[previous.artifactKind] ??
 												selectedDefinitionOptions.triggerEvents
 													.filter((event) => event.recommended)
 													.map((event) => event.event))
 											: previous.triggerEvents,
 									precomputeScript:
 										canRunNext && !previous.precomputeScript
-											? (precomputeDrafts.current[previous.artifactType] ?? "")
+											? (precomputeDrafts.current[previous.artifactKind] ?? "")
 											: previous.precomputeScript,
 								};
 							})
@@ -633,7 +634,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								{slugError && <FieldError id="practice-slug-error">{slugError}</FieldError>}
 							</Field>
 
-							{canRunMentoring && form.artifactType !== "CONVERSATION_THREAD" && (
+							{canRunMentoring && form.artifactKind !== ARTIFACT_KIND.conversationThread && (
 								<FieldSet
 									data-invalid={triggerError ? "true" : undefined}
 									aria-invalid={Boolean(triggerError)}

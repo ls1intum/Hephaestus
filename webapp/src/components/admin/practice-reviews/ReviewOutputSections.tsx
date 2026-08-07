@@ -20,6 +20,7 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
+import type { KnownArtifactKind } from "@/lib/artifact-kinds";
 import { ClaimCurrentnessBadge, FeedbackStateBadge, FindingResultBadge } from "./ReviewBadges";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
 import { CHANNEL_LABELS, SUPPRESSION_REASON_LABELS, subjectLabel } from "./review-format";
@@ -35,7 +36,11 @@ const INSUFFICIENT_EVIDENCE_EXPLANATION =
 
 export interface ReviewOutputScope {
 	agentJobId?: string;
-	artifactType?: NonNullable<ReviewFeedback["artifact"]>["type"];
+	/**
+	 * Narrowed to a kind this build knows, because the scope is carried in the URL and the search
+	 * schema validates it. An artifact of some other kind still renders; it just cannot scope a link.
+	 */
+	artifactKind?: KnownArtifactKind;
 	artifactId?: number;
 }
 

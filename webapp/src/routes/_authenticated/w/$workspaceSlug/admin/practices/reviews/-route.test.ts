@@ -86,7 +86,7 @@ describe("practice review routes", () => {
 		}) as HTMLAnchorElement;
 		const deliveryUrl = new URL(deliveryLink.href);
 		expect(deliveryUrl.pathname).toBe("/w/acme/admin/practices/reviews/delivery");
-		expect(deliveryUrl.searchParams.get("artifactType")).toBe("PULL_REQUEST");
+		expect(deliveryUrl.searchParams.get("artifactKind")).toBe("scm.pull_request");
 		expect(deliveryUrl.searchParams.get("artifactId")).toBe("42");
 	});
 });

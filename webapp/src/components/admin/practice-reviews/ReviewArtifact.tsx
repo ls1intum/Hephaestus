@@ -6,24 +6,34 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ReviewArtifact as ReviewArtifactData, ReviewRunTarget } from "@/api/types.gen";
+import {
+	ARTIFACT_KIND,
+	artifactKindLabel,
+	isKnownArtifactKind,
+	type KnownArtifactKind,
+} from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 
 export type ReviewArtifactDisplay = ReviewArtifactData | ReviewRunTarget;
-const ARTIFACT_TYPE_SLUGS = {
-	PULL_REQUEST: "pull-request",
-	ISSUE: "issue",
-	CONVERSATION_THREAD: "conversation",
-} as const satisfies Record<ReviewArtifactData["type"], string>;
+/**
+ * URL-facing spelling of a kind. The wire id carries a dot, which reads badly in a path segment, so
+ * the routes keep their own short slug and this map is the only place the two meet.
+ */
+const ARTIFACT_KIND_SLUGS = {
+	[ARTIFACT_KIND.pullRequest]: "pull-request",
+	[ARTIFACT_KIND.issue]: "issue",
+	[ARTIFACT_KIND.conversationThread]: "conversation",
+} as const satisfies Record<KnownArtifactKind, string>;
 
-export type ReviewArtifactTypeSlug = (typeof ARTIFACT_TYPE_SLUGS)[keyof typeof ARTIFACT_TYPE_SLUGS];
+export type ReviewArtifactTypeSlug = (typeof ARTIFACT_KIND_SLUGS)[keyof typeof ARTIFACT_KIND_SLUGS];
 
-export function reviewArtifactTypeSlug(type: ReviewArtifactData["type"]): ReviewArtifactTypeSlug {
-	return ARTIFACT_TYPE_SLUGS[type];
+export function reviewArtifactTypeSlug(kind: string): ReviewArtifactTypeSlug | undefined {
+	return isKnownArtifactKind(kind) ? ARTIFACT_KIND_SLUGS[kind] : undefined;
 }
 
-export function reviewArtifactTypeFromSlug(slug: string): ReviewArtifactData["type"] | undefined {
-	const entry = Object.entries(ARTIFACT_TYPE_SLUGS).find(([, value]) => value === slug);
-	return entry?.[0] as ReviewArtifactData["type"] | undefined;
+export function reviewArtifactTypeFromSlug(slug: string): KnownArtifactKind | undefined {
+	const entry = Object.entries(ARTIFACT_KIND_SLUGS).find(([, value]) => value === slug);
+	return entry?.[0] as KnownArtifactKind | undefined;
 }
 
 export interface ReviewArtifactProps {
@@ -37,36 +47,42 @@ export type ReviewArtifactLinkProps = ReviewArtifactProps;
 
 export function reviewArtifactLabel(artifact: ReviewArtifactDisplay): string {
 	switch (artifact.type) {
-		case "PULL_REQUEST":
+		case ARTIFACT_KIND.pullRequest:
 			if (artifact.provider === "GITLAB")
 				return artifact.number == null ? "Merge request" : `MR !${artifact.number}`;
 			return artifact.number == null ? "Pull request" : `PR #${artifact.number}`;
-		case "ISSUE":
+		case ARTIFACT_KIND.issue:
 			return artifact.number == null ? "Issue" : `Issue #${artifact.number}`;
-		case "CONVERSATION_THREAD":
+		case ARTIFACT_KIND.conversationThread:
 			return artifact.channelName ? `#${artifact.channelName}` : "Conversation";
+		default:
+			// A kind this build has no copy for still names itself rather than rendering blank.
+			return artifactKindLabel(artifact.type);
 	}
 }
 
 export function reviewArtifactScopeLabel(
-	type: ReviewArtifactData["type"],
+	kind: string,
 	id: number | undefined,
 	artifact: ReviewArtifactDisplay | undefined,
 ): string {
 	if (id != null && artifact) {
 		return [artifact.repositoryName, reviewArtifactLabel(artifact)].filter(Boolean).join(" · ");
 	}
-	const labels = {
-		PULL_REQUEST: ["pull or merge request", "pull or merge requests"],
-		ISSUE: ["issue", "issues"],
-		CONVERSATION_THREAD: ["conversation", "conversations"],
-	} as const;
-	return `${id == null ? "All" : "One"} ${labels[type][id == null ? 1 : 0]}`;
+	const labels: Record<KnownArtifactKind, readonly [string, string]> = {
+		[ARTIFACT_KIND.pullRequest]: ["pull or merge request", "pull or merge requests"],
+		[ARTIFACT_KIND.issue]: ["issue", "issues"],
+		[ARTIFACT_KIND.conversationThread]: ["conversation", "conversations"],
+	};
+	const scope = isKnownArtifactKind(kind)
+		? labels[kind][id == null ? 1 : 0]
+		: artifactKindLabel(kind).toLowerCase();
+	return `${id == null ? "All" : "One"} ${scope}`;
 }
 
 function ArtifactIcon({ type }: { type: ReviewArtifactDisplay["type"] }) {
-	if (type === "PULL_REQUEST") return <GitPullRequestIcon aria-hidden />;
-	if (type === "ISSUE") return <CircleDotIcon aria-hidden />;
+	if (type === ARTIFACT_KIND.pullRequest) return <GitPullRequestIcon aria-hidden />;
+	if (type === ARTIFACT_KIND.issue) return <CircleDotIcon aria-hidden />;
 	return <MessagesSquareIcon aria-hidden />;
 }
 

@@ -16,7 +16,7 @@ vi.mock("@/components/shared/CodeEditor", () => ({
 const initialData: CuratedPracticeFormInitialValue = {
 	slug: "clear-pr-description",
 	name: "Write a clear pull request description",
-	artifactType: "PULL_REQUEST",
+	artifactKind: "scm.pull_request",
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "Review whether the description explains the change.",
 	automatedReviewPolicy: mockPullRequestEvidence,

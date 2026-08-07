@@ -84,6 +84,10 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 	}
 	const feedback = query.data;
 	const subjectDiffers = feedback.subject && feedback.subject.id !== feedback.recipient?.id;
+	// No slug means a kind this build has no route for; the artifact still renders, unlinked.
+	const artifactSlug = feedback.artifact
+		? reviewArtifactTypeSlug(feedback.artifact.type)
+		: undefined;
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
@@ -106,13 +110,13 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 					)}
 					<div className="min-w-0 space-y-2">
 						<ReviewArtifactLink artifact={feedback.artifact} display="full" />
-						{feedback.artifact && (
+						{feedback.artifact && artifactSlug && (
 							<Link
 								className="text-xs font-medium underline"
-								to="/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId"
+								to="/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId"
 								params={{
 									workspaceSlug,
-									artifactType: reviewArtifactTypeSlug(feedback.artifact.type),
+									artifactKind: artifactSlug,
 									artifactId: String(feedback.artifact.id),
 								}}
 							>

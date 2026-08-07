@@ -28,7 +28,7 @@ const areaDefinition = {
 };
 const practiceDefinition = {
 	name: "Say what changed and why",
-	artifactType: "PULL_REQUEST",
+	artifactKind: "scm.pull_request",
 	triggerEvents: ["PullRequestCreated"],
 	criteria: "Our own criteria",
 	whyItMatters: "Reviewers need context",
@@ -55,7 +55,7 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 			{
 				slug: "describe-what-and-why",
 				name: practiceDefinition.name,
-				artifactType: "PULL_REQUEST",
+				artifactKind: "scm.pull_request",
 				automatedReview: mockPullRequestEvidence.automatedReview,
 				areaSlug: "packaging",
 				position: 0,

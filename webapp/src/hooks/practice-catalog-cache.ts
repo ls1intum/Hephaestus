@@ -80,9 +80,9 @@ export function selectPracticePatch(
 ): Partial<Practice> {
 	const clear = new Set(request.clear);
 	return {
-		...("artifactType" in request ? { artifactType: practice.artifactType } : {}),
+		...("artifactKind" in request ? { artifactKind: practice.artifactKind } : {}),
 		...("criteria" in request ? { criteria: practice.criteria } : {}),
-		...("automatedReviewPolicy" in request || "artifactType" in request
+		...("automatedReviewPolicy" in request || "artifactKind" in request
 			? {
 					automatedReviewPolicy: practice.automatedReviewPolicy,
 					automatedReviewValidation: practice.automatedReviewValidation,

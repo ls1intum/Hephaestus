@@ -58,7 +58,10 @@ public record CreatePracticeRequestDTO(
     @Nullable
     PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
-    @Schema(description = "Type of reviewed work. Defaults to PULL_REQUEST when omitted.", example = "PULL_REQUEST")
+    @Schema(
+        description = "Kind of reviewed work. Defaults to scm.pull_request when omitted.",
+        example = "scm.pull_request"
+    )
     @Nullable
     ArtifactKind artifactKind,
 

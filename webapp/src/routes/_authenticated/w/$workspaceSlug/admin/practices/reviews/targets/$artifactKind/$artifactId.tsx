@@ -4,27 +4,27 @@ import { ReviewTargetPage } from "@/components/admin/practice-reviews/ReviewTarg
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId",
+	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId",
 )({
 	head: workspaceAdminHead("Reviewed work output"),
-	loader: ({ params: { artifactType, artifactId } }) => {
-		const type = reviewArtifactTypeFromSlug(artifactType);
+	loader: ({ params: { artifactKind, artifactId } }) => {
+		const type = reviewArtifactTypeFromSlug(artifactKind);
 		const id = Number(artifactId);
 		if (!type || !Number.isSafeInteger(id) || id < 1) {
 			throw notFound();
 		}
-		return { artifactType: type, artifactId: id };
+		return { artifactKind: type, artifactId: id };
 	},
 	component: ReviewTargetRoute,
 });
 
 function ReviewTargetRoute() {
 	const { workspaceSlug } = Route.useParams();
-	const { artifactType, artifactId } = Route.useLoaderData();
+	const { artifactKind, artifactId } = Route.useLoaderData();
 	return (
 		<ReviewTargetPage
 			workspaceSlug={workspaceSlug}
-			artifactType={artifactType}
+			artifactKind={artifactKind}
 			artifactId={artifactId}
 		/>
 	);

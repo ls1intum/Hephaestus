@@ -49,7 +49,7 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 const MINUTE_MS = 60_000;
 const pullRequestTarget: AgentJob["target"] = {
 	id: 42,
-	type: "PULL_REQUEST",
+	type: "scm.pull_request",
 	provider: "GITHUB",
 	number: 1420,
 	repositoryName: "ls1intum/Hephaestus",
@@ -58,7 +58,7 @@ const pullRequestTarget: AgentJob["target"] = {
 };
 const issueTarget: AgentJob["target"] = {
 	id: 43,
-	type: "ISSUE",
+	type: "scm.issue",
 	provider: "GITHUB",
 	number: 1420,
 	repositoryName: "ls1intum/Hephaestus",

@@ -4,7 +4,6 @@ import {
 	listPracticeReviewFeedbackOptions,
 	listPracticeReviewFindingsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { ReviewArtifact as ReviewArtifactData } from "@/api/types.gen";
 import {
 	Empty,
 	EmptyDescription,
@@ -13,22 +12,23 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { KnownArtifactKind } from "@/lib/artifact-kinds";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewOutputSections } from "./ReviewOutputSections";
 
 export interface ReviewTargetPageProps {
 	workspaceSlug: string;
-	artifactType: ReviewArtifactData["type"];
+	artifactKind: KnownArtifactKind;
 	artifactId: number;
 }
 
 export function ReviewTargetPage({
 	workspaceSlug,
-	artifactType,
+	artifactKind,
 	artifactId,
 }: ReviewTargetPageProps) {
-	const scope = { artifactType, artifactId };
+	const scope = { artifactKind, artifactId };
 	const feedbackQuery = useQuery({
 		...listPracticeReviewFeedbackOptions({
 			path: { workspaceSlug },

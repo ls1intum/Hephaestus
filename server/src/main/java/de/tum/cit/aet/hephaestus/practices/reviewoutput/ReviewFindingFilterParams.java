@@ -23,7 +23,18 @@ public record ReviewFindingFilterParams(
     @RequestParam(required = false) @Nullable List<Assessment> assessment,
     @RequestParam(required = false) @Nullable List<Severity> severity,
     @RequestParam(required = false) @Nullable UUID agentJobId,
-    @RequestParam(required = false) @Nullable ArtifactKind artifactKind,
+    /**
+     * The kind as the bare string it is on the wire, parsed rather than bound.
+     *
+     * <p>A typed parameter here is rendered by springdoc as {@code artifactKind.value} — it walks into
+     * the record — so a generated client would send a query key no caller ever writes. The grammar is
+     * still enforced, one line below, where a malformed value becomes a 400 that names itself instead of
+     * a binding failure.
+     */
+    @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request")
+    @RequestParam(required = false)
+    @Nullable
+    String artifactKind,
     @Parameter(description = "Artifact ID; requires artifactKind")
     @RequestParam(required = false)
     @Positive
@@ -45,6 +56,7 @@ public record ReviewFindingFilterParams(
         if (artifactId != null && artifactKind == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "artifactId requires artifactKind");
         }
+        ArtifactKind kind = parseArtifactKind();
         if (from != null && to != null && from.isAfter(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must not be after to");
         }
@@ -55,11 +67,22 @@ public record ReviewFindingFilterParams(
             assessment,
             severity,
             agentJobId,
-            artifactKind,
+            kind,
             artifactId,
             subjectUserId,
             from,
             to
         );
+    }
+
+    private @Nullable ArtifactKind parseArtifactKind() {
+        if (artifactKind == null) {
+            return null;
+        }
+        try {
+            return ArtifactKind.of(artifactKind);
+        } catch (IllegalArgumentException malformed) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, malformed.getMessage(), malformed);
+        }
     }
 }
