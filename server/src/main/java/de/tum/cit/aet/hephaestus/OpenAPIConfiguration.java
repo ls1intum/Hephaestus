@@ -98,6 +98,9 @@ public class OpenAPIConfiguration {
         "ProblemDetail",
         "PageMetadata",
         "PracticeAutomatedReviewPolicy",
+        // The binding is the shape a practice is authored in, so a client that cannot see it cannot
+        // create one. It has no DTO suffix because it is the domain type the API deliberately exposes.
+        "PracticeBinding",
         "PracticeEvidenceRequirement",
         "PracticeOptionalContextSource",
         "PracticeInsufficientEvidenceAction",

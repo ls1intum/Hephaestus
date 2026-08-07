@@ -930,10 +930,6 @@ export type UpdatePracticeReviewSettingsRequest = {
      * Run practice review for all developers (vs only the run_practice_review role)
      */
     runForAllUsers?: boolean;
-    /**
-     * Skip practice review for draft PRs/MRs
-     */
-    skipDrafts?: boolean;
 };
 
 /**
@@ -945,13 +941,13 @@ export type UpdatePracticeRequest = {
      */
     area?: BindPracticeAreaRequest;
     /**
-     * Kind of reviewed work
-     */
-    artifactKind?: string;
-    /**
-     * Replacement evidence requirements; omit to preserve them, or to use the recommended requirements when artifactKind changes
+     * Replacement review settings; omit to preserve them, or to take the recommended ones when the bindings move the practice to a different kind of work
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
+    /**
+     * Replacement occasions and their evidence; omit to leave them unchanged
+     */
+    bindings?: Array<PracticeBinding>;
     /**
      * Optional fields to clear before applying supplied values
      */
@@ -968,10 +964,6 @@ export type UpdatePracticeRequest = {
      * TypeScript/Bun static analysis run before automated review
      */
     precomputeScript?: string;
-    /**
-     * Events that start a practice review; empty for scheduled conversation reviews
-     */
-    triggerEvents?: Array<string>;
     /**
      * Concrete example shown to the developer; not review criteria
      */
@@ -993,7 +985,25 @@ export type PracticeEvidenceRequirement = {
     /**
      * Whether an absent or degraded capture refuses the review
      */
-    stance: 'REQUIRED' | 'CONTEXTUAL';
+    stance: 'REQUIRED' | 'EXHAUSTIVE' | 'CONTEXTUAL';
+};
+
+/**
+ * An occasion that starts a review, and the evidence that review reads
+ */
+export type PracticeBinding = {
+    /**
+     * Sources a review occasioned this way reads, each with the stance it takes
+     */
+    needs: Array<PracticeEvidenceRequirement>;
+    /**
+     * Whether an artifact still marked draft occasions this review; omit for false
+     */
+    onDrafts?: boolean;
+    /**
+     * Signals that occasion this review, e.g. scm.pull_request.merged
+     */
+    signals: Array<string>;
 };
 
 /**
@@ -1025,7 +1035,7 @@ export type PracticeAutomatedReview = {
 };
 
 /**
- * Author-defined automated review and evidence requirements for one practice revision
+ * Author-defined automated review settings for one practice revision
  */
 export type PracticeAutomatedReviewPolicy = {
     /**
@@ -1040,10 +1050,6 @@ export type PracticeAutomatedReviewPolicy = {
      * Claims the selected evidence cannot support even when every requirement passes
      */
     knownLimitations: Array<PracticeEvidenceLimitation>;
-    /**
-     * Sources this practice reads, each with the stance it takes towards that source
-     */
-    needs: Array<PracticeEvidenceRequirement>;
     /**
      * Exact contract version that defines source kinds and source-state semantics
      */
@@ -2698,23 +2704,30 @@ export type ProbeLlmConnectionRequest = {
 };
 
 /**
- * Review timing, evidence choices, and recommended requirements for one type of reviewed work
+ * Review timing, evidence choices, and recommended settings for one type of reviewed work
  */
 export type PracticeWorkTypeDefinitionOptions = {
     allowedSources: Array<PracticeEvidenceSourceOption>;
     artifactKind: string;
-    recommendedRequirements: PracticeAutomatedReviewPolicy;
+    /**
+     * Evidence a new binding on this work type starts with when the author says nothing
+     */
+    recommendedNeeds: Array<PracticeEvidenceRequirement>;
+    recommendedPolicy: PracticeAutomatedReviewPolicy;
+    /**
+     * Signals a practice on this work type can be reviewed on
+     */
+    signals: Array<PracticeSignalOption>;
     supportedAutomatedReviewModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
-    triggerEvents: Array<PracticeTriggerEventOption>;
 };
 
 /**
- * An event that can start an automated practice review
+ * A signal a practice can start an automated review on
  */
-export type PracticeTriggerEventOption = {
+export type PracticeSignalOption = {
     displayName: string;
-    event: string;
     recommended: boolean;
+    signal: string;
 };
 
 /**
@@ -2759,14 +2772,6 @@ export type PracticeReviewSettings = {
      * Raw override; null = inheriting the fleet default
      */
     runForAllUsersOverride?: boolean;
-    /**
-     * Effective: skip draft PRs/MRs
-     */
-    skipDrafts: boolean;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    skipDraftsOverride?: boolean;
 };
 
 /**
@@ -2925,11 +2930,15 @@ export type Practice = {
      */
     areaSlug?: string;
     /**
-     * Kind of work this practice reviews
+     * Kind of work this practice reviews, read off its bindings
      */
     artifactKind: string;
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
+    /**
+     * Occasions this practice is reviewed on, each with the evidence that review reads
+     */
+    bindings: Array<PracticeBinding>;
     catalogOrigin?: CatalogOrigin;
     /**
      * Timestamp when the practice was created
@@ -2959,10 +2968,6 @@ export type Practice = {
      * URL-safe identifier unique within workspace
      */
     slug: string;
-    /**
-     * Domain events that start a practice review
-     */
-    triggerEvents: Array<string>;
     /**
      * Timestamp when the practice was last updated
      */
@@ -4181,15 +4186,17 @@ export type CatalogEntryStatus = {
  */
 export type CuratedPracticeRequest = {
     areaSlug?: string;
-    artifactKind: string;
     /**
      * Evidence requirements; omit to use the recommended requirements for the selected work type
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
+    /**
+     * Occasions this practice is reviewed on; the kind of work is read off the signals
+     */
+    bindings: Array<PracticeBinding>;
     criteria: string;
     name: string;
     precomputeScript?: string;
-    triggerEvents: Array<string>;
     whatGoodLooksLike?: string;
     whyItMatters?: string;
 };
@@ -4202,10 +4209,10 @@ export type CuratedPracticeDefinition = {
     artifactKind: string;
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
+    bindings: Array<PracticeBinding>;
     criteria: string;
     name: string;
     precomputeScript?: string;
-    triggerEvents: Array<string>;
     whatGoodLooksLike?: string;
     whyItMatters?: string;
 };
@@ -4413,13 +4420,13 @@ export type CreatePracticeRequest = {
      */
     areaSlug?: string | null;
     /**
-     * Kind of reviewed work. Defaults to scm.pull_request when omitted.
-     */
-    artifactKind?: string;
-    /**
-     * Versioned evidence required before Hephaestus may review work; omit to use the recommended requirements for the selected work type
+     * Versioned review settings; omit to use the recommended ones for the work type the bindings name
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
+    /**
+     * Occasions this practice is reviewed on, each with the evidence that review reads. The kind of work reviewed is read off the signals.
+     */
+    bindings: Array<PracticeBinding>;
     /**
      * Practice review criteria
      */
@@ -4436,10 +4443,6 @@ export type CreatePracticeRequest = {
      * URL-safe identifier unique within the workspace
      */
     slug: string;
-    /**
-     * Events that start a practice review; empty for scheduled conversation reviews
-     */
-    triggerEvents: Array<string>;
     /**
      * Developer-facing exemplar; a concrete instance, not the review criteria
      */

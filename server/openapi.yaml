@@ -7666,14 +7666,18 @@ components:
           - "null"
           description: Practice area to add the practice to. Omit or set to null for
             Unassigned.
-        artifactKind:
-          type: string
-          description: Kind of reviewed work. Defaults to scm.pull_request when omitted.
-          example: scm.pull_request
         automatedReviewPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
-          description: Versioned evidence required before Hephaestus may review work;
-            omit to use the recommended requirements for the selected work type
+          description: Versioned review settings; omit to use the recommended ones
+            for the work type the bindings name
+        bindings:
+          type: array
+          description: "Occasions this practice is reviewed on, each with the evidence\
+            \ that review reads. The kind of work reviewed is read off the signals."
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
+          maxItems: 10
+          minItems: 1
         criteria:
           type: string
           description: Practice review criteria
@@ -7697,17 +7701,6 @@ components:
           maxLength: 64
           minLength: 3
           pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        triggerEvents:
-          type: array
-          description: Events that start a practice review; empty for scheduled conversation
-            reviews
-          example:
-          - PullRequestCreated
-          - ReviewSubmitted
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
         whatGoodLooksLike:
           type: string
           description: "Developer-facing exemplar; a concrete instance, not the review\
@@ -7720,10 +7713,10 @@ components:
           maxLength: 2000
           minLength: 0
       required:
+      - bindings
       - criteria
       - name
       - slug
-      - triggerEvents
     CreateReaction:
       type: object
       description: Submit a reaction to a delivered feedback unit
@@ -8044,16 +8037,16 @@ components:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
         automatedReviewValidation:
           $ref: "#/components/schemas/PracticeAutomatedReviewValidation"
+        bindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
         criteria:
           type: string
         name:
           type: string
         precomputeScript:
           type: string
-        triggerEvents:
-          type: array
-          items:
-            type: string
         whatGoodLooksLike:
           type: string
         whyItMatters:
@@ -8062,9 +8055,9 @@ components:
       - artifactKind
       - automatedReviewPolicy
       - automatedReviewValidation
+      - bindings
       - criteria
       - name
-      - triggerEvents
     CuratedPracticeRequest:
       type: object
       description: A complete curated practice definition
@@ -8073,12 +8066,18 @@ components:
           type: string
           maxLength: 64
           minLength: 0
-        artifactKind:
-          type: string
         automatedReviewPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
           description: Evidence requirements; omit to use the recommended requirements
             for the selected work type
+        bindings:
+          type: array
+          description: Occasions this practice is reviewed on; the kind of work is
+            read off the signals
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
+          maxItems: 10
+          minItems: 1
         criteria:
           type: string
           maxLength: 50000
@@ -8091,12 +8090,6 @@ components:
           type: string
           maxLength: 100000
           minLength: 0
-        triggerEvents:
-          type: array
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
         whatGoodLooksLike:
           type: string
           maxLength: 2000
@@ -8106,10 +8099,9 @@ components:
           maxLength: 2000
           minLength: 0
       required:
-      - artifactKind
+      - bindings
       - criteria
       - name
-      - triggerEvents
     CuratedPracticeSummary:
       type: object
       properties:
@@ -9656,12 +9648,18 @@ components:
           description: "Slug of the practice area this practice is bound to, if any"
         artifactKind:
           type: string
-          description: Kind of work this practice reviews
+          description: "Kind of work this practice reviews, read off its bindings"
           example: scm.pull_request
         automatedReviewPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
         automatedReviewValidation:
           $ref: "#/components/schemas/PracticeAutomatedReviewValidation"
+        bindings:
+          type: array
+          description: "Occasions this practice is reviewed on, each with the evidence\
+            \ that review reads"
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
         catalogOrigin:
           $ref: "#/components/schemas/CatalogOrigin"
         createdAt:
@@ -9689,11 +9687,6 @@ components:
         slug:
           type: string
           description: URL-safe identifier unique within workspace
-        triggerEvents:
-          type: array
-          description: Domain events that start a practice review
-          items:
-            type: string
         updatedAt:
           type: string
           format: date-time
@@ -9711,13 +9704,13 @@ components:
       - artifactKind
       - automatedReviewPolicy
       - automatedReviewValidation
+      - bindings
       - createdAt
       - criteria
       - displayOrder
       - id
       - name
       - slug
-      - triggerEvents
       - updatedAt
       - usedInNewReviews
     PracticeArea:
@@ -9791,8 +9784,7 @@ components:
       - mode
     PracticeAutomatedReviewPolicy:
       type: object
-      description: Author-defined automated review and evidence requirements for one
-        practice revision
+      description: Author-defined automated review settings for one practice revision
       properties:
         automatedReview:
           $ref: "#/components/schemas/PracticeAutomatedReview"
@@ -9808,12 +9800,6 @@ components:
             requirement passes
           items:
             $ref: "#/components/schemas/PracticeEvidenceLimitation"
-        needs:
-          type: array
-          description: "Sources this practice reads, each with the stance it takes\
-            \ towards that source"
-          items:
-            $ref: "#/components/schemas/PracticeEvidenceRequirement"
         sourceContractVersion:
           type: string
           description: Exact contract version that defines source kinds and source-state
@@ -9826,7 +9812,6 @@ components:
       required:
       - automatedReview
       - knownLimitations
-      - needs
       - sourceContractVersion
       - whenEvidenceIsInsufficient
     PracticeAutomatedReviewValidation:
@@ -9871,6 +9856,30 @@ components:
       - reviewRuleFingerprint
       - sourceContractVersion
       - status
+    PracticeBinding:
+      type: object
+      description: "An occasion that starts a review, and the evidence that review\
+        \ reads"
+      properties:
+        needs:
+          type: array
+          description: "Sources a review occasioned this way reads, each with the\
+            \ stance it takes"
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceRequirement"
+        onDrafts:
+          type: boolean
+          description: Whether an artifact still marked draft occasions this review;
+            omit for false
+        signals:
+          type: array
+          description: "Signals that occasion this review, e.g. scm.pull_request.merged"
+          items:
+            type: string
+          minItems: 1
+      required:
+      - needs
+      - signals
     PracticeDefinitionOptions:
       type: object
       description: Available and recommended authoring choices for each type of reviewed
@@ -9963,6 +9972,7 @@ components:
           description: Whether an absent or degraded capture refuses the review
           enum:
           - REQUIRED
+          - EXHAUSTIVE
           - CONTEXTUAL
       required:
       - sourceKind
@@ -10023,35 +10033,29 @@ components:
         runForAllUsersOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
-        skipDrafts:
-          type: boolean
-          description: "Effective: skip draft PRs/MRs"
-        skipDraftsOverride:
-          type: boolean
-          description: Raw override; null = inheriting the fleet default
       required:
       - cooldownMinutes
       - deliverToMerged
       - runForAllUsers
-      - skipDrafts
-    PracticeTriggerEventOption:
+    PracticeSignalOption:
       type: object
-      description: An event that can start an automated practice review
+      description: A signal a practice can start an automated review on
       properties:
         displayName:
           type: string
-        event:
-          type: string
         recommended:
           type: boolean
+        signal:
+          type: string
+          example: scm.pull_request.ready
       required:
       - displayName
-      - event
       - recommended
+      - signal
     PracticeWorkTypeDefinitionOptions:
       type: object
-      description: "Review timing, evidence choices, and recommended requirements\
-        \ for one type of reviewed work"
+      description: "Review timing, evidence choices, and recommended settings for\
+        \ one type of reviewed work"
       properties:
         allowedSources:
           type: array
@@ -10059,8 +10063,19 @@ components:
             $ref: "#/components/schemas/PracticeEvidenceSourceOption"
         artifactKind:
           type: string
-        recommendedRequirements:
+        recommendedNeeds:
+          type: array
+          description: Evidence a new binding on this work type starts with when the
+            author says nothing
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceRequirement"
+        recommendedPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+        signals:
+          type: array
+          description: Signals a practice on this work type can be reviewed on
+          items:
+            $ref: "#/components/schemas/PracticeSignalOption"
         supportedAutomatedReviewModes:
           type: array
           items:
@@ -10070,16 +10085,13 @@ components:
             enum:
             - LANGUAGE_MODEL
             - NONE
-        triggerEvents:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeTriggerEventOption"
       required:
       - allowedSources
       - artifactKind
-      - recommendedRequirements
+      - recommendedNeeds
+      - recommendedPolicy
+      - signals
       - supportedAutomatedReviewModes
-      - triggerEvents
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential
@@ -12292,14 +12304,19 @@ components:
           $ref: "#/components/schemas/BindPracticeAreaRequest"
           description: Catalog placement to apply with the definition update; omit
             to leave unchanged
-        artifactKind:
-          type: string
-          description: Kind of reviewed work
-          example: scm.issue
         automatedReviewPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
-          description: "Replacement evidence requirements; omit to preserve them,\
-            \ or to use the recommended requirements when artifactKind changes"
+          description: "Replacement review settings; omit to preserve them, or to\
+            \ take the recommended ones when the bindings move the practice to a different\
+            \ kind of work"
+        bindings:
+          type: array
+          description: Replacement occasions and their evidence; omit to leave them
+            unchanged
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
+          maxItems: 10
+          minItems: 1
         clear:
           type: array
           description: Optional fields to clear before applying supplied values
@@ -12328,14 +12345,6 @@ components:
           description: TypeScript/Bun static analysis run before automated review
           maxLength: 100000
           minLength: 0
-        triggerEvents:
-          type: array
-          description: Events that start a practice review; empty for scheduled conversation
-            reviews
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
         whatGoodLooksLike:
           type: string
           description: Concrete example shown to the developer; not review criteria
@@ -12378,9 +12387,6 @@ components:
           type: boolean
           description: Run practice review for all developers (vs only the run_practice_review
             role)
-        skipDrafts:
-          type: boolean
-          description: Skip practice review for draft PRs/MRs
     UpdatePracticeUsageRequest:
       type: object
       description: Request to choose whether new reviews include a practice

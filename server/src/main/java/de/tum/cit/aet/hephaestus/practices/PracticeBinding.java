@@ -55,13 +55,12 @@ public record PracticeBinding(
     boolean onDrafts
 ) {
     /**
-     * Reads a binding that may not mention drafts at all.
+     * Reads a binding that does not mention drafts at all.
      *
-     * <p>Needed because the component is a primitive and Jackson refuses to guess one: without this,
-     * every binding in the bundled catalog and every binding a client posts would have to spell out
-     * {@code "onDrafts": false}. The default is stated once, here and in the javadoc above, rather than
-     * 36 times in the catalog — and a shape that must be written out is a shape that will be written
-     * out wrong.
+     * <p>The component is a primitive because the value is never absent once constructed, and Jackson
+     * will not guess a primitive. Without this every binding in the bundled catalog and every binding a
+     * client posts would have to spell out {@code "onDrafts": false} — and a shape that must be written
+     * out is a shape that will be written out wrong.
      */
     @JsonCreator
     static PracticeBinding fromJson(
