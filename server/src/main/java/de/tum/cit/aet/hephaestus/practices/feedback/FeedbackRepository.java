@@ -417,4 +417,37 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
         Long getObservationCount();
     }
+
+    /**
+     * How much of what was measured on one artifact actually reached a person, by practice.
+     *
+     * <p>The second axis of the trace view. A practice can be assessed and still say nothing — because
+     * its tier is {@code MEASURE}, because the recipient disputed the last one, because a cap was hit —
+     * and reporting only the measurement would hide precisely the distinction loudness tiers exist to
+     * make. {@code COUNT(DISTINCT)} because one unit routinely fuses several observations of the same
+     * practice, and counting the join rows would triple it.
+     */
+    @Query(
+        """
+        SELECT o.practice.id AS practiceId, f.deliveryState AS deliveryState,
+               f.suppressionReason AS suppressionReason, COUNT(DISTINCT f.id) AS units
+        FROM FeedbackObservation fo JOIN fo.feedback f JOIN fo.observation o
+        WHERE f.workspaceId = :workspaceId
+          AND o.artifactKind = :artifactKind
+          AND o.artifactId = :artifactId
+        GROUP BY o.practice.id, f.deliveryState, f.suppressionReason
+        """
+    )
+    List<ArtifactFeedbackRow> summarizeForArtifact(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") ArtifactKind artifactKind,
+        @Param("artifactId") Long artifactId
+    );
+
+    interface ArtifactFeedbackRow {
+        Long getPracticeId();
+        FeedbackDeliveryState getDeliveryState();
+        FeedbackSuppressionReason getSuppressionReason();
+        long getUnits();
+    }
 }

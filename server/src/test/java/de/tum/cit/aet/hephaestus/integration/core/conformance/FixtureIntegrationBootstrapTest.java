@@ -93,7 +93,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         assertThat(dormant.getFirst().raisedByAnyOf())
             .as("the reason names what to connect, so it is actionable rather than merely true")
             .containsExactly(FixtureIntegration.KIND);
-        assertThat(dormant.getFirst().reason()).contains("connect one of");
+        assertThat(dormant.getFirst().reason()).contains("connect " + FixtureIntegration.KIND.name());
     }
 
     @Test

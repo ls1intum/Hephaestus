@@ -40,6 +40,34 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("ids") Collection<UUID> ids
     );
 
+    /**
+     * What these runs decided, for the trace view. {@code reviewReadiness} is the per-practice record
+     * and is deliberately fetched with them: the two ways a run can end without measuring a practice —
+     * refused evidence and never admitted — are only distinguishable by reading it.
+     */
+    @Query(
+        "SELECT j.id AS id, j.status AS status, j.output AS output, j.reviewReadiness AS reviewReadiness, " +
+            "j.completedAt AS completedAt FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids"
+    )
+    List<ReviewOutcomeRow> findReviewOutcomes(
+        @Param("workspaceId") Long workspaceId,
+        @Param("ids") Collection<UUID> ids
+    );
+
+    interface ReviewOutcomeRow {
+        UUID getId();
+        AgentJobStatus getStatus();
+
+        @Nullable
+        JsonNode getOutput();
+
+        @Nullable
+        JsonNode getReviewReadiness();
+
+        @Nullable
+        Instant getCompletedAt();
+    }
+
     @Query(
         "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
             "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +

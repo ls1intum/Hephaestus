@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A practice that is switched on and can never fire here, with the reason attached.
@@ -31,11 +32,19 @@ public record DormantBinding(
         raisedByAnyOf = Set.copyOf(raisedByAnyOf);
     }
 
-    /** A human-readable reason, phrased as the action that would end the dormancy. */
+    /**
+     * A human-readable reason, phrased as the action that would end the dormancy.
+     *
+     * <p>The lists are joined by hand rather than left to {@code Collection.toString}: this sentence is
+     * read by a developer asking why nothing happened to their work, and {@code [GITHUB, GITLAB]} is a
+     * debug dump wearing an answer's clothes.
+     */
     public String reason() {
+        String names = signals.stream().map(SignalName::value).sorted().collect(Collectors.joining(", "));
         if (raisedByAnyOf.isEmpty()) {
-            return "no integration can raise " + signals + " — the practice is bound to signals nothing produces";
+            return "no integration can raise " + names + " — the practice is bound to signals nothing produces";
         }
-        return "no connected integration raises " + signals + "; connect one of " + raisedByAnyOf;
+        String integrations = raisedByAnyOf.stream().map(Enum::name).sorted().collect(Collectors.joining(" or "));
+        return "no connected integration raises " + names + "; connect " + integrations;
     }
 }

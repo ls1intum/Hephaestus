@@ -82,6 +82,9 @@ tags:
   name: Instance Settings
 - description: Contributor rankings and league statistics
   name: Leaderboard
+- description: Why each practice did or did not run on one piece of work; readable
+    by any workspace member
+  name: Practice review trace
 - description: Current instance definitions visible to workspace administrators
   name: Practice Catalog
 - description: Session lifecycle
@@ -5245,6 +5248,103 @@ paths:
       summary: Get a finding with its evidence and linked feedback
       tags:
       - Practice reviews
+  /workspaces/{workspaceSlug}/practices/trace:
+    get:
+      description: "Built from the signal ledger, so it includes work that was never\
+        \ reviewed — which is exactly what a listing derived from review runs cannot\
+        \ show. Most recently signalled first."
+      operationId: listTracedArtifacts
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 25
+          maximum: 100
+          minimum: 1
+      - description: "Restrict to one kind of work, e.g. scm.pull_request"
+        in: query
+        name: artifactKind
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelTracedArtifact"
+          description: Paginated artifacts returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Unknown artifact kind or invalid pagination
+      summary: List work this workspace recorded something about
+      tags:
+      - Practice review trace
+  /workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}:
+    get:
+      description: "Every practice the workspace runs against this kind of work appears,\
+        \ including the ones that did nothing, each with the recorded reason. 404\
+        \ means nothing about this artifact was ever recorded here — not that the\
+        \ trace is unavailable."
+      operationId: getArtifactTrace
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: "Kind of work, e.g. scm.pull_request"
+        in: path
+        name: artifactKind
+        required: true
+        schema:
+          type: string
+      - description: The artifact's identifier as the ledger stores it
+        in: path
+        name: artifactId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactTrace"
+          description: Trace returned
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Nothing recorded about this artifact in this workspace
+      summary: Explain what every practice did about one piece of work
+      tags:
+      - Practice review trace
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -6984,6 +7084,48 @@ components:
       - reviewOutcome
       - status
       - target
+    ArtifactTrace:
+      type: object
+      description: "Every practice's answer for one artifact, and the occurrences\
+        \ those answers rest on"
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+        artifactKind:
+          type: string
+        container:
+          type: string
+          description: "Repository, collection or channel it sits in"
+        number:
+          type: integer
+          format: int32
+          description: "The number the provider shows, for kinds that have one"
+        practices:
+          type: array
+          description: "Every practice this workspace runs against this kind of work,\
+            \ answered ones first, then the quiet ones"
+          items:
+            $ref: "#/components/schemas/PracticeTraceEntry"
+        signals:
+          type: array
+          description: "Everything recorded about this artifact, oldest first"
+          items:
+            $ref: "#/components/schemas/TracedSignal"
+        title:
+          type: string
+          description: The label a person recognises; the kind's display name when
+            the mirror cannot name it
+        url:
+          type: string
+          description: Where to open it upstream; absent for a deleted or unlinkable
+            artifact
+      required:
+      - artifactId
+      - artifactKind
+      - practices
+      - signals
+      - title
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -9801,6 +9943,15 @@ components:
             $ref: "#/components/schemas/ReviewRunSummary"
         page:
           $ref: "#/components/schemas/PageMetadata"
+    PagedModelTracedArtifact:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/TracedArtifact"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
     PlacePracticeRequest:
       type: object
       description: A practice's position in the catalog
@@ -10249,6 +10400,101 @@ components:
       - displayName
       - recommended
       - signal
+    PracticeTraceEntry:
+      type: object
+      description: "What became of one practice on this artifact, and whether anyone\
+        \ heard about it"
+      properties:
+        decidedAt:
+          type: string
+          format: date-time
+          description: When the answer was settled
+        deliveredCount:
+          type: integer
+          format: int32
+          description: Interventions actually delivered to a person
+        explanation:
+          type: string
+          description: "The outcome in a sentence, phrased as what would change it"
+        observationCount:
+          type: integer
+          format: int32
+          description: Measurements this practice produced on this artifact
+        occasionedBy:
+          type: string
+          description: The occurrence this answer is about; null when nothing it watches
+            happened
+        occasionedById:
+          type: string
+          format: uuid
+          description: That occurrence's id in this trace's signals list. The name
+            alone cannot identify it — the same signal recurs on every revision —
+            so this is what a link should follow.
+        outcome:
+          type: string
+          enum:
+          - REVIEWED
+          - RUNNING
+          - PENDING
+          - SKIPPED
+          - NOT_ASSESSABLE
+          - SILENCED
+          - NOT_OCCASIONED
+          - DORMANT
+          - LAPSED
+          - FAILED
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        reviewId:
+          type: string
+          format: uuid
+          description: "The review this answer came from, when one ran"
+        reviewTier:
+          type: string
+          description: How loudly the workspace currently runs this practice
+          enum:
+          - "OFF"
+          - MEASURE
+          - COACH
+          - ENGAGE
+        watches:
+          type: array
+          description: The signals this practice watches
+          items:
+            type: string
+        withheldReasons:
+          type: array
+          description: Why prepared feedback was withheld. Non-empty with observations
+            present means we measured and deliberately said nothing.
+          items:
+            type: string
+            enum:
+            - VOLUME_CAPPED
+            - COMPOSER_DEDUPED
+            - REACTED_DISPUTED
+            - REACTED_NOT_APPLICABLE
+            - CONVERSATION_EXPIRED
+            - ARTIFACT_GONE
+            - ARTIFACT_CLOSED
+            - ARTIFACT_MERGED
+            - ARTIFACT_DRAFT
+            - RECIPIENT_OPTED_OUT
+            - EMPTY_AFTER_SANITIZE
+            - INSTANCE_SILENCED
+            - PRACTICE_TIER_QUIET
+            - BACKFILL_QUIET
+      required:
+      - deliveredCount
+      - explanation
+      - observationCount
+      - outcome
+      - practiceName
+      - practiceSlug
+      - reviewTier
+      - watches
+      - withheldReasons
     PracticeWorkTypeDefinitionOptions:
       type: object
       description: "Review timing, evidence choices, and recommended settings for\
@@ -12308,6 +12554,119 @@ components:
       - hidden
       - id
       - name
+    TracedArtifact:
+      type: object
+      description: "An artifact this workspace recorded something about, and how much\
+        \ of it turned into review"
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+        artifactKind:
+          type: string
+        container:
+          type: string
+          description: "Repository, collection or channel it sits in"
+        lastSignalAt:
+          type: string
+          format: date-time
+        number:
+          type: integer
+          format: int32
+          description: "The number the provider shows, for kinds that have one"
+        reviewedSignalCount:
+          type: integer
+          format: int32
+          description: How many of them started a review
+        signalCount:
+          type: integer
+          format: int32
+          description: Occurrences recorded on this artifact
+        title:
+          type: string
+        url:
+          type: string
+          description: Where to open it upstream; absent for a deleted or unlinkable
+            artifact
+      required:
+      - artifactId
+      - artifactKind
+      - lastSignalAt
+      - reviewedSignalCount
+      - signalCount
+      - title
+    TracedSignal:
+      type: object
+      description: "One thing that happened to this artifact, and what the system\
+        \ did about it"
+      properties:
+        discoveredVia:
+          type: string
+          description: "How we came to know: by event, by sync, by hand, or by backfill"
+          enum:
+          - EVENT
+          - SYNC
+          - MANUAL
+          - BACKFILL
+        displayName:
+          type: string
+          description: "Human label for the signal, from the artifact kind's descriptor"
+        id:
+          type: string
+          format: uuid
+          description: This occurrence's own identity; what a practice's occasionedById
+            points at
+        occurredAt:
+          type: string
+          format: date-time
+          description: "When it happened upstream; for a sync discovery, only as precise\
+            \ as the sync"
+        reviewId:
+          type: string
+          format: uuid
+          description: "The review this occurrence started, when it started one"
+        revision:
+          type: string
+          description: Which version of the artifact this occurrence is about; the
+            reason editing a description can be re-measured while the commits stay
+            put
+        signal:
+          type: string
+          description: "Signal name, e.g. scm.pull_request.ready"
+        state:
+          type: string
+          enum:
+          - RECORDED
+          - TRIGGERED
+          - SUPPRESSED
+          - PENDING
+          - LAPSED
+        stateReason:
+          type: string
+          description: Why it ended in that state; null once it triggered a review
+          enum:
+          - GATE_SKIPPED
+          - COOLDOWN_ACTIVE
+          - CONCURRENT_DUPLICATE
+          - OUT_OF_REVIEW_SCOPE
+          - WORKSPACE_INACTIVE
+          - PRACTICES_DISABLED
+          - NO_ACTIVE_PRACTICE
+          - BINDING_DISABLED
+          - PRACTICE_TIER_OFF
+          - BUDGET_EXHAUSTED
+          - SUBJECT_UNLINKED
+          - MODEL_UNAVAILABLE
+          - PENDING_DEADLINE_EXCEEDED
+          - ARTIFACT_GONE
+      required:
+      - discoveredVia
+      - displayName
+      - id
+      - occurredAt
+      - revision
+      - signal
+      - state
     TriggerSyncJobRequest:
       type: object
       description: Manual sync trigger request body

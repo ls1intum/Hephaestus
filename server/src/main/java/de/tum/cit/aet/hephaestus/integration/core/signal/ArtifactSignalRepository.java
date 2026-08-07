@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -145,4 +147,69 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
         nativeQuery = true
     )
     int lapseStalePending(@Param("deadline") Instant deadline, @Param("now") Instant now);
+
+    /**
+     * Everything this workspace ever recorded about one artifact, oldest first.
+     *
+     * <p>Empty is the answer that decides whether a trace exists at all: the ledger row is the only
+     * workspace-scoped fact about a mirrored artifact — a repository belongs to a workspace through a
+     * monitor mapping rather than a column — so a caller asking about an id it does not own gets an
+     * empty list here and a 404 rather than another tenant's title.
+     */
+    @Query(
+        "SELECT s FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
+            " AND s.artifactKind = :artifactKind AND s.artifactId = :artifactId" +
+            " ORDER BY s.occurredAt ASC, s.signalName ASC"
+    )
+    List<ArtifactSignal> findForArtifact(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") String artifactKind,
+        @Param("artifactId") Long artifactId
+    );
+
+    /**
+     * One row per artifact this workspace has recorded anything about, most recently signalled first.
+     *
+     * <p>The index of everything the system was in a position to say something about — including,
+     * deliberately, the artifacts it said nothing about, which no job-derived listing can show.
+     */
+    @Query(
+        value = "SELECT s.artifactKind AS artifactKind, s.artifactId AS artifactId," +
+            " MAX(s.occurredAt) AS lastSignalAt, COUNT(s) AS signalCount," +
+            " SUM(CASE WHEN s.state = de.tum.cit.aet.hephaestus.integration.core.signal.SignalState.TRIGGERED" +
+            " THEN 1 ELSE 0 END) AS reviewedSignalCount" +
+            " FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
+            " AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)" +
+            " GROUP BY s.artifactKind, s.artifactId ORDER BY MAX(s.occurredAt) DESC, s.artifactId DESC",
+        countQuery = "SELECT COUNT(DISTINCT CONCAT(s.artifactKind, ':', s.artifactId)) FROM ArtifactSignal s" +
+            " WHERE s.workspace.id = :workspaceId AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)"
+    )
+    Page<SignalledArtifactRow> findSignalledArtifacts(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") @Nullable String artifactKind,
+        Pageable pageable
+    );
+
+    /**
+     * Every signal this workspace has ever actually recorded.
+     *
+     * <p>Evidence against a dormancy claim. Coverage is derived from which integrations are registered
+     * as connected, which is the right answer to "will this ever fire" and the wrong one to "has this
+     * ever fired": a signal sitting in the ledger demonstrably arrives here whatever the connection
+     * registry currently says. Telling somebody a practice is waiting for an integration when the very
+     * signal it waits on is in the log would be a confidently wrong answer on the page whose entire job
+     * is to be right about silence.
+     *
+     * <p>Bounded by the size of the signal vocabulary, not by the number of rows.
+     */
+    @Query("SELECT DISTINCT s.signalName FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId")
+    List<String> findRecordedSignalNames(@Param("workspaceId") Long workspaceId);
+
+    interface SignalledArtifactRow {
+        String getArtifactKind();
+        Long getArtifactId();
+        Instant getLastSignalAt();
+        long getSignalCount();
+        long getReviewedSignalCount();
+    }
 }

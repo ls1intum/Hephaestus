@@ -73,6 +73,10 @@ import org.springframework.data.web.PagedModel;
             name = "Practice reviews",
             description = "Workspace-admin access to review runs, findings, and message delivery history"
         ),
+        @Tag(
+            name = "Practice review trace",
+            description = "Why each practice did or did not run on one piece of work; readable by any workspace member"
+        ),
     },
     servers = { @Server(url = "/", description = "Default Server URL") },
     security = { @SecurityRequirement(name = "bearerAuth") }

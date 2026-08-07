@@ -794,4 +794,33 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         UUID getObservationId();
         PracticeReviewTier getReviewTier();
     }
+
+    /**
+     * Every measurement taken on one artifact, by practice — the trace view's evidence that a practice
+     * ran at all.
+     *
+     * <p>Keyed off the artifact rather than off a run, so a measurement whose run predates the signal
+     * ledger, or one taken by a review nobody linked back, still counts. A practice that produced a
+     * measurement must never be reported as silent.
+     */
+    @Query(
+        """
+        SELECT o.practice.id AS practiceId, o.agentJobId AS reviewId, o.observedAt AS observedAt
+        FROM Observation o
+        WHERE o.practice.workspace.id = :workspaceId
+          AND o.artifactKind = :artifactKind
+          AND o.artifactId = :artifactId
+        """
+    )
+    List<ArtifactObservationRow> findForArtifact(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") ArtifactKind artifactKind,
+        @Param("artifactId") Long artifactId
+    );
+
+    interface ArtifactObservationRow {
+        Long getPracticeId();
+        UUID getReviewId();
+        Instant getObservedAt();
+    }
 }

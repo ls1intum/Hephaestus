@@ -1369,6 +1369,75 @@ export type TriggerSyncJobRequest = {
 };
 
 /**
+ * One thing that happened to this artifact, and what the system did about it
+ */
+export type TracedSignal = {
+    /**
+     * How we came to know: by event, by sync, by hand, or by backfill
+     */
+    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL';
+    /**
+     * Human label for the signal, from the artifact kind's descriptor
+     */
+    displayName: string;
+    /**
+     * This occurrence's own identity; what a practice's occasionedById points at
+     */
+    id: string;
+    /**
+     * When it happened upstream; for a sync discovery, only as precise as the sync
+     */
+    occurredAt: Date;
+    /**
+     * The review this occurrence started, when it started one
+     */
+    reviewId?: string;
+    /**
+     * Which version of the artifact this occurrence is about; the reason editing a description can be re-measured while the commits stay put
+     */
+    revision: string;
+    /**
+     * Signal name, e.g. scm.pull_request.ready
+     */
+    signal: string;
+    state: 'RECORDED' | 'TRIGGERED' | 'SUPPRESSED' | 'PENDING' | 'LAPSED';
+    /**
+     * Why it ended in that state; null once it triggered a review
+     */
+    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'BINDING_DISABLED' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+};
+
+/**
+ * An artifact this workspace recorded something about, and how much of it turned into review
+ */
+export type TracedArtifact = {
+    artifactId: number;
+    artifactKind: string;
+    /**
+     * Repository, collection or channel it sits in
+     */
+    container?: string;
+    lastSignalAt: Date;
+    /**
+     * The number the provider shows, for kinds that have one
+     */
+    number?: number;
+    /**
+     * How many of them started a review
+     */
+    reviewedSignalCount: number;
+    /**
+     * Occurrences recorded on this artifact
+     */
+    signalCount: number;
+    title: string;
+    /**
+     * Where to open it upstream; absent for a deleted or unlinkable artifact
+     */
+    url?: string;
+};
+
+/**
  * Detailed information about a team including members, repositories, and labels
  */
 export type TeamInfo = {
@@ -2855,6 +2924,55 @@ export type PracticeEvidenceSourceOption = {
 };
 
 /**
+ * What became of one practice on this artifact, and whether anyone heard about it
+ */
+export type PracticeTraceEntry = {
+    /**
+     * When the answer was settled
+     */
+    decidedAt?: Date;
+    /**
+     * Interventions actually delivered to a person
+     */
+    deliveredCount: number;
+    /**
+     * The outcome in a sentence, phrased as what would change it
+     */
+    explanation: string;
+    /**
+     * Measurements this practice produced on this artifact
+     */
+    observationCount: number;
+    /**
+     * The occurrence this answer is about; null when nothing it watches happened
+     */
+    occasionedBy?: string;
+    /**
+     * That occurrence's id in this trace's signals list. The name alone cannot identify it — the same signal recurs on every revision — so this is what a link should follow.
+     */
+    occasionedById?: string;
+    outcome: 'REVIEWED' | 'RUNNING' | 'PENDING' | 'SKIPPED' | 'NOT_ASSESSABLE' | 'SILENCED' | 'NOT_OCCASIONED' | 'DORMANT' | 'LAPSED' | 'FAILED';
+    practiceName: string;
+    practiceSlug: string;
+    /**
+     * The review this answer came from, when one ran
+     */
+    reviewId?: string;
+    /**
+     * How loudly the workspace currently runs this practice
+     */
+    reviewTier: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
+    /**
+     * The signals this practice watches
+     */
+    watches: Array<string>;
+    /**
+     * Why prepared feedback was withheld. Non-empty with observations present means we measured and deliberately said nothing.
+     */
+    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
+};
+
+/**
  * A workspace's practice-review policy: effective values plus raw overrides
  */
 export type PracticeReviewSettings = {
@@ -3114,8 +3232,8 @@ export type PlacePracticeRequest = {
     position: number;
 };
 
-export type PagedModelReviewRunSummary = {
-    content?: Array<ReviewRunSummary>;
+export type PagedModelTracedArtifact = {
+    content?: Array<TracedArtifact>;
     page?: PageMetadata;
 };
 
@@ -3124,6 +3242,11 @@ export type PageMetadata = {
     size?: number;
     totalElements?: number;
     totalPages?: number;
+};
+
+export type PagedModelReviewRunSummary = {
+    content?: Array<ReviewRunSummary>;
+    page?: PageMetadata;
 };
 
 export type PagedModelReviewFinding = {
@@ -5027,6 +5150,38 @@ export type AssignRoleRequest = {
      * User ID of the member to update
      */
     userId: number;
+};
+
+/**
+ * Every practice's answer for one artifact, and the occurrences those answers rest on
+ */
+export type ArtifactTrace = {
+    artifactId: number;
+    artifactKind: string;
+    /**
+     * Repository, collection or channel it sits in
+     */
+    container?: string;
+    /**
+     * The number the provider shows, for kinds that have one
+     */
+    number?: number;
+    /**
+     * Every practice this workspace runs against this kind of work, answered ones first, then the quiet ones
+     */
+    practices: Array<PracticeTraceEntry>;
+    /**
+     * Everything recorded about this artifact, oldest first
+     */
+    signals: Array<TracedSignal>;
+    /**
+     * The label a person recognises; the kind's display name when the mirror cannot name it
+     */
+    title: string;
+    /**
+     * Where to open it upstream; absent for a deleted or unlinkable artifact
+     */
+    url?: string;
 };
 
 /**
@@ -9396,6 +9551,81 @@ export type GetPracticeReviewFindingResponses = {
 };
 
 export type GetPracticeReviewFindingResponse = GetPracticeReviewFindingResponses[keyof GetPracticeReviewFindingResponses];
+
+export type ListTracedArtifactsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        /**
+         * Restrict to one kind of work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/trace';
+};
+
+export type ListTracedArtifactsErrors = {
+    /**
+     * Unknown artifact kind or invalid pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListTracedArtifactsError = ListTracedArtifactsErrors[keyof ListTracedArtifactsErrors];
+
+export type ListTracedArtifactsResponses = {
+    /**
+     * Paginated artifacts returned
+     */
+    200: PagedModelTracedArtifact;
+};
+
+export type ListTracedArtifactsResponse = ListTracedArtifactsResponses[keyof ListTracedArtifactsResponses];
+
+export type GetArtifactTraceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Kind of work, e.g. scm.pull_request
+         */
+        artifactKind: string;
+        /**
+         * The artifact's identifier as the ledger stores it
+         */
+        artifactId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}';
+};
+
+export type GetArtifactTraceErrors = {
+    /**
+     * Nothing recorded about this artifact in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetArtifactTraceError = GetArtifactTraceErrors[keyof GetArtifactTraceErrors];
+
+export type GetArtifactTraceResponses = {
+    /**
+     * Trace returned
+     */
+    200: ArtifactTrace;
+};
+
+export type GetArtifactTraceResponse = GetArtifactTraceResponses[keyof GetArtifactTraceResponses];
 
 export type DeletePracticeData = {
     body?: never;
