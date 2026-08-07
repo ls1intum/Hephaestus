@@ -68,4 +68,34 @@ class PracticeDefinitionOptionsServiceTest {
             .singleElement()
             .satisfies(option -> assertThat(option.displayName()).isEqualTo("Pull request details"));
     }
+
+    @Test
+    void saysWhichSourcesCanCarryAClaimAboutWhatIsAbsent() {
+        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
+        var service = new PracticeDefinitionOptionsService(
+            catalogs,
+            new PracticeEvidenceDefaults(catalogs),
+            PracticeSignalOptionsFixture.real()
+        );
+
+        PracticeDefinitionOptionsDTO result = service.options();
+
+        PracticeWorkTypeDefinitionOptionsDTO pullRequests = result
+            .workTypes()
+            .stream()
+            .filter(workType -> workType.artifactKind().equals(ArtifactKinds.PULL_REQUEST))
+            .findFirst()
+            .orElseThrow();
+        // The two sit at the same required-capture floor, so the flag is the only thing that separates
+        // them — an author offered EXHAUSTIVE over linked work items would be sending a request
+        // PracticeDefinitionValidator refuses.
+        assertThat(pullRequests.allowedSources())
+            .filteredOn(option -> option.sourceKind().equals("scm.pull-request.comments"))
+            .singleElement()
+            .satisfies(option -> assertThat(option.supportsExhaustiveEvidence()).isTrue());
+        assertThat(pullRequests.allowedSources())
+            .filteredOn(option -> option.sourceKind().equals("scm.linked-work-items"))
+            .singleElement()
+            .satisfies(option -> assertThat(option.supportsExhaustiveEvidence()).isFalse());
+    }
 }

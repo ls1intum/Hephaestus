@@ -2742,6 +2742,10 @@ export type PracticeEvidenceSourceOption = {
      */
     requiredQuality: 'ANY_CAPTURE' | 'COMPLETE' | 'COMPLETE_AND_NON_EMPTY';
     sourceKind: string;
+    /**
+     * Whether this source can be captured whole, and so whether a practice may rest a claim about what is absent from it on the capture
+     */
+    supportsExhaustiveEvidence: boolean;
 };
 
 /**

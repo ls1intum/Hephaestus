@@ -10002,12 +10002,17 @@ components:
           - COMPLETE_AND_NON_EMPTY
         sourceKind:
           type: string
+        supportsExhaustiveEvidence:
+          type: boolean
+          description: "Whether this source can be captured whole, and so whether\
+            \ a practice may rest a claim about what is absent from it on the capture"
       required:
       - description
       - displayName
       - privacyClass
       - requiredQuality
       - sourceKind
+      - supportsExhaustiveEvidence
     PracticeReviewSettings:
       type: object
       description: "A workspace's practice-review policy: effective values plus raw\
