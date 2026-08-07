@@ -83,7 +83,16 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
         @Param("now") Instant now
     );
 
-    /** @return rows updated (0 or 1); 0 means the signal was not where the caller left it. */
+    /**
+     * Settle an undecided signal as triggered.
+     *
+     * <p>The state predicate is what makes this an arbitration rather than a blind overwrite: only a row
+     * nobody has ruled on ({@code RECORDED}) or one the reaper is re-offering ({@code PENDING}) may be
+     * moved. Without it a late duplicate could re-point a {@code LAPSED} or already-{@code TRIGGERED} row
+     * at a second job and lose the first job's id.
+     *
+     * @return rows updated (0 or 1); 0 means the signal was not where the caller left it.
+     */
     @Modifying
     @Query(
         value = """
@@ -94,12 +103,21 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
           AND artifact_id = :#{#key.artifactId()}
           AND signal_name = :#{#key.signalName().value()}
           AND revision = :#{#key.revision().value()}
+          AND state IN ('RECORDED', 'PENDING')
         """,
         nativeQuery = true
     )
     int markTriggered(@Param("key") SignalKey key, @Param("jobId") UUID jobId, @Param("now") Instant now);
 
-    /** @return rows updated (0 or 1); 0 means the signal was not where the caller left it. */
+    /**
+     * Settle an undecided signal as refused, in whichever state the reason implies.
+     *
+     * <p>Same predicate and same reason as {@link #markTriggered}: a refusal must not overwrite a
+     * decision, and in particular must not walk a {@code LAPSED} row back to {@code PENDING}, which would
+     * re-enter it into the reaper's sweep and defeat the deadline that retired it.
+     *
+     * @return rows updated (0 or 1); 0 means the signal was not where the caller left it.
+     */
     @Modifying
     @Query(
         value = """
@@ -110,6 +128,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
           AND artifact_id = :#{#key.artifactId()}
           AND signal_name = :#{#key.signalName().value()}
           AND revision = :#{#key.revision().value()}
+          AND state IN ('RECORDED', 'PENDING')
         """,
         nativeQuery = true
     )
@@ -119,6 +138,32 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
         @Param("stateReason") String stateReason,
         @Param("now") Instant now
     );
+
+    /**
+     * Claim a swept batch by restamping its wait clock, before any of it is re-offered.
+     *
+     * <p>This is what makes {@link #findRetryablePending}'s ordering a queue rather than a treadmill. The
+     * sweep is ordered oldest-wait-first and bounded; a re-offer that throws leaves the row's state
+     * untouched, so without this claim the same batch returns to the head of the very next sweep and a
+     * batch-sized population of permanently-failing signals starves every other workspace on the instance
+     * until the lapse deadline retires them — days later.
+     *
+     * <p>Claiming up front rather than restamping per row afterwards also covers the re-offer that never
+     * returns at all (a crash, a lock timeout mid-batch).
+     *
+     * @return how many rows were still {@code PENDING} to claim
+     */
+    @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
+    @Transactional
+    @Modifying
+    @Query(
+        value = """
+        UPDATE artifact_signal SET state_changed_at = :now
+        WHERE id IN (:ids) AND state = 'PENDING'
+        """,
+        nativeQuery = true
+    )
+    int claimPendingForRetry(@Param("ids") List<UUID> ids, @Param("now") Instant now);
 
     /** Signals whose blocker has had time to clear, oldest wait first so nothing starves. */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")

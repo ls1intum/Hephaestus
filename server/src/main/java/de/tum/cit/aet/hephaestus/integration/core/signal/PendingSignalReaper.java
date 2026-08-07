@@ -73,22 +73,35 @@ public class PendingSignalReaper {
             now.minus(properties.pendingRetryAfter()),
             PageRequest.ofSize(properties.sweepBatchSize())
         );
+        if (due.isEmpty()) {
+            return;
+        }
+
+        // Claim the whole batch before re-offering any of it, so this sweep cannot hand the next one the
+        // same rows. A re-offer that throws does not touch the row's state, and the sweep is ordered by
+        // that state's clock — so without the claim a batch of permanently-failing signals would sit at
+        // the head of every sweep until the lapse deadline, and nothing behind them would ever be retried.
+        repository.claimPendingForRetry(due.stream().map(ArtifactSignal::getId).toList(), now);
+
         for (ArtifactSignal signal : due) {
-            PendingSignalResubmitter resubmitter = resubmitters.get(ArtifactKind.of(signal.getArtifactKind()));
-            if (resubmitter == null) {
-                // Not the signal's fault that nothing in this deployment can act on its kind; leave it
-                // to the lapse deadline rather than burning it.
-                log.debug("No resubmitter for pending signal kind, leaving it: kind={}", signal.getArtifactKind());
-                continue;
-            }
             try {
+                // Inside the try: the kind is free text as far as this row is concerned, and one row
+                // written by an older or a broken build must not abort the sweep for everything after it.
+                PendingSignalResubmitter resubmitter = resubmitters.get(ArtifactKind.of(signal.getArtifactKind()));
+                if (resubmitter == null) {
+                    // Not the signal's fault that nothing in this deployment can act on its kind; leave it
+                    // to the lapse deadline rather than burning it.
+                    log.debug("No resubmitter for pending signal kind, leaving it: kind={}", signal.getArtifactKind());
+                    continue;
+                }
                 resubmitter.resubmit(signal);
             } catch (RuntimeException e) {
                 log.warn(
-                    "Failed to re-offer pending signal: signalId={}, signal={}, artifactId={}",
+                    "Failed to re-offer pending signal: signalId={}, signal={}, artifactId={}, kind={}",
                     signal.getId(),
                     signal.getSignalName(),
                     signal.getArtifactId(),
+                    signal.getArtifactKind(),
                     e
                 );
             }

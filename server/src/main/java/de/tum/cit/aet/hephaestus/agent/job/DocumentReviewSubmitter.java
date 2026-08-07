@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Turns a recorded {@code docs.document} signal into a review, and settles the ledger row either way.
@@ -54,19 +55,22 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
     private final WorkspaceRepository workspaceRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
     private final SignalRecorder signalRecorder;
+    private final TransactionTemplate transactionTemplate;
 
     public DocumentReviewSubmitter(
         AgentJobService agentJobService,
         DocumentProjection documentProjection,
         WorkspaceRepository workspaceRepository,
         PracticeReviewDetectionGate practiceReviewDetectionGate,
-        SignalRecorder signalRecorder
+        SignalRecorder signalRecorder,
+        TransactionTemplate transactionTemplate
     ) {
         this.agentJobService = agentJobService;
         this.documentProjection = documentProjection;
         this.workspaceRepository = workspaceRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
         this.signalRecorder = signalRecorder;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Override
@@ -90,13 +94,18 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
      * Deliberately NOT transactional. {@link AgentJobService#submit} opens its own transaction and takes a
      * pessimistic lock on the workspace inside it; running that under a caller's transaction is what the
      * SCM listeners were restructured to avoid.
+     *
+     * <p>Which is exactly why every refusal below goes through {@link #refuse} rather than calling the
+     * recorder directly: {@code markRefused} is {@code Propagation.MANDATORY}, and neither entry point —
+     * the sync service nor the reaper — holds a transaction. A direct call throws, the caller swallows
+     * it, and the row stays {@code RECORDED} forever with no reason on it.
      */
     private void submit(SignalKey key, DiscoveredVia discoveredVia) {
         Workspace workspace = workspaceRepository.findById(key.workspaceId()).orElse(null);
         if (workspace == null) {
             // The ledger has a foreign key to the workspace, so this is a workspace deleted between
             // recording and here — nothing left to review, and nothing an operator can undo.
-            signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
+            refuse(key, SignalStateReason.ARTIFACT_GONE);
             return;
         }
 
@@ -106,7 +115,7 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
             .orElse(null);
         if (document == null) {
             log.debug("Document signal has no reviewable document left: documentId={}", key.artifactId());
-            signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
+            refuse(key, SignalStateReason.ARTIFACT_GONE);
             return;
         }
 
@@ -119,7 +128,7 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
                 key.artifactId(),
                 document.createdBySubject()
             );
-            signalRecorder.markRefused(key, SignalStateReason.SUBJECT_UNLINKED);
+            refuse(key, SignalStateReason.SUBJECT_UNLINKED);
             return;
         }
 
@@ -130,7 +139,7 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
                     key.artifactId(),
                     skip.reason()
                 );
-                signalRecorder.markRefused(key, skip.resolvedSignalReason());
+                refuse(key, skip.resolvedSignalReason());
             }
             case GateDecision.Detect detect -> agentJobService.submit(
                 detect.workspace().getId(),
@@ -147,5 +156,16 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
                 key
             );
         }
+    }
+
+    /**
+     * Settle the ledger row in a transaction of this class's own.
+     *
+     * <p>Not an annotation on this method: it is private, so self-invocation would bypass the proxy and
+     * the {@code MANDATORY} recorder would still throw — with a green annotation above it saying
+     * otherwise.
+     */
+    private void refuse(SignalKey key, SignalStateReason reason) {
+        transactionTemplate.executeWithoutResult(status -> signalRecorder.markRefused(key, reason));
     }
 }

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -29,11 +30,13 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The half of {@code docs.document} that was missing: a recorded signal becoming a review, and every
@@ -66,17 +69,35 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     @Mock
     private SignalRecorder signalRecorder;
 
+    /**
+     * Real settling, not a pass-through stub. Every refusal below goes through this template because the
+     * recorder is {@code Propagation.MANDATORY} and neither production entry point holds a transaction —
+     * so a test that let the submitter call the recorder directly would pass against code that throws in
+     * production. Running the callback is what makes these assertions mean anything.
+     */
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     private DocumentReviewSubmitter submitter;
     private Workspace workspace;
 
     @BeforeEach
     void setUp() {
+        lenient()
+            .doAnswer(invocation -> {
+                Consumer<Object> settle = invocation.getArgument(0);
+                settle.accept(null);
+                return null;
+            })
+            .when(transactionTemplate)
+            .executeWithoutResult(any());
         submitter = new DocumentReviewSubmitter(
             agentJobService,
             documentProjection,
             workspaceRepository,
             gate,
-            signalRecorder
+            signalRecorder,
+            transactionTemplate
         );
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);

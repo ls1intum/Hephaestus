@@ -56,13 +56,28 @@ public class LedgerSignalRecorder implements SignalRecorder {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void markTriggered(SignalKey key, UUID jobId) {
-        repository.markTriggered(key, jobId, Instant.now());
+        int affected = repository.markTriggered(key, jobId, Instant.now());
+        if (affected == 0) {
+            logUnsettled("triggered", key);
+            return;
+        }
+        log.debug(
+            "Signal triggered: workspaceId={}, signal={}, artifactId={}, jobId={}",
+            key.workspaceId(),
+            key.signalName(),
+            key.artifactId(),
+            jobId
+        );
     }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void markRefused(SignalKey key, SignalStateReason reason) {
-        repository.markRefused(key, reason.resultingState().name(), reason.name(), Instant.now());
+        int affected = repository.markRefused(key, reason.resultingState().name(), reason.name(), Instant.now());
+        if (affected == 0) {
+            logUnsettled("refused", key);
+            return;
+        }
         log.debug(
             "Signal refused: workspaceId={}, signal={}, artifactId={}, reason={}, state={}",
             key.workspaceId(),
@@ -70,6 +85,23 @@ public class LedgerSignalRecorder implements SignalRecorder {
             key.artifactId(),
             reason,
             reason.resultingState()
+        );
+    }
+
+    /**
+     * A settle that matched nothing. Either the row is gone, or somebody already decided it — both mean
+     * this caller's decision is void, and both are worth saying out loud rather than discarding: the
+     * ledger's whole purpose is that no signal ends up with no explanation.
+     */
+    private void logUnsettled(String attempted, SignalKey key) {
+        log.warn(
+            "Signal was not settleable as {}, leaving whoever decided it: workspaceId={}, signal={}," +
+                " artifactId={}, revision={}",
+            attempted,
+            key.workspaceId(),
+            key.signalName(),
+            key.artifactId(),
+            key.revision()
         );
     }
 }
