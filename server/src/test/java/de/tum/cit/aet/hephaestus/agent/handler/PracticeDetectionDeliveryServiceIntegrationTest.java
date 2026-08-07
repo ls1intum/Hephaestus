@@ -240,7 +240,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         Assessment assessment = switch (presence) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
-            case NOT_APPLICABLE -> null;
+            case NOT_APPLICABLE, INDETERMINATE -> null;
         };
         return new ValidatedFinding(
             slug,

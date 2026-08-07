@@ -957,4 +957,66 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-19">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation.origin already present">
+            <not><columnExists tableName="observation" columnName="origin"/></not>
+        </preConditions>
+        <comment>Record what occasioned each measurement, so a backfill sweep is never read as behaviour change.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- NOT NULL DEFAULT rather than nullable-then-backfill: observation is @Immutable and written by a
+            -- native INSERT, so there is no UPDATE path that could ever fill a null in afterwards. Every row
+            -- that predates the column came from the event-driven path, which is exactly LIVE, so the default
+            -- is the true value for the existing data and not a placeholder.
+            ALTER TABLE observation ADD COLUMN origin VARCHAR(16) NOT NULL DEFAULT 'LIVE';
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_origin
+                CHECK (origin IN ('LIVE', 'MANUAL', 'BACKFILL'));
+            -- Every behavioural read filters origin alongside the target it already scans by; without this the
+            -- exclusion turns each of those into a full scan of the table it was meant to narrow.
+            CREATE INDEX IF NOT EXISTS idx_observation_origin_target
+                ON observation (origin, artifact_kind, artifact_id);
+        ]]></sql>
+        <rollback><![CDATA[
+            DROP INDEX IF EXISTS idx_observation_origin_target;
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_origin;
+            ALTER TABLE observation DROP COLUMN IF EXISTS origin;
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-evidence-contract" id="1785743133884-20">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation presence already admits INDETERMINATE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_observation_presence'
+                  AND pg_get_constraintdef(oid) LIKE '%INDETERMINATE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit INDETERMINATE — looked, could not tell — as a presence that carries no assessment.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence;
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence
+                CHECK (presence IN ('PRESENT', 'ABSENT', 'NOT_APPLICABLE', 'INDETERMINATE'));
+            -- The coupling, restated over four values instead of three: assessment is present exactly when the
+            -- presence carries a direction. INDETERMINATE joins NOT_APPLICABLE on the null side, and that is the
+            -- whole point of the value -- a run that could not settle the question must not be able to smuggle a
+            -- GOOD or a BAD out with it.
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence_assessment;
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence_assessment
+                CHECK ((presence IN ('NOT_APPLICABLE', 'INDETERMINATE') AND assessment IS NULL)
+                    OR (presence IN ('PRESENT', 'ABSENT') AND assessment IS NOT NULL));
+        ]]></sql>
+        <rollback><![CDATA[
+            -- Rolling back the vocabulary means the rows written under it are no longer representable; drop
+            -- them rather than relabel, because every candidate relabel is a lie: NOT_APPLICABLE would assert
+            -- the practice did not apply, and PRESENT/ABSENT would invent the verdict the run declined to give.
+            DELETE FROM observation WHERE presence = 'INDETERMINATE';
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence_assessment;
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence_assessment
+                CHECK ((presence = 'NOT_APPLICABLE' AND assessment IS NULL)
+                    OR (presence IN ('PRESENT', 'ABSENT') AND assessment IS NOT NULL));
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence;
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence
+                CHECK (presence IN ('PRESENT', 'ABSENT', 'NOT_APPLICABLE'));
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

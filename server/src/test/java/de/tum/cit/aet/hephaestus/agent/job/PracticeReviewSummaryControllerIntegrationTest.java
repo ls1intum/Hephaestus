@@ -286,7 +286,8 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             "{}",
             "Reasoning",
             "summary-" + title,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
     }
 

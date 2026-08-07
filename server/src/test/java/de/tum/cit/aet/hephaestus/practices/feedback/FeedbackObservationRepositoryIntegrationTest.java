@@ -234,7 +234,8 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             null,
             null,
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
         return observationRepository.findById(id).orElseThrow();
     }

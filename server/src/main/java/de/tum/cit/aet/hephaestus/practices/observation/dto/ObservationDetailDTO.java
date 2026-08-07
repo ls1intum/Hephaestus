@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,8 +28,12 @@ public record ObservationDetailDTO(
     @NonNull @Schema(description = "Artifact type (e.g. PULL_REQUEST)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Artifact entity ID") Long artifactId,
     @NonNull @Schema(description = "Observation title") String title,
-    @NonNull @Schema(description = "Presence: PRESENT, ABSENT, or NOT_APPLICABLE") Presence presence,
-    @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
+    @NonNull @Schema(description = "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE") Presence presence,
+    @Nullable
+    @Schema(
+        description = "Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INDETERMINATE)"
+    )
+    Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @Nullable ObservationEvidenceDTO evidence,
@@ -37,6 +42,9 @@ public record ObservationDetailDTO(
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
     @NonNull ReviewClaimCurrentness claimCurrentness,
+    @NonNull
+    @Schema(description = "What occasioned the measurement; never mix origins in one trend line")
+    ObservationOrigin origin,
     @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     public static ObservationDetailDTO from(
@@ -60,6 +68,7 @@ public record ObservationDetailDTO(
             observation.getReasoning(),
             deliveredGuidance,
             ReviewClaimCurrentness.of(observation.getPracticeRevision(), practice),
+            observation.getOrigin(),
             observation.getObservedAt()
         );
     }

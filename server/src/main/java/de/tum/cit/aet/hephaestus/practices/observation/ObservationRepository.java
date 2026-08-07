@@ -51,7 +51,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         SELECT o.agent_job_id AS "jobId",
                COUNT(*) FILTER (WHERE o.assessment = 'GOOD') AS "strengths",
                COUNT(*) FILTER (WHERE o.assessment = 'BAD') AS "problems",
-               COUNT(*) FILTER (WHERE o.presence = 'NOT_APPLICABLE') AS "notApplicable"
+               COUNT(*) FILTER (WHERE o.presence = 'NOT_APPLICABLE') AS "notApplicable",
+               COUNT(*) FILTER (WHERE o.presence = 'INDETERMINATE') AS "indeterminate"
         FROM observation o
         JOIN practice p ON p.id = o.practice_id
         WHERE p.workspace_id = :workspaceId
@@ -70,6 +71,13 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Long getStrengths();
         Long getProblems();
         Long getNotApplicable();
+        /**
+         * Runs where the practice looked and could not settle the question. Counted apart from
+         * {@link #getNotApplicable()} rather than folded into it: both are silence on the artifact, but one
+         * says "there was nothing here to judge" and the other says "we could not tell", and an operator
+         * reading a review summary needs to know which of those a quiet run was.
+         */
+        Long getIndeterminate();
     }
 
     /**
@@ -90,14 +98,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             artifact_kind, artifact_id, about_user_id,
             title, presence, assessment, severity, confidence,
             evidence, reasoning,
-            recurrence_key, observed_at
+            recurrence_key, observed_at, origin
         )
         VALUES (
             :id, :idempotencyKey, :agentJobId, :practiceId, :practiceRevisionId,
             :artifactKind, :artifactId, :aboutUserId,
             :title, :presence, :assessment, :severity, :confidence,
             CAST(:evidence AS jsonb), :reasoning,
-            :recurrenceKey, :observedAt
+            :recurrenceKey, :observedAt, :origin
         )
         ON CONFLICT (occurrence_key) DO NOTHING
         """,
@@ -120,7 +128,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("evidence") String evidence,
         @Param("reasoning") String reasoning,
         @Param("recurrenceKey") String recurrenceKey,
-        @Param("observedAt") Instant observedAt
+        @Param("observedAt") Instant observedAt,
+        @Param("origin") String origin
     );
 
     @Modifying
@@ -328,12 +337,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
                 AND target_artifact.id = f.artifact_id
           )
+          AND f.origin <> 'BACKFILL'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_kind = f.artifact_kind
                 AND f2.artifact_id = f.artifact_id
+                AND f2.origin <> 'BACKFILL'
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC
               LIMIT 1
           )
@@ -398,11 +409,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
      * per finding (bounded by the page size) rather than JOIN-fetched.
      *
-     * <p>{@code NOT_APPLICABLE} is excluded: it dominates the list (the bulk are "no change needed /
-     * awaiting review" rows) the mentor cannot coach from, and would bury the actionable {@code BAD} problems
-     * and {@code GOOD} strengths within the page budget. The NA total still reaches the mentor via the
-     * presence-count summary; this is the drill-down list only, and stays recency-ordered (NOT re-ordered by
-     * severity) to preserve its "what happened lately" purpose. Aggregate policy matches
+     * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed. {@code NOT_APPLICABLE}
+     * dominates the list (the bulk are "no change needed / awaiting review" rows) the mentor cannot coach from,
+     * and would bury the actionable {@code BAD} problems and {@code GOOD} strengths within the page budget;
+     * {@code INDETERMINATE} is excluded for the stronger reason that there is nothing to coach — the practice
+     * could not settle the question, and turning that into conversation would invite the mentor to invent a
+     * direction the measurement declined to take. Both totals still reach the mentor via the presence-count
+     * summary; this is the drill-down list only, and stays recency-ordered (NOT re-ordered by severity) to
+     * preserve its "what happened lately" purpose. Aggregate policy matches
      * {@link #findSummaryByDeveloperAndWorkspace}.
      */
     @Query(
@@ -422,12 +436,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                 AND target_artifact.id = f.artifact_id
           )
           AND f.observed_at >= :since
-          AND f.presence <> 'NOT_APPLICABLE'
+          AND f.presence IN ('PRESENT', 'ABSENT')
+          AND f.origin <> 'BACKFILL'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
+                AND f2.origin <> 'BACKFILL'
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         ORDER BY f.observed_at DESC
@@ -468,11 +484,13 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           )
           AND f.observed_at >= :since
           AND f.severity IS NOT NULL
+          AND f.origin <> 'BACKFILL'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
+                AND f2.origin <> 'BACKFILL'
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.severity
@@ -508,11 +526,13 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                 AND target_artifact.id = f.artifact_id
           )
           AND f.observed_at >= :since
+          AND f.origin <> 'BACKFILL'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
+                AND f2.origin <> 'BACKFILL'
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.presence
@@ -531,6 +551,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * The runs (agent jobs) that produced ≥1 correlation-keyed finding for a target, newest first by the
      * run's latest detection. Pass {@code PageRequest.of(0, 2)} to get the two most-recent runs to diff.
      * Workspace-scoped via {@code Practice.workspace}.
+     *
+     * <p>A {@code BACKFILL} run is never one of the two. The diff is read as "did this get fixed between
+     * the two times we looked", and a sweep that looked at the artifact long after the fact would answer
+     * that question with a difference in sampling rather than a difference in the work.
      */
     @Query(
         """
@@ -538,6 +562,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         FROM Observation f JOIN f.practice p
         WHERE f.artifactKind = :artifactKind AND f.artifactId = :artifactId AND p.workspace.id = :workspaceId
           AND f.recurrenceKey IS NOT NULL
+          AND f.origin <> de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin.BACKFILL
         GROUP BY f.agentJobId
         ORDER BY MAX(f.observedAt) DESC, f.agentJobId DESC
         """
@@ -557,7 +582,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                f.title AS title, f.observedAt AS observedAt
         FROM Observation f JOIN f.practice p
         WHERE f.agentJobId IN :agentJobIds AND p.workspace.id = :workspaceId AND f.recurrenceKey IS NOT NULL
-          AND f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
+          AND f.presence IN (de.tum.cit.aet.hephaestus.practices.model.Presence.PRESENT,
+                             de.tum.cit.aet.hephaestus.practices.model.Presence.ABSENT)
         ORDER BY f.observedAt DESC
         """
     )

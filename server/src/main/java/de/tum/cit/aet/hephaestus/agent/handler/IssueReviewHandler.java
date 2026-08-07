@@ -92,6 +92,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             );
         }
         ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put(PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY, r.observationOrigin().name());
         metadata.put("artifact_kind", ArtifactKinds.ISSUE.value());
         metadata.put("repository_id", r.repositoryId());
         metadata.put("repository_full_name", r.repositoryFullName());

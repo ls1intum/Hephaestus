@@ -180,7 +180,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":50,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             "Reasoning for " + title,
             "recurrence-" + title,
-            observedAt
+            observedAt,
+            "LIVE"
         );
         return id;
     }

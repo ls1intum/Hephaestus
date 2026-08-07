@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -40,6 +41,17 @@ public record PullRequestReviewSubmissionRequest(
         if (baseRefName.isBlank()) {
             throw new IllegalArgumentException("baseRefName must not be blank");
         }
+    }
+
+    /**
+     * A run with no lifecycle event behind it was asked for by a person — the bot command and the
+     * gate-bypass dev path are the two — so its observations are a self-selected sample and are recorded
+     * as such. Reviews people request are not a random draw from the work: they are requested about work
+     * somebody was already unsure of.
+     */
+    @Override
+    public ObservationOrigin observationOrigin() {
+        return triggerEvent == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
     }
 
     /**

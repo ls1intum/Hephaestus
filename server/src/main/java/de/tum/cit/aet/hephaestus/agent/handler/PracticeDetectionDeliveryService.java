@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
@@ -81,7 +82,33 @@ public class PracticeDetectionDeliveryService {
         this.sourceCatalogs = sourceCatalogs;
     }
 
+    /**
+     * Job-metadata key carrying {@link ObservationOrigin}. Written at submission and read back here rather
+     * than re-derived: by delivery time, what occasioned the run is no longer reconstructable from the job
+     * row, and a scheduled sweep over live threads looks exactly like a backfill sweep over old ones.
+     */
+    public static final String ORIGIN_METADATA_KEY = "observation_origin";
+
     private record Target(ArtifactKind type, Long id, Long aboutUserId) {}
+
+    /**
+     * The origin stamped on this job, or {@link ObservationOrigin#LIVE} for a job submitted before the key
+     * existed. Falling back rather than failing is right for exactly one reason: every job that predates the
+     * key came from the event-driven path, so LIVE is the true value and not a guess.
+     */
+    private static ObservationOrigin originOf(JsonNode metadata) {
+        JsonNode node = metadata.get(ORIGIN_METADATA_KEY);
+        if (node == null || !node.isString()) {
+            return ObservationOrigin.LIVE;
+        }
+        try {
+            return ObservationOrigin.valueOf(node.asString());
+        } catch (IllegalArgumentException unknown) {
+            // A value this build does not know is a newer writer, not a licence to guess: refuse rather
+            // than silently file the run under LIVE and pollute the only population we treat as unbiased.
+            throw new JobDeliveryException("Unknown observation origin in job metadata: " + node.asString());
+        }
+    }
 
     @Transactional
     public DeliveryResult deliver(AgentJob job, List<ValidatedFinding> validFindings) {
@@ -123,6 +150,7 @@ public class PracticeDetectionDeliveryService {
             enforceEvidenceBoundary(finding, revision.getAutomatedReviewPolicy(), evidenceBoundary, job);
         }
 
+        ObservationOrigin origin = originOf(metadata);
         Long aboutUserId = target.aboutUserId();
         ArtifactKind artifactKind = target.type();
         Long artifactId = target.id();
@@ -191,7 +219,8 @@ public class PracticeDetectionDeliveryService {
                 evidenceJson,
                 finding.reasoning(),
                 recurrenceKey,
-                observedAt
+                observedAt,
+                origin.name()
             );
 
             if (rows == 1) {

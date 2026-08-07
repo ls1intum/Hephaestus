@@ -188,7 +188,8 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             null,
             "reasoning",
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
 
         Feedback feedback = feedbackRepository.save(

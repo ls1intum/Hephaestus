@@ -64,7 +64,8 @@ class ReviewRunSummaryQueryService {
                 : new ReviewFindingCountsDTO(
                       findingCounts.getStrengths(),
                       findingCounts.getProblems(),
-                      findingCounts.getNotApplicable()
+                      findingCounts.getNotApplicable(),
+                      findingCounts.getIndeterminate()
                   ),
             feedbackCounts == null
                 ? ReviewFeedbackCountsDTO.empty()

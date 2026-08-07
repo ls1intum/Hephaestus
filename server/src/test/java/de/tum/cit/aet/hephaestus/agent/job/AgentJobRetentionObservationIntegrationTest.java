@@ -79,7 +79,8 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
             "{}",
             "Reasoning",
             "retention-locus",
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
 
         int deleted = jobRepository.deleteUnreferencedTerminalRowsOlderThan(

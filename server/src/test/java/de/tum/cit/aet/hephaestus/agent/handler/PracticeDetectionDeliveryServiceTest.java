@@ -192,7 +192,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     any(),
                     any(),
                     anyString(),
-                    any()
+                    any(),
+                    anyString()
                 )
             )
             .thenReturn(1);
@@ -202,7 +203,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         Assessment assessment = switch (presence) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
-            case NOT_APPLICABLE -> null;
+            case NOT_APPLICABLE, INDETERMINATE -> null;
         };
         ObjectNode evidence = objectMapper.createObjectNode();
         evidence
@@ -366,7 +367,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 persistedEvidence.capture(),
                 any(),
                 anyString(),
-                any()
+                any(),
+                anyString()
             );
             assertThat(persistedEvidence.getValue()).doesNotContain("quoteSha256", "cbbe06955840924d");
         }
@@ -490,7 +492,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 isNull(),
                 fingerprintCaptor.capture(), // findingFingerprint == persisted recurrence_key
-                any()
+                any(),
+                eq("LIVE") // an event-triggered review is the unbiased population
             );
 
             // The recurrence_key written to the row MUST equal the fingerprint the result map returns —
@@ -701,7 +704,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any(),
                 any(),
                 anyString(),
-                any()
+                any(),
+                anyString()
             );
             return severityCaptor.getValue();
         }
@@ -750,7 +754,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     any(),
                     any(),
                     anyString(),
-                    any()
+                    any(),
+                    anyString()
                 )
             ).thenReturn(0);
 
@@ -786,7 +791,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any(),
                 any(),
                 anyString(),
-                any()
+                any(),
+                anyString()
             );
 
             String key = keyCaptor.getValue();
@@ -869,7 +875,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any(),
                 any(),
                 anyString(),
-                any()
+                any(),
+                anyString()
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().artifactKind()).isEqualTo(ArtifactKinds.ISSUE);

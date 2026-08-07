@@ -21,6 +21,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
@@ -147,8 +148,9 @@ public class Observation {
     private String title;
 
     /**
-     * Whether the practice's target signal was seen, expected-but-absent, or inapplicable (ADR 0022).
-     * Measurement only — the good/bad valence lives on {@link #assessment}.
+     * Whether the practice's target signal was seen, expected-but-absent, inapplicable, or undecidable
+     * from evidence that was present (ADR 0022). Measurement only — the good/bad valence lives on
+     * {@link #assessment}.
      */
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -157,13 +159,26 @@ public class Observation {
 
     /**
      * The good/bad valence of this observation, resolved per observation by the detector (ADR 0022).
-     * NULL iff {@link #presence} is {@link Presence#NOT_APPLICABLE} — an inapplicable practice has no
-     * valence. This coupling is the 2×2 invariant, enforced in the DB by
-     * {@code chk_observation_presence_assessment} and mirrored on the JPA path by {@link #onCreate}.
+     * NULL exactly when {@link #presence} does not {@link Presence#carriesValence() carry valence} — an
+     * inapplicable practice and an undecided one both have a direction of nothing. This coupling is the
+     * 2×2 invariant, enforced in the DB by {@code chk_observation_presence_assessment} and mirrored on
+     * the JPA path by {@link #onCreate}.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "assessment", length = 8)
     private Assessment assessment;
+
+    /**
+     * How this measurement was occasioned — see {@link ObservationOrigin}. NOT NULL with a {@code LIVE}
+     * default so the column can be added to an {@code @Immutable} table without a rewrite pass: every row
+     * that existed before the column did was produced by the event-driven path, which is exactly LIVE.
+     */
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origin", length = 16, nullable = false)
+    @ColumnDefault("'LIVE'")
+    @Builder.Default
+    private ObservationOrigin origin = ObservationOrigin.LIVE;
 
     /**
      * Impact band — meaningful only for an {@link Assessment#BAD} observation; NULL on a GOOD or
@@ -211,12 +226,15 @@ public class Observation {
         if (observedAt == null) {
             observedAt = Instant.now();
         }
+        if (origin == null) {
+            origin = ObservationOrigin.LIVE;
+        }
         // Mirror the DB CHECK chk_observation_presence_assessment: assessment is NULL exactly when the
-        // practice does not apply. A present/absent observation always carries a GOOD/BAD valence.
-        boolean notApplicable = presence == Presence.NOT_APPLICABLE;
-        if (notApplicable != (assessment == null)) {
+        // presence carries no direction. A present/absent observation always carries a GOOD/BAD valence;
+        // an inapplicable or undecided one never does.
+        if (presence.carriesValence() != (assessment != null)) {
             throw new IllegalStateException(
-                "Observation coherence violation: assessment must be null iff presence is NOT_APPLICABLE (presence=" +
+                "Observation coherence violation: assessment is required exactly for a presence that carries valence (presence=" +
                     presence +
                     ", assessment=" +
                     assessment +

@@ -202,8 +202,8 @@ function RunFeedbackSummary({ review }: { review: ReviewRunSummary }) {
 }
 
 function hasFindingOutput(review: ReviewRunSummary) {
-	const { strengths, problems, notApplicable } = review.findings;
-	return strengths + problems + notApplicable > 0;
+	const { strengths, problems, notApplicable, indeterminate } = review.findings;
+	return strengths + problems + notApplicable + indeterminate > 0;
 }
 
 function hasFeedbackOutput(review: ReviewRunSummary) {

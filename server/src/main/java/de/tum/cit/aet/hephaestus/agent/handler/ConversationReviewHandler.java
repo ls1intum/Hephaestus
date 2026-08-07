@@ -90,6 +90,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
             );
         }
         ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put(PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY, r.observationOrigin().name());
         metadata.put("artifact_kind", ArtifactKinds.CONVERSATION_THREAD.value());
         metadata.put("slack_thread_id", r.slackThreadId());
         metadata.put("slack_channel_id", r.slackChannelId());

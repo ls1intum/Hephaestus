@@ -134,6 +134,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ScmEventPayload.PullRequestData pullRequestData = submissionRequest.pullRequest();
 
         ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put(
+            PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY,
+            submissionRequest.observationOrigin().name()
+        );
         metadata.put("repository_id", pullRequestData.repository().id());
         metadata.put("repository_full_name", pullRequestData.repository().nameWithOwner());
         metadata.put("pull_request_id", pullRequestData.id());
@@ -315,15 +319,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             ? scanForSecrets(unifiedDiff)
             : List.of();
 
-        boolean allNotApplicable = parsed
+        // A run that decided nothing at all over a non-empty diff is the stale-diff signature. Both
+        // valence-free presences count here: a model handed an empty diff abstains as NOT_APPLICABLE, and a
+        // model handed a truncated one says INDETERMINATE — the harness fault is identical either way, and
+        // treating INDETERMINATE as a real verdict would let the newer value walk straight through the guard.
+        boolean nothingDecided = parsed
             .validFindings()
             .stream()
-            .allMatch(f -> f.presence() == Presence.NOT_APPLICABLE);
-        if (allNotApplicable && secretFindings.isEmpty()) {
+            .noneMatch(f -> f.presence().carriesValence());
+        if (nothingDecided && secretFindings.isEmpty()) {
             boolean hasDiffContent = !diffFiles.isEmpty();
             if (hasDiffContent) {
                 throw new JobDeliveryException(
-                    "All findings are NOT_APPLICABLE but the diff contains " +
+                    "No finding decided anything (all NOT_APPLICABLE/INDETERMINATE) but the diff contains " +
                         diffFiles.size() +
                         " files — likely a stale/empty diff was provided to the agent. " +
                         "Refusing to deliver. jobId=" +

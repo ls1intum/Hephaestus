@@ -152,7 +152,8 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
             evidence(artifactKind),
             null,
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
         return observationRepository.findById(id).orElseThrow();
     }

@@ -184,7 +184,8 @@ public final class SlackConversationTestSupport {
             null,
             null,
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()

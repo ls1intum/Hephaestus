@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import org.junit.jupiter.api.Nested;
@@ -141,6 +142,33 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
             )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("baseRefName");
+        }
+    }
+
+    @Nested
+    class ObservationPopulation {
+
+        @Test
+        void aLifecycleEventPutsTheRunInTheUnbiasedPopulation() {
+            var request = new PullRequestReviewSubmissionRequest(
+                samplePullRequestData(),
+                "branch",
+                "sha",
+                "main",
+                "PullRequestReady"
+            );
+
+            assertThat(request.observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
+        }
+
+        @Test
+        void aRunNobodysEventOccasionedIsSelfSelected() {
+            // The bot command and the dev trigger both submit without a trigger event: a person asked.
+            // Reviews people ask for are drawn from work they were already unsure of, so folding them into
+            // the event-driven series would read that selection as a change in behaviour.
+            var request = new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", "sha", "main");
+
+            assertThat(request.observationOrigin()).isEqualTo(ObservationOrigin.MANUAL);
         }
     }
 }

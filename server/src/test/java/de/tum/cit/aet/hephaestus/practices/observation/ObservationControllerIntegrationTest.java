@@ -134,7 +134,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             DIFF_EVIDENCE_JSON,
             "Test reasoning for " + title,
             null,
-            detectedAt
+            detectedAt,
+            "LIVE"
         );
         return id;
     }
@@ -532,7 +533,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 null,
                 "reasoning",
                 null,
-                now
+                now,
+                "LIVE"
             );
 
             // Query the first workspace — should only see "My WS finding"
@@ -809,7 +811,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 evidenceJson,
                 "reasoning",
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             webTestClient
@@ -854,7 +857,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 arrayEvidenceJson,
                 "reasoning",
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             webTestClient
@@ -1112,7 +1116,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 null,
                 "reasoning",
                 null,
-                now
+                now,
+                "LIVE"
             );
 
             // Query workspace1 — should only see WS1 finding

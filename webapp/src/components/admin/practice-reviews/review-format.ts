@@ -17,6 +17,7 @@ export const PRESENCE_LABELS: Record<Presence, string> = {
 	PRESENT: "Observed",
 	ABSENT: "Expected but not observed",
 	NOT_APPLICABLE: "Not applicable",
+	INDETERMINATE: "Could not be determined",
 };
 
 export const REVIEW_RESULT_LABELS: Record<ReviewResult, string> = {

@@ -163,7 +163,8 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
             evidence(artifactKind),
             null,
             null,
-            now
+            now,
+            "LIVE"
         );
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()

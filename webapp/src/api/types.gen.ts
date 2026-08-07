@@ -1759,6 +1759,13 @@ export type ReviewRunSummary = {
  * Counts of findings by assessment
  */
 export type ReviewFindingCounts = {
+    /**
+     * Practices that looked at the evidence and could not settle the question either way; reported apart from notApplicable because one says there was nothing here to judge and the other says we could not tell
+     */
+    indeterminate: number;
+    /**
+     * Practices whose subject did not occur in this work
+     */
     notApplicable: number;
     problems: number;
     strengths: number;
@@ -1859,7 +1866,7 @@ export type ReviewFindingDetail = {
      */
     practiceRevisionId?: number;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
     reasoning?: string;
     /**
      * Cross-run locus key; null when continuity is unavailable
@@ -1980,7 +1987,7 @@ export type ReviewFinding = {
     observedAt: Date;
     practiceName: string;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
     /**
      * Cross-run locus key; null when continuity is unavailable
      */
@@ -2101,7 +2108,7 @@ export type ReviewBoundFinding = {
     ordinal: number;
     practiceName: string;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
     /**
      * Whether the finding leads the message or reinforces it
      */
@@ -3071,7 +3078,7 @@ export type ObservationList = {
      */
     artifactKind: string;
     /**
-     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INDETERMINATE)
      */
     assessment?: 'GOOD' | 'BAD';
     /**
@@ -3091,6 +3098,10 @@ export type ObservationList = {
      */
     observedAt: Date;
     /**
+     * What occasioned the measurement; never mix origins in one trend line
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
      * Practice name
      */
     practiceName: string;
@@ -3099,9 +3110,9 @@ export type ObservationList = {
      */
     practiceSlug: string;
     /**
-     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE
      */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
     /**
      * Severity level (null unless assessment is BAD)
      */
@@ -3481,7 +3492,7 @@ export type ObservationDetail = {
      */
     artifactKind: string;
     /**
-     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INDETERMINATE)
      */
     assessment?: 'GOOD' | 'BAD';
     /**
@@ -3506,6 +3517,10 @@ export type ObservationDetail = {
      */
     observedAt: Date;
     /**
+     * What occasioned the measurement; never mix origins in one trend line
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
      * Practice name
      */
     practiceName: string;
@@ -3514,9 +3529,9 @@ export type ObservationDetail = {
      */
     practiceSlug: string;
     /**
-     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE
      */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
     /**
      * AI reasoning behind the observation
      */
@@ -8728,7 +8743,7 @@ export type ListObservationsData = {
         /**
          * Filter by presence
          */
-        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
         page?: number;
         size?: number;
     };
@@ -9066,7 +9081,7 @@ export type ListPracticeReviewFindingsData = {
         sort?: 'NEWEST' | 'ACTIONABILITY';
         practiceSlug?: Array<string>;
         areaSlug?: Array<string>;
-        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE'>;
+        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE'>;
         assessment?: Array<'GOOD' | 'BAD'>;
         severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         agentJobId?: string;

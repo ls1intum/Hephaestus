@@ -45,8 +45,9 @@ public class FeedbackChannelRouter {
         if (context.recipientRole() != RecipientRole.AUTHOR) {
             return ConversationRoutingDecision.REVIEWER_DEFERRED;
         }
-        // Only a problem is raised in a coaching turn; strengths and NOT_APPLICABLE abstentions are not delivered.
-        if (observation.getPresence() == Presence.NOT_APPLICABLE || observation.getAssessment() != Assessment.BAD) {
+        // Only a problem is raised in a coaching turn; strengths, abstentions and undecided measurements
+        // are not delivered.
+        if (!observation.getPresence().carriesValence() || observation.getAssessment() != Assessment.BAD) {
             return ConversationRoutingDecision.NOT_DELIVERABLE;
         }
         // A locus with a natural diff anchor belongs in-context, not in the conversation.

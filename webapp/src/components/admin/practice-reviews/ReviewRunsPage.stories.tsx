@@ -13,7 +13,7 @@ const reviews: ReviewRunSummary[] = [
 		status: "COMPLETED",
 		target: reviewArtifact,
 		createdAt: new Date("2026-07-28T13:42:00Z"),
-		findings: { strengths: 2, problems: 1, notApplicable: 1 },
+		findings: { strengths: 2, problems: 1, notApplicable: 1, indeterminate: 1 },
 		feedback: { delivered: 1, failed: 0, prepared: 0, superseded: 0, suppressed: 1 },
 	},
 	{
@@ -28,7 +28,7 @@ const reviews: ReviewRunSummary[] = [
 			title: "Keep the controller thin",
 		},
 		createdAt: new Date("2026-07-28T12:10:00Z"),
-		findings: { strengths: 0, problems: 0, notApplicable: 0 },
+		findings: { strengths: 0, problems: 0, notApplicable: 0, indeterminate: 0 },
 		feedback: { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 0 },
 	},
 ];

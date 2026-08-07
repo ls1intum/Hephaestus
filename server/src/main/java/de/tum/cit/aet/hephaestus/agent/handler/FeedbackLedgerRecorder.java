@@ -253,12 +253,14 @@ public class FeedbackLedgerRecorder {
         excludedIds.addAll(alreadySuppressed);
 
         // Bind every DELIVERED finding: BAD (the problems surfaced) lead as PRIMARY, GOOD
-        // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.
+        // strengths as SUPPORTING; abstentions (NOT_APPLICABLE), undecided measurements (INDETERMINATE)
+        // and withheld findings are excluded — feedback is an intervention, and neither of those two
+        // says anything to intervene about.
         // Severity is null for a GOOD strength (ADR 0022) — sort it after any problem (least severe).
         Set<String> deliveredInlineKeys = deliveredKeys(inlineSignals);
         List<Observation> assessed = findings
             .stream()
-            .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
+            .filter(f -> f.getPresence().carriesValence())
             .filter(f -> !excludedIds.contains(f.getId()))
             .filter(f -> summaryDelivered || deliveredInlineKeys.contains(f.getRecurrenceKey()))
             // Stable order matching the composer’s prioritisation: severity, then confidence DESC, then id — so the
@@ -479,7 +481,7 @@ public class FeedbackLedgerRecorder {
         int ordinal = 0;
         List<Observation> assessed = evidence
             .stream()
-            .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
+            .filter(f -> f.getPresence().carriesValence())
             .sorted(
                 Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
                     .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())
@@ -618,11 +620,11 @@ public class FeedbackLedgerRecorder {
                 .createdAt(now)
                 .build()
         );
-        // Bind the assessed findings (NA excluded) so the undelivered body traces back to its observations.
+        // Bind the assessed findings (valence-carrying only) so the undelivered body traces back to its observations.
         int ordinal = 0;
         List<Observation> assessed = findings
             .stream()
-            .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
+            .filter(f -> f.getPresence().carriesValence())
             .sorted(
                 Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
                     .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())

@@ -4445,6 +4445,7 @@ paths:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INDETERMINATE
       - in: query
         name: page
         required: false
@@ -4983,6 +4984,7 @@ paths:
             - PRESENT
             - ABSENT
             - NOT_APPLICABLE
+            - INDETERMINATE
       - in: query
         name: assessment
         required: false
@@ -9108,7 +9110,8 @@ components:
           description: Artifact type (e.g. PULL_REQUEST)
         assessment:
           type: string
-          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          description: "Assessment: GOOD or BAD; null when the presence carries no\
+            \ direction (NOT_APPLICABLE, INDETERMINATE)"
           enum:
           - GOOD
           - BAD
@@ -9137,6 +9140,14 @@ components:
           type: string
           format: date-time
           description: When the observation was made
+        origin:
+          type: string
+          description: What occasioned the measurement; never mix origins in one trend
+            line
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         practiceName:
           type: string
           description: Practice name
@@ -9145,11 +9156,12 @@ components:
           description: Practice slug
         presence:
           type: string
-          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE"
           enum:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INDETERMINATE
         reasoning:
           type: string
           description: AI reasoning behind the observation
@@ -9171,6 +9183,7 @@ components:
       - confidence
       - id
       - observedAt
+      - origin
       - practiceName
       - practiceSlug
       - presence
@@ -9200,7 +9213,8 @@ components:
           description: Artifact type (e.g. PULL_REQUEST)
         assessment:
           type: string
-          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          description: "Assessment: GOOD or BAD; null when the presence carries no\
+            \ direction (NOT_APPLICABLE, INDETERMINATE)"
           enum:
           - GOOD
           - BAD
@@ -9223,6 +9237,14 @@ components:
           type: string
           format: date-time
           description: When the observation was made
+        origin:
+          type: string
+          description: What occasioned the measurement; never mix origins in one trend
+            line
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         practiceName:
           type: string
           description: Practice name
@@ -9231,11 +9253,12 @@ components:
           description: Practice slug
         presence:
           type: string
-          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE"
           enum:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INDETERMINATE
         severity:
           type: string
           description: Severity level (null unless assessment is BAD)
@@ -9254,6 +9277,7 @@ components:
       - confidence
       - id
       - observedAt
+      - origin
       - practiceName
       - practiceSlug
       - presence
@@ -10945,6 +10969,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INDETERMINATE
         role:
           type: string
           description: Whether the finding leads the message or reinforces it
@@ -11240,6 +11265,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INDETERMINATE
         recurrenceKey:
           type: string
           description: Cross-run locus key; null when continuity is unavailable
@@ -11273,9 +11299,16 @@ components:
       type: object
       description: Counts of findings by assessment
       properties:
+        indeterminate:
+          type: integer
+          format: int64
+          description: Practices that looked at the evidence and could not settle
+            the question either way; reported apart from notApplicable because one
+            says there was nothing here to judge and the other says we could not tell
         notApplicable:
           type: integer
           format: int64
+          description: Practices whose subject did not occur in this work
         problems:
           type: integer
           format: int64
@@ -11283,6 +11316,7 @@ components:
           type: integer
           format: int64
       required:
+      - indeterminate
       - notApplicable
       - problems
       - strengths
@@ -11344,6 +11378,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INDETERMINATE
         reasoning:
           type: string
         recurrenceKey:

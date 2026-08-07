@@ -144,7 +144,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 "Good quality",
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             assertThat(result).isEqualTo(1);
@@ -183,7 +184,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                now
+                now,
+                "LIVE"
             );
 
             int second = observationRepository.insertIfAbsent(
@@ -203,7 +205,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                now
+                now,
+                "LIVE"
             );
 
             assertThat(first).isEqualTo(1);
@@ -233,7 +236,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 evidence,
                 "Missing error handling",
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             assertThat(result).isEqualTo(1);
@@ -270,7 +274,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             assertThat(observationRepository.findAll()).hasSize(1);
 
@@ -320,7 +325,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             // Finding in workspace B
             observationRepository.insertIfAbsent(
@@ -340,7 +346,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             assertThat(observationRepository.findAll()).hasSize(2);
 
@@ -387,7 +394,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             // Finding on the other practice (should survive)
             observationRepository.insertIfAbsent(
@@ -407,7 +415,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             assertThat(observationRepository.findAll()).hasSize(2);
 
@@ -455,7 +464,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                observedAt
+                observedAt,
+                "LIVE"
             );
         }
 
@@ -563,7 +573,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             Observation found = observationRepository.findById(id).orElseThrow();
@@ -611,7 +622,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                at
+                at,
+                "LIVE"
             );
         }
 
@@ -783,7 +795,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                at
+                at,
+                "LIVE"
             );
         }
 

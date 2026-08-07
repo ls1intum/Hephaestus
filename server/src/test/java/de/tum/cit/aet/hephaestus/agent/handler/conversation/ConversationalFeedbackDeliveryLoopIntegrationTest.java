@@ -309,7 +309,8 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
             "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/metadata.json\",\"path\":\"metadata.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             null,
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
         return observationRepository.findById(id).orElseThrow();
     }

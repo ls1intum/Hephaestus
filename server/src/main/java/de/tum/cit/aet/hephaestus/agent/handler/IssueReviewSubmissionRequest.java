@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import java.time.Instant;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -33,5 +34,11 @@ public record IssueReviewSubmissionRequest(
         if (repositoryId <= 0) {
             throw new IllegalArgumentException("repositoryId must be positive, got " + repositoryId);
         }
+    }
+
+    /** Same rule as a pull-request review: no lifecycle event behind it means a person asked. */
+    @Override
+    public ObservationOrigin observationOrigin() {
+        return triggerEvent == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
     }
 }
