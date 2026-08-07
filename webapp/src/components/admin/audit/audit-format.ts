@@ -1,4 +1,5 @@
 import type { AdminListAuthEventsData } from "@/api/types.gen";
+import { humanizeToken } from "@/lib/humanize";
 export type AuditSeverity = "error" | "warning" | "info";
 
 const HIGH_RISK_EVENTS = new Set([
@@ -51,8 +52,7 @@ export const EVENT_TYPE_LABELS: Record<AuthEventType, string> = {
 export function eventLabel(eventType: string): string {
 	const known = (EVENT_TYPE_LABELS as Record<string, string | undefined>)[eventType];
 	if (known) return known;
-	const lower = eventType.replace(/_/g, " ").toLowerCase();
-	return lower.charAt(0).toUpperCase() + lower.slice(1);
+	return humanizeToken(eventType);
 }
 
 export function resultLabel(result: string): string {

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, within } from "storybook/test";
+import { Button } from "@/components/ui/button";
 import { mockPracticeDefinitionOptions, mockPullRequestBinding } from "@/mocks/fixtures/practice";
 import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 
@@ -101,6 +102,48 @@ export const NothingRequiredYet: Story = {
 		await expect(canvas.getByText("Nothing yet")).toBeVisible();
 		// The invalid state opens the source list, because the fix is not reachable from the summary.
 		await expect(canvas.getByRole("radiogroup", { name: /Use Code changes/ })).toBeVisible();
+	},
+};
+
+/**
+ * Drives `invalid` from outside the way a form does — false while the author is writing, true from
+ * the submit onwards — and can re-render without changing it, which is every keystroke afterwards.
+ */
+function SubmittedIntoInvalid(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
+	const [invalid, setInvalid] = useState(false);
+	const [renders, setRenders] = useState(0);
+	return (
+		<div className="space-y-3">
+			<Button type="button" onClick={() => setInvalid(true)}>
+				Submit the form
+			</Button>
+			<Button type="button" variant="outline" onClick={() => setRenders(renders + 1)}>
+				Type something else
+			</Button>
+			<PracticeEvidenceEditor {...args} invalid={invalid} />
+		</div>
+	);
+}
+
+/**
+ * The other way into the open panel, and the one a real author takes: submitting a form that is
+ * already on screen. It has to open on the *transition* rather than on the flag, because the flag
+ * stays true while the author fixes it and an editor that re-opened under the caret on every
+ * keystroke would be unusable.
+ */
+export const SubmittingRevealsTheSources: Story = {
+	args: { needs: [] },
+	render: (args) => <SubmittedIntoInvalid {...args} />,
+	play: async ({ canvas, userEvent }) => {
+		await expect(canvas.queryByRole("radiogroup", { name: /Use Code changes/ })).toBeNull();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Submit the form" }));
+		await expect(canvas.getByRole("radiogroup", { name: /Use Code changes/ })).toBeVisible();
+
+		// Closed again by the author, and it stays closed while the error stands.
+		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Type something else" }));
+		await expect(canvas.queryByRole("radiogroup", { name: /Use Code changes/ })).toBeNull();
 	},
 };
 

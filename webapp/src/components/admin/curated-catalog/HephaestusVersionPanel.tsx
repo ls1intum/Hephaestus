@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Spinner } from "@/components/ui/spinner";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
+import { humanizeToken } from "@/lib/humanize";
 import { cn } from "@/lib/utils";
 import {
 	canKeepCurrentDefinition,
@@ -70,14 +71,6 @@ function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefin
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
 }
 
-function words(token: string): string {
-	return token
-		.replace(/_/g, " ")
-		.replace(/([a-z])([A-Z])/g, "$1 $2")
-		.toLowerCase()
-		.replace(/^./, (letter) => letter.toUpperCase());
-}
-
 function displayValue(
 	field: string,
 	value: unknown,
@@ -92,7 +85,8 @@ function displayValue(
 	if (field === "areaSlug" && typeof value === "string") {
 		return areaNames[value] ?? "Area no longer exists";
 	}
-	if ((field === "icon" || field === "color") && typeof value === "string") return words(value);
+	if ((field === "icon" || field === "color") && typeof value === "string")
+		return humanizeToken(value);
 	return Array.isArray(value) ? value.join("\n") : String(value);
 }
 

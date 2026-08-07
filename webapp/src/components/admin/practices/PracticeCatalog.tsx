@@ -285,6 +285,11 @@ function CatalogToolbar({
 					))}
 				</SelectContent>
 			</Select>
+			{/*
+			 * toolbar, not the default group: ToggleGroup emits aria-orientation, which ARIA permits on
+			 * toolbar but not on group, and these toggle buttons already carry roving arrow-key focus.
+			 * radiogroup would be worse — the items are aria-pressed buttons, not radios.
+			 */}
 			<ToggleGroup
 				role="toolbar"
 				value={[focusFilter]}
@@ -304,7 +309,15 @@ function CatalogToolbar({
 								"h-auto min-h-7 whitespace-normal py-1 sm:whitespace-nowrap",
 						)}
 					>
-						{filter.value === "ALL" ? "All" : filter.label}
+						{/* Shortened on screen for the row to fit, but named in full for anyone who hears it
+						    rather than sees it — the same filter must not answer to two names. */}
+						{filter.value === "ALL" ? (
+							<>
+								All<span className="sr-only"> work types</span>
+							</>
+						) : (
+							filter.label
+						)}
 					</ToggleGroupItem>
 				))}
 			</ToggleGroup>
@@ -563,7 +576,10 @@ function RenameAreaDialog({
 				<form
 					onSubmit={async (event) => {
 						event.preventDefault();
-						const input = event.currentTarget.elements.namedItem("areaName") as HTMLInputElement;
+						// `namedItem` answers with a RadioNodeList when a name is shared, so the element is
+						// checked rather than asserted.
+						const input = event.currentTarget.elements.namedItem("areaName");
+						if (!(input instanceof HTMLInputElement)) return;
 						const name = input.value.trim();
 						if (!area || !name || name === area.name) {
 							onClose();
@@ -672,7 +688,8 @@ function CreateAreaButton({
 				<form
 					onSubmit={async (event) => {
 						event.preventDefault();
-						const input = event.currentTarget.elements.namedItem("areaName") as HTMLInputElement;
+						const input = event.currentTarget.elements.namedItem("areaName");
+						if (!(input instanceof HTMLInputElement)) return;
 						const name = input.value.trim();
 						if (name && (await onCreate(name))) setOpen(false);
 					}}

@@ -1,5 +1,6 @@
 import type { AgentJob } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
+import { humanizeToken } from "@/lib/humanize";
 
 export type JobStatus = AgentJob["status"];
 export type DeliveryStatus = NonNullable<AgentJob["deliveryStatus"]>;
@@ -99,11 +100,7 @@ const UNKNOWN_HOLD_DETAIL =
 export function holdReasonCopy(reason: string): HoldReasonCopy {
 	const known = HOLD_REASON_COPY[reason];
 	if (known) return known;
-	const lower = reason.replace(/_/g, " ").toLowerCase();
-	return {
-		label: lower.charAt(0).toUpperCase() + lower.slice(1),
-		detail: UNKNOWN_HOLD_DETAIL,
-	};
+	return { label: humanizeToken(reason), detail: UNKNOWN_HOLD_DETAIL };
 }
 
 export function isCancellable(status: JobStatus): boolean {

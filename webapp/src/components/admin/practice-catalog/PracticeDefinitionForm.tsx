@@ -434,8 +434,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						<div>
 							<h2 className="text-lg font-semibold">Practice</h2>
 							<p className="text-sm text-muted-foreground">
-								Name the habit and choose where it applies. Fields marked <span aria-hidden>*</span>{" "}
-								are required.
+								Name the habit and choose where it applies. Fields marked <span aria-hidden>*</span>
+								<span className="sr-only">with an asterisk</span> are required.
 							</p>
 						</div>
 						<FieldGroup className="gap-4">
