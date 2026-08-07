@@ -247,6 +247,50 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ).hasSize(1);
     }
 
+    /**
+     * A partial capture of a source the contract is content to take partially still refuses the one
+     * practice whose claim is that something is not in it — a fragment that does not contain the
+     * resolution is equally consistent with the resolution being in the part nobody fetched.
+     */
+    @Test
+    void shouldRefuseAnAbsenceClaimOnAPartialCapture() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        String path = "inputs/context/comments.json";
+        files.put(path, "[{}]".getBytes(StandardCharsets.UTF_8));
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(path, COMMENTS),
+            "job-partial-comments",
+            plan(Set.of(COMMENTS)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(COMMENTS, SourceCompleteness.PARTIAL),
+                Map.of(COMMENTS, SourceContentState.NON_EMPTY),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(COMMENTS)
+            )
+        );
+
+        // The same partial capture, read by a practice that only reads what is in front of it.
+        assertThat(
+            builder
+                .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiringComments()))
+                .readyPractices()
+        ).hasSize(1);
+
+        AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadinessAsOfNow(
+            manifest,
+            List.of(practiceRequiring(COMMENTS, "asserts-an-absence", EvidenceStance.EXHAUSTIVE))
+        );
+
+        assertThat(refused.readyPractices()).isEmpty();
+        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).contains(
+            SourceReadinessReason.SOURCE_INCOMPLETE
+        );
+    }
+
     @Test
     void shouldSkipAutomatedReviewsThatCannotRun() {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-unsupported-assessment", NOW);

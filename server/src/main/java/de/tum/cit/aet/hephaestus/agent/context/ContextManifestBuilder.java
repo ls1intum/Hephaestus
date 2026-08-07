@@ -381,7 +381,11 @@ public class ContextManifestBuilder {
                     : SourceCompleteness.UNKNOWN;
                 List<SourceReadinessReason> reasons = new ArrayList<>();
                 if (!available) reasons.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
-                if (quality.demandsComplete() && completeness != SourceCompleteness.COMPLETE) reasons.add(
+                // The one thing the practice still gets to say about the capture, because it is a
+                // statement about the claim rather than about the source: a review that asserts
+                // something is absent cannot be satisfied by a fragment that merely does not contain it.
+                boolean demandsComplete = quality.demandsComplete() || need.stance().demandsCompleteCapture();
+                if (demandsComplete && completeness != SourceCompleteness.COMPLETE) reasons.add(
                     SourceReadinessReason.SOURCE_INCOMPLETE
                 );
                 if (

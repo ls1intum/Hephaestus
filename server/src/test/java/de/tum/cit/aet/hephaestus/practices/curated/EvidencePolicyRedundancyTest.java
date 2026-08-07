@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.evidence.RequiredCaptureQuality;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
@@ -16,7 +17,9 @@ import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -67,6 +70,53 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
                 )
                 .isNotEmpty();
         }
+    }
+
+    /**
+     * Which shipped practices claim something is <em>absent</em>, recorded here because it is a reading
+     * of each practice's criteria rather than anything the code can derive.
+     *
+     * <p>The list is deliberately short. A practice that reports a contradiction it can point at —
+     * {@code change-keeps-linked-docs-consistent} quoting a ticked box against an untouched doc — is not
+     * making an absence claim and does not need the whole capture. Nor are the review-quality practices,
+     * which judge the comments that are there. If a fifth practice joins this list, that is a decision
+     * about what it may assert, and it should be made here rather than noticed in a diff.
+     */
+    @Test
+    void onlyThePracticesThatAssertAnAbsenceDemandAWholeCapture() {
+        Map<String, Set<SourceKind>> exhaustive = new LinkedHashMap<>();
+        loader
+            .catalog()
+            .practices()
+            .forEach(practice ->
+                practice
+                    .definition()
+                    .bindings()
+                    .forEach(binding ->
+                        binding
+                            .needs()
+                            .stream()
+                            .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
+                            .forEach(need ->
+                                exhaustive
+                                    .computeIfAbsent(practice.slug(), slug -> new LinkedHashSet<>())
+                                    .add(need.sourceKind())
+                            )
+                    )
+            );
+
+        assertThat(exhaustive).containsOnlyKeys(
+            "merged-past-unresolved-review-threads",
+            "engaging-with-inline-review-comments",
+            "issue-closed-with-unmet-outcome",
+            "ready-and-traceable-handoff"
+        );
+        assertThat(exhaustive.get("merged-past-unresolved-review-threads")).containsExactly(
+            new SourceKind("scm.review-threads")
+        );
+        assertThat(exhaustive.get("issue-closed-with-unmet-outcome")).containsExactly(
+            new SourceKind("scm.issue.comments")
+        );
     }
 
     /**

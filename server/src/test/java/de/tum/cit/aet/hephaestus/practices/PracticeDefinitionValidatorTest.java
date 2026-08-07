@@ -101,6 +101,49 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             .hasMessage("Evidence source is not available for the selected work type");
     }
 
+    /**
+     * An exhaustive claim over a source that can never report a complete capture is a practice switched
+     * on and refusing every review it triggers — a state indistinguishable, in the report it produces,
+     * from nobody having done the thing yet.
+     */
+    @Test
+    void rejectsAnAbsenceClaimOverASourceThatIsNeverComplete() {
+        assertThatThrownBy(() ->
+            validator.validate(
+                definition(
+                    ScmSignals.PULL_REQUEST_OPENED,
+                    null,
+                    List.of(
+                        need(DIFF),
+                        new PracticeEvidenceRequirement(
+                            new SourceKind("scm.linked-work-items"),
+                            EvidenceStance.EXHAUSTIVE
+                        )
+                    ),
+                    languageModel()
+                )
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("can never be captured completely");
+    }
+
+    @Test
+    void acceptsAnAbsenceClaimOverASourceThatCanBeComplete() {
+        assertThatCode(() ->
+            validator.validate(
+                definition(
+                    ScmSignals.PULL_REQUEST_OPENED,
+                    null,
+                    List.of(
+                        new PracticeEvidenceRequirement(new SourceKind("scm.review-threads"), EvidenceStance.EXHAUSTIVE)
+                    ),
+                    languageModel()
+                )
+            )
+        ).doesNotThrowAnyException();
+    }
+
     @Test
     void acceptsGuidanceOnlyPracticeWithoutAutomatedInputs() {
         assertThatCode(() ->

@@ -191,9 +191,10 @@
                 "minLength": 1
               },
               "stance": {
-                "description": "REQUIRED: the claim reads it. CONTEXTUAL: used if present, never fatal.",
+                "description": "REQUIRED: the claim reads it. EXHAUSTIVE: the claim asserts something is absent from it, so a partial capture cannot satisfy it. CONTEXTUAL: used if present, never fatal.",
                 "enum": [
                   "REQUIRED",
+                  "EXHAUSTIVE",
                   "CONTEXTUAL"
                 ]
               }

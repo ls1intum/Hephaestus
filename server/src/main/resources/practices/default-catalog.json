@@ -76,7 +76,7 @@
               "needs": [
                 {
                   "sourceKind": "scm.pull-request.core",
-                  "stance": "REQUIRED"
+                  "stance": "EXHAUSTIVE"
                 },
                 {
                   "sourceKind": "scm.pull-request.diff",
@@ -179,7 +179,7 @@
                 },
                 {
                   "sourceKind": "scm.review-threads",
-                  "stance": "REQUIRED"
+                  "stance": "EXHAUSTIVE"
                 }
               ]
             }
@@ -199,7 +199,7 @@
               "needs": [
                 {
                   "sourceKind": "scm.review-threads",
-                  "stance": "REQUIRED"
+                  "stance": "EXHAUSTIVE"
                 }
               ]
             }
@@ -1001,7 +1001,7 @@
               "needs": [
                 {
                   "sourceKind": "scm.issue.comments",
-                  "stance": "REQUIRED"
+                  "stance": "EXHAUSTIVE"
                 },
                 {
                   "sourceKind": "scm.issue.core",

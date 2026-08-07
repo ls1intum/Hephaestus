@@ -201,9 +201,10 @@
           "title": "Stance",
           "enum": [
             "REQUIRED",
+            "EXHAUSTIVE",
             "CONTEXTUAL"
           ],
-          "description": "REQUIRED refuses the review when the source is missing or below the quality its contract demands; CONTEXTUAL is used when present and never blocks."
+          "description": "REQUIRED refuses the review when the source is missing or below the quality its contract demands; EXHAUSTIVE additionally refuses a partial capture, because a claim that something is absent cannot rest on a fragment; CONTEXTUAL is used when present and never blocks."
         }
       },
       "description": "One source this practice reads and how it relates to it."

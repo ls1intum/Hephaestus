@@ -87,9 +87,20 @@ public final class PracticeDefinitionValidator {
         Set<SourceKind> applicable = sourceCatalogs.requireSourcesFor(version, artifactKind.value());
         for (PracticeBinding binding : definition.bindings()) {
             for (PracticeEvidenceRequirement need : binding.needs()) {
-                sourceCatalogs.requireSource(version, need.sourceKind());
+                var contract = sourceCatalogs.requireSource(version, need.sourceKind());
                 if (!applicable.contains(need.sourceKind())) {
                     throw new IllegalArgumentException("Evidence source is not available for the selected work type");
+                }
+                // An exhaustive claim over a source that can never report a complete capture is a
+                // practice that refuses every review it ever triggers. Caught here rather than at review
+                // time, because "switched on and permanently refusing" is indistinguishable from
+                // "nobody has done this yet" in the report it produces.
+                if (need.stance().demandsCompleteCapture() && !contract.completenessPolicy().supportsComplete()) {
+                    throw new IllegalArgumentException(
+                        "Evidence source " +
+                            need.sourceKind() +
+                            " can never be captured completely, so no claim about what is absent from it can rest on it"
+                    );
                 }
             }
         }
