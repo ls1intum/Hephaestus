@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import {
 	mockAuthorDeclaredEvidenceValidation,
+	mockMergeBinding,
 	mockPracticeDefinitionOptions,
-	mockPullRequestEvidence,
+	mockPullRequestBinding,
+	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -17,14 +19,13 @@ const areas = [
 const initialData = {
 	slug: "clear-pr-description",
 	name: "Write a clear pull request description",
-	artifactKind: "scm.pull_request" as const,
 	areaSlug: "communication",
-	triggerEvents: ["PullRequestCreated", "PullRequestReady"],
+	bindings: [mockPullRequestBinding, mockMergeBinding],
 	criteria: "Review whether the description explains the purpose, approach, and testing.",
 	whyItMatters: "Reviewers should not need to reconstruct the author's intent.",
 	whatGoodLooksLike: "The description states why, what changed, and how it was verified.",
 	precomputeScript: "export default function precompute() { return {}; }",
-	automatedReviewPolicy: mockPullRequestEvidence,
+	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	status: {
 		etag: "tag",
@@ -104,9 +105,9 @@ export const HephaestusUpdateAvailable: Story = {
 			shipped: {
 				name: "Say what changed and why",
 				artifactKind: "scm.pull_request",
-				triggerEvents: ["PullRequestCreated"],
+				bindings: [mockPullRequestBinding],
 				criteria: "The updated default criteria",
-				automatedReviewPolicy: mockPullRequestEvidence,
+				automatedReviewPolicy: mockPullRequestPolicy,
 				automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},

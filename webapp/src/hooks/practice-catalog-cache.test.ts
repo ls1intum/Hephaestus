@@ -134,8 +134,11 @@ describe("practice catalog cache updates", () => {
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});
-		expect(selectPracticePatch(updated, { artifactKind: "scm.pull_request" })).toEqual({
-			artifactKind: "scm.pull_request",
+		// Replacing the occasions can move the practice to a different kind of work, and with it to that
+		// kind's recommended review settings — so the optimistic patch has to carry all three.
+		expect(selectPracticePatch(updated, { bindings: updated.bindings })).toEqual({
+			bindings: updated.bindings,
+			artifactKind: updated.artifactKind,
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});

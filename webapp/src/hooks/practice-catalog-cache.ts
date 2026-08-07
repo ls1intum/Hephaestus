@@ -80,9 +80,13 @@ export function selectPracticePatch(
 ): Partial<Practice> {
 	const clear = new Set(request.clear);
 	return {
-		...("artifactKind" in request ? { artifactKind: practice.artifactKind } : {}),
+		// The kind of work is read off the bindings server-side, so replacing them can move it — and can
+		// therefore swap in a different work type's recommended review settings.
+		...("bindings" in request
+			? { bindings: practice.bindings, artifactKind: practice.artifactKind }
+			: {}),
 		...("criteria" in request ? { criteria: practice.criteria } : {}),
-		...("automatedReviewPolicy" in request || "artifactKind" in request
+		...("automatedReviewPolicy" in request || "bindings" in request
 			? {
 					automatedReviewPolicy: practice.automatedReviewPolicy,
 					automatedReviewValidation: practice.automatedReviewValidation,
@@ -92,7 +96,6 @@ export function selectPracticePatch(
 		...("precomputeScript" in request || clear.has("PRECOMPUTE_SCRIPT")
 			? { precomputeScript: practice.precomputeScript }
 			: {}),
-		...("triggerEvents" in request ? { triggerEvents: practice.triggerEvents } : {}),
 		...("whatGoodLooksLike" in request || clear.has("WHAT_GOOD_LOOKS_LIKE")
 			? { whatGoodLooksLike: practice.whatGoodLooksLike }
 			: {}),

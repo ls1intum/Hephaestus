@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPracticeDefinitionOptions,
-	mockPullRequestEvidence,
+	mockPullRequestBinding,
+	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
@@ -29,10 +30,10 @@ const areaDefinition = {
 const practiceDefinition = {
 	name: "Say what changed and why",
 	artifactKind: "scm.pull_request",
-	triggerEvents: ["PullRequestCreated"],
+	bindings: [mockPullRequestBinding],
 	criteria: "Our own criteria",
 	whyItMatters: "Reviewers need context",
-	automatedReviewPolicy: mockPullRequestEvidence,
+	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
@@ -56,7 +57,7 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 				slug: "describe-what-and-why",
 				name: practiceDefinition.name,
 				artifactKind: "scm.pull_request",
-				automatedReview: mockPullRequestEvidence.automatedReview,
+				automatedReview: mockPullRequestPolicy.automatedReview,
 				areaSlug: "packaging",
 				position: 0,
 				effectivelyOffered: true,
@@ -634,9 +635,14 @@ describe("instance catalog routes", () => {
 	});
 
 	it.each([
-		["unchanged", false, mockPullRequestEvidence],
-		["changed", true, mockPracticeDefinitionOptions.workTypes[2].recommendedRequirements],
-	] as const)("%s artifact sends the visible evidence rule", async (_label, changeArtifact, expectedEvidence) => {
+		["unchanged", false, mockPullRequestPolicy, mockPullRequestBinding.signals],
+		[
+			"changed",
+			true,
+			mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
+			["chat.conversation_thread.settled"],
+		],
+	] as const)("%s artifact sends the visible review rule", async (_label, changeArtifact, expectedPolicy, expectedSignals) => {
 		mockCatalog();
 		let requestBody: Record<string, unknown> | undefined;
 		server.use(
@@ -666,6 +672,11 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(() => expect(requestBody).toBeDefined());
-		expect(requestBody?.automatedReviewPolicy).toEqual(expectedEvidence);
+		expect(requestBody?.automatedReviewPolicy).toEqual(expectedPolicy);
+		// The kind of work is read off the signals, so switching it has to rewrite the occasions
+		// rather than send a kind alongside bindings that still name the old one.
+		expect(
+			(requestBody?.bindings as Array<{ signals: string[] }>).map((binding) => binding.signals),
+		).toEqual([[...expectedSignals]]);
 	});
 });

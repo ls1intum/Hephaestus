@@ -147,9 +147,17 @@ export const ValidationAndSubmit: Story = {
 				name: "Clear review context",
 				slug: "clear-review-context",
 				criteria: "Check whether the reviewed work explains its purpose.",
-				triggerEvents: ["PullRequestCreated", "PullRequestReady", "PullRequestSynchronized"],
-				artifactKind: "scm.pull_request",
-				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[0].recommendedRequirements,
+				bindings: [
+					{
+						signals: [
+							"scm.pull_request.opened",
+							"scm.pull_request.ready",
+							"scm.pull_request.synchronized",
+						],
+						needs: mockPracticeDefinitionOptions.workTypes[0].recommendedNeeds,
+					},
+				],
+				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[0].recommendedPolicy,
 			},
 			null,
 		);
@@ -172,8 +180,9 @@ export const ConversationPractice: Story = {
 		createSubmit.mockClear();
 		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
 		await userEvent.click(canvas.getByRole("radio", { name: /Conversation/ }));
-		await userEvent.click(canvas.getByRole("button", { name: /Technical settings/ }));
-		await expect(canvas.queryByText("Run mentoring when *")).not.toBeInTheDocument();
+		// A conversation is settled or it is not, so its one occasion is chosen for the author rather
+		// than left as an empty list that cannot be saved.
+		await expect(canvas.getByRole("checkbox", { name: "Discussion settled" })).toBeChecked();
 		await userEvent.type(
 			canvas.getByRole("textbox", { name: /What to look for/ }),
 			"Check whether the conversation stays constructive.",
@@ -184,9 +193,13 @@ export const ConversationPractice: Story = {
 				name: "Helpful discussion",
 				slug: "helpful-discussion",
 				criteria: "Check whether the conversation stays constructive.",
-				triggerEvents: [],
-				artifactKind: "chat.conversation_thread",
-				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[2].recommendedRequirements,
+				bindings: [
+					{
+						signals: ["chat.conversation_thread.settled"],
+						needs: mockPracticeDefinitionOptions.workTypes[2].recommendedNeeds,
+					},
+				],
+				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
 			},
 			null,
 		);

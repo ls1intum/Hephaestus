@@ -5,13 +5,12 @@ import type {
 	CuratedAreaRequest,
 	CuratedPracticeDefinition,
 	PracticeDefinitionOptions,
-	PracticeTriggerEventOption,
 } from "@/api/types.gen";
-import { FOCUS_ARTIFACT_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Spinner } from "@/components/ui/spinner";
+import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import {
 	canKeepCurrentDefinition,
@@ -54,13 +53,18 @@ const PRACTICE_FIELDS = {
 	name: "Name",
 	artifactKind: "Work reviewed",
 	areaSlug: "Area",
-	triggerEvents: "Starts a review when",
 	criteria: "What to look for",
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Static analysis",
-	automatedReviewPolicy: "Mentoring support and evidence",
-} satisfies Record<Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation">, string>;
+	// One row, not two: the occasions and the evidence each of them reads are the same sentence now,
+	// and PracticeEvidenceSummary is what reads it back — including its own "when it is reviewed"
+	// heading, which this label must therefore not repeat.
+	automatedReviewPolicy: "How it is reviewed",
+} satisfies Record<
+	Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation" | "bindings">,
+	string
+>;
 
 function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
@@ -78,27 +82,12 @@ function displayValue(
 	field: string,
 	value: unknown,
 	areaNames: Readonly<Record<string, string>>,
-	triggerEvents: readonly PracticeTriggerEventOption[] = [],
 ): string {
 	if (value === null || value === undefined || value === "") {
 		return field === "areaSlug" ? "Unassigned" : "Not set";
 	}
-	if (field === "triggerEvents" && Array.isArray(value) && value.length === 0) {
-		return "No automatic trigger";
-	}
 	if (field === "artifactKind") {
-		return (
-			FOCUS_ARTIFACT_OPTIONS.find((option) => option.value === value)?.label ?? words(String(value))
-		);
-	}
-	if (field === "triggerEvents" && Array.isArray(value)) {
-		return value
-			.map(
-				(event) =>
-					triggerEvents.find((option) => option.event === event)?.displayName ??
-					words(String(event)),
-			)
-			.join("\n");
+		return artifactKindLabel(String(value));
 	}
 	if (field === "areaSlug" && typeof value === "string") {
 		return areaNames[value] ?? "Area no longer exists";
@@ -181,24 +170,17 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 													shippedDefinitionOptions ? (
 														<PracticeEvidenceSummary
 															policy={shippedPractice.automatedReviewPolicy}
+															bindings={shippedPractice.bindings}
 															validation={shippedPractice.automatedReviewValidation}
 															sources={shippedDefinitionOptions.allowedSources}
-															workTypeLabel={
-																FOCUS_ARTIFACT_OPTIONS.find(
-																	(option) => option.value === shippedPractice.artifactKind,
-																)?.label ?? "Reviewed work"
-															}
+															signals={shippedDefinitionOptions.signals}
+															workTypeLabel={artifactKindLabel(shippedPractice.artifactKind)}
 														/>
 													) : (
 														"Evidence details are unavailable for this work type."
 													)
 												) : (
-													displayValue(
-														field,
-														shippedDefinition[field],
-														areaNames,
-														shippedDefinitionOptions?.triggerEvents,
-													)
+													displayValue(field, shippedDefinition[field], areaNames)
 												)}
 											</dd>
 										</div>

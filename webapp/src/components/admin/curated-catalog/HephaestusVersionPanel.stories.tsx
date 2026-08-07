@@ -3,8 +3,10 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
+	mockMergeBinding,
 	mockPracticeDefinitionOptions,
-	mockPullRequestEvidence,
+	mockPullRequestBinding,
+	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
@@ -19,10 +21,10 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 const shipped = {
 	name: "Say what changed and why",
 	artifactKind: "scm.pull_request" as const,
-	triggerEvents: ["PullRequestCreated"],
+	bindings: [mockPullRequestBinding, mockMergeBinding],
 	criteria: "The updated default criteria.",
 	whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
-	automatedReviewPolicy: mockPullRequestEvidence,
+	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
@@ -73,16 +75,20 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
-		await expect(canvas.getByText("Starts a review when")).toBeVisible();
-		await expect(canvas.getByText("Pull or merge request is opened")).toBeVisible();
-		await expect(canvas.getByText("Mentoring support and evidence")).toBeVisible();
+		await expect(canvas.getByText("How it is reviewed")).toBeVisible();
+		// Both occasions, each with its own evidence — a merged list would claim the practice always
+		// reads the review threads whole, which only the review at the merge does.
+		await expect(canvas.getByText(/Occasion 1: Opened, Marked ready for review/)).toBeVisible();
+		await expect(canvas.getByText(/Occasion 2: Merged/)).toBeVisible();
+		await expect(canvas.getByText(/it can say what is missing/)).toBeVisible();
 		expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
-		await expect(canvas.getByText("Pull request details")).toBeVisible();
+		await expect(canvas.getAllByText("Pull request details").length).toBeGreaterThan(0);
 		await expect(canvas.getByText("Not independently validated")).toBeVisible();
 		await expect(
 			canvas.getByText("Repository evidence does not establish behavior in a deployed runtime."),
 		).toBeVisible();
-		await expect(canvas.queryByText("PullRequestCreated")).not.toBeInTheDocument();
+		// Signals read back under the domain's own label, never as a raw id.
+		await expect(canvas.queryByText("scm.pull_request.opened")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("button", { name: "Keep saved version" })).toBeVisible();
 	},
 };
