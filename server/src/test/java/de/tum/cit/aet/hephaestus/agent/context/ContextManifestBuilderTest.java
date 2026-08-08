@@ -210,9 +210,74 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         assertThat(refused.readyPractices()).isEmpty();
-        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).contains(
+        // Exactly one reason, not merely this one among others: an empty capture is a capture, so
+        // nothing may also call it absent.
+        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).containsExactly(
             SourceReadinessReason.SOURCE_EMPTY
         );
+    }
+
+    /**
+     * The reason a source is unusable is one reason. When nothing captured the diff, the reader was
+     * told it "was not captured; was captured only in part; was captured empty" — three claims that
+     * cannot all hold, on the one sentence the whole trace exists to deliver. Incompleteness and
+     * emptiness are facts about a capture that happened; where none did, absence is the whole answer.
+     */
+    @Test
+    void shouldNameOnlyAbsenceWhenNothingWasCaptured() {
+        // The diff was asked for and nothing provided it, and the practice needing it requires the
+        // strictest quality any source declares — the combination that produced all three at once.
+        ArtifactSourceManifest manifest = builder.augment(
+            new LinkedHashMap<>(),
+            Map.of(),
+            "job-absent-diff",
+            plan(Set.of(DIFF)),
+            new ContextManifestBuilder.CaptureMetadata(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Set.of())
+        );
+
+        AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadinessAsOfNow(
+            manifest,
+            List.of(practiceRequiring(DIFF, "needs-diff"))
+        );
+
+        assertThat(refused.readyPractices()).isEmpty();
+        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).containsExactly(
+            SourceReadinessReason.SOURCE_NOT_AVAILABLE
+        );
+    }
+
+    /** The counterpart the other three cases are distinguished from: a good capture names nothing at all. */
+    @Test
+    void shouldNameNoReasonWhenACompleteCaptureHeldSomething() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        String path = "inputs/context/diff.patch";
+        files.put(path, "diff --git a b".getBytes(StandardCharsets.UTF_8));
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(path, DIFF),
+            "job-good-diff",
+            plan(Set.of(DIFF)),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(DIFF, SourceCompleteness.COMPLETE),
+                Map.of(DIFF, SourceContentState.NON_EMPTY),
+                Map.of(DIFF, "abc123"),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(DIFF)
+            )
+        );
+        Practice practice = practiceRequiring(DIFF, "needs-substance");
+
+        AutomatedReviewReadinessResult accepted = builder.checkAutomatedReviewReadinessAsOfNow(
+            manifest,
+            List.of(practice)
+        );
+
+        assertThat(accepted.readyPractices()).containsExactly(practice);
+        SourceReadinessCheck check = accepted.decisions().getFirst().sourceChecks().getFirst();
+        assertThat(check.meetsRequirements()).isTrue();
+        assertThat(check.reasonCodes()).isEmpty();
     }
 
     /**
@@ -286,7 +351,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
 
         assertThat(refused.readyPractices()).isEmpty();
-        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).contains(
+        // Exactly one reason: the fragment that was captured is still a capture, so nothing may also
+        // call it absent.
+        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).containsExactly(
             SourceReadinessReason.SOURCE_INCOMPLETE
         );
     }

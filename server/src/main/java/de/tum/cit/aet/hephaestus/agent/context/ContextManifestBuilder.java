@@ -374,24 +374,29 @@ public class ContextManifestBuilder {
                     .requireSource(manifest.contractVersion(), need.sourceKind())
                     .requiredQuality();
                 SourceCapture capture = captures.get(need.sourceKind());
-                boolean available = capture != null && capture.state() instanceof SourceCaptureState.Available;
-                SourceCompleteness completeness = available
-                    ? ((SourceCaptureState.Available) capture.state()).completeness()
-                    : SourceCompleteness.UNKNOWN;
+                SourceCaptureState.Available available =
+                    capture != null && capture.state() instanceof SourceCaptureState.Available captured
+                        ? captured
+                        : null;
                 List<SourceReadinessReason> reasons = new ArrayList<>();
-                if (!available) reasons.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
-                // The one thing the practice still gets to say about the capture, because it is a
-                // statement about the claim rather than about the source: a review that asserts
-                // something is absent cannot be satisfied by a fragment that merely does not contain it.
-                boolean demandsComplete = quality.demandsComplete() || need.stance().demandsCompleteCapture();
-                if (demandsComplete && completeness != SourceCompleteness.COMPLETE) reasons.add(
-                    SourceReadinessReason.SOURCE_INCOMPLETE
-                );
-                if (
-                    quality.demandsContent() &&
-                    (!available ||
-                        ((SourceCaptureState.Available) capture.state()).content() != SourceContentState.NON_EMPTY)
-                ) reasons.add(SourceReadinessReason.SOURCE_EMPTY);
+                if (available == null) {
+                    // Absence is the whole answer. Incompleteness and emptiness are facts ABOUT a
+                    // capture, so a source nothing captured cannot also be partial or empty; stating
+                    // all three at once contradicts itself and sends the reader to the wrong fix.
+                    reasons.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
+                } else {
+                    // The one thing the practice still gets to say about the capture, because it is a
+                    // statement about the claim rather than about the source: a review that asserts
+                    // something is absent cannot be satisfied by a fragment that merely does not
+                    // contain it.
+                    boolean demandsComplete = quality.demandsComplete() || need.stance().demandsCompleteCapture();
+                    if (demandsComplete && available.completeness() != SourceCompleteness.COMPLETE) reasons.add(
+                        SourceReadinessReason.SOURCE_INCOMPLETE
+                    );
+                    if (quality.demandsContent() && available.content() != SourceContentState.NON_EMPTY) reasons.add(
+                        SourceReadinessReason.SOURCE_EMPTY
+                    );
+                }
                 sourceChecks.add(
                     new SourceReadinessCheck(
                         need.sourceKind(),
