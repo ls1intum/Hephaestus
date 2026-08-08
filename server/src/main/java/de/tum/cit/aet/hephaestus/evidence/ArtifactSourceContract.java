@@ -80,10 +80,9 @@ public record ArtifactSourceContract(
     /**
      * Whether a practice bound to one of this source's kinds reads it unless the author says otherwise.
      *
-     * <p>Which sources a review of a kind starts with used to be a switch inside the practices module,
-     * listing them per kind by hand and throwing for any kind it had not been told about. It is a fact
-     * about the sources, so the sources state it: adding a documentation domain is now a catalog entry
-     * rather than an edit in a module that must not know the domain exists.
+     * <p>Which sources a review of a kind starts with is a fact about the sources, so the sources state
+     * it. Adding a documentation domain is therefore a catalog entry rather than an edit in a module that
+     * must not know the domain exists.
      */
     public boolean isDefaultRequirement() {
         return defaultRequirement;

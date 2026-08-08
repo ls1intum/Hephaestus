@@ -13,10 +13,9 @@ import java.util.regex.Pattern;
  * GitLab alike, so nothing about a provider may leak into the identifier.
  *
  * <p>This is the <em>only</em> name for what a practice observes, what an agent job is about, and what
- * an observation is filed against. It replaced two forked enums — {@code WorkArtifact} in the practices
- * module and {@code SubjectClass} in the integration SPI — which had already drifted to two names for
- * one thing ({@code CONVERSATION_THREAD} against {@code SLACK_MESSAGE_THREAD}) and were produced by two
- * parallel switches over the same job type.
+ * an observation is filed against. One name rather than a per-module vocabulary, because two of them
+ * drift: the same artifact acquires two spellings, and the switch that translates between them becomes
+ * the place a new domain has to be registered twice.
  *
  * <p>The grammar is deliberately narrower than "any string" because these values are persisted in
  * {@code artifact_signal.artifact_kind} and outlive the code that wrote them: whatever the parser

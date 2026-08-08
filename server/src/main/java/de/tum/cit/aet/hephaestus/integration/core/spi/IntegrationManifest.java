@@ -36,10 +36,10 @@ public interface IntegrationManifest {
      * <em>could</em> raise is a fact about the build and must read the same on every deployment. The
      * manifests used to carry the feature flag as a {@code @ConditionalOnProperty}, which made
      * {@code DeclaredSignalCoverage.compiledCoverage()} — the thing whose name promises it is compiled
-     * in — quietly vary with configuration: turning an integration off deleted its manifest bean, and
-     * every signal only that vendor raises then looked like a signal nothing in the build could raise.
-     * That is invisible while the one always-on vendor covers every signal, and fatal the moment a kind
-     * arrives whose only producer ships behind a flag.
+     * in — quietly vary with configuration: if turning an integration off deleted its manifest bean, every
+     * signal only that vendor raises would look like a signal nothing in the build can raise. That is
+     * invisible while one always-on vendor covers every signal, and fatal the moment a kind arrives whose
+     * only producer ships behind a flag.
      *
      * <p>What the flag still governs is the <em>wiring</em>: a disabled integration has no credential
      * provider, no subject parser and no message handlers, so the bootstrap's per-capability bean checks

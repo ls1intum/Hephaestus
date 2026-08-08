@@ -379,10 +379,9 @@ public class PracticeReviewDetectionGate {
         }
 
         // 4. Practice matching: at least one selected practice must be bound to this signal, and — when
-        //    the artifact is still a draft — bound to it on drafts. This replaced a fleet-wide draft
-        //    veto that ran ahead of everything: with drafts skipped by default, the draft-specific
-        //    criteria several practices are largely made of could never be reached. Whether a draft is
-        //    worth reviewing is a property of the occasion, so the binding is where it is now answered.
+        //    the artifact is still a draft — bound to it on drafts. Whether a draft is worth reviewing is
+        //    a property of the occasion, so the binding answers it; a fleet-wide draft veto ahead of this
+        //    would make the draft-specific criteria several practices are largely made of unreachable.
         //    Admission then applies the loudness tier: OFF is the one tier that stops the review, so
         //    MEASURE and COACH still get here and still record their observations.
         SignalMatch match = findMatchingPractices(workspace.getId(), signal, draft);

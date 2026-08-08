@@ -21,10 +21,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * One occasion on which a practice is reviewed, and the evidence a review occasioned that way needs.
  *
- * <p>This replaced three separate statements a practice used to make — its artifact kind, the events
- * that started a review, and the named evidence policy the review read under. The first was stated
- * three times and derivable from the third; the last was shared across practices, so adding a source
- * to one practice was a mutation invisible in that practice's diff.
+ * <p>One statement rather than three — artifact kind, the events that start a review, and the evidence
+ * the review reads under. The kind is derivable from the events, and evidence shared across practices by
+ * name made adding a source to one practice a mutation invisible in that practice's diff.
  *
  * <p>Evidence belongs here rather than on the practice because <em>what a review needs is a function
  * of what occasioned it</em>: a review that runs when a change merges may have to establish that no
@@ -35,10 +34,10 @@ import org.jspecify.annotations.Nullable;
  *
  * @param signals  the signals that occasion this review; at least one, and all of one artifact kind
  * @param needs    the sources a review occasioned this way reads, with the stance it takes to each
- * @param onDrafts whether an artifact still marked draft occasions this review. Defaults to false —
- *                 most practices judge work that has been handed over — and is the per-binding
- *                 replacement for the fleet-wide draft veto that made every draft-specific criterion
- *                 in the catalog unreachable
+ * @param onDrafts whether an artifact still marked draft occasions this review. Defaults to false,
+ *                 because most practices judge work that has been handed over. Per binding rather than
+ *                 fleet-wide: whether a draft is worth reviewing is a property of the occasion, and a
+ *                 blanket veto makes every draft-specific criterion in the catalog unreachable
  */
 @Schema(description = "An occasion that starts a review, and the evidence that review reads")
 public record PracticeBinding(

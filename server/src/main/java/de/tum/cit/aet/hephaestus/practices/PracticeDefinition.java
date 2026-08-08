@@ -11,8 +11,7 @@ import org.jspecify.annotations.Nullable;
  * A practice as its author wrote it.
  *
  * <p>{@code artifactKind} is not a field. It is read off {@link #bindings()}, whose signal names carry
- * it as a prefix — the practice used to state it three times (on itself, on its evidence profile, and
- * implicitly in its trigger events) and a pairwise validator held the three together.
+ * it as a prefix, so there is nothing for a second statement of it to disagree with.
  */
 public record PracticeDefinition(
     String name,

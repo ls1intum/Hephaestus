@@ -39,10 +39,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p>Uses {@code @Async @TransactionalEventListener(AFTER_COMMIT)} to avoid blocking the webhook
  * processing thread and to ensure entities are committed before we read them.
  *
- * <p><strong>How we found out no longer decides whether we record.</strong> A reconciliation-sourced
- * event used to be dropped at the door, which conflated two questions: a transition we successfully
- * received left no trace anywhere, and the mirror then agreed with upstream, so nothing could ever
- * notice it again. Now the source only governs whether a review is <em>triggered</em>; both sources
+ * <p><strong>How we found out does not decide whether we record.</strong> Dropping a
+ * reconciliation-sourced event at the door would conflate two questions, and leave a transition we
+ * successfully received with no trace anywhere — after which the mirror agrees with upstream and nothing
+ * can ever notice it again. The source governs only whether a review is <em>triggered</em>; both sources
  * reach the ledger. (Terminal-state filtering still happens before recording — a merge is recorded by
  * the handler whose trigger it actually is.)
  *

@@ -8,9 +8,8 @@ import java.util.Objects;
  * <p>Stated by the kind's {@link ArtifactDescriptor} because it is a fact about the domain, not about
  * any one practice: no amount of repository evidence establishes what a deployed service did at
  * runtime, and no amount of document evidence establishes whether the thing the document describes was
- * ever built. Practices used to carry these as a per-kind switch inside the practices module — the last
- * place a new artifact kind still forced an edit there — and a fifth kind arriving found the switch
- * throwing rather than the review declaring an honest limit.
+ * ever built. Stating it per kind here, rather than as a switch inside the practices module, is what
+ * lets a new artifact kind declare its own honest limit instead of finding a switch that throws.
  *
  * <p>It travels with the review as a standing caveat: the model is told what its evidence cannot settle,
  * so it declines rather than guesses, and an operator reading a report can see which questions were out

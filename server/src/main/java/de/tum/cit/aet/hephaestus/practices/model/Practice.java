@@ -173,9 +173,8 @@ public class Practice {
 
     /**
      * How loud this practice is allowed to be in this workspace: whether it is reviewed at all, and how
-     * far the result of that review may travel. Widens the boolean it replaced, which could only say
-     * "reviewed and delivered everywhere" or "not reviewed" and so made silencing a noisy practice cost
-     * the measurement too.
+     * far the result of that review may travel. A tier rather than a boolean, because "reviewed and
+     * delivered everywhere" or "not reviewed" makes silencing a noisy practice cost the measurement too.
      *
      * @see PracticeReviewTier
      */

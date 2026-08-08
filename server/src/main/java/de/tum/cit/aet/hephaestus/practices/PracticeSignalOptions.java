@@ -16,12 +16,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>Every answer here is derived from the registered {@link ArtifactDescriptor}s. Nothing in the
  * practices module names an artifact kind or a signal, which is the property that lets a new domain
- * become bindable without an edit in this package — the failure the whole contract exists to fix was
- * that adding a document trigger meant editing practices.
+ * become bindable without an edit in this package.
  *
- * <p>Its predecessor also translated signals into the {@code PullRequestReady}-style literals practices
- * used to be authored against. That translation is gone with the literals: a binding names the signal
- * itself, so the two vocabularies that had to be kept in step are one.
+ * <p>No translation layer either: a binding names the signal itself, so there is one vocabulary rather
+ * than two that have to be kept in step.
  */
 @Component
 public class PracticeSignalOptions {

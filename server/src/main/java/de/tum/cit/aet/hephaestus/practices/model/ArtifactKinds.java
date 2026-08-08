@@ -13,10 +13,10 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
  * ({@code core.spi}, {@code core.signal}) and on nothing that implements it, which is the boundary that
  * lets a new domain become bindable without an edit here.
  *
- * <p>The list of kinds an author may choose used to be here too. It was a claim about domains this
- * module does not own, kept true by whoever remembered to edit it; it is now derived from the
- * registered {@code ArtifactDescriptor}s by {@code PracticeSignalOptions}, so a kind becomes authorable
- * by being declared rather than by being listed here.
+ * <p>The list of kinds an author may choose is deliberately <em>not</em> here. That would be a claim
+ * about domains this module does not own, kept true by whoever remembered to edit it;
+ * {@code PracticeSignalOptions} derives it from the registered {@code ArtifactDescriptor}s instead, so a
+ * kind becomes authorable by being declared rather than by being listed.
  */
 public final class ArtifactKinds {
 

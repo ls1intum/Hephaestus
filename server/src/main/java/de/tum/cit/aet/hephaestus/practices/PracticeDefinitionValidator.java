@@ -47,9 +47,9 @@ public final class PracticeDefinitionValidator {
      * signal's prefix, so a misspelled signal would otherwise invent a kind nothing can raise and the
      * practice would sit in the catalog looking configured and never fire.
      *
-     * <p>A practice only a human reviews is checked the same way. It used to be forbidden from naming
-     * any occasion at all; it cannot be now, because the occasion is where its artifact kind comes from
-     * — and saying what a practice is about was never the same claim as asking Hephaestus to act on it.
+     * <p>A practice only a human reviews is checked the same way, and must name an occasion like any
+     * other: the occasion is where its artifact kind comes from, and saying what a practice is about is
+     * not the same claim as asking Hephaestus to act on it.
      */
     private void validateBindings(List<PracticeBinding> bindings) {
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
@@ -78,9 +78,9 @@ public final class PracticeDefinitionValidator {
      * A practice may only read evidence that could exist for the kind of thing it reviews.
      *
      * <p>The allow-list is the sources that declare they apply to this artifact kind, asked of the
-     * catalog each time rather than stored as a named profile. What each source demands of its capture
-     * is no longer checked here at all: it is stated once in the source contract, and the contract
-     * refuses to state a demand the source can never satisfy.
+     * catalog each time rather than stored as a named profile. What each source demands of its capture is
+     * not checked here: it is stated once in the source contract, which refuses to state a demand the
+     * source can never satisfy.
      */
     private void validateEvidence(ArtifactKind artifactKind, PracticeDefinition definition) {
         var version = definition.automatedReviewPolicy().sourceContractVersion();
