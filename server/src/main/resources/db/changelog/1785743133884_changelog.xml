@@ -2028,4 +2028,26 @@
         </rollback>
     </changeSet>
 
+    <!-- The reaper claimed each swept batch by stamping state_changed_at, which is the column the lapse
+         deadline measures against. With a retry delay shorter than that deadline — the only setting that
+         means anything — a pending signal was restamped every sweep and could never reach it: the
+         property was inert, artifact_signal accumulated rows that re-ran the full review gate hourly
+         forever, and the trace read "queued for review" for work nothing would ever review.
+
+         The retry clock moves to its own column so the two can no longer interfere. Null means the reaper
+         has not offered this row yet, and the sweep falls back to state_changed_at for it — a signal
+         nobody has re-offered has been waiting since it entered the state. -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-34">
+        <preConditions onFail="MARK_RAN" onFailMessage="artifact_signal.last_attempted_at already present">
+            <not><columnExists tableName="artifact_signal" columnName="last_attempted_at"/></not>
+        </preConditions>
+        <comment>Give the signal reaper a retry clock separate from the one the lapse deadline reads.</comment>
+        <addColumn tableName="artifact_signal">
+            <column name="last_attempted_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="artifact_signal" columnName="last_attempted_at"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

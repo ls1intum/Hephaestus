@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.core.signal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.data.domain.Pageable;
 
 class PendingSignalReaperTest extends BaseUnitTest {
@@ -109,5 +112,35 @@ class PendingSignalReaperTest extends BaseUnitTest {
         reaper(resubmitter).sweep();
 
         verify(resubmitter).resubmit(following);
+    }
+
+    @Test
+    void shouldClaimTheWholeBatchBeforeReOfferingAnyOfIt() {
+        // Ordering is the whole content of the claim. Stamping the rows afterwards would leave a batch
+        // that throws — or a sweep that dies mid-batch — unclaimed and back at the head of the next
+        // sweep, which is the starvation the claim exists to prevent. Without the InOrder assertion this
+        // test passes with the claim deleted outright.
+        PendingSignalResubmitter resubmitter = resubmitterFor("scm.pull_request");
+        ArtifactSignal signal = pendingSignal("scm.pull_request", "scm.pull_request.ready");
+        when(repository.findRetryablePending(any(), any(Pageable.class))).thenReturn(List.of(signal));
+        org.mockito.Mockito.doThrow(new IllegalStateException("boom")).when(resubmitter).resubmit(signal);
+
+        reaper(resubmitter).sweep();
+
+        InOrder inOrder = inOrder(repository, resubmitter);
+        inOrder.verify(repository).claimPendingForRetry(eq(List.of(signal.getId())), any());
+        inOrder.verify(resubmitter).resubmit(signal);
+    }
+
+    @Test
+    void shouldClaimASignalNoResubmitterCanTake() {
+        // The kind with nothing to act on it is left PENDING for the lapse deadline. It must still be
+        // claimed, or it sits at the head of every sweep forever, ahead of signals that could be retried.
+        ArtifactSignal signal = pendingSignal("docs.document", "docs.document.published");
+        when(repository.findRetryablePending(any(), any(Pageable.class))).thenReturn(List.of(signal));
+
+        reaper().sweep();
+
+        verify(repository).claimPendingForRetry(eq(List.of(signal.getId())), any());
     }
 }

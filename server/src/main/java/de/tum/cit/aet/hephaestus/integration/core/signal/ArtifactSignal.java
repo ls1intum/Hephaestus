@@ -103,10 +103,29 @@ public class ArtifactSignal {
     @Column(name = "job_id")
     private UUID jobId;
 
-    /** Doubles as the reaper's clock: how long this signal has been waiting in its current state. */
+    /**
+     * When the {@link #state} last actually changed — and therefore how long this signal has been
+     * waiting in the one it is in.
+     *
+     * <p>Only a change of state moves this, which is what gives the lapse deadline something to measure.
+     * A pending signal re-offered and refused again for the same class of reason has not changed state,
+     * so its wait keeps running; if every refusal restamped it, a signal refused forever would be
+     * permanently seven days away from lapsing and the deadline would never fire for anything.
+     */
     @NonNull
     @Column(name = "state_changed_at", nullable = false)
     private Instant stateChangedAt;
+
+    /**
+     * When the reaper last re-offered this signal, or {@code null} if it never has.
+     *
+     * <p>Separate from {@link #stateChangedAt} because the two clocks answer different questions and one
+     * column cannot do both: this one spaces the retries out, that one decides when to give up. Sharing
+     * a column means every retry postpones the deadline it is supposed to be racing.
+     */
+    @Nullable
+    @Column(name = "last_attempted_at")
+    private Instant lastAttemptedAt;
 
     /** The ledger identity of this row, for handing back to a {@link SignalRecorder}. */
     public SignalKey key() {

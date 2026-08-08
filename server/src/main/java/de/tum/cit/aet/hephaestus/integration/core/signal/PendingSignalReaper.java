@@ -25,8 +25,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>Whether a blocker has cleared is not observable from here — there is no event for "an admin
  * re-enabled practices" — so the sweep simply re-attempts on a human timescale and lets the
- * submission path answer. Every re-attempt restamps {@code state_changed_at}, which spaces the
- * retries out and gives the lapse deadline its meaning.
+ * submission path answer.
+ *
+ * <p>Two clocks, deliberately. {@code last_attempted_at} is stamped by every sweep and spaces the
+ * retries out; {@code state_changed_at} moves only when the signal's state does, and is what the lapse
+ * deadline measures. Retrying is meant to race giving up, so the retry must not be able to postpone it.
  */
 @ConditionalOnServerRole
 @Component
