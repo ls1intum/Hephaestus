@@ -2070,4 +2070,35 @@
         </rollback>
     </changeSet>
 
+    <!-- 1784242879917-2 revoked UPDATE on config_audit_event alongside the triggers that make the table
+         append-only. That revoke contradicts the same changeset's own erasure carve-out: the trigger is
+         written to permit exactly one UPDATE — the per-column NULLing an account erasure performs — and a
+         missing UPDATE privilege is checked before any trigger runs, so the statement would be rejected
+         before the carve-out could admit it. Account erasure NULLs actor_account_id and acting_account_id
+         on this table, so under a non-superuser role the erasure would fail and the account could not be
+         erased.
+
+         It has never bitten: every environment connects as the role the postgres image bootstraps, which
+         is a superuser, and superusers skip privilege checks entirely — which is also why the revoke was
+         never protecting anything. Granting UPDATE back leaves the triggers as the single, and real,
+         append-only control.
+
+         TRUNCATE stays revoked. Unlike UPDATE it contradicts nothing: it agrees with the statement-level
+         trigger that already blocks TRUNCATE, and nothing in the application ever truncates this table.
+
+         Forward-fix rather than an edit to 1784242879917-2, which deployed databases have already applied
+         and which is immutable. -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-36">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event not present">
+            <tableExists tableName="config_audit_event"/>
+        </preConditions>
+        <comment>Let an account erasure redact the config audit trail it is required to redact.</comment>
+        <sql splitStatements="false"><![CDATA[
+            GRANT UPDATE ON config_audit_event TO CURRENT_USER;
+        ]]></sql>
+        <rollback><![CDATA[
+            REVOKE UPDATE ON config_audit_event FROM CURRENT_USER;
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>
