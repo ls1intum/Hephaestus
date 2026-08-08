@@ -289,6 +289,115 @@ site points at it:
 No database action is required. The config-audit trail keeps its historical entity-type values as
 written — the table is append-only by database trigger, so past rows are never rewritten.
 
+#### 🔴 The default GitLab server follows your GitLab login instead of the maintainers' instance
+
+**Affected**: deployments that use the shipped Compose files, talk to a GitLab other than
+`gitlab.com`, and have never set `GITLAB_DEFAULT_SERVER_URL` themselves. Check with
+`grep GITLAB_ .env` before you upgrade.
+
+**Before**: `docker/compose.app.yaml` passed `GITLAB_DEFAULT_SERVER_URL:-https://gitlab.lrz.de` — the
+maintainers' own university instance. Because Compose always supplied a concrete value, the fallback
+the shipped configuration documents never ran, and an operator who had configured only their GitLab
+login silently got an instance they had never named.
+
+**After**: the same line is `${GITLAB_DEFAULT_SERVER_URL:-${GITLAB_OAUTH_BASE_URL:-https://gitlab.com}}`.
+Unset, it follows your GitLab login URL; with neither set it is `https://gitlab.com`.
+
+This setting names the GitLab that workspace creation and repository, group and member sync talk to.
+Sync resolves its provider by that URL, so changing it does not re-point existing data — it stops
+matching the rows written under the old URL and begins writing new ones stamped with the new one.
+
+**Migration**:
+
+1. If `GITLAB_DEFAULT_SERVER_URL` is set in your `.env`, nothing changes for you.
+2. If it is unset but `GITLAB_OAUTH_BASE_URL` already names your GitLab, that is now the value —
+   which is the intended behaviour, and for most self-hosted installs is the correct one. Confirm it
+   is the instance you sync from.
+3. If both are unset and you are not on `gitlab.com`, set `GITLAB_DEFAULT_SERVER_URL` to your
+   instance **before** starting the new version.
+
+A deployment that runs the application without the shipped Compose files was already defaulting to
+`https://gitlab.com` and is unaffected.
+
+#### 🔴 An agent heartbeat slower than 30 seconds now refuses to start
+
+**Affected**: deployments that override `hephaestus.agent.heartbeat-interval`. There is no environment
+variable for it, so that means an `application-local.yaml` or another `spring.config.import` source,
+or the relaxed-binding form `HEPHAESTUS_AGENT_HEARTBEATINTERVAL`. The shipped default is `25s` and is
+valid; if you have not set this, there is nothing to do.
+
+A worker renews a 60-second lease on the jobs it is running. A heartbeat slower than half that lease
+let a worker be declared dead while it was still working: its in-flight reviews were requeued onto a
+sibling and the same work ran twice, at double the model spend. The value is now rejected instead of
+accepted.
+
+**Migration**: if you set it above `30s`, lower it before upgrading. Otherwise the application does
+not start — on every role, not only the worker, because the value is rejected when configuration is
+bound — and reports:
+
+```
+hephaestus.agent.heartbeat-interval must be <= PT30S (half the PT1M worker lease), or every worker
+is orphaned while its jobs are still running; got: ...
+```
+
+#### 🔴 The containers now have their own memory limits
+
+**Affected**: hosts with less RAM than the limits add up to — in particular any host sized from
+guidance that named 4 GB as the floor.
+
+`application-server` (`APPLICATION_SERVER_MEM_LIMIT`, default `5g`), `application-worker`
+(`APPLICATION_WORKER_MEM_LIMIT`, default `3g`) and `webhook-server` (`WEBHOOK_SERVER_MEM_LIMIT`,
+default `2g`) each carry a container memory limit, and each JVM now sizes its heap from its own limit
+rather than from the whole host. On the single-host install the worker runs inside the application
+server, so the limits that apply there are `5g` and `2g`.
+
+Nothing compares these against the host. Docker starts the stack either way and the kernel kills
+whichever container exceeds its own limit; all three restart automatically, so an undersized host
+presents as a restart loop rather than as a refusal to start. Review sandboxes are separate
+containers and their memory sits outside these limits (`SANDBOX_MEMORY_BYTES`, default 4 GiB per
+concurrent sandbox).
+
+**Migration**: on a host below 8 GB RAM, set lower values in `.env` before the first start of the new
+version. The [install guide](https://ls1intum.github.io/Hephaestus/admin/install) states the floor
+and how the limits relate to it.
+
+#### 🔴 A workspace's per-run AI timeout is capped at one hour
+
+**Affected**: workspaces whose per-run timeout under Administration → AI models is above 3600 seconds.
+
+The ceiling is enforced when the value is saved, and existing stored values are left as they are.
+That combination is what needs your attention: such a workspace cannot save **any** change on its AI
+models page until the timeout is brought to 3600 or below, because the whole form is rejected. Its
+mentor turns are clamped to the ceiling, but its practice-review runs still run to the stored value,
+so the setting and the behaviour disagree until you change it.
+
+**Migration**: open each workspace's Administration → AI models page and lower any timeout above one
+hour. There is no automatic clamp of stored values.
+
+#### 🔴 Reviewed work is renamed in place, and the rename is one way
+
+**Affected**: every deployment, and any API client that reads or writes the kind of work a practice
+applies to or that a review or observation records.
+
+A practice, a review run and a recorded observation all now identify what was reviewed as
+`scm.pull_request`, `scm.issue` or `chat.conversation_thread`, replacing two internal vocabularies
+that had drifted apart. The upgrade rewrites the stored values.
+
+**Rolling the release back requires rolling this database change back with it.** Redeploying the
+previous image on its own leaves a database the old version cannot read.
+
+Two effects are worth expecting while the first reviews run after the upgrade, neither of which needs
+action:
+
+- A piece of feedback already posted on an open pull request or thread may be posted once more rather
+  than updated in place. What ties a re-review to an earlier one is derived from the old name, so the
+  first review after the upgrade does not recognise its own earlier comment.
+- Practice review rules are re-fingerprinted on the first start after the upgrade, so a practice can
+  briefly show as differing from its Hephaestus default until that finishes. If a workspace still
+  shows as locally edited long afterwards, check the startup log: the pass records a failure per
+  workspace and moves on rather than stopping, so a workspace it could not complete stays that way
+  until the next start.
+
 ### v0.69.0
 
 #### 🔴 Agent image pin moved from `docker/agent-image-pin.env` to a signed release asset
