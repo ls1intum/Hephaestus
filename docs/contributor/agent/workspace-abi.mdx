@@ -23,7 +23,11 @@ precompute scratch; never collected), and `out/` (the only directory collected b
 │   │   └── scm/repo/                #   Pinned, read-only SCM tree without Git metadata or history.
 │   ├── context/                     #   System-written, AI-readable. Populated by the ContentSource SPI.
 │   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
-│   │                                #   linked_work_items.json, review_threads.json, …
+│   │                                #   diff_stat.txt, linked_work_items.json, review_threads.json,
+│   │                                #   general_comments.json, project_inventory.json, context-map.md,
+│   │                                #   issue_summary.md, conversation_thread.json, document.md,
+│   │                                #   outline/index.json + outline/{collection}/{doc}.md — whichever
+│   │                                #   of them apply to the artifact kind under review.
 │   ├── history/                     #   What earlier reviews recorded and already said, about the
 │   │                                #   person whose work this is: observations.json, feedback.json.
 │   │                                #   ALWAYS present, empty on a first-ever review.
@@ -52,12 +56,15 @@ covered by this ABI.
 - **`inputs/context/`** — system-written, AI-readable source materializations of the artifact under
   review. A source with nothing to report still writes its file, holding an empty list: "the record was
   read and held nothing" is a fact a review may reason from, and "the file is not there" is not.
-- **`inputs/history/`** — the same, for what came before this event rather than for this event. Selected
-  by every evidence plan regardless of practice bindings, because a review of one event is only a partial
-  practice review and cannot be made whole by reading that event harder. Never reported COMPLETE: it is a
-  bounded window over a growing record.
-- **`inputs/manifest.json`** — the source and artifact index. It indexes context files but is not itself a source
-  artifact.
+- **`inputs/history/`** — the same, for what came before this event rather than for this event. Present on
+  every review, because a review of one event is only a partial practice review and cannot be made whole by
+  reading that event harder. Never reported COMPLETE: it is a bounded window over a growing record.
+- **`inputs/manifest.json`** — the source and artifact index, and the authoritative statement of what a run
+  staged. **Every source the source contract says applies to the artifact kind is captured and staged, on
+  every review** — practice bindings decide which practices may run, never which files the agent can see. A
+  source listed as anything other than `AVAILABLE` says why in a typed reason code (`NO_PROVIDER`,
+  `GOVERNANCE_NOT_EFFECTIVE`, `COLLECTION_ERROR`, …); none of those reasons is "no practice asked for it".
+  It indexes context files but is not itself a source artifact.
 - **`inputs/sources/scm/repo/`** — a read-only repository tree materialised at the manifest's
   immutable commit identity. It intentionally excludes `.git`, history, submodules, and symlink
   targets; `inputs/manifest.json` records whether the resulting source is complete or partial.

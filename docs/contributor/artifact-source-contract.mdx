@@ -21,9 +21,16 @@ The contract separates three identities:
 
 1. **Source catalog:** logical source kinds and their authority, identity anchoring, completeness, required
    capture quality, privacy, and absence-state semantics.
-2. **Practice binding:** the occasion a review runs on and the sources that review reads. A source declares
-   the artifact kinds it applies to, so the catalog constrains which sources a binding may name.
+2. **Practice binding:** the occasion a review runs on and the evidence that review *requires* before it may
+   run at all. A source declares the artifact kinds it applies to, so the catalog constrains which sources a
+   binding may name.
 3. **Capture manifest:** the state, provenance facts, and materialized artifacts for one invocation.
+
+A binding's `needs` decide **readiness**, not staging. Every source the catalog says applies to the artifact
+kind is captured and staged for every review of that kind, whether or not a practice named it: relevance is a
+question for the practice criteria and the reviewing model, not a reason to withhold data from it. A binding
+that names a source with a refusing stance still refuses the review when that source did not arrive, and an
+`EXHAUSTIVE` stance still fences what the review may assert an absence over. Neither cuts the sandbox down.
 
 Paths are materializations, not source identities. Prompts, practice files, task envelopes, runner code, model
 settings, and executables are invocation inputs and require separate evaluation provenance.
@@ -141,13 +148,15 @@ into one state.
 ### Availability
 
 - `AVAILABLE`: capture facts and logical content state are present.
-- `NOT_COLLECTED`: the source was outside the plan, disabled, or not attempted.
+- `NOT_COLLECTED`: no unexpired use decision permits the source for this purpose, or collection is
+  switched off for it in this deployment. Never "no practice wanted it": every source that applies to the
+  artifact kind is staged for every review, so relevance is not a reason a source can be missing.
 - `UNAVAILABLE`: the source could not be retrieved for a non-error reason.
 - `REDACTED`: the entire source was withheld for privacy or security.
 - `COLLECTION_ERROR`: an attempted collection failed.
 
 A non-available source contains no artifacts or source identifiers, and carries a typed
-`SourceAbsenceReason` saying *why* — `MINIMIZED`, `GOVERNANCE_NOT_EFFECTIVE`, `PINNED_HEAD_MISSING`,
+`SourceAbsenceReason` saying *why* — `GOVERNANCE_NOT_EFFECTIVE`, `NO_PROVIDER`, `PINNED_HEAD_MISSING`,
 `CONSENT_NOT_ACTIVE`, and the rest. Safe, typed reason codes may be role-filtered; free-form exception text
 must not enter the manifest.
 
