@@ -87,6 +87,25 @@ export const SelectedModelUnavailable: Story = {
 	args: { model: { ...model, binding: { ...readyBinding, ready: false } } },
 };
 
+/**
+ * Ready and turned off are two different facts about a model, and only one of them is `ready`. A
+ * model that has been switched off elsewhere is still reported as ready by the binding, so a
+ * readiness check that stops there offers to start reviews that cannot run.
+ */
+export const SelectedModelTurnedOff: Story = {
+	args: {
+		model: { ...model, binding: { ...readyBinding, enabled: false } },
+		workspace: { ...workspace, enabled: false },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("The review model is unavailable")).toBeVisible();
+		await expect(canvas.getByRole("switch", { name: "Start practice reviews" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+	},
+};
+
 export const CheckingModelReadiness: Story = {
 	args: { model: { ...model, binding: undefined, isLoading: true } },
 };
@@ -254,5 +273,45 @@ export const WideningTheScopeAgain: Story = {
 		await userEvent.click(reset);
 
 		await expect(args.policy.onReset).toHaveBeenCalledWith("REVIEW_SCOPE");
+	},
+};
+
+/**
+ * The cooldown is the one number on this screen, and it is saved on the way out of the field rather
+ * than on every keystroke — so leaving it alone has to be silent, and leaving it changed has to save.
+ */
+export const ChangingTheTimeBetweenReviews: Story = {
+	args: { policy: { ...policy, onUpdate: fn() } },
+	play: async ({ args, canvas }) => {
+		const cooldown = canvas.getByRole("spinbutton", { name: "Time between reviews (minutes)" });
+
+		// Passing through the field is not an edit.
+		await userEvent.click(cooldown);
+		await userEvent.tab();
+		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
+
+		await userEvent.clear(cooldown);
+		await userEvent.type(cooldown, "45");
+		await userEvent.tab();
+
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({ cooldownMinutes: 45 });
+	},
+};
+
+/**
+ * A number outside the range stays in the field. `aria-invalid` says only *that* something is wrong,
+ * so the field also points at the sentence that says what would be right (WCAG 2.2 SC 3.3.1).
+ */
+export const RefusingATimeOutsideTheRange: Story = {
+	args: { policy: { ...policy, onUpdate: fn() } },
+	play: async ({ args, canvas }) => {
+		const cooldown = canvas.getByRole("spinbutton", { name: "Time between reviews (minutes)" });
+		await userEvent.clear(cooldown);
+		await userEvent.type(cooldown, "1500");
+		await userEvent.tab();
+
+		await expect(cooldown).toBeInvalid();
+		await expect(cooldown).toHaveAccessibleDescription("Enter a whole number from 0 to 1,440.");
+		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
 };
