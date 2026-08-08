@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -150,20 +151,25 @@ public class AgentJobService {
         );
     }
 
-    /** Submit a prepared dev request and render the result message. Call only after the build transaction commits. */
+    /**
+     * Submit a prepared dev request and render the result message. Call only after the build
+     * transaction commits.
+     *
+     * <p>The message quotes the reason the submission actually stopped on. It used to name a fixed
+     * pair of guesses instead, which is how a run stopped by a cooldown was reported as an exhausted
+     * budget — sending the reader to raise a cap that was never set.
+     */
     public String submitPrepared(
         Long workspaceId,
         AgentJobType jobType,
         JobSubmissionRequest request,
         @Nullable SignalKey signalKey
     ) {
-        Optional<AgentJob> job = submit(workspaceId, jobType, request, signalKey);
-        return job
-            .map(j -> "Job submitted: " + j.getId())
-            .orElse(
-                "No job created. Practice reviews are unbound or disabled for this workspace, or their " +
-                    "monthly AI budget is reached (see the workspace's AI usage report)."
-            );
+        SubmissionOutcome outcome = submitWithOutcome(workspaceId, jobType, request, signalKey);
+        if (outcome.job() != null) {
+            return "Job submitted: " + outcome.job().getId();
+        }
+        return "No job created. " + outcome.requireRefusal().describe();
     }
 
     /**
@@ -182,6 +188,19 @@ public class AgentJobService {
      *     practice-review binding, or the cap funding it is reached
      */
     public Optional<AgentJob> submit(
+        Long workspaceId,
+        AgentJobType jobType,
+        JobSubmissionRequest request,
+        @Nullable SignalKey signalKey
+    ) {
+        return Optional.ofNullable(submitWithOutcome(workspaceId, jobType, request, signalKey).job());
+    }
+
+    /**
+     * {@link #submit} for callers that must explain themselves: the same attempt, keeping the reason
+     * it stopped on instead of flattening it into an empty result.
+     */
+    SubmissionOutcome submitWithOutcome(
         Long workspaceId,
         AgentJobType jobType,
         JobSubmissionRequest request,
@@ -210,26 +229,26 @@ public class AgentJobService {
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        return Optional.ofNullable(submitForBinding(workspace, jobType, submission, signalKey));
+        return submitForBinding(workspace, jobType, submission, signalKey);
     }
 
     /**
-     * Hold a refused signal open so the reaper can re-offer it, and answer the caller with the empty
-     * result the refusal implies. Wrapped in the transaction template because the callers differ in
-     * whether they already have one.
+     * Hold a refused signal open so the reaper can re-offer it, and answer the caller with the reason
+     * it was refused. Wrapped in the transaction template because the callers differ in whether they
+     * already have one.
      */
-    private Optional<AgentJob> refuse(@Nullable SignalKey signalKey, SignalStateReason reason) {
+    private SubmissionOutcome refuse(@Nullable SignalKey signalKey, SignalStateReason reason) {
         if (signalKey != null) {
             transactionTemplate.executeWithoutResult(status -> signalRecorder.markRefused(signalKey, reason));
         }
-        return Optional.empty();
+        return SubmissionOutcome.refused(reason);
     }
 
     /**
      * Submit exactly one practice-review job — never a fan-out. The binding is re-fetched inside the
      * transaction because the discovery read in {@link #submit} runs detached.
      */
-    private @Nullable AgentJob submitForBinding(
+    private SubmissionOutcome submitForBinding(
         Workspace workspace,
         AgentJobType jobType,
         JobSubmission submission,
@@ -237,7 +256,7 @@ public class AgentJobService {
     ) {
         String detectionKey = submission.idempotencyKey() + ":detection";
 
-        return transactionTemplate.execute(status -> {
+        SubmissionOutcome outcome = transactionTemplate.execute(status -> {
             Workspace currentWorkspace = workspaceRepository
                 .findByIdForUpdate(workspace.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Workspace", workspace.getId().toString()));
@@ -295,7 +314,7 @@ public class AgentJobService {
                         existing.get().getId(),
                         detectionKey
                     );
-                    return existing.get();
+                    return SubmissionOutcome.of(existing.get());
                 }
             }
 
@@ -365,7 +384,9 @@ public class AgentJobService {
                 // the occurrence free to be recorded again rather than consumed by a job that never was.
                 log.info("Idempotency constraint caught concurrent duplicate: key={}", detectionKey);
                 status.setRollbackOnly();
-                return null;
+                // Named but NOT recorded: the rollback unwinds this signal's ledger row, and the
+                // submission that won carries the review and its own settlement.
+                return SubmissionOutcome.refused(SignalStateReason.CONCURRENT_DUPLICATE);
             }
 
             if (signalKey != null) {
@@ -379,16 +400,19 @@ public class AgentJobService {
                 workspace.getId()
             );
 
-            return job;
+            return SubmissionOutcome.of(job);
         });
+        // Only a callback returning null could produce null here, and every branch above returns an
+        // outcome; a null would be a silence with no reason, which is the one thing this must not do.
+        return Objects.requireNonNull(outcome, "submission outcome");
     }
 
     /** Settle a refused signal inside the submission transaction, so the two stand or fall together. */
-    private @Nullable AgentJob refuseInTransaction(@Nullable SignalKey signalKey, SignalStateReason reason) {
+    private SubmissionOutcome refuseInTransaction(@Nullable SignalKey signalKey, SignalStateReason reason) {
         if (signalKey != null) {
             signalRecorder.markRefused(signalKey, reason);
         }
-        return null;
+        return SubmissionOutcome.refused(reason);
     }
 
     /**

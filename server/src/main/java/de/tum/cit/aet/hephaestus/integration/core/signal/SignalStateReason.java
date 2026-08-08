@@ -83,4 +83,32 @@ public enum SignalStateReason {
     public boolean isRetryable() {
         return resultingState == SignalState.PENDING;
     }
+
+    /**
+     * One sentence, in the reader's words, for every surface that has to explain a silence.
+     *
+     * <p>Beside the reason rather than at each surface that renders it, for the same argument the
+     * vocabulary itself rests on: a reason and the sentence explaining it are one fact, and a second
+     * copy of it is a second thing to keep true. A hand-written second copy is how a refusal that was
+     * a cooldown came to be reported as an exhausted budget — which sends an operator to raise a cap
+     * that was never set.
+     */
+    public String describe() {
+        return switch (this) {
+            case GATE_SKIPPED -> "The workspace's review gate declined this occurrence.";
+            case COOLDOWN_ACTIVE -> "Another review ran on this artifact inside the workspace's cooldown window.";
+            case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
+            case OUT_OF_REVIEW_SCOPE -> "This artifact is outside the branches and repositories this workspace reviews.";
+            case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";
+            case PRACTICES_DISABLED -> "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
+            case NO_ACTIVE_PRACTICE -> "No practice was bound to this occurrence when it was recorded.";
+            case BINDING_DISABLED -> "No enabled binding covered this occurrence when it was recorded.";
+            case PRACTICE_TIER_OFF -> "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
+            case BUDGET_EXHAUSTED -> "The budget funding this review was exhausted; it is re-offered when the budget refills.";
+            case SUBJECT_UNLINKED -> "Nobody this could be attributed to has linked their account; linking one re-offers it.";
+            case MODEL_UNAVAILABLE -> "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";
+            case PENDING_DEADLINE_EXCEEDED -> "It waited longer than the ledger keeps re-offering a signal.";
+            case ARTIFACT_GONE -> "The artifact was deleted before a review could run.";
+        };
+    }
 }

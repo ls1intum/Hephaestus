@@ -343,27 +343,12 @@ final class PracticeTraceDeriver {
         return "The review could not read what this practice needs: " + String.join("; ", readiness.blockers()) + ".";
     }
 
-    /** One sentence per recorded reason, phrased as what would change the answer. */
+    /**
+     * One sentence per recorded reason, phrased as what would change the answer — the reason's own,
+     * so this page and every other surface that explains a silence say the same thing about it.
+     */
     private static String reasonCopy(@Nullable SignalStateReason reason, String fallback) {
-        if (reason == null) {
-            return fallback;
-        }
-        return switch (reason) {
-            case GATE_SKIPPED -> "The workspace's review gate declined this occurrence.";
-            case COOLDOWN_ACTIVE -> "Another review ran on this artifact inside the workspace's cooldown window.";
-            case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
-            case OUT_OF_REVIEW_SCOPE -> "This artifact is outside the branches and repositories this workspace reviews.";
-            case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";
-            case PRACTICES_DISABLED -> "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
-            case NO_ACTIVE_PRACTICE -> "No practice was bound to this occurrence when it was recorded.";
-            case BINDING_DISABLED -> "No enabled binding covered this occurrence when it was recorded.";
-            case PRACTICE_TIER_OFF -> "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
-            case BUDGET_EXHAUSTED -> "The budget funding this review was exhausted; it is re-offered when the budget refills.";
-            case SUBJECT_UNLINKED -> "Nobody this could be attributed to has linked their account; linking one re-offers it.";
-            case MODEL_UNAVAILABLE -> "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";
-            case PENDING_DEADLINE_EXCEEDED -> "It waited longer than the ledger keeps re-offering a signal.";
-            case ARTIFACT_GONE -> "The artifact was deleted before a review could run.";
-        };
+        return reason == null ? fallback : reason.describe();
     }
 
     /**

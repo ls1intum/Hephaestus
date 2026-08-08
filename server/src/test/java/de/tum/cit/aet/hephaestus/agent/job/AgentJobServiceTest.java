@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -636,15 +637,19 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(service.buildIssueRequest(issue, ScmSignals.ISSUE_CLOSED)).isNull();
         }
 
-        @Test
+        @BeforeEach
         @SuppressWarnings("unchecked")
-        void submitPreparedNamesTheUnboundAndBudgetCausesWhenNothingWasSubmitted() {
+        void runTheSubmissionTransaction() {
             lenient()
                 .when(transactionTemplate.execute(any()))
                 .thenAnswer(inv -> {
                     TransactionCallback<?> callback = inv.getArgument(0);
                     return callback.doInTransaction(mock(TransactionStatus.class));
                 });
+        }
+
+        @Test
+        void submitPreparedNamesTheReasonTheSubmissionActuallyStoppedOn() {
             when(
                 agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)
             ).thenReturn(Optional.empty());
@@ -657,7 +662,60 @@ class AgentJobServiceTest extends BaseUnitTest {
                 null
             );
 
-            assertThat(result).contains("No job created").contains("unbound or disabled").contains("budget");
+            assertThat(result).isEqualTo("No job created. " + SignalStateReason.BINDING_DISABLED.describe());
+        }
+
+        @Test
+        void submitPreparedNamesTheCooldownRatherThanGuessingAtTheBudget() {
+            // The live case this pins: an enabled binding, no budget configured at all, and a run
+            // stopped by the workspace's cooldown. The message used to name an exhausted budget and a
+            // disabled binding — three claims, all false, one of them pointing at a cap nobody set.
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            AgentJob recent = new AgentJob();
+            recent.prePersist();
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.of(recent));
+
+            String result = service.submitPrepared(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class),
+                null
+            );
+
+            assertThat(result).isEqualTo("No job created. " + SignalStateReason.COOLDOWN_ACTIVE.describe());
+            assertThat(result).doesNotContain("budget");
+        }
+
+        @Test
+        void submitPreparedNamesTheJobItCreated() {
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
+                AgentJob saved = inv.getArgument(0);
+                saved.prePersist();
+                return saved;
+            });
+
+            String result = service.submitPrepared(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class),
+                null
+            );
+
+            assertThat(result).startsWith("Job submitted: ");
         }
     }
 }
