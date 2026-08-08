@@ -100,7 +100,11 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 					}
 				>
 					<div className="flex min-w-0 items-center gap-2">
-						<Label htmlFor="trace-artifact-kind" className="shrink-0 text-muted-foreground">
+						<Label
+							id="trace-artifact-kind-label"
+							htmlFor="trace-artifact-kind"
+							className="shrink-0 text-muted-foreground"
+						>
 							Show
 						</Label>
 						<Select
@@ -116,7 +120,7 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 							<SelectTrigger id="trace-artifact-kind" className="w-56 max-w-full">
 								<SelectValue placeholder="All work" />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent aria-labelledby="trace-artifact-kind-label">
 								{kindItems.map((kind) => (
 									<SelectItem key={kind.value} value={kind.value}>
 										{kind.label}
