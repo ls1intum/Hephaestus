@@ -2,10 +2,15 @@ import { QueryClient } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { screen, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "@/mocks/server";
 import { routeTree } from "@/routeTree.gen";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
+
+// Mounting the real route pulls in the whole admin layout and its lazy modules. The default 5s is a
+// deadlock backstop here rather than a budget these renders were ever meant to fit inside, and under
+// a full parallel run they do not.
+vi.setConfig({ testTimeout: 15_000 });
 
 function routerAt(url: string) {
 	return createRouter({
