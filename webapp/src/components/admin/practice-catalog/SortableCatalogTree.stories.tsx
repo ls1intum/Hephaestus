@@ -173,6 +173,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const openActions = async (canvas: ReturnType<typeof within>, name: string) => {
+	// A menu left over from a previous step is still on screen for a frame after the click that
+	// dismissed it, and `findByRole("menu")` would hand back that one.
+	await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
 	await userEvent.click(canvas.getByRole("button", { name: `More actions for ${name}` }));
 	return within(await screen.findByRole("menu"));
 };
