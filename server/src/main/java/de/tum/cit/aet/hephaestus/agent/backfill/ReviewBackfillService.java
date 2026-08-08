@@ -21,7 +21,9 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.resilience.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -173,7 +175,15 @@ public class ReviewBackfillService {
      * <p>Confirmation is the only place the estimate turns into permission to spend, so it records who
      * gave it. A paused run is confirmable again, which is how an admin restarts one that stopped on an
      * exhausted budget without waiting for the driver's own retry.
+     *
+     * <p>Retried on an optimistic-lock failure rather than reported. The row this contends with is the
+     * driver's own save on the tick it is mid-batch, which is over in milliseconds; the contending
+     * transaction has already rolled back, so the retry re-reads a settled row and the second attempt
+     * decides against current state. Handing the admin a conflict instead would mean the button whose
+     * whole job is to stop spending fails precisely while spending is happening — the moment it is
+     * pressed, and the moment it must work.
      */
+    @Retryable(includes = { OptimisticLockingFailureException.class }, maxRetries = 3, delay = 50)
     @Transactional
     public ReviewBackfillRunDTO updateStatus(
         WorkspaceContext context,

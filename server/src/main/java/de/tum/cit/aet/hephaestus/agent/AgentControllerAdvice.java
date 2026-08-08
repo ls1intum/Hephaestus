@@ -12,6 +12,7 @@ import java.net.URI;
 import java.util.Optional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -32,6 +33,26 @@ public class AgentControllerAdvice {
     @ExceptionHandler(ReviewBackfillConflictException.class)
     ProblemDetail handleReviewBackfillConflict(ReviewBackfillConflictException exception) {
         return problem(HttpStatus.CONFLICT, "review-backfill-conflict", "Review backfill conflict", exception);
+    }
+
+    /**
+     * An optimistic-lock failure that outlived its retries is a conflict, not a server fault.
+     *
+     * <p>Version columns exist on agent entities the admin screens edit while a scheduler is also writing
+     * them, so this is a contended-row outcome the caller can act on by repeating the request — the same
+     * answer as any other 409 here. Without the mapping it falls through to
+     * {@code GlobalControllerAdvice}'s {@code @ExceptionHandler(Exception.class)} and becomes a 500,
+     * which tells the admin the server is broken when what happened is that somebody else got there
+     * first.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ProblemDetail handleOptimisticLockingFailure(OptimisticLockingFailureException exception) {
+        return problem(
+            HttpStatus.CONFLICT,
+            "concurrent-modification",
+            "Concurrent modification",
+            new IllegalStateException("The record changed while this request was being processed. Try again.")
+        );
     }
 
     @ExceptionHandler(AgentJobStateConflictException.class)
