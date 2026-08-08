@@ -605,7 +605,9 @@
         <preConditions onFail="MARK_RAN" onFailMessage="fk_observation_practice already non-cascading">
             <sqlCheck expectedResult="1">
                 SELECT count(*) FROM pg_constraint
-                WHERE conname = 'fk_observation_practice' AND confdeltype = 'c'
+                WHERE conname = 'fk_observation_practice'
+                  AND conrelid = 'observation'::regclass
+                  AND confdeltype = 'c'
             </sqlCheck>
         </preConditions>
         <comment>Stop cascade-deleting observations when a practice is removed.</comment>
@@ -999,6 +1001,7 @@
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_constraint
                 WHERE conname = 'chk_observation_presence'
+                  AND conrelid = 'observation'::regclass
                   AND pg_get_constraintdef(oid) LIKE '%INDETERMINATE%'
             </sqlCheck>
         </preConditions>
@@ -1636,6 +1639,7 @@
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_constraint
                 WHERE conname = 'chk_feedback_suppression_reason'
+                  AND conrelid = 'feedback'::regclass
                   AND pg_get_constraintdef(oid) LIKE '%PRACTICE_TIER_QUIET%'
             </sqlCheck>
         </preConditions>
@@ -1696,6 +1700,7 @@
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_constraint
                 WHERE conname = 'ck_artifact_signal_discovered_via'
+                  AND conrelid = 'artifact_signal'::regclass
                   AND pg_get_constraintdef(oid) LIKE '%BACKFILL%'
             </sqlCheck>
         </preConditions>
@@ -1726,6 +1731,7 @@
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_constraint
                 WHERE conname = 'chk_feedback_suppression_reason'
+                  AND conrelid = 'feedback'::regclass
                   AND pg_get_constraintdef(oid) LIKE '%BACKFILL_QUIET%'
             </sqlCheck>
         </preConditions>
@@ -1756,6 +1762,7 @@
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_constraint
                 WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND conrelid = 'config_audit_event'::regclass
                   AND pg_get_constraintdef(oid) LIKE '%REVIEW_BACKFILL_RUN%'
             </sqlCheck>
         </preConditions>
