@@ -9,8 +9,8 @@ thing where reviews are stored and another where they are run. The bundled pract
 and the admin screens use the new names, and existing practices, reviews and observations are moved
 across on upgrade.
 
-**Operators:** the upgrade rewrites the names in place and needs no action, but it is a one-way
-change: rolling the release back requires rolling the database change back with it. Two effects are
+**Operators:** this is a one-way change — the upgrade rewrites the names in place, so rolling the
+release back requires rolling the database change back with it. Two effects are
 worth knowing about while the first reviews run afterwards. A piece of feedback that was already
 posted on an open pull request or thread may be posted once more rather than updated in place, since
 what ties a re-review to an earlier one is derived from the old name. And practice review rules are

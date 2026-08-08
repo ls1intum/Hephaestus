@@ -16,6 +16,6 @@ redelivery used to be recognised only while the earlier review was still running
 after it finished paid for the whole review again; the review cooldown minutes are now purely a rate
 limit rather than the last line of defence.
 
-**Operators:** how long a blocked review keeps waiting is configurable and needs no action — it is
+How long a blocked review keeps waiting is configurable, and the defaults need no action: it is
 re-attempted hourly and given up on after seven days (`hephaestus.signal-ledger.pending-retry-after`,
 `hephaestus.signal-ledger.pending-lapse-after`).
