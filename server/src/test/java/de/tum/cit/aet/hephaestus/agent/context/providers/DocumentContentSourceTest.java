@@ -151,7 +151,7 @@ class DocumentContentSourceTest extends BaseUnitTest {
 
         assertThat(captured.stateOverrides()).containsEntry(
             SOURCE_KIND,
-            new SourceCaptureState.Unavailable(SourceAbsenceReason.MINIMIZED)
+            new SourceCaptureState.Unavailable(SourceAbsenceReason.CONTENT_EVICTED)
         );
     }
 

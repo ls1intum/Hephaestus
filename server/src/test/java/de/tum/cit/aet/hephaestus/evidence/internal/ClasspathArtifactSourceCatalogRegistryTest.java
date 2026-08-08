@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUseBasis;
@@ -16,6 +17,8 @@ import java.io.InputStream;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -292,6 +295,28 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             assertThat(schema.path("$schema").asString()).isEqualTo("https://json-schema.org/draft/2020-12/schema");
             assertThat(schema.path("$id").asString()).contains("/1.0.0/");
             assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        }
+    }
+
+    @Test
+    void shouldPinTheAbsenceReasonVocabularyToTheJavaEnum() throws IOException {
+        // The schema calls this a "closed vocabulary; see SourceAbsenceReason" and then restates it by
+        // hand, twice. A value added to the enum and not here makes the manifest we write fail its own
+        // published contract; a value removed from the enum and left here keeps advertising a reason
+        // nothing can emit. Neither shows up until someone validates a manifest against the schema,
+        // which no production path does — so the restatement is held to the enum here instead.
+        JsonNode schema = read("contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json");
+        List<String> expected = Stream.of(SourceAbsenceReason.values()).map(Enum::name).toList();
+
+        List<JsonNode> vocabularies = schema.findValues("reasonCode");
+        vocabularies.addAll(schema.findValues("errorCode"));
+        assertThat(vocabularies).as("both the absence and the collection-error vocabularies").hasSize(2);
+
+        for (JsonNode vocabulary : vocabularies) {
+            List<String> declared = vocabulary.path("enum").valueStream().map(JsonNode::asString).toList();
+            assertThat(declared)
+                .as("schema vocabulary vs SourceAbsenceReason.values()")
+                .containsExactlyInAnyOrderElementsOf(expected);
         }
     }
 

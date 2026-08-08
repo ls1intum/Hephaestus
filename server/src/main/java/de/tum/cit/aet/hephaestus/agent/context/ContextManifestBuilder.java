@@ -238,7 +238,7 @@ public class ContextManifestBuilder {
                     ? source
                     : new SourceCapture(
                           source.kind(),
-                          new SourceCaptureState.NotCollected(SourceAbsenceReason.MINIMIZED),
+                          new SourceCaptureState.NotCollected(SourceAbsenceReason.NOT_NEEDED_BY_READY_PRACTICES),
                           List.of()
                       )
             )
@@ -438,7 +438,10 @@ public class ContextManifestBuilder {
     ) {
         ArtifactSourceContract contract = catalogs.requireSource(plan.contractVersion(), kind);
         if (!plan.selectedSources().contains(kind)) {
-            return missingCapture(contract, new SourceCaptureState.NotCollected(SourceAbsenceReason.MINIMIZED));
+            return missingCapture(
+                contract,
+                new SourceCaptureState.NotCollected(SourceAbsenceReason.NOT_NEEDED_BY_READY_PRACTICES)
+            );
         }
         SourceCaptureState override = stateOverrides.get(kind);
         if (override != null) {

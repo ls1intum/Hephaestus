@@ -198,7 +198,7 @@ public class DocumentContentSource implements EvidenceSource, ReviewContextBuild
                 documentId,
                 job.getId()
             );
-            return Subject.absent(SourceAbsenceReason.MINIMIZED);
+            return Subject.absent(SourceAbsenceReason.CONTENT_EVICTED);
         }
         log.info("Document context built: documentId={}, jobId={}", documentId, job.getId());
         return Subject.of(render(document).getBytes(StandardCharsets.UTF_8));

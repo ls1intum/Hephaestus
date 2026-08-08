@@ -160,7 +160,7 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 	const manifestId = schemaId(version, "artifact-source-manifest.schema.json");
 	const readinessId = schemaId(version, "automated-review-readiness-report.schema.json");
 	const capturedAt = "2026-08-03T00:00:00Z";
-	const absent = { availability: "NOT_COLLECTED", reasonCode: "MINIMIZED" };
+	const absent = { availability: "NOT_COLLECTED", reasonCode: "NOT_NEEDED_BY_READY_PRACTICES" };
 	const manifestOf = (artifactKind, kinds) => ({
 		contractVersion: version,
 		catalogDigest: digest,

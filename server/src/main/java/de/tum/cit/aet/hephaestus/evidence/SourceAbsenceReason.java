@@ -7,8 +7,17 @@ package de.tum.cit.aet.hephaestus.evidence;
  * what makes the absence actionable for an operator, an auditor, or the review prompt.
  */
 public enum SourceAbsenceReason {
-    /** {@code NOT_COLLECTED}: the practice did not ask for this source, so it was never read. */
-    MINIMIZED,
+    /**
+     * {@code NOT_COLLECTED}: no practice that survived the readiness gate reads this source, so it is not
+     * staged into the sandbox view.
+     *
+     * <p>Named for what it does rather than for what it once meant. The source <em>was</em> collected and
+     * <em>is</em> retained — retention is unchanged by a hair — so calling this "minimised" claimed a data
+     * minimisation the code does not perform, and pointed an auditor at the wrong control. What actually
+     * happened is narrower and duller: practices refused for insufficient evidence dropped out, and the
+     * sources only they read had nothing left to serve.
+     */
+    NOT_NEEDED_BY_READY_PRACTICES,
     /** {@code NOT_COLLECTED}: no unexpired use decision permits this source for this purpose. */
     GOVERNANCE_NOT_EFFECTIVE,
     /** {@code NOT_COLLECTED}: collection is switched off for this source in this deployment. */
@@ -23,6 +32,15 @@ public enum SourceAbsenceReason {
     NO_WORKING_COPY,
     /** {@code UNAVAILABLE}: the requested conversation or artifact does not exist upstream. */
     NOT_FOUND,
+    /**
+     * {@code UNAVAILABLE}: the mirror holds the row but not its content, which it dropped under a size
+     * cap.
+     *
+     * <p>Deliberately distinct from {@link #NOT_FOUND}: the artifact exists and the operator's fix is to
+     * raise the cap, not to go looking for something deleted. Previously reported as the minimisation
+     * reason, which sent that operator to a consent-and-retention control that had nothing to do with it.
+     */
+    CONTENT_EVICTED,
     /** {@code REDACTED}: withheld by policy rather than by a subject's choice. */
     PRIVACY_POLICY,
     /** {@code REDACTED}: the people in it have not granted, or have withdrawn, consent to read it. */

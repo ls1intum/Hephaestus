@@ -332,7 +332,7 @@
 								},
 								"reasonCode": {
 									"enum": [
-										"MINIMIZED",
+										"NOT_NEEDED_BY_READY_PRACTICES",
 										"GOVERNANCE_NOT_EFFECTIVE",
 										"DISABLED",
 										"NO_PROVIDER",
@@ -340,6 +340,7 @@
 										"PINNED_HEAD_MISSING",
 										"NO_WORKING_COPY",
 										"NOT_FOUND",
+										"CONTENT_EVICTED",
 										"PRIVACY_POLICY",
 										"CONSENT_NOT_ACTIVE",
 										"PROVIDER_FAILURE"
@@ -361,7 +362,7 @@
 								},
 								"errorCode": {
 									"enum": [
-										"MINIMIZED",
+										"NOT_NEEDED_BY_READY_PRACTICES",
 										"GOVERNANCE_NOT_EFFECTIVE",
 										"DISABLED",
 										"NO_PROVIDER",
@@ -369,6 +370,7 @@
 										"PINNED_HEAD_MISSING",
 										"NO_WORKING_COPY",
 										"NOT_FOUND",
+										"CONTENT_EVICTED",
 										"PRIVACY_POLICY",
 										"CONSENT_NOT_ACTIVE",
 										"PROVIDER_FAILURE"

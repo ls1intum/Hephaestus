@@ -776,7 +776,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 .findFirst()
                 .orElseThrow()
                 .state()
-        ).isEqualTo(new SourceCaptureState.NotCollected(SourceAbsenceReason.MINIMIZED));
+        ).isEqualTo(new SourceCaptureState.NotCollected(SourceAbsenceReason.NOT_NEEDED_BY_READY_PRACTICES));
     }
 
     @Test
