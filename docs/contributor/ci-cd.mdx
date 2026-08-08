@@ -189,23 +189,17 @@ Docker builds use **registry-based caching** to store intermediate layers in `gh
 - Works across branches (PRs benefit from main's cache)
 - Persistent (survives cache clearing)
 
-### Docker Hub Authentication (Recommended)
+### Registry Authentication
 
-Without Docker Hub authentication, base image metadata resolution can be rate-limited, adding **2+ minutes** to every Docker build. To avoid this:
-
-1. Create a Docker Hub account (free tier is sufficient)
-2. Generate an access token at [hub.docker.com/settings/security](https://hub.docker.com/settings/security)
-3. Add repository variable and secret:
-   - **Variable**: `DOCKERHUB_USERNAME` = your Docker Hub username
-   - **Secret**: `DOCKERHUB_TOKEN` = your access token
-
-The Docker build workflow will automatically use these credentials if present, falling back to anonymous (slower) access if not configured.
+Image builds log in to `ghcr.io` with the workflow's own `GITHUB_TOKEN`; there is no Docker Hub
+login step and no repository secret to configure. Base image metadata is resolved anonymously, which
+is occasionally rate-limited.
 
 ### Parallel Execution
 
-- 6 test types run in parallel (3 app-server, 3 webapp). Webhook reception is part of the app-server test surface since ADR 0008.
-- 5 quality-gate legs run in parallel (App Server, Webapp, OpenAPI, Database, Migrations), plus a legacy-cleanup guard
-- 4 Docker builds × 2 architectures (amd64 + arm64)
+- Test legs run in parallel across the app server and the webapp. Webhook reception is part of the app-server test surface since ADR 0008.
+- Quality-gate legs (App Server, Webapp, OpenAPI, Database, Migrations) run in parallel, plus a legacy-cleanup guard
+- Docker images build for both architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback
 
 ### Concurrency Control
@@ -233,7 +227,7 @@ pnpm run test:webapp           # Unit tests
 
 # Application Server (Java) — includes the integration.core.webhook receiver
 pnpm run format:java:check     # Check formatting
-cd server && ./mvnw test -Dgroups="unit"  # Unit tests
+cd server && ./mvnw test -P'!quick'  # Unit tests — see the testing guide for why `!quick` is mandatory
 ```
 
 ### Common Issues

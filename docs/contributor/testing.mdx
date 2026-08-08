@@ -14,11 +14,18 @@ Testing keeps regression risk low across services. The application server uses M
 
    ```bash
    # Unit tests only (fast)
-   ./mvnw test
+   ./mvnw test -P'!quick'
 
    # Full suite including integration tests
    ./mvnw verify
    ```
+
+   :::danger Always deactivate `quick`
+   The `quick` profile activates itself as soon as GraphQL codegen has produced its sources — that
+   is, on every machine that has built the server once. It sets `maven.test.skip=true`, so a bare
+   `./mvnw test` prints **BUILD SUCCESS having run zero tests**, and `./mvnw test-compile` reports
+   success while test sources fail to compile. Pass `-P'!quick'` on every test run.
+   :::
 
 3. Extend the correct base class:
 
@@ -144,11 +151,17 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 ## Maven recipes
 
 ```bash
-./mvnw test                                   # Unit tests
+./mvnw test -P'!quick'                        # Unit tests
+./mvnw test -P'!quick,architecture-tests'     # ArchUnit + Modulith verification
 ./mvnw verify                                 # Full suite + packaging
-./mvnw test -Dtest=UserServiceTest            # Single test class
-./mvnw test -Dtest=UserServiceTest#methodName # Single test method
+./mvnw test -P'!quick' -Dtest=UserServiceTest # Single test class
+./mvnw test -P'!quick' -Dtest=UserServiceTest#methodName # Single test method
 ```
+
+The tag filter is a property, not the `-Dgroups` user property: surefire is configured with
+`<groups>${surefire.includedGroups}</groups>`, which an explicitly-configured plugin parameter wins
+over. `-Dgroups=…` is silently ignored; use `-Dsurefire.includedGroups=…` when you need to change the
+tag set directly, or the profiles above, which set it for you.
 
 ## Live external-service tests
 

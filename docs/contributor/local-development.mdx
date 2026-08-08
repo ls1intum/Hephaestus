@@ -30,9 +30,14 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 ## Application server
 
-### Maven profiles and local configuration
+### Spring profiles and local configuration
 
-We ship three Maven profiles: `local` (default), `prod`, and `specs`. For development stick to the `local` profile.
+We ship three Spring profiles: `local` (default), `prod`, and `specs`. For development stick to the `local` profile.
+
+They are **not** Maven profiles — `./mvnw -Plocal` warns that the profile does not exist and changes
+nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
+is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does). Maven's own profiles are a separate,
+smaller set: `live-tests`, `architecture-tests`, `quick`, `pitest`, `aot` and `local-db-timeout`.
 
 Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
@@ -72,7 +77,7 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 | -------------------- | ------- | --------------------------- | -------------------------------- |
 | PostgreSQL           | 5432    | `POSTGRES_PORT`             | `server/.env` |
 | Application server   | 8080    | `SERVER_PORT`               | `server/.env` |
-| Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env or `webapp/.env`       |
+| Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env only                   |
 
 :::tip Pre-flight check
 Run `pnpm run check:ports` before starting the stack to verify all ports are free.
@@ -108,16 +113,28 @@ The application server automatically picks up the new port from the same `.env` 
 SERVER_PORT=18080
 ```
 
-If the webapp also needs to reach the server at the new port, set the server URL in the webapp environment:
+If the webapp also needs to reach the server at the new port, edit the runtime-environment stub the
+webapp loads before its bundle:
 
-```bash
-# webapp/.env (or shell)
-VITE_APPLICATION_SERVER_URL=http://localhost:18080
+```js
+// webapp/public/env-config.js
+window.__ENV__ = { APPLICATION_SERVER_URL: "http://localhost:18080" };
 ```
+
+:::caution Keep it local
+`env-config.js` is committed as an empty stub and overwritten by the Docker entrypoint in
+production. Treat a local override the way you treat `application-local.yml`: do not commit it.
+:::
+
+The webapp has no Vite-level environment variables — `vite.config.ts` does not call `loadEnv`, sets
+no `envPrefix`, and nothing in `src/` reads `import.meta.env` beyond `DEV`. A `webapp/.env` file has
+no effect on the application's configuration, and there is no `VITE_`-prefixed setting for the server
+URL.
 
 **Changing the webapp port:**
 
-The Vite dev server reads `WEBAPP_PORT` from the shell environment (not from `server/.env`):
+The Vite dev server reads `WEBAPP_PORT` from the shell environment (`process.env`, not a `.env` file
+and not `server/.env`):
 
 ```bash
 WEBAPP_PORT=5200 pnpm --filter webapp run dev
@@ -141,7 +158,11 @@ Changing a port in one place may require updates elsewhere. This table shows the
 | `POSTGRES_PORT`             | Nothing (automatic)                                        | Both Compose and Spring read from `.env` |
 
 :::warning Webapp defaults
-The webapp has a hardcoded dev default in `webapp/src/environment/index.ts` for `APPLICATION_SERVER_URL` (`http://localhost:8080`). In production this is injected via `window.__ENV__`. For local development with non-standard ports, set it as a Vite environment variable or update the default.
+The webapp reads its configuration from `window.__ENV__`, falling back to hardcoded dev defaults in
+`webapp/src/environment/index.ts` — `APPLICATION_SERVER_URL` defaults to `http://localhost:8080`. In
+production the Docker entrypoint writes the real values into `env-config.js`. For local development
+with non-standard ports, put the override in `webapp/public/env-config.js` as shown above. Nothing
+here reads a Vite environment variable.
 :::
 
 ### GitHub configuration

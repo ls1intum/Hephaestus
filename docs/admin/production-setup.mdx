@@ -40,13 +40,20 @@ The required secrets — `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, `HEPHAESTUS_AUTH_
 [Install guide](./install#2-configure-env), along with how to generate each and the warning about
 never changing the encryption key. Everything there applies to this stack too.
 
-Three variables exist only in the reference deployment, so they live here:
+These variables exist only in the reference deployment, so they live here:
 
 | Variable | Purpose |
 | --- | --- |
 | `HEPHAESTUS_AUTH_ISSUER` | Public issuer origin, e.g. `https://<host>` (sets the JWT `iss` + `/.well-known` issuer). The self-host compose file derives this from `APP_HOSTNAME`; the multi-file stack does not. |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
 | `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host. |
+
+:::caution The OAuth redirect pair is not wired through Compose
+`HEPHAESTUS_AUTH_ISSUER` and `LEGAL_PROFILE` are forwarded into the container by the shipped Compose
+files, so setting them in `docker/.env` works. The two OAuth redirect variables are **not** — no
+Compose file passes them through, so a value in `docker/.env` has no effect and the defaults stay in
+force. To override them, add them to the `application-server` service's own `environment:` block.
+:::
 
 :::warning `GH_`, not `GITHUB_`
 In `docker/.env` the GitHub OAuth keys are `GH_OAUTH_CLIENT_ID` / `GH_OAUTH_CLIENT_SECRET`: GitHub
