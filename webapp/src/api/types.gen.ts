@@ -53,31 +53,23 @@ export type WorkspaceTeamRepositorySettings = {
  * and a practice that tried would be wrong for most installations. Dependabot draws the same line with
  * <code>target-branch</code>.
  *
- * <p><strong>The vocabulary is closed and deliberately tiny: two exact-match lists.</strong> An empty
- * or absent list means "no restriction on this axis" — the scope only ever narrows, never widens, so a
- * workspace that never touches it behaves exactly as before. Both lists must match for an artifact to
- * be in scope; within a list, any entry matches.
+ * <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
+ * axis".
  *
  * <h2>What this cannot express, and why</h2>
  *
  * <ul>
- * <li><strong>Changed paths.</strong> Not offered, because it is not decidable where the decision is
- * made. The detection gate holds the <code>PullRequest</code> row, not the diff; changed paths do not
- * exist until the evidence stage, by which point the review has been admitted and paid for. A
- * path scope here would be a predicate that quietly never narrows anything, which is worse than
- * its absence.
+ * <li><strong>Changed paths.</strong> Not decidable where the decision is made: the detection gate
+ * holds the <code>PullRequest</code> row, not the diff, and changed paths do not exist until the
+ * evidence stage, by which point the review has been admitted and paid for. A path axis here
+ * would be a predicate that quietly never narrows anything, which is worse than its absence.
  * <li><strong>Branch patterns.</strong> Exact names only. A glob is a small language, and a small
- * language is the thing that grows; exact names are unambiguous today and adding patterns later
- * stays backward compatible, whereas taking them away would not.
- * <li><strong>Anything else at all.</strong> The two keys are the whole vocabulary, and the vocabulary
- * is enforced at the column by <code>chk_workspace_review_scope</code>, not by this type: an extra key —
- * <code>paths</code> being the obvious temptation — fails the write. It is stated there rather than as a
- * Jackson annotation because the column outlives any one version of the code that reads it, and
- * because a reader configured to ignore unknown fields would otherwise drop the key in silence and
- * leave a workspace believing a restriction was in force.
- * <li><strong>Branch scope on an issue.</strong> An issue has no target branch, so
- * {@link de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope#targetBranches #targetBranches} cannot narrow issue review — only {@link de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope#repositories #repositories} does. Stated
- * rather than silently ignored.
+ * language is the thing that grows; adding patterns later stays backward compatible, whereas
+ * taking them away would not.
+ * <li><strong>Any third key.</strong> The vocabulary is closed at the column
+ * (<code>chk_workspace_review_scope</code>), not by this type, because the column outlives any one
+ * version of the code that reads it and because a reader configured to ignore unknown fields
+ * would drop the key in silence, leaving a workspace believing a restriction was in force.
  * </ul>
  */
 export type WorkspaceReviewScope = {
@@ -940,7 +932,7 @@ export type UpdateSilentModeRequest = {
 };
 
 /**
- * The one lifecycle transition an admin can ask for.
+ * The lifecycle transitions an admin can ask for.
  *
  * <p><code>RUNNING</code> is the confirmation: it is the point at which somebody accepts the estimate they
  * were shown and authorises the spend. <code>CANCELLED</code> stops a campaign for good. Every other
@@ -3399,15 +3391,15 @@ export type ConfigAuditEntryView = {
     actingActor?: ConfigAuditActorRef;
     action?: 'CREATED' | 'UPDATED' | 'DELETED';
     /**
-     * resolved identity of {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorAccountId #actorAccountId}; null for SYSTEM rows or once the
-     * account is gone. Read together with {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorKind #actorKind} — that is what keeps
+     * resolved identity of <code>actorAccountId</code>; null for SYSTEM rows or once the
+     * account is gone. Read together with <code>actorKind</code> — that is what keeps
      * "a system did this" distinct from "we no longer know who did this".
      */
     actor?: ConfigAuditActorRef;
     actorAccountId?: number;
     actorKind?: 'USER' | 'SYSTEM' | 'IMPERSONATED';
     /**
-     * dot-paths that differ between {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#oldValue #oldValue} and {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#newValue #newValue}
+     * dot-paths that differ between <code>oldValue</code> and <code>newValue</code>
      */
     changedKeys?: Array<string>;
     entityId?: string;
@@ -4165,11 +4157,11 @@ export type InstanceLlmSettings = {
 /**
  * Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
  *
- * <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
+ * <p>Two outcomes, distinguished by <code>type</code>:
  * <ul>
- * <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
+ * <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). <code>vendorUrl</code> is the
  * URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
- * <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
+ * <li><code>LINKED</code> — inline-credential flows (GitLab PAT). <code>connectionId</code> is the
  * newly-created Connection; no further round-trip is needed.</li>
  * </ul>
  *
@@ -4988,10 +4980,10 @@ export type ConnectionSummary = {
  * <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
  * client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
  * entity, and every secret-bearing key of the config itself is stripped by
- * {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO#redactSensitive #redactSensitive} before serialization.
+ * <code>redactSensitive</code> before serialization.
  *
  * <p><b>Why redact here and not with <code>@JsonIgnore</code> on the record component?</b> The very
- * same {@link ObjectMapper ObjectMapper} bean serializes {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO  de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+ * same <code>ObjectMapper</code> bean serializes <code>ConnectionConfig</code> into the JSONB
  * <code>connection.config</code> column (Hibernate's <code>json_format_mapper</code> is wired to it in
  * <code>HibernateJacksonFormatMapperConfig</code>). Annotating the component would therefore drop the
  * secret on write and destroy the stored value — the API-boundary filter below is the only place
@@ -5021,7 +5013,7 @@ export type ConnectionDetail = {
  * Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
  *
  * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
- * to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
+ * to <code>Connection</code> that we don't
  * want to serialize on every response.
  */
 export type ConnectionAuditEntry = {
