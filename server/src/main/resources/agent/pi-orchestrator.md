@@ -385,6 +385,11 @@ Use `report_finding` — it is the output contract in this runtime.
             "severity": "CRITICAL | MAJOR | MINOR | INFO",
             "confidence": 0.85,
             "evidence": {
+                "search": {
+                    "consulted": ["scm.review-threads"],
+                    "lookedFor": "what you tried to find, whose absence you are reporting",
+                    "boundary": "what this search did NOT cover"
+                },
                 "citations": [{
                     "sourceKind": "scm.pull-request.diff",
                     "artifactPath": "inputs/context/diff.patch",
@@ -406,6 +411,14 @@ Use `report_finding` — it is the output contract in this runtime.
 - `presence` is always required: `PRESENT`, `ABSENT`, `NOT_APPLICABLE`, or `INDETERMINATE`.
 - `assessment` (`GOOD`/`BAD`) is required UNLESS `presence` is `NOT_APPLICABLE` or `INDETERMINATE` — omit it there.
 - `severity` matters only for `assessment=BAD`; you may leave it off for a strength, a `NOT_APPLICABLE`, or an `INDETERMINATE` finding.
+- `evidence.search` is REQUIRED when `presence` is `ABSENT`, and ignored otherwise. `consulted` lists the
+  evidence source kinds you actually searched (they must be sources the practice declares and this run staged),
+  `lookedFor` names the thing whose absence you are reporting, and `boundary` says what the search did not cover.
+  The practice's `exhaustiveSources` in `inputs/practices/index.json` are the sources it is entitled to assert an
+  absence over: **every one of them must appear in `consulted`, or the delivery is rejected.** If you cannot
+  honestly say you searched them, the answer is `INDETERMINATE`, not `ABSENT` — see "When a practice asserts
+  absence" above. This is the structured form of rule 3a's "say where you looked": narrating it in `reasoning` no
+  longer suffices, because nothing could check it.
 - Every evidence citation must name a source from the practice's `allowedSources`, an `artifactPath` listed for
   that source in `inputs/manifest.json`, and an exact non-empty quote from that artifact. `path` is the
   developer-facing file or object location. The runtime verifies source ownership and quote content and rejects

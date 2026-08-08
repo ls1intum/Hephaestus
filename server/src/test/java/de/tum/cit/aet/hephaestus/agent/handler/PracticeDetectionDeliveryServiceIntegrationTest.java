@@ -250,14 +250,14 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assessment,
             Severity.INFO,
             0.9f,
-            evidence(),
+            evidence(presence),
             null,
             null,
             List.of()
         );
     }
 
-    private static ObjectNode evidence() {
+    private static ObjectNode evidence(Presence presence) {
         ObjectNode evidence = OBJECT_MAPPER.createObjectNode();
         evidence
             .putArray("citations")
@@ -269,6 +269,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             .put("startLine", 10)
             .put("endLine", 10)
             .put("quote", "+ insecure();");
+        // An ABSENT observation asserts a universal, so delivery requires it to record its search.
+        if (presence == Presence.ABSENT) {
+            ObjectNode search = evidence.putObject("search");
+            search.putArray("consulted").add("scm.pull-request.diff");
+            search.put("lookedFor", "a described rationale for the change");
+            search.put("boundary", "the diff of this pull request only");
+        }
         return evidence;
     }
 
@@ -397,7 +404,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                         Assessment.BAD,
                         Severity.MINOR,
                         0.8f,
-                        evidence(),
+                        evidence(Presence.ABSENT),
                         null,
                         null,
                         List.of()

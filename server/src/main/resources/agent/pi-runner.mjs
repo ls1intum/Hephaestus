@@ -20,6 +20,7 @@ import {
     dedupeKeyForFinding,
     normalizeFinding,
     validateEvidenceSources,
+    validateSearchScope,
 } from "./pi-finding-normalize.mjs";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
 
@@ -68,11 +69,14 @@ const artifactSources = new Map(
         (source.artifacts ?? []).map((artifact) => [artifact.path, source.kind]),
     ),
 );
+const practiceIndex = JSON.parse(readFileSync(`${CWD}/inputs/practices/index.json`, "utf8"));
 const practiceSources = new Map(
-    JSON.parse(readFileSync(`${CWD}/inputs/practices/index.json`, "utf8")).map((practice) => [
-        practice.slug,
-        new Set(practice.allowedSources),
-    ]),
+    practiceIndex.map((practice) => [practice.slug, new Set(practice.allowedSources)]),
+);
+// The sources this practice holds EXHAUSTIVE — the domain over which it is allowed to assert an
+// absence, and therefore the domain a search must cover before ABSENT is sound.
+const practiceExhaustiveSources = new Map(
+    practiceIndex.map((practice) => [practice.slug, new Set(practice.exhaustiveSources ?? [])]),
 );
 
 const usageTotals = {
@@ -96,11 +100,38 @@ const reviewState = {
 const presenceSchema = { type: "string", enum: PRESENCE_VALUES };
 const assessmentSchema = { type: "string", enum: ASSESSMENT_VALUES };
 const severitySchema = { type: "string", enum: SEVERITY_VALUES };
+// Where you looked, for what, and where the looking stopped. REQUIRED when presence=ABSENT: "I did
+// not find it" only means "it is not there" if the corpus searched was the one the claim ranges over,
+// and that is a fact only the searcher can report.
+const searchSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["consulted", "lookedFor", "boundary"],
+    properties: {
+        consulted: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string", minLength: 1 },
+            description: "Evidence source kinds you actually searched, e.g. scm.review-threads.",
+        },
+        lookedFor: {
+            type: "string",
+            minLength: 1,
+            description: "The concrete thing whose absence you are reporting.",
+        },
+        boundary: {
+            type: "string",
+            minLength: 1,
+            description: "What this search did NOT cover, so a reader can judge how far the absence reaches.",
+        },
+    },
+};
 const evidenceSchema = {
     type: "object",
     additionalProperties: false,
     required: ["citations"],
     properties: {
+        search: searchSchema,
         citations: {
             type: "array",
             minItems: 1,
@@ -278,6 +309,12 @@ function normalizeAndValidateFinding(rawFinding) {
     const declaredSourceKinds = practiceSources.get(finding.practiceSlug);
     if (!declaredSourceKinds) throw new Error(`unknown practice '${finding.practiceSlug}'`);
     validateEvidenceSources(finding, declaredSourceKinds, availableSourceKinds, artifactSources);
+    validateSearchScope(
+        finding,
+        practiceExhaustiveSources.get(finding.practiceSlug) ?? new Set(),
+        declaredSourceKinds,
+        availableSourceKinds,
+    );
     for (const citation of finding.evidence.citations) {
         const content = readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
         if (!citationMatchesArtifact(citation, content)) {

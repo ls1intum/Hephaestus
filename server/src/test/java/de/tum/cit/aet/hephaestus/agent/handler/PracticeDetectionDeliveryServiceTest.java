@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyFloat;
@@ -224,6 +225,13 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             .put("startLine", 10)
             .put("endLine", 10)
             .put("quote", "+ insecure();");
+        // An ABSENT observation asserts a universal, so delivery requires it to say where it looked.
+        if (presence == Presence.ABSENT) {
+            ObjectNode search = evidence.putObject("search");
+            search.putArray("consulted").add("scm.pull-request.diff");
+            search.put("lookedFor", "a described rationale for the change");
+            search.put("boundary", "the diff of this pull request only");
+        }
         return new ValidatedFinding(
             slug,
             "Test finding",
@@ -468,6 +476,84 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("misattributed evidence source");
             verifyNoInteractions(observationRepository);
+        }
+    }
+
+    /**
+     * An ABSENT observation is a universal claim, and the delivery boundary — not just the in-sandbox
+     * normalizer — is where it has to earn one. The runner can crash, run an older image, or have its
+     * output rescued from raw text; each of those reaches delivery with nothing having validated the
+     * search, which is exactly why the citation rules are duplicated here too.
+     */
+    @Nested
+    class RecordedSearch {
+
+        @Test
+        @DisplayName("an ABSENT observation with no recorded search is refused")
+        void rejectsAbsentWithoutASearch() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.ABSENT);
+            ((ObjectNode) finding.evidence()).remove("search");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("must record where it searched");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("a recorded search missing any of its three parts is refused")
+        void rejectsAnIncompleteSearch() {
+            for (String field : new String[] { "consulted", "lookedFor", "boundary" }) {
+                ValidatedFinding finding = validFinding("pr-description-quality", Presence.ABSENT);
+                ((ObjectNode) finding.evidence().get("search")).remove(field);
+
+                assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                    .as("an ABSENT observation missing search.%s", field)
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("must record where it searched");
+            }
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("a search claiming a source this run never staged is refused")
+        void rejectsASearchOutsideTheBoundary() {
+            // The absence-shaped twin of citing evidence we never had: the source was not staged, so it
+            // cannot have been searched, and the claim of having searched it is unfalsifiable otherwise.
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.ABSENT);
+            ObjectNode search = (ObjectNode) finding.evidence().get("search");
+            search.putArray("consulted").add("scm.repository.tree");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("undeclared or unavailable source");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("an ABSENT observation that recorded its search is delivered")
+        void acceptsAnAbsentWithARecordedSearch() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.ABSENT);
+
+            var result = service.deliver(testJob, List.of(finding));
+
+            assertThat(result.inserted()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("a search is asked of ABSENT alone — the other presences assert no universal")
+        void doesNotAskForASearchOnOtherPresences() {
+            for (Presence presence : Presence.values()) {
+                if (presence == Presence.ABSENT) {
+                    continue;
+                }
+                ValidatedFinding finding = validFinding("pr-description-quality", presence);
+                assertThat(finding.evidence().get("search")).as("%s carries no search", presence).isNull();
+
+                assertThatCode(() -> service.deliver(testJob, List.of(finding)))
+                    .as("%s is delivered without a recorded search", presence)
+                    .doesNotThrowAnyException();
+            }
         }
     }
 

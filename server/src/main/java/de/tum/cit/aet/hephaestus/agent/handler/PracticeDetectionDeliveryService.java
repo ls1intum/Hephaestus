@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -24,6 +25,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
@@ -288,9 +290,14 @@ public class PracticeDetectionDeliveryService {
         // binding of the same practice reads is still out of bounds here: that source was never staged
         // for this run, so a quote from it cannot have been read.
         Set<SourceKind> declared = new HashSet<>();
-        PracticeBinding.needsFor(revision.getBindings(), PracticeCatalogInjector.signalOf(job)).forEach(need ->
-            declared.add(need.sourceKind())
-        );
+        Set<SourceKind> exhaustive = new HashSet<>();
+        PracticeBinding.needsFor(revision.getBindings(), PracticeCatalogInjector.signalOf(job)).forEach(need -> {
+            declared.add(need.sourceKind());
+            if (need.stance() == EvidenceStance.EXHAUSTIVE) {
+                exhaustive.add(need.sourceKind());
+            }
+        });
+        enforceRecordedSearch(finding, declared, exhaustive, boundary, job);
         for (JsonNode citation : citations) {
             JsonNode sourceKind = citation.path("sourceKind");
             JsonNode artifactPath = citation.path("artifactPath");
@@ -442,6 +449,99 @@ public class PracticeDetectionDeliveryService {
             }
         }
         return false;
+    }
+
+    /**
+     * Holds an {@code ABSENT} observation to the search it recorded.
+     *
+     * <p>An absence is a universal claim, and the only claim a fragment of a corpus can never support:
+     * a partial capture of the review threads is equally consistent with "nobody raised it" and "the
+     * raising was in the part we did not fetch". {@link EvidenceStance#EXHAUSTIVE} is the practice
+     * declaring the corpus its absence ranges over, so those sources are exactly what the search must
+     * have covered.
+     *
+     * <p>Enforced here and not only in the sandbox because the in-sandbox normalizer runs inside the
+     * thing it is checking. A runner that crashed, an older image, or a rescued text payload all reach
+     * delivery without it having run; a guard that can be skipped by the party it constrains is
+     * advice, not a boundary. This is the same reason the citation check below is duplicated here.
+     */
+    private void enforceRecordedSearch(
+        ValidatedFinding finding,
+        Set<SourceKind> declared,
+        Set<SourceKind> exhaustive,
+        EvidenceBoundary boundary,
+        AgentJob job
+    ) {
+        if (finding.presence() != Presence.ABSENT) {
+            return;
+        }
+        JsonNode search = finding.evidence() == null ? null : finding.evidence().get("search");
+        JsonNode consulted = search == null ? null : search.get("consulted");
+        if (
+            search == null ||
+            consulted == null ||
+            !consulted.isArray() ||
+            consulted.isEmpty() ||
+            !search.path("lookedFor").isTextual() ||
+            search.path("lookedFor").asString().isBlank() ||
+            !search.path("boundary").isTextual() ||
+            search.path("boundary").asString().isBlank()
+        ) {
+            throw new JobDeliveryException(
+                "An ABSENT observation must record where it searched: slug=" +
+                    finding.practiceSlug() +
+                    ", jobId=" +
+                    job.getId()
+            );
+        }
+        Set<SourceKind> searched = new HashSet<>();
+        for (JsonNode kind : consulted) {
+            if (!kind.isTextual()) {
+                throw new JobDeliveryException(
+                    "Recorded search names a non-textual source: slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+            SourceKind sourceKind;
+            try {
+                sourceKind = new SourceKind(kind.asString());
+            } catch (IllegalArgumentException e) {
+                throw new JobDeliveryException(
+                    "Recorded search names an invalid source: slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId(),
+                    e
+                );
+            }
+            // Same boundary the citations answer to: a source this run never staged cannot have been
+            // searched, so claiming it was is the absence-shaped version of citing evidence we never had.
+            if (!declared.contains(sourceKind) || !boundary.allowedSources().contains(sourceKind)) {
+                throw new JobDeliveryException(
+                    "Recorded search claims an undeclared or unavailable source " +
+                        sourceKind +
+                        ": slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+            searched.add(sourceKind);
+        }
+        if (!searched.containsAll(exhaustive)) {
+            Set<SourceKind> unsearched = new HashSet<>(exhaustive);
+            unsearched.removeAll(searched);
+            throw new JobDeliveryException(
+                "An ABSENT observation did not search the sources its practice asserts absence over " +
+                    unsearched +
+                    ": slug=" +
+                    finding.practiceSlug() +
+                    ", jobId=" +
+                    job.getId()
+            );
+        }
     }
 
     private static JsonNode evidenceForPersistence(JsonNode evidence) {

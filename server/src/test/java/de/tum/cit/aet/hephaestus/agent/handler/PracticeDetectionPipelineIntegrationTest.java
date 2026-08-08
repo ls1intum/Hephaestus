@@ -330,6 +330,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     citation.put("endLine", 1);
                     citation.put("quote", "Test body");
                 }
+                // An ABSENT observation asserts a universal, so delivery requires it to record the
+                // search that came up empty.
+                if ("ABSENT".equals(finding.path("presence").asString(null))) {
+                    var search = ((ObjectNode) finding.path("evidence")).putObject("search");
+                    search.putArray("consulted").add("scm.pull-request.core");
+                    search.put("lookedFor", "a null check on the changed method");
+                    search.put("boundary", "the pull request metadata only");
+                }
             }
             return OBJECT_MAPPER.writeValueAsString(root);
         } catch (RuntimeException ignored) {

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -177,6 +178,19 @@ class PracticeCatalogInjector {
                 .distinct()
                 .sorted()
                 .forEach(allowedSources::add);
+            // The subset the practice holds EXHAUSTIVE: the sources it says its claim asserts something
+            // is NOT in. That stance is what makes an absence assertable at all, so it doubles as the
+            // domain a search must cover before the runner will accept an ABSENT observation. Published
+            // here rather than inferred in the sandbox, because the stance lives on the binding and the
+            // model must be told what it is on the hook for searching.
+            ArrayNode exhaustiveSources = entry.putArray("exhaustiveSources");
+            PracticeBinding.needsFor(p.getBindings(), signalOf(job))
+                .stream()
+                .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
+                .map(need -> need.sourceKind().value())
+                .distinct()
+                .sorted()
+                .forEach(exhaustiveSources::add);
         }
         try {
             files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));

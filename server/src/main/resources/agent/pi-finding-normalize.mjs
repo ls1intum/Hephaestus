@@ -31,7 +31,26 @@ export function normalizeDiffNote(note) {
     return { filePath, startLine, endLine, body };
 }
 
-export function normalizeEvidence(evidence) {
+/**
+ * The recorded scope of a search that came up empty. An ABSENT observation is a universal claim —
+ * "it is not there" — and the one thing a fragment of a corpus can never support. Narrating the
+ * search in `reasoning` is the honour-system version of this; a structured block is what a validator
+ * can actually hold against the domain the practice declared.
+ */
+export function normalizeSearch(search) {
+    if (!search || typeof search !== "object") throw new Error("search is required");
+    const consulted = Array.isArray(search.consulted)
+        ? search.consulted.map((kind) => String(kind ?? "").trim()).filter(Boolean)
+        : [];
+    const lookedFor = String(search.lookedFor ?? "").trim();
+    const boundary = String(search.boundary ?? "").trim();
+    if (consulted.length === 0) throw new Error("search.consulted must name at least one source you searched");
+    if (!lookedFor) throw new Error("search.lookedFor is required");
+    if (!boundary) throw new Error("search.boundary is required");
+    return { consulted: [...new Set(consulted)].sort(), lookedFor, boundary };
+}
+
+export function normalizeEvidence(evidence, presence) {
     if (!Array.isArray(evidence?.citations) || evidence.citations.length === 0)
         throw new Error("evidence citations are required");
     const citations = evidence.citations.map((citation) => {
@@ -56,7 +75,18 @@ export function normalizeEvidence(evidence) {
         if (!quote) throw new Error("evidence citation quote is required");
         return { sourceKind, artifactPath, path, ...(side == null ? {} : { side }), startLine, endLine, quote };
     });
-    return { citations };
+    // Required for ABSENT and kept whenever it is offered: on a PRESENT observation the citations are
+    // already the warrant, but a model that recorded where it looked has said something true and there
+    // is no reason to discard it.
+    if (presence === "ABSENT") {
+        if (evidence.search == null) {
+            throw new Error(
+                "an ABSENT observation must record its search: evidence.search with consulted, lookedFor and boundary",
+            );
+        }
+        return { citations, search: normalizeSearch(evidence.search) };
+    }
+    return evidence.search == null ? { citations } : { citations, search: normalizeSearch(evidence.search) };
 }
 
 export function normalizeFinding(finding) {
@@ -94,7 +124,7 @@ export function normalizeFinding(finding) {
         throw new Error("confidence must be between 0 and 1");
     if (!reasoning) throw new Error("reasoning is required");
     if (!guidance) throw new Error("guidance is required");
-    const evidence = normalizeEvidence(finding.evidence);
+    const evidence = normalizeEvidence(finding.evidence, presence);
     const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
         ? finding.suggestedDiffNotes.map(normalizeDiffNote)
         : [];
@@ -132,6 +162,41 @@ export function validateEvidenceSources(finding, declaredSourceKinds, availableS
         if (artifactSources.get(citation.artifactPath) !== sourceKind) {
             throw new Error(`artifact '${citation.artifactPath}' does not belong to evidence source '${sourceKind}'`);
         }
+    }
+}
+
+/**
+ * Holds a recorded search against the domain the practice declared it would search.
+ *
+ * <p>`EXHAUSTIVE` is the practice saying "this claim asserts something is NOT in this source", which
+ * is the only stance under which absence is assertable at all. So the sources held that way ARE the
+ * domain: an ABSENT observation that did not consult one of them is asserting a universal over a
+ * corpus it never opened, and the honest answer is INDETERMINATE instead.
+ *
+ * <p>Consulting something the practice never declared is the same error the citation check already
+ * rejects — the source was not staged for this run, so it cannot have been searched.
+ */
+export function validateSearchScope(finding, exhaustiveSourceKinds, declaredSourceKinds, availableSourceKinds) {
+    if (finding.presence !== "ABSENT") return;
+    const search = finding.evidence.search;
+    if (!search) throw new Error("an ABSENT observation must record its search");
+    const consulted = new Set(search.consulted);
+    for (const sourceKind of consulted) {
+        if (!declaredSourceKinds.has(sourceKind)) {
+            throw new Error(
+                `practice '${finding.practiceSlug}' does not declare evidence source '${sourceKind}', so it cannot have been searched`,
+            );
+        }
+        if (!availableSourceKinds.has(sourceKind)) {
+            throw new Error(`searched source '${sourceKind}' was not available to this invocation`);
+        }
+    }
+    const unsearched = [...exhaustiveSourceKinds].filter((sourceKind) => !consulted.has(sourceKind)).sort();
+    if (unsearched.length > 0) {
+        throw new Error(
+            `cannot conclude ABSENT for '${finding.practiceSlug}' without searching ${unsearched.join(", ")} — ` +
+                `say INDETERMINATE instead, or record the search`,
+        );
     }
 }
 
