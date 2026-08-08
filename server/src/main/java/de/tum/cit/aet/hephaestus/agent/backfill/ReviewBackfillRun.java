@@ -140,6 +140,7 @@ public class ReviewBackfillRun {
 
     /** Artifacts for which a review job was created. */
     @NotNull
+    @ColumnDefault("0")
     @Column(name = "submitted_count", nullable = false)
     private Integer submittedCount = 0;
 
@@ -149,6 +150,7 @@ public class ReviewBackfillRun {
      * arithmetic adds up on screen.
      */
     @NotNull
+    @ColumnDefault("0")
     @Column(name = "passed_count", nullable = false)
     private Integer passedCount = 0;
 
@@ -161,6 +163,7 @@ public class ReviewBackfillRun {
      * {@code submitted + passed} reach the estimate and report COMPLETED over a baseline with holes.
      */
     @NotNull
+    @ColumnDefault("0")
     @Column(name = "failed_count", nullable = false)
     private Integer failedCount = 0;
 
