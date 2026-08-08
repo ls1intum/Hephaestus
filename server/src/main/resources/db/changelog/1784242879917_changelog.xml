@@ -6,12 +6,11 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-        Admin configuration audit trail (#1359): append-only, workspace-scoped, unpartitioned
-        (~10^4 rows/year, and no read pattern leads with occurred_at, so partitions would prune
-        nothing). Retention is a trigger-permitted DELETE past the window (changeset -2) rather than
-        auth_event's DROP PARTITION. Scalar FKs (sfk_*) — no JPA @ManyToOne, so they are excluded
-        from the JPA-vs-DB drift gate. workspace_id is NOT NULL: every producer today is
-        workspace-scoped; #1356 adds the scope discriminator instance-scoped controls will need.
+        Admin configuration audit trail: append-only, workspace-scoped, unpartitioned (this table grows
+        by orders of magnitude less than auth_event, and no read pattern leads with occurred_at, so
+        partitions would prune nothing). Retention is therefore a trigger-permitted DELETE past the
+        window rather than auth_event's DROP PARTITION. Scalar FKs (sfk_*) — no JPA @ManyToOne, so they
+        are excluded from the JPA-vs-DB drift gate.
     -->
     <changeSet author="FelixTJDietrich" id="1784242879917-1-config-audit-event">
         <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event already present">
@@ -42,18 +41,18 @@
                     CHECK (action IN ('CREATED', 'UPDATED', 'DELETED')),
                 CONSTRAINT ck_config_audit_event_entity_type
                     CHECK (entity_type IN ('PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG'))
-                -- No "old_value OR new_value IS NOT NULL" check: it would forbid the erasure UPDATE that
-                -- changeset -2 exists to permit (erasure NULLs both). Enforced at the write path instead,
-                -- in ConfigAuditEntry's constructor.
+                -- No "old_value OR new_value IS NOT NULL" check: erasure NULLs both, so the constraint
+                -- would forbid the one UPDATE the immutability trigger permits. Enforced at the write
+                -- path instead, in ConfigAuditEntry's constructor.
             );
 
             -- workspace_id: NO ACTION, not CASCADE — CASCADE would be a one-click audit eraser, and the
-            -- cascaded DELETE would trip the changeset -2 trigger (FK referential actions fire triggers,
-            -- PG 37.1). The account FKs are ON DELETE SET NULL, which is exactly what that trigger's
-            -- per-column erasure carve-out permits, so the two agree rather than deadlock.
+            -- cascaded DELETE would trip the immutability trigger (FK referential actions fire triggers,
+            -- PG "Overview of Trigger Behavior"). The account FKs are ON DELETE SET NULL, which is exactly
+            -- what that trigger's per-column erasure carve-out permits, so the two agree rather than deadlock.
 
-            -- Per-resource and per-control history (#1357): the settings pages filter by entity, then
-            -- by changed key.
+            -- Per-resource and per-control history: the settings pages filter by entity, then by
+            -- changed key.
             CREATE INDEX ix_config_audit_event_entity
                 ON config_audit_event (workspace_id, entity_type, entity_id, occurred_at DESC, id DESC);
 
@@ -69,9 +68,9 @@
     </changeSet>
 
     <!--
-        Immutability at the storage layer. context="prod" because the test tier's fixtures do UPDATE and
-        DELETE. The REVOKE is inert until a non-superuser app role exists (the app connects as the image's
-        bootstrap superuser, which skips privilege checks); the triggers are the binding control. TRUNCATE
+        Immutability at the storage layer, enforced by triggers rather than by REVOKE: a privilege grant
+        cannot express the two carve-outs below, and REVOKE UPDATE would forbid the erasure the trigger
+        exists to permit. context="prod" because the test tier's fixtures do UPDATE and DELETE. TRUNCATE
         needs a statement-level trigger — row triggers never fire on it.
     -->
     <changeSet author="FelixTJDietrich" id="1784242879917-2-config-audit-event-immutability" context="prod">
@@ -81,8 +80,6 @@
             </sqlCheck>
         </preConditions>
         <sql splitStatements="false"><![CDATA[
-            REVOKE UPDATE, TRUNCATE ON config_audit_event FROM CURRENT_USER;
-
             CREATE OR REPLACE FUNCTION config_audit_event_block_mutation() RETURNS trigger AS $cfg_immut$
             BEGIN
                 IF TG_OP = 'DELETE' THEN
@@ -95,10 +92,10 @@
                     END IF;
                     RETURN OLD;
                 END IF;
-                -- Permit ONLY erasure, per column: each redactable column may stay or go to NULL. Per-column
-            -- (not all-at-once) so an FK's ON DELETE SET NULL, which touches one column, does not trip
-            -- this. Comparing to_jsonb(NEW) minus the redactable keys covers future columns with no edit here.
-
+                -- Permit ONLY erasure, per column: each redactable column may stay or go to NULL.
+                -- Per-column (not all-at-once) so an FK's ON DELETE SET NULL, which touches one column,
+                -- does not trip this. Comparing to_jsonb(NEW) minus the redactable keys covers future
+                -- columns with no edit here.
                 IF (NEW.actor_account_id IS NULL OR NEW.actor_account_id = OLD.actor_account_id)
                    AND (NEW.acting_account_id IS NULL OR NEW.acting_account_id = OLD.acting_account_id)
                    AND (NEW.old_value IS NULL OR NEW.old_value = OLD.old_value)
@@ -132,17 +129,15 @@
                 DROP TRIGGER IF EXISTS trg_config_audit_event_block_mutation ON config_audit_event;
                 DROP FUNCTION IF EXISTS config_audit_event_block_truncate();
                 DROP FUNCTION IF EXISTS config_audit_event_block_mutation();
-                GRANT UPDATE, TRUNCATE ON config_audit_event TO CURRENT_USER;
             ]]></sql>
         </rollback>
     </changeSet>
 
     <!--
         Widen the entity-type CHECK to cover the workspace-administration events (roles, feature flags,
-        lifecycle status, token rotation, visibility). DROP + ADD, the same shape 1782980500800-15 uses
-        for auth_event's event_type: the ADD validates against every existing row in one pass (no data
-        rewrite) under a momentary ACCESS EXCLUSIVE lock — trivial at this table's size. Kept as a
-        separate changeSet (not an edit to -1) because -1 is already applied on deployed databases.
+        lifecycle status, token rotation, visibility). DROP + ADD rather than an edit to the creating
+        changeSet, which any deployed database has already applied: the ADD validates against every
+        existing row in one pass (no data rewrite) under a momentary ACCESS EXCLUSIVE lock.
     -->
     <changeSet author="FelixTJDietrich" id="1784242879917-3-config-audit-event-entity-types">
         <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already widened">

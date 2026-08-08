@@ -58,7 +58,7 @@ class DefaultMentorReadinessQuery implements MentorReadinessQuery {
             return agentBindingRepository
                 .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.MENTOR)
                 .filter(WorkspaceAgentBinding::isEnabled)
-                .map(this::hasAvailableCatalogModel)
+                .map(llmModelResolver::isAvailable)
                 .orElse(false);
         } catch (RuntimeException exception) {
             log.debug(
@@ -66,14 +66,6 @@ class DefaultMentorReadinessQuery implements MentorReadinessQuery {
                 workspaceId,
                 exception.toString()
             );
-            return false;
-        }
-    }
-
-    private boolean hasAvailableCatalogModel(WorkspaceAgentBinding binding) {
-        try {
-            return llmModelResolver.resolve(binding) != null;
-        } catch (IllegalStateException ignored) {
             return false;
         }
     }

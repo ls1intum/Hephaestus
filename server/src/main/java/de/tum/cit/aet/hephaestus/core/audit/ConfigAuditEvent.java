@@ -22,15 +22,14 @@ import org.jspecify.annotations.Nullable;
 /**
  * One admin configuration change: who changed which control, when, from what to what.
  *
- * <p>Append-only. {@code ConfigAuditRecorder} only INSERTs, and a {@code prod}-context trigger blocks
- * UPDATE, DELETE and TRUNCATE at the storage layer, with two carve-outs: erasure may set the actor
- * references and the snapshots to NULL (per column, so an FK's {@code ON DELETE SET NULL} agrees with
- * the trigger rather than deadlocking against it), and retention may DELETE past the window. The
- * accompanying REVOKE does not currently bind — the app connects as the bootstrap superuser — so the
- * trigger is the only live control; it holds against application bugs, not against the operator.
+ * <p>Append-only, enforced by a {@code prod}-context trigger that blocks UPDATE, DELETE and TRUNCATE at
+ * the storage layer, with two carve-outs: erasure may set the actor references and the snapshots to
+ * NULL (per column, so an FK's {@code ON DELETE SET NULL} agrees with the trigger rather than
+ * deadlocking against it), and retention may DELETE past the window. It holds against application bugs,
+ * not against an operator with database access.
  *
- * <p>{@code workspace_id} is null for instance-curated catalog events; every workspace resource must
- * identify its workspace. The database CHECK constraint enforces this boundary.
+ * <p>{@code workspace_id} is null only for instance-scoped events; a CHECK constraint ties which
+ * entity types may leave it null, so a workspace resource cannot lose its workspace.
  */
 @Entity
 @Table(name = "config_audit_event")
@@ -77,9 +76,9 @@ public class ConfigAuditEvent {
     /**
      * Dot-paths whose value differs between the snapshots (see {@code ConfigAuditDiff}). Persisted
      * rather than derived because Postgres has no built-in jsonb diff, and because per-control history
-     * must filter server-side: several controls live in one entity, so a page of 50 rows may
-     * contain zero matching the requested control, and a client filtering after paging cannot know
-     * whether to fetch more.
+     * must filter server-side: several controls live in one entity, so a whole page may contain zero
+     * rows matching the requested control, and a client filtering after paging cannot know whether to
+     * fetch more.
      */
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "changed_keys", nullable = false, columnDefinition = "text[]")

@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
@@ -32,7 +31,6 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     private Workspace workspace;
     private WorkspaceContext context;
 
-    // Fleet defaults: runForAll=false, deliverToMerged=false, cooldown=15
     private final PracticeReviewProperties reviewProperties = new PracticeReviewProperties(
         false,
         false,
@@ -48,14 +46,20 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         workspace.setWorkspaceSlug("ws");
         context = new WorkspaceContext(1L, "ws", "Ws", AccountType.ORG, null, false, false, Set.of());
-        // lenient: the read-only getter resolves through findById, the audited writes through the
-        // locking variant, so each test uses exactly one of the two.
-        lenient().when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
+    }
+
+    private void readsWorkspace() {
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+    }
+
+    private void writesWorkspace() {
+        when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
+        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
     void getSettingsReturnsEffectiveAndRawOverrideValues() {
+        readsWorkspace();
         workspace.getReviewSettings().setRunForAllUsers(true);
 
         PracticeReviewSettingsDTO view = service.getSettings(context);
@@ -68,6 +72,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void effectiveValueUsesOverrideOverPropertyWhenOverrideIsFalse() {
+        readsWorkspace();
         workspace.getReviewSettings().setDeliverToMerged(true);
 
         PracticeReviewSettingsDTO view = service.getSettings(context);
@@ -78,7 +83,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void updatePracticeReviewAppliesThePatchAndReturnsTheUpdatedView() {
-        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        writesWorkspace();
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
@@ -94,7 +99,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void updatePracticeReviewReplacesTheReviewScopeWholesale() {
-        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        writesWorkspace();
         workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main", "develop"), List.of()));
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
@@ -114,7 +119,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void twoEmptyListsClearTheScopeBackToUnrestricted() {
-        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        writesWorkspace();
         workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
@@ -130,7 +135,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void namingReviewScopeInResetClearsIt() {
-        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        writesWorkspace();
         workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
 
         service.updatePracticeReview(

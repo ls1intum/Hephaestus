@@ -110,9 +110,8 @@ class EvidenceCompletenessReportingTest {
                 if (value instanceof SourceKind kind) {
                     kinds.add(kind);
                 }
-            } catch (IllegalAccessException ignored) {
-                // A collector that hides its kinds cannot be checked here; the catalog-coverage test
-                // still requires every catalog kind to be collected.
+            } catch (IllegalAccessException exception) {
+                throw new AssertionError("Cannot read " + field, exception);
             }
         }
         return kinds;

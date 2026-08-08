@@ -44,13 +44,13 @@ public class AgentJobZombieSweeper {
 
     private static final Duration RUNNING_BUFFER = Duration.ofMinutes(5);
 
-    /** A worker is "alive" if it self-reported within this window; several times the heartbeat cadence. */
-    private static final Duration WORKER_LEASE_TTL = Duration.ofSeconds(60);
-
     /** Grace before a RUNNING job is judged orphaned, so a (re)started worker can write its first heartbeat. */
     private static final Duration ORPHAN_STARTUP_GRACE = Duration.ofSeconds(120);
 
-    /** Must stay well above {@link #WORKER_LEASE_TTL} so a dead worker's jobs are requeued before its row goes. */
+    /**
+     * Must stay well above {@link AgentProperties#WORKER_LEASE_TTL} so a dead worker's jobs are requeued
+     * before its registry row goes.
+     */
     private static final Duration STALE_REGISTRATION_TTL = Duration.ofHours(1);
 
     private static final Duration DELIVERY_PENDING_STUCK_THRESHOLD = Duration.ofMinutes(10);
@@ -166,7 +166,7 @@ public class AgentJobZombieSweeper {
     public void recoverOrphanedJobs() {
         List<OrphanedJobRef> orphans = jobRepository.findOrphanedRunningJobs(
             Instant.now().minus(ORPHAN_STARTUP_GRACE),
-            WORKER_LEASE_TTL.toSeconds()
+            AgentProperties.WORKER_LEASE_TTL.toSeconds()
         );
         if (orphans.isEmpty()) {
             return;

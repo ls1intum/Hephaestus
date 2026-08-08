@@ -19,23 +19,13 @@ public class PracticeReviewReadinessAdapter implements PracticeReviewReadiness {
         this.llmModelResolver = llmModelResolver;
     }
 
+    // The graph-fetching lookup is what lets the availability check run outside a transaction.
     @Override
-    // Must stay non-transactional: isModelAvailable swallows the resolver's throw, which inside a
-    // shared transaction would leave it rollback-only. Hence the graph-fetching lookup.
     public boolean hasRunnableAgent(Long workspaceId) {
         return bindingRepository
             .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_REVIEW)
             .filter(WorkspaceAgentBinding::isEnabled)
-            .map(this::isModelAvailable)
+            .map(llmModelResolver::isAvailable)
             .orElse(false);
-    }
-
-    private boolean isModelAvailable(WorkspaceAgentBinding binding) {
-        try {
-            llmModelResolver.resolve(binding);
-            return true;
-        } catch (IllegalStateException ignored) {
-            return false;
-        }
     }
 }

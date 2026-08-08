@@ -344,7 +344,7 @@ describe("useMentorChat", () => {
 	});
 
 	describe("thread hydration", () => {
-		// UUIDs, because `parseThreadMessages` silently drops a thread whose ids are any other shape.
+		// UUIDs: `parseThreadMessages` rejects the whole thread if any id is another shape.
 		const threadMessages = [
 			createMockMessage("user", "Previous message", "f47ac10b-58cc-4372-a567-0e02b2c3d479"),
 			createMockMessage("assistant", "Previous response", "c9bf9e57-1685-4c89-bafb-ff5af830be8a"),
@@ -388,8 +388,8 @@ describe("useMentorChat", () => {
 				wrapper: createWrapper(queryClient),
 			});
 
-			// Long enough for the hydration effect to have run, had it been going to.
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			// The hydration effect keys on the thread detail, so once that is readable it has had its run.
+			await waitFor(() => expect(result.current.threadDetail?.messages).toBeDefined());
 			expect(result.current.messages).toEqual([]);
 			expect(result.current.status).toBe("streaming");
 		});

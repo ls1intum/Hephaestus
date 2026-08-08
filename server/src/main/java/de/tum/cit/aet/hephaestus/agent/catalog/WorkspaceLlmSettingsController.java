@@ -30,9 +30,10 @@ public class WorkspaceLlmSettingsController {
         operationId = "workspaceGetLlmSettings"
     )
     @RequireAtLeastWorkspaceAdmin
+    // The answer is instance-wide, so the context is not read; every handler on a
+    // @WorkspaceScopedController declares it regardless, which
+    // WorkspaceScopedControllerComplianceIntegrationTest enforces.
     public ResponseEntity<WorkspaceLlmSettingsDTO> get(WorkspaceContext workspaceContext) {
-        // workspaceContext is unused on purpose: resolving it is what proves the caller belongs to the
-        // workspace in the path.
         return ResponseEntity.ok(
             new WorkspaceLlmSettingsDTO(instanceLlmSettingsService.get().isAllowWorkspaceConnections())
         );

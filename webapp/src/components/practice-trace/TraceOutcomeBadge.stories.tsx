@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import { OUTCOMES } from "./trace-format";
@@ -14,13 +15,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The happy case: the practice was measured. Says nothing about whether anyone heard about it. */
 export const Default: Story = {};
 
-/**
- * The full vocabulary. Each outcome carries its own icon and its own words, so none of them depends
- * on colour to be told apart.
- */
 export const EveryOutcome: Story = {
 	parameters: { layout: "padded" },
 	render: () => (
@@ -32,6 +28,15 @@ export const EveryOutcome: Story = {
 			))}
 		</ul>
 	),
+	play: async ({ canvasElement }) => {
+		// WCAG 2.2 SC 1.4.1: every outcome is told apart by an icon and words, never by colour alone.
+		const badges = within(canvasElement).getAllByRole("listitem");
+		await expect(badges).toHaveLength(OUTCOMES.length);
+		for (const badge of badges) {
+			await expect(badge.querySelector("svg")).not.toBeNull();
+			await expect(badge.textContent?.trim()).toBeTruthy();
+		}
+	},
 };
 
 export const Mobile: Story = {

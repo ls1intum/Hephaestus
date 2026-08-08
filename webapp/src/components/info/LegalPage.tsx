@@ -108,6 +108,9 @@ export function LegalPage({
 
 			{resolved ? (
 				<article lang="en" className="prose dark:prose-invert max-w-none">
+					{/* Empty `rehypePlugins` drops Streamdown's default rehype-raw, and its bundled
+					    rehype-harden ships `allowedProtocols: ["*"]`, so SAFE_COMPONENTS is the only
+					    thing keeping `javascript:` and unknown schemes out of the DOM. */}
 					<Streamdown
 						mode="static"
 						rehypePlugins={[]}

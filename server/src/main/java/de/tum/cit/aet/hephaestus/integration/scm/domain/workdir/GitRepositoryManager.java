@@ -51,8 +51,6 @@ import org.springframework.stereotype.Service;
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
 
-    private static final int MAX_TREE_FILES = 20_000;
-
     private static final String SCM_CONNECTOR = "scm";
 
     private final GitRepositoryProperties properties;
@@ -699,12 +697,16 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Materialises a commit tree into a temporary directory, without dereferencing symlinks or
-     * submodules across the source boundary.
+     * Materialises a commit tree into a temporary directory.
+     *
+     * <p>Symlinks, submodules and paths that escape the staging root are excluded rather than followed,
+     * so nothing outside the commit's own tree can be written or read through the snapshot. Each
+     * exclusion is named in {@link GitTreeSnapshot#limitations()} so a consumer can say what it did not
+     * see instead of treating a partial tree as the whole repository.
      *
      * <p>Blobs are streamed one at a time from the object database straight to disk, so peak memory is
-     * one buffer regardless of repository size — the tree never exists in this process's heap. The
-     * caller owns the result and must {@link GitTreeSnapshot#close() close} it to delete the directory.
+     * one buffer regardless of repository size. The caller owns the result and must
+     * {@link GitTreeSnapshot#close() close} it to delete the directory.
      *
      * <p>The git handles are opened and closed entirely within this call. Returning lazy readers instead
      * would be cheaper still, but would leave an {@code ObjectReader} and the repository read lock alive

@@ -128,8 +128,8 @@ describe("projectBudget", () => {
 		expect(projection?.reachedOn?.toISOString().slice(0, 10)).toBe("2026-07-20");
 	});
 
-	it("clamps a slow pace to the last day of the month", () => {
-		// $15 over 15 days is $1/day, which reaches a $31 cap on the 32nd of a 31-day month.
+	it("projects the last day when the pace only just reaches the cap", () => {
+		// $1/day reaches a $31 cap exactly as the 31-day month ends.
 		const projection = projectBudget(15, 31, july, new Date("2026-07-15T12:00:00.000Z"));
 		expect(projection?.reachedOn?.toISOString().slice(0, 10)).toBe("2026-07-31");
 	});

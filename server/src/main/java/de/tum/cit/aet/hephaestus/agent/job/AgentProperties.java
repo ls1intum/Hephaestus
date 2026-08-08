@@ -42,6 +42,18 @@ public record AgentProperties(
     /** Floor for {@link #heartbeatInterval}: below this the liveness signal floods {@code worker_registry}. */
     public static final Duration MIN_HEARTBEAT_INTERVAL = Duration.ofSeconds(1);
 
+    /**
+     * A worker whose last {@code worker_registry} heartbeat is older than this is judged dead and its
+     * RUNNING jobs are requeued to a sibling.
+     */
+    public static final Duration WORKER_LEASE_TTL = Duration.ofSeconds(60);
+
+    /**
+     * Ceiling for {@link #heartbeatInterval}. Half the lease, so a worker survives losing one beat; a
+     * heartbeat slower than the lease would have every worker orphan its own running jobs.
+     */
+    public static final Duration MAX_HEARTBEAT_INTERVAL = WORKER_LEASE_TTL.dividedBy(2);
+
     /** Bean Validation has no duration-comparison constraint, so the {@link Duration} bounds are checked here. */
     public AgentProperties {
         if (pollInterval == null || pollInterval.compareTo(MIN_POLL_INTERVAL) < 0) {
@@ -57,6 +69,16 @@ public record AgentProperties(
                 "hephaestus.agent.heartbeat-interval must be >= " +
                     MIN_HEARTBEAT_INTERVAL +
                     ", got: " +
+                    heartbeatInterval
+            );
+        }
+        if (heartbeatInterval.compareTo(MAX_HEARTBEAT_INTERVAL) > 0) {
+            throw new IllegalArgumentException(
+                "hephaestus.agent.heartbeat-interval must be <= " +
+                    MAX_HEARTBEAT_INTERVAL +
+                    " (half the " +
+                    WORKER_LEASE_TTL +
+                    " worker lease), or every worker is orphaned while its jobs are still running; got: " +
                     heartbeatInterval
             );
         }
