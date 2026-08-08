@@ -46,10 +46,14 @@
         <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
         <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
 
-        <!-- Fail fast on CI, where the first few failures are the whole story and the runner minutes
-             are not. Locally, `-Dhephaestus.surefire.skipAfterFailureCount=0` turns it off: past this
-             threshold surefire reports every remaining test as *Skipped*, so a run that is really
-             fixing N failures otherwise takes N/5 full builds to enumerate them. -->
+        <!-- Past this many failures surefire stops and reports every remaining test as *Skipped*, so a
+             run that is really fixing N failures shows 5 and enumerating the rest costs N/5 full builds.
+             0 turns it off; ci-tests.yml passes 0 on every tier for exactly that reason, and a green run
+             pays nothing for it. The default stays 5 for the ad-hoc run that only wants to know whether
+             anything is broken at all.
+
+             The name is load-bearing: this property is what <skipAfterFailureCount> below binds to, so
+             surefire's own -DskipAfterFailureCount matches nothing here and is ignored without a word. -->
         <hephaestus.surefire.skipAfterFailureCount>5</hephaestus.surefire.skipAfterFailureCount>
 
         <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
