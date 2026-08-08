@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -177,16 +177,26 @@ const openActions = async (canvas: ReturnType<typeof within>, name: string) => {
 	return within(await screen.findByRole("menu"));
 };
 
+/** What dnd-kit is telling a screen reader right now. Also how this file waits for it. */
+const announcement = () =>
+	document.querySelector('[id^="DndLiveRegion"]')?.textContent?.trim() ?? "";
+
+const rowOf = (canvas: ReturnType<typeof within>, name: string) => {
+	const row = canvas.getByRole("button", { name: `Reorder ${name}` }).closest('[role="listitem"]');
+	if (!(row instanceof HTMLElement)) throw new Error(`No row for ${name}`);
+	return row;
+};
+
 /**
- * A pointer drag from a row's grip, ending `dy` pixels lower. The sensor arms after 6px, so the
- * first step is always past that even when the drag ends where it started.
+ * A pointer drag from a row's grip to a point on the page, stepping through the sensor's 6px
+ * activation distance and waiting on each announcement rather than on a frame count — under a full
+ * suite run there is no fixed number of frames that is both enough and not wasteful.
  */
-const dragBy = async (handle: HTMLElement, dy: number) => {
+const dragTo = async (handle: HTMLElement, clientY: number) => {
 	const box = handle.getBoundingClientRect();
 	const clientX = Math.round(box.left + box.width / 2);
-	const top = Math.round(box.top + box.height / 2);
-	const settle = () => new Promise((resolve) => requestAnimationFrame(resolve));
-	const send = (type: string, clientY: number, target: EventTarget = document) =>
+	const startY = Math.round(box.top + box.height / 2);
+	const send = (type: string, y: number, target: EventTarget = document) =>
 		target.dispatchEvent(
 			new PointerEvent(type, {
 				bubbles: true,
@@ -195,22 +205,17 @@ const dragBy = async (handle: HTMLElement, dy: number) => {
 				isPrimary: true,
 				pointerId: 1,
 				clientX,
-				clientY,
+				clientY: y,
 			}),
 		);
 
-	send("pointerdown", top, handle);
-	await settle();
-	// The sensor arms on this one; dnd-kit measures and re-renders over the next two frames.
-	send("pointermove", top + 12);
-	await settle();
-	await settle();
-	send("pointermove", top + dy);
-	await settle();
-	await settle();
-	send("pointerup", top + dy);
-	await settle();
-	await settle();
+	send("pointerdown", startY, handle);
+	send("pointermove", startY + (clientY < startY ? -12 : 12));
+	await waitFor(() => expect(announcement()).toMatch(/^Picked up/));
+	send("pointermove", clientY);
+	await waitFor(() => expect(announcement()).toMatch(/^Moving/));
+	send("pointerup", clientY);
+	await waitFor(() => expect(announcement()).toMatch(/^(Moved|Move cancelled)/));
 };
 
 export const Default: Story = {};
@@ -327,33 +332,34 @@ export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 export const DroppingARowWhereItAlreadyIsIsNotAMove: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		const first = canvas.getByRole("button", { name: "Reorder Small, reviewable changes" });
-		const second = canvas.getByRole("button", { name: "Reorder Explain what changed and why" });
-		const rowHeight = second.getBoundingClientRect().top - first.getBoundingClientRect().top;
+		const next = rowOf(canvas, "Explain what changed and why").getBoundingClientRect();
 
 		// Onto the next row but short of its midpoint, which resolves to "before it" — the position
-		// the row is already in.
-		await dragBy(first, rowHeight - 10);
+		// the dragged row is already in.
+		await dragTo(
+			canvas.getByRole("button", { name: "Reorder Small, reviewable changes" }),
+			Math.round(next.top + 2),
+		);
 
 		// The drop resolved a destination — this is the guard refusing a no-op, not a drag that never
 		// found anywhere to land and would refuse everything.
-		await expect(
-			await screen.findByText("Moved Small, reviewable changes to position 1 of 3 in Delivery."),
-		).toBeInTheDocument();
+		await expect(announcement()).toBe(
+			"Moved Small, reviewable changes to position 1 of 3 in Delivery.",
+		);
 		await expect(args.onPlaceEntry).not.toHaveBeenCalled();
 	},
 };
 
-/** …and the same drag ending one row lower is a move, so the guard above is not a mute. */
+/** …and the same drag carried past that midpoint is a move, so the guard above is not a mute. */
 export const DraggingARowOntoTheNext: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		const first = canvas.getByRole("button", { name: "Reorder Small, reviewable changes" });
-		const second = canvas.getByRole("button", { name: "Reorder Explain what changed and why" });
-		const rowHeight = second.getBoundingClientRect().top - first.getBoundingClientRect().top;
+		const next = rowOf(canvas, "Explain what changed and why").getBoundingClientRect();
 
-		// Past the next row's midpoint, which is what makes this an "after" rather than a "before".
-		await dragBy(first, rowHeight + 10);
+		await dragTo(
+			canvas.getByRole("button", { name: "Reorder Small, reviewable changes" }),
+			Math.round(next.bottom - 2),
+		);
 
 		await expect(args.onPlaceEntry).toHaveBeenCalledWith("small-changes", "delivery", 1);
 	},
