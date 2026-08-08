@@ -24,6 +24,9 @@ precompute scratch; never collected), and `out/` (the only directory collected b
 │   ├── context/                     #   System-written, AI-readable. Populated by the ContentSource SPI.
 │   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
 │   │                                #   linked_work_items.json, review_threads.json, …
+│   ├── history/                     #   What earlier reviews recorded and already said, about the
+│   │                                #   person whose work this is: observations.json, feedback.json.
+│   │                                #   ALWAYS present, empty on a first-ever review.
 │   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
 │   ├── precompute/                  #   Per-practice precompute scripts injected by the server.
@@ -46,7 +49,13 @@ covered by this ABI.
 
 - **`inputs/`** — the entire read-only region. The sandbox path-guard whitelists exactly this
   subtree; an agent write attempt anywhere under `inputs/` is rejected.
-- **`inputs/context/`** — system-written, AI-readable source materializations.
+- **`inputs/context/`** — system-written, AI-readable source materializations of the artifact under
+  review. A source with nothing to report still writes its file, holding an empty list: "the record was
+  read and held nothing" is a fact a review may reason from, and "the file is not there" is not.
+- **`inputs/history/`** — the same, for what came before this event rather than for this event. Selected
+  by every evidence plan regardless of practice bindings, because a review of one event is only a partial
+  practice review and cannot be made whole by reading that event harder. Never reported COMPLETE: it is a
+  bounded window over a growing record.
 - **`inputs/manifest.json`** — the source and artifact index. It indexes context files but is not itself a source
   artifact.
 - **`inputs/sources/scm/repo/`** — a read-only repository tree materialised at the manifest's
