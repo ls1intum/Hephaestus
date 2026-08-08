@@ -60,6 +60,19 @@ server:
         accesslog:
             enabled: false
 
+# SecurityConfig permits /v3/api-docs/** and /swagger-ui/** unauthenticated on BOTH filter chains,
+# because the `specs` profile generates openapi.yaml on a boot that has no JwtDecoder and would
+# otherwise 403. That carve-out is not profile-guarded, so a prod instance published the complete
+# API surface — every admin and instance-admin route — plus an interactive Swagger UI to anyone who
+# asked. Turning the endpoints off here means springdoc never registers them and those permitAll
+# matchers match nothing; the `specs` profile is a different profile and still generates the spec.
+# Opt back in per-instance only if you intend the spec to be world-readable.
+springdoc:
+    api-docs:
+        enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+    swagger-ui:
+        enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
+
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
 
