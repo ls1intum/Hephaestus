@@ -49,6 +49,16 @@ public final class SandboxLayout {
 
     public static final String MANIFEST_PATH = INPUTS_PREFIX + "manifest.json";
 
+    /**
+     * Workspace-relative prefix for what earlier reviews recorded and already said.
+     *
+     * <p>Separate from {@link #CONTEXT_PREFIX} because it is the one part of the sandbox that is not
+     * about the artifact under review: {@code inputs/context/} is this event, {@code inputs/history/} is
+     * every event before it. Both files below it are always present — an empty one is the review saying
+     * it looked and there was nothing, which is a different fact from never having looked.
+     */
+    public static final String HISTORY_PREFIX = INPUTS_PREFIX + "history/";
+
     /** Workspace-relative prefix for per-practice catalog files (index, criteria). */
     public static final String PRACTICES_PREFIX = INPUTS_PREFIX + "practices/";
 

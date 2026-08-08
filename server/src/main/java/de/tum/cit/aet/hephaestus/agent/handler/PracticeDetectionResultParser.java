@@ -227,6 +227,7 @@ public class PracticeDetectionResultParser {
         // Reject internal workspace paths — agent sometimes hallucinates inputs/context/ or work/analysis/ paths
         if (
             filePath.startsWith(SandboxLayout.CONTEXT_PREFIX) ||
+            filePath.startsWith(SandboxLayout.HISTORY_PREFIX) ||
             filePath.startsWith(SandboxLayout.PRACTICES_PREFIX) ||
             filePath.startsWith(SandboxLayout.ANALYSIS_PREFIX) ||
             filePath.startsWith(OUTPUT_RELATIVE_PREFIX) ||

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.providers.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
@@ -289,7 +290,10 @@ public class PracticeDetectionDeliveryService {
         // Only what the bindings this occasion matched declared. A citation to a source another
         // binding of the same practice reads is still out of bounds here: that source was never staged
         // for this run, so a quote from it cannot have been read.
-        Set<SourceKind> declared = new HashSet<>();
+        // Plus what every run stages regardless of any binding. These are declared sources with staged
+        // bytes, so a claim about an earlier observation is held to the same quote check as a claim
+        // about a diff — the point of staging history as evidence rather than as loose context.
+        Set<SourceKind> declared = new HashSet<>(EvidencePlan.WORKSPACE_CONTEXT_SOURCES);
         Set<SourceKind> exhaustive = new HashSet<>();
         PracticeBinding.needsFor(revision.getBindings(), PracticeCatalogInjector.signalOf(job)).forEach(need -> {
             declared.add(need.sourceKind());

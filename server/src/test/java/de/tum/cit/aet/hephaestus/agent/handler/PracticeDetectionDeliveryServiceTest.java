@@ -555,6 +555,61 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     .doesNotThrowAnyException();
             }
         }
+
+        /**
+         * The history is staged for every practice without any binding declaring it, so a practice must
+         * be able to cite it. This is what makes staging it as a declared source worth the catalog entry:
+         * an observation that says "we raised this before" is checkable rather than merely plausible.
+         */
+        @Test
+        @DisplayName("a citation to the review history is in bounds although no binding declared it")
+        void acceptsACitationToTheStagedHistory() {
+            stageHistory("we raised this in the last review");
+            ValidatedFinding finding = historyCiting("we raised this in the last review");
+
+            var result = service.deliver(testJob, List.of(finding));
+
+            assertThat(result.inserted()).isEqualTo(1);
+        }
+
+        /** And the other half of that bargain: a past observation cannot be invented. */
+        @Test
+        @DisplayName("a fabricated quote from the review history is refused like any other")
+        void rejectsAnInventedPastObservation() {
+            stageHistory("we raised this in the last review");
+            ValidatedFinding finding = historyCiting("we raised this three times before");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("quote");
+            verifyNoInteractions(observationRepository);
+        }
+
+        private static final String HISTORY_SHA = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
+        private void stageHistory(String body) {
+            var source = ((ObjectNode) testJob.getEvidenceSnapshot().path("manifest")).withArray("sources")
+                .addObject()
+                .put("kind", "hephaestus.observation-history");
+            source.putObject("state").put("availability", "AVAILABLE").put("content", "NON_EMPTY");
+            source
+                .putArray("artifacts")
+                .addObject()
+                .put("path", "inputs/history/observations.json")
+                .put("sha256", HISTORY_SHA);
+            when(cas.get(HISTORY_SHA)).thenReturn(Optional.of(body.getBytes(StandardCharsets.UTF_8)));
+        }
+
+        private ValidatedFinding historyCiting(String quote) {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ObjectNode citation = (ObjectNode) finding.evidence().withArray("citations").get(0);
+            citation.put("sourceKind", "hephaestus.observation-history");
+            citation.put("artifactPath", "inputs/history/observations.json");
+            citation.put("path", "inputs/history/observations.json");
+            citation.remove("side");
+            citation.put("quote", quote);
+            return finding;
+        }
     }
 
     @Nested

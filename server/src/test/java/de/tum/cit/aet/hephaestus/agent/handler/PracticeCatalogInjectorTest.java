@@ -220,6 +220,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
         assertThat(index).contains("authoring").contains("retrospective");
         assertThat(index).contains("allowedSources").contains("scm.pull-request.diff");
+        // Every practice may cite the history, whether or not its bindings asked for it: it is workspace
+        // context, not per-practice evidence. This array is the whole of what the in-sandbox normalizer
+        // accepts a citation against, so omitting it here would stage history the model could not cite.
+        assertThat(index).contains("hephaestus.observation-history").contains("hephaestus.feedback-history");
         // Per-slug criteria + the all-criteria bundle are present.
         assertThat(files).containsKey(md("authoring")).containsKey(md("retrospective"));
         String bundle = new String(

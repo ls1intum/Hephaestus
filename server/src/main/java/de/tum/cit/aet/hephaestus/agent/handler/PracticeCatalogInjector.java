@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
@@ -169,6 +171,13 @@ class PracticeCatalogInjector {
             entry.put("revisionId", p.getCurrentRevision().getId());
             entry.put("defectDetector", p.isDefectDetector());
             ArrayNode allowedSources = entry.putArray("allowedSources");
+            // What every run stages whether or not a binding asked for it. Listed per practice because
+            // this array is the whole of what the in-sandbox normalizer will accept a citation against,
+            // and a review that may read the history must be able to cite what it read there.
+            EvidencePlan.WORKSPACE_CONTEXT_SOURCES.stream()
+                .map(SourceKind::value)
+                .sorted()
+                .forEach(allowedSources::add);
             // Only what the bindings this occasion matched actually read. A practice bound to both a
             // merge and an opening may read a decision record on one and not the other; listing the
             // union would tell the model it may cite evidence this run never staged.
