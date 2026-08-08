@@ -6,9 +6,12 @@ import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionReques
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -66,17 +69,20 @@ public class DevTriggerController {
     private final ReviewableArtifactLoader artifactLoader;
     private final PracticeReviewDetectionGate detectionGate;
     private final TransactionTemplate transactionTemplate;
+    private final SignalRecorder signalRecorder;
 
     public DevTriggerController(
         AgentJobService agentJobService,
         ReviewableArtifactLoader artifactLoader,
         PracticeReviewDetectionGate detectionGate,
-        TransactionTemplate transactionTemplate
+        TransactionTemplate transactionTemplate,
+        SignalRecorder signalRecorder
     ) {
         this.agentJobService = agentJobService;
         this.artifactLoader = artifactLoader;
         this.detectionGate = detectionGate;
         this.transactionTemplate = transactionTemplate;
+        this.signalRecorder = signalRecorder;
     }
 
     /** Outcome of the session-bound prep phase: a request ready to submit, or a terminal message. */
@@ -140,6 +146,17 @@ public class DevTriggerController {
         if (triggerSignal != null) {
             GateDecision decision = detectionGate.evaluate(pr, triggerSignal, TriggerMode.AUTO);
             if (decision instanceof GateDecision.Skip skip) {
+                recordRefusal(
+                    ScmSignals.pullRequestKey(
+                        workspaceId,
+                        pr.getId(),
+                        triggerSignal,
+                        pr.getHeadRefOid(),
+                        pr.getTitle(),
+                        pr.getBody()
+                    ).orElse(null),
+                    skip
+                );
                 return Prepared.done("Gate skipped (" + triggerSignal + "): " + skip.reason());
             }
         }
@@ -156,6 +173,17 @@ public class DevTriggerController {
         if (triggerSignal != null) {
             GateDecision decision = detectionGate.evaluateIssue(issue, triggerSignal, TriggerMode.AUTO);
             if (decision instanceof GateDecision.Skip skip) {
+                recordRefusal(
+                    ScmSignals.issueKey(
+                        workspaceId,
+                        issue.getId(),
+                        triggerSignal,
+                        issue.getTitle(),
+                        issue.getBody(),
+                        issue.getUpdatedAt()
+                    ).orElse(null),
+                    skip
+                );
                 return Prepared.done("Gate skipped (" + triggerSignal + "): " + skip.reason());
             }
         }
@@ -163,5 +191,25 @@ public class DevTriggerController {
         return request == null
             ? Prepared.done("Issue missing repository: issueId=" + issue.getId())
             : Prepared.issue(request);
+    }
+
+    /**
+     * Settle the ledger the way the production listener does, so a gate-routed trigger leaves the same
+     * trace a real delivery would.
+     *
+     * <p>Without this the artifact keeps a signal that says only "recorded", and the trace answers a
+     * reader with "no decision has been taken yet" for a review that ran, finished and was paid for —
+     * telling them to wait for something already over. Recorded rather than the response alone
+     * because the response is gone as soon as it is read.
+     *
+     * <p>Null key when the signal has nothing stable to be keyed on (a pull request whose head commit
+     * the mirror does not have yet). There is then no ledger row this refusal belongs to, and inventing
+     * one would assert an occurrence nobody observed.
+     */
+    private void recordRefusal(@Nullable SignalKey key, GateDecision.Skip skip) {
+        if (key == null) {
+            return;
+        }
+        signalRecorder.markRefused(key, skip.resolvedSignalReason());
     }
 }
