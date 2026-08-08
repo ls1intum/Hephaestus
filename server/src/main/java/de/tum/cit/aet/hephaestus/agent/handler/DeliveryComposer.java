@@ -1256,15 +1256,15 @@ class DeliveryComposer {
     }
 
     /**
-     * Server-side grounding context for the inline-anchor guard (M1). Built from the raw two-ref diff of the
+     * Server-side grounding context for the inline-anchor guard. Built from the raw two-ref diff of the
      * change under review, it answers one question: is a finding's proposed inline anchor real, or a
      * hallucinated locus that would land a confident file:line note on a student about code that isn't there?
      *
-     * <p>An anchor is GROUNDED when its file is in the diff's changed-file set AND the finding's evidence
-     * snippet is substring-present in that file's hunk text. A {@link #FORCE_NO_LOCUS} context (issues, which
-     * have no file path at all) treats every anchor as ungrounded. An INACTIVE context (no diff supplied)
-     * is a strict no-op: every anchor passes, so the existing PR delivery layout is unchanged for callers
-     * that cannot produce the diff.
+     * <p>An anchor is grounded when its file is in the diff's changed-file set AND the finding's evidence
+     * snippet is substring-present in that file's hunk text. With {@code forceNoLocus} — issues, which have
+     * no file path at all — every anchor is ungrounded. With {@code active} false, no diff was supplied and
+     * the guard is a strict no-op: every anchor passes, so the delivery layout is unchanged for callers that
+     * cannot produce the diff.
      *
      * @param active        whether the guard runs at all (false ⇒ no-op pass-through)
      * @param forceNoLocus  whether to reject every anchor regardless of the diff (issues have no file locus)

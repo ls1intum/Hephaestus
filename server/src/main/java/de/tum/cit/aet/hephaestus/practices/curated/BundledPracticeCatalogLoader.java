@@ -129,9 +129,8 @@ public class BundledPracticeCatalogLoader {
             bindings,
             criteria,
             loadPrecomputeScript(node, slug),
-            // Every one of the thirteen named policies this replaced turned out to be, once the evidence
-            // moved onto the bindings, exactly the kind's default: same contract, same mode, same limits.
-            // A bundled practice that wanted a different frame would have to say so, and none does.
+            // Every bundled practice takes its kind's default frame: same contract, same mode, same
+            // limits. One that wanted a different frame would have to say so, and none does.
             evidenceDefaults.policyFor(artifactKind),
             whyItMatters,
             whatGoodLooksLike,
@@ -145,7 +144,8 @@ public class BundledPracticeCatalogLoader {
      * Reads the {@code on} list.
      *
      * <p>A bare string is a binding on that signal reading the kind's default evidence — which is what
-     * almost every practice wants, and spelling it out 36 times would only invite the copies to drift.
+     * almost every practice wants, and spelling it out once per practice would only invite the copies to
+     * drift.
      * An object says what the review reads instead, and is how a practice that must establish an
      * <em>absence</em> declares the exhaustive capture that licenses the claim.
      */

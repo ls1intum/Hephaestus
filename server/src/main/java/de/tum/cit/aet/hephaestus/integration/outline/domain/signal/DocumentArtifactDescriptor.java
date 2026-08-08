@@ -16,11 +16,8 @@ import org.springframework.stereotype.Component;
 /**
  * What can happen to a written document, and which of those a practice may be reviewed on.
  *
- * <p>This is the descriptor the whole contract was built to make possible. Outline has had a complete
- * webhook stack and eleven ingested lifecycle events for as long as it has existed here, and until now
- * not one of them could start anything: the practices module had to know a kind existed before a
- * practice could be bound to it, so adding document triggering meant editing practices. Nothing in
- * this file is known to that module — it reads the registered descriptors and offers whatever it finds.
+ * <p>Nothing in this file is known to the practices module: it reads the registered descriptors and
+ * offers whatever it finds, which is what lets a document become bindable without an edit there.
  *
  * <p>Unconditional, like every other descriptor. What a document is, and what can happen to one, is a
  * fact about the domain; whether this deployment has Outline switched on is a fact about the
@@ -40,7 +37,7 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
     /**
      * Every document event arrives on one registry key.
      *
-     * <p>{@code OutlineSubjectParser} collapses all eleven subscribed events onto
+     * <p>{@code OutlineSubjectParser} collapses every document event onto
      * {@code EventTypeKey(OUTLINE, "document")}, so that key — not the Outline event name — is the unit
      * of provenance the framework can check a handler for. Which of those events raises which signal is
      * stated in {@link DocsSignals#forOutlineEvent(String)}, next to the names the sync path already

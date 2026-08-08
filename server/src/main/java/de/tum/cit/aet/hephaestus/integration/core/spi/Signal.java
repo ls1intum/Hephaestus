@@ -11,17 +11,17 @@ import java.util.Set;
  *
  * <p>The load-bearing field is {@link #producedBy()}. Without it a signal name is a wish: nothing
  * connects it to an ingested event, so a practice can be bound to it, the binding can look healthy in
- * the UI, and it can simply never fire — which is precisely how thirteen Outline document events came
- * to be ingested while no practice could react to any of them. {@code ArtifactKind}'s javadoc already
- * warns about the same failure mode ("aspirational entries become silent classification bugs"); this
- * record makes the warning enforceable, because the bootstrap can check that each named event type has
- * a registered handler.
+ * the UI, and it can simply never fire — which is precisely how Outline's document events came to be
+ * ingested while no practice could react to any of them. Declaring the provenance is what makes that
+ * checkable: the bootstrap verifies each named event type has a registered handler, so the claim is
+ * enforced rather than merely written down.
  *
  * <p>An empty {@code producedBy} is legal and meaningful — it says "no ingested event raises this; it
  * comes from somewhere else", which is true of a review someone explicitly asked for. What is not
  * legal is an integration claiming to <em>raise</em> such a signal, and the bootstrap refuses that.
  *
- * @param name        the vendor-neutral name practices bind to; persisted, hence {@link #stability()}
+ * @param name        the vendor-neutral name practices bind to, and persisted under — so whatever this
+ *                    accepts today it must keep accepting
  * @param displayName human-readable label for authoring surfaces
  * @param producedBy  the ingested event types that raise this signal, across every vendor of the
  *                    owning domain — provenance, not routing

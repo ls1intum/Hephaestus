@@ -13,12 +13,9 @@ import org.springframework.stereotype.Component;
  * The frame a practice on an artifact kind starts with: the evidence a binding reads by default, and the
  * standing caveats every review of that kind carries.
  *
- * <p>Both answers used to be {@code if}-chains over the three kinds this build happened to have, and both
- * threw for a kind they had not been told about. That was the last place in the practices module where a
- * new domain forced an edit here — and it was not a small one: because {@link #policyFor} is called for
- * <em>every</em> bundled practice, a fourth kind could not even be added to the catalog without this file
- * changing first. The module is not supposed to know which kinds exist, so it no longer answers either
- * question itself:
+ * <p>Neither answer is given here. The module is not supposed to know which kinds exist, and
+ * {@link #policyFor} is called for <em>every</em> bundled practice — so a per-kind chain in this file
+ * would mean no kind could be added to the catalog without editing it first:
  *
  * <ul>
  *   <li><b>Which sources a binding starts with</b> is a fact about the sources, and each source contract
@@ -46,7 +43,7 @@ public class PracticeEvidenceDefaults {
     /**
      * The evidence a binding on this kind starts with when the author has not said otherwise.
      *
-     * <p>Every default is {@code REQUIRED}, which is where all 36 shipped practices already put them.
+     * <p>Every default is {@code REQUIRED}, which is where every shipped practice already put them.
      * The stance is what separates "there were no comments" from "we failed to collect the comments",
      * and only the first of those is a fact about a developer. How strictly each source must then be
      * captured is not stated here at all: it belongs to the source contract, which every practice

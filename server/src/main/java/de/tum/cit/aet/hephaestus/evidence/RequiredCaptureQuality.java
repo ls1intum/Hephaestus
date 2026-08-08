@@ -4,12 +4,11 @@ package de.tum.cit.aet.hephaestus.evidence;
  * What a practice is asking for when it requires this source — a fact about the source, not about the
  * practice that names it.
  *
- * <p>Every shipped practice already agreed on this per source, and nothing enforced the agreement:
- * each restated completeness and emptiness for every source it required, thirteen policies deep.
- * {@code EvidencePolicyRedundancyTest} measured the uniformity before it was relied on, which is what
- * makes moving the axis here a simplification rather than a loss of expressiveness. If a practice ever
- * genuinely needs a stricter capture than its neighbours, that is a per-practice axis being
- * rediscovered and it must be reintroduced deliberately.
+ * <p>Stated once per source rather than once per practice that names it. Every shipped practice agrees
+ * on the answer for a given source, and {@code EvidencePolicyRedundancyTest} measures that uniformity
+ * rather than assuming it — which is what makes one axis here a simplification and not a loss of
+ * expressiveness. If a practice ever genuinely needs a stricter capture than its neighbours, that is a
+ * per-practice axis being rediscovered, and it must be reintroduced deliberately.
  *
  * <p>One ordered enum rather than two independent booleans: the three values are a ladder, and the
  * fourth cell of the cross-product — "non-empty but possibly partial" — asserts something no source can

@@ -25,8 +25,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * The enforcement half of the review contract. A declaration nobody checks is documentation, and
- * documentation is what let thirteen ingested document events sit behind a manifest that never claimed
- * to raise anything.
+ * documentation is what let a complete set of ingested document events sit behind a manifest that never
+ * claimed to raise anything.
  *
  * <p>Produces violation strings rather than throwing, so {@link IntegrationFrameworkBootstrap} can
  * report every problem in one message instead of one per restart.
@@ -77,12 +77,10 @@ public class ReviewContractValidator {
      *
      * <p>Together with {@link #LANE_CAPABILITIES} this must classify every {@link FeedbackLane}: a lane
      * added to the enum with no rule here would be enforced only once some vendor happened to declare it,
-     * which is to say discovered in production. That completeness used to be asserted in a static
-     * initializer. It is a fact about the build — the enum and both collections are compile-time
-     * constants, so the answer is identical on every deployment and cannot change at runtime — and
-     * asserting it at class-init only moved the discovery from CI to whichever pod first loaded the class.
-     * {@code ReviewContractLaneRulesTest} asserts it instead, where a failure costs a red build rather
-     * than a crash-looping process.
+     * which is to say discovered in production. The enum and both collections are compile-time constants,
+     * so the answer is identical on every deployment and cannot change at runtime — which makes
+     * {@code ReviewContractLaneRulesTest} the right place to assert it, where a failure costs a red build
+     * rather than a crash-looping process.
      */
     static final Set<FeedbackLane> HEPHAESTUS_OWNED_LANES = EnumSet.of(FeedbackLane.PROFILE);
 
@@ -148,10 +146,9 @@ public class ReviewContractValidator {
                 if (descriptor.lanes().isEmpty()) {
                     violations.add(kind + " is declared reviewable but declares no lane to deliver feedback on");
                 }
-                // What the evidence cannot settle used to be a per-kind switch inside the practices
-                // module, which threw for any kind it had not been told about — so a new domain could
-                // declare itself reviewable here and only fail much later, at catalog load, with an
-                // error about practices rather than about the descriptor that omitted this.
+                // Checked here rather than at catalog load: a new domain that declares itself reviewable
+                // and names no limitation should fail against the descriptor that omitted it, not much
+                // later with an error about practices.
                 if (descriptor.reviewLimitations().isEmpty()) {
                     violations.add(
                         kind +

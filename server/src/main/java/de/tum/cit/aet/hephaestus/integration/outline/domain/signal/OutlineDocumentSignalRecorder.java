@@ -22,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
  * reason the ledger exists — it makes <em>"why did nothing happen?"</em> answerable, rather than leaving
  * a publish that nobody reviewed indistinguishable from a publish that never arrived.
  *
- * <p>Only three of the eleven ingested Outline events map to a signal; the rest return empty from
+ * <p>Only some document events map to a signal. The rest return empty from
  * {@link DocsSignals#forOutlineEvent} and are silently not recorded, which is the honest answer for a
- * document that merely moved.
+ * document that merely moved. Outline also subscribes collection events, which never reach this class
+ * at all: they change the catalog a document sits in rather than the document, so there is nothing
+ * about a document for them to record.
  */
 @Component
 public class OutlineDocumentSignalRecorder {

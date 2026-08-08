@@ -18,8 +18,8 @@ import org.jspecify.annotations.Nullable;
  * documentation tool would raise the same signal against the same practices rather than arriving with
  * a vocabulary of its own.
  *
- * <p>Three of the eleven ingested Outline events carry review meaning; the rest move a document, rename
- * a collection or delete something, and a review occasioned by one of those could only read the same
+ * <p>Only some ingested Outline events carry review meaning; the rest move a document, rename a
+ * collection or delete something, and a review occasioned by one of those could only read the same
  * bytes it read before. The mapping is stated once, in {@link #forOutlineEvent(String)}, because the
  * event names are also what the sync path already switches on.
  *

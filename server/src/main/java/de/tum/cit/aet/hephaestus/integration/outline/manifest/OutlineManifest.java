@@ -47,11 +47,6 @@ public class OutlineManifest implements IntegrationManifest {
     /**
      * Documents, and the three events about them that carry review meaning.
      *
-     * <p>This used to be {@code none()}, with a comment explaining that the emptiness was the defect the
-     * contract had been built to make visible: eleven ingested lifecycle events, a complete webhook
-     * stack, and nothing any of them could start. Closing it took a descriptor in this module and these
-     * two lines — and no edit anywhere in the practices module, which was the point of the exercise.
-     *
      * <p><b>Raises is a subset, and deliberately.</b> The descriptor lists what can happen to a document
      * in general; Outline raises the three it actually delivers. It observes {@code docs.document}
      * because it is the module that writes the mirror those documents live in.
