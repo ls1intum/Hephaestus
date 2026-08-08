@@ -6,11 +6,6 @@ import type {
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 
-/**
- * The visual spec for this surface. Every `outcome` the API can report appears at least once, so a
- * new value added server-side shows up as a story with no matching row rather than as a blank badge
- * discovered in production.
- */
 export const tracedArtifacts = [
 	{
 		artifactKind: "scm.pull_request",
@@ -57,9 +52,8 @@ export const tracedArtifacts = [
 ] satisfies Wire<TracedArtifact>[];
 
 /**
- * Two of these are `scm.pull_request.synchronized` at different revisions. That collision is the
- * point: the signal *name* cannot say which push a practice's answer rests on, so the ids below are
- * what the practice rows link through.
+ * `scm.pull_request.synchronized` appears twice at different revisions. That collision is the
+ * point: the name cannot say which push an answer rests on, so practice rows link through the ids.
  */
 export const tracedSignals = [
 	{
@@ -287,7 +281,6 @@ export const artifactTrace = {
 	practices: practiceTraceEntries,
 } satisfies Wire<ArtifactTrace>;
 
-/** Nothing ever reached this artifact: the shape a reader lands on when the answer is "we never saw it". */
 export const untouchedArtifactTrace = {
 	artifactKind: "scm.issue",
 	artifactId: 1430,

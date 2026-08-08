@@ -31,10 +31,8 @@ export interface TracePageProps {
 }
 
 /**
- * One piece of work, everything recorded about it, and every practice's answer — the answered ones
- * and the quiet ones alike. Nothing here collapses behind a "show more": a practice that did
- * nothing is precisely what the reader came to find, so it is on screen by default with its reason
- * next to it.
+ * One piece of work and every practice's answer, the quiet ones included. Nothing collapses behind
+ * a "show more": a practice that did nothing is precisely what the reader came to find.
  */
 export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePageProps) {
 	const query = useQuery({
@@ -79,8 +77,8 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 
 	const trace = query.data;
 	const KindIcon = artifactKindIcon(trace.artifactKind);
-	// The same signal name recurs on every revision, so only the id identifies which occurrence a
-	// practice's answer actually rests on.
+	// The same signal name recurs on every revision, so only the id says which occurrence an answer
+	// rests on.
 	const signalsById = new Map(trace.signals.map((signal) => [signal.id, signal]));
 
 	return (
@@ -138,9 +136,8 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 				) : (
 					<ol className="min-w-0 space-y-0 border-l pl-4">
 						{trace.signals.map((signal) => (
-							// `tabIndex={-1}` is what makes the jump land somewhere: following the fragment moves
-							// focus here, so a screen-reader or keyboard user arrives at the occurrence rather
-							// than being told the page scrolled and left to find it.
+							// `tabIndex={-1}` is what makes the jump land: following the fragment moves focus
+							// here, so a keyboard or screen-reader user arrives at the occurrence itself.
 							<li
 								key={signal.id}
 								id={occurrenceDomId(signal.id)}
@@ -215,8 +212,8 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 													{entry.practiceName}
 												</ItemTitle>
 											</div>
-											{/* Server-rendered and printed verbatim: it is phrased as what would change the
-										    outcome, and re-wording it here is how a screen and a support answer drift. */}
+											{/* Printed verbatim: the server phrases it as what would change the outcome, and
+										    re-wording it here is how a screen and a support answer drift. */}
 											<p className="break-words text-sm text-muted-foreground">
 												{entry.explanation}
 											</p>
@@ -251,9 +248,9 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 														<dt>Rests on</dt>
 														<dd className="min-w-0">
 															{occurrence ? (
-																// The visible words are the occurrence's own label, and the accessible
-																// name only prefixes them, so the spoken name still starts with what a
-																// speech-control user can see and say (WCAG 2.2 SC 2.5.3).
+																// The accessible name contains the visible label verbatim, so a
+																// speech-control user can activate the link by the words they can
+																// see (WCAG 2.2 SC 2.5.3).
 																<a
 																	href={`#${occurrenceDomId(occurrence.id)}`}
 																	className="inline-flex max-w-full items-center gap-1 font-medium text-foreground underline underline-offset-4 hover:no-underline"
@@ -263,8 +260,8 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 																	<ArrowUpIcon className="size-3 shrink-0" aria-hidden />
 																</a>
 															) : (
-																// The id did not resolve to anything in this trace's timeline. The raw
-																// signal name is worse copy than a label but far better than silence.
+																// The id names an occurrence this trace does not carry: the raw signal
+																// name is worse copy than a label and far better than silence.
 																<span className="break-all">{entry.occasionedBy}</span>
 															)}
 														</dd>

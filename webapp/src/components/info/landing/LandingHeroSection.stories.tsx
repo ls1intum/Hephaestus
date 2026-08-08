@@ -2,11 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { LandingHeroSection } from "./LandingHeroSection";
 
-/**
- * Hero section component that introduces Hephaestus with a prominent headline,
- * description, and call-to-action buttons. Its animated preview connects project
- * work, practice feedback, and a conversation with Heph.
- */
 const meta = {
 	component: LandingHeroSection,
 	parameters: {
@@ -47,20 +42,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default hero section for first-time visitors.
- * Features the sign-in CTA and animated practice-feedback preview.
- */
 export const Default: Story = {
 	args: {
 		isSignedIn: false,
 	},
 };
 
-/**
- * Hero section for authenticated users.
- * "Sign in" button is replaced with "Go to dashboard".
- */
 export const SignedIn: Story = {
 	args: {
 		isSignedIn: true,

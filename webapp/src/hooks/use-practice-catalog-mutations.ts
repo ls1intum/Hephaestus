@@ -311,11 +311,10 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
-	// Subscribed, not read out of the cache during render. `getQueryData` is a snapshot with no
-	// subscription behind it, so a catalogue that changed while a move or a delete was in flight left
-	// these buckets — and every reorder control they disable — describing the list as it used to be.
-	// The one caller renders this same query, so this shares its subscription rather than adding a
-	// fetch, and `select` keeps the hook from re-rendering on fields it does not read.
+	// Subscribed rather than read with `getQueryData`, which is a snapshot with no subscription behind
+	// it: a catalogue that changes while a move or a delete is in flight would leave these buckets —
+	// and every reorder control they disable — describing a stale list. The one caller renders this
+	// same query, so this shares its subscription rather than adding a fetch.
 	const { data: practices = [] } = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
 		select: (all) => all.map(({ slug, areaSlug }) => ({ slug, areaSlug })),

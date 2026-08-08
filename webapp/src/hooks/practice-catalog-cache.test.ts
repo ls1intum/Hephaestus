@@ -135,7 +135,7 @@ describe("practice catalog cache updates", () => {
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});
 		// Replacing the occasions can move the practice to a different kind of work, and with it to that
-		// kind's recommended review settings — so the optimistic patch has to carry all three.
+		// kind's recommended review settings — so the optimistic patch carries those too.
 		expect(selectPracticePatch(updated, { bindings: updated.bindings })).toEqual({
 			bindings: updated.bindings,
 			artifactKind: updated.artifactKind,

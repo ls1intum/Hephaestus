@@ -22,5 +22,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The supporting principles without another competing call to action. */
 export const Default: Story = {};

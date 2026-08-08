@@ -57,13 +57,12 @@ interface HarnessProps {
 }
 
 /**
- * Stands in for `PracticeCatalog` and `CuratedCatalogTree`: it applies the moves the tree asks for,
- * which is what makes focus restoration and the badge counts observable at all.
+ * Applies the moves the tree asks for, which is what makes focus restoration and the badge counts
+ * observable at all.
  *
- * <p>Its menu items are `aria-disabled` and still clickable rather than natively `disabled`. That is
- * the a11y-preferred shape for a menu item, and it is also what lets one story ask both halves of the
- * question the tree answers twice over — *is* this destination offered, and does asking for it anyway
- * do nothing.
+ * Its menu items are `aria-disabled` and still clickable rather than natively `disabled` — the
+ * a11y-preferred shape for a menu item, and what lets these stories ask both halves of the question:
+ * *is* the destination offered, and does asking for it anyway do nothing.
  */
 function CatalogTreeHarness({ blocked = [], visible, onPlaceEntry, onReorderAreas }: HarnessProps) {
 	const [rows, setRows] = useState(entries);
@@ -173,8 +172,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const openActions = async (canvas: ReturnType<typeof within>, name: string) => {
-	// A menu left over from a previous step is still on screen for a frame after the click that
-	// dismissed it, and `findByRole("menu")` would hand back that one.
+	// A menu left over from a previous step outlives the click that dismissed it by a frame, and
+	// `findByRole("menu")` would hand back that one.
 	await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
 	await userEvent.click(canvas.getByRole("button", { name: `More actions for ${name}` }));
 	return within(await screen.findByRole("menu"));
@@ -191,9 +190,9 @@ const rowOf = (canvas: ReturnType<typeof within>, name: string) => {
 };
 
 /**
- * A pointer drag from a row's grip to a point on the page, stepping through the sensor's 6px
- * activation distance and waiting on each announcement rather than on a frame count — under a full
- * suite run there is no fixed number of frames that is both enough and not wasteful.
+ * A pointer drag from a row's grip, stepping past the sensor's activation distance and waiting on
+ * each announcement rather than on a frame count — under a full suite run there is no fixed number
+ * of frames that is both enough and not wasteful.
  */
 const dragTo = async (handle: HTMLElement, clientY: number) => {
 	const box = handle.getBoundingClientRect();
@@ -224,12 +223,10 @@ const dragTo = async (handle: HTMLElement, clientY: number) => {
 export const Default: Story = {};
 
 /**
- * A move driven from the row's menu leaves the reader where they were.
- *
- * <p>Moving a row to another area unmounts it from one bucket and mounts it in the other, so the
- * menu's own focus restoration has nothing left to return to and focus falls to the document. Without
- * the tree re-focusing the moved row's trigger, a keyboard reader is dropped at the top of the page
- * after every move (WCAG 2.2 SC 2.4.3).
+ * A move unmounts the row from one bucket and mounts it in the other, so the menu's own focus
+ * restoration has nothing left to return to and focus falls to the document. Without the tree
+ * re-focusing the moved row's trigger, a keyboard reader is dropped at the top of the page after
+ * every move (WCAG 2.2 SC 2.4.3 Focus Order).
  */
 export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
 	play: async ({ args, canvasElement }) => {
@@ -257,8 +254,8 @@ export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 		const blocked = menu.getByRole("menuitem", { name: "Move to Quality" });
 
 		await expect(blocked).toHaveAttribute("aria-disabled", "true");
-		// Unassigned is not in flight, so the row can still go there — this is one blocked area and
-		// not a row that has stopped moving.
+		// Unassigned is not in flight, so the row can still go there: this is one blocked area and not
+		// a row that has stopped moving.
 		await expect(menu.getByRole("menuitem", { name: "Move to Unassigned" })).toHaveAttribute(
 			"aria-disabled",
 			"false",
@@ -270,9 +267,8 @@ export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 };
 
 /**
- * The ends of a list. Both the offer and the move itself have to refuse, because the caller renders
- * the control and may leave it reachable — as this harness does, and as `aria-disabled` menu items
- * generally are.
+ * Both the offer and the move itself have to refuse, because the caller renders the control and may
+ * leave it reachable.
  */
 export const TheEndsOfAnAreaHaveNowhereToGo: Story = {
 	play: async ({ args, canvasElement }) => {
@@ -304,10 +300,8 @@ export const ReorderingInsideAnArea: Story = {
 };
 
 /**
- * The badge counts the area, not the search.
- *
- * <p>A filtered tree hides rows; it does not shrink the areas. "Delivery 3" next to one visible row
- * is what tells the reader the other two are behind their filter rather than gone.
+ * A filtered tree hides rows; it does not shrink the areas. The count beside one visible row is what
+ * tells the reader the rest are behind the filter rather than gone.
  */
 export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 	args: { visible: ["explain-why", "tests-with-changes"] },
@@ -326,11 +320,9 @@ export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 };
 
 /**
- * Picking a row up and putting it back down is not an edit.
- *
- * <p>The keyboard path through drag-and-drop ends in a drop wherever it ends, including on the row's
- * own position — and every drop that reaches the server costs a round trip and a re-render of the
- * whole catalog. Nothing above this tree can tell that drop apart from a real one.
+ * Picking a row up and putting it back down is not an edit. The keyboard path through drag-and-drop
+ * ends in a drop wherever it ends, including on the row's own position, and every drop that reaches
+ * the server costs a round trip and a re-render of the whole catalog.
  */
 export const DroppingARowWhereItAlreadyIsIsNotAMove: Story = {
 	play: async ({ args, canvasElement }) => {

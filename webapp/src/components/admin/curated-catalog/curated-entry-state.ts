@@ -40,9 +40,8 @@ export function curatedEntryCopy(
 				};
 			}
 			return {
-				// The label has to carry the distinction: colour alone left a screen-reader user and a
-				// colour-blind admin unable to tell a wording change from one that alters what the AI
-				// does — the exact decision this screen exists to support (WCAG 2.2 SC 1.4.1).
+				// The label, not just the tone, has to say which kind of update this is: colour alone
+				// cannot carry the distinction (WCAG 2.2 SC 1.4.1).
 				label:
 					status.changeKind === "WORDING"
 						? "Hephaestus update available: wording"
@@ -62,7 +61,7 @@ export function curatedEntryCopy(
 					: `This ${kind} is no longer included with Hephaestus and is excluded from new workspaces. Existing workspaces do not change.`,
 			};
 		// Named rather than defaulted: a state added by the API later must become a type error, not
-		// silently render the most reassuring answer this function can give.
+		// silently render the most reassuring answer.
 		case "FROM_HEPHAESTUS":
 			return {
 				label: "Uses Hephaestus default",

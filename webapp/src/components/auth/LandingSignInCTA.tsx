@@ -9,22 +9,16 @@ import { cn } from "@/lib/utils";
 type ButtonSize = ComponentPropsWithoutRef<typeof Button>["size"];
 
 interface LandingSignInCTAProps {
-	/** Whether the visitor is signed in (renders "Go to dashboard" instead of "Sign in"). */
 	isSignedIn: boolean;
-	/** Start sign-in with a specific provider (used for the single-provider fast path). */
 	onSignIn: (idpHint: string) => void;
-	/** Navigate a signed-in visitor to their workspace. */
 	onGoToDashboard?: () => void;
 	size?: ButtonSize;
 	className?: string;
 }
 
 /**
- * The landing page's single auth call-to-action — one clear action instead of a wall of provider
- * buttons repeated across every section. Signed-in visitors get "Go to dashboard"; signed-out
- * visitors get "Sign in", which goes straight to the provider when only one is configured (the
- * common GitHub-only case) and otherwise opens the focused {@code /login} picker. {@code /login}
- * stays the single place a provider is chosen, so a visitor never picks a provider twice.
+ * One call-to-action instead of a wall of provider buttons repeated across every section: `/login`
+ * stays the single place a provider is chosen, so a visitor never picks one twice.
  */
 export function LandingSignInCTA({
 	isSignedIn,

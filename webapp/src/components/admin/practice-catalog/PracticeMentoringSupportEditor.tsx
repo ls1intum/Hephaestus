@@ -26,9 +26,9 @@ export function mentoringSupportOf(policy: PracticeAutomatedReviewPolicy): Mento
 }
 
 /**
- * Derived from the text, never random: the server digests code and text together, and that digest
- * decides whether a curated update changed review behaviour or only wording. Retyping the same
- * sentence must yield the same code.
+ * Derived from the text, never random: the server digests code and description together, and that
+ * digest decides whether a curated update changed review behaviour. Retyping the same sentence must
+ * yield the same code.
  */
 export function limitationCodeFor(description: string) {
 	const slug = description
@@ -64,11 +64,8 @@ export function practicePolicyErrorTarget(policy: PracticeAutomatedReviewPolicy)
 }
 
 /**
- * What is wrong with the practice-wide review frame, if anything.
- *
- * <p>Evidence is no longer part of it: what a review reads is a property of the occasion that started
- * it, and is checked per binding. What survives here is what holds however the review was occasioned —
- * the level of support, and the claims this kind of evidence can never make.
+ * Only what holds however the review was occasioned: the level of support, and the claims this kind
+ * of evidence can never make. What a review reads belongs to the occasion and is checked per binding.
  */
 export function practicePolicyError(policy: PracticeAutomatedReviewPolicy) {
 	if (policy.automatedReview.mode === "NONE" && policy.knownLimitations.length > 0) {
@@ -102,11 +99,8 @@ export interface PracticeMentoringSupportEditorProps {
 }
 
 /**
- * How far Hephaestus is allowed to go on this practice, and what it can never conclude.
- *
- * <p>Practice-wide on purpose. The occasions below say what each review reads; this says whether a
- * review is attempted at all — an answer that cannot sensibly differ between two occasions of the same
- * habit.
+ * Practice-wide on purpose: the occasions below say what each review reads, while this says whether a
+ * review is attempted at all — an answer that cannot sensibly differ between occasions of one habit.
  */
 export function PracticeMentoringSupportEditor({
 	value,
@@ -286,13 +280,8 @@ export function PracticeMentoringSupportEditor({
 							and even when every requirement passes.
 						</p>
 					</div>
-					{/*
-					 * Under "Human review needed" the first limitation IS the reason, edited above under its
-					 * own label. Listing it again binds one value to two controls with contradictory labels,
-					 * only one of which carries the invalid state.
-					 */}
 					{value.knownLimitations.map((limitation, index) => {
-						// Identity for markup is the row's position; the code is derived from the text and
+						// Identity for markup is the row's position: the code is derived from the text and
 						// would change under the caret on every keystroke.
 						const limitationId = String(index);
 						return (

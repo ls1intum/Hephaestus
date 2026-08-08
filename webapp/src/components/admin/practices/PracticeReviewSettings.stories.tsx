@@ -168,9 +168,8 @@ export const ReviewScopeNarrowed: Story = {
 };
 
 /**
- * The scope lists hold a draft of their own and are the only thing on this screen that does. Adding
- * one entry has to send the *whole* narrowed scope, not just the branch that was typed — sending a
- * patch of one list would silently drop the other and widen reviews to every repository.
+ * Adding one entry has to send the *whole* narrowed scope, not just the branch that was typed:
+ * patching one list would silently drop the other and widen reviews to every repository.
  */
 export const AddingATargetBranch: Story = {
 	args: {
@@ -194,7 +193,7 @@ export const AddingATargetBranch: Story = {
 	},
 };
 
-/** Enter is how a list like this is filled; reaching for the mouse between entries is the slow path. */
+/** Enter is how a list like this is filled, so it must add the entry without using the button. */
 export const EnterAddsTheEntry: Story = {
 	args: { policy: { ...policy, onUpdate: fn() } },
 	play: async ({ args, canvas }) => {
@@ -207,8 +206,8 @@ export const EnterAddsTheEntry: Story = {
 };
 
 /**
- * A repeated entry cannot be added. Saying so has to reach the input itself: the only other sign is
- * the Add button quietly greying out, which announces nothing and explains less.
+ * A repeated entry cannot be added, and saying so has to reach the input itself: the Add button
+ * greying out announces nothing.
  */
 export const RefusingADuplicate: Story = {
 	args: {
@@ -226,8 +225,7 @@ export const RefusingADuplicate: Story = {
 		await expect(input).toHaveAccessibleDescription(/main is already listed\./);
 		await expect(canvas.getByRole("button", { name: "Add to target branches" })).toBeDisabled();
 
-		// Enter is the other way in, and it is refused on the same terms rather than sending a
-		// duplicate the server would have to reject.
+		// Enter is refused on the same terms rather than sending a duplicate the server would reject.
 		await userEvent.type(input, "{Enter}");
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
@@ -277,8 +275,8 @@ export const WideningTheScopeAgain: Story = {
 };
 
 /**
- * The cooldown is the one number on this screen, and it is saved on the way out of the field rather
- * than on every keystroke — so leaving it alone has to be silent, and leaving it changed has to save.
+ * The cooldown is saved on the way out of the field rather than on every keystroke, so leaving it
+ * alone has to be silent and leaving it changed has to save.
  */
 export const ChangingTheTimeBetweenReviews: Story = {
 	args: { policy: { ...policy, onUpdate: fn() } },

@@ -179,7 +179,7 @@ export function AdminLlmConnectionsTable({
 											size="sm"
 											disabled={busy}
 											// No `aria-controls`: the route swaps that region between a spinner, an error
-											// alert and the models section, so the IDREF would dangle for two of the three.
+											// alert and the models section, so the IDREF dangles unless the models are up.
 											aria-expanded={selectedId === connection.id}
 											aria-label={`Manage models for ${connection.displayName}`}
 											onClick={() => onSelect(connection)}

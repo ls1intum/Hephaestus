@@ -109,8 +109,8 @@ describe("PracticeMentoringSupportEditor", () => {
 
 		await user.type(screen.getByLabelText(/Description/), "Runtime behavior not observed");
 
-		// A pure function of the text: identical wording always yields this code, so retyping the same
-		// limitation cannot look like a review-rule change to the policy digest.
+		// A pure function of the text, so retyping the same limitation cannot look like a review-rule
+		// change to the policy digest.
 		expect(screen.getByTestId("code").textContent).toBe("RUNTIME_BEHAVIOR_NOT_OBSERVED");
 	});
 
@@ -163,7 +163,7 @@ describe("PracticeMentoringSupportEditor", () => {
 		expect(
 			practicePolicyError({ ...recommended, knownLimitations: [{ code: "X", description: "a" }] }),
 		).toBe("Limitation identifiers must use 3–64 uppercase letters, numbers, and underscores.");
-		// Evidence is no longer this function's business; it belongs to the occasion that reads it.
+		// Evidence belongs to the occasion that reads it, not to the practice-wide frame.
 		expect(practicePolicyError(recommended)).toBeUndefined();
 	});
 });

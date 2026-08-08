@@ -4,10 +4,9 @@ export interface DetailRowProps {
 }
 
 /**
- * One label/value pair of a detail sheet's `<dl>`. `dt`/`dd` is what associates the two
- * programmatically — a pair of neighbouring spans reads as two unrelated strings to a screen
- * reader — and `min-w-0 break-words` is what wraps unbroken tokens (model ids, user agents)
- * instead of pushing the row past the sheet.
+ * `dt`/`dd` is what associates label and value programmatically — neighbouring spans read as two
+ * unrelated strings to a screen reader — and the value wraps unbroken tokens (model ids, user
+ * agents) instead of pushing the row past the sheet.
  */
 export function DetailRow({ label, children }: DetailRowProps) {
 	return (

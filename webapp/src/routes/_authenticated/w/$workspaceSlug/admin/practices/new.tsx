@@ -56,9 +56,8 @@ function CreatePracticeContainer() {
 		},
 	});
 
-	// Reports the failure by rejecting rather than swallowing it: the form holds its unsaved-changes
-	// guard down from submit until it hears one way or the other, so a caught-and-resolved failure
-	// would leave a lost draft unguarded.
+	// Rejects rather than swallowing the failure: the form holds its unsaved-changes guard down from
+	// submit until it hears one way or the other, so resolving on failure would lose the draft.
 	const handleSubmit = async (data: CreatePracticeRequest, areaSlug: string | null) => {
 		const created = await createPractice.mutateAsync({
 			path: { workspaceSlug },

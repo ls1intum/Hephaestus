@@ -74,9 +74,8 @@ export function AdminLlmModelsSection({
 	return (
 		<div className="space-y-3">
 			<div className="flex items-center justify-between">
-				{/* One level below the page's `h1`. `CardTitle` and this table's own caption are `<div>`
-				    and `<caption>`, so nothing between them contributes to the outline and an `h3` would
-				    skip a level (WCAG SC 1.3.1). Level is independent of the `text-sm` sizing. */}
+				{/* `CardTitle` is a `<div>` and the caption a `<caption>`, so neither contributes to the
+				    outline and an `h3` here would skip a level (WCAG SC 1.3.1) — despite the `text-sm`. */}
 				<h2 className="text-sm font-medium">Models on {connectionDisplayName}</h2>
 				<Button size="sm" variant="outline" onClick={onAdd}>
 					<Plus className="size-4" aria-hidden />
@@ -121,8 +120,8 @@ export function AdminLlmModelsSection({
 							return (
 								<TableRow key={model.id}>
 									<TableCell className="font-medium">{model.displayName}</TableCell>
-									{/* Left-aligned: `priceLabel` is a sentence, not a figure. `tabular-nums` only
-									    lines the digits inside it up down the column. */}
+									{/* Left-aligned: `priceLabel` is a sentence, not a figure; `tabular-nums` only
+									    aligns the digits inside it. */}
 									<TableCell className="tabular-nums">
 										{priceLabel(priceFieldsOf(model), "instance")}
 									</TableCell>

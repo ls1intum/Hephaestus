@@ -4,7 +4,6 @@ import type {
 	PracticeEvidenceSourceOption,
 } from "@/api/types.gen";
 
-/** Every reason a review can record for skipping a practice, closed by the generated schema. */
 type PracticeEvidenceReason = PracticeEvidenceOutcome["blockersObserved"][number]["reasonCode"];
 
 export function evidenceSourceLabel(
@@ -16,10 +15,7 @@ export function evidenceSourceLabel(
 	);
 }
 
-/**
- * What requiring this source demands of its capture. The source contract answers it, not the
- * practice: how completely a source can be captured is a property of the source.
- */
+/** The source contract answers this, not the practice: completeness is a property of the source. */
 export function evidenceQualityLabel(
 	quality: PracticeEvidenceSourceOption["requiredQuality"] | undefined,
 ) {
@@ -58,8 +54,8 @@ export function automatedReviewUnavailableLabel(
 }
 
 /**
- * The label a list row needs, or null when the practice behaves the way every other one does.
- * AI-supported mentoring is the norm, so badging it says nothing and hides the two answers that do.
+ * Null where the practice behaves the way every other one does: AI-supported mentoring is the norm,
+ * so badging it says nothing and buries the answers that do carry information.
  */
 export function automatedReviewLimitationLabel(
 	automatedReview: PracticeAutomatedReviewPolicy["automatedReview"],
@@ -71,7 +67,7 @@ export function automatedReviewLimitationLabel(
 	return null;
 }
 
-/** The full label for a detail view, where the reader is asking what this practice does. */
+/** The detail-view label, where naming the norm is an answer rather than noise. */
 export function mentoringSupportLabel(
 	automatedReview: PracticeAutomatedReviewPolicy["automatedReview"],
 ) {
@@ -79,8 +75,6 @@ export function mentoringSupportLabel(
 }
 
 /**
- * A readiness reason, read back as the thing an author would change.
- *
  * Keyed on the generated union, so a reason added server-side fails the build here rather than
  * reaching an admin as a raw constant name.
  */

@@ -407,9 +407,9 @@ function CatalogFilters({
 				</SelectContent>
 			</Select>
 			{/*
-			 * toolbar, not the default group: ToggleGroup emits aria-orientation, which ARIA permits on
-			 * toolbar but not on group, and these toggle buttons already carry roving arrow-key focus.
-			 * radiogroup would be worse — the items are aria-pressed buttons, not radios.
+			 * toolbar, not the default group: ToggleGroup emits aria-orientation, which ARIA allows on
+			 * toolbar but not on group, and these buttons already have the roving arrow-key focus a
+			 * toolbar implies. radiogroup would be worse — the items are aria-pressed, not radios.
 			 */}
 			<ToggleGroup
 				role="toolbar"
@@ -437,7 +437,6 @@ function CatalogFilters({
 				onValueChange={(value) =>
 					onSearchChange({
 						...search,
-						// The search schema validates the kind, so only one this build knows may reach the URL.
 						artifact: value === "ALL" || !isKnownArtifactKind(value) ? undefined : value,
 					})
 				}

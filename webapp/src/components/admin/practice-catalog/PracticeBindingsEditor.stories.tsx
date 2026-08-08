@@ -29,7 +29,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** What a new practice starts as: one occasion, on the moments work arrives to look at. */
 export const OneOccasion: Story = {
 	play: async ({ canvas }) => {
 		// Nothing to remove when there is only one: a practice with no occasion cannot be saved.
@@ -38,9 +37,8 @@ export const OneOccasion: Story = {
 };
 
 /**
- * The shape the refactor exists to express. The same habit, reviewed twice: once as the work arrives,
- * and once at the merge — where reading the review threads whole is what licenses the review to say
- * nobody ever resolved one.
+ * One habit reviewed twice: as the work arrives, and at the merge — where reading the review threads
+ * whole is what licenses the review to say nobody ever resolved one.
  */
 export const TwoOccasionsReadingDifferentThings: Story = {
 	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
@@ -60,8 +58,8 @@ export const TwoOccasionsReadingDifferentThings: Story = {
 };
 
 /**
- * A moment belongs to one occasion. The server rejects a signal bound twice, and the refusal would
- * otherwise arrive as a failed save with nothing on screen explaining it.
+ * The server rejects a signal bound twice, and the refusal would otherwise arrive as a failed save
+ * with nothing on screen explaining it.
  */
 export const AMomentBelongsToOneOccasion: Story = {
 	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
@@ -97,7 +95,7 @@ export const IssuesHaveNoDrafts: Story = {
 	},
 };
 
-/** Pull requests do, and it is per occasion rather than a switch across the whole fleet. */
+/** Drafts are answered per occasion, not by one switch for the practice. */
 export const DraftsAreAPropertyOfTheOccasion: Story = {
 	args: {
 		bindings: [{ ...mockPullRequestBinding, onDrafts: true }, mockMergeBinding],
@@ -120,7 +118,7 @@ export const GuidanceOnly: Story = {
 	},
 };
 
-/** How the requirements have actually fared, shown once for the practice rather than per occasion. */
+/** Recent outcomes are shown once for the practice rather than per occasion. */
 export const WithRecentOutcomes: Story = {
 	args: {
 		outcome: {
@@ -145,9 +143,8 @@ export const WithRecentOutcomes: Story = {
 };
 
 /**
- * A submit sends focus to the control that has to change. The message has to travel with it: on its
- * own it is text somewhere else on a long form, and an author who lands in the group hears its name
- * and nothing about what is wrong.
+ * A submit sends focus to the control that has to change, and the message has to travel with it: on
+ * its own it is text somewhere else on a long form.
  */
 export const Invalid: Story = {
 	args: {
@@ -182,10 +179,7 @@ export const NoOccasionAtAll: Story = {
 	},
 };
 
-/**
- * The write path, which nothing exercised: adding an occasion, choosing a moment for it, and removing
- * it again. Each reports the whole list back, because the editor holds no state of its own.
- */
+/** Every edit reports the whole list back, because the editor holds no state of its own. */
 export const AddingAnOccasion: Story = {
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Add occasion" }));
@@ -204,8 +198,7 @@ export const ChoosingAMoment: Story = {
 		const group = within(canvas.getByRole("group", { name: "Starts a review when, occasion 1" }));
 		await userEvent.click(group.getByRole("checkbox", { name: "Review submitted" }));
 
-		// Sorted on the way out, the way the server stores it: unsorted, reloading an untouched
-		// practice and saving nothing would come back looking edited.
+		// Sorted on the way out, so an untouched practice does not come back looking edited.
 		await expect(args.onChange).toHaveBeenCalledWith([
 			{
 				signals: [

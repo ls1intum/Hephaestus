@@ -93,7 +93,6 @@ export function BudgetExhaustedAlert({
 	);
 }
 
-/** "1 run on your models has" / "3 shared-model runs have" / "Some runs on your models have". */
 function unpricedRunsSubject(scope: CapScope, count: number | undefined): string {
 	const own = scope === "own";
 	if (count === 1) {

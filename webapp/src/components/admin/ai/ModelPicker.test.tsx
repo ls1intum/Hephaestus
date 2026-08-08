@@ -41,9 +41,8 @@ describe("ModelPicker", () => {
 		screen.getByText("Your models");
 	});
 
-	// The names are written out rather than interpolated through `priceLabel`, which is the helper the
-	// component itself calls: a composed expectation catches "the price is gone" and never "the price
-	// is wrong".
+	// Names written out rather than composed through `priceLabel`, the helper the component itself
+	// calls: a composed expectation catches "the price is gone" and never "the price is wrong".
 	it("keeps the price in each option's accessible name", () => {
 		render(<ModelPicker availableModels={models} value={null} onChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole("combobox"));

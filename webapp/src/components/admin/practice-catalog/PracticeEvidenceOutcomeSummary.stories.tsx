@@ -39,7 +39,7 @@ export const RequirementsThatKeepSkipping: Story = {
 };
 
 /**
- * Reasons are counted per source, so a review blocked on two of them appears twice. The rows can
+ * Reasons are counted per source, so a review blocked on several appears once for each. The rows can
  * therefore total more than the skipped count, and the copy above them never claims otherwise.
  */
 export const ReasonsCanOutnumberTheSkips: Story = {

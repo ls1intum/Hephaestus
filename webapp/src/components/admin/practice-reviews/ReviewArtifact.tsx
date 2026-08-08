@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 
 export type ReviewArtifactDisplay = ReviewArtifactData | ReviewRunTarget;
 /**
- * URL-facing spelling of a kind. The wire id carries a dot, which reads badly in a path segment, so
- * the routes keep their own short slug and this map is the only place the two meet.
+ * URL-facing spelling of a kind: the wire id carries a dot, which reads badly in a path segment, so
+ * the routes keep their own short slug and this map is where the two meet.
  */
 const ARTIFACT_KIND_SLUGS = {
 	[ARTIFACT_KIND.pullRequest]: "pull-request",

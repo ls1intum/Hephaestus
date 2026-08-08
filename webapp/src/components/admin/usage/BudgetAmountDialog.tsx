@@ -37,9 +37,8 @@ export interface BudgetAmountDialogProps {
 }
 
 /**
- * The money-cap editor shared by `SetBudgetDialog` and `SetOwnProviderBudgetDialog`. Both edit the
- * same value under the same rules — USD, >= 0, cent precision, `null` removes, `0` pauses
- * immediately — so the wrappers supply only the copy.
+ * The money-cap editor both budget dialogs share: one set of rules — USD, >= 0, cent precision,
+ * `null` removes, `0` pauses immediately — so the wrappers supply only the copy.
  */
 export function BudgetAmountDialog({
 	open,
@@ -49,7 +48,7 @@ export function BudgetAmountDialog({
 }: BudgetAmountDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			{/* Keyed on what the form seeds from, so the input cannot carry the previous subject's amount. */}
+			{/* Keyed on the amount the form seeds from, so the input never carries a stale value. */}
 			{open && (
 				<BudgetAmountDialogContent
 					key={contentProps.currentValueUsd ?? "none"}
@@ -121,7 +120,7 @@ function BudgetAmountDialogContent({
 					<DialogTitle>{title}</DialogTitle>
 					<DialogDescription>{description}</DialogDescription>
 				</DialogHeader>
-				{/* Short in portrait, but header plus three stacked buttons exceed a phone in landscape. */}
+				{/* The footer stacks on a narrow viewport, so the body scrolls rather than the dialog. */}
 				<DialogBody className="py-1">
 					<FieldGroup>
 						<Field data-invalid={isInvalid}>

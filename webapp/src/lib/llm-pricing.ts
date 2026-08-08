@@ -20,9 +20,8 @@ export function priceFieldsOf(model: Pick<LlmModel, "currentPrice">): PriceField
 }
 
 /**
- * The only place the price wording lives. Never render the words "Priced" / "Unpriced" /
- * "Unverifiable": a price always shows as the number itself, and the absence of one reads
- * differently depending on who is looking.
+ * The `PricingMode` names are never rendered: a price shows as the number itself, and a missing one
+ * reads differently to an instance operator than to a workspace admin.
  */
 export function priceLabel(model: PriceFields, audience: LlmAudience): string {
 	if (model.pricingMode === "NO_CHARGE") {

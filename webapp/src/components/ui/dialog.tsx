@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 /**
  * ⚠️ Diverges from the shadcn registry — `shadcn add dialog` drops the following; re-apply them.
  *
- * 1. `DialogContent` is height-bound and scrollable. Upstream's popup is `fixed` with no
+ * 1. `DialogContent` is height-bound and scrollable: upstream's popup is `fixed` with no
  *    `max-height`, and a fixed element taller than the viewport cannot be scrolled back into view
  *    (WCAG 2.2 SC 1.4.10).
- * 2. `DialogBody` — an opt-in scrollable middle, with header and footer pinned around it.
- * 3. `DialogForm` — a `display: contents` form wrapper, so a submitting footer costs no layout box.
+ * 2. `DialogBody`, the opt-in scrollable middle.
+ * 3. `DialogForm`, the `display: contents` form wrapper.
  */
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
 	return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -94,9 +94,9 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 /**
- * The scrollable middle of a tall dialog; its presence switches {@link DialogContent} to
- * "only the body scrolls". `min-h-0` is load-bearing — a flex item's automatic minimum size is its
- * content, so without it the body refuses to shrink and the popup overflows again.
+ * The scrollable middle of a tall dialog; its presence switches {@link DialogContent} to "only the
+ * body scrolls". `min-h-0` is load-bearing — a flex item's automatic minimum size is its content,
+ * so without it the body refuses to shrink and the popup overflows again.
  */
 function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
 	return (
@@ -110,9 +110,8 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
 
 /**
  * `display: contents` keeps header, body and footer as {@link DialogContent}'s own flex children; a
- * form with a box of its own would defeat the pinned-header/scrolling-body column.
- *
- * `noValidate` because these forms report their own errors: the browser's bubble announces nothing.
+ * form with a box of its own would defeat the pinned-header/scrolling-body column. `noValidate`
+ * because these forms report their own errors: the browser's bubble announces nothing.
  */
 function DialogForm({ className, ...props }: React.ComponentProps<"form">) {
 	return <form className={cn("contents", className)} noValidate {...props} />;

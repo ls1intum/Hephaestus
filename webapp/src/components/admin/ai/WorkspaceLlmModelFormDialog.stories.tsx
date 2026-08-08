@@ -49,11 +49,7 @@ export const FreeModel: Story = {
 	args: { editing: { ...mockModel, pricingMode: "NO_CHARGE", priceNote: "self-hosted, no cost" } },
 };
 
-/**
- * WCAG 2.2 SC 1.4.10 at 320 px: this form outgrows the viewport, and `DialogBody` bounding the
- * height is all that keeps a `position: fixed` popup from hanging off both ends with its title and
- * submit out of reach.
- */
+/** WCAG 2.2 SC 1.4.10 at 320 px: `DialogBody`'s height bound is all that keeps the popup on screen. */
 export const MobileReflow: Story = {
 	args: { editing: mockModel },
 	parameters: {

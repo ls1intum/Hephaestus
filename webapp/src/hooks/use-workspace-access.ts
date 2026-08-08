@@ -26,8 +26,8 @@ export function useWorkspaceAccess() {
 		selectWorkspace,
 		role,
 		isAdmin: hasMinimumWorkspaceRole(role, "ADMIN"),
-		// The account's SCM identity for THIS workspace's provider — its GitHub user in a GitHub
-		// workspace, its GitLab user in a GitLab one. Prefer these over the global `username`.
+		// The account's SCM identity for THIS workspace's provider, so prefer these over the global
+		// `username` on the current user.
 		userLogin: membershipQuery.data?.userLogin,
 		userName: membershipQuery.data?.userName,
 		isLoading: workspacesLoading || membershipQuery.isLoading,

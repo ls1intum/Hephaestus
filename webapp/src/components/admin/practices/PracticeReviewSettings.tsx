@@ -396,10 +396,9 @@ function ProjectReviewRulesCard({ policy }: Pick<PracticeReviewSettingsProps, "p
 /**
  * Which of a workspace's work is reviewed at all.
  *
- * <p>Two independent lists, both exact matches and both empty by default, because empty has to mean
- * "everything": a workspace that has never expressed an opinion must not silently review nothing. There
- * are no wildcards — a pattern language here would be a promise the gate cannot keep, since it holds the
- * pull request row and not the diff.
+ * Empty means "everything": a workspace that has never expressed an opinion must not silently review
+ * nothing. Matches are exact — a wildcard language here would be a promise the gate cannot keep,
+ * since it holds the pull request row and not the diff.
  */
 function ReviewScopeCard({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
 	const scope = policy.settings.reviewScope;
@@ -448,9 +447,8 @@ function ReviewScopeCard({ policy }: Pick<PracticeReviewSettingsProps, "policy">
 						disabled={policy.isSaving}
 						onClick={() => policy.onReset("REVIEW_SCOPE")}
 					>
-						{/* The words on the button open its accessible name rather than being replaced by an
-						    `aria-label`, so someone driving this by voice can say what they can read and have
-						    it activate (WCAG 2.2 SC 2.5.3). The rest only says which card it belongs to. */}
+						{/* The visible words open the accessible name rather than being replaced by an
+						    `aria-label`, so a voice-control user can say what they read (WCAG 2.2 SC 2.5.3). */}
 						Review everything again
 						<span className="sr-only"> — use the default for Review scope</span>
 					</Button>
@@ -518,15 +516,14 @@ function ScopeList({
 					disabled={disabled || trimmed.length === 0 || duplicate}
 					onClick={add}
 				>
-					{/* Two lists, so two buttons that would otherwise both answer to "Add". The visible word
-					    still opens the name, which is what a voice-control user says. */}
+					{/* Two lists, so two buttons that would otherwise both answer to "Add"; the visible word
+					    still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
 					Add
 					<span className="sr-only"> to {label.toLowerCase()}</span>
 				</Button>
 			</div>
-			{/* The live region is on screen before it has anything to say. Inserting it together with its
-			    message is not reliably announced, and the only other sign that Add stopped working is the
-			    button quietly greying out — which nothing announces at all. */}
+			{/* The live region is mounted empty: a region inserted together with its message is not
+			    reliably announced, and the only other sign of a duplicate is Add greying out. */}
 			<div aria-live="polite" aria-atomic="true">
 				{duplicate ? (
 					<p id={errorId} className="font-normal text-destructive text-sm">

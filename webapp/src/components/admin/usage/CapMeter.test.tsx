@@ -2,11 +2,8 @@ import { describe, expect, it } from "vitest";
 import { capState } from "./CapMeter";
 
 /**
- * Both consoles read this, and its threshold also raises the pace warning and turns the bar amber.
- *
- * <p>The percentages are written out rather than derived from `BUDGET_WARN_PERCENT`, so that moving
- * the constant is a decision this file has to be shown and agree to. Rows spelled
- * `BUDGET_WARN_PERCENT - 1` restate the implementation and stay green for any threshold at all.
+ * The percentages are written out rather than derived from `BUDGET_WARN_PERCENT`: a row spelled
+ * `BUDGET_WARN_PERCENT - 1` restates the implementation and stays green for any threshold at all.
  */
 describe("capState", () => {
 	it.each<[string, number | undefined, boolean, boolean, "paused" | "near" | null]>([

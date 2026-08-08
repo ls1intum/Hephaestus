@@ -34,16 +34,14 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	reviewScope: { targetBranches: [], repositories: [] },
 	deliverToMerged: false,
 	runForAllUsers: true,
-	// Mix of explicit overrides (Reset to default) and inherited / undefined (Inherited from default).
 	cooldownMinutesOverride: 30,
 	deliverToMergedOverride: undefined,
 	runForAllUsersOverride: undefined,
 };
 
 /**
- * A run that is waiting on the clock has to be minutes from now or its "due …" phrase reads as
- * history, so the two waiting fixtures are anchored to load time. Every other fixture keeps the
- * fixed 2026-05-20 scene, where `availableAt` is a claim time already past.
+ * A run waiting on the clock has to be minutes from *now* or its "due …" phrase reads as history, so
+ * those fixtures are anchored to load time rather than to the otherwise fixed 2026-05-20 scene.
  */
 const MINUTE_MS = 60_000;
 const pullRequestTarget: AgentJob["target"] = {
@@ -73,7 +71,6 @@ export const mockJobCompleted: AgentJob = {
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T10:00:00Z"),
-	// Claimable the instant it was submitted, and claimed five minutes before it finished.
 	availableAt: new Date("2026-05-20T10:00:00Z"),
 	completedAt: new Date("2026-05-20T10:05:00Z"),
 	deliveryStatus: "DELIVERED",
@@ -95,7 +92,6 @@ export const mockJobRunning: AgentJob = {
 	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T11:58:00Z"),
-	// A worker has already claimed it, so its eligibility instant is behind it.
 	availableAt: new Date("2026-05-20T11:58:00Z"),
 	retryCount: 0,
 };
@@ -109,7 +105,6 @@ export const mockJobFailedDelivery: AgentJob = {
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T09:00:00Z"),
-	// One execution retry, so a backoff pushed it out two minutes before it ran and completed.
 	availableAt: new Date("2026-05-20T09:02:00Z"),
 	completedAt: new Date("2026-05-20T09:05:00Z"),
 	deliveryStatus: "FAILED",
@@ -130,12 +125,10 @@ export const mockJobQueued: AgentJob = {
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T12:00:00Z"),
-	// Eligible since it was submitted: this one is waiting for a free worker, not for the clock.
 	availableAt: new Date("2026-05-20T12:00:00Z"),
 	retryCount: 0,
 };
 
-/** Queued and parked on the monthly AI cap — the case the runs table has to tell apart from above. */
 export const mockJobHeldOnBudget: AgentJob = {
 	id: "job-held-budget-1",
 	jobType: "PULL_REQUEST_REVIEW",
@@ -165,7 +158,6 @@ export const mockJobHeldForUnknownReason: AgentJob = {
 	retryCount: 0,
 };
 
-/** Queued with no hold: it crashed, and the ordinary retry backoff has pushed it into the future. */
 export const mockJobBackingOff: AgentJob = {
 	id: "job-backoff-1",
 	jobType: "PULL_REQUEST_REVIEW",
@@ -189,7 +181,6 @@ export const mockJobTimedOut: AgentJob = {
 	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T08:00:00Z"),
-	// One execution retry backed it off three minutes; it then ran for twenty and was killed.
 	availableAt: new Date("2026-05-20T08:03:00Z"),
 	completedAt: new Date("2026-05-20T08:20:00Z"),
 	errorMessage: "Agent exceeded the 1200s timeout and was terminated.",

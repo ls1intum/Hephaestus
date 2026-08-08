@@ -75,8 +75,8 @@ export const CompletedWithMixedOutput: Story = {
 };
 
 /**
- * A run that skipped automated review for insufficient evidence completes successfully and produces
- * no findings, exactly like a review that assessed the work and found none. The empty state must
+ * A run that skipped automated review for insufficient evidence completes successfully with no
+ * findings, exactly like a review that assessed the work and found none: the empty state must
  * distinguish the two.
  */
 export const DeclinedForInsufficientEvidence: Story = {
@@ -96,8 +96,8 @@ export const DeclinedForInsufficientEvidence: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// findAllByText resolves on the first match, so asserting a count on it races the second
-		// panel's render. Wait for both.
+		// `findAllByText` resolves on the first match, so asserting a count on it races the second
+		// panel's render.
 		await waitFor(async () =>
 			expect(await canvas.findAllByText("Nothing was assessed")).toHaveLength(2),
 		);

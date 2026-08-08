@@ -35,11 +35,7 @@ describe("review activity routes", () => {
 		await screen.findByRole("link", { name: /Member-facing review activity/ }, ROUTE_RENDER_WAIT);
 	});
 
-	/**
-	 * The page links are built with `search={(previous) => ({ ...previous, page })}`, so what keeps a
-	 * filter alive across a page turn is the router's own search state rather than anything the list
-	 * holds. Turning to page 2 of "issues only" must stay issues only.
-	 */
+	/** Page 2 of "issues only" stays issues only: the filter lives in the router's search state. */
 	it("keeps the work-type filter when the reader turns the page", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/trace", () =>
@@ -63,7 +59,7 @@ describe("review activity routes", () => {
 	it("carries a dotted artifact kind through the URL into the detail view", async () => {
 		renderRouteAt("/w/acme/reviews/scm.pull_request/1423");
 
-		// The quiet practices are the point of the page, so one is asserted rather than the loud one.
+		// A dormant practice is asserted, not a delivering one: showing the quiet ones is the point.
 		await screen.findByText("Discussion hygiene", undefined, ROUTE_RENDER_WAIT);
 		expect(screen.getByText("Waiting on a connection")).toBeTruthy();
 	});

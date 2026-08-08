@@ -37,7 +37,6 @@ export const Default: Story = {
 			await canvas.findByText(`${tracedArtifacts.length} pieces of work.`),
 		).toBeVisible();
 		await expect(canvas.getByRole("link", { name: /Member-facing review activity/ })).toBeVisible();
-		// Both halves of the signal summary are on screen: what we saw, and how much we reviewed.
 		await expect(canvas.getByText("6 signals · 2 reviewed")).toBeVisible();
 	},
 };
@@ -58,10 +57,7 @@ export const UnlinkableArtifact: Story = {
 	},
 };
 
-/**
- * The empty state has to be true and useful: nothing recorded is a fact about the connection, not a
- * fact about the reader's work.
- */
+/** Nothing recorded is a fact about the connection, not a fact about the reader's work. */
 export const NothingRecorded: Story = {
 	parameters: {
 		msw: { handlers: [http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage([])))] },
@@ -73,10 +69,7 @@ export const NothingRecorded: Story = {
 	},
 };
 
-/**
- * A filter that arrives by link has to be visible and clearable even for a kind this build has never
- * heard of, so the picker's choices are its own three plus whatever the page and the URL name.
- */
+/** A filter that arrives by link stays visible in the picker, and clearable. */
 export const FilteredToOneKind: Story = {
 	args: { search: { kind: "scm.issue" }, onSearchChange: fn() },
 	parameters: {
@@ -96,8 +89,8 @@ export const FilteredToOneKind: Story = {
 };
 
 /**
- * "Everything" needs a value of its own because Base UI reads "" as no selection at all, and that
- * value must not escape into the URL — a `kind=__all` link filters for a kind nothing ever has.
+ * "Everything" needs a value of its own (Base UI reads "" as no selection), and that value must not
+ * escape into the URL — a `kind=__all` link filters for a kind nothing ever has.
  */
 export const ClearingTheFilterFromThePicker: Story = {
 	args: { search: { kind: "scm.issue", page: 3 }, onSearchChange: fn() },
@@ -106,7 +99,7 @@ export const ClearingTheFilterFromThePicker: Story = {
 		await userEvent.click(await canvas.findByRole("combobox", { name: "Show" }));
 		await userEvent.click(await within(document.body).findByRole("option", { name: "All work" }));
 
-		// The page number goes with it: page 4 of an unfiltered list is not where the reader was.
+		// The page number goes with it: a page of the filtered list is not a page of the unfiltered one.
 		await expect(args.onSearchChange).toHaveBeenCalledWith({ kind: undefined, page: undefined });
 	},
 };

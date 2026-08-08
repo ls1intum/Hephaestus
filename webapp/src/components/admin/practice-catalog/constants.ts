@@ -1,6 +1,5 @@
 import { ARTIFACT_KIND, type ArtifactKindId, artifactKindPluralLabel } from "@/lib/artifact-kinds";
 
-/** What a practice is authored against, as the server names it. */
 export type WorkArtifact = ArtifactKindId;
 
 const WORK_ARTIFACT_HINTS: Record<string, string> = {
@@ -9,10 +8,7 @@ const WORK_ARTIFACT_HINTS: Record<string, string> = {
 	[ARTIFACT_KIND.conversationThread]: "Reviews messages in a conversation thread",
 };
 
-/**
- * One line explaining what reviewing this kind of work means, or nothing for a kind this build has
- * never heard of — which is offered anyway, under its own name, rather than hidden.
- */
+/** Undefined for a kind this build has never heard of, which is still offered under its own name. */
 export function workArtifactHint(kind: string): string | undefined {
 	return WORK_ARTIFACT_HINTS[kind];
 }

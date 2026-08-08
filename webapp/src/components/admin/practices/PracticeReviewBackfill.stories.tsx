@@ -7,8 +7,8 @@ import { PracticeReviewBackfill } from "./PracticeReviewBackfill";
 
 /**
  * The run as it reaches the component: ISO strings, because no response transformer revives them.
- * Building this from `new Date(…)` is what let a screen that calls `.toLocaleDateString()` on a
- * string ship green, so the one cast below is the whole point of this factory.
+ * A fixture built from `new Date(…)` would let a screen that calls `.toLocaleDateString()` on a
+ * string pass here and break in the browser.
  */
 const run = (overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRun =>
 	({
@@ -58,7 +58,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Nothing has ever been backfilled: the range picker, and an explicit promise that it costs nothing. */
 export const ChooseARange: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
@@ -67,8 +66,8 @@ export const ChooseARange: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/nothing is reviewed until you confirm/i)).toBeInTheDocument();
-		// Both pickers say what is chosen in the reader's words. A closed Base UI trigger falls back to
-		// printing the raw value, and "scm.pull_request" over "30" is not a decision anyone can check.
+		// A closed Base UI trigger falls back to printing the raw value, and "scm.pull_request" is not
+		// a decision anyone can check.
 		await expect(canvas.getByRole("combobox", { name: /Kind of work/ })).toHaveTextContent(
 			"Pull or merge requests",
 		);
@@ -79,7 +78,6 @@ export const ChooseARange: Story = {
 	},
 };
 
-/** The decision point: how much work, how much money, and what a backfill will and will not do. */
 export const AwaitingConfirmation: Story = {
 	args: { runs: [run()] },
 	play: async ({ canvasElement }) => {
@@ -93,8 +91,8 @@ export const AwaitingConfirmation: Story = {
 };
 
 /**
- * A fresh workspace has no priced reviews to forecast from. The cost must read as unknown — a $0.00
- * here would invite exactly the unconsidered spend this screen exists to prevent.
+ * A fresh workspace has no priced reviews to forecast from, so the cost must read as unknown — a
+ * $0.00 here would invite exactly the unconsidered spend this screen exists to prevent.
  */
 export const CostUnknown: Story = {
 	args: { runs: [run({ estimatedCostUsd: undefined })] },
@@ -121,9 +119,8 @@ export const Running: Story = {
 };
 
 /**
- * An artifact the campaign could not read is not one it measured and found nothing in. Folding the
- * two together would leave a baseline in which "not reviewed" and "reviewed, nothing found" are the
- * same absence, which is the one thing a baseline may not do.
+ * An artifact the campaign could not read is not one it measured and found nothing in; folding the
+ * two together would leave a baseline in which the two absences are indistinguishable.
  */
 export const SomeCouldNotBeRead: Story = {
 	args: {
@@ -144,7 +141,7 @@ export const SomeCouldNotBeRead: Story = {
 	},
 };
 
-/** The pause has to read as "still owed", never as "skipped" — that distinction is the whole design. */
+/** The pause has to read as "still owed", never as "skipped". */
 export const PausedOnBudget: Story = {
 	args: {
 		runs: [

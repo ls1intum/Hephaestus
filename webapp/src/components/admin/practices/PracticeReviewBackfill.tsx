@@ -40,17 +40,13 @@ export interface PracticeReviewBackfillProps {
 }
 
 /**
- * The kinds a backfill can walk. Not every artifact kind qualifies — a backfill re-reads work as it
- * stands today, which only makes sense where the work is still there to be re-read — so this is a
- * chosen subset of {@link ARTIFACT_KIND} rather than every kind the instance knows. The words for
- * each kind come from the shared vocabulary, so a workspace on GitLab is not told about "pull
- * requests" here while every other screen calls them merge requests.
+ * A chosen subset of {@link ARTIFACT_KIND}, not every kind the instance knows: a backfill re-reads
+ * work as it stands today, which only makes sense where the work is still there to be re-read.
  */
 const WORK_KINDS = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue] as const;
 
-// `items` is what lets the closed trigger show a choice's words. Without it Base UI has nothing to
-// resolve the selected value against and prints the value itself — "scm.pull_request", not "Pull or
-// merge requests".
+// Without `items`, Base UI has nothing to resolve the selected value against and a closed trigger
+// prints the value itself — "scm.pull_request", not "Pull or merge requests".
 const WORK_KIND_ITEMS = WORK_KINDS.map((kind) => ({
 	value: kind as string,
 	label: artifactKindPluralLabel(kind),
@@ -79,7 +75,7 @@ const nounFor = (artifactKind: string) => artifactKindLabel(artifactKind).toLowe
 const countOf = (count: number, artifactKind: string) =>
 	`${count} ${(count === 1 ? artifactKindLabel(artifactKind) : artifactKindPluralLabel(artifactKind)).toLowerCase()}`;
 
-// `fromAt`/`toAt` are typed `Date` and arrive as ISO strings, so they are read through `asDate`.
+// `fromAt`/`toAt` are typed `Date` but arrive as ISO strings.
 const formatWindow = (run: ReviewBackfillRun) => {
 	const from = asDate(run.fromAt);
 	const to = asDate(run.toAt);
@@ -88,12 +84,9 @@ const formatWindow = (run: ReviewBackfillRun) => {
 };
 
 /**
- * Reviewing work that already existed, as a decision rather than a switch.
- *
- * <p>The screen is deliberately two steps. Choosing a range only produces an estimate; a second,
- * explicitly-worded confirmation is what starts spending. A backfill is the one action here that can
- * consume a workspace's whole monthly AI budget from a single click, so the count and the cost are on
- * screen before anything is submitted.
+ * Two steps on purpose: choosing a range only produces an estimate, and a second, explicitly-worded
+ * confirmation is what starts spending. A backfill can consume a workspace's whole monthly budget
+ * from a single click, so the count and the cost are on screen before anything is submitted.
  */
 export function PracticeReviewBackfill({
 	runs,
@@ -246,9 +239,8 @@ function ConfirmationCard({
 }) {
 	const noun = nounFor(run.artifactKind);
 	const plural = artifactKindPluralLabel(run.artifactKind).toLowerCase();
-	// `formatCostUsd` renders a fraction of a cent as "<$0.01" rather than rounding it to "$0.00";
-	// this is the one screen where a rounded-to-nothing forecast would invite the unconsidered spend
-	// it exists to prevent. An absent estimate is a different statement and keeps its own copy.
+	// An estimate that is missing is not an estimate of nothing, so it stays `undefined` and gets its
+	// own copy rather than a formatted zero.
 	const cost = run.estimatedCostUsd === undefined ? undefined : formatCostUsd(run.estimatedCostUsd);
 	const nothingToDo = run.estimatedArtifacts === 0;
 

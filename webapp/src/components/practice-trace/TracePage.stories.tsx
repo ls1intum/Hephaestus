@@ -26,10 +26,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The visual spec: every outcome the API can report, each with its own reason, none of them hidden
- * behind a toggle. The quiet rows are the ones the reader came for.
- */
+/** Every outcome the API can report, each with its own reason, none of them behind a toggle. */
 export const EveryOutcome: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -41,15 +38,13 @@ export const EveryOutcome: Story = {
 		await expect(
 			canvas.getByText("Measured, kept quiet by the practice's loudness tier"),
 		).toBeVisible();
-		// Two of the ten practices were reviewed, and the other eight say why they were not.
 		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
 	},
 };
 
 /**
- * Two of the occurrences are the same signal name at different revisions. The proof that a practice
- * row now points at a specific *occurrence* rather than at a name: two rows say "New commits pushed"
- * and go to different places, and following one lands focus on the entry it names.
+ * Two occurrences share one signal name at different revisions: a practice row has to point at the
+ * occurrence, not at the name.
  */
 export const SameSignalTwice: Story = {
 	play: async ({ canvasElement }) => {
@@ -61,16 +56,13 @@ export const SameSignalTwice: Story = {
 			if (!(row instanceof HTMLElement)) throw new Error(`No row for ${practiceName}`);
 			return within(row).getByRole("link", { name: "Jump to: New commits pushed" });
 		};
-		// Same visible label on both rows — the signal name never could tell them apart — and yet the
-		// two links go to different occurrences.
 		const skipped = jumpFrom("Small, reviewable changes");
 		const lapsed = jumpFrom("Drafts are not left open");
 		await expect(skipped).toHaveAttribute("href", "#occurrence-sig-sync-9ab3c410");
 		await expect(lapsed).toHaveAttribute("href", "#occurrence-sig-sync-b71d0a52");
 
-		// The click itself is the browser's job (fragment navigation focuses a focusable target), and
-		// exercising it here would navigate the test runner's own page. What is ours to prove is that
-		// each href resolves to a real timeline entry that can take focus.
+		// Not clicked: fragment navigation would move the test runner's own page. What is ours to prove
+		// is that each href resolves to a timeline entry that can take focus.
 		for (const id of ["occurrence-sig-sync-9ab3c410", "occurrence-sig-sync-b71d0a52"]) {
 			const target = canvasElement.ownerDocument.getElementById(id);
 			if (!target) throw new Error(`No timeline entry with id ${id}`);
@@ -84,8 +76,8 @@ export const SameSignalTwice: Story = {
 export const SignalsExplainThemselves: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Scoped to the timeline: an occurrence's label also appears as the "Rests on" link text on
-		// every practice row that rests on it, so a page-wide query is ambiguous by design.
+		// Scoped to the timeline: an occurrence's label also appears as "Rests on" text on every
+		// practice row that rests on it, so a page-wide query is ambiguous by design.
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
 		await expect(timeline.getByText("Marked ready for review")).toBeVisible();
 		await expect(timeline.getByText("This work was reviewed too recently.")).toBeVisible();
@@ -108,10 +100,9 @@ export const NothingWasReviewed: Story = {
 };
 
 /**
- * A practice can name an occurrence this timeline does not carry — the shape a server that records
- * more than the detail endpoint returns produces, and what a version skew between the two looks
- * like from here. Falling back to the raw signal name is worse copy than a label and far better than
- * a row that quietly drops the one thing that explains it.
+ * A practice can name an occurrence this timeline does not carry — what a version skew between the
+ * recorder and this endpoint looks like from here. The raw signal name is worse copy than a label
+ * and far better than a row that drops the one thing explaining it.
  */
 export const OccurrenceMissingFromTheTimeline: Story = {
 	parameters: {
@@ -147,8 +138,8 @@ export const OccurrenceMissingFromTheTimeline: Story = {
 };
 
 /**
- * Nothing reached this artifact at all. Both empty states have to be statements about us rather than
- * about the reader's work — "we never saw it", not a blank page they are left to interpret.
+ * An empty state has to be a statement about us — "we never saw it" — rather than a blank page the
+ * reader is left to interpret.
  */
 export const NothingReachedIt: Story = {
 	args: { artifactKind: "scm.issue", artifactId: 1430 },

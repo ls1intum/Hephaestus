@@ -36,10 +36,7 @@ const INSUFFICIENT_EVIDENCE_EXPLANATION =
 
 export interface ReviewOutputScope {
 	agentJobId?: string;
-	/**
-	 * Narrowed to a kind this build knows, because the scope is carried in the URL and the search
-	 * schema validates it. An artifact of some other kind still renders; it just cannot scope a link.
-	 */
+	/** An artifact of a kind this build does not know still renders; it just cannot scope a link. */
 	artifactKind?: KnownArtifactKind;
 	artifactId?: number;
 }

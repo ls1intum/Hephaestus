@@ -44,10 +44,7 @@ export const Submitting: Story = {
 	args: { isSubmitting: true },
 };
 
-/**
- * WCAG 2.2 SC 1.4.10 at 320 px on the taller create variant: a `position: fixed` popup that outgrows
- * the viewport hangs off both ends at once with no way to scroll it back.
- */
+/** WCAG 2.2 SC 1.4.10 at 320 px: a `fixed` popup that outgrows the viewport hangs off both ends. */
 export const MobileReflow: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },

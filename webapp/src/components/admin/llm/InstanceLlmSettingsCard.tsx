@@ -14,9 +14,6 @@ export interface InstanceLlmSettingsCardProps {
 }
 
 /**
- * Instance-wide LLM governance: the provider-host allowlist and whether workspaces may connect their
- * own AI provider.
- *
  * The form is mounted only once its settings exist, so its fields seed from them directly. An effect
  * copying settings into state would re-run on a background refetch and overwrite an unsaved edit.
  */

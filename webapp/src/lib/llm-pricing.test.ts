@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import { priceLabel } from "./llm-pricing";
 
 /**
- * The expected strings are written out rather than composed with `formatRateUsd`. Building them from
- * the same helper the subject uses makes both sides move together — a formatter that returned `""`
- * would keep every case green.
+ * Expectations are written out, not composed with `formatRateUsd`: composed ones move with the
+ * subject, so a formatter that returned `""` would keep every case green.
  */
 describe("priceLabel", () => {
 	it("composes a sub-cent price from the rate formatter, not the spend formatter", () => {

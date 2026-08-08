@@ -69,8 +69,8 @@ export function NavDashboards({
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
-				{/* Not gated on a feature flag: when practices are off, the page says so out loud, which is
-				    the answer a developer wondering why nothing was said actually needs. */}
+				{/* Deliberately not feature-gated: with practices off the page says so, which is the answer
+				    a developer wondering why nothing was said came for. */}
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Review activity"

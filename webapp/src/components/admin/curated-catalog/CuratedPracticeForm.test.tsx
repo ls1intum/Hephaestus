@@ -286,7 +286,7 @@ describe("CuratedPracticeForm", () => {
 			),
 		);
 
-		// Absent rather than present-and-refused on save: the source contract can never promise a whole
+		// Absent rather than present-and-refused on save: the source contract cannot promise a whole
 		// capture of the linked issues, so no claim about what is missing from them can rest on it.
 		expect(
 			screen.queryByRole("checkbox", { name: /says what is missing from Linked issues/ }),
@@ -409,8 +409,8 @@ describe("CuratedPracticeForm", () => {
 
 		await user.click(screen.getByRole("radio", { name: /^Issue/ }));
 
-		// "An issue is never a draft" — the detection gate's words. A control for a state that cannot
-		// occur is worse than no control.
+		// An issue can never be a draft, and a control for a state that cannot occur is worse than no
+		// control.
 		expect(screen.queryByRole("checkbox", { name: /Also while it is still a draft/ })).toBeNull();
 	});
 });

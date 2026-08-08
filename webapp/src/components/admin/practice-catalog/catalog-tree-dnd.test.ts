@@ -16,9 +16,8 @@ const entry = (slug: string, areaSlug: string | undefined, displayOrder: number)
 });
 
 describe("catalog tree drop target", () => {
-	// Deliberately not in `displayOrder` order. The caller hands over whatever the API returned, and a
-	// fixture whose array order already agrees with `displayOrder` cannot tell a sorted destination
-	// apart from an unsorted one.
+	// Deliberately not in `displayOrder` order: a fixture whose array order already agrees with
+	// `displayOrder` cannot tell a sorted destination apart from an unsorted one.
 	const entries = [
 		entry("after", "delivery", 1),
 		entry("source", "quality", 0),
@@ -37,9 +36,8 @@ describe("catalog tree drop target", () => {
 	});
 
 	/**
-	 * The row being dragged is not in its own destination: moving "before" past "after" inside
-	 * Delivery lands at index 1 of a two-row area, not at index 2 of a list that still counts itself.
-	 * Position 2 would be off the end, and the row would come back where it started.
+	 * The row being dragged is not in its own destination. Counting itself would put the drop off the
+	 * end of the area, and the row would come back where it started.
 	 */
 	it("does not count the moving row when it stays in its own area", () => {
 		expect(getCatalogDropTarget(entries, "before", "delivery", "after", true)).toEqual({
@@ -85,7 +83,6 @@ describe("catalog tree drop target", () => {
 		expect(
 			getCatalogDropTarget(entries, "source", "delivery", "gone-in-a-later-render"),
 		).toBeNull();
-		// "source" is a real row, but it lives in Quality and the drop is aimed at Delivery.
 		expect(getCatalogDropTarget(entries, "before", "delivery", "source")).toBeNull();
 	});
 });

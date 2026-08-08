@@ -68,7 +68,7 @@ function displayFor(currencyCode: string): CurrencyDisplay {
 
 /**
  * Below one unit of the requested precision there is no figure rather than a misleading one: at
- * {@link CAP_DIGITS} a $0.40 cap would render `≈ €0`, which is free, and $0.60 as `≈ €1`.
+ * {@link CAP_DIGITS} a $0.40 cap would round to `≈ €0`, which is free.
  */
 function amountIn(
 	usd: number | null | undefined,
@@ -149,7 +149,6 @@ function publisherOf(source: FxRateInfo["source"]): string | undefined {
 }
 
 interface DisclosureParts {
-	/** `EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026` */
 	lead: string;
 	/** The rate itself: `1 USD ≈ €0.879`. */
 	rate: FxConversion;

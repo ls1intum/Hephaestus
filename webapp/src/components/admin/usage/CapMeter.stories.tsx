@@ -5,10 +5,6 @@ import { CapMeter } from "./CapMeter";
 const sharedBudgetMeter = (canvas: ReturnType<typeof within>) =>
 	canvas.getByRole("progressbar", { name: "Shared-model budget used" });
 
-/**
- * The one cap meter, shared by the workspace's usage page and the instance rollup. It owns what must
- * never diverge between them: the tone thresholds, the clamping past 100%, and the announcement.
- */
 const meta = {
 	component: CapMeter,
 	parameters: { layout: "padded" },

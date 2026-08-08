@@ -6,13 +6,11 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { isAppAdmin, resolveCurrentUser } from "@/integrations/auth/guard";
 
 /**
- * Instance-admin (APP_ADMIN) layout route (ADR 0017 native auth). Guards the whole `/admin` subtree in
- * `beforeLoad`, redirecting non-admins before any admin UI renders. The client is not a security
- * boundary — every `/admin` endpoint is enforced server-side by `hasAuthority('app_admin')`; this
- * guard only avoids a pointless flash.
+ * The client is not a security boundary — every `/admin` endpoint is enforced server-side by
+ * `hasAuthority('app_admin')` (ADR 0017), so this guard only avoids a pointless flash of admin UI.
  *
- * The layout pins the silent-mode banner above every admin page: an engaged brake must stay visible
- * wherever the operator navigates.
+ * The silent-mode banner is pinned by the layout rather than per page: an engaged brake must stay
+ * visible wherever the operator navigates.
  */
 export const Route = createFileRoute("/_authenticated/admin")({
 	beforeLoad: async ({ context }) => {

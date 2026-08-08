@@ -6,7 +6,6 @@ import { SetOwnProviderBudgetDialog } from "./SetOwnProviderBudgetDialog";
 
 const capDialog = async () => within(await screen.findByRole("dialog"));
 
-/** The workspace's cap on spend through its own provider — their money, so theirs to change. */
 const meta = {
 	component: SetOwnProviderBudgetDialog,
 	parameters: { layout: "centered" },
@@ -55,8 +54,8 @@ export const PassesItsFieldAndButtonCopyThrough: Story = {
 };
 
 /**
- * WCAG 2.2 SC 1.4.10 at 320 px: with a cap in force the footer stacks three buttons, which already
- * exceeds a phone held in landscape, so the height bound matters as much as the width.
+ * WCAG 2.2 SC 1.4.10 at 320 px: with a cap in force the footer stacks, so the height bound matters
+ * as much as the width.
  */
 export const MobileReflow: Story = {
 	parameters: {

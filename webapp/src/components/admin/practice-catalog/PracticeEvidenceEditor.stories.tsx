@@ -24,19 +24,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Holds the needs, for the stories that are about what happens when one of them changes. */
 function ControlledEvidence(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
 	const [needs, setNeeds] = useState(args.needs);
 	return <PracticeEvidenceEditor {...args} needs={needs} onChange={setNeeds} />;
 }
 
-/** The boundary reads back before anything is expanded: what must be there, and what may be. */
 export const RecommendedEvidence: Story = {};
 
 /**
- * Every choice is a visible control rather than a menu. The three roles are a radio group, and the
- * one thing EXHAUSTIVE adds to REQUIRED is offered as that thing — a follow-up claim, not a fourth
- * role nobody could tell apart from the third.
+ * Every choice is a visible control rather than a menu, and the one thing EXHAUSTIVE adds to REQUIRED
+ * is offered as that claim rather than as a role nobody could tell apart from REQUIRED.
  */
 export const EveryChoiceIsVisible: Story = {
 	play: async ({ canvas, userEvent }) => {
@@ -78,10 +75,7 @@ export const AbsenceClaimNeedsARequiredSource: Story = {
 	},
 };
 
-/**
- * The occasion that licenses an absence claim: the review at the merge, which reads the review
- * threads whole so it may say nobody resolved one.
- */
+/** The occasion that licenses an absence claim: the review that reads the threads whole. */
 export const ReadsASourceExhaustively: Story = {
 	args: {
 		needs: [
@@ -107,7 +101,7 @@ export const NothingRequiredYet: Story = {
 
 /**
  * Drives `invalid` from outside the way a form does — false while the author is writing, true from
- * the submit onwards — and can re-render without changing it, which is every keystroke afterwards.
+ * the submit onwards — and can re-render without changing it, as every later keystroke does.
  */
 function SubmittedIntoInvalid(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
 	const [invalid, setInvalid] = useState(false);
@@ -126,10 +120,9 @@ function SubmittedIntoInvalid(args: React.ComponentProps<typeof PracticeEvidence
 }
 
 /**
- * The other way into the open panel, and the one a real author takes: submitting a form that is
- * already on screen. It has to open on the *transition* rather than on the flag, because the flag
- * stays true while the author fixes it and an editor that re-opened under the caret on every
- * keystroke would be unusable.
+ * Submitting a form already on screen has to open the panel on the *transition* rather than on the
+ * flag: the flag stays true while the author fixes it, and an editor re-opening under the caret on
+ * every keystroke would be unusable.
  */
 export const SubmittingRevealsTheSources: Story = {
 	args: { needs: [] },

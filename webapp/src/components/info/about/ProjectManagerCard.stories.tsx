@@ -19,9 +19,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default project manager card with the current project information.
- */
 export const Default: Story = {
 	args: {
 		projectManager: {

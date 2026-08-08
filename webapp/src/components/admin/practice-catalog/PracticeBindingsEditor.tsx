@@ -30,24 +30,20 @@ import {
 } from "@/components/ui/field";
 
 /**
- * The one error this editor shows, and the id the control it names points at.
- *
- * <p>Rendering the message is not enough on its own: an author who submits an invalid form is sent to
- * the control that has to change, and unless that control is described by the message, what they hear
- * on arrival is the group's name and nothing about what is wrong with it.
+ * Rendering the message is not enough on its own: an author sent to the control that has to change
+ * hears the group's name and nothing about what is wrong with it unless that control is described by
+ * the message.
  */
 const BINDINGS_ERROR_ID = "practice-bindings-error";
 
 export interface PracticeBindingsEditorProps {
-	/** The work type every binding belongs to; supplies the signals and sources they may name. */
 	options: PracticeWorkTypeDefinitionOptions;
 	bindings: PracticeBinding[];
 	onChange: (bindings: PracticeBinding[]) => void;
-	/** Whether a review is attempted at all; when false, evidence is recorded but never checked. */
+	/** When false, evidence is still recorded but never checked. */
 	canAttemptReview?: boolean;
 	/** True while the practice runs no automated review, which forbids evidence outright. */
 	guidanceOnly?: boolean;
-	/** How these requirements have turned out on recent reviews; omitted while creating a practice. */
 	outcome?: PracticeEvidenceOutcome;
 	error?: string;
 	/** The control the error points at, so the invalid occasion is the one that opens. */
@@ -56,12 +52,8 @@ export interface PracticeBindingsEditorProps {
 }
 
 /**
- * The occasions a practice is reviewed on.
- *
- * <p>A list rather than one shared set of fields, because the two questions genuinely have different
- * answers per occasion: reviewing a change when it opens and reviewing it when it merges are different
- * reviews reading different things. The form shows them as separate cards rather than a merged list so
- * that difference stays visible.
+ * A list rather than one shared set of fields: reviewing a change when it opens and reviewing it at
+ * the merge are different reviews reading different things, and separate cards keep that visible.
  */
 export function PracticeBindingsEditor({
 	options,
@@ -151,9 +143,7 @@ interface BindingCardProps {
 	claimedElsewhere: ReadonlySet<string>;
 	canAttemptReview: boolean;
 	guidanceOnly: boolean;
-	/** The control this occasion must send focus to, when the invalid one is in this occasion. */
 	errorFocusId?: string;
-	/** The id of the form-level message, so the control focus lands on is described by it. */
 	errorId?: string;
 	disabled: boolean;
 	onChange: (binding: PracticeBinding) => void;
@@ -218,11 +208,11 @@ function BindingCard({
 				data-invalid={signalsInvalid || undefined}
 				aria-describedby={signalsInvalid ? errorId : undefined}
 				id={bindingFieldId(index, "signals")}
-				// Focusable only programmatically: a form-level error sends focus here so the occasion it
-				// names is the one the author lands in, but the group stays out of the tab order.
+				// Focusable only programmatically: a form-level error sends focus here so the author lands
+				// in the occasion it names, but the group stays out of the tab order.
 				tabIndex={-1}
-				// The legend is scoped by the occasion so a screen reader reading two of them apart hears
-				// which one it is in rather than three identical "Starts a review when" groups.
+				// Scoped by occasion so a screen reader hears which one it is in rather than a run of
+				// identical "Starts a review when" groups.
 				aria-label={`Starts a review when, ${occasionLabel}`}
 			>
 				<FieldLegend variant="label">Starts a review when *</FieldLegend>
@@ -304,7 +294,6 @@ export function withoutEvidence(bindings: readonly PracticeBinding[]): PracticeB
 	return bindings.map((binding) => ({ ...binding, needs: [] }));
 }
 
-/** Restores the recommended evidence on every occasion that has none. */
 export function withRecommendedEvidence(
 	bindings: readonly PracticeBinding[],
 	options: PracticeWorkTypeDefinitionOptions,

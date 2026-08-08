@@ -34,11 +34,6 @@ type Story = StoryObj<typeof meta>;
 
 export const StaleIndependentValidation: Story = {};
 
-/**
- * One occasion, read back as the sentence it is. Merging both occasions' evidence into a single list
- * would claim the practice always reads the review threads whole — which only the review at the merge
- * does.
- */
 export const OneOccasion: Story = {
 	args: { bindings: [mockPullRequestBinding] },
 };

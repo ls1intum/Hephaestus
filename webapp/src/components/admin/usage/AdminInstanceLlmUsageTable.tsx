@@ -85,11 +85,7 @@ function capUsage(input: {
 	};
 }
 
-/**
- * Instance-admin table of every workspace's AI spend for one month against both caps: the
- * shared-model budget the host funds, and the provider cap the workspace's own admins set over
- * spend on their own provider. The provider cap is read-only here by design.
- */
+/** The provider cap is read-only here by design: it is the workspace's own money. */
 export function AdminInstanceLlmUsageTable({
 	rows,
 	month,
@@ -123,8 +119,8 @@ export function AdminInstanceLlmUsageTable({
 		);
 	}
 
-	// Detail lives *beside* the table, not in a `colSpan` row: nested, its own two tables would each
-	// open a horizontal scroller inside the table's — two-dimensional scrolling (WCAG 2.2 SC 1.4.10).
+	// Detail lives *beside* the table, not in a `colSpan` row: nested, its breakdown tables would open
+	// a horizontal scroller inside the table's — two-dimensional scrolling (WCAG 2.2 SC 1.4.10).
 	const expandedRow = rows.find((row) => row.workspaceSlug === expandedWorkspaceSlug);
 	const hasConversion = rows.some(
 		(row) =>
@@ -394,7 +390,7 @@ interface HelpHeaderProps {
 	help: string;
 }
 
-/** `min-h-6` is the 24 px target size (WCAG 2.2 SC 2.5.8); the header's line height is only ~20 px. */
+/** `min-h-6` is SC 2.5.8's 24 px minimum target — a header line box alone leaves the trigger short. */
 function HelpHeader({ children, help }: HelpHeaderProps) {
 	return (
 		<Tooltip>

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export interface ConfirmDialogProps<T> {
-	/** The row awaiting confirmation; `null` closes the dialog. The dialog never owns this state. */
+	/** `null` closes the dialog. The dialog never owns this state. */
 	subject: T | null;
 	title: (subject: T) => ReactNode;
 	description: ReactNode | ((subject: T) => ReactNode);
@@ -23,8 +23,8 @@ export interface ConfirmDialogProps<T> {
 }
 
 /**
- * Survives `subject` going `null` so a closing dialog can still render what it was describing —
- * derived during render rather than in an effect, so a new subject lands in the same commit.
+ * Survives `subject` going `null` so a closing dialog still renders what it was describing. Derived
+ * during render rather than in an effect, so a new subject lands in the same commit.
  */
 function useLastNonNull<T>(subject: T | null): T | null {
 	const [shown, setShown] = useState<T | null>(subject);
@@ -35,11 +35,9 @@ function useLastNonNull<T>(subject: T | null): T | null {
 }
 
 /**
- * The shared confirm for destructive row actions.
- *
- * **Confirming closes the dialog, before the request it starts has settled** — the row that owns the
- * request reports the outcome instead. ADR 0027 has the derivation:
- * {@link https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md}
+ * Confirming closes the dialog before the request it starts has settled — the row that owns the
+ * request reports the outcome instead. Derived in
+ * `docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md`.
  */
 export function ConfirmDialog<T>({
 	subject,

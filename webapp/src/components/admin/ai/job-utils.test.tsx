@@ -15,8 +15,6 @@ describe("jobWait", () => {
 	});
 
 	it("still reports a hold once the parked instant has lapsed", () => {
-		// The server re-parks a still-capped run each poll, so a lapsed hold is a hold. Keying this
-		// off the clock instead of the reason would blank the row every few minutes.
 		expect(jobWait({ status: "QUEUED", holdReason: "BUDGET", availableAt: EARLIER }, NOW)).toEqual({
 			kind: "hold",
 			reason: "BUDGET",
@@ -28,8 +26,6 @@ describe("jobWait", () => {
 	});
 
 	it("reports nothing for a queued run that is already claimable", () => {
-		// `availableAt` is required and in the past for almost every run: reporting a wait here would
-		// put a "due …" line on every queued row in the table.
 		expect(jobWait({ status: "QUEUED", availableAt: EARLIER }, NOW)).toBeNull();
 	});
 
@@ -48,7 +44,6 @@ describe("holdReasonCopy", () => {
 	});
 
 	it("reads a reason it has never seen as English rather than as a constant", () => {
-		// `holdReason` is a plain string on the wire; a reason added server-side must not surface raw.
 		expect(holdReasonCopy("MODEL_UNAVAILABLE").label).toBe("Model unavailable");
 		expect(holdReasonCopy("MODEL_UNAVAILABLE").detail).toMatch(/resumes on its own/);
 	});

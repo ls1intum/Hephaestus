@@ -28,8 +28,8 @@ export interface PriceModeEditorProps {
 	idPrefix: string;
 }
 
-/** The price radio + fields shared by both model forms. The "no rate" options are worded by
- * {@link priceLabel} so the radio and the label the tables print cannot drift apart. */
+/** The "no rate" options are worded by {@link priceLabel}, so the radio and the label the tables
+ * print cannot drift apart. */
 export function PriceModeEditor({
 	audience,
 	value,

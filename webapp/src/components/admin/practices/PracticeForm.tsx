@@ -43,7 +43,7 @@ interface PracticeFormEditProps {
 	) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
-	/** Recent readiness outcomes for this practice; absent until it has been reviewed at least once. */
+	/** Absent until the practice has been reviewed at least once. */
 	evidenceOutcome?: PracticeEvidenceOutcome;
 }
 

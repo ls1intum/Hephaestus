@@ -24,8 +24,8 @@ type Story = StoryObj<typeof meta>;
 export const AiSupported: Story = {};
 
 /**
- * The reason a practice needs a human is its own field, so a limitation can never be mistaken for it.
- * Both are editable at once, and the limitation list is complete rather than missing its first entry.
+ * The reason a practice needs a human is its own field, not the first known limitation, so both are
+ * editable at once and the limitation list is complete.
  */
 export const HumanReviewReasonIsNotALimitation: Story = {
 	args: {
@@ -89,7 +89,7 @@ export const Invalid: Story = {
 		error: "Explain at least one limitation that requires additional context.",
 	},
 	play: async ({ canvas }) => {
-		// Two errors are on screen: the missing reason, on its own field, and the section's own.
+		// Both errors are on screen: the missing reason, on its own field, and the section's own.
 		await expect(
 			canvas.getByText("Explain at least one limitation that requires additional context."),
 		).toBeVisible();

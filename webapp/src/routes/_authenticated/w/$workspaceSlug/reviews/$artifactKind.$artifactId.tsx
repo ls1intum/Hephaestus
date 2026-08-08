@@ -5,8 +5,7 @@ export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/reviews/$artifactKind/$artifactId",
 )({
 	// `artifactKind` stays the wire id (`scm.pull_request`) rather than a short slug: kinds are an
-	// open vocabulary, and a slug map would make a kind this build has never heard of unreachable —
-	// on the one page whose promise is that nothing is left out.
+	// open vocabulary, and a slug map would make a kind this build has never heard of unreachable.
 	loader: ({ params: { artifactId } }) => {
 		const id = Number(artifactId);
 		if (!Number.isSafeInteger(id) || id < 1) {

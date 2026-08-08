@@ -38,7 +38,6 @@ export interface WorkspaceLlmConnectionFormDialogProps {
 	onUpdate: (id: number, body: UpdateWorkspaceLlmConnectionRequest) => void;
 }
 
-/** Create or update a workspace-owned OpenAI-compatible connection. */
 export function WorkspaceLlmConnectionFormDialog({
 	open,
 	onOpenChange,
@@ -114,8 +113,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 					</DialogDescription>
 				</DialogHeader>
 
-				{/* This form is ~700 px tall — taller than a phone in portrait and far taller than one in
-				    landscape. It scrolls here so the submit button is always on screen. */}
+				{/* This form outgrows a 320 px viewport, so the body scrolls and the submit stays on screen. */}
 				<DialogBody className="space-y-4 py-1">
 					<LlmConnectionFields
 						value={fields}

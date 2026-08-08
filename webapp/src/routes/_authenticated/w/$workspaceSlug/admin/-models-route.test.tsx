@@ -6,9 +6,8 @@ import type { AgentBinding } from "@/api/types.gen";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
-// Mounting the real route pulls in the whole admin layout and its lazy modules. The default 5s is a
-// deadlock backstop here rather than a budget these renders were ever meant to fit inside, and under
-// a full parallel run they do not.
+// Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
+// deadlock backstop, not a budget these renders were meant to fit inside.
 vi.setConfig({ testTimeout: 15_000 });
 
 const MODELS = [

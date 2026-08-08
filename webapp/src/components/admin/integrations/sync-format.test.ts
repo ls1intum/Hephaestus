@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { freshnessTone } from "./sync-format";
 
-/**
- * Three rendered components read this, and each of them can only ever show one band at a time. The
- * boundaries are stated here, once, in the units the function actually takes.
- */
 describe("freshnessTone", () => {
 	const now = new Date("2026-08-07T12:00:00.000Z");
 	const hourly = 3_600;
@@ -33,9 +29,9 @@ describe("freshnessTone", () => {
 	});
 
 	/**
-	 * An age is only readable against the schedule behind it. Without one — including the zero a
-	 * connection with no cadence reports, which would otherwise divide by it — the honest answer is
-	 * that we do not know, not that the resource is nine cadences late.
+	 * An age is only readable against the schedule behind it. With no cadence — including the zero a
+	 * connection without one reports, which there is nothing to divide by — the honest answer is that
+	 * we do not know, not that the resource is late.
 	 */
 	it("declines to judge freshness with no cadence to judge it against", () => {
 		expect(freshnessTone(ago(60 * hourly), undefined, now)).toBe("unknown");

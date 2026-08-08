@@ -20,10 +20,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 	component: BackfillContainer,
 });
 
-/**
- * A running campaign advances in the background, so the page polls while one is live and stops as soon
- * as nothing is moving — refetching a settled list forever would cost more than the feature.
- */
+/** Polled only while a campaign is live: a settled list is not worth refetching forever. */
 const ACTIVE_POLL_MS = 15_000;
 
 function BackfillContainer() {

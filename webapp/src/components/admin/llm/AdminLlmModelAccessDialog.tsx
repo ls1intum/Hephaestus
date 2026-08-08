@@ -98,7 +98,7 @@ function AdminLlmModelAccessDialogContent({
 				</DialogDescription>
 			</DialogHeader>
 
-			{/* Enough content to overflow a phone in landscape, so only the body scrolls. */}
+			{/* The workspace list outgrows a short viewport, so only the body scrolls. */}
 			<DialogBody className="space-y-4 py-1">
 				<ModelAccessScopeChoice
 					idPrefix="llm-model-access"

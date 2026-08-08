@@ -26,14 +26,12 @@ export function canStepForwardFrom(month: string): boolean {
 	return month < currentMonthUtc();
 }
 
-/** Shift an ISO `yyyy-MM` month by `delta` months (UTC-safe). */
 export function addMonths(month: string, delta: number): string {
 	const [yearStr, monthStr] = month.split("-");
 	const date = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1 + delta, 1));
 	return date.toISOString().slice(0, 7);
 }
 
-/** Human label for an ISO `yyyy-MM` month, e.g. "July 2026". */
 export function formatMonthLabel(month: string): string {
 	const [yearStr, monthStr] = month.split("-");
 	return new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, 1)).toLocaleDateString(
@@ -53,7 +51,6 @@ export function formatUsageDay(value: LlmUsageByDay["day"]): string {
 	});
 }
 
-/** Long day label for a UTC date, e.g. "July 22" — used by budget projections and reset dates. */
 export function formatDayLabel(date: Date): string {
 	return date.toLocaleDateString(undefined, {
 		month: "long",

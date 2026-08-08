@@ -50,9 +50,8 @@ const capField = () => screen.getByLabelText(/Monthly cap/i);
 
 /**
  * Only what is peculiar to *this* route. Where a rejection is reported — inline while the dialog is
- * open, as a toast once it is gone — belongs to `BudgetAmountDialog` and is stated once, over the
- * instance budget, in `-admin-usage-route.test.tsx`. Restating it here bought a second boot of the
- * lazy admin layout and no second thing proved.
+ * open, as a toast once it is gone — belongs to `BudgetAmountDialog` and is asserted once, over the
+ * instance budget.
  */
 describe("workspace AI usage route", () => {
 	it("does not re-show a dismissed rejection when the cap dialog is reopened", async () => {

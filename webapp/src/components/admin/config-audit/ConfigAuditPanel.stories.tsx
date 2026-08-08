@@ -57,8 +57,6 @@ function page(content: ConfigAuditEntryView[]) {
 	};
 }
 
-// `meta.component` is the instance panel, which only ever calls `/admin/config-audit`. The
-// workspace endpoint is registered by the one story that renders the workspace panel.
 const handlers = (content: ConfigAuditEntryView[] = entries) => [
 	http.get("*/admin/config-audit", () => HttpResponse.json(page(content))),
 ];

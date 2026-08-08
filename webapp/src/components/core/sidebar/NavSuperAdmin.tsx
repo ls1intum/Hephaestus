@@ -20,15 +20,6 @@ import {
 } from "@/components/ui/sidebar";
 import { NavContextHeader } from "./NavContextHeader";
 
-/**
- * Content of the dedicated instance-admin (APP_ADMIN) shell — the `context === "admin"` sidebar.
- * It is workspace-independent (no workspace switcher; a "Back to app" link returns to the dashboard)
- * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, the per-workspace
- * admin nav — the instance and workspace levels are never interleaved.
- *
- * Grouped by concern rather than one flat list: who can get in (Access), what is reviewed
- * (Practices), what it costs (AI), and running the instance (Operations).
- */
 const ADMIN_NAV_GROUPS = [
 	{
 		label: "Access",
@@ -90,6 +81,11 @@ const ADMIN_NAV_GROUPS = [
 	},
 ] as const;
 
+/**
+ * The instance-admin (APP_ADMIN) sidebar. Workspace-independent — no workspace switcher — so an
+ * admin with zero workspaces can still reach it, and never interleaved with the per-workspace
+ * admin nav.
+ */
 export function NavSuperAdmin() {
 	const matchRoute = useMatchRoute();
 	return (

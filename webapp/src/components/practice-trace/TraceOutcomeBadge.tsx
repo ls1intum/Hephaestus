@@ -17,9 +17,8 @@ import { OUTCOME_LABELS, type TraceOutcome } from "./trace-format";
 type BadgeVariant = "success" | "secondary" | "outline" | "warning" | "destructive";
 
 /**
- * Colour is the last channel, never the only one: every outcome also carries its own icon and its
- * own written label, so the badge still distinguishes itself in greyscale, under a colour-vision
- * deficiency, and to a screen reader reading the text alone (WCAG 2.2 SC 1.4.1).
+ * Colour is never the only channel: each outcome also carries its own icon and its own words, so
+ * the badge survives greyscale, colour-vision deficiency, and a screen reader (WCAG 2.2 SC 1.4.1).
  */
 const OUTCOME_BADGE = {
 	REVIEWED: { variant: "success", Icon: CircleCheckIcon },
@@ -39,7 +38,6 @@ export interface TraceOutcomeBadgeProps {
 	className?: string;
 }
 
-/** What became of one practice on one piece of work, in one glanceable token. */
 export function TraceOutcomeBadge({ outcome, className }: TraceOutcomeBadgeProps) {
 	const { variant, Icon } = OUTCOME_BADGE[outcome];
 	return (

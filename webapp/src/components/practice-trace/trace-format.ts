@@ -4,9 +4,8 @@ import { SUPPRESSION_REASON_LABELS } from "@/components/admin/practice-reviews/r
 import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
 
 /**
- * Every label the trace surface prints is keyed off the generated wire union rather than a hand-kept
- * string list, so a value the server adds or renames fails `typecheck:webapp` here instead of
- * rendering as a blank cell on the one page whose entire job is to leave nothing unexplained.
+ * Labels key off the generated wire union rather than a hand-kept string list, so a value the
+ * server adds or renames fails `typecheck:webapp` here instead of rendering as a blank cell.
  */
 export type TraceOutcome = PracticeTraceEntry["outcome"];
 export type ReviewTier = PracticeTraceEntry["reviewTier"];
@@ -16,9 +15,9 @@ export type SignalStateReason = NonNullable<TracedSignal["stateReason"]>;
 export type DiscoveredVia = TracedSignal["discoveredVia"];
 
 /**
- * Was the practice *measured*. Deliberately says nothing about whether anyone heard about it —
- * that is `observationCount`/`deliveredCount`/`withheldReasons`, a separate axis. A practice can be
- * "Reviewed" and have delivered nothing, which is the MEASURE tier working exactly as configured.
+ * Was the practice *measured*, and nothing more: whether anyone heard about it is the separate
+ * `observationCount`/`deliveredCount`/`withheldReasons` axis. "Reviewed" having delivered nothing
+ * is the MEASURE tier working as configured.
  */
 export const OUTCOME_LABELS: Record<TraceOutcome, string> = {
 	REVIEWED: "Reviewed",
@@ -35,7 +34,7 @@ export const OUTCOME_LABELS: Record<TraceOutcome, string> = {
 
 export const OUTCOMES = Object.keys(OUTCOME_LABELS) as TraceOutcome[];
 
-/** How loudly the workspace runs a practice. The upper bound on what could ever reach a person. */
+/** The upper bound on what a practice could ever say to a person. */
 export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
 	OFF: "Off",
 	MEASURE: "Measure only",
@@ -75,7 +74,7 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	ARTIFACT_GONE: "The work no longer exists",
 };
 
-/** How we came to know about an occurrence. Sets how precise `occurredAt` can be. */
+/** How we came to know about an occurrence, which sets how precise `occurredAt` can be. */
 export const DISCOVERED_VIA_LABELS: Record<DiscoveredVia, string> = {
 	EVENT: "Live event",
 	SYNC: "Noticed during a sync",
@@ -91,25 +90,20 @@ export const DISCOVERED_VIA_DESCRIPTIONS: Record<DiscoveredVia, string> = {
 };
 
 /**
- * Withholding reasons are the same vocabulary the delivery surface already explains, so the copy is
- * borrowed rather than re-written — two different sentences for one enum value is how a support
- * answer and a screen stop agreeing. The `Record<WithheldReason, …>` annotation is load-bearing: it
- * fails the build if the trace endpoint ever reports a reason the delivery surface has no words for.
+ * Borrowed from the delivery surface rather than re-worded: two different sentences for one enum
+ * value is how a support answer and a screen stop agreeing. The `Record<WithheldReason, …>`
+ * annotation fails the build if the trace endpoint reports a reason delivery has no words for.
  */
 export const WITHHELD_REASON_LABELS: Record<WithheldReason, string> = SUPPRESSION_REASON_LABELS;
 
-/**
- * The DOM id of one occurrence in the timeline. The anchor a practice row links to and the element
- * it lands on both go through here, so the two can never drift apart.
- */
+/** The anchor a practice row links to and the element it lands on both go through here. */
 export function occurrenceDomId(signalId: string): string {
 	return `occurrence-${signalId}`;
 }
 
 /**
- * Kinds are an open vocabulary — a kind this build has never heard of still gets a generic icon
- * rather than a hole, because a page about "what happened to my work" cannot be the page that
- * quietly omits a whole class of work.
+ * Kinds are an open vocabulary: a kind this build has never heard of gets a generic icon rather
+ * than a hole, on the page whose whole job is to omit nothing.
  */
 export function artifactKindIcon(kind: string) {
 	switch (kind) {
@@ -124,19 +118,14 @@ export function artifactKindIcon(kind: string) {
 	}
 }
 
-/**
- * "3 signals · 1 reviewed". Says how much of what we saw actually turned into a review, which is the
- * first thing to check when the answer to "why was nothing said" is "we never started".
- */
 export function signalCountsLabel(signalCount: number, reviewedSignalCount: number): string {
 	const signals = `${signalCount} ${signalCount === 1 ? "signal" : "signals"}`;
 	return `${signals} · ${reviewedSignalCount} reviewed`;
 }
 
 /**
- * The delivery axis in one phrase. Never collapsed into the outcome badge: "Reviewed" plus
- * "nothing was delivered" is a legitimate, configured state and the reader has to be able to see
- * both halves to know which one to go and change.
+ * Never collapsed into the outcome badge: "Reviewed" with nothing delivered is a configured state,
+ * and the reader has to see both halves to know which one to go and change.
  */
 export function deliveryLabel(entry: PracticeTraceEntry): string {
 	if (entry.deliveredCount > 0) {

@@ -84,8 +84,8 @@ describe("usage breakdown totals", () => {
 		render(<LlmUsageByJobTypeTable report={report} />);
 
 		const footer = totalsRowOf("AI spend by run type");
-		// Server money, then client counts: 3 unpriced, 4,000 input, 600 output, 36 calls, 30 runs —
-		// and a dash where a blended average would be, because there are two purses.
+		// Reads as: the server's two money figures, a dash where a blended average would be (two
+		// purses), then the counts this table adds up itself.
 		expect(footer.textContent).toBe("Total$4.25$1.75—34,0006003630");
 	});
 

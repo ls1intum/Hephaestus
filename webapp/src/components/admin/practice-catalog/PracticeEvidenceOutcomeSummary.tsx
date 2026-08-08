@@ -9,7 +9,6 @@ export interface PracticeEvidenceOutcomeSummaryProps {
 	sources: readonly PracticeEvidenceSourceOption[];
 }
 
-/** How a practice's evidence requirements fared on the workspace's recent reviews. */
 export function PracticeEvidenceOutcomeSummary({
 	outcome,
 	sources,

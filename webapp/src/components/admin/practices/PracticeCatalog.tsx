@@ -51,10 +51,7 @@ import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
-/**
- * How loud a practice is allowed to be, ascending. Every tier above "Off" runs the review and records
- * the measurement; they differ only in how far the result travels.
- */
+/** Ascending loudness. Every tier above "Off" runs the review; they differ only in who is told. */
 const REVIEW_TIERS = [
 	{ value: "OFF", label: "Off", hint: "Not reviewed at all." },
 	{ value: "MEASURE", label: "Measure", hint: "Reviewed and recorded. Nobody is told anything." },
@@ -285,9 +282,9 @@ function CatalogToolbar({
 				</SelectContent>
 			</Select>
 			{/*
-			 * toolbar, not the default group: ToggleGroup emits aria-orientation, which ARIA permits on
-			 * toolbar but not on group, and these toggle buttons already carry roving arrow-key focus.
-			 * radiogroup would be worse — the items are aria-pressed buttons, not radios.
+			 * toolbar, not the default group: ToggleGroup emits aria-orientation, which ARIA allows on
+			 * toolbar but not on group, and these buttons already have the roving arrow-key focus a
+			 * toolbar implies. radiogroup would be worse — the items are aria-pressed, not radios.
 			 */}
 			<ToggleGroup
 				role="toolbar"
@@ -308,8 +305,8 @@ function CatalogToolbar({
 								"h-auto min-h-7 whitespace-normal py-1 sm:whitespace-nowrap",
 						)}
 					>
-						{/* Shortened on screen for the row to fit, but named in full for anyone who hears it
-						    rather than sees it — the same filter must not answer to two names. */}
+						{/* Shortened on screen to fit the row; the accessible name still contains the visible
+						    text and names the filter in full (WCAG 2.2 SC 2.5.3). */}
 						{filter.value === "ALL" ? (
 							<>
 								All<span className="sr-only"> work types</span>
@@ -437,9 +434,9 @@ function PracticeActions({
 	onDelete: (practice: Practice) => void;
 }) {
 	const canReview = canAttemptAutomatedReview(practice.automatedReviewPolicy, supportedModes);
-	// A practice whose policy cannot run an automated review has nowhere to go from Off, so at Off the
-	// control is locked rather than offering three tiers the server would refuse. One already above Off
-	// keeps its control, because turning a practice down must never need a policy edit.
+	// A practice whose policy cannot run an automated review has nowhere to go from Off, so the
+	// control is locked there rather than offering tiers the server would refuse. One already above
+	// Off keeps its control: turning a practice down must never need a policy edit.
 	const tierChangeDisabled = pending || (practice.reviewTier === "OFF" && !canReview);
 	return (
 		<>
@@ -575,8 +572,8 @@ function RenameAreaDialog({
 				<form
 					onSubmit={async (event) => {
 						event.preventDefault();
-						// `namedItem` answers with a RadioNodeList when a name is shared, so the element is
-						// checked rather than asserted.
+						// `namedItem` answers with a RadioNodeList when a name is shared, so narrow rather
+						// than cast.
 						const input = event.currentTarget.elements.namedItem("areaName");
 						if (!(input instanceof HTMLInputElement)) return;
 						const name = input.value.trim();

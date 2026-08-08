@@ -25,8 +25,8 @@ describe("areaVisuals", () => {
 		expect(visual.pill).toBe(PILL.sky);
 	});
 
-	// Naming the icon, not merely ruling out the fallback: `not.toBe(Folder)` is satisfied by any of
-	// the hundred icons in the set, so the whole keyword map could be shuffled and stay green.
+	// Naming the icon, not merely ruling out the fallback: `not.toBe(Folder)` is satisfied by any icon
+	// in the set, so the whole keyword map could be shuffled and stay green.
 	it("derives an icon from keywords for an unknown admin-created slug", () => {
 		const security = getAreaVisual("security-hardening", "Security hardening");
 		expect(security.Icon).toBe(ShieldCheck);

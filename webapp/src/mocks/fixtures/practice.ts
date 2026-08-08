@@ -59,7 +59,6 @@ const mockConversationPolicy = {
 	],
 } satisfies PracticeAutomatedReviewPolicy;
 
-/** What a pull-request practice reviews when the author accepts every recommendation. */
 export const mockPullRequestBinding = {
 	signals: ["scm.pull_request.opened", "scm.pull_request.ready", "scm.pull_request.synchronized"],
 	needs: [
@@ -69,10 +68,6 @@ export const mockPullRequestBinding = {
 	],
 } satisfies PracticeBinding;
 
-/**
- * The occasion the refactor exists for: the same practice, reviewed again at the merge, reading the
- * review threads exhaustively so it may say nobody resolved one.
- */
 export const mockMergeBinding = {
 	signals: ["scm.pull_request.merged"],
 	needs: [

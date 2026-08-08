@@ -47,7 +47,7 @@ export interface WorkspaceLlmProviderPanelProps {
 	workspaceSlug: string;
 	/**
 	 * Whether the instance still lets this workspace register *new* providers and models. False does
-	 * not hide the panel — providers already connected stay listed and editable, as the banner says.
+	 * not hide the panel — providers already connected stay listed and editable.
 	 */
 	ownProviderAllowed: boolean;
 }
@@ -55,20 +55,19 @@ export interface WorkspaceLlmProviderPanelProps {
 type TestResult = { ok: boolean; message: string };
 
 // Each write is filed under a shared prefix so one cache lookup answers "is this row busy" — a row
-// stays disabled until *its own* write settles, not until whichever write settles first.
+// stays disabled until *its own* write settles, not until whichever write settles first. The filing
+// key and the key the lookup reads are both built from these: were they to drift, the lookup would
+// return an empty set and re-enable every row mid-flight.
 const PROBE_MUTATION_KEY = ["workspaceProbeLlmConnection"];
 const MODEL_WRITE_MUTATION_KEY = ["workspaceWriteLlmModel"];
 const CONNECTION_WRITE_MUTATION_KEY = ["workspaceWriteLlmConnection"];
 
-/** Workspace-owned OpenAI-compatible connections and the models grouped under each connection. */
 export function WorkspaceLlmProviderPanel({
 	workspaceSlug,
 	ownProviderAllowed,
 }: WorkspaceLlmProviderPanelProps) {
 	const queryClient = useQueryClient();
 	const cardLabelPrefix = useId();
-	// Hoisted, so a `filedUnder` key and the `usePendingMutationIds` key reading it cannot drift apart:
-	// the lookup would silently return an empty set and re-enable every row mid-flight.
 	const modelWriteKey = [...MODEL_WRITE_MUTATION_KEY, workspaceSlug];
 	const connectionWriteKey = [...CONNECTION_WRITE_MUTATION_KEY, workspaceSlug];
 	const probeKey = [...PROBE_MUTATION_KEY, workspaceSlug];
@@ -311,9 +310,9 @@ export function WorkspaceLlmProviderPanel({
 									</div>
 								</CardHeader>
 								<CardContent className="space-y-4">
-									{/* Three cards deep, "Edit" / "Test connection" / "Disconnect" are otherwise the same
-									    three names repeated with nothing tying them to a card (SC 2.4.6). Each name opens
-									    with the button's own visible text, so speech control still matches (SC 2.5.3). */}
+									{/* Repeated per card these would otherwise be identical names with nothing tying them
+									    to a provider (SC 2.4.6); each opens with the button's own visible text so speech
+									    control still matches (SC 2.5.3). */}
 									<div className="flex flex-wrap gap-2">
 										<Button
 											variant="outline"

@@ -65,8 +65,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Not the actor names — those are `args.events` read back. The outcome is the table's own
-		// rendering of a status field.
+		// The table's own rendering of `result`, not `args.events` read back.
 		await expect(canvas.getByText("Failure")).toBeInTheDocument();
 	},
 };

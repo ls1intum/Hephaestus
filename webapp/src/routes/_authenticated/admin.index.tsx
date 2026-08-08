@@ -25,7 +25,6 @@ function AdminOverviewPage() {
 
 	const workspaces = workspacesQuery.data ?? [];
 	const activeWorkspaces = workspaces.filter((ws) => ws.status === "ACTIVE").length;
-	// Memberships, not distinct accounts: a user in N workspaces counts N times.
 	const memberships = workspaces.reduce((sum, ws) => sum + ws.memberCount, 0);
 
 	return (

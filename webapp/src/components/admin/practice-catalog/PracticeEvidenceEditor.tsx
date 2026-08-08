@@ -27,9 +27,8 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 /**
- * The three roles an author picks between. EXHAUSTIVE is deliberately not a fourth: it is REQUIRED
- * plus one further claim, and it is offered as that claim rather than as a separate role — see
- * {@link AbsenceClaim}.
+ * EXHAUSTIVE is deliberately not a role here: it is REQUIRED plus one further claim, and it is
+ * offered as that claim — see {@link AbsenceClaim}.
  */
 const EVIDENCE_ROLE_OPTIONS = [
 	{ value: "REQUIRED", label: "Required" },
@@ -37,42 +36,32 @@ const EVIDENCE_ROLE_OPTIONS = [
 	{ value: "NOT_USED", label: "Not used" },
 ] satisfies Array<{ value: Exclude<EvidenceRole, "EXHAUSTIVE">; label: string }>;
 
-/** Which of the three radios is selected; an exhaustive stance is a required one. */
 function selectedRole(role: EvidenceRole): string {
 	return role === "EXHAUSTIVE" ? "REQUIRED" : role;
 }
 
 export interface PracticeEvidenceEditorProps {
-	/** The work type this occasion belongs to; supplies the sources it may read. */
 	options: PracticeWorkTypeDefinitionOptions;
-	/** One occasion's evidence — not the practice's. What a review reads depends on what started it. */
+	/** One occasion's evidence, not the practice's. */
 	needs: PracticeEvidenceRequirement[];
 	onChange: (needs: PracticeEvidenceRequirement[]) => void;
 	/**
-	 * Whether a review will actually be attempted. Only changes the copy: an author who has said a
-	 * human is needed is still choosing what a future automated review would read.
+	 * Only changes the copy: an author who has said a human is needed is still choosing what a future
+	 * automated review would read.
 	 */
 	canAttemptReview?: boolean;
 	/** Prefix for control ids, so a form-level error can send focus into the right occasion. */
 	idPrefix: string;
 	/**
-	 * Which occasion this is, appended to every group's accessible name. Three occasions otherwise
-	 * present three identically named groups, and a screen-reader user cannot tell which is which.
+	 * Appended to every group's accessible name. Repeated occasions otherwise present identically
+	 * named groups, and a screen-reader user cannot tell which one they are in.
 	 */
 	occasionLabel: string;
 	disabled?: boolean;
 	invalid?: boolean;
-	/** The id of the form-level message about this occasion, when this group is the one it names. */
 	errorId?: string;
 }
 
-/**
- * What one occasion's review reads.
- *
- * <p>Evidence hangs off the occasion rather than the practice because the two answers genuinely
- * differ: a review that runs when a change is opened is reading what is in front of it, while the one
- * that runs at the merge is the review that can say nobody ever resolved a thread.
- */
 export function PracticeEvidenceEditor({
 	options,
 	needs,
@@ -84,12 +73,12 @@ export function PracticeEvidenceEditor({
 	invalid = false,
 	errorId,
 }: PracticeEvidenceEditorProps) {
-	// Open from the start when this occasion is already invalid — a form re-rendered into its error
-	// state never crosses the transition below, and the fix is not reachable from the collapsed summary.
+	// Open from the start when this occasion is already invalid: such a form never crosses the
+	// transition below, and the fix is not reachable from the collapsed summary.
 	const [open, setOpen] = useState(invalid);
-	// Reveal it when a later submit lands an error. Adjusting during render rather than in an effect
-	// keeps it keyed on the error itself, so editing afterwards no longer re-opens the panel under the
-	// caret. https://react.dev/learn/you-might-not-need-an-effect
+	// Reveal it on the transition into invalid rather than on the flag, which stays true while the
+	// author fixes it — an editor re-opening under the caret on every keystroke would be unusable.
+	// https://react.dev/learn/you-might-not-need-an-effect
 	const [lastInvalid, setLastInvalid] = useState(invalid);
 	if (invalid !== lastInvalid) {
 		setLastInvalid(invalid);
@@ -109,7 +98,7 @@ export function PracticeEvidenceEditor({
 			<div
 				className="rounded-lg border bg-muted/30 p-3 text-sm"
 				id={`${idPrefix}-evidence`}
-				// Same reason as the signal group: reachable by a form-level error, not by Tab.
+				// A focus target for a form-level error, not a Tab stop.
 				tabIndex={-1}
 			>
 				<dl className="grid gap-2 sm:grid-cols-[8rem_1fr]">
@@ -275,11 +264,7 @@ interface AbsenceClaimProps {
 }
 
 /**
- * The one thing EXHAUSTIVE adds to REQUIRED, asked as that thing.
- *
- * <p>Offered as a follow-up to "Required" rather than as a fourth role because that is what the stance
- * is: the same source, read for the same review, with one further claim resting on the capture being
- * whole. Absent — not present-and-unselectable — where the source contract can never promise a whole
+ * Absent — not present-and-unselectable — where the source contract can never promise a whole
  * capture, since choosing it there is a request the server refuses.
  */
 function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: AbsenceClaimProps) {

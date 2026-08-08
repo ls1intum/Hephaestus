@@ -82,7 +82,7 @@ export interface PracticeDefinitionValue {
 	slug: string;
 	name: string;
 	areaSlug?: string;
-	/** The occasions this practice is reviewed on. The kind of work is read off their signals. */
+	/** The kind of work is read off these signals; it is not carried separately. */
 	bindings: PracticeBinding[];
 	criteria: string;
 	whyItMatters?: string;
@@ -99,16 +99,13 @@ interface PracticeDefinitionFormBaseProps {
 	afterFields?: React.ReactNode;
 	cancelAction: React.ReactNode;
 	/**
-	 * Saves the practice.
-	 *
-	 * <p>Return a promise that rejects when the save failed. The unsaved-changes guard then stays down
-	 * from the moment of submit until it hears otherwise, which is what stops a caller that navigates
-	 * straight after an awaited save being asked whether to discard the changes it just saved. A
-	 * caller that returns nothing keeps the guard exactly as it is.
+	 * Return a promise that rejects when the save failed: the unsaved-changes guard then stays down
+	 * from submit until it hears otherwise, so a caller navigating straight after an awaited save is
+	 * not asked to discard the changes it just saved. A caller returning nothing leaves the guard as
+	 * it is.
 	 */
 	onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>;
 	definitionOptions: PracticeDefinitionOptions;
-	/** How this practice's evidence requirements have turned out on recent reviews, when it has any. */
 	evidenceOutcome?: PracticeEvidenceOutcome;
 }
 
@@ -177,8 +174,8 @@ const EMPTY_POLICY: PracticeAutomatedReviewPolicy = {
 };
 
 /**
- * The new work type's recommended frame, keeping the answer the author already gave about how far
- * Hephaestus may go. Changing what is reviewed is not a decision to start reviewing it.
+ * Keeps the answer the author already gave about how far Hephaestus may go: changing what is
+ * reviewed is not a decision to start reviewing it.
  */
 function recommendedPolicyWithCurrentSupport(
 	recommended: PracticeAutomatedReviewPolicy,
@@ -225,13 +222,11 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const workTypes = orderedWorkTypes(definitionOptions);
 	const artifactKind = artifactKindOfBindings(form.bindings);
 	const selectedWorkType = workTypeOptionsFor(definitionOptions, artifactKind);
-	// Recorded history belongs to the work type the practice was reviewed under. Switching work type in
-	// the form changes which sources are even allowed, so the same rows would resolve to "Unknown
-	// source" and describe a work type the author is no longer editing.
+	// Recorded history belongs to the work type the practice was reviewed under: switching work type
+	// changes which sources are allowed, so the same rows would resolve to "Unknown source".
 	const workTypeUnchanged = artifactKindOfBindings(initialData?.bindings ?? []) === artifactKind;
-	// What the author had written under each work type, so switching away and back does not throw it
-	// out. `useRef` takes no lazy initialiser, so the map is built on the first render and every later
-	// render is spared building one to discard.
+	// `useRef` takes no lazy initialiser, so the map is built on the first render and every later one
+	// is spared building a map to discard.
 	// https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents
 	const draftsRef = useRef<Map<string, WorkTypeDraft>>(null);
 	draftsRef.current ??= new Map(
@@ -255,10 +250,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	);
 	const guidanceOnly = form.automatedReviewPolicy.automatedReview.mode === "NONE";
 	const isDirty = !deepEqual(form, initialState(definitionOptions, initialData));
-	// Down from the moment a save is dispatched until the caller says it failed. `isPending` drops the
-	// instant the mutation resolves and the caller navigates on the very next line, so releasing the
-	// guard on that alone races the navigation and asks "Discard unsaved changes?" about a save that
-	// has just succeeded.
+	// Down from the moment a save is dispatched until the caller says it failed. `isPending` drops
+	// before the caller navigates, so releasing the guard on it races that navigation.
 	const [saving, setSaving] = useState(false);
 	const guarded = isDirty && !saving;
 	const blocker = useBlocker({
@@ -308,8 +301,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	};
 
 	// Evidence is forbidden outright while no review runs and mandatory as soon as one does, so the
-	// support choice has to reach into every occasion rather than leaving the author to fix each by
-	// hand and be refused on save.
+	// support choice has to reach into every occasion rather than leave the author to be refused on
+	// save.
 	const updatePolicy = (automatedReviewPolicy: PracticeAutomatedReviewPolicy) => {
 		setForm((previous) => {
 			const nowGuidanceOnly = automatedReviewPolicy.automatedReview.mode === "NONE";
@@ -389,8 +382,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			automatedReviewPolicy: form.automatedReviewPolicy,
 		});
 		// Only a caller that returns a promise can say the save failed, so only that caller gets the
-		// guard held down for it. One that returns nothing is telling us nothing, and holding the guard
-		// down on no information would leave a failed save unprotected for good.
+		// guard held down for it.
 		if (submission instanceof Promise) {
 			setSaving(true);
 			void submission.catch(() => setSaving(false));

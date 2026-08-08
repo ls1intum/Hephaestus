@@ -20,7 +20,6 @@ function member(index: number): ExtendedUserTeams {
 	};
 }
 
-/** Workspace-admin view for re-running a member's achievement calculation. */
 const meta = {
 	component: AdminAchievementsTable,
 	parameters: { layout: "fullscreen" },

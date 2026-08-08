@@ -8,10 +8,9 @@ import { tracedArtifacts } from "./story-mock-data";
 import { TraceListPage } from "./TraceListPage";
 
 /**
- * The rest of this page is covered by its stories. The page links are not, and cannot be: they are
- * built with `search={(previous) => …}`, where `previous` is the *router's* search params rather
- * than the component's prop — so proving they carry the filter takes a router whose current
- * location has one, which the Storybook preview's shared router does not.
+ * Not a story: the page links are built with `search={(previous) => …}`, where `previous` is the
+ * *router's* search params rather than the component's prop, so proving they carry the filter takes
+ * a router whose location has one — which the Storybook preview's shared router does not.
  */
 describe("paging a filtered list", () => {
 	function renderAtPage(page: number) {

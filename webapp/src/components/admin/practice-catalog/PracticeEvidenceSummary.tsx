@@ -43,11 +43,8 @@ interface OccasionSummaryProps {
 }
 
 /**
- * One occasion, read back as the sentence it is: this review starts here, and reads these things.
- *
- * <p>Listing every occasion separately rather than merging their evidence into one set is the whole
- * point of binding evidence to the occasion — a merged list would say the practice reads the review
- * threads exhaustively without saying that only the review at the merge does.
+ * Listed per occasion rather than merged into one set: a merged list would say the practice reads the
+ * review threads whole without saying that only the review at the merge does.
  */
 function OccasionSummary({ binding, index, sources, signals }: OccasionSummaryProps) {
 	const required = binding.needs.filter((need) => need.stance !== "CONTEXTUAL");
@@ -100,7 +97,6 @@ function OccasionSummary({ binding, index, sources, signals }: OccasionSummaryPr
 
 export interface PracticeEvidenceSummaryProps {
 	policy: PracticeAutomatedReviewPolicy;
-	/** The occasions this practice is reviewed on, each with the evidence that review reads. */
 	bindings: readonly PracticeBinding[];
 	validation: PracticeAutomatedReviewValidation;
 	sources: readonly PracticeEvidenceSourceOption[];

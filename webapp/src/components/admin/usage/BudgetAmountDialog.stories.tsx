@@ -13,10 +13,6 @@ const EUR: Fx = {
 	source: "ECB",
 };
 
-/**
- * The money-cap editor shared by both budget dialogs. It owns the rules both caps obey — USD, at
- * least $0, at most two decimals, `null` removes the cap, `0` pauses now — and callers supply copy.
- */
 const meta = {
 	component: BudgetAmountDialog,
 	parameters: { layout: "centered" },

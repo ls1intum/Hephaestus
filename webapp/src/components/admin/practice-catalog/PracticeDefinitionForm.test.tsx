@@ -31,7 +31,6 @@ async function openTechnicalSettings() {
 	return screen.findByRole("textbox", { name: "Identifier" });
 }
 
-/** Fills in enough of a new practice for the form to accept it. */
 function fillValidDraft() {
 	fireEvent.change(nameField(), { target: { value: "Explain what changed and why" } });
 	fireEvent.change(screen.getByRole("textbox", { name: /What to look for/ }), {
@@ -66,7 +65,6 @@ describe("the identifier a practice is created under", () => {
 
 		expect((slugField() as HTMLInputElement).value).toBe("small-changes");
 
-		// …and following the name again from there.
 		fireEvent.change(nameField(), { target: { value: "Small, reviewable changes" } });
 		expect((slugField() as HTMLInputElement).value).toBe("small-reviewable-changes");
 	});
@@ -74,8 +72,8 @@ describe("the identifier a practice is created under", () => {
 
 /**
  * `isPending` drops the instant the mutation resolves, and the caller navigates on the very next
- * line. Releasing the unsaved-changes guard on `isPending` alone therefore races that navigation and
- * asks "Discard unsaved changes?" about the save that has just succeeded.
+ * line. Releasing the guard on `isPending` alone therefore races that navigation and asks "Discard
+ * unsaved changes?" about the save that has just succeeded.
  */
 describe("the unsaved-changes guard around a save", () => {
 	it("stays out of the way of a caller navigating after a successful save", async () => {

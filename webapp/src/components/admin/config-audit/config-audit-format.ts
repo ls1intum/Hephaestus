@@ -5,8 +5,8 @@ type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;
 type ActorKind = NonNullable<ConfigAuditEntryView["actorKind"]>;
 
-/** Entity types renamed since: the trail is append-only, so old rows keep the spelling they were
- * written under and must still read as the thing they describe. */
+/** The trail is append-only, so a row keeps the spelling it was written under: entity types that no
+ * longer exist under these names must still read as the thing they describe. */
 const RENAMED_ENTITY_TYPE_LABELS = {
 	AGENT_CONFIG: "Agent config",
 	AI_CONFIG_BINDING: "AI binding",

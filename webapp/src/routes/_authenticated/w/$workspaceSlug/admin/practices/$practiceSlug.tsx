@@ -59,8 +59,8 @@ function EditPracticeContainer() {
 	const definitionOptionsQuery = useQuery({
 		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
 	});
-	// Outside the gates below: how past reviews turned out is context for the requirements, not
-	// something the author needs in order to edit them.
+	// Deliberately outside the pending/error gates below: how past reviews turned out is context, not
+	// something the author needs in order to edit the requirements.
 	const evidenceOutcomesQuery = useQuery({
 		...listPracticeEvidenceOutcomesOptions({ path: { workspaceSlug } }),
 	});
@@ -77,9 +77,8 @@ function EditPracticeContainer() {
 		onError: () => toast.error("Couldn't save the practice"),
 	});
 
-	// Reports the failure by rejecting rather than swallowing it: the form holds its unsaved-changes
-	// guard down from submit until it hears one way or the other, so a caught-and-resolved failure
-	// would leave a lost draft unguarded.
+	// Rejects rather than swallowing the failure: the form holds its unsaved-changes guard down from
+	// submit until it hears one way or the other, so resolving on failure would lose the draft.
 	const handleSubmit = async (
 		slug: string,
 		data: UpdatePracticeRequest,

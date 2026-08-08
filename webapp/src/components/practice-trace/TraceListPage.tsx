@@ -51,9 +51,8 @@ export interface TraceListPageProps {
 }
 
 /**
- * Every piece of work this workspace has recorded anything about. The entry point to the question
- * this whole surface exists to answer — "why didn't Hephaestus say anything about my merge
- * request?" — so an artifact appears here even when no practice had a word to say about it.
+ * Every piece of work this workspace has recorded anything about — including work no practice had a
+ * word to say about, which is exactly what "why did nobody say anything?" needs to show.
  */
 export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceListPageProps) {
 	const page = search.page ?? 0;
@@ -64,9 +63,8 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 		}),
 	});
 	const artifacts = query.data?.content ?? [];
-	// Kinds are open-ended and no endpoint enumerates them, so the choices are the ones this build
-	// knows plus any the current page actually shows — and always the active filter, so a filter
-	// arriving by link can still be seen and cleared.
+	// No endpoint enumerates the kinds, so the choices are the ones this build knows plus any the
+	// page shows — and always the active filter, so a filter arriving by link can be seen and cleared.
 	const kinds = [
 		...new Set([
 			...ARTIFACT_KIND_VALUES,
@@ -74,8 +72,8 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 			...(search.kind ? [search.kind] : []),
 		]),
 	];
-	// `items` is what lets the closed trigger show a choice's words. Without it Base UI has nothing to
-	// resolve the selected value against and prints the value itself — "scm.issue", not "Issues".
+	// Without `items`, Base UI has nothing to resolve the selected value against and the closed
+	// trigger prints the value itself — "scm.issue", not "Issues".
 	const kindItems = [
 		{ value: ALL_KINDS, label: "All work" },
 		...kinds.map((kind) => ({ value: kind, label: artifactKindPluralLabel(kind) })),

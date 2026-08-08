@@ -7,9 +7,8 @@
  * `fallback`.
  *
  * **`message` is deliberately not in that list**: a network rejection and a null-deref in our own
- * code are both a thrown `TypeError`, so reading it would put runtime internals under a toast about
- * saving a model. Only wording the server chose is ever shown. A caller that needs to say "no HTTP
- * answer at all" gets that from {@link problemStatusOf} returning `undefined`.
+ * code are both a thrown `TypeError`, so only wording the server chose is ever shown. "No HTTP
+ * answer at all" comes from {@link problemStatusOf} returning `undefined`.
  */
 export function problemDetailOf(
 	err: unknown,

@@ -58,9 +58,8 @@ const PRACTICE_FIELDS = {
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Static analysis",
-	// One row, not two: the occasions and the evidence each of them reads are the same sentence now,
-	// and PracticeEvidenceSummary is what reads it back — including its own "when it is reviewed"
-	// heading, which this label must therefore not repeat.
+	// PracticeEvidenceSummary renders the occasions and their evidence together under a heading of its
+	// own, so this label must not repeat it.
 	automatedReviewPolicy: "How it is reviewed",
 } satisfies Record<
 	Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation" | "bindings">,

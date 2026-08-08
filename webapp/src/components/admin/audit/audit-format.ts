@@ -83,21 +83,18 @@ function stringify(value: unknown): string {
 	return String(value);
 }
 
-/** Tailwind class per severity; `warning` is the only tone that earns a colour. */
 const SEVERITY_DOT: Record<AuditSeverity, string> = {
 	error: "bg-destructive",
 	warning: "bg-warning",
 	info: "bg-muted-foreground/40",
 };
 
-/**
- * The dot's hue is the only marker of a high-risk event, so screen readers get it in words.
- * Import this rather than re-deriving the colours: a second copy drifts silently.
- */
+/** Import this rather than re-deriving the colours; a second copy drifts silently. */
 export function severityDotClass(severity: AuditSeverity): string {
 	return SEVERITY_DOT[severity];
 }
 
+/** The dot's hue is the only visual marker of a high-risk event, so screen readers hear it. */
 export function severityScreenReaderPrefix(severity: AuditSeverity): string | null {
 	return severity === "warning" ? "High-risk event: " : null;
 }

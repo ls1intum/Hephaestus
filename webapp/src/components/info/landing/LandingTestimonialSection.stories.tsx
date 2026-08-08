@@ -36,20 +36,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default testimonial section for first-time visitors.
- * Features the testimonial cards.
- */
 export const Default: Story = {
 	args: {
 		isSignedIn: false,
 	},
 };
 
-/**
- * Testimonial section for authenticated users.
- * The section content does not change with authentication state.
- */
 export const SignedIn: Story = {
 	args: {
 		isSignedIn: true,

@@ -3,7 +3,6 @@ import { fn } from "storybook/test";
 import { expectAmountRejected } from "@/test/budget-amount-field";
 import { SetBudgetDialog } from "./SetBudgetDialog";
 
-/** Instance-admin dialog to set or remove a workspace's monthly shared-model budget. */
 const meta = {
 	component: SetBudgetDialog,
 	parameters: { layout: "centered" },

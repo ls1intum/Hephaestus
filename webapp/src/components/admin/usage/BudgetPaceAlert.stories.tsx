@@ -10,10 +10,7 @@ const eur: FxRateInfo = {
 	source: "ECB",
 };
 
-/**
- * Warn before the wall: how much of a cap is gone, and when this month's pace would reach it. Both
- * consoles render it, so only the subject of the sentence changes — never the figures or their order.
- */
+/** Both consoles render it, so only the subject of the sentence changes — never the figures. */
 const meta = {
 	component: BudgetPaceAlert,
 	parameters: { layout: "padded" },
