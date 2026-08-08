@@ -15,8 +15,7 @@ now resumes the work it paused within about a minute, instead of leaving it queu
 hour. The instance overview gains a read-only column showing which workspaces have capped
 themselves, how much of each cap is used, and which cap paused a workspace.
 
-**Operators:** the budget you set for a workspace now pauses only work on *shared* models. It used
-to also pause work a workspace paid for through its own connected provider — spend you were never
-charged for and could not see the price of. Workspaces on their own key are bounded by their own cap
-instead, which their admins set. If you relied on your budget to stop *all* AI work in a workspace,
-use that workspace's status or feature switches instead.
+The budget an instance administrator sets for a workspace bounds only work on *shared* models — the
+spend the instance is billed for. Work a workspace pays for through its own connected provider is
+bounded by that workspace's own cap. Neither cap is a way to stop all AI work in a workspace; the
+workspace's status and its feature switches are.

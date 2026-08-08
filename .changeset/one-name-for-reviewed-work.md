@@ -6,8 +6,7 @@ Reviewed work is named the same way everywhere. A practice, a review run and a r
 all now identify what was reviewed as `scm.pull_request`, `scm.issue` or `chat.conversation_thread`,
 instead of two internal vocabularies that had already drifted apart — a chat thread was called one
 thing where reviews are stored and another where they are run. The bundled practice catalog, the API
-and the admin screens use the new names, and existing practices, reviews and observations are moved
-across on upgrade.
+and the admin screens use the new names.
 
 **Operators:** this is a one-way change — the upgrade rewrites the names in place, so rolling the
 release back requires rolling the database change back with it. Two effects are
