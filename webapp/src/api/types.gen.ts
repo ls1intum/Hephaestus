@@ -2307,12 +2307,17 @@ export type ReviewBackfillRun = {
      * Forecast total spend in USD; absent when the workspace has no priced review history
      */
     estimatedCostUsd?: number;
+    /**
+     * artifacts whose submission threw, leaving no job and no recorded decision. Non-zero
+     * means this campaign's baseline has holes in it, which is why it is reported apart from a pass.
+     */
+    failedCount: number;
     finishedAt?: Date;
     fromAt: Date;
     id: string;
     /**
      * artifacts walked past without one: already measured at their current state, or
-     * refused by the review gate. Together with <code>submittedCount</code> this is how far the walk has got.
+     * refused by the review gate. The campaign looked at each of these and decided.
      */
     passedCount: number;
     /**

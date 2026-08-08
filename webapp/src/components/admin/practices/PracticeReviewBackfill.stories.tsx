@@ -21,6 +21,7 @@ const run = (overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRu
 		estimatedCostUsd: 15.36,
 		submittedCount: 0,
 		passedCount: 0,
+		failedCount: 0,
 		requestedByAccountId: 7,
 		createdAt: "2026-08-07T09:00:00Z",
 		...overrides,
@@ -116,6 +117,30 @@ export const Running: Story = {
 		runs: [
 			run({ status: "RUNNING", submittedCount: 40, passedCount: 12, confirmedByAccountId: 7 }),
 		],
+	},
+};
+
+/**
+ * An artifact the campaign could not read is not one it measured and found nothing in. Folding the
+ * two together would leave a baseline in which "not reviewed" and "reviewed, nothing found" are the
+ * same absence, which is the one thing a baseline may not do.
+ */
+export const SomeCouldNotBeRead: Story = {
+	args: {
+		runs: [
+			run({
+				status: "RUNNING",
+				submittedCount: 40,
+				passedCount: 12,
+				failedCount: 3,
+				confirmedByAccountId: 7,
+			}),
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/3 could not be read, and stay unmeasured/i)).toBeVisible();
+		await expect(canvas.getByText(/12 already measured/i)).toBeVisible();
 	},
 };
 

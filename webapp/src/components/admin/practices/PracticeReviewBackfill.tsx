@@ -322,7 +322,7 @@ function ActiveRunCard({
 	isUpdating: boolean;
 	onCancel: (runId: string) => void;
 }) {
-	const walked = run.submittedCount + run.passedCount;
+	const walked = run.submittedCount + run.passedCount + run.failedCount;
 	const total = Math.max(run.estimatedArtifacts, walked);
 	const percent = total === 0 ? 100 : Math.round((walked / total) * 100);
 
@@ -343,6 +343,9 @@ function ActiveRunCard({
 					<p className="text-muted-foreground text-sm">
 						{walked} of {countOf(total, run.artifactKind)} looked at — {run.submittedCount} sent for
 						review, {run.passedCount} already measured or outside your review rules.
+						{run.failedCount > 0
+							? ` ${run.failedCount} could not be read, and stay unmeasured.`
+							: ""}
 					</p>
 				</div>
 
@@ -402,7 +405,11 @@ function HistoryCard({ runs, isLoading }: { runs: ReviewBackfillRun[]; isLoading
 									<ItemDescription>
 										{run.status === "CANCELLED"
 											? `Stopped after reviewing ${countOf(run.submittedCount, run.artifactKind)}.`
-											: `Reviewed ${countOf(run.submittedCount, run.artifactKind)}; ${run.passedCount} needed no new measurement.`}
+											: `Reviewed ${countOf(run.submittedCount, run.artifactKind)}; ${run.passedCount} needed no new measurement.${
+													run.failedCount > 0
+														? ` ${run.failedCount} could not be read, and stay unmeasured.`
+														: ""
+												}`}
 									</ItemDescription>
 								</ItemContent>
 								<ItemActions>
