@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.providers.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
@@ -287,21 +286,19 @@ public class PracticeDetectionDeliveryService {
                     job.getId()
             );
         }
-        // Only what the bindings this occasion matched declared. A citation to a source another
-        // binding of the same practice reads is still out of bounds here: that source was never staged
-        // for this run, so a quote from it cannot have been read.
-        // Plus what every run stages regardless of any binding. These are declared sources with staged
-        // bytes, so a claim about an earlier observation is held to the same quote check as a claim
-        // about a diff — the point of staging history as evidence rather than as loose context.
-        Set<SourceKind> declared = new HashSet<>(EvidencePlan.WORKSPACE_CONTEXT_SOURCES);
+        // The sources a practice may assert an ABSENCE over are still its own: that stance is a claim
+        // about how far "I did not find it" reaches, and only the practice author can make it. What a
+        // practice may CITE is no longer narrowed the same way. Every source that applies to the
+        // artifact is staged for every review now, so a quote from one this practice's bindings did not
+        // name is a quote from bytes that were really there and really read — the fabrication check is
+        // the manifest and the byte-exact quote below, not a list of sources somebody predicted.
         Set<SourceKind> exhaustive = new HashSet<>();
         PracticeBinding.needsFor(revision.getBindings(), PracticeCatalogInjector.signalOf(job)).forEach(need -> {
-            declared.add(need.sourceKind());
             if (need.stance() == EvidenceStance.EXHAUSTIVE) {
                 exhaustive.add(need.sourceKind());
             }
         });
-        enforceRecordedSearch(finding, declared, exhaustive, boundary, job);
+        enforceRecordedSearch(finding, exhaustive, boundary, job);
         for (JsonNode citation : citations) {
             JsonNode sourceKind = citation.path("sourceKind");
             JsonNode artifactPath = citation.path("artifactPath");
@@ -349,14 +346,9 @@ public class PracticeDetectionDeliveryService {
                 );
             }
             SourceArtifactRef artifact = boundary.artifacts().get(artifactPath.asText());
-            if (
-                !declared.contains(kind) ||
-                !boundary.allowedSources().contains(kind) ||
-                artifact == null ||
-                !artifact.kind().equals(kind)
-            ) {
+            if (!boundary.allowedSources().contains(kind) || artifact == null || !artifact.kind().equals(kind)) {
                 throw new JobDeliveryException(
-                    "Finding cited unavailable, undeclared, or misattributed evidence source " +
+                    "Finding cited unavailable or misattributed evidence source " +
                         kind +
                         ": slug=" +
                         finding.practiceSlug() +
@@ -471,7 +463,6 @@ public class PracticeDetectionDeliveryService {
      */
     private void enforceRecordedSearch(
         ValidatedFinding finding,
-        Set<SourceKind> declared,
         Set<SourceKind> exhaustive,
         EvidenceBoundary boundary,
         AgentJob job
@@ -522,9 +513,9 @@ public class PracticeDetectionDeliveryService {
             }
             // Same boundary the citations answer to: a source this run never staged cannot have been
             // searched, so claiming it was is the absence-shaped version of citing evidence we never had.
-            if (!declared.contains(sourceKind) || !boundary.allowedSources().contains(sourceKind)) {
+            if (!boundary.allowedSources().contains(sourceKind)) {
                 throw new JobDeliveryException(
-                    "Recorded search claims an undeclared or unavailable source " +
+                    "Recorded search claims a source this run did not stage " +
                         sourceKind +
                         ": slug=" +
                         finding.practiceSlug() +

@@ -96,29 +96,29 @@ test("citation side is present exactly for pull-request diffs", () => {
     assert.throws(() => normalizeFinding(nonDiffSide), /must not specify side/);
 });
 
-test("evidence sources must be declared and available", () => {
+test("a citation must name a source this run staged, and the artifact that source produced", () => {
     const finding = normalizeFinding(baseFinding());
     assert.doesNotThrow(() =>
         validateEvidenceSources(
             finding,
             new Set(["scm.pull-request.diff"]),
-            new Set(["scm.pull-request.diff"]),
             new Map([["inputs/context/diff.patch", "scm.pull-request.diff"]]),
         ),
     );
-    assert.throws(
-        () => validateEvidenceSources(finding, new Set(["scm.pull-request.core"]), new Set(["scm.pull-request.diff"])),
-        /does not declare/,
+    // The practice's own bindings no longer narrow this: every source that applies to the artifact is
+    // staged, so a quote from one the practice did not name is still a quote from bytes that were there.
+    assert.doesNotThrow(() =>
+        validateEvidenceSources(
+            finding,
+            new Set(["scm.pull-request.diff", "workspace.project-inventory"]),
+            new Map([["inputs/context/diff.patch", "scm.pull-request.diff"]]),
+        ),
     );
-    assert.throws(
-        () => validateEvidenceSources(finding, new Set(["scm.pull-request.diff"]), new Set(), new Map()),
-        /was not available/,
-    );
+    assert.throws(() => validateEvidenceSources(finding, new Set(), new Map()), /was not available/);
     assert.throws(
         () =>
             validateEvidenceSources(
                 finding,
-                new Set(["scm.pull-request.diff"]),
                 new Set(["scm.pull-request.diff"]),
                 new Map([["inputs/context/diff.patch", "scm.pull-request.core"]]),
             ),
@@ -213,39 +213,32 @@ test("a non-ABSENT observation needs no search block, but keeps one it offers", 
 
 test("ABSENT is refused unless the search covered every source the practice asserts absence over", () => {
     const finding = normalizeFinding(absentFinding(goodSearch));
-    const declared = new Set(["scm.review-threads", "scm.linked-work-items"]);
     const available = new Set(["scm.review-threads", "scm.linked-work-items"]);
 
     // Searched exactly the exhaustive domain.
-    assert.doesNotThrow(() =>
-        validateSearchScope(finding, new Set(["scm.review-threads"]), declared, available),
-    );
+    assert.doesNotThrow(() => validateSearchScope(finding, new Set(["scm.review-threads"]), available));
     // A source the practice asserts absence over that the search never opened: the claim ranges over a
     // corpus that was not read, which is the one thing an absence may never do.
     assert.throws(
-        () => validateSearchScope(finding, new Set(["scm.review-threads", "scm.linked-work-items"]), declared, available),
+        () => validateSearchScope(finding, new Set(["scm.review-threads", "scm.linked-work-items"]), available),
         /without searching scm.linked-work-items/,
     );
     // Claiming to have searched something this run never staged.
-    assert.throws(
-        () => validateSearchScope(finding, new Set(), new Set(["scm.linked-work-items"]), available),
-        /does not declare evidence source/,
-    );
-    assert.throws(() => validateSearchScope(finding, new Set(), declared, new Set()), /was not available/);
+    assert.throws(() => validateSearchScope(finding, new Set(), new Set()), /was not available/);
 });
 
 test("the search scope rule applies to ABSENT only", () => {
     const present = normalizeFinding(baseFinding());
     assert.doesNotThrow(() =>
-        validateSearchScope(present, new Set(["scm.review-threads"]), new Set(), new Set()),
+        validateSearchScope(present, new Set(["scm.review-threads"]), new Set()),
     );
 });
 
 test("a claim about an earlier review is bound to the staged history like any other citation", () => {
-    // The history is staged for every practice without any binding declaring it, so index.json lists it
-    // in allowedSources and the normalizer must accept it. The point of declaring it as a source rather
-    // than dropping it in as loose context is exactly this: "we raised this before" becomes a quote that
-    // has to match staged bytes, instead of a plausible sentence nothing can check.
+    // The history is staged for every review without any binding declaring it, as every source now is.
+    // The point of declaring it as a source rather than dropping it in as loose context is exactly this:
+    // "we raised this before" becomes a quote that has to match staged bytes, instead of a plausible
+    // sentence nothing can check.
     const finding = normalizeFinding(
         baseFinding({
             evidence: {
@@ -263,22 +256,22 @@ test("a claim about an earlier review is bound to the staged history like any ot
         }),
     );
     const artifacts = new Map([["inputs/history/observations.json", "hephaestus.observation-history"]]);
-    const declared = new Set(["scm.pull-request.diff", "hephaestus.observation-history"]);
+    const staged = new Set(["scm.pull-request.diff", "hephaestus.observation-history"]);
 
-    assert.doesNotThrow(() => validateEvidenceSources(finding, declared, declared, artifacts));
-    const staged = '{"observations":[{"recurrenceKey": "rec-1","title":"Caught and ignored"}]}';
-    assert.equal(citationMatchesArtifact(finding.evidence.citations[0], staged), true);
+    assert.doesNotThrow(() => validateEvidenceSources(finding, staged, artifacts));
+    const bytes = '{"observations":[{"recurrenceKey": "rec-1","title":"Caught and ignored"}]}';
+    assert.equal(citationMatchesArtifact(finding.evidence.citations[0], bytes), true);
     // An earlier observation that was never staged cannot be quoted into existence.
     assert.equal(
-        citationMatchesArtifact({ ...finding.evidence.citations[0], quote: '"recurrenceKey": "invented"' }, staged),
+        citationMatchesArtifact({ ...finding.evidence.citations[0], quote: '"recurrenceKey": "invented"' }, bytes),
         false,
     );
 });
 
 test("the history is never an exhaustive source, so it can never carry an absence", () => {
     // It is a bounded window over a growing record: it can show that something recurred and can never
-    // show that something never happened. PracticeCatalogInjector puts it in allowedSources only, so an
-    // ABSENT claim can cite it as one place it looked but can never rest on it.
+    // show that something never happened. No practice may hold it EXHAUSTIVE, so an ABSENT claim can
+    // cite it as one place it looked but can never rest on it.
     const finding = normalizeFinding(
         absentFinding({
             consulted: ["scm.review-threads", "hephaestus.observation-history"],
@@ -286,8 +279,8 @@ test("the history is never an exhaustive source, so it can never carry an absenc
             boundary: "threads on this pull request, plus the earlier record for this person",
         }),
     );
-    const declared = new Set(["scm.review-threads", "hephaestus.observation-history"]);
+    const staged = new Set(["scm.review-threads", "hephaestus.observation-history"]);
 
     // Consulting it is fine — it is a place the review genuinely looked.
-    assert.doesNotThrow(() => validateSearchScope(finding, new Set(["scm.review-threads"]), declared, declared));
+    assert.doesNotThrow(() => validateSearchScope(finding, new Set(["scm.review-threads"]), staged));
 });

@@ -219,11 +219,10 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         // index.json lists both practices (area falls back to the slug when ungrouped).
         String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
         assertThat(index).contains("authoring").contains("retrospective");
-        assertThat(index).contains("allowedSources").contains("scm.pull-request.diff");
-        // Every practice may cite the history, whether or not its bindings asked for it: it is workspace
-        // context, not per-practice evidence. This array is the whole of what the in-sandbox normalizer
-        // accepts a citation against, so omitting it here would stage history the model could not cite.
-        assertThat(index).contains("hephaestus.observation-history").contains("hephaestus.feedback-history");
+        // A pointer to where this practice's author expects the answer — not a fence. What may be cited
+        // is what the run staged, and inputs/manifest.json is where that is stated, once.
+        assertThat(index).contains("readsSources").contains("scm.pull-request.diff");
+        assertThat(index).doesNotContain("allowedSources");
         // Per-slug criteria + the all-criteria bundle are present.
         assertThat(files).containsKey(md("authoring")).containsKey(md("retrospective"));
         String bundle = new String(

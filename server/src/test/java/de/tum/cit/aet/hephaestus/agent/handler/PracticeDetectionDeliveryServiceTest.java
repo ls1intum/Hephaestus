@@ -156,8 +156,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getSlug()).thenReturn("pr-description-quality");
         lenient().when(revision.getPractice()).thenReturn(testPractice);
         lenient().when(revision.getAutomatedReviewPolicy()).thenReturn(testPractice.getAutomatedReviewPolicy());
-        // The evidence boundary is drawn from the revision's bindings: a citation to a source no
-        // binding of this occasion declared was never staged, so a quote from it cannot have been read.
+        // The bindings still decide what this practice may assert an ABSENCE over. They no longer decide
+        // what it may cite: every source that applies to the artifact is staged for every review.
         lenient().when(revision.getBindings()).thenReturn(testPractice.getBindings());
         lenient().when(practiceRevisionRepository.findById(11L)).thenReturn(Optional.of(revision));
         lenient()
@@ -301,7 +301,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void rejectsSourcesOutsideThePracticeDeclaration() {
+        @DisplayName("a citation to a source this run did not stage is refused")
+        void rejectsSourcesTheRunNeverStaged() {
             ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
             ObjectNode citation = (ObjectNode) finding.evidence().withArray("citations").get(0);
             citation.put("sourceKind", "scm.repository.tree");
@@ -311,6 +312,40 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("misattributed evidence source");
             verifyNoInteractions(observationRepository);
+        }
+
+        /**
+         * Every source that applies to the artifact is staged for every review, so a quote from one this
+         * practice's bindings never named is a quote from bytes that were really there. Refusing it would
+         * throw away a finding for being observant — and the orchestrator prompt sends the model to the
+         * project inventory for cross-artifact judgement, which no shipped practice declares.
+         */
+        @Test
+        @DisplayName("a citation to a staged source the practice's bindings did not name is accepted")
+        void acceptsAStagedSourceOutsideThePracticeDeclaration() {
+            var inventory = ((ObjectNode) testJob.getEvidenceSnapshot().path("manifest")).withArray("sources")
+                .addObject()
+                .put("kind", "workspace.project-inventory");
+            inventory.putObject("state").put("availability", "AVAILABLE").put("content", "NON_EMPTY");
+            inventory
+                .putArray("artifacts")
+                .addObject()
+                .put("path", "inputs/context/project_inventory.json")
+                .put("sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");
+            when(cas.get("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")).thenReturn(
+                Optional.of(
+                    "{\"issues\":[{\"number\":7,\"title\":\"Same migration\"}]}".getBytes(StandardCharsets.UTF_8)
+                )
+            );
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.PRESENT);
+            ObjectNode citation = (ObjectNode) finding.evidence().withArray("citations").get(0);
+            citation.put("sourceKind", "workspace.project-inventory");
+            citation.put("artifactPath", "inputs/context/project_inventory.json");
+            citation.put("path", "project_inventory.json");
+            citation.put("quote", "\"title\":\"Same migration\"");
+            citation.remove("side");
+
+            assertThat(service.deliver(testJob, List.of(finding)).inserted()).isEqualTo(1);
         }
 
         @Test
@@ -526,7 +561,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
                 .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("undeclared or unavailable source");
+                .hasMessageContaining("claims a source this run did not stage");
             verifyNoInteractions(observationRepository);
         }
 

@@ -1,11 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
@@ -170,23 +168,19 @@ class PracticeCatalogInjector {
             }
             entry.put("revisionId", p.getCurrentRevision().getId());
             entry.put("defectDetector", p.isDefectDetector());
-            ArrayNode allowedSources = entry.putArray("allowedSources");
-            // What every run stages whether or not a binding asked for it. Listed per practice because
-            // this array is the whole of what the in-sandbox normalizer will accept a citation against,
-            // and a review that may read the history must be able to cite what it read there.
-            EvidencePlan.WORKSPACE_CONTEXT_SOURCES.stream()
-                .map(SourceKind::value)
-                .sorted()
-                .forEach(allowedSources::add);
-            // Only what the bindings this occasion matched actually read. A practice bound to both a
-            // merge and an opening may read a decision record on one and not the other; listing the
-            // union would tell the model it may cite evidence this run never staged.
+            // Where this practice's author expects the answer to be — a pointer into a sandbox that now
+            // stages the whole workspace, not a fence around it. What may be CITED is what the run
+            // staged, which {@code inputs/manifest.json} states once for every practice; a per-practice
+            // copy of that would only be a second thing to disagree with it. A practice whose subject
+            // turns out to live somewhere its author did not think to name is the case full context
+            // exists to catch, so reading beyond this list is expected rather than a violation.
+            ArrayNode readsSources = entry.putArray("readsSources");
             PracticeBinding.needsFor(p.getBindings(), signalOf(job))
                 .stream()
                 .map(need -> need.sourceKind().value())
                 .distinct()
                 .sorted()
-                .forEach(allowedSources::add);
+                .forEach(readsSources::add);
             // The subset the practice holds EXHAUSTIVE: the sources it says its claim asserts something
             // is NOT in. That stance is what makes an absence assertable at all, so it doubles as the
             // domain a search must cover before the runner will accept an ABSENT observation. Published

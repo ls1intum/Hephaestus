@@ -150,12 +150,18 @@ export function dedupeKeyForFinding(finding) {
     return `${finding.practiceSlug}|${finding.title}|${citations}`;
 }
 
-export function validateEvidenceSources(finding, declaredSourceKinds, availableSourceKinds, artifactSources = new Map()) {
+/**
+ * Holds every citation to bytes this run actually staged, under the source that produced them.
+ *
+ * <p>The run stages every source that applies to the artifact, so the question is no longer whether
+ * the practice predicted it would read this one — it is whether the source was there and the quote
+ * really came out of it. A practice whose subject turns out to live in a source its author did not
+ * name is exactly the case full context exists to catch, and rejecting its citation would have thrown
+ * away the finding for being observant.
+ */
+export function validateEvidenceSources(finding, availableSourceKinds, artifactSources = new Map()) {
     for (const citation of finding.evidence.citations) {
         const sourceKind = citation.sourceKind;
-        if (!declaredSourceKinds.has(sourceKind)) {
-            throw new Error(`practice '${finding.practiceSlug}' does not declare evidence source '${sourceKind}'`);
-        }
         if (!availableSourceKinds.has(sourceKind)) {
             throw new Error(`evidence source '${sourceKind}' was not available to this invocation`);
         }
@@ -173,20 +179,15 @@ export function validateEvidenceSources(finding, declaredSourceKinds, availableS
  * domain: an ABSENT observation that did not consult one of them is asserting a universal over a
  * corpus it never opened, and the honest answer is INDETERMINATE instead.
  *
- * <p>Consulting something the practice never declared is the same error the citation check already
- * rejects — the source was not staged for this run, so it cannot have been searched.
+ * <p>Consulting something this run never staged is the same error the citation check already rejects —
+ * the bytes were not there, so they cannot have been searched.
  */
-export function validateSearchScope(finding, exhaustiveSourceKinds, declaredSourceKinds, availableSourceKinds) {
+export function validateSearchScope(finding, exhaustiveSourceKinds, availableSourceKinds) {
     if (finding.presence !== "ABSENT") return;
     const search = finding.evidence.search;
     if (!search) throw new Error("an ABSENT observation must record its search");
     const consulted = new Set(search.consulted);
     for (const sourceKind of consulted) {
-        if (!declaredSourceKinds.has(sourceKind)) {
-            throw new Error(
-                `practice '${finding.practiceSlug}' does not declare evidence source '${sourceKind}', so it cannot have been searched`,
-            );
-        }
         if (!availableSourceKinds.has(sourceKind)) {
             throw new Error(`searched source '${sourceKind}' was not available to this invocation`);
         }

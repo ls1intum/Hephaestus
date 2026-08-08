@@ -70,11 +70,11 @@ const artifactSources = new Map(
     ),
 );
 const practiceIndex = JSON.parse(readFileSync(`${CWD}/inputs/practices/index.json`, "utf8"));
-const practiceSources = new Map(
-    practiceIndex.map((practice) => [practice.slug, new Set(practice.allowedSources)]),
-);
+const admittedPractices = new Set(practiceIndex.map((practice) => practice.slug));
 // The sources this practice holds EXHAUSTIVE — the domain over which it is allowed to assert an
-// absence, and therefore the domain a search must cover before ABSENT is sound.
+// absence, and therefore the domain a search must cover before ABSENT is sound. The only per-practice
+// source list left: what may be CITED is what the manifest says this run staged, which is the same
+// answer for every practice.
 const practiceExhaustiveSources = new Map(
     practiceIndex.map((practice) => [practice.slug, new Set(practice.exhaustiveSources ?? [])]),
 );
@@ -306,13 +306,11 @@ function appendFindings(findings) {
 
 function normalizeAndValidateFinding(rawFinding) {
     const finding = normalizeFinding(rawFinding);
-    const declaredSourceKinds = practiceSources.get(finding.practiceSlug);
-    if (!declaredSourceKinds) throw new Error(`unknown practice '${finding.practiceSlug}'`);
-    validateEvidenceSources(finding, declaredSourceKinds, availableSourceKinds, artifactSources);
+    if (!admittedPractices.has(finding.practiceSlug)) throw new Error(`unknown practice '${finding.practiceSlug}'`);
+    validateEvidenceSources(finding, availableSourceKinds, artifactSources);
     validateSearchScope(
         finding,
         practiceExhaustiveSources.get(finding.practiceSlug) ?? new Set(),
-        declaredSourceKinds,
         availableSourceKinds,
     );
     for (const citation of finding.evidence.citations) {
