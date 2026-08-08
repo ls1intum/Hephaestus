@@ -1,15 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.core.framework;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 

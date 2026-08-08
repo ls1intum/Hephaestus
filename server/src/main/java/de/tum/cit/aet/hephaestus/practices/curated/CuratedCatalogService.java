@@ -490,14 +490,6 @@ public class CuratedCatalogService {
         }
     }
 
-    private void resequenceAreas(List<String> orderedSlugs, Instant now) {
-        for (int position = 0; position < orderedSlugs.size(); position++) {
-            CuratedAreaOverride override = areaOverride(orderedSlugs.get(position), now);
-            override.setPosition(position, now);
-            areaOverrides.save(override);
-        }
-    }
-
     private void clearPracticeDefinition(String slug) {
         practiceOverrides
             .findBySlug(slug)
