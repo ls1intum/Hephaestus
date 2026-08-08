@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
@@ -68,10 +69,15 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
     }
 
     /**
-     * Reports the truncation the payload already records.
+     * Reports the truncation the payload already records, and reads emptiness out of the payload.
      *
      * <p>The default capture leaves completeness to the catalog, which permits COMPLETE for this source —
      * so a pull request past the comment limit would be described as holding all of them.
+     *
+     * <p>Emptiness cannot come from the staged file list here, because the file is written whether or not
+     * there were comments: a pull request nobody commented on stages {@code {"comments": []}}, which is the
+     * review reporting that it read the comments and there were none. Left to the default, the presence of
+     * that file would answer NON_EMPTY and quietly turn "no comments" into "comments exist".
      */
     @Override
     public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
@@ -80,14 +86,15 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
         if (!selectedKinds.contains(KIND) || emitted == null) {
             return captured;
         }
-        boolean truncated = objectMapper.readTree(emitted).path("truncated").asBoolean(false);
+        JsonNode root = objectMapper.readTree(emitted);
+        boolean truncated = root.path("truncated").asBoolean(false);
         return new EvidenceContribution(
             captured.files(),
             Map.of(KIND, truncated ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE),
             captured.immutableIdentities(),
             captured.observedAt(),
             captured.sourceEffectiveAt(),
-            captured.contentStates()
+            Map.of(KIND, root.path("comments").isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
         );
     }
 
@@ -120,9 +127,6 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
                 String body = comment == null ? null : comment.getBody();
                 return body == null || body.isBlank() || body.contains(HEPHAESTUS_MARKER);
             });
-            if (comments.isEmpty()) {
-                return;
-            }
             if (comments.size() > MAX_COMMENTS + 1) {
                 comments = new java.util.ArrayList<>(comments.subList(0, MAX_COMMENTS + 1));
             }

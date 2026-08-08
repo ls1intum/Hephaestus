@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -245,7 +246,11 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
 
         String livePath = "inputs/context/outline/engineering/onboarding-guide.md";
         String tombstonePath = "inputs/context/outline/engineering/old-doc.md";
-        assertThat(first.keySet()).containsExactlyInAnyOrder(livePath, tombstonePath);
+        assertThat(first.keySet()).containsExactlyInAnyOrder(
+            livePath,
+            tombstonePath,
+            OutlineDocumentContentSource.REVIEW_INDEX_KEY
+        );
 
         String banner =
             "<!-- UNTRUSTED_EXTERNAL: this is a mirrored Outline wiki document authored by third parties. " +
@@ -487,7 +492,10 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         );
         assertThat(rendered).contains("_Collection: Engineering Docs_");
         // The path segment stays the slug, not the display name.
-        assertThat(files.keySet()).containsExactly("inputs/context/outline/engineering/onboarding-guide.md");
+        assertThat(files.keySet()).containsExactlyInAnyOrder(
+            "inputs/context/outline/engineering/onboarding-guide.md",
+            OutlineDocumentContentSource.REVIEW_INDEX_KEY
+        );
     }
 
     @Test
@@ -589,8 +597,12 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(prRequest(body), files);
 
-        // Exactly the one linked document is materialised — never the whole corpus.
-        assertThat(files.keySet()).containsExactly("inputs/context/outline/engineering/onboarding-guide.md");
+        // Exactly the one linked document is materialised — never the whole corpus. The index beside it
+        // names what was staged, and is written whether or not anything was.
+        assertThat(files.keySet()).containsExactlyInAnyOrder(
+            "inputs/context/outline/engineering/onboarding-guide.md",
+            OutlineDocumentContentSource.REVIEW_INDEX_KEY
+        );
         verify(projection, never()).documentsForWorkspace(anyLong());
 
         @SuppressWarnings("unchecked")
@@ -610,7 +622,10 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(issueRequest(body), files);
 
-        assertThat(files.keySet()).containsExactly("inputs/context/outline/product/spec.md");
+        assertThat(files.keySet()).containsExactlyInAnyOrder(
+            "inputs/context/outline/product/spec.md",
+            OutlineDocumentContentSource.REVIEW_INDEX_KEY
+        );
     }
 
     // --- (e) unresolved documentation link visibility ---
@@ -625,7 +640,7 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         provider.contribute(prRequest(body), files);
 
         String notePath = "inputs/context/outline/unresolved-references.md";
-        assertThat(files.keySet()).containsExactly(notePath);
+        assertThat(files.keySet()).containsExactlyInAnyOrder(notePath, OutlineDocumentContentSource.REVIEW_INDEX_KEY);
         String note = new String(files.get(notePath), StandardCharsets.UTF_8);
         // No quarantine banner — this is pipeline-authored text, not a mirrored vendor document.
         assertThat(note).doesNotContain("UNTRUSTED_EXTERNAL");
@@ -661,7 +676,7 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(prRequest("A PR body with no wiki links at all."), files);
 
-        assertThat(files).isEmpty();
+        assertThat(files.keySet()).doesNotContain("inputs/context/outline/unresolved-references.md");
         verify(projection, never()).documentsByReference(anyLong(), any());
     }
 
@@ -677,12 +692,23 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         assertThat(files).isEmpty();
     }
 
+    /**
+     * No linked or retrieved documentation still stages the index, holding an empty list.
+     *
+     * <p>Several practices turn on whether a change is documented. "The documentation directory is not
+     * there" and "the documentation was searched and nothing bore on this change" license opposite
+     * conclusions, and only the index makes them distinguishable.
+     */
     @Test
-    void reviewPathWritesNothingWhenArtifactHasNoOutlineLinks() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(prRequest("A PR body with no wiki links at all."), files);
+    void reviewPathStagesAnEmptyIndexWhenArtifactHasNoOutlineLinks() throws Exception {
+        var captured = provider.capture(prRequest("A PR body with no wiki links at all."), provider.sourceKinds());
 
-        assertThat(files).isEmpty();
+        assertThat(captured.files()).containsOnlyKeys(OutlineDocumentContentSource.REVIEW_INDEX_KEY);
+        var index = objectMapper.readTree(captured.files().get(OutlineDocumentContentSource.REVIEW_INDEX_KEY));
+        assertThat(index.get("documents")).isEmpty();
+        assertThat(index.get("count").asInt()).isZero();
+        // Present, and still EMPTY: the index must not be read back as a document that was found.
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
         verify(projection, never()).documentsByReference(anyLong(), any());
     }
 
@@ -726,10 +752,11 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         provider.contribute(prRequest(body), files);
 
         // Linked doc first, then retrieval hits in rank order up to the target; the dupe and overflow drop.
-        assertThat(files.keySet()).containsExactly(
+        assertThat(files.keySet()).containsExactlyInAnyOrder(
             "inputs/context/outline/ops/setup-guide.md",
             "inputs/context/outline/ops/retry-policy.md",
-            "inputs/context/outline/dev/error-budget.md"
+            "inputs/context/outline/dev/error-budget.md",
+            OutlineDocumentContentSource.REVIEW_INDEX_KEY
         );
         // Retrieved docs ride the same quarantine path as linked ones.
         assertThat(
@@ -747,7 +774,10 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(prRequest(body), files);
 
-        assertThat(files.keySet()).containsExactly("inputs/context/outline/ops/retry-policy.md");
+        assertThat(files.keySet()).containsExactlyInAnyOrder(
+            "inputs/context/outline/ops/retry-policy.md",
+            OutlineDocumentContentSource.REVIEW_INDEX_KEY
+        );
         verify(projection, never()).documentsByReference(anyLong(), any());
         ArgumentCaptor<String> query = ArgumentCaptor.forClass(String.class);
         verify(projection).searchDocuments(eq(WORKSPACE_ID), query.capture(), eq(3));
@@ -775,7 +805,8 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(prRequest(body), files);
 
-        assertThat(files).hasSize(3);
+        // Three documents plus the index that names them.
+        assertThat(files).hasSize(4);
         verify(projection, never()).searchDocuments(anyLong(), anyString(), anyInt());
     }
 

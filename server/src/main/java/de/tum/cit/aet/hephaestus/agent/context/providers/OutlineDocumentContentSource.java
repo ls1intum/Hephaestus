@@ -6,10 +6,12 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.IssueReviewRequest
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.PracticeReviewRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -74,6 +76,17 @@ public class OutlineDocumentContentSource implements EvidenceSource {
 
     /** Review-path sub-tree root for the per-document {@code .md} files. */
     static final String REVIEW_PREFIX = OUTPUT_PREFIX + "outline/";
+
+    /**
+     * Review-path index of the documents staged below {@link #REVIEW_PREFIX}, written on every review.
+     *
+     * <p>The per-document files are the evidence; this says which of them there are. It is written even
+     * when there are none, because a directory that is not there and a directory that is there and empty
+     * are different findings: the first says nothing was staged, the second says the documentation was
+     * searched and none of it turned out to bear on this work. Only the second is something a review may
+     * reason from.
+     */
+    static final String REVIEW_INDEX_KEY = REVIEW_PREFIX + "index.json";
 
     /** Cap on documents surfaced to the mentor per turn — the corpus-breadth envelope (telescope, not dump). */
     static final int MAX_MENTOR_DOCUMENTS = 15;
@@ -378,6 +391,51 @@ public class OutlineDocumentContentSource implements EvidenceSource {
                 renderReviewDocument(entry.getValue()).getBytes(StandardCharsets.UTF_8)
             );
         }
+        writeReviewIndex(files, byPath);
+    }
+
+    /** The staged document paths, in staging order. Written even when there are none. */
+    private void writeReviewIndex(Map<String, byte[]> files, Map<String, ProjectedDocument> byPath) {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put(
+            "note",
+            "Documentation staged for this review, by path. Retrieval cannot establish that it found every " +
+                "relevant document, so an empty list means none was matched, not that none exists."
+        );
+        root.put("count", byPath.size());
+        ArrayNode documents = root.putArray("documents");
+        for (Map.Entry<String, ProjectedDocument> entry : byPath.entrySet()) {
+            ObjectNode node = documents.addObject();
+            node.put("path", entry.getKey());
+            node.put("collection", entry.getValue().collectionSlug());
+            node.put("slug", entry.getValue().slug());
+            node.put("title", entry.getValue().title());
+        }
+        files.put(REVIEW_INDEX_KEY, objectMapper.writeValueAsBytes(root));
+    }
+
+    /**
+     * Reads emptiness out of the index rather than out of the staged file list.
+     *
+     * <p>The index is always staged, so "there is a file" is no longer the same question as "a document was
+     * found". Left to the default, every review would report documentation as present.
+     */
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        byte[] index = captured.files().get(REVIEW_INDEX_KEY);
+        if (!selectedKinds.contains(KIND) || index == null) {
+            return captured;
+        }
+        JsonNode documents = objectMapper.readTree(index).path("documents");
+        return new EvidenceContribution(
+            captured.files(),
+            captured.completeness(),
+            captured.immutableIdentities(),
+            captured.observedAt(),
+            captured.sourceEffectiveAt(),
+            Map.of(KIND, documents.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
+        );
     }
 
     private static String reviewPath(ProjectedDocument doc) {

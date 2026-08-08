@@ -151,10 +151,6 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
             cap
         );
 
-        if (issues.isEmpty() && pullRequests.isEmpty()) {
-            return;
-        }
-
         ObjectNode root = objectMapper.createObjectNode();
         String repositoryName = m == null ? null : MetaJson.optString(m, "repository_full_name");
         if (repositoryName != null) {
@@ -217,9 +213,6 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         }
         long workspaceId = job.getWorkspace().getId();
         List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(workspaceId);
-        if (repos.isEmpty()) {
-            return;
-        }
         boolean repoCapHit = repos.size() > MAX_REPOS_SCANNED;
         List<Repository> scanned = repos.size() > MAX_REPOS_SCANNED ? repos.subList(0, MAX_REPOS_SCANNED) : repos;
 
@@ -242,10 +235,6 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         }
         if (pullRequests.size() > MAX_PER_TYPE) {
             pullRequests = pullRequests.subList(0, MAX_PER_TYPE);
-        }
-
-        if (issues.isEmpty() && pullRequests.isEmpty()) {
-            return;
         }
 
         ObjectNode root = objectMapper.createObjectNode();

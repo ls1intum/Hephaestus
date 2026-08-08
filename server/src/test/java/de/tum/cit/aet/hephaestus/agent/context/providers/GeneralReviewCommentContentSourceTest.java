@@ -87,11 +87,22 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             .hasRootCauseMessage("Review-comment collection has no pull_request_id");
     }
 
+    /**
+     * A pull request nobody commented on stages the file anyway, holding an empty list.
+     *
+     * <p>The file is the review's record that it read the comments. Omitting it leaves the model unable to
+     * tell "there were no comments" from "the comments were never staged", and only the first of those is
+     * something an observation may be built on.
+     */
     @Test
-    void contribute_noComments_writesNothing() {
+    void contribute_noComments_stagesAnEmptyCommentList() throws Exception {
         var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());
 
-        assertThat(captured.files()).doesNotContainKey(FILE_KEY);
+        assertThat(captured.files()).containsKey(FILE_KEY);
+        var out = objectMapper.readTree(captured.files().get(FILE_KEY));
+        assertThat(out.get("comments")).isEmpty();
+        assertThat(out.get("count").asInt()).isZero();
+        // Present, and still EMPTY: the staged placeholder must not be read back as content.
         assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
@@ -147,7 +158,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_onlyHephaestusComments_writesNothing() {
+    void contribute_onlyHephaestusComments_stagesAnEmptyCommentList() {
         when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(
                 comment("bot", "<!-- hephaestus:practice-review:abc --> summary", Instant.parse("2025-06-01T09:00:00Z"))
@@ -157,8 +168,9 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
-        // Only the bot's own comment was present — emit nothing so reviewer-craft keeps empty-context abstention.
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        // Only the bot's own comment was present. The file is still staged, holding nothing: reviewer-craft
+        // keeps its empty-context abstention from the empty list rather than from a file that is not there.
+        assertThat(files).containsKey(FILE_KEY);
     }
 
     @Test

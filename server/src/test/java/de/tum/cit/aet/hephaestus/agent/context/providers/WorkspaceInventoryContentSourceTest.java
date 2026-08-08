@@ -250,11 +250,14 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         assertThat(prs.get(0).get("isDraft").asBoolean()).isTrue();
     }
 
+    /** A repository tracking no work still stages the inventory, holding empty lists. */
     @Test
-    void writesNothingWhenRepositoryHasNoArtifacts() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(issueRequest(1), files);
-        assertThat(files).doesNotContainKey(OUTPUT);
+    void stagesAnEmptyInventoryWhenRepositoryHasNoArtifacts() {
+        var captured = provider.capture(issueRequest(1), provider.sourceKinds());
+
+        assertThat(captured.files()).containsKey(OUTPUT);
+        // Present, and still EMPTY: emptiness is read out of the counts, not out of the file list.
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
@@ -339,11 +342,13 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         assertThat(root.get("truncated").asBoolean()).isFalse();
     }
 
+    /** A workspace monitoring nothing stages the inventory too — an empty index, not a missing one. */
     @Test
-    void conversationFlow_writesNothingWhenWorkspaceMonitorsNoRepositories() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(conversationRequest(), files);
-        assertThat(files).doesNotContainKey(OUTPUT);
+    void conversationFlow_stagesAnEmptyInventoryWhenWorkspaceMonitorsNoRepositories() {
+        var captured = provider.capture(conversationRequest(), provider.sourceKinds());
+
+        assertThat(captured.files()).containsKey(OUTPUT);
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
