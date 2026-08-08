@@ -65,6 +65,27 @@ database enforces that pairing. They are not interchangeable — see
 [when each is correct](./practice-review-glossary.mdx#outcome-states). Severity is present only for a
 bad assessment; validation and persistence paths enforce that invariant.
 
+#### An `ABSENT` observation must record its search
+
+`ABSENT` is a universal claim, and the only claim a fragment of a corpus cannot support: a partial
+capture of the review threads is equally consistent with "nobody raised it" and "the raising was in the
+part we did not fetch". So an `ABSENT` observation carries an `evidence.search` block —
+
+- `consulted`: the evidence source kinds actually searched,
+- `lookedFor`: the thing whose absence is being reported,
+- `boundary`: what the search did not cover.
+
+A practice declares the corpus its absences range over by holding a source `EXHAUSTIVE` (see
+[`EvidenceStance`](../../server/src/main/java/de/tum/cit/aet/hephaestus/practices/EvidenceStance.java)).
+Every such source must appear in `consulted`, or delivery rejects the observation — the correct answer
+for a search that could not cover them is `INDETERMINATE`. There is deliberately no second field
+declaring "may assert absence here": `EXHAUSTIVE` already carries that decision, and a parallel
+vocabulary would let the two contradict each other.
+
+Both the in-sandbox normalizer and the delivery boundary enforce this. The duplication is intentional
+and matches the citation rules: a runner that crashed, ran an older image, or had its output rescued
+from raw text reaches delivery with nothing having validated the search.
+
 ### Recipient and subject remain distinct
 
 An observation's `aboutUserId` identifies the developer the evidence concerns. Feedback separately
