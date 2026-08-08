@@ -374,6 +374,25 @@ so the setting and the behaviour disagree until you change it.
 **Migration**: open each workspace's Administration → AI models page and lower any timeout above one
 hour. There is no automatic clamp of stored values.
 
+#### 🔴 AI proxy metrics are labelled by API contract, not by provider
+
+**Affected**: deployments with dashboards or alerts on the LLM proxy metrics, and anything searching
+logs by the `proxy.provider` field.
+
+`llm.proxy.duration` and `llm.proxy.errors` keep their names. Their label changes from `provider`
+(values `OPENAI`, `ANTHROPIC`, `AZURE_OPENAI`) to `apiProtocol` (values `openai-completions`,
+`openai-responses`), because a provider name stopped identifying anything once any OpenAI-compatible
+endpoint can be registered. The MDC log fields change from `proxy.jobId` and `proxy.provider` to
+`proxy.principal` and `proxy.apiProtocol`.
+
+A query filtering on the old label does not error — it matches no series and renders empty. An alert
+built on one stops firing, which is indistinguishable from the condition being healthy.
+
+**Migration**: update those queries before upgrading. New counters you may want to add while you are
+there: `llm.proxy.budget.blocked` (calls refused by a spending cap), `llm.proxy.unbillable.refused`,
+`llm.proxy.usage.unparseable` and `llm.proxy.stream.usage.unsupported` (responses whose token counts
+could not be read, which is what makes a monthly total understated).
+
 #### 🔴 Reviewed work is renamed in place, and the rename is one way
 
 **Affected**: every deployment, and any API client that reads or writes the kind of work a practice
