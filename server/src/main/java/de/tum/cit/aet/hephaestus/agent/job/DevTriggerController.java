@@ -25,10 +25,15 @@ import org.springframework.web.bind.annotation.RestController;
  * Enabled by setting hephaestus.dev.trigger-enabled=true.
  *
  * <p><strong>Instance admins only.</strong> The property is the switch that makes the endpoint exist;
- * it is not an access control. This route spends real LLM budget against any workspace id a caller
- * names, so the property gates whether it is mounted and {@code app_admin} gates who may call it —
- * anything less and enabling the flag on a reachable deployment hands unauthenticated callers a
- * cross-workspace spend button bounded only by the monthly cap.
+ * it is not an access control. This route spends real LLM budget, so the property gates whether it is
+ * mounted and {@code app_admin} gates who may call it — anything less and enabling the flag on a
+ * reachable deployment hands unauthenticated callers a spend button bounded only by the monthly cap.
+ *
+ * <p>The artifact is loaded <em>through</em> the named workspace, not merely alongside it. Both are
+ * request parameters and nothing about the two ids relates them, so an artifact fetched by surrogate id
+ * alone and then submitted under whichever workspace was named would bill that workspace's
+ * {@code agent_job} and LLM usage ledger for another's work — and the backfill cost estimator reads that
+ * ledger, so the misattribution outlives the request.
  *
  * <p>Two modes:
  * <ul>
@@ -108,7 +113,7 @@ public class DevTriggerController {
         }
 
         Prepared prepared = transactionTemplate.execute(status ->
-            issueId != null ? prepareIssue(issueId, signal) : preparePullRequest(prId, signal)
+            issueId != null ? prepareIssue(workspaceId, issueId, signal) : preparePullRequest(workspaceId, prId, signal)
         );
 
         if (prepared == null || prepared.request() == null) {
@@ -127,10 +132,12 @@ public class DevTriggerController {
         );
     }
 
-    private Prepared preparePullRequest(Long prId, @Nullable String signal) {
-        PullRequest pr = artifactLoader.findPullRequestForGate(prId).orElse(null);
+    private Prepared preparePullRequest(Long workspaceId, Long prId, @Nullable String signal) {
+        // One answer for "no such PR" and "not this workspace's PR". Submitting it anyway would bill this
+        // workspace's job and usage ledger for another one's artifact.
+        PullRequest pr = artifactLoader.findPullRequestForGate(workspaceId, prId).orElse(null);
         if (pr == null) {
-            return Prepared.done("PR not found: " + prId);
+            return Prepared.done("PR not found in workspace " + workspaceId + ": " + prId);
         }
         SignalName triggerSignal = signal == null || signal.isBlank() ? null : SignalName.of(signal);
         if (triggerSignal != null) {
@@ -143,10 +150,10 @@ public class DevTriggerController {
         return request == null ? Prepared.done("PR missing branch info: prId=" + pr.getId()) : Prepared.review(request);
     }
 
-    private Prepared prepareIssue(Long issueId, @Nullable String signal) {
-        Issue issue = artifactLoader.findIssueForGate(issueId).orElse(null);
+    private Prepared prepareIssue(Long workspaceId, Long issueId, @Nullable String signal) {
+        Issue issue = artifactLoader.findIssueForGate(workspaceId, issueId).orElse(null);
         if (issue == null) {
-            return Prepared.done("Issue not found: " + issueId);
+            return Prepared.done("Issue not found in workspace " + workspaceId + ": " + issueId);
         }
         SignalName triggerSignal = signal == null || signal.isBlank() ? null : SignalName.of(signal);
         if (triggerSignal != null) {
