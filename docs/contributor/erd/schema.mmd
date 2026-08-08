@@ -109,6 +109,7 @@ erDiagram
         VARCHAR(48) state_reason
         UUID job_id
         TIMESTAMPTZ state_changed_at "NOT NULL"
+        TIMESTAMPTZ last_attempted_at
     }
 
     AuthEvent {
@@ -262,7 +263,7 @@ erDiagram
         VARCHAR(64) slug PK
         VARCHAR(128) name
         VARCHAR(64) applies_to
-        JSONB trigger_events
+        JSONB bindings
         TEXT criteria
         TEXT precompute_script
         TEXT why_it_matters
@@ -724,6 +725,7 @@ erDiagram
         VARCHAR(64) recurrence_key
         BIGINT practice_revision_id FK
         VARCHAR(8) assessment
+        VARCHAR(16) origin "NOT NULL"
     }
 
     Organization {
@@ -810,9 +812,8 @@ erDiagram
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
-        JSONB trigger_events "NOT NULL"
+        JSONB bindings "NOT NULL"
         TEXT criteria "NOT NULL"
-        BOOLEAN used_in_new_reviews "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
@@ -825,6 +826,7 @@ erDiagram
         VARCHAR(64) source_curated_slug
         VARCHAR(96) source_curated_fingerprint
         JSONB automated_review_policy "NOT NULL"
+        VARCHAR(16) review_tier "NOT NULL"
     }
 
     PracticeArea {
@@ -858,7 +860,7 @@ erDiagram
         VARCHAR(64) slug
         VARCHAR(128) name
         VARCHAR(64) applies_to
-        JSONB trigger_events
+        JSONB bindings
         TEXT precompute_script
         TEXT why_it_matters
         TEXT what_good_looks_like
@@ -1084,6 +1086,29 @@ erDiagram
         BIGINT native_id
     }
 
+    ReviewBackfillRun {
+        UUID id PK
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(64) artifact_kind "NOT NULL"
+        TIMESTAMPTZ from_at "NOT NULL"
+        TIMESTAMPTZ to_at "NOT NULL"
+        VARCHAR(24) status "NOT NULL"
+        VARCHAR(32) pause_reason
+        INTEGER estimated_artifacts "NOT NULL"
+        NUMERIC(12,4) estimated_cost_usd
+        BIGINT cursor_artifact_id
+        INTEGER submitted_count "NOT NULL"
+        INTEGER passed_count "NOT NULL"
+        BIGINT requested_by_account_id "NOT NULL"
+        BIGINT confirmed_by_account_id
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ finished_at
+        TIMESTAMPTZ updated_at "NOT NULL"
+        BIGINT version "NOT NULL"
+        INTEGER failed_count "NOT NULL"
+    }
+
     Shedlock {
         VARCHAR(64) name PK
         TIMESTAMP lock_until "NOT NULL"
@@ -1278,6 +1303,7 @@ erDiagram
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
+        JSONB practice_review_scope
     }
 
     WorkspaceAgentBinding {
@@ -1490,6 +1516,7 @@ erDiagram
     Organization ||--o{ Repository : has
     IdentityProvider ||--o{ Repository : references
     Workspace ||--o{ RepositoryToMonitor : monitors
+    Workspace ||--o{ ReviewBackfillRun : reviewed
     User ||--o{ SlackChannelConsentEvent : has
     Workspace ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackMessage : authored_by
