@@ -29,7 +29,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "0607390694430a6ee1c026144be3ebd2324d28f45358db7e7070bc34ce16daab";
+        "978097f57047bb716457e8b3c44115ef0bb55602dbce4f1a15900a40d70a39b8";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -39,7 +39,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
         assertThat(registry.current().version()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(registry.catalogDigest()).isEqualTo(VERSION_1_CATALOG_SHA256);
-        assertThat(registry.current().sources()).hasSize(13);
+        assertThat(registry.current().sources()).hasSize(15);
         assertThat(registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.pull_request")).contains(
             new SourceKind("scm.repository.tree"),
             new SourceKind("scm.pull-request.diff")
@@ -127,7 +127,11 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 "scm.review-threads",
                 "scm.general-review-comments",
                 "workspace.project-inventory",
-                "outline.documents"
+                "outline.documents",
+                // Staged for every review without any binding asking for them, so they carry the same
+                // engineering baseline as the sources a binding does ask for.
+                "hephaestus.observation-history",
+                "hephaestus.feedback-history"
             );
     }
 

@@ -19,7 +19,7 @@
       "description": "Source contract used to interpret the referenced manifest and source checks."
     },
     "catalogDigest": {
-      "const": "0607390694430a6ee1c026144be3ebd2324d28f45358db7e7070bc34ce16daab",
+      "const": "978097f57047bb716457e8b3c44115ef0bb55602dbce4f1a15900a40d70a39b8",
       "description": "SHA-256 digest of the exact source catalog used by the runtime."
     },
     "artifactKind": {
@@ -400,13 +400,15 @@
             "scm.repository.tree",
             "scm.issue.core",
             "scm.issue.comments",
+            "docs.document.core",
             "slack.conversation.thread",
             "scm.linked-work-items",
             "scm.review-threads",
             "scm.general-review-comments",
             "workspace.project-inventory",
             "outline.documents",
-            "docs.document.core"
+            "hephaestus.observation-history",
+            "hephaestus.feedback-history"
           ],
           "description": "Required logical source being checked."
         },
@@ -520,7 +522,9 @@
                                   "scm.review-threads",
                                   "scm.general-review-comments",
                                   "workspace.project-inventory",
-                                  "outline.documents"
+                                  "outline.documents",
+                                  "hephaestus.observation-history",
+                                  "hephaestus.feedback-history"
                                 ]
                               }
                             },
@@ -579,7 +583,9 @@
                                   "scm.issue.core",
                                   "scm.issue.comments",
                                   "workspace.project-inventory",
-                                  "outline.documents"
+                                  "outline.documents",
+                                  "hephaestus.observation-history",
+                                  "hephaestus.feedback-history"
                                 ]
                               }
                             },
@@ -636,7 +642,9 @@
                               "sourceKind": {
                                 "enum": [
                                   "slack.conversation.thread",
-                                  "workspace.project-inventory"
+                                  "workspace.project-inventory",
+                                  "hephaestus.observation-history",
+                                  "hephaestus.feedback-history"
                                 ]
                               }
                             },
@@ -692,7 +700,9 @@
                             "properties": {
                               "sourceKind": {
                                 "enum": [
-                                  "docs.document.core"
+                                  "docs.document.core",
+                                  "hephaestus.observation-history",
+                                  "hephaestus.feedback-history"
                                 ]
                               }
                             },
