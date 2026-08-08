@@ -44,15 +44,18 @@ These variables exist only in the reference deployment, so they live here:
 
 | Variable | Purpose |
 | --- | --- |
-| `HEPHAESTUS_AUTH_ISSUER` | Public issuer origin, e.g. `https://<host>` (sets the JWT `iss` + `/.well-known` issuer). The self-host compose file derives this from `APP_HOSTNAME`; the multi-file stack does not. |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
 | `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host. |
 
-:::caution The OAuth redirect pair is not wired through Compose
-`HEPHAESTUS_AUTH_ISSUER` and `LEGAL_PROFILE` are forwarded into the container by the shipped Compose
-files, so setting them in `docker/.env` works. The two OAuth redirect variables are **not** — no
-Compose file passes them through, so a value in `docker/.env` has no effect and the defaults stay in
-force. To override them, add them to the `application-server` service's own `environment:` block.
+:::caution Not everything the container reads is settable from `docker/.env`
+`LEGAL_PROFILE` is forwarded by the shipped Compose files, so setting it in `docker/.env` works.
+These are **not**, and a value in `docker/.env` for them is silently ignored:
+
+- **`HEPHAESTUS_AUTH_ISSUER`** — the `application-server` service hardcodes it to `https://${APP_HOSTNAME}`.
+  Change `APP_HOSTNAME` to change the issuer.
+- **The two OAuth redirect variables** — no Compose file passes them through, so the defaults stay in force.
+
+To override any of them, add them to the `application-server` service's own `environment:` block.
 :::
 
 :::warning `GH_`, not `GITHUB_`
@@ -215,7 +218,7 @@ GitLab login, GitLab workspaces, webhook auto-registration, and practice review 
 | `GITLAB_ENABLED` | Enables server-side GitLab beans in the application server |
 | `GITLAB_WORKSPACE_CREATION` | Enables GitLab workspace creation in the UI and API |
 | `WEBHOOK_SECRET` | Shared secret used for GitLab webhook verification and auto-registration |
-| `WEBHOOK_EXTERNAL_URL` | Public webhook base URL registered on GitLab |
+| `WEBHOOK_EXTERNAL_URL` | Public webhook base URL registered on GitLab. The reference Compose files deliberately leave it unset so auto-registration derives it from the application host URL; add it to the `application-server` service's `environment:` block if you need to override that. |
 
 The login provider is instance-agnostic: gitlab.com works out of the box, and any self-hosted GitLab works by pointing `GITLAB_OAUTH_BASE_URL` at it. Create the GitLab OAuth application on that instance with these settings:
 
@@ -231,20 +234,25 @@ Practice review is not enabled by a single flag. The following settings must be 
 | Variable | Purpose |
 | --- | --- |
 | `PRACTICE_REVIEW_FOR_ALL` | Enables the feature flag and the detection gate for all users. Also sets the detection gate via `PRACTICE_REVIEW_RUN_FOR_ALL`. |
-| `PRACTICE_REVIEW_SKIP_DRAFTS` | Skips draft PRs and draft merge requests |
 | `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
 | `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
 | `AGENT_ENABLED` | Enables the PostgreSQL-backed agent job queue and executor |
 | `GIT_CHECKOUT_ENABLED` | Enables local repository checkout used to materialize declared evidence |
-| `HEPHAESTUS_FABRIC_ROOT` | Container mount point for repository checkouts, replay metadata, and content-addressed evidence. The reference Compose stack mounts its `git-repos` volume at `/data/git-repos`. A custom split or multi-host deployment must mount the same durable read-write filesystem on every server and worker, with cross-process file locks, atomic rename, and appropriate access controls. |
 | `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | Age after which replay directories and unreferenced evidence blobs become eligible for collection (default `30`). |
 | `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
 | `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
 
-Grant only the uses the deployment exposes. Without `AUTOMATED_PRACTICE_REVIEW`, affected practices decline before a model
-request. Without `PRACTICE_FEEDBACK_DELIVERY`, findings using the source are not persisted or delivered and its
-citations are omitted from contributor APIs. Without `CONVERSATIONAL_MENTORING`, those observations are excluded from
-mentor context. Without `OPERATOR_EVIDENCE_REVIEW`, workspace-admin finding details omit their citations.
+Repository checkouts, replay metadata, and content-addressed evidence live under the fabric root, which the
+reference Compose stack pins to `/data/git-repos` on the `git-repos` volume. A custom split or multi-host
+deployment must mount the same durable read-write filesystem on every server and worker, with cross-process
+file locks, atomic rename, and appropriate access controls.
+
+Which sources a review may read, and for which purpose, is not a deployment setting: it is fixed by the
+reviewed source-use decisions shipped in the artifact-source contract, and a deployment cannot widen or
+narrow them. A source your workspace has not connected is simply never captured. See the
+[artifact-source contract](https://github.com/ls1intum/Hephaestus/blob/main/docs/contributor/artifact-source-contract.mdx)
+for what each purpose covers, and [Artifact-Source Governance](./dsms/artifact-source-governance) for the
+decision record behind them.
 
 The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by `AGENT_ENABLED`. Keep that capability and Docker access on the application server because interactive mentor sandboxes are request-affine and run there; a dedicated `application-worker` adds capacity for queued practice reviews. When `AGENT_ENABLED` is also true, any worker-capable replica may claim those PostgreSQL jobs. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
 
@@ -263,7 +271,7 @@ The agent job queue (`agent_job`, polled by `AgentJobExecutor`) exposes its own 
 
 The queue-health gauges are sampled every 30s; timers and counters are recorded inline. None run on a request path.
 
-**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row and its durable evidence snapshot. Replay directories and unreferenced CAS blobs use `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` (default `30`, positive integer). Tighten these only against the deployment's approved retention policy. Treat `HEPHAESTUS_FABRIC_ROOT` as sensitive storage: restrict host access, include it in erasure operations, and monitor successful garbage-collection sweeps.
+**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row and its durable evidence snapshot. Replay directories and unreferenced CAS blobs use `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` (default `30`, positive integer). Tighten these only against the deployment's approved retention policy. Treat the fabric root volume as sensitive storage: restrict host access, include it in erasure operations, and monitor successful garbage-collection sweeps.
 
 ### Rollout tiers
 
@@ -432,7 +440,7 @@ This allows platform administrators to troubleshoot and manage workspaces where 
 - Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
 - Schedule regular backups for PostgreSQL (it now holds auth state — accounts, identity links, sessions — in addition to application data).
 - Review weekly leaderboard Slack posts to ensure the automation is active.
-- Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent job queue settings.
+- A preview deployment only represents the GitLab practice-review rollout if it is wired with the same GitLab IdP, sandbox, git-checkout, and agent-job-queue settings. Verify a rollout on staging, not on a preview.
 
 ## Support
 

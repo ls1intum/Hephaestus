@@ -17,14 +17,15 @@ Testing keeps regression risk low across services. The application server uses M
    ./mvnw test -P'!quick'
 
    # Full suite including integration tests
-   ./mvnw verify
+   ./mvnw verify -P'!quick'
    ```
 
    :::danger Always deactivate `quick`
    The `quick` profile activates itself as soon as GraphQL codegen has produced its sources — that
    is, on every machine that has built the server once. It sets `maven.test.skip=true`, so a bare
    `./mvnw test` prints **BUILD SUCCESS having run zero tests**, and `./mvnw test-compile` reports
-   success while test sources fail to compile. Pass `-P'!quick'` on every test run.
+   success while test sources fail to compile. Pass `-P'!quick'` on every test run — including
+   alongside another profile (`-P'!quick,live-tests'`), because no other profile deactivates it.
    :::
 
 3. Extend the correct base class:
@@ -68,7 +69,7 @@ class UserServiceTest extends BaseUnitTest {
 
 - Extend `BaseIntegrationTest` for cross-component behaviour.
 - Relies on a shared PostgreSQL Testcontainers instance (significantly faster than per-test containers).
-- Provides annotations such as `@GitHubPayload("label.created")` to inject recorded webhook payloads.
+- Reads recorded webhook payloads from the fixture folder and deserialises them into the handler's event DTO.
 
 Example:
 
@@ -76,7 +77,10 @@ Example:
 class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should persist label from webhook")
-    void shouldPersistLabel(GHEventPayload.Label payload) {
+    void shouldPersistLabel() throws IOException {
+        var payload = objectMapper.readValue(
+            new ClassPathResource("github/label.created.json").getContentAsString(UTF_8),
+            GitHubLabelEventDTO.class);
         // Test with real webhook data
     }
 }
@@ -140,7 +144,7 @@ The `hephaestus.tenancy.enforcement: throw` setting in `application-test.yml` fa
 
 ## Webhook fixtures and tooling
 
-Reusable webhook JSON lives in `src/test/resources/github`. Use `@GitHubPayload("event.name")` to inject them, or extract new samples with:
+Reusable webhook JSON lives in `src/test/resources/github`, named after the event it records. Load one with a `ClassPathResource`, or extract new samples with:
 
 ```bash
 pnpm run nats:extract-examples
@@ -153,9 +157,9 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 ```bash
 ./mvnw test -P'!quick'                        # Unit tests
 ./mvnw test -P'!quick,architecture-tests'     # ArchUnit + Modulith verification
-./mvnw verify                                 # Full suite + packaging
-./mvnw test -P'!quick' -Dtest=UserServiceTest # Single test class
-./mvnw test -P'!quick' -Dtest=UserServiceTest#methodName # Single test method
+./mvnw verify -P'!quick'                      # Full suite + packaging
+./mvnw test -P'!quick' -Dtest=SomeTest        # Single test class
+./mvnw test -P'!quick' -Dtest=SomeTest#method # Single test method
 ```
 
 The tag filter is a property, not the `-Dgroups` user property: surefire is configured with
@@ -165,7 +169,7 @@ tag set directly, or the profiles above, which set it for you.
 
 ## Live external-service tests
 
-Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from `mvn test` / `mvn verify`**; they only run under `mvn test -Plive-tests`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset.
+Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from every other tier**; they only run under `./mvnw test -P'!quick,live-tests'`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset. It does not deactivate `quick`, so `!quick` has to ride along or the run executes nothing.
 
 ### Meta-annotation cheat sheet
 
@@ -224,12 +228,12 @@ We ship a focused suite that exercises the live GitHub App installation and veri
 From `server/` run:
 
 ```bash
-./mvnw test -Plive-tests
+./mvnw test -P'!quick,live-tests'
 ```
 
-The `-Plive-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests – if you don't pass the profile, the tests simply won't run.
+The `live-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests – if you don't pass the profile, the tests simply won't run.
 
-**Live tests never run during normal CI.** They are explicitly excluded from `mvn test` and `mvn verify` via tag filtering in the Surefire and Failsafe plugins.
+**Live tests never run during normal CI.** They are excluded from the other tiers by tag filtering in the Surefire and Failsafe plugins.
 
 The run takes roughly two minutes and prints the GitHub artefacts it provisions. Clean-up is handled automatically, but if a failure interrupts execution you can safely delete any `hephaestus-it-*` repositories, milestones, or teams that remain in the sandbox.
 

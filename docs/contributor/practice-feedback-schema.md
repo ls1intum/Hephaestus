@@ -60,8 +60,10 @@ result is good or bad for the developer.
 | `PRESENT` | desired behaviour is present | undesirable behaviour is present |
 | `ABSENT` | undesirable behaviour is absent | desired behaviour is missing |
 
-For `NOT_APPLICABLE`, assessment is null; the database enforces that pairing. Severity is present only
-for a bad assessment; validation and persistence paths enforce that invariant.
+The two valence-free presences, `NOT_APPLICABLE` and `INDETERMINATE`, carry a null assessment; the
+database enforces that pairing. They are not interchangeable — see
+[when each is correct](./practice-review-glossary.mdx#outcome-states). Severity is present only for a
+bad assessment; validation and persistence paths enforce that invariant.
 
 ### Recipient and subject remain distinct
 

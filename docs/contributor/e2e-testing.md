@@ -9,7 +9,7 @@ The opt-in `e2e` profile enables these local-only capabilities:
 | --- | --- |
 | Passwordless dev sign-in | `hephaestus.auth.dev-login-enabled=true` |
 | Plain-http cookies (drops `Secure` + `__Host-`) | `hephaestus.auth.cookie-secure=false` |
-| Self-service GitLab/GitHub workspace creation | `hephaestus.workspace.creation-policy=SELF_SERVICE` + `features.flags.gitlab-workspace-creation=true` |
+| Self-service GitLab/GitHub workspace creation | `hephaestus.workspace.creation-policy=SELF_SERVICE` + `hephaestus.features.flags.gitlab-workspace-creation=true` |
 | Persistable Connection credentials (PATs) | `hephaestus.security.encryption-key` (a fixed local dev key) |
 | Dev review trigger | `hephaestus.dev.trigger-enabled=true` |
 | PostgreSQL job executor | `hephaestus.agent.enabled=true` |

@@ -32,7 +32,10 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 ### Spring profiles and local configuration
 
-We ship three Spring profiles: `local` (default), `prod`, and `specs`. For development stick to the `local` profile.
+For development stick to the `local` profile, which is the default. The other shipped profiles each
+have their own `application-<name>.yml` under `server/src/main/resources/` — `prod` and `specs`, plus
+the per-role and per-purpose overlays (`worker`, `webhook`, `e2e`, `cds-training`) documented where
+they are used.
 
 They are **not** Maven profiles — `./mvnw -Plocal` warns that the profile does not exist and changes
 nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
@@ -80,7 +83,8 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 | Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env only                   |
 
 :::tip Pre-flight check
-Run `pnpm run check:ports` before starting the stack to verify all ports are free.
+Run `pnpm run check:ports` before starting the stack. It checks the three ports above; a NATS
+container binds 4222 as well, and a conflict there shows up only at boot.
 :::
 
 #### How it works
@@ -192,7 +196,7 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
            - your-github-org/repo2
    ```
 
-3. Leave `github.app.id` unset or set to `0`.
+3. Leave `hephaestus.integration.github.app.id` unset or set to `0`.
 
 #### Option B: GitHub App
 
@@ -201,15 +205,15 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
 2. Create `application-local.yml`:
 
    ```yaml
-   github:
-     app:
-       id: 12345
-       privateKey: |
-         -----BEGIN RSA PRIVATE KEY-----
-         ...
-         -----END RSA PRIVATE KEY-----
-
    hephaestus:
+     integration:
+       github:
+         app:
+           id: 12345
+           privateKey: |
+             -----BEGIN RSA PRIVATE KEY-----
+             ...
+             -----END RSA PRIVATE KEY-----
      workspace:
        init-default: false # Workspaces created from installations
    ```

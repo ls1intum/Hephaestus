@@ -16,7 +16,7 @@ The broader [practice feedback language](./practice-feedback-language.md) remain
 | **Guidance only** | Keep the practice's criteria and guidance without asking Hephaestus to review it. | practice guidance only, invalid practice, human-only |
 | **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
 | **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
-| **Automated-review policy** | The frame a review runs in for one practice: the source-contract version, the review mode, the refusal behaviour, and the known limits. It no longer lists sources. | evidence requirements |
+| **Automated-review policy** | The frame a review runs in for one practice: the source-contract version, the review mode, the refusal behaviour, and the known limits. Sources belong to the bindings, not here. | evidence requirements |
 | **Binding** | One occasion a practice is reviewed on, and the evidence a review occasioned that way reads. A practice declares a list of them. | trigger, review event, schedule |
 | **Signal** | The name of an ingested event a binding can be occasioned by, such as `scm.pull_request.merged`. Its prefix is the artifact kind, which is why a practice never states its artifact kind separately. | trigger event, webhook, hook |
 | **Evidence requirement** | One source a binding reads, and the stance the practice takes towards it. | required evidence, evidence declaration, detector configuration |
@@ -65,8 +65,8 @@ than one ground truth. A statement that a person *could* observe something must 
 
 ## Loudness tiers
 
-`PracticeReviewTier` is the workspace's answer to "how loud may this practice be", and it replaced the
-boolean that used to answer only "is this practice used at all". Each tier adds to the one before it.
+`PracticeReviewTier` is the workspace's answer to "how loud may this practice be" — a question a boolean
+cannot answer, because measuring and intervening are separate decisions. Each tier adds to the one before it.
 
 | Tier | Review runs | Observation recorded | Mentor conversation | On the artifact |
 | --- | --- | --- | --- | --- |
@@ -77,15 +77,14 @@ boolean that used to answer only "is this practice used at all". Each tier adds 
 
 Only `OFF` stops the review. `MEASURE` and `COACH` run it and record every observation exactly as `ENGAGE`
 does; they differ only in how far the result travels. That is the point of the tier: turning a noisy
-practice down no longer puts a hole in the behaviour series, because the measurement and the intervention
-are separate decisions. `ENGAGE` is the default and the tier a workspace that never touches the setting
-stays at.
+practice down does not put a hole in the behaviour series. `ENGAGE` is the default and the tier a workspace
+that never touches the setting stays at.
 
 **`COACH` means the mentor conversation, and nothing else.** The channel vocabulary
 (`FeedbackChannel`) declares `IN_CONTEXT`, `CONVERSATION`, and `PROFILE`, but nothing in the application
 writes a `PROFILE` unit — there is no producer. Do not describe `COACH` as reaching a profile or
-reflection surface. `PROFILE` is declared and unwritten; when a producer exists it joins `COACH`
-alongside `CONVERSATION` without the tier's meaning changing.
+reflection surface. Should a producer appear, `PROFILE` joins `COACH` alongside `CONVERSATION` without
+the tier's meaning changing.
 
 A finding withheld by a tier is written to the feedback ledger as `SUPPRESSED` with reason
 `PRACTICE_TIER_QUIET` rather than dropped, so "we saw it and chose to stay quiet" reads differently from
@@ -99,7 +98,7 @@ with `SUFFICIENT_WHEN_REQUIREMENTS_MET` — is forced to `OFF` when it is create
 ## Review scope
 
 `WorkspaceReviewScope` narrows which of a workspace's work is reviewed at all. It is ANDed onto every
-binding and only ever narrows: a workspace that never sets it behaves exactly as before.
+binding and only ever narrows; unset, it admits everything.
 
 | Axis | JSON key | Matching | Empty list means |
 | --- | --- | --- | --- |
@@ -171,17 +170,10 @@ mentoring choice:
 
 ## Source states
 
-Keep availability, content, completeness, and collection outcome separate. In particular:
-
-- **Available and empty** means collection succeeded and the source legitimately contained no items.
-- **Not collected** means collection was not attempted.
-- **Redacted** means policy withheld the source.
-- **Partial** means only part of the requested scope was captured.
-- **Collection error** means collection was attempted and failed.
-
-There is no staleness state. A capture either names something immutable — a commit SHA — or it does not,
-and nothing in the pipeline can tell "collected an hour ago and unchanged" from "collected an hour ago and
-since superseded". `IdentityPolicy` records only the honest half: whether a source can be anchored at all.
+Availability, content, completeness, and collection outcome are four separate facts about one capture,
+never one field. The [artifact-source contract](./artifact-source-contract.mdx#capture-state) defines
+them and the states each may take; write about a capture in its words, and in particular do not write
+that a capture is *stale* — there is no such state, and the contract says why.
 
 ## Outcome states
 

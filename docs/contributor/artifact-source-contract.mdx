@@ -186,9 +186,9 @@ only the ability to re-derive it is unavailable.
 The [practice review glossary](./practice-review-glossary.mdx) defines the canonical product and machine
 terms. A practice makes two separate statements.
 
-**The policy** is the frame the review runs in, and no longer lists sources: the contract version that names
-them, whether a model runs at all, the refusal behaviour, and the claims that kind of evidence can never
-support whatever the occasion.
+**The policy** is the frame the review runs in: the contract version that names the sources, whether a model
+runs at all, the refusal behaviour, and the claims that kind of evidence can never support whatever the
+occasion. It does not itself list sources.
 
 **The bindings** are the occasions, each carrying the evidence a review occasioned that way reads. Evidence
 belongs here rather than on the practice because what a review needs is a function of what occasioned it: a
@@ -196,9 +196,10 @@ review that runs when a change merges may have to establish that no decision was
 same practice reviewed when the change was opened is only reading what is in front of it. It is also the only
 shape in which one practice can watch both sides of a question.
 
-A binding's artifact kind is read off its signals' shared prefix and is never written down separately —
-stating it a second time is what allowed a practice's declared kind and its triggers to disagree. All signals
-in one binding must share one artifact kind, and all bindings on one practice must agree on it.
+A binding's artifact kind is read off its signals' shared prefix and is never written down separately: a
+second statement of the same fact is a second thing to keep in agreement, and a practice whose declared kind
+contradicts its own signals cannot be resolved. All signals in one binding must share one artifact kind, and
+all bindings on one practice must agree on it.
 
 Each entry in `needs` names a source and the stance the practice takes towards it:
 
@@ -261,7 +262,8 @@ The runtime appends them to the criteria it stages for the reviewing model, beca
 and then withholds constrains nobody: the model still reaches the conclusion the author knew the evidence could not
 carry. `insufficiencyReason` is separate and is present only when `evidenceSufficiency` is
 `DECLARED_EVIDENCE_INSUFFICIENT`: it says why a person is needed, which is a different question from what the
-evidence cannot show, and folding it back into the limitation list is how it stopped being answerable.
+evidence cannot show. Folded into the limitation list it stops being answerable, since a limitation on a
+practice nobody reviews reads as one more caveat rather than the reason there is no review.
 
 Every bundled practice that requires the pull-request diff lists `scm.repository.tree` as `CONTEXTUAL`. A diff
 shows the changed lines and not the code they call into, so a reviewer restricted to it either guesses at the
@@ -280,11 +282,12 @@ prompt, tools, and preprocessing — and never certifies a future finding.
 
 Only `LANGUAGE_MODEL` with `SUFFICIENT_WHEN_REQUIREMENTS_MET` runs a model. These skip:
 
-- `DECLARED_EVIDENCE_INSUFFICIENT` with `DECLARED_EVIDENCE_INSUFFICIENT`;
-- `NONE` with `NO_AUTOMATED_REVIEW`.
+- `LANGUAGE_MODEL` with `DECLARED_EVIDENCE_INSUFFICIENT`;
+- `NONE` with `NONE`.
 
 Neither can be reviewed, so a practice declaring one is forced to loudness tier `OFF` when it is created or
-edited. A skipped practice is omitted from that review request. Source readiness checks contain only
+edited. The [glossary](./practice-review-glossary.mdx#machine-names) maps each pair to the mentoring choice
+an author sees. A skipped practice is omitted from that review request. Source readiness checks contain only
 source-quality reasons — `SOURCE_NOT_AVAILABLE`, `SOURCE_INCOMPLETE`, `SOURCE_EMPTY` — so review-mode
 limitations are never misreported as defective sources. Missing evidence never becomes a fabricated
 `NOT_APPLICABLE` finding.
@@ -300,15 +303,14 @@ input, it needs a governed source kind and purpose authorization.
 Two workspace-level gates decide whether a review is admitted at all, before any source is captured. Both
 refuse the signal with a typed reason rather than silently doing nothing.
 
-- **Loudness tier.** A practice at `OFF` admits no review. When every practice bound to a signal sits at
-  `OFF`, the signal is refused with `PRACTICE_TIER_OFF`, which is retryable: an admin raising the tier lifts
-  it without the artifact changing. `MEASURE` and `COACH` still run the review and still record every
-  observation; they only narrow where the result is allowed to travel.
-- **Review scope.** An artifact outside the workspace's `targetBranches` or `repositories` lists is refused
-  with `OUT_OF_REVIEW_SCOPE`, which is terminal: the branch a merge request targeted will not change.
+- **Loudness tier.** A practice at `OFF` admits no review; the quieter tiers still run it. When every
+  practice bound to a signal sits at `OFF`, the signal is refused with `PRACTICE_TIER_OFF`.
+- **Review scope.** An artifact outside the workspace's declared branches or repositories is refused with
+  `OUT_OF_REVIEW_SCOPE`.
 
-Both are defined in the [practice review glossary](./practice-review-glossary.mdx). Neither is an evidence
-concern — they decide whether evidence is collected at all.
+Both are defined in the [practice review glossary](./practice-review-glossary.mdx), including which refusal
+is retryable and which is terminal. Neither is an evidence concern — they decide whether evidence is
+collected at all.
 
 ## Conservative examples
 

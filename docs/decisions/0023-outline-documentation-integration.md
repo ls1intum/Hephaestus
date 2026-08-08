@@ -41,6 +41,9 @@ cross-cutting logic (context assembly, retention) treat "a documentation source"
 
 ### 2. Content source, not detection surface
 
+> **Partly superseded** — see the 2026-08-08 update at the end. A document is now a reviewable
+> artifact kind. The module boundary this decision protects still holds.
+
 Outline contributes context; it produces no observations, findings, or reactions. Pre-baked
 Outline doc-quality practices are an explicit non-goal. Because nothing
 touches the observation/finding schema, [ADR 0021](0021-findings-feedback-synthesis-seam.md) and
@@ -51,10 +54,11 @@ mirrored into `outline_document` and projected to the agent through an agent-own
 ### 3. `WEBHOOK_INGEST` capability on the unified JetStream lane
 
 Outline change notifications ride the same durable `/webhooks/{kind}` JetStream lane as GitHub and
-GitLab. `OutlineManifest.declaredCapabilities()` is `{WEBHOOK_INGEST}`, which binds the four per-kind
-SPI beans the framework bootstrap validates: `OutlineWebhookSignatureVerifier` (implements
-`WebhookSignatureVerifier`), `OutlineWebhookSecretSource` (implements `WebhookSecretSource`,
-`Scope.SUBSCRIPTION`), `OutlineSubjectKeyDeriver`, and `OutlineSubjectParser`. The registrar points
+GitLab. `OutlineManifest.declaredCapabilities()` is `{WEBHOOK_INGEST}`, so the module binds
+`OutlineWebhookSignatureVerifier` (implements `WebhookSignatureVerifier`), `OutlineSubjectKeyDeriver`
+and `OutlineSubjectParser`, which the framework bootstrap requires, plus `OutlineWebhookSecretSource`
+(implements `WebhookSecretSource`, `Scope.SUBSCRIPTION`), which it does not — a vendor may resolve
+its signing secret inside its own verifier instead. The registrar points
 the subscription's delivery URL at `POST /webhooks/outline`; the webhook-role `WebhookController`
 verifies the HMAC and publishes to the `outline` JetStream stream, and the server-role consumer fleet
 subscribes to `outline.<subscriptionId>.>` and hands each event to `OutlineWebhookMessageHandler`
@@ -191,3 +195,21 @@ Two mechanisms refine the decisions above without changing them:
 - The SSRF surface is covered by existing, tested guards.
 - The next documentation vendor (Confluence, Notion) reuses the family, the mirror shape, the
   projection seam, and this privacy and retention posture.
+
+## Update — 2026-08-08: a document is a reviewable artifact
+
+Decision 2 said Outline "produces no observations, findings, or reactions" and named pre-baked
+doc-quality practices an explicit non-goal. That no longer holds, and the code is the authority:
+`DocumentArtifactDescriptor.reviewable()` is `true`, `docs.document.published` and
+`docs.document.updated` are signals practices bind to, the bundled catalog ships practices bound to
+them, and `DocumentReviewHandler` records observations against `docs.document`.
+
+What changed is the framing, not the schema. A document is now one artifact kind among several,
+reviewed through the same signal → binding → observation path as a pull request or an issue, and the
+Outline module still produces nothing on its own: it mirrors documents and records signals, and the
+agent module composes the review off that ledger. So the module boundary Decision 2 protects still
+stands — `ADR 0021` and `ADR 0022` remain untouched, and the agent read path still goes through
+`DocumentProjection`. Only the "not a detection surface" clause is superseded.
+
+The privacy posture is unchanged: reviews read allow-listed collections only, and a document review
+sees the document and nothing else.

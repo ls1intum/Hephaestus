@@ -323,12 +323,16 @@ live evidence.
 
 ### Governance and minimization (supersedes §8's audience tag)
 
-A checked-in, unexpired engineering decision is necessary but **not sufficient** to collect a source.
-Each deployment also has a default-empty `hephaestus.evidence.authorized-source-uses` allowlist of
-explicit `source:purpose` grants, controlled by its data controller. Capture, feedback delivery,
-mentoring reuse and operator evidence review each check their own grant, so removing one grant stops
-that use without widening or rewriting the others. With no deployment authorization, Hephaestus skips
-practice reviews rather than collecting data.
+A checked-in, unexpired decision is what authorizes a source for one purpose, and it is recorded per
+`source:purpose` pair rather than per source. Capture, feedback delivery, mentoring reuse and
+operator evidence review each check their own decision, so withdrawing one stops that use without
+widening or rewriting the others. A source whose decision is missing, refused or expired is never
+read, and Hephaestus skips the practice rather than collecting the data.
+
+A per-deployment override of those decisions was considered and is not part of this decision: a
+deployment that could widen a grant would make the shipped contract unfalsifiable, and one that could
+narrow it would silently disable practices the workspace had switched on. Changing what may be read
+is therefore a contract change, reviewed and versioned.
 
 Adding or widening a source requires an updated source descriptor, profile inventory, governance
 decision, retention/erasure coverage and contract tests. **Accuracy benefit alone is not
