@@ -65,10 +65,8 @@ import reactor.util.retry.Retry;
  * variable can stand in for an alias name, and the count varies per batch — so the envelope cannot be a
  * static document. Only the envelope is assembled: the per-commit selection set lives in
  * {@code graphql/github/fragments/CommitEnrichmentFields.graphql} and is appended verbatim, which is
- * what puts every field name under {@code GraphQlOperationDocumentValidationTest} (via
- * {@code GetCommitMetadata.graphql}) and {@code GraphQlResponseStubValidator}. The assembled string
- * itself is validated against the checked-in schema by {@code CommitMetadataEnrichmentServiceQueryTest}.
- * SHA values are validated against {@link #SHA_PATTERN} before interpolation to prevent injection.
+ * what keeps every field name under the schema validation a checked-in document gets. SHA values are
+ * validated against {@link #SHA_PATTERN} before interpolation to prevent injection.
  */
 @Service
 @Slf4j
@@ -106,7 +104,6 @@ public class CommitMetadataEnrichmentService {
      */
     static final int ASSOCIATED_PRS_PAGE_SIZE = 10;
 
-    /** Per-commit selection set, loaded once from the checked-in fragment document. */
     private static final String COMMIT_ENRICHMENT_FRAGMENT = loadCommitEnrichmentFragment();
 
     /** Maximum pages to fetch in follow-up pagination to prevent runaway loops. */

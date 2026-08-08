@@ -65,19 +65,14 @@ public class GitLabManifest implements IntegrationManifest {
     }
 
     /**
-     * GitLab carries the same shared domain as GitHub minus one signal, and that omission is the reason
-     * this declaration exists.
+     * {@code scm.pull_request.synchronized} is deliberately absent: a merge-request hook does fire on a
+     * push, but the processor derives no "new commits" transition from it, so a practice watching that
+     * signal cannot fire on GitLab. Leaving it out turns that into a dormant binding with a stated
+     * reason rather than a practice indistinguishable from a quiet week.
      *
-     * <p>{@code scm.pull_request.synchronized} is absent because GitLab's webhook path emits no
-     * synchronize event at all — a merge-request hook fires on a push, but the processor derives no
-     * "new commits" transition from it. So a practice watching for new commits has never fired on
-     * GitLab, and there was no way to tell that apart from a quiet week. Declared here, it becomes a
-     * dormant binding with a reason instead of silence, and the day the processor learns to diff head
-     * commits, this set grows by one line and every such practice wakes up.
-     *
-     * <p>Delivery lanes are gated on the same flag as the channel beans: claiming a lane whose
-     * {@code SummaryChannel} is not wired would be caught at boot, which is the intended behaviour but
-     * a poor way to find out.
+     * <p>Delivery lanes track the same flag as the channel beans: claiming a lane whose
+     * {@code SummaryChannel} is not wired is caught at boot, which is the intended behaviour but a poor
+     * way to find out.
      */
     @Override
     public ReviewContribution reviewContribution() {

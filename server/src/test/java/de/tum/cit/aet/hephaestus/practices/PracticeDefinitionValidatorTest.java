@@ -17,12 +17,6 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * What the validator checks that the definition record cannot check for itself: agreement with the
  * registered domains and with the source catalog.
- *
- * <p>Two rules this file used to hold are gone rather than moved. "Trigger events must not contain
- * duplicates" is now {@code PracticeDefinition}'s "signal is bound twice", asserted where it lives. And
- * a practice only a human reviews may now name the occasion it is about: the occasion is where its
- * artifact kind comes from, so forbidding it left such a practice with nothing to say what it was about
- * — and saying what a practice concerns was never the same claim as asking Hephaestus to act on it.
  */
 class PracticeDefinitionValidatorTest extends BaseUnitTest {
 

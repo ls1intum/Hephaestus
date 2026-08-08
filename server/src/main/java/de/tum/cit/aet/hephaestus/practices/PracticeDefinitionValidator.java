@@ -47,9 +47,8 @@ public final class PracticeDefinitionValidator {
      * signal's prefix, so a misspelled signal would otherwise invent a kind nothing can raise and the
      * practice would sit in the catalog looking configured and never fire.
      *
-     * <p>A practice only a human reviews is checked the same way, and must name an occasion like any
-     * other: the occasion is where its artifact kind comes from, and saying what a practice is about is
-     * not the same claim as asking Hephaestus to act on it.
+     * <p>A practice only a human reviews is checked the same way and must still name an occasion: that
+     * is where its artifact kind comes from.
      */
     private void validateBindings(List<PracticeBinding> bindings) {
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
@@ -78,9 +77,8 @@ public final class PracticeDefinitionValidator {
      * A practice may only read evidence that could exist for the kind of thing it reviews.
      *
      * <p>The allow-list is the sources that declare they apply to this artifact kind, asked of the
-     * catalog each time rather than stored as a named profile. What each source demands of its capture is
-     * not checked here: it is stated once in the source contract, which refuses to state a demand the
-     * source can never satisfy.
+     * catalog each time rather than stored as a named profile. What each source demands of its capture
+     * is the source contract's business, not checked here.
      */
     private void validateEvidence(ArtifactKind artifactKind, PracticeDefinition definition) {
         var version = definition.automatedReviewPolicy().sourceContractVersion();
@@ -91,10 +89,9 @@ public final class PracticeDefinitionValidator {
                 if (!applicable.contains(need.sourceKind())) {
                     throw new IllegalArgumentException("Evidence source is not available for the selected work type");
                 }
-                // An exhaustive claim over a source that can never report a complete capture is a
-                // practice that refuses every review it ever triggers. Caught here rather than at review
-                // time, because "switched on and permanently refusing" is indistinguishable from
-                // "nobody has done this yet" in the report it produces.
+                // An exhaustive claim over a source that can never report a complete capture refuses
+                // every review it triggers. Caught at authoring time, because at review time
+                // "permanently refusing" and "nobody has done this yet" produce the same report.
                 if (need.stance().demandsCompleteCapture() && !contract.completenessPolicy().supportsComplete()) {
                     throw new IllegalArgumentException(
                         "Evidence source " +

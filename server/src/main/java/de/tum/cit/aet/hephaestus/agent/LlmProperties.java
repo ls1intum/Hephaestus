@@ -28,8 +28,8 @@ public record LlmProperties(
     @Valid @DefaultValue Fx fx
 ) {
     /**
-     * Supported display currencies as a regex alternation. One entry, because {@code fx_rate} holds a
-     * single {@code usd_per_eur} scalar — widening this means widening that table first.
+     * Supported display currencies as a regex alternation. Widening it means widening {@code fx_rate}
+     * first: that table holds a single {@code usd_per_eur} scalar.
      */
     public static final String SUPPORTED_DISPLAY_CURRENCIES = "EUR";
 

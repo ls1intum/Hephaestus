@@ -81,9 +81,9 @@ public class Practice {
     /**
      * The kind of artifact this practice reviews.
      *
-     * <p>A projection, not a fact: {@link #setBindings} derives it from the signals bound to, which
-     * already carry it as a prefix. It stays a column because two repository queries filter on it and a
-     * JSONB predicate over {@link #bindings} would be neither indexable nor readable.
+     * <p>A projection, not a fact: {@link #setBindings} derives it from the bound signals, which already
+     * carry it as a prefix. It stays a column because repository queries filter on it and a JSONB
+     * predicate over {@link #bindings} would be neither indexable nor readable.
      */
     @Column(name = "applies_to", nullable = false, length = ArtifactKind.MAX_LENGTH)
     @ColumnDefault("'scm.pull_request'")
@@ -116,11 +116,11 @@ public class Practice {
     /**
      * The occasions this practice is reviewed on, and the evidence each occasion's review reads, stored
      * as a JSONB array. The detection gate starts a review only when the observed signal is bound here,
-     * so the rule's lifecycle is bound to the signals it cares about — and, since a signal name carries
-     * its artifact kind, this list is also where {@link #artifactKind} comes from.
+     * and — since a signal name carries its artifact kind — this list is where {@link #artifactKind}
+     * comes from.
      *
-     * <p>The column is {@code bindings} rather than {@code on} because {@code ON} is reserved SQL. The
-     * authoring file spells it {@code on}, which is what an author writes and reads.
+     * <p>Named {@code bindings} rather than {@code on} because {@code ON} is reserved SQL; the authoring
+     * file still spells it {@code on}.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "bindings", columnDefinition = "jsonb", nullable = false)
@@ -173,8 +173,8 @@ public class Practice {
 
     /**
      * How loud this practice is allowed to be in this workspace: whether it is reviewed at all, and how
-     * far the result of that review may travel. A tier rather than a boolean, because "reviewed and
-     * delivered everywhere" or "not reviewed" makes silencing a noisy practice cost the measurement too.
+     * far the result may travel. A tier rather than a boolean, so silencing a noisy practice does not
+     * also cost its measurement.
      *
      * @see PracticeReviewTier
      */

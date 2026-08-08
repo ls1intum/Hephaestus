@@ -380,12 +380,10 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # CONFIG-backed feature flags evaluated by FeatureFlagService.
     # ROLE-backed flags (mentor_access, admin, etc.) are stored per account in the account_feature table.
-    # Each flag names its own env var so the SHORT name works everywhere. The long relaxed-binding form
-    # (HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION) also reaches these keys and still wins when
-    # both are set — but it is not the name anyone writes down. docker/.env, the compose files and the
-    # admin docs all say GITLAB_WORKSPACE_CREATION / PRACTICE_REVIEW_FOR_ALL, and before these
-    # placeholders existed those were compose-file aliases that fanned out to the long form: setting one
-    # anywhere but a shipped compose file did nothing at all, silently. Pinned by FeatureFlagEnvBindingTest.
+    # Each flag names its own env var so the SHORT name works everywhere: docker/.env, the compose files
+    # and the admin docs all say GITLAB_WORKSPACE_CREATION / PRACTICE_REVIEW_FOR_ALL. The long
+    # relaxed-binding form (HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION) also reaches these keys
+    # and still wins when both are set. Pinned by FeatureFlagEnvBindingTest.
     features:
         flags:
             practice-review-for-all: ${PRACTICE_REVIEW_FOR_ALL:false}
@@ -439,8 +437,8 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # AGENT JOB QUEUE (PostgreSQL-backed)
     # ═══════════════════════════════════════════════════════════════════════════
-    # The queue IS the agent_job table — a QUEUED insert is the enqueue. AgentJobExecutor polls
-    # for QUEUED rows on a fixed interval instead of a NATS push consumer. Disabled by default.
+    # The queue IS the agent_job table — a QUEUED insert is the enqueue, and AgentJobExecutor polls
+    # for QUEUED rows on a fixed interval. Disabled by default.
     agent:
         enabled: ${AGENT_ENABLED:false}
         # How long the poll loop sleeps when there is nothing to claim.

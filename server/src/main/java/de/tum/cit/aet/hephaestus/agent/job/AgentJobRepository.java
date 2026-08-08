@@ -42,8 +42,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     /**
      * What these runs decided, for the trace view. {@code reviewReadiness} is the per-practice record
-     * and is deliberately fetched with them: the two ways a run can end without measuring a practice —
-     * refused evidence and never admitted — are only distinguishable by reading it.
+     * and is deliberately fetched with them: a run that ends without measuring a practice looks the
+     * same from {@code status} and {@code output} whatever the cause, and only readiness says which.
      */
     @Query(
         "SELECT j.id AS id, j.status AS status, j.output AS output, j.reviewReadiness AS reviewReadiness, " +
@@ -117,8 +117,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     Optional<AgentJob> findByJobTokenHashAndStatus(String jobTokenHash, AgentJobStatus status);
 
     /**
-     * Clears the hour-long hold a budget block placed on this workspace's queued jobs, so raising the
-     * cap takes effect immediately. Scoped to {@code hold_reason = 'BUDGET'} rather than "any future
+     * Clears the hold a budget block placed on this workspace's queued jobs, so raising the cap takes
+     * effect immediately. Scoped to {@code hold_reason = 'BUDGET'} rather than "any future
      * {@code available_at}" so it cannot fast-forward a crash-retry backoff.
      *
      * @return how many held jobs were released
@@ -137,7 +137,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         Collection<AgentJobStatus> statuses
     );
 
-    /** The key prefix is PR- and config-scoped but SHA-agnostic, so this matches re-reviews of the same PR. */
+    /**
+     * Matches on an idempotency-key prefix, so a caller can look across the varying tail of the key
+     * (head SHA, revision, timestamp) for an earlier review of the same subject.
+     */
     @Query(
         "SELECT j FROM AgentJob j WHERE j.workspace.id = :workspaceId" +
             " AND j.idempotencyKey LIKE :keyPrefix ESCAPE '\\'" +
@@ -338,7 +341,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("stamp") ProvenanceStamp stamp
     );
 
-    /** What one run consumed, written as a unit so the snapshot and its decisions cannot diverge. */
+    /** Written as a unit so the evidence snapshot and the readiness decisions over it cannot diverge. */
     record ProvenanceStamp(
         @Nullable String promptDigest,
         @Nullable String inputsDigest,
@@ -481,7 +484,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("commentId") String commentId
     );
 
-    /** @return 1 if transitioned, 0 if the current status matched none of {@code fromStatuses}. */
+    /** @return 1 if transitioned, 0 if the row no longer matches the expected job/delivery statuses. */
     @WorkspaceAgnostic("ID-based delivery transition; job ID from workspace-scoped context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
@@ -609,7 +612,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Nullable
         Instant getOldestAvailableAt();
 
-        /** QUEUED jobs parked on an admin-undoable hold (currently only a monthly LLM cap). */
+        /** QUEUED jobs parked on a hold an admin can lift, as opposed to a retry backoff. */
         long getHeld();
 
         long getRunning();

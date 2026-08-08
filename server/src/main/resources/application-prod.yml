@@ -54,7 +54,7 @@ server:
         # on a writable /var/log/hephaestus (a fresh named volume is root:root, which aborted startup).
         # Deliberately, NO layer writes a per-request IP/URL record: the Traefik ingress
         # (docker/compose.proxy.yaml) runs without --accesslog too, which is Traefik's default. Client
-        # IPs are recorded only against auth_event rows, under that table's 12-month partitioned
+        # IPs are recorded only against auth_event rows, under that table's partitioned retention
         # window. This is a documented GDPR posture (docs/admin/dsms/): enabling either access log is a
         # material change that needs the record of processing updated with it.
         accesslog:

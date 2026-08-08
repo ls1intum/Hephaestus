@@ -15,25 +15,15 @@ public enum SignalStateReason {
     /** Rate limiting, not correctness. Retrying later would defeat the limit the workspace asked for. */
     COOLDOWN_ACTIVE(SignalState.SUPPRESSED),
 
-    /**
-     * Another submission for the same subject won the idempotency race; it carries the review.
-     *
-     * <p>Nothing records this today: the path that would have is the one that calls
-     * {@code setRollbackOnly()}, which unwinds the very row the reason would have been written to. It is
-     * kept because the vocabulary crosses the API and the webapp renders an exhaustive map of it, so
-     * removing it is a server-and-client change; it should go, together with that map and the
-     * regenerated client, rather than half of it here.
-     */
+    /** Another submission for the same subject won the idempotency race; it carries the review. */
     CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
 
     /**
      * The artifact falls outside the workspace's review scope — the wrong target branch, or a repository
      * the workspace syncs but does not review.
      *
-     * <p>Terminal rather than pending, unlike the tier reasons: the facts it turns on belong to the
-     * artifact and do not change. A merge request that targeted {@code develop} will still have targeted
-     * {@code develop} tomorrow, so re-offering it would be the reaper burning cycles on a decision that
-     * cannot come out differently. Widening the scope changes what happens NEXT, not what already did.
+     * <p>Terminal rather than pending, unlike the tier reasons: it turns on facts that belong to the
+     * artifact and cannot change, so widening the scope alters what happens next, not what already did.
      */
     OUT_OF_REVIEW_SCOPE(SignalState.SUPPRESSED),
 
@@ -47,14 +37,10 @@ public enum SignalStateReason {
     BINDING_DISABLED(SignalState.PENDING),
 
     /**
-     * A practice IS bound to this signal, and every one that is sits at loudness tier {@code OFF} — the
-     * workspace turned the review down to silence rather than never having asked for it.
+     * A practice is bound to this signal and every one that is sits at loudness tier {@code OFF}.
      *
-     * <p>Separate from {@link #NO_ACTIVE_PRACTICE} on purpose: that reason means the workspace has no
-     * practice for this work at all, while this one means it has one and chose not to run it. Collapsing
-     * them would make "we are deliberately not reviewing this" indistinguishable from "nobody ever set
-     * this up", which are the two answers an operator most needs told apart. Retryable, because raising
-     * the tier lifts it without the artifact changing.
+     * <p>Separate from {@link #NO_ACTIVE_PRACTICE} on purpose: collapsing them would make "we are
+     * deliberately not reviewing this" indistinguishable from "nobody ever set this up".
      */
     PRACTICE_TIER_OFF(SignalState.PENDING),
 
@@ -65,10 +51,9 @@ public enum SignalStateReason {
      * The artifact exists but nobody it could be attributed to resolves to a workspace member — the
      * author has not linked the account this vendor knows them by.
      *
-     * <p>Retryable, and that is the whole reason it is its own reason rather than a gate skip: linking an
-     * account is something the person can do afterwards, and when they do, every document of theirs that
-     * was passed over becomes reviewable without anything upstream having to happen again. Recording it as
-     * {@code GATE_SKIPPED} would make it terminal and lose that history silently.
+     * <p>Its own reason rather than a gate skip because it is retryable: the person can link the account
+     * afterwards, and everything of theirs that was passed over then becomes reviewable without anything
+     * upstream happening again. {@link #GATE_SKIPPED} would make it terminal and lose that silently.
      */
     SUBJECT_UNLINKED(SignalState.PENDING),
 
@@ -92,11 +77,8 @@ public enum SignalStateReason {
     }
 
     /**
-     * Whether this reason leaves the signal open for the reaper to re-offer.
-     *
-     * <p>A restatement of {@link #resultingState()}, not a second source of truth: the reaper selects on
-     * the stored state, so it never calls this. It exists so a test can say which of the two kinds of
-     * refusal a reason is without spelling out the comparison, which is the thing worth asserting.
+     * Whether this reason leaves the signal open for the reaper to re-offer — a restatement of
+     * {@link #resultingState()}, not a second source of truth. The reaper selects on the stored state.
      */
     public boolean isRetryable() {
         return resultingState == SignalState.PENDING;

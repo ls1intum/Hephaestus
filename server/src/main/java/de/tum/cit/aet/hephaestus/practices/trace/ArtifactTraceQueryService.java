@@ -53,16 +53,13 @@ import org.springframework.transaction.annotation.Transactional;
  * Assembles the trace: the signal ledger crossed with the workspace's practices, the runs those
  * signals started, and what those runs produced.
  *
- * <p>A pure read model over data this branch already pays for. It collects nothing, records nothing,
- * and adds no column — the whole point of the ledger was that these questions become answerable
- * without new instrumentation.
+ * <p>A pure read model: it collects nothing, records nothing and adds no column.
  *
- * <p><b>The ledger is the tenancy boundary.</b> A mirrored merge request belongs to a workspace
- * through a monitor mapping rather than a column, so there is no way to ask the mirror "is this yours"
- * cheaply and no reason to: {@code artifact_signal} is workspace-scoped by construction, and an
- * artifact with no row in it gets a 404 rather than a resolved title. That also makes the 404 mean
- * something honest — we have nothing recorded about this work — instead of standing for a permission
- * check the caller cannot distinguish from absence.
+ * <p><b>The ledger is the tenancy boundary.</b> A mirrored merge request belongs to a workspace through
+ * a monitor mapping rather than a column, so there is no cheap way to ask the mirror "is this yours" —
+ * {@code artifact_signal} is workspace-scoped by construction, and an artifact with no row in it gets a
+ * 404. The 404 therefore means "we have nothing recorded about this work" rather than standing in for a
+ * permission check the caller cannot distinguish from absence.
  */
 @Service
 @RequiredArgsConstructor
@@ -191,11 +188,8 @@ class ArtifactTraceQueryService {
      * Dormancy as declared by coverage, minus every claim the ledger refutes.
      *
      * <p>{@code PracticeSignalCoverage} answers from the connection registry, which is the right source
-     * for "will this ever fire here". It is the wrong source for "has this ever fired": a signal already
-     * in this workspace's ledger demonstrably arrives, whatever the registry says today. Telling a
-     * developer their practice is waiting for an integration, on the page whose whole job is to be right
-     * about silence, when the signal it waits on is sitting in the log, is the one mistake this feature
-     * cannot afford.
+     * for "will this ever fire here" and the wrong one for "has this ever fired": a signal already in
+     * this workspace's ledger demonstrably arrives, whatever the registry says.
      */
     private Map<Long, String> dormancyContradictedByTheLedger(Long workspaceId) {
         List<DormantBinding> dormant = coverage.dormantBindings(workspaceId);

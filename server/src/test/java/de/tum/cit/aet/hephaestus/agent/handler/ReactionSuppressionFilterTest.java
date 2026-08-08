@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
-/** Unit tests for reaction-aware re-nag suppression (ADR 0021, B2). */
+/** Unit tests for reaction-aware re-nag suppression (ADR 0021). */
 @org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class ReactionSuppressionFilterTest extends BaseUnitTest {
 

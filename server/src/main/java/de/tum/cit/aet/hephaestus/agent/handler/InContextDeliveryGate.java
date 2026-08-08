@@ -124,8 +124,8 @@ class InContextDeliveryGate {
         }
         int index = 0;
         for (ValidatedFinding finding : withheld) {
-            // The band is one thousand slots wide and overflowing it would address the NEXT band's unit,
-            // which the (agent_job_id, position) guard would then read as "already recorded" and drop.
+            // Overflowing the band would address the NEXT band's unit, which the (agent_job_id, position)
+            // guard would then read as "already recorded" and drop.
             if (index >= FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
                 log.warn(
                     "Withheld-feedback ledger band full at {} rows; remaining withheld findings are unrecorded: jobId={}",

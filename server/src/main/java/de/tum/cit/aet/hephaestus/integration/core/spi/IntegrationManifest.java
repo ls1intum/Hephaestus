@@ -32,20 +32,16 @@ public interface IntegrationManifest {
     /**
      * Whether this deployment has the integration switched on.
      *
-     * <p>A manifest is registered whether or not its vendor is enabled, because what an integration
-     * <em>could</em> raise is a fact about the build and must read the same on every deployment. The
-     * manifests used to carry the feature flag as a {@code @ConditionalOnProperty}, which made
-     * {@code DeclaredSignalCoverage.compiledCoverage()} — the thing whose name promises it is compiled
-     * in — quietly vary with configuration: if turning an integration off deleted its manifest bean, every
-     * signal only that vendor raises would look like a signal nothing in the build can raise. That is
-     * invisible while one always-on vendor covers every signal, and fatal the moment a kind arrives whose
-     * only producer ships behind a flag.
+     * <p>A manifest must be registered whether or not its vendor is enabled, and so must never gate
+     * itself with {@code @ConditionalOnProperty}: what an integration <em>could</em> raise is a fact
+     * about the build, and if the flag deleted the bean then every signal only that vendor raises would
+     * read as a signal nothing in the build can raise.
      *
-     * <p>What the flag still governs is the <em>wiring</em>: a disabled integration has no credential
-     * provider, no subject parser and no message handlers, so the bootstrap's per-capability bean checks
-     * and the provenance half of the review contract are skipped for it. Those rules are not thereby
-     * unenforced — {@code IntegrationManifestContractTest} runs the real validator against every shipped
-     * manifest at build time, and an ArchUnit rule fails the build if a manifest has no such test.
+     * <p>The flag governs the <em>wiring</em>: a disabled integration has no credential provider, no
+     * subject parser and no message handlers, so the bootstrap's per-capability bean checks and the
+     * provenance half of the review contract are skipped for it. Those rules stay enforced at build
+     * time instead — {@code IntegrationManifestContractTest} runs the real validator against every
+     * shipped manifest, and an ArchUnit rule fails the build if a manifest has no such test.
      */
     default boolean enabled() {
         return true;
@@ -62,12 +58,11 @@ public interface IntegrationManifest {
     /**
      * The practice-review section of a manifest.
      *
-     * <p>{@link #raises()} is the interesting field and it is deliberately a <em>subset</em> of what the
-     * artifact's {@code ArtifactDescriptor} declares. The descriptor states what the domain can express;
-     * this states what this vendor actually delivers of it. Today GitLab's webhook path emits no
-     * synchronize event at all, so it cannot raise {@code scm.pull_request.synchronized} — and with this
-     * record that becomes a fact the system can read, report as a dormant binding, and eventually close,
-     * instead of a practice that quietly never fires for half the workspaces.
+     * <p>{@link #raises()} is deliberately a <em>subset</em> of what the artifact's
+     * {@link ArtifactDescriptor} declares: the descriptor states what the domain can express, this
+     * states what one vendor delivers of it. A vendor whose ingest carries no event for a signal
+     * therefore says so, and the gap is readable as a dormant binding instead of a practice that
+     * quietly never fires for the workspaces on that vendor.
      *
      * @param observes the artifact kinds this integration writes to at all
      * @param raises   per kind, the signals this integration can actually raise; every entry must be

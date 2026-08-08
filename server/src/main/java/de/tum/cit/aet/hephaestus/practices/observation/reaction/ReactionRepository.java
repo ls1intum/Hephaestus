@@ -29,7 +29,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
 
     /**
      * Latest reaction per {@code recurrence_key} (stable locus) for the given keys, restricted to one
-     * reacting developer (the feedback's recipient — only the recipient may react). Used by B2 to suppress
+     * reacting developer (the feedback's recipient — only the recipient may react). Used by reaction suppression to suppress
      * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an earlier run,
      * even though the per-run feedback row (and its {@code feedback_id}) is different this run.
      *

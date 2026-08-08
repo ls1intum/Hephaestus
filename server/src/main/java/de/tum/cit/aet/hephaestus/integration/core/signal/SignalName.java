@@ -53,7 +53,7 @@ public record SignalName(String value) {
      * The artifact family this signal is about, read off the name's prefix.
      *
      * <p>Never serialized: the prefix is already in {@link #value()}, and a second spelling of it on the
-     * wire is the duplication that made a practice state its artifact kind three times.
+     * wire would let a practice state its artifact kind twice and disagree with itself.
      */
     @JsonIgnore
     public ArtifactKind artifactKind() {

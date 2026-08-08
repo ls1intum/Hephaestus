@@ -187,7 +187,7 @@ public class PracticeDetectionDeliveryService {
                 }
             }
 
-            // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
+            // Cross-run identity (ADR 0021): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
             // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
             String recurrenceKey = ObservationFingerprint.compute(
@@ -620,9 +620,9 @@ public class PracticeDetectionDeliveryService {
      * builds carry.
      *
      * <p>A kind neither source recognises is refused rather than defaulted. Falling through to
-     * pull-request handling — as this did — turns "this build cannot deliver that kind" into "Missing
-     * pull_request_id in job metadata", which sends whoever reads it looking for the wrong bug. The
-     * pull-request default now applies only where it is actually a fact: a job that names no kind at all.
+     * pull-request handling turns "this build cannot deliver that kind" into "Missing pull_request_id in
+     * job metadata", which sends whoever reads it looking for the wrong bug. The pull-request default
+     * applies only where it is a fact: a job that names no kind at all.
      */
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
         String artifactKind =

@@ -771,7 +771,7 @@
         </preConditions>
         <comment>
             Admit the instance LLM catalog's audit events on auth_event. The catalog is global, and
-            config_audit_event.workspace_id is NOT NULL, so these changes cannot live there; auth_event
+            the config trail is workspace-scoped, so these changes cannot live there; auth_event
             is the same ledger the account admin already uses for APP_ROLE_CHANGED. The ADD validates
             every existing row in one pass under a momentary ACCESS EXCLUSIVE lock, no rewrite.
         </comment>

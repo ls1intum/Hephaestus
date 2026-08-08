@@ -1317,8 +1317,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         @Test
         void shouldPublishReadyWhenSyncFindsAMergeRequestThatLeftDraft() {
             // The transition arrives as a difference against what we last knew, and the upsert below
-            // overwrites that. Dropping it here made a merge request that went ready between webhooks
-            // unreviewable as ready forever: the mirror agrees with upstream and upstream has already
+            // overwrites that. Dropping it here leaves a merge request that went ready between webhooks
+            // unreviewable as ready forever: the mirror agrees with upstream, and upstream has already
             // announced the change.
             PullRequest existingDraft = createPullRequestEntity();
             existingDraft.setDraft(true);

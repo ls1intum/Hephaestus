@@ -16,9 +16,9 @@ import org.springframework.core.io.FileSystemResource;
 
 /**
  * {@code application-prod.yml} states, and {@code docs/admin/dsms/} publishes as a GDPR posture, that
- * NO layer of the deployment writes a per-request IP/URL record. That is a claim about four layers at
- * once, only one of which is Java — so it is asserted here across all four rather than trusted per
- * file.
+ * NO layer of the deployment writes a per-request IP/URL record. That is a claim about every layer at
+ * once, only one of which is Java — so it is asserted here over the shipped configuration of each
+ * rather than trusted per file.
  *
  * <p>The URL is the personal datum, not the address: neither nginx image loads {@code real_ip}, so the
  * peer they would log is the proxy's container address. But an SPA deep link names a person

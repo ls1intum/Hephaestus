@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 /**
- * The one lifecycle transition an admin can ask for.
+ * The lifecycle transitions an admin can ask for.
  *
  * <p>{@code RUNNING} is the confirmation: it is the point at which somebody accepts the estimate they
  * were shown and authorises the spend. {@code CANCELLED} stops a campaign for good. Every other
@@ -22,7 +22,6 @@ public record UpdateReviewBackfillRunStatusRequestDTO(
     )
     RequestedReviewBackfillStatus status
 ) {
-    /** The subset of the run's lifecycle a person may ask for. */
     public enum RequestedReviewBackfillStatus {
         RUNNING,
         CANCELLED,

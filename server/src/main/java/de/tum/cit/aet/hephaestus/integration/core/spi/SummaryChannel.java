@@ -7,10 +7,8 @@ import java.util.Objects;
  * {@link Capability#FEEDBACK_DELIVERY} implements it. Named for what it posts, like its siblings
  * {@link InlineFindingChannel} and {@link ApprovalChannel}, which are separate capability-gated SPIs.
  *
- * <p>It was called {@code FeedbackChannel} and was the only type name declared twice in the codebase:
- * {@code practices.feedback.FeedbackChannel} is an enum of destinations (in-context, conversation,
- * profile) that a delivery is recorded against, and it keeps the word because that is what it names.
- * This is a pipe, and every method on it posts, updates or finds a summary.
+ * <p>Distinct from {@code practices.feedback.FeedbackChannel}, which is the enum of destinations a
+ * delivery is recorded against. That one names where feedback landed; this one does the landing.
  *
  * <p>Vendor-specific subject formatting (e.g. GitHub {@code owner/repo#42} vs
  * GitLab {@code group/project!42}) lives behind {@link #formatPullRequestSubjectId} so
@@ -54,7 +52,7 @@ public interface SummaryChannel {
      * Format the vendor's external identifier for a pull request / merge request. GitHub
      * uses {@code repoFullName#prNumber}; GitLab uses {@code repoFullName!prNumber};
      * future kinds add their own. The {@code subjectExternalId} stored on the
-     * vendor post id is recorded as a {@code FeedbackPlacement.external_ref} (ADR 0021 C6).
+     * vendor post id is recorded as a {@code FeedbackPlacement.external_ref} (ADR 0021).
      *
      * @throws IllegalArgumentException if {@code repoFullName} is not well-formed for the
      *     vendor (e.g. GitHub's two-segment {@code owner/repo} requirement).
@@ -79,7 +77,7 @@ public interface SummaryChannel {
 
     record FeedbackContent(String body, String marker) {}
 
-    /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021 C6). */
+    /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021). */
     record SummaryHandle(String externalId) {}
 
     record ExistingSummaryLookup(Kind kind, SummaryHandle handle) {

@@ -24,10 +24,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The reaper's two clocks, driven against a real database.
  *
  * <p>Every statement involved takes its {@code now} as a parameter, so a month of sweeps plays out in a
- * loop and the deadline is observed rather than argued about. That is the point of testing it here: the
- * defect these tests pin was invisible to the mock-based reaper test, because the reaper called exactly
- * the methods it was supposed to, in the right order, and the whole of the damage was in which column
- * the SQL wrote.
+ * loop and the deadline is observed rather than argued about. That is the point of testing it here: a
+ * mock-based reaper test cannot see these defects, because the reaper calls exactly the methods it is
+ * supposed to, in the right order, and the whole of the damage is in which column the SQL writes.
  */
 class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
 
@@ -64,10 +63,10 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
     void aPermanentlyFailingSignalStillLapsesOnSchedule() {
         SignalKey key = recordPending(1L, START);
 
-        // Thirty days of sweeps in which every re-offer throws, so nothing ever calls markRefused and the
-        // claim is the only write the row sees. This is the exact scenario that produced an immortal
-        // PENDING row: the claim used to land on state_changed_at, which is what lapseStalePending reads,
-        // so a retry delay shorter than the deadline meant the deadline could never be reached.
+        // Every re-offer throws, so nothing ever calls markRefused and the claim is the only write the row
+        // sees. Were the claim to stamp state_changed_at — the column lapseStalePending reads — a retry
+        // delay shorter than the deadline would push the deadline out on every sweep, and the row would
+        // be immortal.
         Instant lapsedAt = null;
         for (Instant now : sweeps(Duration.ofDays(30))) {
             signals.lapseStalePending(now.minus(LAPSE_AFTER), now);

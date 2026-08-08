@@ -17,7 +17,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Drives the conversational-feedback router + preparer off {@link PracticeDetectionDeliveredEvent}. Runs
  * {@code @Async @TransactionalEventListener(AFTER_COMMIT)} so it never blocks the delivery path and reads the
  * cycle's observations only after they are committed, in its own {@code REQUIRES_NEW} transaction. Best-effort: any
- * failure is logged, never propagated. Reviewer attribution is not built (ADR-0021-C2), so every pass is driven with
+ * failure is logged, never propagated. Reviewer attribution is not built (ADR 0021), so every pass is driven with
  * {@link RoutingContext#author()}.
  */
 @Component

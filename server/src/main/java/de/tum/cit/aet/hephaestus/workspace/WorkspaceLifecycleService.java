@@ -230,11 +230,10 @@ public class WorkspaceLifecycleService {
     }
 
     /**
-     * Update the lifecycle status for the workspace using the canonical transition helpers.
+     * Update the lifecycle status for the workspace.
      *
-     * <p>{@code PURGED} is rejected here: purge is owner-only and irreversible, so it is exposed
-     * exclusively through {@code DELETE /workspaces/{workspaceSlug}}. Routing it through the
-     * admin-level status endpoint would bypass the owner requirement.
+     * <p>{@code PURGED} is rejected here: purge is owner-only and irreversible, and routing it through
+     * the admin-level status endpoint would bypass the owner requirement.
      */
     @Transactional
     public Workspace updateStatus(String workspaceSlug, WorkspaceStatus targetStatus) {

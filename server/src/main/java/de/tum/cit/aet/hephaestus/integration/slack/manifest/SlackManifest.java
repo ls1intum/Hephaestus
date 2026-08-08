@@ -40,12 +40,10 @@ public class SlackManifest implements IntegrationManifest {
     /**
      * Nothing, and stated rather than assumed.
      *
-     * <p>Slack does review conversations, but the artifact it reviews is a thread <em>projected</em> in
-     * the agent module out of ingested messages, not an entity this integration owns — so no module
-     * contributes a descriptor for it and Slack has no kind to observe. It is also raised by a
-     * scheduler rather than by any ingested event, which the contract has no way to express and should
-     * not pretend to: an empty {@code raises} is the truth, and a chat descriptor is the fix, not a
-     * declaration written ahead of one.
+     * <p>Conversations do get reviewed, but the artifact is a thread projected in the agent module out
+     * of ingested messages, and its descriptor is declared there rather than here. Its one signal is
+     * raised by a scheduler reading quiescence, not by any ingested Slack event, so there is no vendor
+     * provenance for Slack to claim — declaring it would be an aspiration the contract cannot check.
      */
     @Override
     public ReviewContribution reviewContribution() {

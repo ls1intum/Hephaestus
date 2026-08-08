@@ -48,10 +48,9 @@ public class GitHubManifest implements IntegrationManifest {
     }
 
     /**
-     * GitHub carries the shared SCM domain in full: every signal either descriptor declares as
-     * webhook-produced has a GitHub event behind it, which is why it is the vendor the vocabulary was
-     * shaped against. The manual review-request signals are absent from both sets because no ingested
-     * event raises them — somebody asks for those by hand.
+     * GitHub carries the shared SCM domain in full: every signal a descriptor declares as
+     * webhook-produced has a GitHub event behind it. The manual review-request signals are absent
+     * because no ingested event raises them — somebody asks for those by hand.
      */
     @Override
     public ReviewContribution reviewContribution() {

@@ -10,13 +10,13 @@ import org.junit.jupiter.api.Test;
 
 class AgentJobBackoffTest extends BaseUnitTest {
 
-    /** Always returns the midpoint (0.5) — i.e. zero jitter, exact base value. */
+    /** The midpoint: zero jitter, so the base value comes through exactly. */
     private static final RandomGenerator NO_JITTER = fixed(0.5);
 
-    /** Always returns 1.0 — the maximum +10% jitter. */
+    /** The maximum +10% jitter. */
     private static final RandomGenerator MAX_POSITIVE_JITTER = fixed(1.0);
 
-    /** Always returns 0.0 — the maximum -10% jitter. */
+    /** The maximum -10% jitter. */
     private static final RandomGenerator MAX_NEGATIVE_JITTER = fixed(0.0);
 
     private static RandomGenerator fixed(double value) {

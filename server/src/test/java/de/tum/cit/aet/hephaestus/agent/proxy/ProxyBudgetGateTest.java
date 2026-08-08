@@ -131,9 +131,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
     }
 
     /**
-     * A mentor turn has no {@code agent_job} row, so until it was given a meter of its own it could spend
-     * without limit inside one turn — the gate saw a route with nothing to charge and let every call
-     * through.
+     * A mentor turn has no {@code agent_job} row, so it needs a meter of its own: a route the gate finds
+     * nothing to charge against spends without limit for the whole length of a turn.
      */
     @Nested
     @DisplayName("a mentor turn is bounded by its own completed calls, exactly like a job attempt")

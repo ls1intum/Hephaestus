@@ -166,9 +166,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldReviewAMirroredRecordWhoseCurrentnessCannotBeEstablished() {
-        // A pull request unchanged for months is correctly mirrored, not stale. The previous gate
-        // read the mirror's last-written timestamp as a last-verified timestamp and skipped exactly
-        // this case, which covers every backfilled review and every established repository.
+        // A pull request unchanged for months is correctly mirrored, not stale. Reading the mirror's
+        // last-written timestamp as a last-verified one would refuse exactly this case, which covers
+        // every backfilled review and every established repository.
         var manifest = coreManifest(builder, "job-quiet", Instant.EPOCH);
 
         assertThat(
@@ -183,8 +183,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         // A pull request really can produce an empty diff — a full revert, a force-push, a
         // merge-commit-only range. The contract allows it, so availability and completeness both pass.
         // Only the diff's declared COMPLETE_AND_NON_EMPTY separates "there is nothing here to judge"
-        // from "I looked and it was fine", and it now applies to every practice that requires the diff
-        // rather than to the ones that remembered to ask.
+        // from "I looked and it was fine", and it applies to every practice requiring the diff, not
+        // only to the ones that thought to ask for it.
         Map<String, byte[]> files = new LinkedHashMap<>();
         String path = "inputs/context/diff.patch";
         files.put(path, new byte[0]);
@@ -512,8 +512,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-invalid-watermark", NOW.plusSeconds(60));
 
         // Nothing here can show the copy is behind: the mirror records when a row last changed, not
-        // when it was last checked. Refusing on that is refusing for a reason we cannot establish,
-        // which is what made every backfilled and every quiet-repository review fail.
+        // when it was last checked. Refusing on that is refusing for a reason we cannot establish.
         assertThat(
             builder
                 .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiring(CORE, "pr-core")))

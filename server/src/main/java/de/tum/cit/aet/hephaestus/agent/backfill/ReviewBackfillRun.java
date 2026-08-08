@@ -35,21 +35,6 @@ import org.jspecify.annotations.Nullable;
  * and triggers none of them, precisely so adoption does not fire thousands of reviews. This row is how
  * that refusal is lifted, once, on purpose, for a named range.
  *
- * <p>Three properties are load-bearing and each is a column here:
- *
- * <ul>
- *   <li><strong>Confirmed before it costs anything.</strong> The run is created with its scope enumerated
- *       and costed and its status {@code AWAITING_CONFIRMATION}; nothing is submitted until an admin
- *       moves it to {@code RUNNING}. {@link #requestedByAccountId} and {@link #confirmedByAccountId} are kept
- *       apart so the estimate and the decision to spend are separately attributable.
- *   <li><strong>Resumable, and paused rather than thinned.</strong> {@link #cursorArtifactId} is the
- *       high-water mark of an ascending walk. When the budget runs out the run pauses <em>without
- *       advancing it</em>, so no artifact is passed over. A gap-toothed baseline is worse than a
- *       truncated one, because nothing downstream can tell "not reviewed" from "reviewed, nothing found".
- *   <li><strong>Bounded by construction.</strong> The window is closed at both ends and fixed at
- *       creation, so the scope cannot grow under a running campaign.
- * </ul>
- *
  * <p>Not to be confused with {@code RepositoryToMonitor}'s backfill checkpoints, which are about
  * <em>fetching</em> history from a provider. This is about <em>reviewing</em> history already mirrored.
  */
@@ -74,15 +59,10 @@ public class ReviewBackfillRun {
     private UUID id;
 
     /**
-     * Optimistic-lock guard, and the only thing standing between an admin's cancel and a campaign that
-     * keeps spending.
-     *
-     * <p>The driver reads a run on one tick and writes it back detached, which is a {@code merge} — a
-     * full-column copy-back of {@code status}, {@code pauseReason} and the counters as they were when the
-     * batch started. An admin who cancels mid-batch would otherwise have {@code RUNNING} written straight
-     * back over {@code CANCELLED}, and the next tick would find an active campaign and carry on paying for
-     * it. With the version the losing write throws instead, the batch's progress is discarded, and the
-     * next tick re-reads the run and sees the cancel.
+     * The driver writes a run back detached, which is a {@code merge} — a full-column copy-back of the
+     * status and counters as they were when the batch started. Without this lock an admin's mid-batch
+     * cancel would be overwritten with {@code RUNNING} and the campaign would keep spending; with it the
+     * losing write throws, the batch's progress is discarded, and the next tick re-reads the cancel.
      */
     @Version
     @ColumnDefault("0")
@@ -138,11 +118,9 @@ public class ReviewBackfillRun {
     private Integer estimatedArtifacts = 0;
 
     /**
-     * What the preflight thought the campaign would cost, in USD.
-     *
-     * <p>Null when the workspace has no priced review history to derive a per-review cost from. Null is
-     * shown as "unknown" rather than as zero: an unknown cost that renders as free is the single worst
-     * thing this screen could do.
+     * What the preflight thought the campaign would cost, in USD. Null when the workspace has no priced
+     * review history to derive a per-review cost from, and must be rendered as unknown rather than as
+     * zero — an unknown cost shown as free invites a confirmation nobody meant to give.
      */
     @Nullable
     @Column(name = "estimated_cost_usd", precision = 12, scale = 4, updatable = false)
@@ -151,6 +129,10 @@ public class ReviewBackfillRun {
     /**
      * The highest artifact id already walked. Null before the first batch. The walk is ordered by id
      * ascending, which is a stable total order independent of any timestamp the mirror may rewrite.
+     *
+     * <p>A run that pauses must NOT advance this past artifacts it did not submit. A gap-toothed
+     * baseline is worse than a truncated one: nothing downstream can tell "not reviewed" from
+     * "reviewed, nothing found".
      */
     @Nullable
     @Column(name = "cursor_artifact_id")
@@ -174,11 +156,9 @@ public class ReviewBackfillRun {
      * Artifacts whose submission threw, and which therefore have no ledger row, no observation and no
      * decision recorded anywhere.
      *
-     * <p>Its own counter rather than folded into {@link #passedCount}, because the two are opposite
-     * facts. A pass means the campaign looked and decided; a failure means it never got an answer. Adding
-     * a crash to the passes makes {@code submitted + passed} reach the estimate and the campaign report
-     * COMPLETED over a baseline with holes in it — which is the one outcome this whole class is built to
-     * prevent, arrived at by the accounting instead of by the walk.
+     * <p>Its own counter rather than folded into {@link #passedCount}: a pass means the campaign looked
+     * and decided, a failure means it never got an answer. Counting failures as passes would let
+     * {@code submitted + passed} reach the estimate and report COMPLETED over a baseline with holes.
      */
     @NotNull
     @Column(name = "failed_count", nullable = false)
@@ -223,7 +203,6 @@ public class ReviewBackfillRun {
         }
     }
 
-    /** The artifact kind as the signal vocabulary spells it. */
     public ArtifactKind kind() {
         return ArtifactKind.of(artifactKind);
     }

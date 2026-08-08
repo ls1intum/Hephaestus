@@ -3,16 +3,13 @@ package de.tum.cit.aet.hephaestus.practices.trace;
 /**
  * What became of one practice on one artifact — the answer to "why didn't it say anything?".
  *
- * <p>Ten answers rather than a boolean, because the whole premise of this work is that silence has
- * kinds and that collapsing them is what makes mentoring silence indistinguishable from having nothing
- * to say. Every constant here is derived from something already recorded: a
- * {@code SignalStateReason} on the ledger, a readiness decision on the run, a tier on the practice, or
- * the absence of a signal the practice watches. Nothing is inferred from a guess.
+ * <p>Every constant is derived from something already recorded — a {@code SignalStateReason} on the
+ * ledger, a readiness decision on the run, a tier on the practice, or the absence of a signal the
+ * practice watches. Nothing is inferred from a guess.
  *
  * <p>The split that matters most is {@link #SKIPPED} against {@link #NOT_ASSESSABLE}: we chose not to
- * look, against we looked and could not see. Conflating them is the error §6 of the design calls a
- * research-integrity boundary — a review that could not read the diff is telemetry about our
- * instrument, not a measurement of anybody's behaviour.
+ * look, against we looked and could not see. A review that could not read the diff is telemetry about
+ * our instrument, not a measurement of anybody's behaviour.
  */
 public enum PracticeTraceOutcome {
     /** A review assessed this practice on this artifact. It may still have found nothing to say. */

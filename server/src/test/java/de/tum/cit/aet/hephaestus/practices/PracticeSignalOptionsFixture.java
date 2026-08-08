@@ -14,8 +14,8 @@ import java.util.Optional;
 /**
  * The signal options a running server offers, assembled from the real shipped descriptors.
  *
- * <p>Names four vendor-side descriptor classes, which the practices module itself may not do. That is
- * the point of it being test code: the boundary rule is checked over production classes, and this
+ * <p>Names descriptor classes from outside the practices module, which that module itself may not do.
+ * That is the point of it being test code: the boundary rule is checked over production classes, and this
  * fixture exists precisely to assert that the production module reaches the same answer without ever
  * naming them.
  *

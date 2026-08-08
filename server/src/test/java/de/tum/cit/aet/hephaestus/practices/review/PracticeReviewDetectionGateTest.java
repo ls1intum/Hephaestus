@@ -159,18 +159,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         return workspace;
     }
 
-    // Gate Check Tests
-
     /**
-     * The draft question used to be a veto: one fleet-wide setting, checked before anything else, that
-     * decided for every practice at once whether a draft was worth reviewing. It defaulted to skipping,
-     * which meant the draft-specific criteria several shipped practices are largely made of could not be
-     * reached at all — {@code ready-and-traceable-handoff} spends most of its rubric on how to judge a
-     * draft handover, and none of it ever ran.
-     *
-     * <p>It is a per-binding fact now, because it is a property of the occasion rather than of the
-     * workspace: judging how a change was handed over is exactly what one wants to say about a draft,
-     * while judging how a merged change was reviewed cannot arise on one.
+     * Whether a draft occasions a review is a per-binding fact, because it is a property of the occasion
+     * rather than of the workspace: judging how a change was handed over is exactly what one wants to say
+     * about a draft, while judging how a merged change was reviewed cannot arise on one. A fleet-wide
+     * veto puts the draft-specific criteria of a practice like {@code ready-and-traceable-handoff} out of
+     * reach of the only artifact they apply to.
      */
     @Nested
     class DraftGateTests {
@@ -889,11 +883,10 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     /**
      * The gate reached by a kind that has no repository, no branch and no assignee.
      *
-     * <p>Before this method existed, every entry point took a {@code PullRequest} or an {@code Issue}, so
-     * a repo-less kind could not be gated at all — it went straight to submission, and the difference
-     * between "no practice for this work" and "a practice bound to it and turned off" was lost. These
-     * tests use a document signal because that is the first kind to need it, but nothing in the method
-     * names one.
+     * <p>An entry point that took a {@code PullRequest} or an {@code Issue} could not gate such a kind at
+     * all: it would go straight to submission, losing the difference between "no practice for this work"
+     * and "a practice bound to it and turned off". These tests use a document signal, but nothing in the
+     * method names one.
      */
     @Nested
     class RepoLessSignalGate {

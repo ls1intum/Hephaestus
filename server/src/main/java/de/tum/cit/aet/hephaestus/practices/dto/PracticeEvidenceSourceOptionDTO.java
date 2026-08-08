@@ -15,14 +15,12 @@ public record PracticeEvidenceSourceOptionDTO(
     @Schema(description = "What requiring this source demands of its capture; fixed by the source contract")
     RequiredCaptureQuality requiredQuality,
     /**
-     * Whether {@link de.tum.cit.aet.hephaestus.practices.EvidenceStance#EXHAUSTIVE} may be taken towards
+     * Whether {@code EXHAUSTIVE} may be taken towards
      * this source.
      *
-     * <p>Not derivable from {@link #requiredQuality}: {@code scm.pull-request.comments} sits at
-     * {@code ANY_CAPTURE} and can still be captured whole, while {@code scm.linked-work-items} sits at the
-     * same floor and never can. Without it published, an authoring surface offering "and nothing is
-     * missing" would produce a request the validator refuses, so the endpoint whose whole job is to say
-     * what an author may choose would be under-reporting the choice.
+     * <p>Not derivable from {@code requiredQuality}: two sources at the same floor can differ on whether
+     * a complete capture is reachable at all. Unpublished, an authoring surface would offer "and nothing
+     * is missing" for a source the validator then refuses.
      */
     @Schema(
         description = "Whether this source can be captured whole, and so whether a practice may rest a claim about what is absent from it on the capture",

@@ -33,8 +33,8 @@ public class PracticeSignalOptions {
     /**
      * The kinds an author may write a practice against: the reviewable ones, in a stable order.
      *
-     * <p>A kind that only supplies evidence about something else — an Outline document is the standing
-     * example — is deliberately absent: a review of it is a job that can only fail.
+     * <p>A kind that only supplies evidence about something else is deliberately absent: a review of it
+     * is a job that can only fail.
      */
     public List<ArtifactKind> authorableKinds() {
         return artifacts

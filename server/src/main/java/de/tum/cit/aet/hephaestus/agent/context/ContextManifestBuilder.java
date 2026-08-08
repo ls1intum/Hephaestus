@@ -369,8 +369,7 @@ public class ContextManifestBuilder {
                     continue;
                 }
                 // How strictly the capture must have gone is the source's answer, not the practice's:
-                // every shipped practice demanded the same quality of the same source, and stating it per
-                // practice only created a way for two of them to disagree.
+                // stating it per practice is only a way for two practices to disagree about one source.
                 RequiredCaptureQuality quality = catalogs
                     .requireSource(manifest.contractVersion(), need.sourceKind())
                     .requiredQuality();

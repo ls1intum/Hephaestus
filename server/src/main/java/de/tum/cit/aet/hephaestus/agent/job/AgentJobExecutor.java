@@ -127,8 +127,8 @@ public class AgentJobExecutor {
             CannotCreateTransactionException.class
         )
         .maxRetries(2)
-        // Growing: a lock timeout or a failover needs more than an immediate retry gives it.
         .delay(Duration.ofMillis(200))
+        // Growing rather than fixed: a lock timeout or a failover outlasts an immediate retry.
         .multiplier(2)
         .build();
 
@@ -240,7 +240,6 @@ public class AgentJobExecutor {
         );
     }
 
-    /** Bound on how long {@link #stopAcceptingNewJobs()} waits for the poll thread to actually exit. */
     private static final Duration POLL_THREAD_JOIN_TIMEOUT = Duration.ofSeconds(10);
 
     /**
@@ -422,9 +421,8 @@ public class AgentJobExecutor {
     }
 
     /**
-     * {@code WorkerCapacityState.reviewMax} and the sandbox executor's pool size are independently
-     * configured and nothing enforces they agree, so the free-slot bound is what stops a reviewMax
-     * larger than the pool from claiming jobs the pool then rejects.
+     * The sandbox executor's free slots are the hard bound: worker capacity and pool size are separate
+     * knobs, so a capacity larger than the pool must not claim jobs the pool would then reject.
      */
     int computeCapacity() {
         int poolCapacity = capacityState
@@ -458,7 +456,7 @@ public class AgentJobExecutor {
 
     /**
      * @return true if the job was claimed and dispatched. Anything else leaves it QUEUED for the next
-     *     poll, except the two {@link ClaimOutcome}s {@link #claimJob} has already cancelled outright.
+     *     poll, except the {@link ClaimOutcome}s {@link #claimJob} has already cancelled outright.
      */
     boolean processJob(UUID jobId) {
         ClaimAttempt attempt;
@@ -575,8 +573,7 @@ public class AgentJobExecutor {
         };
     }
 
-    // Everything below runs on the sandbox executor, not the poll thread.
-
+    /** Runs on the sandbox executor, not the poll thread. */
     private void runClaimedJob(UUID jobId, ClaimResult claim) {
         MDC.put(MDC_JOB_ID, jobId.toString());
         AgentJob job = claim.job;
@@ -674,14 +671,13 @@ public class AgentJobExecutor {
             .record(duration);
     }
 
-    /** Prepares the spec without starting provider execution — no LLM cost accrues here. */
     /**
-     * A sandbox specification together with the staged inputs backing it. The staging directories must
-     * outlive {@code injectFiles} — which runs inside the sandbox execution — so the caller closes them
-     * once the run is over, whatever its outcome.
+     * The staging directories must outlive {@code injectFiles} — which runs inside the sandbox
+     * execution — so the caller closes them once the run is over, whatever its outcome.
      */
     private record PreparedSandbox(SandboxSpec spec, PreparedJobInputs stagedInputs) {}
 
+    /** No provider execution happens here, so no LLM cost accrues if this throws. */
     private PreparedSandbox prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
 
@@ -796,7 +792,6 @@ public class AgentJobExecutor {
         PracticeSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
-        // The adapter takes precedence on collision.
         Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
         allInputFiles.putAll(agentSpec.inputFiles());
 
@@ -1018,8 +1013,8 @@ public class AgentJobExecutor {
                 return refuseUnavailableModel(job);
             }
 
-            // Concurrency gate: at most maxConcurrentJobs RUNNING for this workspace + purpose. Admission
-            // above holds the binding row lock (joined into this transaction), so the count is stable.
+            // Admission above holds the binding row lock (joined into this transaction), so this count
+            // cannot race a sibling claim.
             {
                 long runningCount = jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
                     job.getWorkspace().getId(),
@@ -1068,10 +1063,9 @@ public class AgentJobExecutor {
      * pre-queue jobs faster than the cap updates. It is never re-checked past this point — there is no
      * mid-execution kill on budget alone.
      *
-     * <p>Held rather than cancelled, because exhaustion is temporary (month rollover, or an admin
-     * raises the cap) and {@code retry_count} is untouched — this is not an execution failure. A job
-     * still blocked once it is older than {@link #BUDGET_HOLD_MAX_JOB_AGE} is cancelled instead, so a
-     * bound that never trips cannot hold it forever.
+     * <p>Held rather than cancelled: a month rollover or a raised cap clears the block without the job
+     * having failed, so {@code retry_count} stays untouched. The age bound is what keeps that from
+     * being unbounded when neither ever happens.
      */
     private ClaimOutcome holdOrCancelOverBudget(AgentJob job, LlmBudgetBlockReason blockReason) {
         Instant now = Instant.now();

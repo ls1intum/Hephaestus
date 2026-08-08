@@ -57,9 +57,8 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
     @Test
     @DisplayName("golden vectors: the canonical digest is pinned so supersession identity never drifts")
     void goldenVectors() {
-        // Re-pinned once when the artifact kind became scm.pull_request: the key digests the kind, so
-        // threads opened under the old spelling do not match one opened under the new one. The second
-        // vector is unchanged, which is the check that only the kind moved.
+        // The key digests the artifact kind, so re-spelling a kind orphans every thread opened under the
+        // old spelling. The second vector names no kind, which is what isolates that axis.
         assertThat(FeedbackThreadKey.compute(TYPE, 42L, 7L, FeedbackChannel.IN_CONTEXT)).isEqualTo(
             "a94dab8733d9b5e1ae7933969116e27e717b88f43e06ee63c23cf905d1b3fc96"
         );

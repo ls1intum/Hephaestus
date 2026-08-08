@@ -21,23 +21,17 @@ import org.jspecify.annotations.Nullable;
 /**
  * One occasion on which a practice is reviewed, and the evidence a review occasioned that way needs.
  *
- * <p>One statement rather than three — artifact kind, the events that start a review, and the evidence
- * the review reads under. The kind is derivable from the events, and evidence shared across practices by
- * name made adding a source to one practice a mutation invisible in that practice's diff.
- *
- * <p>Evidence belongs here rather than on the practice because <em>what a review needs is a function
- * of what occasioned it</em>: a review that runs when a change merges may have to establish that no
- * decision was ever recorded, while the same practice reviewed when the change was opened is only
- * reading what is in front of it. It is also the only shape in which one practice can watch both sides
- * of a question — "a change merged with no decision recorded" needs a binding on the change and a
- * binding on the document, each with its own evidence.
+ * <p>Evidence sits on the occasion rather than on the practice because <em>what a review needs is a
+ * function of what occasioned it</em>: reviewed at merge, a practice may have to establish that no
+ * decision was ever recorded; reviewed at open, the same practice only reads what is in front of it.
+ * It is also the only shape in which one practice can watch both sides of a question, with a binding
+ * and its own evidence on each side. Evidence named once and shared across practices was rejected: it
+ * made adding a source to one practice a mutation invisible in that practice's diff.
  *
  * @param signals  the signals that occasion this review; at least one, and all of one artifact kind
  * @param needs    the sources a review occasioned this way reads, with the stance it takes to each
- * @param onDrafts whether an artifact still marked draft occasions this review. Defaults to false,
- *                 because most practices judge work that has been handed over. Per binding rather than
- *                 fleet-wide: whether a draft is worth reviewing is a property of the occasion, and a
- *                 blanket veto makes every draft-specific criterion in the catalog unreachable
+ * @param onDrafts whether an artifact still marked draft occasions this review; defaults to false,
+ *                 because most practices judge work that has been handed over
  */
 @Schema(description = "An occasion that starts a review, and the evidence that review reads")
 public record PracticeBinding(
@@ -56,10 +50,9 @@ public record PracticeBinding(
     /**
      * Reads a binding that does not mention drafts at all.
      *
-     * <p>The component is a primitive because the value is never absent once constructed, and Jackson
-     * will not guess a primitive. Without this every binding in the bundled catalog and every binding a
-     * client posts would have to spell out {@code "onDrafts": false} — and a shape that must be written
-     * out is a shape that will be written out wrong.
+     * <p>The component is a primitive, and Jackson will not default a primitive from an absent key.
+     * Without this, every binding in the catalog and every posted binding would have to spell out
+     * {@code "onDrafts": false}.
      */
     @JsonCreator
     static PracticeBinding fromJson(
@@ -71,9 +64,8 @@ public record PracticeBinding(
     }
 
     public PracticeBinding {
-        // Sorted and de-duplicated on construction for the same reason the needs list is: these values
-        // are digested into the review-rule fingerprint, and two authors writing the same binding in a
-        // different order must not read as two different rules.
+        // Sorted and de-duplicated, as the needs list below is: both are digested into the review-rule
+        // fingerprint, so the same binding written in a different order must not read as a second rule.
         signals = List.copyOf(
             new LinkedHashSet<>(
                 Objects.requireNonNull(signals, "signals")
@@ -113,8 +105,7 @@ public record PracticeBinding(
     /**
      * The kind of artifact this binding is about, read off its signals' shared prefix.
      *
-     * <p>Never serialized: it is already spelled out in every signal name, and writing it a second time
-     * is what allowed a practice's declared kind and its triggers to disagree.
+     * <p>Never serialized: a second statement of it is a second thing to disagree with the signals.
      */
     @JsonIgnore
     public ArtifactKind artifactKind() {
@@ -127,12 +118,8 @@ public record PracticeBinding(
     }
 
     /**
-     * Whether an artifact in the given draft state occasions this review.
-     *
-     * <p>A non-draft artifact always does; a draft one only where the author said so. The question is
-     * asked per binding because it is a property of the occasion: judging how a change was handed over
-     * is exactly what one wants to say about a draft, while judging how a merged change was reviewed
-     * cannot arise on one.
+     * Whether an artifact in the given draft state occasions this review: a non-draft one always does,
+     * a draft one only where the author said so.
      */
     public boolean occasionedBy(SignalName signal, boolean draft) {
         return matches(signal) && (!draft || onDrafts);
@@ -141,10 +128,9 @@ public record PracticeBinding(
     /**
      * The evidence a review of these practices occasioned by {@code signal} reads.
      *
-     * <p>A {@code null} signal means nobody named an occasion — an explicit ask, or a replay that
-     * predates the ledger. Every binding then contributes, because a review somebody asked for is a
-     * request to apply the practice as widely as it can apply, and narrowing it silently to one
-     * binding's evidence would answer a different question than the one asked.
+     * <p>A {@code null} signal means nobody named an occasion (an explicit ask, or a replay with no
+     * ledger row). Every binding then contributes: narrowing silently to one binding's evidence would
+     * answer a narrower question than the one asked.
      */
     public static List<PracticeEvidenceRequirement> needsFor(
         List<PracticeBinding> bindings,

@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>Unconditional on purpose, unlike {@code SlackManifest}: a descriptor is the domain's ceiling — what
  * the kind <em>is</em> — while a manifest is one vendor's contribution to it. Gating this on Slack being
- * enabled would make the three shipped conversation practices unauthorable, and then unloadable, on
- * every instance that has not connected Slack.
+ * enabled would make the bundled conversation practices unauthorable, and then unloadable, on every
+ * instance that has not connected Slack.
  *
  * <p>Its single signal has no {@code producedBy}, which is the honest declaration: no ingested event
  * says a discussion has finished. {@code ConversationThreadTriggerScheduler} decides it from quiescence,

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Exposes personal settings under {@code /user/settings}. */
+/** The signed-in account's own preferences, as opposed to anything workspace-scoped. */
 @Validated
 @RestController
 @RequestMapping("/user")

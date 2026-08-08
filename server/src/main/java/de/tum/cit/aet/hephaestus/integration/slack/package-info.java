@@ -25,7 +25,7 @@
         "workspace::authorization",
         "workspace::context",
         // SlackWorkspacePurgeAdapter implements the WorkspacePurgeContributor SPI so a workspace
-        // PURGE cascades into a bulk delete of the four Slack-owned tables.
+        // PURGE cascades into a bulk delete of every Slack-owned table.
         "workspace::spi",
         // SlackLeaderboardDigestPublisher subscribes to LeaderboardDigestReadyEvent; the leaderboard task owns
         // schedule + data assembly, this adapter owns the Slack publish. The payload's LeaderboardEntryDTO

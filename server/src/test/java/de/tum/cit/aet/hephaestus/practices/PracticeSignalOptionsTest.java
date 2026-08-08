@@ -16,7 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * What an author may bind a practice to, now that the answer is derived from the domains rather than
+ * What an author may bind a practice to — an answer derived from the registered domains rather than
  * written down in this module.
  */
 class PracticeSignalOptionsTest extends BaseUnitTest {
@@ -50,9 +50,6 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
     @Test
     @DisplayName("a conversation thread is authorable now that a descriptor declares what happens to it")
     void offersTheConversationSignal() {
-        // The predecessor of this class had a hand-written arm returning an empty list for this kind,
-        // and the three shipped conversation practices carried no trigger at all. Both were the same
-        // absence: nothing declared that a settled thread is an occasion.
         assertThat(options.optionsFor(ArtifactKinds.CONVERSATION_THREAD))
             .extracting(SignalOption::signal)
             .containsExactly(ChatSignals.CONVERSATION_THREAD_SETTLED);

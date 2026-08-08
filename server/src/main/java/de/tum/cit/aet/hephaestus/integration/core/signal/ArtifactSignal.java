@@ -105,12 +105,8 @@ public class ArtifactSignal {
 
     /**
      * When the {@link #state} last actually changed — and therefore how long this signal has been
-     * waiting in the one it is in.
-     *
-     * <p>Only a change of state moves this, which is what gives the lapse deadline something to measure.
-     * A pending signal re-offered and refused again for the same class of reason has not changed state,
-     * so its wait keeps running; if every refusal restamped it, a signal refused forever would be
-     * permanently seven days away from lapsing and the deadline would never fire for anything.
+     * waiting in the one it is in. Only a change of state moves it, which is what the lapse deadline
+     * measures; a re-offer refused again for the same class of reason leaves the wait running.
      */
     @NonNull
     @Column(name = "state_changed_at", nullable = false)
@@ -119,9 +115,8 @@ public class ArtifactSignal {
     /**
      * When the reaper last re-offered this signal, or {@code null} if it never has.
      *
-     * <p>Separate from {@link #stateChangedAt} because the two clocks answer different questions and one
-     * column cannot do both: this one spaces the retries out, that one decides when to give up. Sharing
-     * a column means every retry postpones the deadline it is supposed to be racing.
+     * <p>Separate from {@link #stateChangedAt} because this one spaces the retries out and that one
+     * decides when to give up. Sharing a column would let every retry postpone the deadline it races.
      */
     @Nullable
     @Column(name = "last_attempted_at")

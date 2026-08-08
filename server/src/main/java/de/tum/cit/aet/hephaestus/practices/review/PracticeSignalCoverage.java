@@ -20,21 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Whether a practice binding can ever fire, and if not, why.
  *
- * <p>Two questions with deliberately different consequences.
+ * <p>Two questions with deliberately different consequences. A signal <em>no</em> integration declares
+ * is a mistake in the build, the same on every deployment, and fails the boot. A signal only an
+ * unconnected integration raises is a workspace halfway through onboarding — the normal case — and is
+ * reported as dormancy, which is why that half is asked per workspace.
  *
- * <p><b>At boot, a hard failure.</b> Every signal an author can bind to must either have an ingested
- * event behind it or declare that it has none. A signal that claims a producer no integration provides
- * is a mistake in the build, not a fact about a deployment, and shipping it means offering a switch
- * that does nothing — the exact shape of the defect that started this work.
- *
- * <p><b>At runtime, a dormancy.</b> A practice bound to a signal that only an unconnected integration
- * raises is not broken; it is waiting. That must be visible and must not crash anything: a workspace
- * halfway through onboarding is the normal case, and a boot failure there would punish it for a state
- * we expect. This is also why coverage is asked per workspace rather than globally.
- *
- * <p>The practices module reaches the answer through {@link SignalCoverage} and the registered artifact
- * descriptors. It never learns which integrations exist, which is the property that lets a new domain
- * become bindable without editing anything here.
+ * <p>Answered through {@link SignalCoverage} and the registered artifact descriptors, so the practices
+ * module never learns which integrations exist and a new domain becomes bindable without an edit here.
  */
 @Service
 public class PracticeSignalCoverage {
@@ -58,20 +50,13 @@ public class PracticeSignalCoverage {
     /**
      * Asserts that the authoring vocabulary offers no signal nothing can raise.
      *
-     * <p>Checks the offered vocabulary rather than the stored practices, and that is the whole point: what
-     * an author is offered is compiled in and identical on every deployment, so this is a fact about the
-     * build rather than about an installation.
+     * <p>Checks the offered vocabulary rather than the stored practices: what an author is offered is
+     * compiled in and identical on every deployment.
      *
-     * <p>The two sets must stay independently derived for the comparison to mean anything. The offered
-     * side comes from the registered artifact descriptors; the compiled side comes, through
-     * {@link SignalCoverage}, from what the shipped manifests declare they raise. Anything that computes
-     * one from the other — including a test fixture that does — turns this into a tautology that passes
-     * with every manifest empty.
-     *
-     * <p>Run twice, on purpose. {@code PracticeSignalCoverageIntegrationTest} calls it against the real
-     * registries so a gap fails in CI, where it is free; {@link PracticeSignalVocabularyCheck} calls it at
-     * boot so a gap in an image built outside that gate still cannot serve an authoring UI full of
-     * switches that do nothing.
+     * <p><strong>The two sets must stay independently derived</strong> or the comparison means nothing.
+     * The offered side comes from the registered artifact descriptors, the compiled side from what the
+     * manifests declare through {@link SignalCoverage}. Anything computing one from the other —
+     * including a test fixture — turns this into a tautology that passes with every manifest empty.
      */
     void validateAuthoringVocabulary() {
         List<String> violations = new ArrayList<>();
@@ -107,13 +92,12 @@ public class PracticeSignalCoverage {
         List<DormantBinding> dormant = new ArrayList<>();
         for (Practice practice : practices.findByWorkspaceId(workspaceId)) {
             if (!practice.getReviewTier().admitsReview()) {
-                // A practice nobody reviews cannot have a dormant binding; reporting one would be noise.
                 continue;
             }
             Set<SignalName> bound = signalsOf(practice);
             if (bound.isEmpty() || bound.stream().anyMatch(signal -> !raisedByAnIngestedEvent(signal))) {
-                // Nothing to wait for: a signal an ingested event never carries is raised from inside
-                // Hephaestus, so connecting an integration would not change whether it fires.
+                // Nothing to wait for: a signal no ingested event carries is raised inside Hephaestus,
+                // so connecting an integration would not change whether it fires.
                 continue;
             }
             if (bound.stream().anyMatch(connected::contains)) {

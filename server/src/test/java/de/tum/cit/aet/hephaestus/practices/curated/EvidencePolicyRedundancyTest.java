@@ -27,11 +27,10 @@ import tools.jackson.databind.json.JsonMapper;
  * Facts the shipped evidence vocabulary asserts about itself, held as tests rather than as a paragraph
  * in a design note.
  *
- * <p>They are load-bearing: they are the argument for deleting {@code EvidenceProfile} and for moving
- * strictness out of the practice and into the source contract. A design decision justified by "we looked
- * and the data says X" decays the moment somebody adds a source, and the decay is silent — one practice
- * would want a stricter diff than another, and nothing would say so until the refactor that assumed
- * otherwise was already written.
+ * <p>They are load-bearing: they are the argument for strictness living on the source contract rather
+ * than on the practice. A design decision justified by "we looked and the data says X" decays the moment
+ * somebody adds a source, and the decay is silent — one practice would want a stricter diff than another,
+ * and nothing would say so until the refactor that assumed otherwise was already written.
  *
  * <p>If either of these fails, the correct response is <em>not</em> to relax the test. It is to decide
  * whether the new case is a genuine requirement — in which case the axis it needs must be reintroduced
@@ -54,10 +53,9 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     /**
      * Every kind a practice can be authored against has at least one source that declares it applies.
      *
-     * <p>This is what the named evidence profiles used to guarantee by existing: a kind with no profile
-     * could not be selected. Now that the allow-list is derived, the failure mode moves — a kind nothing
-     * supplies evidence for is authorable and refuses every review it triggers, at review time rather
-     * than at build time. Asking here makes it a build-time answer again.
+     * <p>The authorable-kind allow-list is derived, so a kind nothing supplies evidence for is authorable
+     * and refuses every review it triggers — at review time, where nobody is watching. Asking here makes
+     * it a build-time answer.
      */
     @Test
     void everyAuthorableArtifactKindHasEvidenceThatAppliesToIt() {
@@ -79,7 +77,7 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
      * <p>The list is deliberately short. A practice that reports a contradiction it can point at —
      * {@code change-keeps-linked-docs-consistent} quoting a ticked box against an untouched doc — is not
      * making an absence claim and does not need the whole capture. Nor are the review-quality practices,
-     * which judge the comments that are there. If a fifth practice joins this list, that is a decision
+     * which judge the comments that are there. If another practice joins this list, that is a decision
      * about what it may assert, and it should be made here rather than noticed in a diff.
      */
     @Test
@@ -123,11 +121,8 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
      * Every source a shipped practice requires is captured to the quality its own contract demands, and
      * the contract is the only place that quality is written down.
      *
-     * <p>This is the test that licensed moving the axis: it used to read that no two practices demanded
-     * the same source at different strictnesses, which is what made a per-practice statement of it pure
-     * duplication. Now that the statement lives in one place the invariant becomes the weaker but still
-     * load-bearing one — nothing may go on demanding a quality of a source the source cannot supply,
-     * because such a practice is switched on and refuses every review it ever triggers.
+     * <p>Nothing may demand a quality of a source the source cannot supply: such a practice is switched
+     * on and refuses every review it ever triggers.
      */
     @Test
     void everyRequiredSourceCanSupplyTheQualityItsContractDemands() {

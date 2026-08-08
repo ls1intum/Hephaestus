@@ -38,13 +38,11 @@ import org.springframework.stereotype.Service;
  * <strong>Preconditions:</strong> The {@link PullRequest} must have labels, assignees,
  * and repository eagerly loaded before calling {@link #evaluate}.
  *
- * <p><strong>Two entry points, one order.</strong> {@link #evaluate} / {@link #evaluateIssue} take an SCM
- * artifact and run every step below. {@link #evaluateSignal} takes a workspace and a signal, for a kind
- * with no repository, no branch and no assignee — it runs steps 2a, 2b, 3 and 4, which are the ones that
- * ask nothing of the artifact. Both go through {@code evaluateWorkspaceAndSignal}, so the shared steps
- * cannot come to mean different things on the two paths.
+ * <p>{@link #evaluateSignal} is the entry point for a kind with no repository, branch or assignee; it
+ * runs only the steps that ask nothing of the artifact. Both paths share
+ * {@code evaluateWorkspaceAndSignal}, so those steps cannot come to mean different things.
  *
- * <h2>Gate checks (in order; numbers match the inline step comments)</h2>
+ * <h2>Gate checks (in order)</h2>
  * <ol>
  *   <li>(1) Workspace resolution → SKIP if not found (first, so per-workspace settings drive the gates below)</li>
  *   <li>(2a) Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
@@ -109,10 +107,8 @@ public class PracticeReviewDetectionGate {
     }
 
     /**
-     * Issue-side counterpart of {@link #evaluate}: runs the same workspace / feature / trigger-mode /
-     * agent-config / practice-matching / role checks for an issue event. Practice matching filters by
-     * the bound signals, and a signal name carries its artifact kind, so only issue practices can match
-     * an issue signal — PR-only workspaces short-circuit with no extra cost. An issue is never a draft.
+     * Issue-side counterpart of {@link #evaluate}. A signal name carries its artifact kind, so only
+     * issue practices can match an issue signal. An issue is never a draft.
      *
      * @param issue the issue (must have repository + assignees eagerly loaded)
      */
@@ -125,19 +121,10 @@ public class PracticeReviewDetectionGate {
     }
 
     /**
-     * The kind-generic half of the gate: everything that turns on the <em>workspace</em> and the
-     * <em>signal</em>, for an artifact that has no repository, no branch and no assignee.
+     * The kind-generic half of the gate, for an artifact that has no repository, branch or assignee.
      *
-     * <p>{@link #evaluate} and {@link #evaluateIssue} still take an SCM entity, because the checks they
-     * add — review scope and the assignee role — read fields only an SCM artifact has. This method is what
-     * a repo-less kind can reach: a document, a conversation thread, a pipeline run. It deliberately runs
-     * the checks that decide <em>whether a review is wanted at all</em>, which is where the answers an
-     * operator most needs told apart live: a workspace with no practice for this work, versus one that
-     * bound a practice and turned it off.
-     *
-     * <p>What it does <em>not</em> do is check consent, because there is nothing kind-generic to check it
-     * on. A repo-less kind names its subject itself, and the caller that resolved that subject is the one
-     * that can answer for them.
+     * <p>Consent is <em>not</em> checked here: there is nothing kind-generic to check it on, so the
+     * caller that resolved the subject is the one that must answer for them.
      *
      * @param workspace the resolved workspace — supplied rather than looked up, since a repo-less caller
      *     already knows it (the signal ledger records the workspace on every row)
@@ -147,8 +134,8 @@ public class PracticeReviewDetectionGate {
         @NonNull SignalName signal,
         @NonNull TriggerMode triggerMode
     ) {
-        // Not a draft: draftness is a pull request's state, and a kind that has no such state must not be
-        // filtered by the draft-specific half of a binding.
+        // Never a draft: draftness is a pull request's state, so the draft half of a binding must not
+        // filter a kind that has no such state.
         return evaluateWorkspaceAndSignal(
             workspace,
             signal,
@@ -178,12 +165,10 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no workspace");
         }
 
-        // 2a-bis. Workspace review scope: which of this workspace's work is reviewed at all. ANDed onto
-        //    every binding, because a binding names a signal and cannot name the trunk it fires against —
-        //    a trunk is called main here and develop there, so a curated catalogue cannot know it. Computed
-        //    here because only an SCM artifact has the repository and branch it reads, and applied by the
-        //    shared gate in its original position: right after the feature flag, before anything that
-        //    costs a query. It costs no query itself, so computing it eagerly changes nothing.
+        // 2a-bis. Workspace review scope, ANDed onto every binding: a binding names a signal and cannot
+        //    name the trunk it fires against — a trunk is main here and develop there, so a curated
+        //    catalogue cannot know it. Computed here because only an SCM artifact carries the repository
+        //    and branch it reads; costs no query, so computing it before the shared gate applies it is free.
         GateDecision.@Nullable Skip scopeSkip = null;
         WorkspaceReviewScope scope = workspace.getReviewSettings().resolveReviewScope();
         if (!scope.isUnrestricted()) {
@@ -203,8 +188,7 @@ public class PracticeReviewDetectionGate {
             }
         }
 
-        // 2a / 2b / 3 / 4: everything that turns on the workspace and the signal rather than on the
-        //    artifact. Shared with every repo-less kind through evaluateSignal.
+        // 2a / 2b / 3 / 4: the workspace- and signal-level checks, shared with evaluateSignal.
         GateDecision shared = evaluateWorkspaceAndSignal(
             workspace,
             signal,
@@ -312,9 +296,8 @@ public class PracticeReviewDetectionGate {
     /**
      * The workspace- and signal-level gate: the checks an artifact contributes nothing to.
      *
-     * <p>Extracted so a repo-less kind reaches exactly the same decisions, in exactly the same order, as
-     * a pull request does. The alternative — a second, simpler gate for kinds without a repository — is
-     * how two paths come to disagree about what {@code OFF} means.
+     * <p>Shared rather than duplicated for repo-less kinds, so the two paths cannot come to disagree
+     * about what {@code OFF} means.
      *
      * @param subject an identifier for the logs only; the gate makes no decision from it
      * @param scopeSkip the artifact-level review-scope refusal, already computed by an SCM caller, or
@@ -339,7 +322,7 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("practices disabled for workspace");
         }
 
-        // 2a-bis. The artifact's own scope refusal, in the position it has always been evaluated in.
+        // 2a-bis. The artifact's own scope refusal: after the feature flag, before anything costing a query.
         if (scopeSkip != null) {
             return scopeSkip;
         }
@@ -378,16 +361,13 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no runnable practice-review agent");
         }
 
-        // 4. Practice matching: at least one selected practice must be bound to this signal, and — when
-        //    the artifact is still a draft — bound to it on drafts. Whether a draft is worth reviewing is
-        //    a property of the occasion, so the binding answers it; a fleet-wide draft veto ahead of this
-        //    would make the draft-specific criteria several practices are largely made of unreachable.
-        //    Admission then applies the loudness tier: OFF is the one tier that stops the review, so
-        //    MEASURE and COACH still get here and still record their observations.
+        // 4. Practice matching. The binding answers the draft question, not a fleet-wide veto ahead of
+        //    this one, which would make every draft-specific criterion in the catalog unreachable. OFF is
+        //    then the only tier that stops the review; MEASURE and COACH still record their observations.
         SignalMatch match = findMatchingPractices(workspace.getId(), signal, draft);
         if (match.admitted().isEmpty()) {
-            // A practice bound to this signal but turned all the way down is a deliberate act, not an
-            // empty catalogue; recording the two under one reason would make them unanswerable apart.
+            // Two reasons, not one: "bound and turned all the way down" is a deliberate act and must stay
+            // answerable apart from "nothing bound".
             if (match.silencedByTier()) {
                 log.debug(
                     "Practice review gate: SKIP, reason=allBoundPracticesOff, subject={}, signal={}, workspaceId={}",
@@ -416,11 +396,9 @@ public class PracticeReviewDetectionGate {
     }
 
     /**
-     * The practices this signal occasions, split by whether their tier lets a review start.
-     *
      * @param admitted the practices to review — bound to the signal and above {@link PracticeReviewTier#OFF}
-     * @param silencedByTier whether at least one practice WAS bound to the signal and sat at {@code OFF},
-     *     which is what lets the caller record "deliberately silenced" rather than "nothing bound"
+     * @param silencedByTier at least one practice was bound to the signal and sat at {@code OFF}; this is
+     *     what lets the caller record "deliberately silenced" rather than "nothing bound"
      */
     private record SignalMatch(List<Practice> admitted, boolean silencedByTier) {}
 

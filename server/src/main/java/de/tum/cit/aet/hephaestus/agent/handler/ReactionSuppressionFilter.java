@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reaction-aware re-nag suppression (ADR 0021, B2). Runs AFTER the findings are persisted (so each carries
+ * Reaction-aware re-nag suppression (ADR 0021). Runs AFTER the findings are persisted (so each carries
  * its stable {@code recurrence_key}) and BEFORE the summary/inline notes are composed: a locus the student
  * already DISPUTED / marked NOT_APPLICABLE on an EARLIER run is dropped from this run's delivery (and a
  * SUPPRESSED ledger row is written so an eval sees it was deliberately withheld, not missed). A locus the
@@ -95,7 +95,7 @@ class ReactionSuppressionFilter {
                 recurrenceKeys.add(f.getRecurrenceKey());
             }
         }
-        // Every persisted observation may carry a null recurrence_key (pre-C2 rows / a detector that emitted
+        // Every persisted observation may carry a null recurrence_key (a detector that emitted
         // no locatable findings). The reaction lookup is a native query whose `IN (:recurrenceKeys)` would
         // render as `IN ()` and crash on Postgres — short-circuit with no suppression when there are no keys.
         if (recurrenceKeys.isEmpty()) {

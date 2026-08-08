@@ -14,7 +14,7 @@ public enum ConversationRoutingDecision {
     HAS_INLINE_ANCHOR,
     /** The same locus (recurrence_key) was already DELIVERED in-context to this recipient - do not re-raise it. */
     ALREADY_DELIVERED_IN_CONTEXT,
-    /** Reviewer-targeted - deferred (ADR-0021-C2). */
+    /** Reviewer-targeted - deferred (ADR 0021). */
     REVIEWER_DEFERRED,
     /**
      * The practice's loudness tier does not admit the conversation channel - it is at OFF or MEASURE, so it

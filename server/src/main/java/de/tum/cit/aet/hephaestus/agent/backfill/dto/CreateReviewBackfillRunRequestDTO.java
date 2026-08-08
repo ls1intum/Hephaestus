@@ -17,7 +17,7 @@ import org.jspecify.annotations.NonNull;
  */
 // jspecify's @NonNull states intent to static analysis; jakarta's @NotNull is what @Valid enforces at
 // the request boundary. Both, because a missing field must be a 400 that names the field, not an NPE
-// deep in the service surfacing as the 500 this endpoint's @ApiResponse says it does not return.
+// deep in the service surfacing as an undocumented 500.
 public record CreateReviewBackfillRunRequestDTO(
     @NonNull
     @NotNull

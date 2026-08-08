@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
 /**
  * Dispatches labelling to the resolver that owns the kind, and answers for the kinds nobody resolves.
  *
- * <p>Two resolvers for one kind is fatal for the same reason two descriptors are: which title a trace
- * shows would depend on bean ordering.
+ * <p>Two resolvers for one kind is fatal: which title a trace shows would otherwise depend on bean
+ * ordering.
  */
 @Component
 public class RegisteredArtifactIdentities implements ArtifactIdentities {

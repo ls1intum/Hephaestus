@@ -536,9 +536,9 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                 .append(" |\n");
         }
 
-        // Deliberately an index and nothing more. Appending each file's diff here repeated the whole
-        // of diff.patch, so a large change entered the model's context twice — and the copy here has
-        // no [L<n>] line markers, making it the worse of the two to quote from.
+        // Deliberately an index and nothing more. Appending each file's diff here would repeat the whole
+        // of diff.patch, putting a large change into the model's context twice — and this copy carries no
+        // [L<n>] line markers, making it the worse of the two to quote from.
         summary.append("\nThe change itself is in `diff.patch`, annotated with line numbers for citation.\n");
 
         byte[] summaryBytes = summary.toString().getBytes(StandardCharsets.UTF_8);

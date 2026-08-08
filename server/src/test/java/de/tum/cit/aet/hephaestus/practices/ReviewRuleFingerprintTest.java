@@ -11,13 +11,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * What counts as the same review rule, now that the occasion and its evidence are part of it.
+ * What counts as the same review rule, the occasion and its evidence included.
  *
- * <p>The first two claims are ported from {@code PracticeAutomatedReviewPolicyDigestTest}, which held
- * them while the sources sat on the policy. They are the same claims — changing what a review must read
- * makes it a different review, and the order the author happened to write it in does not — asserted of
- * the digest that now carries the sources. Without them the bindings could be dropped from the
- * fingerprint entirely and every test would stay green while every stored fingerprint went stale.
+ * <p>Changing what a review must read makes it a different review; the order the author happened to
+ * write it in does not. Without both claims the bindings could be dropped from the fingerprint entirely
+ * and every test would stay green while every stored fingerprint went stale.
  */
 class ReviewRuleFingerprintTest extends BaseUnitTest {
 

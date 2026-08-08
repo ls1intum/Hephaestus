@@ -187,9 +187,9 @@ class ReviewContractViolationTest extends BaseUnitTest {
         @Test
         @DisplayName("a reviewable kind nothing can run a review of is refused")
         void aReviewableKindWithNoWayToExecuteIsRefused() {
-            // The rule that would have caught docs.document. Every other check here passed for it: a
-            // descriptor, a context builder, a role, a lane, its limitations — and no job type, no
-            // handler, no submitter, so the practice bound to it read as live and fired never.
+            // The one shape every other check here passes: a descriptor, a context builder, a role, a
+            // lane, its limitations — and no job type, no handler, no submitter. A practice bound to such
+            // a kind reads as live in the catalog and fires never.
             ReviewContractValidator validator = new ReviewContractValidator(
                 new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor())),
                 new IntegrationMessageHandlerRegistry(List.of()),

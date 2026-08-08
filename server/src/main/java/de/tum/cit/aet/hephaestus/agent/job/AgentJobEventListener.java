@@ -39,14 +39,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p>Uses {@code @Async @TransactionalEventListener(AFTER_COMMIT)} to avoid blocking the webhook
  * processing thread and to ensure entities are committed before we read them.
  *
- * <p><strong>How we found out does not decide whether we record.</strong> Dropping a
- * reconciliation-sourced event at the door would conflate two questions, and leave a transition we
- * successfully received with no trace anywhere — after which the mirror agrees with upstream and nothing
- * can ever notice it again. The source governs only whether a review is <em>triggered</em>; both sources
- * reach the ledger. (Terminal-state filtering still happens before recording — a merge is recorded by
- * the handler whose trigger it actually is.)
- *
- * <p>Only active when the agent job queue is enabled.
+ * <p><strong>How a transition was discovered does not decide whether it is recorded.</strong> Dropping
+ * a reconciliation-sourced event at the door would leave a successfully received transition with no
+ * trace anywhere, after which the mirror agrees with upstream and nothing can ever notice it again. The
+ * source governs only whether a review is <em>triggered</em>; both sources reach the ledger.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -250,8 +246,8 @@ public class AgentJobEventListener {
      * a reconciliation pass records without ever needing the rest of it.
      */
     private @Nullable SignalKey signalKeyFor(ScmEventPayload.PullRequestData prData, String triggerEventName) {
-        // The mirror can hold a pull request whose repository row is gone; the gate has always read that
-        // as "not ours" rather than as an error, and so does the ledger.
+        // The mirror can hold a pull request whose repository row is gone; that reads as "not ours"
+        // rather than as an error, matching the gate.
         String repositoryName = repositoryNameOf(prData);
         Workspace workspace = workspaceResolver.resolveForRepository(repositoryName).orElse(null);
         if (workspace == null) {

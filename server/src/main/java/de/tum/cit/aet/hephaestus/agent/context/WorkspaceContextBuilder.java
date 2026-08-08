@@ -411,9 +411,8 @@ public class WorkspaceContextBuilder {
             case ContextRequest.IssueReviewRequest ir -> ir.job();
             case ContextRequest.ConversationReviewRequest cr -> cr.job();
             case ContextRequest.DocumentReviewRequest dr -> dr.job();
-            // Mentor chat is synchronous and has no job. Exhaustive over the sealed type on purpose: an
-            // instanceof chain silently returned null for a variant it had not been told about, which is
-            // how DocumentReviewRequest came to be treated as the mentor flow.
+            // Mentor chat is synchronous and has no job. No default branch: a variant added to the sealed
+            // type must be a compile error here rather than a silent null.
             case ContextRequest.MentorChatRequest ignored -> null;
         };
     }

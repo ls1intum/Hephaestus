@@ -29,8 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Offers one already-existing artifact to the review path on a campaign's behalf.
  *
- * <p>Runs the same three steps the live ingestion path runs — record the signal, ask the gate, submit —
- * and differs in exactly two ways, both deliberate:
+ * <p>Runs the same steps the live ingestion path runs — record the signal, ask the gate, submit — and
+ * differs only in these deliberate ways:
  *
  * <ul>
  *   <li>The signal is recorded with {@link DiscoveredVia#BACKFILL}, which is what lets it claim a row a
@@ -55,9 +55,7 @@ public class ReviewBackfillSubmitter {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewBackfillSubmitter.class);
 
-    /** What one artifact's turn produced. */
     public enum Outcome {
-        /** A review job now exists for this artifact. */
         SUBMITTED,
         /**
          * Nothing was submitted, and nothing is owed. The artifact was already measured at its current
@@ -178,10 +176,9 @@ public class ReviewBackfillSubmitter {
     }
 
     /**
-     * When the artifact reached the state we are about to measure — as close as the mirror can say. The
-     * last update is the better answer of the two available and is still an upper bound, which is the
-     * honest limit of every non-live discovery: we know that the artifact is in this state, not exactly
-     * when it got there.
+     * When the artifact reached the state about to be measured. The last update is only an upper bound —
+     * the limit of every non-live discovery: the mirror knows the artifact is in this state, not when it
+     * got there.
      */
     private static Instant occurredAt(Instant updatedAt, Instant createdAt) {
         if (updatedAt != null) {

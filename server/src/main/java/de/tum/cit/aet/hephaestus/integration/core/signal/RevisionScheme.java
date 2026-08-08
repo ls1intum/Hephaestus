@@ -4,11 +4,9 @@ package de.tum.cit.aet.hephaestus.integration.core.signal;
  * How a signal's {@link SignalRevision} is derived — declared <em>per signal</em>, never per artifact
  * kind.
  *
- * <p>This is the distinction the whole ledger turns on. Editing a merge request's description moves
- * no commit SHA, so if every pull-request signal keyed on the head SHA then a practice whose criteria
- * are entirely about the description could never be re-measured after the author fixed it — the
- * coaching loop the practice exists for would run exactly once. Conversely, keying a push on the
- * description would re-review unchanged code.
+ * <p>This is the distinction the whole ledger turns on. Editing a description moves no commit SHA, so
+ * keying every signal of a kind on the head SHA would make a practice about the prose unmeasurable
+ * after the author fixed it. Keying a push on the prose instead would re-review unchanged code.
  *
  * <p>The scheme is recoverable from a stored revision (each carries its scheme's prefix), so a
  * ledger row explains its own identity without consulting the catalog that produced it.

@@ -21,7 +21,6 @@ public final class PracticeTestEvidence {
         return forArtifact(ArtifactKinds.CONVERSATION_THREAD);
     }
 
-    /** The review frame, which no longer says what is read; {@link #bindings} does. */
     public static PracticeAutomatedReviewPolicy forArtifact(ArtifactKind artifactKind) {
         needsFor(artifactKind); // reject an unsupported kind here rather than at the binding
         return new PracticeAutomatedReviewPolicy(

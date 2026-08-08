@@ -129,8 +129,8 @@ public class BundledPracticeCatalogLoader {
             bindings,
             criteria,
             loadPrecomputeScript(node, slug),
-            // Every bundled practice takes its kind's default frame: same contract, same mode, same
-            // limits. One that wanted a different frame would have to say so, and none does.
+            // The authoring file cannot override the review frame: every bundled practice takes its
+            // kind's default contract, mode and limits.
             evidenceDefaults.policyFor(artifactKind),
             whyItMatters,
             whatGoodLooksLike,
@@ -143,11 +143,10 @@ public class BundledPracticeCatalogLoader {
     /**
      * Reads the {@code on} list.
      *
-     * <p>A bare string is a binding on that signal reading the kind's default evidence — which is what
-     * almost every practice wants, and spelling it out once per practice would only invite the copies to
-     * drift.
-     * An object says what the review reads instead, and is how a practice that must establish an
-     * <em>absence</em> declares the exhaustive capture that licenses the claim.
+     * <p>A bare string is a binding on that signal reading the kind's default evidence; requiring each
+     * practice to spell those out would only let the copies drift. An object names the evidence instead,
+     * and is how a practice that must establish an <em>absence</em> declares the exhaustive capture that
+     * licenses the claim.
      */
     private static List<PracticeBinding> bindings(
         JsonMapper objectMapper,

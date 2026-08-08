@@ -13,8 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Names a mirrored document.
  *
- * <p>No URL, for the reason {@code ReviewRunTargetMapper} already gives: the mirror stores a slug, and
- * the server it hangs off is connection state this resolver cannot reach. Half a link is a broken one.
+ * <p>No URL: the mirror stores only a slug, and the server it hangs off is connection state this
+ * resolver cannot reach. A link built from half of it would be a broken one.
  */
 @Component
 public class DocumentIdentityResolver implements ArtifactIdentityResolver {

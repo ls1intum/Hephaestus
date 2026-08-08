@@ -23,7 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * derived from the options can only ever agree with them. Here both sides come from the container — the
  * offered vocabulary from every registered {@code ArtifactDescriptor} bean, the compiled coverage from
  * what {@code GitHubManifest}, {@code GitLabManifest}, {@code OutlineManifest} and {@code SlackManifest}
- * actually declare in their review contributions. A fifth descriptor, or a manifest that stops raising
+ * actually declare in their review contributions. A new descriptor, or a manifest that stops raising
  * something, changes the answer here and nowhere else.
  */
 class PracticeSignalCoverageIntegrationTest extends BaseIntegrationTest {
@@ -47,9 +47,9 @@ class PracticeSignalCoverageIntegrationTest extends BaseIntegrationTest {
     @DisplayName("the two sides of the comparison are really independent")
     void neitherSideOfTheComparisonIsDerivedFromTheOther() {
         // Guards the test above from going quietly vacuous. If the manifests ever declared nothing, or no
-        // descriptor were registered, the check would pass for the same reason an empty AND is true — and
-        // that is exactly how the assertion was lost once already. Overlap in both directions is the
-        // cheapest evidence that two independently built sets are being compared.
+        // descriptor were registered, the check would pass for the same reason an empty AND is true.
+        // Overlap in both directions is the cheapest evidence that two independently built sets are
+        // being compared.
         Set<SignalName> offered = new LinkedHashSet<>();
         for (ArtifactKind kind : options.authorableKinds()) {
             offered.addAll(options.eligibleFor(kind));

@@ -66,8 +66,8 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
             .expectStatus()
             .isOk();
 
-        // The listing loads the binding fresh — the write above cannot have left it hydrated in a
-        // session, which is exactly the path that regressed.
+        // A separate request, so the listing loads the binding fresh: the write above cannot have left
+        // it hydrated in a session.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())

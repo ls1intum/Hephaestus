@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
@@ -74,9 +73,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Long getNotApplicable();
         /**
          * Runs where the practice looked and could not settle the question. Counted apart from
-         * {@link #getNotApplicable()} rather than folded into it: both are silence on the artifact, but one
-         * says "there was nothing here to judge" and the other says "we could not tell", and an operator
-         * reading a review summary needs to know which of those a quiet run was.
+         * {@link #getNotApplicable()}: both are silence on the artifact, but an operator reading a review
+         * summary needs "nothing here to judge" told apart from "we could not tell".
          */
         Long getIndeterminate();
     }
@@ -411,14 +409,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * per finding (bounded by the page size) rather than JOIN-fetched.
      *
      * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed. {@code NOT_APPLICABLE}
-     * dominates the list (the bulk are "no change needed / awaiting review" rows) the mentor cannot coach from,
-     * and would bury the actionable {@code BAD} problems and {@code GOOD} strengths within the page budget;
-     * {@code INDETERMINATE} is excluded for the stronger reason that there is nothing to coach — the practice
-     * could not settle the question, and turning that into conversation would invite the mentor to invent a
-     * direction the measurement declined to take. Both totals still reach the mentor via the presence-count
-     * summary; this is the drill-down list only, and stays recency-ordered (NOT re-ordered by severity) to
-     * preserve its "what happened lately" purpose. Aggregate policy matches
-     * {@link #findSummaryByDeveloperAndWorkspace}.
+     * dominates the list ("no change needed / awaiting review" rows) and would bury the actionable {@code BAD}
+     * problems and {@code GOOD} strengths within the page budget; {@code INDETERMINATE} is excluded because
+     * coaching on it would invite the mentor to invent a direction the measurement declined to take. Both
+     * totals still reach the mentor via the presence-count summary; this is the drill-down list only, and
+     * stays recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
+     * Aggregate policy matches {@link #findSummaryByDeveloperAndWorkspace}.
      */
     @Query(
         value = """
@@ -720,11 +716,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         String getAreaName();
         String getAreaIcon();
         String getAreaColor();
-        /**
-         * The raw column, converted by the caller. A native-query projection is assembled by reflection
-         * over JDBC types, so declaring {@link ArtifactKind} here would make the mapping depend on a
-         * conversion the compiler cannot see.
-         */
+        /** The raw column: a native-query projection is mapped from JDBC types, with no converter run. */
         String getArtifactKind();
         Long getArtifactId();
         Long getAboutUserId();
@@ -774,11 +766,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * The loudness tier of each observation's practice, resolved in ONE query rather than by walking the
      * lazy {@code Observation.practice} association.
      *
-     * <p>The association is deliberately not used for this. The conversational router receives
-     * observations that may already be detached, and traversing a lazy proxy there made the router's
-     * correctness depend on the caller's session — it worked in production only because the listener
-     * happens to hold a transaction, and failed the moment anything else called it. A projection is
-     * session-independent, so the rule holds wherever it is applied.
+     * <p>The association is deliberately not used: the conversational router receives observations that
+     * may already be detached, so traversing a lazy proxy there would make the tier rule's correctness
+     * depend on whether the caller happens to hold a session. A projection is session-independent.
      */
     @Query(
         """
@@ -799,9 +789,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * Every measurement taken on one artifact, by practice — the trace view's evidence that a practice
      * ran at all.
      *
-     * <p>Keyed off the artifact rather than off a run, so a measurement whose run predates the signal
-     * ledger, or one taken by a review nobody linked back, still counts. A practice that produced a
-     * measurement must never be reported as silent.
+     * <p>Keyed off the artifact rather than off a run: a practice that produced a measurement must never
+     * be reported as silent, including when its run predates the signal ledger or was never linked back.
      */
     @Query(
         """

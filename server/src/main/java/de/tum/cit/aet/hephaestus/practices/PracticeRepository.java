@@ -25,10 +25,9 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     /**
      * Every practice of the workspace, at any tier — including {@code OFF}.
      *
-     * <p>The detection gate reads the whole set rather than a pre-filtered one so it can tell "nothing is
-     * bound to this signal" apart from "something is bound and its workspace turned it off", which are
-     * different answers to "why did nothing happen" and now get different recorded reasons. A workspace's
-     * catalogue is tens of rows, so the filter is cheaper in the JVM than a second query would be.
+     * <p>Unfiltered so the detection gate can tell "nothing is bound to this signal" apart from "something
+     * is bound and its workspace turned it off" and record them as different reasons. A workspace's
+     * catalogue is small enough that filtering in the JVM beats a second query.
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceId(Long workspaceId);

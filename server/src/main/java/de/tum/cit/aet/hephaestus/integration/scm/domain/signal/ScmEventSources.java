@@ -10,10 +10,10 @@ import java.util.Set;
  * The ingested event types the shared SCM domain's signals come from.
  *
  * <p>Kept in the domain rather than in either vendor package because a signal's provenance spans both:
- * {@code scm.pull_request.reviewed} is raised by a GitHub review event and by a GitLab merge-request or
- * note event, and the descriptor that declares the signal has to name all three. The keys are repeated
- * from the handlers on purpose — the bootstrap resolves each one against the handler registry, so a
- * drift here fails the boot rather than quietly declaring provenance nothing can deliver.
+ * {@code scm.pull_request.reviewed} is raised by a GitHub review event and by GitLab merge-request and
+ * note events, and the one descriptor that declares the signal has to name them all. The keys are
+ * repeated from the handlers on purpose — the bootstrap resolves each against the handler registry, so
+ * a drift here fails the boot rather than quietly declaring provenance nothing can deliver.
  */
 final class ScmEventSources {
 
@@ -33,8 +33,8 @@ final class ScmEventSources {
      * The scheme is already stated once, next to the code that computes the revision; restating it in the
      * descriptor would let a signal be deduplicated by one rule and re-measured by another.
      *
-     * <p>None of these names is free to move: they have been persisted in
-     * {@code practice.trigger_events} since long before they were signal names.
+     * <p>A signal name is not free to move: it is persisted in {@code artifact_signal.signal_name} as part
+     * of the dedup key, so renaming one re-runs every occurrence already recorded under the old name.
      */
     static Signal declare(SignalName name, String displayName, Set<EventTypeKey> producedBy) {
         return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name));

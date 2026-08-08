@@ -26,10 +26,6 @@ import org.springframework.stereotype.Component;
  * <p>Whether a blocker has cleared is not observable from here — there is no event for "an admin
  * re-enabled practices" — so the sweep simply re-attempts on a human timescale and lets the
  * submission path answer.
- *
- * <p>Two clocks, deliberately. {@code last_attempted_at} is stamped by every sweep and spaces the
- * retries out; {@code state_changed_at} moves only when the signal's state does, and is what the lapse
- * deadline measures. Retrying is meant to race giving up, so the retry must not be able to postpone it.
  */
 @ConditionalOnServerRole
 @Component
@@ -80,20 +76,16 @@ public class PendingSignalReaper {
             return;
         }
 
-        // Claim the whole batch before re-offering any of it, so this sweep cannot hand the next one the
-        // same rows. A re-offer that throws does not touch the row's state, and the sweep is ordered by
-        // that state's clock — so without the claim a batch of permanently-failing signals would sit at
-        // the head of every sweep until the lapse deadline, and nothing behind them would ever be retried.
         repository.claimPendingForRetry(due.stream().map(ArtifactSignal::getId).toList(), now);
 
         for (ArtifactSignal signal : due) {
             try {
-                // Inside the try: the kind is free text as far as this row is concerned, and one row
-                // written by an older or a broken build must not abort the sweep for everything after it.
+                // Parsing the stored kind can throw; inside the try so one unparseable row cannot abort
+                // the sweep for everything behind it.
                 PendingSignalResubmitter resubmitter = resubmitters.get(ArtifactKind.of(signal.getArtifactKind()));
                 if (resubmitter == null) {
-                    // Not the signal's fault that nothing in this deployment can act on its kind; leave it
-                    // to the lapse deadline rather than burning it.
+                    // Leave it to the lapse deadline: nothing in this deployment can act on the kind, which
+                    // is not a reason to burn the signal.
                     log.debug("No resubmitter for pending signal kind, leaving it: kind={}", signal.getArtifactKind());
                     continue;
                 }

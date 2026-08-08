@@ -174,7 +174,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         );
     }
 
-    /** Every signal the practice is bound to, which is what the trigger-event list used to be. */
     private static List<SignalName> signalsOf(PracticeDTO practice) {
         return PracticeBinding.signalsOf(practice.bindings());
     }
@@ -727,8 +726,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
          *
          * <p>A binding sorts and de-duplicates its signals on construction, because the list is digested
          * into the review-rule fingerprint and two authors writing the same occasion in a different order
-         * must not read as two different rules. This used to assert a rejection and got one — for the
-         * unrelated reason that the request carried no criteria.
+         * must not read as two different rules.
          */
         @Test
         @WithAdminUser
@@ -2125,13 +2123,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     /**
-     * What replaced "the triggers must match the declared focus".
-     *
-     * <p>There is no pair to keep compatible any more: a practice's artifact kind is read off its
-     * signals, so a PR signal makes it a PR practice and there is nothing left to contradict. The two
-     * rejections this class used to assert are gone with the second spelling that made them possible.
-     * What can still be wrong is naming signals about two different kinds of work at once, and that a
-     * practice cannot be reviewed as both.
+     * A practice's artifact kind is read off its signals, so a pull-request signal makes it a
+     * pull-request practice and there is no separately declared focus left to contradict. What can still
+     * be wrong is naming signals about two different kinds of work at once.
      */
     @Nested
     @DisplayName("A practice's kind of work comes from its signals")
@@ -2242,8 +2236,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.artifactKind()).isEqualTo(ArtifactKinds.CONVERSATION_THREAD);
             // No ingested event raises it — a scheduler decides a thread has settled — but the occasion
-            // is now declared rather than left empty, which is what let these practices be reviewed
-            // with nothing in the catalog saying what started them.
+            // is still declared, so the catalog says what started the review.
             assertThat(signalsOf(result)).containsExactly(ChatSignals.CONVERSATION_THREAD_SETTLED);
         }
     }

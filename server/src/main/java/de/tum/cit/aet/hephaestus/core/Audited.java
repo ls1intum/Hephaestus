@@ -16,7 +16,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Audited {
-    /** Which trail the action lands on. */
     AuditLedger ledger();
 
     /**

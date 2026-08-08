@@ -94,9 +94,8 @@ public record PracticeDefinition(
     }
 
     /**
-     * One signal, one binding. Two bindings on the same signal would have to be merged by whoever read
-     * them, and the two candidate merges — union the evidence, or take the first — are not the same
-     * review; refusing the shape means nobody has to guess which was meant.
+     * One signal, one binding. Two bindings on one signal would need merging by every reader, and the
+     * candidate merges — union the evidence, or take the first — are not the same review.
      */
     private static void rejectDuplicateSignals(List<PracticeBinding> bindings) {
         java.util.Set<SignalName> seen = new java.util.HashSet<>();

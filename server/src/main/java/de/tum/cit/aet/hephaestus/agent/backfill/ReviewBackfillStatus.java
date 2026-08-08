@@ -3,10 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.backfill;
 /**
  * Where a review-backfill campaign is in its life.
  *
- * <p>The first state is deliberately not "running". A backfill is the one operation in the system that
- * can spend a workspace's whole monthly LLM budget from a single click, so the estimate is produced
- * first, shown, and then confirmed by name — a workspace-scale spend has to be a decision somebody made,
- * not a side effect of setting a date range.
+ * <p>The first state is deliberately not "running". A campaign can spend a workspace's whole monthly LLM
+ * budget, so the estimate is produced first, shown, and then confirmed by name — a spend that size has
+ * to be a decision somebody made, not a side effect of setting a date range.
  */
 public enum ReviewBackfillStatus {
     /** Scope enumerated and costed. Nothing has been submitted and nothing will be until it is confirmed. */

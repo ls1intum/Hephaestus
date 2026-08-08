@@ -13,38 +13,23 @@ import org.jspecify.annotations.Nullable;
  * The signal vocabulary of the documentation domain, and the per-signal rule for what counts as a new
  * occurrence.
  *
- * <p>Names are vendor-neutral for the same reason the SCM ones are. Outline is the only vendor that
- * writes documents here today, but nothing in {@code docs.document.published} says so, and a second
- * documentation tool would raise the same signal against the same practices rather than arriving with
- * a vocabulary of its own.
+ * <p>Names are vendor-neutral: a second documentation tool would raise the same signals against the
+ * same practices rather than arriving with a vocabulary of its own.
  *
- * <p>Only some ingested Outline events carry review meaning; the rest move a document, rename a
- * collection or delete something, and a review occasioned by one of those could only read the same
- * bytes it read before. The mapping is stated once, in {@link #forOutlineEvent(String)}, because the
- * event names are also what the sync path already switches on.
- *
- * <p>Both content signals digest the document rather than keying on anything version-shaped: a document
- * has no commits, and the whole point of reviewing one is to read what it says. Archiving is terminal
- * — an archived document can be restored, but the archiving itself happened once.
+ * <p>Content signals digest the document rather than keying on anything version-shaped, because a
+ * document has no commits. Archiving is terminal: an archived document can be restored, but the
+ * archiving itself happened once, which is what makes a redelivered webhook inert.
  */
 public final class DocsSignals {
 
-    /** A written document — prose, structure and its revision history; no diff, no code. */
     public static final ArtifactKind DOCUMENT = ArtifactKind.of("docs.document");
 
-    /**
-     * A draft became visible to the team. The most informative moment a documentation practice has:
-     * it is the first time the thing being judged exists as something anyone was meant to read.
-     */
     public static final SignalName DOCUMENT_PUBLISHED = SignalName.of("docs.document.published");
 
-    /** A published document's content changed — the occasion to re-measure what it now says. */
     public static final SignalName DOCUMENT_UPDATED = SignalName.of("docs.document.updated");
 
-    /** A document was taken out of circulation. */
     public static final SignalName DOCUMENT_ARCHIVED = SignalName.of("docs.document.archived");
 
-    /** The Outline webhook event names that raise each signal. */
     private static final Map<String, SignalName> BY_OUTLINE_EVENT = Map.of(
         "documents.publish",
         DOCUMENT_PUBLISHED,
@@ -68,9 +53,8 @@ public final class DocsSignals {
     /**
      * The signal an ingested Outline event raises, if it carries review meaning at all.
      *
-     * <p>Empty is the common answer and not a gap: a move, a rename or a collection edit changes where
-     * a document sits, not what it says, and occasioning a review on one would spend a model call to
-     * re-read unchanged bytes.
+     * <p>Empty is not a gap: an event that moves or renames a document changes where it sits, not what
+     * it says, and occasioning a review on one would spend a model call to re-read unchanged bytes.
      */
     public static Optional<SignalName> forOutlineEvent(@Nullable String outlineEventName) {
         return Optional.ofNullable(outlineEventName).map(BY_OUTLINE_EVENT::get);
@@ -88,8 +72,8 @@ public final class DocsSignals {
      * The ledger identity of a document signal.
      *
      * <p>{@code documentId} is the mirror row's primary key, not Outline's UUID: the ledger keys on
-     * local identity everywhere, and a reconnect that re-mirrors a document is destructive-and-rare
-     * enough that keying on the provider's id would buy nothing for the cost of a second identity.
+     * local identity everywhere, and keying on the provider's id would buy nothing for the cost of a
+     * second identity.
      *
      * @param contentHash the mirror's hash of the document body, which is what a content-shaped signal
      *                    is keyed on; empty when the body has been evicted and there is nothing stable
@@ -120,8 +104,8 @@ public final class DocsSignals {
                 ? Optional.empty()
                 : Optional.of(SignalRevision.ofContentDigest(title, contentHash));
             case TERMINAL_STATE -> Optional.of(SignalRevision.ofTerminalState(lastSegmentOf(signal)));
-            // A document has no commits and nobody asks for a document review by hand yet; neither
-            // scheme can produce an identity here, and inventing one would key every occurrence alike.
+            // Neither scheme can produce an identity for a document: it has no commits, and no document
+            // signal is raised by hand. Inventing a revision would key every occurrence alike.
             case HEAD_COMMIT, RUN_ID -> Optional.empty();
         };
     }

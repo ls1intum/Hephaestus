@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
  *       does not become actionable by turning a dial.
  * </ul>
  *
- * <p>They are conjoined here rather than at each delivery site so that a new channel, tier or origin has
- * exactly one place to be reasoned about, and so a test can enumerate the whole product.
+ * <p>Conjoined here rather than at each delivery site, so a new channel, tier or origin has one place
+ * to be reasoned about and a test can enumerate the whole product.
  */
 public final class FeedbackAdmission {
 

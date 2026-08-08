@@ -26,13 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Materialises the {@code docs.document} review context under {@code inputs/context/} — the document
- * under review, as one quarantined markdown file:
- *
- * <ul>
- *   <li>{@code document.md} — the document's own prose, with its title, collection, author and upstream
- *       timestamps in a front-matter block, wrapped in the untrusted-content quarantine envelope.</li>
- * </ul>
+ * Materialises the {@code docs.document} review context under {@code inputs/context/} as one quarantined
+ * {@code document.md}: the document's prose, with its title, collection, author and upstream timestamps
+ * in a front-matter block, inside the untrusted-content envelope.
  *
  * <p>The repo-less, diff-less counterpart of {@link IssueContentSource}, and deliberately <em>not</em>
  * the same thing as {@link OutlineDocumentContentSource}: that one collects the documents a change
@@ -41,9 +37,8 @@ import tools.jackson.databind.JsonNode;
  * claims — retrieval can never prove it found every relevant document, but the one document a review was
  * occasioned by is a complete capture of its own subject.
  *
- * <p>Reads the Outline substrate through the agent-owned {@link DocumentProjection} SPI, implemented by
- * {@code integration.outline} (the owner of the schema), so the coupling runs one way and this class
- * names no vendor.
+ * <p>Reads the mirror through the agent-owned {@link DocumentProjection} SPI, which the vendor module
+ * owning the schema implements, so the coupling runs one way and this class names no vendor.
  */
 @Component
 public class DocumentContentSource implements EvidenceSource, ReviewContextBuilder {

@@ -19,10 +19,9 @@ import tools.jackson.databind.json.JsonMapper;
  * The published policy schema still describes the record it is published for.
  *
  * <p>Nothing in the server reads this schema — it is the contract an authoring tool, a reviewer, or a
- * future version of us reads instead of the Java. That is exactly why it rots: the record gained a
- * field for why a person is needed and lost the sources a review reads to the bindings, and the schema
- * went on describing the shape from two refactors ago. A published contract with no enforcement is
- * documentation, and documentation is where this drift went unnoticed the first time.
+ * future version of us reads instead of the Java. That is exactly why it rots: a published contract
+ * with no enforcement is documentation, and the record can gain and lose components with the schema
+ * still describing an older shape and nothing turning red.
  *
  * <p>Only the shape is pinned here. Whether the schema <em>enforces</em> what it declares is exercised
  * by {@code scripts/validate-artifact-source-contracts.mjs}, which has a JSON Schema validator; this

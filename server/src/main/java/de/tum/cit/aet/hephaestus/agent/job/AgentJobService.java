@@ -281,9 +281,8 @@ public class AgentJobService {
             }
 
             // A keyed submission was already deduplicated by the ledger's unique constraint, which
-            // outlives the job. The status-scoped check below only ever caught a duplicate while a job
-            // was still running, so a redelivery after completion re-ran the whole review; it remains
-            // for the paths that cannot name a signal yet.
+            // outlives the job. This status-scoped fallback only catches a duplicate while a job is
+            // still active, so it is reached only by paths that cannot name a signal.
             if (signalKey == null) {
                 Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                     workspace.getId(),
@@ -300,8 +299,8 @@ public class AgentJobService {
                 }
             }
 
-            // Rate limiting, not correctness — a workspace may set it to zero. It refuses a re-trigger
-            // of the same subject at ANY freshness, not just this one.
+            // Rate limiting, not correctness — a workspace may set it to zero. Keyed on the prefix, so
+            // it refuses a re-trigger of the same subject at any revision, not just the one submitted.
             int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(reviewProperties.cooldownMinutes());
             if (cooldown > 0) {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
@@ -393,10 +392,8 @@ public class AgentJobService {
     }
 
     /**
-     * The artifact a job of this type is about. One switch: until this slice there were two, one
-     * producing a {@code SubjectClass} for the job row and one a {@code WorkArtifact} for the
-     * observations, which is how {@code SLACK_MESSAGE_THREAD} and {@code CONVERSATION_THREAD} came to
-     * name the same thing.
+     * The artifact a job of this type is about. The single mapping for both the job row and the
+     * observations filed against it — a second one drifts, and the same artifact ends up with two names.
      */
     public static ArtifactKind artifactKindFor(AgentJobType jobType) {
         return switch (jobType) {

@@ -565,9 +565,9 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     }
 
     /**
-     * An ISSUE subject ({@code path#iid}) must reach the issue's own notes. This used to be a permanent
-     * {@code UNKNOWN} — the lookup only knew a merge-request document — so the channel could never find the
-     * summary it had itself posted on an issue.
+     * An ISSUE subject ({@code path#iid}) must reach the issue's own notes. A lookup that only knew the
+     * merge-request document would answer a permanent {@code UNKNOWN} and never find the summary the
+     * channel had itself posted on an issue.
      */
     @Test
     void findExistingSummary_issueSubject_scansIssueNotes_isFound() {

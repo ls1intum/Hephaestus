@@ -23,10 +23,9 @@ public enum FeedbackSuppressionReason {
     /** The target PR was already merged and merged-delivery is disabled for the workspace. */
     ARTIFACT_MERGED,
     /**
-     * Retired, and kept only so rows written before it was retired still read back.
-     *
-     * <p>Nothing produces it: whether a draft occasions a review is a property of the practice's
-     * binding, and a review the gate allowed to run is one whose result the author is meant to see.
+     * Nothing produces this: the practice's binding decides whether a draft occasions a review, so a
+     * review the gate let run is one whose result the author is meant to see. Kept because rows written
+     * under it must still read back.
      */
     @Deprecated
     ARTIFACT_DRAFT,
@@ -38,19 +37,15 @@ public enum FeedbackSuppressionReason {
     INSTANCE_SILENCED,
     /**
      * The practice's loudness tier does not admit this channel, so the finding was measured and recorded
-     * but never said out loud. Produced under {@code MEASURE} (no channel) and {@code COACH} (conversation
-     * only, so nothing lands on the artifact). Written rather than dropped so that "we saw it and chose to
-     * stay quiet" reads differently from "we missed it" in every downstream evaluation.
+     * but never said out loud. Written rather than dropped so "we saw it and chose to stay quiet" reads
+     * differently from "we missed it" in every downstream evaluation.
      */
     PRACTICE_TIER_QUIET,
     /**
-     * The observation came from a backfill campaign, whose only entitled channel has no producer, so it
-     * was measured and recorded but never said out loud.
+     * The observation came from a backfill campaign, whose only entitled channel has no producer.
      *
-     * <p>Distinct from {@link #PRACTICE_TIER_QUIET} because the two are undone by different acts: a tier
-     * is a dial an admin can turn, while this reason disappears only when somebody builds the profile
-     * surface. Collapsing them would make "we chose to be quiet about this practice" unanswerable apart
-     * from "nothing we built can say this yet".
+     * <p>Chosen over {@link #PRACTICE_TIER_QUIET} because the two are undone by different acts: a tier is
+     * a dial an admin can turn, this lifts only when a profile-surface producer exists.
      */
     BACKFILL_QUIET,
 }

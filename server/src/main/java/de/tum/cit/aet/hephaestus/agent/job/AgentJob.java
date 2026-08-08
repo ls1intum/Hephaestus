@@ -77,7 +77,7 @@ public class AgentJob {
     @ToString.Exclude
     private Workspace workspace;
 
-    /** The workspace agent binding this job runs on; the executor re-admits it at claim time. */
+    /** Selects the workspace agent binding this job runs on; the executor re-admits it at claim time. */
     @Enumerated(EnumType.STRING)
     @Column(name = "purpose", length = 32)
     private AgentPurpose purpose;
@@ -101,7 +101,7 @@ public class AgentJob {
 
     /**
      * Discriminator for the work subject this job analyses; drives polymorphic delivery dispatch.
-     * Nullable for legacy rows, which are backfilled as {@link ArtifactKind#PULL_REQUEST}.
+     * Nullable for legacy rows, which are backfilled as {@code scm.pull_request}.
      */
     @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH)
     @Nullable
@@ -199,7 +199,7 @@ public class AgentJob {
 
     /**
      * Digest of the prompt scaffolding this run consumed. Equal digests ran byte-identical prompt
-     * assembly, which is how an evaluation groups runs. Null for rows written before provenance existed.
+     * assembly, which is how an evaluation groups runs.
      */
     @Column(name = "prompt_digest", length = 64)
     private String promptDigest;
@@ -207,7 +207,7 @@ public class AgentJob {
     /**
      * Digest over every file materialised into the sandbox workspace, with the job's own id elided so two
      * runs over identical work agree. The read-only repo mount is NOT hashed — its state is pinned by
-     * {@code metadata.commit_sha}. Null for rows written before provenance existed.
+     * {@code metadata.commit_sha}.
      */
     @Column(name = "inputs_digest", length = 64)
     private String inputsDigest;
@@ -220,8 +220,8 @@ public class AgentJob {
      * The readiness decisions, kept out of {@link #evidenceSnapshot} because they are read in bulk.
      *
      * <p>A snapshot carries one entry per staged file, so a repository-tree capture makes it megabytes.
-     * Postgres has no partial read for a TOASTed jsonb: reading one key out of 200 snapshots detoasts
-     * all of both, which is minutes of I/O for a few kilobytes of answer.
+     * Postgres has no partial read for a TOASTed jsonb, so reading one key out of a page of snapshots
+     * detoasts every one of them in full — minutes of I/O for a few kilobytes of answer.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "review_readiness", columnDefinition = "jsonb")
@@ -269,9 +269,6 @@ public class AgentJob {
 
     @Column(name = "llm_cache_write_tokens")
     private Integer llmCacheWriteTokens;
-
-    // No cost field here: money lives in llm_usage_event as NUMERIC(18,6) with the rates it was charged
-    // at, never as a binary float on the job row.
 
     @PrePersist
     public void prePersist() {

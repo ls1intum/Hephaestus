@@ -31,13 +31,10 @@ public class PracticeReviewSettings {
     private Boolean runForAllUsers;
 
     /**
-     * Retired: whether a draft occasions a review is now a property of the practice's binding.
-     *
-     * <p>Nothing reads this. It was a fleet-wide veto on the whole practice set, applied before anything
-     * else, so a practice whose subject <em>is</em> the draft hand-over could never reach a draft — and
-     * once the gate stopped vetoing, this went on suppressing the delivery, so the review ran and told
-     * nobody. The column stays for one release under deprecate-then-remove; the mapping stays with it so
-     * the schema and the entity do not disagree in the meantime.
+     * Nothing reads this: whether a draft occasions a review is a property of the practice's binding,
+     * because a fleet-wide veto cannot express a practice whose subject <em>is</em> the draft hand-over.
+     * The column stays for one release under deprecate-then-remove, and the mapping with it, so the
+     * schema and the entity do not disagree in the meantime.
      */
     @Deprecated(forRemoval = true)
     @Column(name = "practice_skip_drafts")
@@ -59,7 +56,7 @@ public class PracticeReviewSettings {
      *
      * <p>Unlike the fields above this has no fleet default to inherit: a trunk name is a fact about ONE
      * deployment, so there is nothing sensible for an instance-wide setting to say. {@code null} means
-     * unrestricted, and {@link #resolveReviewScope()} is the single reader.
+     * unrestricted.
      *
      * @see WorkspaceReviewScope
      */
@@ -80,7 +77,6 @@ public class PracticeReviewSettings {
         return cooldownMinutes != null ? cooldownMinutes : fallback;
     }
 
-    /** The configured review scope, or {@link WorkspaceReviewScope#UNRESTRICTED} when none is set. */
     public WorkspaceReviewScope resolveReviewScope() {
         return reviewScope != null ? reviewScope : WorkspaceReviewScope.UNRESTRICTED;
     }
@@ -120,8 +116,8 @@ public class PracticeReviewSettings {
                     this.runForAllUsers = null;
                     yield true;
                 }
-                // Retired; the field it cleared is no longer read. The constant stays until the column
-                // goes, so a stored reset request written by an older client is still understood.
+                // Retired with the field it clears. The constant stays until the column goes, so a
+                // reset request from an older client is still understood rather than rejected.
                 case SKIP_DRAFTS -> {
                     this.skipDrafts = null;
                     yield true;

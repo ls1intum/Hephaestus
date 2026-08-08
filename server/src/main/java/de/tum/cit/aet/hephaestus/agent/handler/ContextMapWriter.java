@@ -15,10 +15,10 @@ import java.util.regex.Pattern;
 /**
  * Writes {@code inputs/context-map.md}: where to look for the code a changed line depends on.
  *
- * <p>A repository tree can hold twenty thousand files, and an agent given only a mount point pays an
- * unbounded search cost before it learns anything. The map converts that search into a handful of
- * named starting points — the neighbours of each changed file, its likely test counterpart, and the
- * files elsewhere that mention it — so one targeted read replaces an exploration.
+ * <p>An agent given only a mount point pays a search cost bounded by the size of the tree before it
+ * learns anything. The map converts that search into a handful of named starting points — the
+ * neighbours of each changed file, its likely test counterpart, and the files elsewhere that mention
+ * it — so one targeted read replaces an exploration.
  *
  * <p>Structural only: paths, extensions, basenames, and literal mentions. It never claims what a file
  * means, so it behaves the same on any language or layout and cannot state something untrue about code

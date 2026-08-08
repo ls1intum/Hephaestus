@@ -11,10 +11,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Resolves a GitLab MR's global ID + diffRefs in a single GraphQL round-trip
- * ({@code GetMergeRequestGlobalId}). Shared by the three GitLab feedback adapters
- * ({@link GitlabSummaryChannel}, {@link GitlabInlineFindingChannel},
- * {@link GitlabApprovalChannel}) so per-channel mutations don't re-roundtrip the same
- * lookup.
+ * ({@code GetMergeRequestGlobalId}). Shared by the GitLab feedback adapters so per-channel mutations
+ * don't re-roundtrip the same lookup.
  *
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider} — the channel beans only load when the GitLab

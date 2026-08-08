@@ -70,7 +70,6 @@ public class ReviewBackfillService {
         this.configAudit = configAudit;
     }
 
-    /** The job type that reviews this kind of work. */
     static AgentJobType jobTypeFor(ArtifactKind kind) {
         if (ArtifactKinds.PULL_REQUEST.equals(kind)) {
             return AgentJobType.PULL_REQUEST_REVIEW;
@@ -176,12 +175,10 @@ public class ReviewBackfillService {
      * gave it. A paused run is confirmable again, which is how an admin restarts one that stopped on an
      * exhausted budget without waiting for the driver's own retry.
      *
-     * <p>Retried on an optimistic-lock failure rather than reported. The row this contends with is the
-     * driver's own save on the tick it is mid-batch, which is over in milliseconds; the contending
-     * transaction has already rolled back, so the retry re-reads a settled row and the second attempt
-     * decides against current state. Handing the admin a conflict instead would mean the button whose
-     * whole job is to stop spending fails precisely while spending is happening — the moment it is
-     * pressed, and the moment it must work.
+     * <p>Retried on an optimistic-lock failure rather than reported. The only contender is the driver's
+     * own save mid-batch; that transaction has already rolled back, so a retry re-reads a settled row
+     * and decides against current state. Reporting the conflict instead would fail the cancel button
+     * exactly while a campaign is spending — the one moment it has to work.
      */
     @Retryable(includes = { OptimisticLockingFailureException.class }, maxRetries = 3, delay = 50)
     @Transactional

@@ -8,11 +8,9 @@ import java.util.stream.Collectors;
 /**
  * A practice that is switched on and can never fire here, with the reason attached.
  *
- * <p>The reason is the whole point. Dropping such a practice from a listing would recreate exactly the
- * failure this work exists to remove — something configured, apparently healthy, permanently silent —
- * and failing the boot over it would break every workspace that has simply not connected an integration
- * yet. Every comparable tool enumerates its non-events for the same reason: Renovate's dashboard lists
- * what it is not doing, GitHub's rule insights show what would have failed.
+ * <p>The reason is the whole point. Dropping such a practice from a listing leaves it configured,
+ * apparently healthy and permanently silent; failing the boot over it would break every workspace that
+ * has simply not connected an integration yet.
  *
  * @param practiceId    the practice that cannot fire
  * @param signals       the signals it is bound to, none of which anything connected here raises
@@ -27,11 +25,9 @@ public record DormantBinding(Long practiceId, Set<SignalName> signals, Set<Integ
     }
 
     /**
-     * A human-readable reason, phrased as the action that would end the dormancy.
-     *
-     * <p>The lists are joined by hand rather than left to {@code Collection.toString}: this sentence is
-     * read by a developer asking why nothing happened to their work, and {@code [GITHUB, GITLAB]} is a
-     * debug dump wearing an answer's clothes.
+     * A human-readable reason, phrased as the action that would end the dormancy. Read by a developer
+     * asking why nothing happened to their work, so the lists are joined by hand rather than left to
+     * {@code Collection.toString}.
      */
     public String reason() {
         String names = signals.stream().map(SignalName::value).sorted().collect(Collectors.joining(", "));

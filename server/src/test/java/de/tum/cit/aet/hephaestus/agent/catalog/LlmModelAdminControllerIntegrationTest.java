@@ -276,11 +276,10 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         // The uniqueness this defends is a billing invariant: two catalog rows for one upstream id let
         // LlmUsageRecorder match either, so a NO_CHARGE sibling can silently shadow a PRICED one.
         //
-        // The status is also the thing that regressed. LlmModelUpstreamIdConflictException carries
-        // @ResponseStatus(CONFLICT), but that is inert behind GlobalControllerAdvice's
-        // @ExceptionHandler(Exception.class) — ExceptionHandlerExceptionResolver wins and
-        // ResponseStatusExceptionResolver never runs — so without an explicit handler in
-        // AgentControllerAdvice this returned 500 while the OpenAPI contract promised 409.
+        // The status is asserted because @ResponseStatus(CONFLICT) on the exception cannot deliver it:
+        // GlobalControllerAdvice's @ExceptionHandler(Exception.class) already matches, so
+        // ExceptionHandlerExceptionResolver wins and ResponseStatusExceptionResolver never runs. Without
+        // an explicit handler in AgentControllerAdvice this answers 500 while OpenAPI promises 409.
         LlmConnection connection = seedConnection();
         createModel(connection.getId(), "dup-first");
 

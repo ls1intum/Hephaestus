@@ -26,23 +26,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Turns a recorded {@code docs.document} signal into a review, and settles the ledger row either way.
  *
- * <p>The missing half of the kind. Documents were mirrored, their lifecycle events ingested, their
- * signals recorded and their review context assemblable — and nothing ever asked for a review, so a
- * workspace with Outline connected saw the bundled practice as live and it fired exactly never.
- *
  * <p>One class serves both paths deliberately. The live path ({@link DocumentReviewTrigger}) runs when
  * the sync writes a new ledger row; the reaper path ({@link PendingSignalResubmitter}) re-offers a row
  * that was refused for something an operator can undo. Splitting them would be two places to keep the
  * refusal vocabulary honest, and the reaper's whole purpose is that the second attempt reaches exactly
  * the same decision as the first.
  *
- * <p><strong>Who the observation is about.</strong> The document's author, per
- * {@code DocumentArtifactDescriptor}'s single {@code AUTHOR} role — not whoever last edited it. A wiki
- * names every editor, but "has edited" is not a role the descriptor declares, and attributing a
- * judgement about a document to the last person who fixed a typo in it would be worse than not
- * attributing it at all. The consequence is stated rather than hidden: on
- * {@code docs.document.updated}, the author is measured on a document somebody else may have changed.
- * The document is theirs; the practices are about what it says.
+ * <p>The observation is attributed to the document's author, per {@code DocumentArtifactDescriptor}'s
+ * sole {@code AUTHOR} role, never to whoever last edited it. The consequence is accepted rather than
+ * hidden: on an update signal the author is measured on a document somebody else may have changed.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -91,14 +83,13 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
     }
 
     /**
-     * Deliberately NOT transactional. {@link AgentJobService#submit} opens its own transaction and takes a
-     * pessimistic lock on the workspace inside it; running that under a caller's transaction is what the
-     * SCM listeners were restructured to avoid.
+     * Deliberately NOT transactional: {@link AgentJobService#submit} opens its own and takes a pessimistic
+     * lock on the workspace inside it, which must not be widened to a caller's unit of work.
      *
-     * <p>Which is exactly why every refusal below goes through {@link #refuse} rather than calling the
-     * recorder directly: {@code markRefused} is {@code Propagation.MANDATORY}, and neither entry point —
-     * the sync service nor the reaper — holds a transaction. A direct call throws, the caller swallows
-     * it, and the row stays {@code RECORDED} forever with no reason on it.
+     * <p>Which is why every refusal below goes through {@link #refuse} rather than calling the recorder
+     * directly: {@code markRefused} is {@code Propagation.MANDATORY}, and neither entry point holds a
+     * transaction. A direct call throws, the caller swallows it, and the row stays {@code RECORDED}
+     * forever with no reason on it.
      */
     private void submit(SignalKey key, DiscoveredVia discoveredVia) {
         Workspace workspace = workspaceRepository.findById(key.workspaceId()).orElse(null);
@@ -162,8 +153,7 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
      * Settle the ledger row in a transaction of this class's own.
      *
      * <p>Not an annotation on this method: it is private, so self-invocation would bypass the proxy and
-     * the {@code MANDATORY} recorder would still throw — with a green annotation above it saying
-     * otherwise.
+     * the {@code MANDATORY} recorder would still throw, with the annotation claiming otherwise.
      */
     private void refuse(SignalKey key, SignalStateReason reason) {
         transactionTemplate.executeWithoutResult(status -> signalRecorder.markRefused(key, reason));

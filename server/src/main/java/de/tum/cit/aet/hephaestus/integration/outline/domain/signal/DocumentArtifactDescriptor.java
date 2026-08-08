@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewLimitation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
+import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineWebhookMessageHandler;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -16,34 +17,25 @@ import org.springframework.stereotype.Component;
 /**
  * What can happen to a written document, and which of those a practice may be reviewed on.
  *
- * <p>Nothing in this file is known to the practices module: it reads the registered descriptors and
- * offers whatever it finds, which is what lets a document become bindable without an edit there.
- *
- * <p>Unconditional, like every other descriptor. What a document is, and what can happen to one, is a
- * fact about the domain; whether this deployment has Outline switched on is a fact about the
- * deployment, and it is answered by {@code OutlineManifest.enabled()} and by whether a workspace has a
- * connection. A descriptor gated on a feature flag would make the vocabulary itself configuration, and
- * a practice bound to a document would stop parsing when an operator turned the integration off.
- *
- * <p><b>Lanes.</b> Only {@link FeedbackLane#PROFILE}. Outline's API can post a comment on a document,
- * but nothing here does, and declaring a lane no channel fills is the same aspirational declaration
- * this branch has spent ten slices deleting. Feedback about a document therefore lands where
- * Hephaestus owns the surface, and the day a document comment channel exists this line and the
- * manifest's {@code delivers} change together.
+ * <p>Registered unconditionally, not gated on {@code hephaestus.integration.outline.enabled}: what a
+ * document is, is a fact about the domain, while whether this deployment has Outline switched on is a
+ * fact about the deployment. Gating the descriptor on the flag would make the vocabulary itself
+ * configuration, and a practice bound to a document would stop parsing when an operator turned the
+ * integration off.
  */
 @Component
 public class DocumentArtifactDescriptor implements ArtifactDescriptor {
 
     /**
-     * Every document event arrives on one registry key.
-     *
-     * <p>{@code OutlineSubjectParser} collapses every document event onto
-     * {@code EventTypeKey(OUTLINE, "document")}, so that key — not the Outline event name — is the unit
-     * of provenance the framework can check a handler for. Which of those events raises which signal is
-     * stated in {@link DocsSignals#forOutlineEvent(String)}, next to the names the sync path already
+     * Every Outline event collapses onto this one key, so it — not the Outline event name — is the unit
+     * of provenance the framework can check a handler for. Which event raises which signal is stated
+     * only in {@link DocsSignals#forOutlineEvent(String)}, next to the names the sync path already
      * switches on, rather than duplicated here as a second mapping that could drift.
      */
-    private static final EventTypeKey OUTLINE_DOCUMENT = new EventTypeKey(IntegrationKind.OUTLINE, "document");
+    private static final EventTypeKey OUTLINE_DOCUMENT = new EventTypeKey(
+        IntegrationKind.OUTLINE,
+        OutlineWebhookMessageHandler.EVENT_TYPE
+    );
 
     private static final List<Signal> SIGNALS = List.of(
         declare(DocsSignals.DOCUMENT_PUBLISHED, "Published", true),
@@ -67,9 +59,9 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
     }
 
     /**
-     * Only an author. A document has no assignee and no reviewer — Outline's revision history names
-     * everyone who has edited it, but "has edited" is not a role a review can attribute an observation
-     * to, and inventing one would put a co-editor's name on a judgement about somebody else's writing.
+     * Outline's revision history names everyone who has edited a document, but "has edited" is not a
+     * role a review can attribute an observation to: deriving one would put a co-editor's name on a
+     * judgement about somebody else's writing.
      */
     @Override
     public Set<ActorRole> roles() {
@@ -81,11 +73,6 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
         return Set.of(FeedbackLane.PROFILE);
     }
 
-    /**
-     * A document is a claim about the world, and reading it establishes only what it claims. Whether the
-     * system it describes actually behaves that way is not in the document, and neither is whether the
-     * document is the one people actually read — a wiki keeps the abandoned draft next to the live page.
-     */
     @Override
     public List<ReviewLimitation> reviewLimitations() {
         return List.of(

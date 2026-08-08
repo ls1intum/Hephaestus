@@ -9,7 +9,7 @@ import org.jspecify.annotations.NonNull;
 /**
  * Display estimate only — never an input to a budget, a price or the ledger.
  *
- * <p>The ECB publishes USD per 1 EUR; clients need the opposite. {@link #fromEcbRate} is the single
+ * <p>The ECB publishes USD per 1 EUR; clients need the opposite. {@code fromEcbRate} is the single
  * place that inversion happens.
  */
 @Schema(
@@ -51,7 +51,7 @@ public record FxRateInfoDTO(
 
     /**
      * Inverts an ECB quote (USD per 1 EUR) into the direction clients multiply by (display currency per
-     * 1 USD). The only inversion in the codebase, and the only place {@link #ECB_SOURCE} is stamped.
+     * 1 USD). The only inversion in the codebase, and the only place {@code ECB_SOURCE} is stamped.
      */
     public static FxRateInfoDTO fromEcbRate(String currencyCode, BigDecimal usdPerDisplayUnit, LocalDate rateDate) {
         return new FxRateInfoDTO(

@@ -49,7 +49,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Records the delivered-feedback LEDGER (ADR 0021 C6): after the hardened delivery path posts the MR/issue
+ * Records the delivered-feedback LEDGER (ADR 0021): after the hardened delivery path posts the MR/issue
  * summary + inline notes, this persists ONE {@link Feedback} unit (surface IN_CONTEXT) describing what was
  * actually delivered, the {@link FeedbackObservation}s it fused,
  * and a {@link FeedbackPlacement} per posted comment (SUMMARY + one per inline note).
@@ -76,32 +76,31 @@ public class FeedbackLedgerRecorder {
      */
     public static final int UNIT_ORDINAL_BAND_WIDTH = 1000;
 
-    /** SUPPRESSED units (B2) start here so they never collide with the live IN_CONTEXT unit (ordinal 0). */
+    /** Reaction-suppressed units start here so they never collide with the live IN_CONTEXT unit (ordinal 0). */
     private static final int SUPPRESSED_UNIT_ORDINAL_BASE = 1000;
 
-    /** Composer-withheld SUPPRESSED units (C3) start here — clear of the live unit (0) and the B2 base (1000). */
+    /** Composer-withheld SUPPRESSED units start here, one band clear of the one above. */
     private static final int COMPOSER_WITHHELD_UNIT_ORDINAL_BASE = 2000;
 
     /**
-     * PREPARED conversational units start here so their {@code (agent_job_id, position)} never collides with
-     * the live IN_CONTEXT unit (0), the B2 base (1000), or the composer-withheld base (2000). Public so the
-     * {@link ConversationalFeedbackPreparer} derives its
-     * positions from the one shared constant rather than a second literal.
+     * PREPARED conversational units start here, one band clear of the one above. Public so
+     * {@link ConversationalFeedbackPreparer} derives its positions from the one shared constant rather than
+     * a second literal.
      */
     public static final int CONVERSATION_UNIT_ORDINAL_BASE = 3000;
 
     /**
-     * Undelivered (FAILED) units start here — clear of the live unit (0), the B2 base (1000), the
-     * composer-withheld base (2000), and the conversational base (3000). One row per job records the composed
-     * body a delivery attempt could not place, so an evaluator can audit what the student WOULD have received.
+     * Undelivered (FAILED) units start here, one band clear of the one above. One row per job records the
+     * composed body a delivery attempt could not place, so an evaluator can audit what the student WOULD
+     * have received.
      */
     private static final int UNDELIVERED_UNIT_ORDINAL = 4000;
 
-    /** The gate-suppressed unit (one per job) — clear of every other base. */
+    /** The gate-suppressed unit, one per job. */
     private static final int GATE_SUPPRESSED_UNIT_ORDINAL = 5000;
 
     /**
-     * Tier-withheld SUPPRESSED units start here — clear of every base above. Public so
+     * Tier-withheld SUPPRESSED units start here, one band clear of the one above. Public so
      * {@code InContextDeliveryGate} derives its positions from the one shared constant rather than a second
      * literal, and so it can bound itself by {@link #UNIT_ORDINAL_BAND_WIDTH}.
      */
@@ -212,7 +211,7 @@ public class FeedbackLedgerRecorder {
                 .artifactKind(artifactKind)
                 .artifactId(artifactId)
                 // recipient == about for the author-side catalogue (single source); they diverge only for
-                // reviewer-audience practices (ADR 0021 C2).
+                // reviewer-audience practices (ADR 0021).
                 .recipientUserId(recipientUserId)
                 .aboutUserId(recipientUserId)
                 .channel(FeedbackChannel.IN_CONTEXT)
@@ -231,7 +230,7 @@ public class FeedbackLedgerRecorder {
             feedbackRepository.updateState(supersedesId, FeedbackDeliveryState.SUPERSEDED.name());
         }
 
-        // B2 reaction suppression already wrote its REACTED_* units before this runs and does NOT delete the
+        // Reaction suppression already wrote its REACTED_* units before this runs and does NOT delete the
         // Observation, so exclude those rows here or they would be bound a second time.
         Set<UUID> alreadySuppressed = new HashSet<>(
             feedbackObservationRepository.findObservationIdsSuppressedForJob(job.getId())
@@ -357,7 +356,7 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
-     * Record each never-rendered observation (C3) as a SUPPRESSED unit carrying the composer's reason, so an
+     * Record each never-rendered observation as a SUPPRESSED unit carrying the composer's reason, so an
      * eval excludes it rather than scoring a model-correct-but-policy-withheld finding as a miss. Runs in the
      * caller's transaction so these rows and the DELIVERED unit they qualify commit together.
      */
@@ -532,7 +531,7 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
-     * Record a SUPPRESSED ledger unit for a locus withheld by reaction-aware suppression (ADR 0021, B2) — the
+     * Record a SUPPRESSED ledger unit for a locus withheld by reaction-aware suppression (ADR 0021) — the
      * student already DISPUTED / marked NOT_APPLICABLE / DISMISSED this concern, so it was NOT re-delivered.
      * Writing it (rather than silently dropping) means an eval sees the finding was deliberately withheld, not
      * a model miss. Uses a high {@code unit_ordinal} ({@value #SUPPRESSED_UNIT_ORDINAL_BASE}+) so it never
@@ -709,7 +708,7 @@ public class FeedbackLedgerRecorder {
      * The stable continuity line for a finding: (target, recipient, in-context surface).
      *
      * <p>The recipient arg is intentionally {@code getAboutUserId()}: recipient == about for the author-side
-     * catalogue. For reviewer-audience practices (recipient != about, ADR 0021 C2), this MUST switch to the
+     * catalogue. For reviewer-audience practices (recipient != about), this MUST switch to the
      * recipient id, or supersession continuity would key off the subject and mis-thread —
      * {@link FeedbackThreadKey#compute} documents that arg as the user the unit is delivered to.
      */

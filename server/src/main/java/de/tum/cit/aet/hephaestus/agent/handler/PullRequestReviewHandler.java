@@ -419,7 +419,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        // Stamp each finding with the EXACT keys deliver() persisted (ADR 0021 C2), by identity, so downstream
+        // Stamp each finding with the EXACT keys deliver() persisted, by identity, so downstream
         // stages address the stored observation without recomputing a key that could drift. Done BEFORE the
         // reaction filter so an escalated copy inherits them. A finding absent from the map (unknown slug —
         // never persisted) stays unstamped.
@@ -428,7 +428,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             scopedFindings.set(i, scopedFindings.get(i).withKeys(keysByFinding.get(scopedFindings.get(i))));
         }
 
-        // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
+        // Reaction-aware re-nag suppression (ADR 0021): drop a locus the student already DISPUTED /
         // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an ADDRESSED-but-recurring
         // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
         // deliver() because recurrence_key is persisted there; before compose() so the drop reaches both the

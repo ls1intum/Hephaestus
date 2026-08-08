@@ -8,7 +8,8 @@ import org.jspecify.annotations.Nullable;
  * What is true of this capture and could not be known before it ran.
  *
  * <p>Holds nothing derivable from the catalog the manifest pins by digest — a copied constant can drift
- * from its source. Nullable watermarks make unknown freshness explicit rather than absent.
+ * from its source. The timestamps are nullable so a collector that could not establish one records that
+ * it could not, rather than omitting the fact.
  */
 public record SourceCaptureFacts(
     Instant capturedAt,

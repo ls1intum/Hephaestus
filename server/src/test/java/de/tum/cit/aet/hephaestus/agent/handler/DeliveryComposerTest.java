@@ -2208,11 +2208,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes()).hasSize(1); // no-op guard ⇒ anchor kept
     }
 
-    // Withheld-finding report (issue #1363): the composer must tell the ledger what it decided NOT to render.
-
     @Test
     void compose_withheld_reportsCappedImprovementTailAsPolicyFloorDrop() {
-        // 5 keyed MINOR nudges, cap = 3 → the 2 folded ones are reported withheld with VOLUME_CAPPED.
         List<ValidatedFinding> findings = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             findings.add(
@@ -2234,7 +2231,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.withheld())
             .hasSize(2)
             .allSatisfy(w -> assertThat(w.reason()).isEqualTo(FeedbackSuppressionReason.VOLUME_CAPPED));
-        // Nothing reported withheld was rendered: the two collapsed nudges are absent from the summary.
+        // Nothing reported withheld may also have been rendered.
         Map<String, String> titleByKey = findings
             .stream()
             .collect(Collectors.toMap(ValidatedFinding::occurrenceKey, ValidatedFinding::title));
@@ -2245,10 +2242,9 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_withheld_addressesOneObservation_notTheWholeLocus() {
-        // Four findings of one practice on one file share a recurrence key by design (the key is a LOCUS).
-        // The cap keeps three and drops the fourth; the report must name the dropped OBSERVATION. Keying by
-        // locus instead would see the key surviving on a kept finding and report nothing — leaving the
-        // dropped finding silently bound to the DELIVERED unit.
+        // Findings of one practice on one file share a recurrence key by design (the key is a LOCUS), so a
+        // report keyed by locus would see the key surviving on a kept finding and name nothing — leaving the
+        // dropped finding silently bound to the DELIVERED unit. The dropped OBSERVATION is what must be named.
         List<ValidatedFinding> sameLocus = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
             sameLocus.add(
@@ -2272,8 +2268,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_withheld_reportsCoOccurrenceDedupAsComposerDeduped() {
-        // ready-and-traceable-handoff + ships-tests-with-the-change both BAD → the redundant one collapses
-        // and must be reported COMPOSER_DEDUPED (not silently bound as delivered).
+        // The collapsed near-duplicate must be reported COMPOSER_DEDUPED, not silently bound as delivered.
         ValidatedFinding redundant = negativeFinding(
             "ready-and-traceable-handoff",
             "DoD checkbox claims tests pass",

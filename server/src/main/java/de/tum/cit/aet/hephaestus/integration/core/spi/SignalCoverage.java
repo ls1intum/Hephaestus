@@ -8,11 +8,11 @@ import java.util.Set;
  * is merely quiet from one that is broken.
  *
  * <p>Two different answers, because they carry different consequences. A signal no <em>compiled</em>
- * integration declares it raises is a build-time mistake: the vocabulary offers something the system
+ * integration declares it raises is a build-time mistake — the vocabulary offers something the system
  * cannot produce, and that must stop a boot. A signal no <em>connected</em> integration raises is an
- * ordinary fact about one workspace — it has not connected Outline yet — and the practice bound to it
- * is dormant, which is worth surfacing and never worth crashing over. Conflating the two would either
- * break every workspace that has not finished onboarding, or restore the silence we are removing.
+ * ordinary fact about one workspace part-way through onboarding, and the practice bound to it is
+ * dormant: worth surfacing, never worth crashing over. Conflating the two would either break every
+ * workspace that has not finished connecting, or restore the silence this exists to remove.
  *
  * <p>A port so that the practices module can ask without importing the integration framework, the
  * connection store, or any vendor.

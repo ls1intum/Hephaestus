@@ -8,15 +8,14 @@ import org.jspecify.annotations.Nullable;
 /**
  * How a person recognises one artifact: the number they typed, the title they read, where it lives.
  *
- * <p>Everything else about an artifact reaches the practices module through the signal ledger, which
- * stores nothing but {@code (kind, id)} — deliberately, because a ledger that copied titles would have
- * to keep them in step with the mirror forever. That is fine for deciding whether to review something
- * and useless for telling somebody what was reviewed: {@code scm.pull_request #48211} is a row id, not
- * a merge request. This record is the one thing core asks a domain module to translate.
+ * <p>The signal ledger stores nothing but {@code (kind, id)} — deliberately, because a ledger that
+ * copied titles would have to keep them in step with the mirror forever. That is enough to decide
+ * whether to review something and useless for telling somebody what was reviewed, so this record is
+ * the one thing core asks a domain module to translate.
  *
  * <p>Deliberately not the same type as {@code ReviewRunTargetLookup.Target}, which answers the adjacent
  * question "what was this <em>job</em> about" by decoding the metadata the job carries. That answer
- * cannot exist for an artifact no job ran on — which is precisely the case a trace exists to explain.
+ * cannot exist for an artifact no job ran on — precisely the case a trace exists to explain.
  *
  * @param kind      the family the artifact belongs to
  * @param id        the mirror's identifier, as the ledger stores it

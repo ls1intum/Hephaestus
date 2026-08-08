@@ -24,9 +24,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
- * The enforcement half of the review contract. A declaration nobody checks is documentation, and
- * documentation is what let a complete set of ingested document events sit behind a manifest that never
- * claimed to raise anything.
+ * The enforcement half of the review contract: a declaration nobody checks is documentation, and a
+ * practice bound to a signal nothing raises is indistinguishable from one that is merely quiet.
  *
  * <p>Produces violation strings rather than throwing, so {@link IntegrationFrameworkBootstrap} can
  * report every problem in one message instead of one per restart.
@@ -36,20 +35,17 @@ import org.springframework.stereotype.Component;
  *   <li><b>Subset.</b> A raised signal must be declared by the kind's descriptor. Otherwise the
  *       descriptor stops being the definition of the domain and every vendor invents its own vocabulary.
  *   <li><b>Provenance.</b> A raised signal must name an ingested event of that same vendor, and that
- *       event must have a registered handler. This is the aspirational-signal check: without it a
- *       manifest can claim a signal nothing delivers, which reads as "configured and quiet" in every
- *       surface we have.
+ *       event must have a registered handler — otherwise a manifest can claim a signal nothing
+ *       delivers, which reads as "configured and quiet" on every surface.
  *   <li><b>Reviewability.</b> A kind declared reviewable must have a {@link ReviewContextBuilder}, at
  *       least one role to attribute to, and at least one lane to speak on — a review with no subject,
  *       no addressee, or nowhere to land is a job that can only fail after we have paid for it.
- *   <li><b>Executability.</b> A kind declared reviewable must be one this build can actually <em>run</em> a
- *       review of, per {@link ReviewExecutionCatalog}. Every rule above checks a declaration against
- *       another declaration, and {@code docs.document} satisfied all of them for a whole slice while no
- *       job type, no handler and no submitter existed — so a workspace with Outline connected saw the
- *       bundled practice as live and it could never fire. That is the same shape of defect as a freshness
- *       value with no producer: a claim nothing can falsify. This is the rule that falsifies it.
+ *   <li><b>Executability.</b> A kind declared reviewable must be one this build can <em>run</em> a
+ *       review of, per {@link ReviewExecutionCatalog}. Every rule above checks one declaration against
+ *       another, all of which a kind with no job type, no handler and no submitter can satisfy while
+ *       being unable to fire. This is the rule that falsifies that.
  *   <li><b>Lanes.</b> A delivered lane must be one the descriptor allows and one the manifest holds the
- *       matching {@link Capability} for, so "GitLab posts inline notes" cannot outlive the bean that
+ *       matching {@link Capability} for, so a claim to post inline notes cannot outlive the bean that
  *       posts them.
  * </ul>
  */
@@ -75,12 +71,10 @@ public class ReviewContractValidator {
     /**
      * Lanes that exist but that no integration can reach, because the surface is ours.
      *
-     * <p>Together with {@link #LANE_CAPABILITIES} this must classify every {@link FeedbackLane}: a lane
-     * added to the enum with no rule here would be enforced only once some vendor happened to declare it,
-     * which is to say discovered in production. The enum and both collections are compile-time constants,
-     * so the answer is identical on every deployment and cannot change at runtime — which makes
-     * {@code ReviewContractLaneRulesTest} the right place to assert it, where a failure costs a red build
-     * rather than a crash-looping process.
+     * <p>Together with {@link #LANE_CAPABILITIES} this must classify every {@link FeedbackLane}; a lane
+     * with no rule in either would be enforced only once some vendor happened to declare it. All three
+     * are compile-time constants, so {@code ReviewContractLaneRulesTest} asserts the exhaustiveness and
+     * a gap costs a red build rather than a crash-looping process.
      */
     static final Set<FeedbackLane> HEPHAESTUS_OWNED_LANES = EnumSet.of(FeedbackLane.PROFILE);
 
@@ -100,9 +94,8 @@ public class ReviewContractValidator {
         this.contextBuilders = contextBuilders
             .stream()
             .collect(Collectors.groupingBy(ReviewContextBuilder::artifactKind));
-        // Required, not optional. An optional catalog would mean the executability rule quietly stops
-        // applying in exactly the deployment where nothing runs reviews — which is the failure this rule
-        // exists to make impossible, reintroduced one level up.
+        // Required, not optional: an absent catalog would switch the executability rule off in exactly
+        // the deployment where nothing runs reviews.
         this.executionCatalog = executionCatalog;
     }
 
@@ -131,8 +124,6 @@ public class ReviewContractValidator {
                         kind + " is declared reviewable but no ReviewContextBuilder can assemble its review context"
                     );
                 }
-                // Assembling a context is not running a review. A builder proves the evidence can be
-                // gathered; this proves something exists that would ever ask it to.
                 if (!executionCatalog.executableKinds().contains(kind)) {
                     violations.add(
                         kind +

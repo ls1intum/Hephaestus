@@ -15,10 +15,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * What a practice's automated review is, minus what it reads.
  *
- * <p>The sources moved out to {@link PracticeBinding#needs()}: which evidence a review needs depends on
- * what occasioned it, and one list per practice could not say that. What is left is the frame the
- * review runs in — which contract version names the sources, whether a language model runs at all, and
- * the claims the evidence cannot support whatever the occasion.
+ * <p>The frame the review runs in: which contract version names the sources, whether a language model
+ * runs at all, and the claims the evidence cannot support whatever the occasion. Which sources it
+ * actually reads is <em>not</em> here — that depends on what occasioned the review, so it lives on
+ * {@link PracticeBinding#needs()}.
  */
 @Schema(description = "Author-defined automated review settings for one practice revision")
 public record PracticeAutomatedReviewPolicy(
@@ -68,8 +68,8 @@ public record PracticeAutomatedReviewPolicy(
         ) {
             throw new IllegalArgumentException("Known limitation codes must be unique");
         }
-        // A known limitation is what the evidence cannot show; this is why no automated review runs at
-        // all. Sharing one list conflated the two and left the reason identified only by its position.
+        // Its own field, not another known limitation: a limitation says what the evidence cannot show,
+        // this says why no automated review runs at all.
         boolean declaredInsufficient =
             automatedReview.evidenceSufficiency() == PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT;
         if (declaredInsufficient && insufficiencyReason == null) {

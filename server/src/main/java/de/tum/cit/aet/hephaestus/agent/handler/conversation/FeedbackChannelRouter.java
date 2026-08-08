@@ -83,7 +83,7 @@ public class FeedbackChannelRouter {
         if (tier != null && !tier.delivers(FeedbackChannel.CONVERSATION)) {
             return ConversationRoutingDecision.PRACTICE_TIER_QUIET;
         }
-        // Reviewer-targeted delivery: deferred (ADR-0021-C2).
+        // Reviewer-targeted delivery: deferred (ADR 0021).
         if (context.recipientRole() != RecipientRole.AUTHOR) {
             return ConversationRoutingDecision.REVIEWER_DEFERRED;
         }

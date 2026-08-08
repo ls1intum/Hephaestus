@@ -36,18 +36,11 @@ import tools.jackson.databind.node.ObjectNode;
  * no {@code inputs/sources/scm/} mount. The case context is one mirrored document — its prose, its
  * collection and its authorship — at {@code inputs/context/document.md}.
  *
- * <p>This handler is the half of {@code docs.document} that was missing. The kind was authorable and its
- * context assemblable for a whole slice, and a workspace with Outline connected saw the bundled practice
- * as live while nothing could ever submit a job for it. {@code ReviewContractValidator}'s executability
- * rule now refuses to start a build in that state, and this class is what satisfies it.
- *
  * <p><b>Delivery records observations and stops there.</b> The descriptor gives {@code docs.document} one
- * lane, {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane#PROFILE}, and no channel
- * writes to it today — Outline's API would take a comment on a document, but nothing here posts one. So a
- * document review is a measurement and not yet an intervention. Saying that plainly is the point: the
- * alternative, publishing a delivery event no listener acts on, would look like feedback in every surface
- * we have and reach nobody. When a document channel exists, this method grows a delivery step, the
- * descriptor's lanes grow with it, and the manifest's {@code delivers} grows in the same commit.
+ * lane, {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane#PROFILE}, and no channel writes
+ * to it, so a document review is a measurement rather than an intervention. Publishing a delivery event no
+ * listener acts on would look like feedback in every surface we have and reach nobody; a delivery step
+ * belongs here only once a channel and the descriptor's lanes gain one in the same commit.
  */
 public class DocumentReviewHandler implements JobTypeHandler {
 

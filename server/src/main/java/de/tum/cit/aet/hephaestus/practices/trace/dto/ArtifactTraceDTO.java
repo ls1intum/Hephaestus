@@ -9,9 +9,7 @@ import org.jspecify.annotations.NonNull;
  * The whole answer to "what did Hephaestus do about this piece of work, and why".
  *
  * <p>Every practice the workspace runs against this kind of work appears, including — especially — the
- * ones that did nothing. A listing that showed only what happened would be the failure mode this view
- * exists to remove, and is why Renovate's dashboard enumerates what it is <em>not</em> doing and
- * GitHub's rule insights show what <em>would</em> have failed.
+ * ones that did nothing. A listing of only what happened cannot answer the question the view is for.
  */
 @Schema(description = "Every practice's answer for one artifact, and the occurrences those answers rest on")
 public record ArtifactTraceDTO(

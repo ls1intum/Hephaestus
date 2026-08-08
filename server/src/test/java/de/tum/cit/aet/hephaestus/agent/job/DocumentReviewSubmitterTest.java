@@ -39,8 +39,8 @@ import org.mockito.Mock;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The half of {@code docs.document} that was missing: a recorded signal becoming a review, and every
- * way it can fail to, recorded under a reason somebody can act on.
+ * A recorded {@code docs.document} signal becoming a review — and every way it can fail to become one,
+ * settled under a reason somebody can act on.
  */
 class DocumentReviewSubmitterTest extends BaseUnitTest {
 

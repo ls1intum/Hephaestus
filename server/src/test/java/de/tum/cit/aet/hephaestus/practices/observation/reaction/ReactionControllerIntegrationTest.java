@@ -140,7 +140,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         );
 
         // Bind the observation as the feedback's PRIMARY evidence so findHeadlineRecurrenceKey resolves the
-        // headline locus the reaction must denormalize (B2).
+        // headline locus the reaction must denormalize.
         feedbackObservationRepository.insertIfAbsent(
             feedbackUnit.getId(),
             finding.getId(),
@@ -179,7 +179,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             assertThat(response.id()).isNotNull();
             assertThat(response.createdAt()).isNotNull();
 
-            // B2 denormalization: the persisted reaction carries the feedback's headline recurrence key.
+            // The persisted reaction carries the feedback's headline recurrence key.
             Reaction saved = reactionRepository.findById(response.id()).orElseThrow();
             assertThat(saved.getRecurrenceKey()).isEqualTo(HEADLINE_RECURRENCE_KEY);
         }

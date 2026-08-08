@@ -32,21 +32,21 @@ import org.springframework.stereotype.Component;
 public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
-        // The first three are what a new practice starts out watching: the moments where work
-        // arrives to look at. A merge or a close is the end of the story rather than something to
-        // review, and a submitted review is about somebody else's conduct.
+        // Recommended signals are the moments where work arrives to look at. A merge or a close is the
+        // end of the story rather than something to review, and a submitted review is about somebody
+        // else's conduct.
         declareRecommended(ScmSignals.PULL_REQUEST_OPENED, "Opened", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
         declareRecommended(
             ScmSignals.PULL_REQUEST_READY,
             "Marked ready for review",
             Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)
         ),
-        // GitHub only, and writing that down is the point. GitLab's webhook path emits no synchronize
-        // event at all, so a practice watching "new commits are pushed" is silent on GitLab — until now
+        // GitHub only: GitLab's webhook path derives no "new commits" transition, so a practice watching
+        // this signal is silent on GitLab. Naming the provenance is what makes that visible instead of
         // indistinguishable from a workspace where nobody pushes.
         declareRecommended(ScmSignals.PULL_REQUEST_SYNCHRONIZED, "New commits pushed", Set.of(GITHUB_PULL_REQUEST)),
-        // Three sources for one signal: GitHub has a dedicated review event, GitLab splits the same fact
-        // across an approval on the merge request and a review note.
+        // GitHub has a dedicated review event; GitLab splits the same fact across an approval on the
+        // merge request and a review note.
         declare(
             ScmSignals.PULL_REQUEST_REVIEWED,
             "Review submitted",
@@ -85,14 +85,10 @@ public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
 
     @Override
     public Set<FeedbackLane> lanes() {
-        // The only artifact carrying a diff, and therefore the only one that can take a positional note.
+        // A pull request carries a diff, so a finding about it can be anchored to a position in one.
         return Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE);
     }
 
-    /**
-     * A diff and its discussion say how a change was made; they say nothing about what the change then
-     * did when it ran. The one standing caveat every pull-request review carries.
-     */
     @Override
     public List<ReviewLimitation> reviewLimitations() {
         return List.of(

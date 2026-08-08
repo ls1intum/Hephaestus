@@ -44,10 +44,10 @@ import java.util.Set;
  *   <li>It borrows an existing {@link IntegrationKind} instead of adding a fixture constant.
  *       {@code IntegrationKind} is persisted on connections and jobs, and a value that exists only for
  *       tests would be a value production data could acquire.
- *   <li>It cannot be driven through {@code PracticeReviewDetectionGate}, which still takes a
- *       {@code PullRequest} or an {@code Issue}. That coupling is frozen by
- *       {@code PracticesIntegrationBoundaryTest} and removed when bindings land; until then the
- *       practices-side proof runs through {@code PracticeSignalCoverage}, which is fully kind-agnostic.
+ *   <li>It cannot be driven through {@code PracticeReviewDetectionGate}, which takes a
+ *       {@code PullRequest} or an {@code Issue}. That coupling is frozen and shrinking under
+ *       {@code PracticesIntegrationBoundaryTest}; the practices-side proof therefore runs through
+ *       {@code PracticeSignalCoverage}, which is fully kind-agnostic.
  * </ul>
  */
 final class FixtureIntegration {

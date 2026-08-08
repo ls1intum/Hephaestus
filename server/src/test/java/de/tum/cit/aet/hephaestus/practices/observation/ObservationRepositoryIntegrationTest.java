@@ -370,9 +370,9 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         /**
          * Removing a practice from the catalog is refused while anything was ever measured against it.
          *
-         * <p>The foreign key used to cascade, so pruning the catalog silently erased the recorded history
-         * of everyone who had ever been measured against that practice — the substrate the whole product
-         * exists to build. Practices retire; measurements persist, and the database is what enforces it.
+         * <p>A cascading foreign key here would let pruning the catalog silently erase the recorded
+         * history of everyone measured against that practice — the substrate the whole product exists to
+         * build. Practices retire; measurements persist, and the database is what enforces it.
          */
         @Test
         void refusesToRemoveAPracticeThatHasBeenMeasuredAgainst() {

@@ -21,10 +21,10 @@ import org.springframework.core.io.ClassPathResource;
  * {@code PRACTICE_REVIEW_FOR_ALL} — which is the name the operator docs, {@code docker/.env} and the
  * compose files all use.
  *
- * <p>The short name only became real when the placeholder was added; before that it was a Compose-file
- * alias that fanned out to the long name, so setting it anywhere else silently did nothing. These tests
- * bind the shipped {@code application.yml} for real, through a real
- * {@link SystemEnvironmentPropertySource}, so neither route can quietly stop working.
+ * <p>The short name is only real because {@code application.yml} carries the placeholder — a
+ * Compose-file alias would leave it doing nothing anywhere else. These tests bind the shipped
+ * {@code application.yml} for real, through a real {@link SystemEnvironmentPropertySource}, so neither
+ * route can quietly stop working.
  */
 class FeatureFlagEnvBindingTest extends BaseUnitTest {
 

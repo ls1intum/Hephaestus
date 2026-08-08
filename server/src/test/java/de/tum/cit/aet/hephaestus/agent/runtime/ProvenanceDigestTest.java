@@ -10,7 +10,6 @@ import java.util.TreeMap;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for the run-provenance digest: deterministic, order-independent, content-sensitive. */
 class ProvenanceDigestTest extends BaseUnitTest {
 
     private static byte[] bytes(String s) {

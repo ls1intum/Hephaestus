@@ -58,7 +58,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     /**
      * The headline locus of a feedback unit: the {@code recurrence_key} of its earliest {@code PRIMARY}-role
      * bound observation. Denormalized onto a {@link de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction}
-     * at write time so B2 suppression (ADR 0021) can follow a reacted locus across the detector's per-run
+     * at write time so reaction suppression (ADR 0021) can follow a reacted locus across the detector's per-run
      * re-detections, even though the per-run feedback row differs each run. Null-key PRIMARY rows are
      * SKIPPED (the {@code recurrenceKey IS NOT NULL} filter): this returns the earliest PRIMARY observation
      * that HAS a non-null key. Empty only when the unit binds no PRIMARY observation with a recurrence_key.
@@ -393,11 +393,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     interface OperatorFeedbackRow {
         UUID getId();
         UUID getAgentJobId();
-        /**
-         * The raw column, converted by the caller. A native-query projection is assembled by reflection
-         * over JDBC types, so declaring {@link ArtifactKind} here would make the mapping depend on a
-         * conversion the compiler cannot see.
-         */
+        /** The raw column: a native-query projection is mapped from JDBC types, with no converter run. */
         String getArtifactKind();
         Long getArtifactId();
         Long getRecipientUserId();

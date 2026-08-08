@@ -20,21 +20,16 @@ import org.jspecify.annotations.Nullable;
 /**
  * Turns recorded facts into one legible answer per practice.
  *
- * <p>Pure and static. Every branch here is a claim about what the system did, and those claims are the
- * product — a wrong one is worse than no trace at all, because it is a confident wrong answer to
- * "why didn't you say anything about my merge request?".
- *
  * <p><b>The order of the questions is the design.</b> Evidence that a practice <em>was</em> assessed
  * outranks every reason it might not have been, because configuration is read as it stands today while
  * observations are history: a practice measured last week and turned off yesterday must read as
  * measured, not as silenced. Below that, the workspace's own choice outranks anything mechanical —
- * "you turned this off" is a better answer than "the cooldown was active", even when both are true.
+ * "you turned this off" beats "the cooldown was active" even when both are true.
  *
- * <p><b>Known limit.</b> Configuration is current, not as-of-run. A tier changed after a review still
- * shows its present value, and a binding edited since is matched as it reads now. The alternative is
- * snapshotting the whole practice set onto every job, which is a real cost for a rarely-asked
- * question; stating the limit is the honest trade, and it is why the outcome is derived from what the
- * run recorded wherever a recording exists.
+ * <p>Configuration is therefore current, not as-of-run: a tier or binding changed since a review is
+ * matched as it reads now. Snapshotting the whole practice set onto every job was rejected as too
+ * costly for a rarely-asked question, which is why the outcome is derived from what the run recorded
+ * wherever a recording exists.
  */
 final class PracticeTraceDeriver {
 
@@ -107,9 +102,9 @@ final class PracticeTraceDeriver {
 
         // 1. It produced measurements. Nothing below can make that untrue.
         if (output.observations() > 0) {
-            // Name the occurrence that actually started the run those measurements came from, not merely
-            // the newest one that matched: a practice assessed when the change opened and signalled again
-            // since would otherwise be reported as assessed on a signal it was never run for.
+            // Name the occurrence that started the run the measurements came from, not the newest match:
+            // a practice assessed at open and signalled again since would otherwise be reported as
+            // assessed on a signal it was never run for.
             SignalOccurrence occasion = matched
                 .stream()
                 .filter(occurrence -> Objects.equals(occurrence.reviewId(), output.latestReviewId()))
@@ -271,13 +266,10 @@ final class PracticeTraceDeriver {
     }
 
     /**
-     * A run that finished and never named this practice.
-     *
-     * <p>Three different facts, and telling them apart is the difference between an answer and a shrug.
-     * A run refused for evidence says so at the run level even when it could not get as far as a
-     * per-practice decision. A run that recorded decisions for other practices and not this one did not
-     * admit it — the gate's doing, most often a draft policy or a tier since raised. A run that recorded
-     * no decisions at all cannot support either claim, and saying so is better than picking one.
+     * A run that finished and never named this practice — three distinguishable facts. A run refused
+     * for evidence says so at the run level even without a per-practice decision. A run that recorded
+     * decisions for other practices and not this one did not admit it. A run that recorded no decisions
+     * at all supports neither claim, and says so rather than picking one.
      */
     private static PracticeTraceEntryDTO completed(
         TracedPractice practice,
@@ -375,8 +367,9 @@ final class PracticeTraceDeriver {
     }
 
     /**
-     * Sentence-cases a reason built elsewhere. Uses an explicit root-locale uppercase on one ASCII
-     * letter rather than a naked {@code toUpperCase}, which is banned for the Turkish-i reason.
+     * Sentence-cases a reason built elsewhere. {@code Character.toUpperCase} rather than
+     * {@code String.toUpperCase}, which is locale-sensitive (the Turkish dotless i) and banned by
+     * {@code LocaleSafetyArchTest}.
      */
     private static String capitalize(String sentence) {
         if (sentence.isEmpty()) {

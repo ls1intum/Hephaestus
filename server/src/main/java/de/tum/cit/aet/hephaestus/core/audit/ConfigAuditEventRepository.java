@@ -12,13 +12,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Queries are native for two reasons: the {@code changedKey} filter needs Postgres'
- * array containment operator, which JPQL cannot express and which the GIN index can serve, and the {@code workspace_id} predicate must be
- * literal in the emitted SQL for {@code WorkspaceStatementInspector} to see it.
+ * Queries are native for two reasons: the {@code changedKey} filter needs Postgres' array containment
+ * operator, which JPQL cannot express and which the GIN index can serve, and the {@code workspace_id}
+ * predicate must be literal in the emitted SQL for {@code WorkspaceStatementInspector} to see it.
  *
- * <p>Filter dimensions bind through {@link ConfigAuditFilter} via SpEL rather than one parameter
- * each: seven of them plus a workspace and a {@code Pageable} would blow the six-parameter budget
- * {@code CodeQualityTest} enforces.
+ * <p>Filter dimensions bind through {@link ConfigAuditFilter} via SpEL rather than one parameter each:
+ * bound individually they would blow the method-parameter budget {@code CodeQualityTest} enforces.
  */
 @Repository
 public interface ConfigAuditEventRepository extends JpaRepository<ConfigAuditEvent, Long> {
@@ -50,7 +49,7 @@ public interface ConfigAuditEventRepository extends JpaRepository<ConfigAuditEve
         Pageable pageable
     );
 
-    /** Instance-admin view; {@code workspaceId} is genuinely optional here — that is the whole point. */
+    /** Instance-admin view; here {@code workspaceId} is an optional filter rather than a boundary. */
     @WorkspaceAgnostic(
         "Instance-admin config audit spans workspaces; gated by hasAuthority('app_admin') on AdminConfigAuditController"
     )

@@ -127,7 +127,7 @@ public class PiRuntimeFactory {
         return String.join(" ", flags) + " ";
     }
 
-    /** Values are NOT shell-quoted — add quoting here if a profile ever needs whitespace/metachars. */
+    /** Emitted verbatim into the command line, unquoted: a profile's values must be shell-safe. */
     private static String renderNodeEnv(Map<String, String> env) {
         if (env == null || env.isEmpty()) {
             return "";

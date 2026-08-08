@@ -9,13 +9,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * What the review frame still says about itself now that it no longer says what a review reads.
- *
- * <p>The evidence rules this file used to hold did not disappear with {@code needs()}; they moved to the
- * shape that can now state them per occasion. Duplicate sources and their canonical order are
- * {@code PracticeBindingTest}; the two rules that relate the review mode to the evidence — no evidence
- * without a review, no review without something it must read — are {@code PracticeDefinitionTest}, which
- * is where the record that can see both now enforces them.
+ * The review frame: what a practice claims about its own automated review. What a review <em>reads</em>
+ * is stated per occasion on the bindings, so the rules relating evidence to the review mode are enforced
+ * where both are visible — on the definition — rather than here.
  */
 class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
 

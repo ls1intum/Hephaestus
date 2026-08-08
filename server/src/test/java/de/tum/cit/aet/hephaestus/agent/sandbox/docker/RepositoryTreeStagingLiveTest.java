@@ -37,7 +37,7 @@ import org.testcontainers.DockerClientFactory;
 
 /**
  * Proves against a real Docker daemon that content staged by path arrives in the sandbox intact, at
- * sizes the previous in-memory staging path rejected outright.
+ * sizes no in-memory staging path could carry.
  *
  * <p>The unit tests assert what goes into the tar. This asserts what the agent can actually read,
  * which is the only claim that matters to a review: a practice cannot judge evidence the container
@@ -47,13 +47,13 @@ import org.testcontainers.DockerClientFactory;
 @Tag("live")
 class RepositoryTreeStagingLiveTest {
 
-    /** Over the removed 50 MB whole-input ceiling and the removed 10 MB per-file skip, in one blob. */
+    /** One blob far past anything a heap-bound stager could hold. */
     private static final int LARGE_FILE_MB = 64;
 
     /** The staging target must own {@code /workspace}: {@code docker cp} cannot create the root itself. */
     private static final String AGENT_IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:latest";
 
-    /** Over the removed 20,000-file tree ceiling. */
+    /** A tree large enough that any per-file ceiling would have to reject it. */
     private static final int TREE_FILE_COUNT = 25_000;
 
     private DockerSandboxAdapter sandboxAdapter;

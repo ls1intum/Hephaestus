@@ -82,9 +82,7 @@ class SourceContractValueTest {
 
     /**
      * A demand the source can never meet is a refusal written as a requirement: every review that
-     * required the source would be refused forever, for a reason no operator could act on. This used to
-     * be checked once per practice that named the source; stating the demand on the source means it can
-     * be checked once, where it cannot be got wrong twice.
+     * required the source would be refused forever, for a reason no operator could act on.
      */
     @Test
     void aSourceCannotDemandAQualityItCanNeverReport() {

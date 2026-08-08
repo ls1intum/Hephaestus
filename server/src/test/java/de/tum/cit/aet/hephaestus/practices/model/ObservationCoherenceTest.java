@@ -16,9 +16,9 @@ import org.junit.jupiter.params.provider.EnumSource;
  * The presence/assessment coupling, held over the whole enum rather than over the values that existed
  * when it was written.
  *
- * <p>Adding {@code INDETERMINATE} is exactly the change that breaks a test enumerating three values by
- * hand: the new value would simply not be covered, and an INDETERMINATE row carrying a GOOD assessment —
- * the precise failure the value exists to prevent — would slip through with every test still green.
+ * <p>A test that enumerates the values by hand silently stops covering the enum the moment one is
+ * added: the new value is simply not checked, and an {@code INDETERMINATE} row carrying a GOOD
+ * assessment — the precise failure that value exists to prevent — slips through with the suite green.
  */
 class ObservationCoherenceTest extends BaseUnitTest {
 
@@ -66,8 +66,8 @@ class ObservationCoherenceTest extends BaseUnitTest {
 
     /**
      * INDETERMINATE is a measurement about the world; a source that could not be read is not, and is
-     * refused before any observation is written. If a fifth {@link Presence} ever appears that means "we
-     * could not look", this test is the one that should stop it.
+     * refused before any observation is written. If a {@link Presence} ever appears that means "we could
+     * not look", this test is the one that should stop it.
      */
     @Test
     void noPresenceValueDescribesTheInstrumentRatherThanTheWork() {

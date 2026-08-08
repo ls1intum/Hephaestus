@@ -24,12 +24,9 @@ public record ReviewFindingFilterParams(
     @RequestParam(required = false) @Nullable List<Severity> severity,
     @RequestParam(required = false) @Nullable UUID agentJobId,
     /**
-     * The kind as the bare string it is on the wire, parsed rather than bound.
-     *
-     * <p>A typed parameter here is rendered by springdoc as {@code artifactKind.value} — it walks into
-     * the record — so a generated client would send a query key no caller ever writes. The grammar is
-     * still enforced, one line below, where a malformed value becomes a 400 that names itself instead of
-     * a binding failure.
+     * A bare string, not an {@link ArtifactKind}: springdoc walks into the record and publishes a typed
+     * parameter as {@code artifactKind.value}, so a generated client would send a query key no caller
+     * writes. The grammar is enforced below instead, where a malformed value becomes a 400.
      */
     @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request")
     @RequestParam(required = false)

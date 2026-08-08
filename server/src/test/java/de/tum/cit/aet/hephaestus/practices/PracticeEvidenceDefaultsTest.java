@@ -72,9 +72,7 @@ class PracticeEvidenceDefaultsTest {
 
     private static Stream<Arguments> baselines() {
         return Stream.of(
-            // Comments are REQUIRED, not contextual, and that is the deliberate resolution of a
-            // disagreement: the defaults offered them as optional context while all 36 shipped practices
-            // that read comments required them. Requiring them is what keeps "there were no comments"
+            // Comments are REQUIRED, not contextual: that is what keeps "there were no comments"
             // distinguishable from "we failed to collect the comments".
             Arguments.of(
                 ArtifactKinds.PULL_REQUEST,
@@ -82,9 +80,9 @@ class PracticeEvidenceDefaultsTest {
             ),
             Arguments.of(ArtifactKinds.ISSUE, List.of("scm.issue.core", "scm.issue.comments")),
             Arguments.of(ArtifactKinds.CONVERSATION_THREAD, List.of("slack.conversation.thread")),
-            // The kind this module was never told about. It reaches a baseline here through the source
-            // contract's own `defaultRequirement`, and a limitation list through the descriptor — which
-            // is the whole claim of the contract, asserted on the one kind that arrived after it.
+            // A kind this module knows nothing about. It reaches a baseline through the source contract's
+            // own `defaultRequirement` and a limitation list through the descriptor, which is the whole
+            // claim of the contract.
             Arguments.of(ArtifactKind.of("docs.document"), List.of("docs.document.core"))
         );
     }

@@ -44,8 +44,8 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .doesNotExist()
             .jsonPath("$.deliverToMerged")
             .isEqualTo(false)
-            // Whether a draft occasions a review is a property of the practice's binding now, so the
-            // fleet-wide veto is gone from the policy — not merely defaulted, absent.
+            // Whether a draft occasions a review is a property of the practice's binding, so the policy
+            // carries no fleet-wide veto — absent, not merely defaulted.
             .jsonPath("$.skipDrafts")
             .doesNotExist()
             .jsonPath("$.skipDraftsOverride")

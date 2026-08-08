@@ -18,9 +18,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Instance-admin viewer over the config audit trail, spanning workspaces. Sits beside
- * {@code /admin/audit} (the auth trail); the workspace-scoped view of the same data is
- * {@code /workspaces/{slug}/config-audit}.
+ * Instance-admin viewer over the config audit trail, spanning workspaces. The workspace-scoped view of
+ * the same data is {@code WorkspaceConfigAuditController}.
  */
 @ConditionalOnServerRole
 @RestController

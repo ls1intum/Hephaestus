@@ -6,14 +6,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Fingerprints review-rule inputs, excluding why-it-matters and what-good-looks-like guidance.
  *
- * <p>The scheme prefix is bumped whenever the <em>inputs</em> change rather than the rules, so a stored
- * fingerprint is never silently compared against one computed from a different set of facts. {@code v3}
- * dropped the named evidence profile: it was the set of sources that declare they apply to the artifact
- * kind, which the kind — already digested — determines on its own.
- *
- * <p>Bindings did not bump it again. They changed what is digested, but the branch that introduced v3
- * is unreleased, so no stored v3 digest was ever computed from the old inputs; bumping would only cost
- * a needless recomputation of fingerprints nobody has.
+ * <p>Bump {@code SCHEME} whenever the set of digested <em>inputs</em> changes, so a stored fingerprint
+ * is never silently compared against one computed from different facts. A bump is unnecessary only
+ * while no released build has written a digest under the current scheme.
  */
 public final class ReviewRuleFingerprint {
 

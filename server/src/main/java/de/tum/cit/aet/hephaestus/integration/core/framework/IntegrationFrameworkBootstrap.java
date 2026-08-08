@@ -31,11 +31,10 @@ import org.springframework.stereotype.Component;
  * the first request. Gated to the application-server runtime role since worker pods
  * intentionally wire only a subset of SPI beans.
  *
- * <p>Also the single place the review contract is enforced. A manifest has two sections — the
- * capabilities, which say what plumbing exists, and the {@code ReviewContribution}, which says what the
- * integration contributes to practice review — and both are checked here against the same
- * collect-then-throw pattern, so an operator sees every declaration problem in one message. The
- * per-section rules live in {@link ReviewContractValidator}; the aggregation and the failure stay here.
+ * <p>Also the single place the review contract is enforced. Capability wiring and
+ * {@code ReviewContribution} are collected together before anything throws, so an operator sees every
+ * declaration problem in one message rather than one per restart. The per-section rules live in
+ * {@link ReviewContractValidator}.
  */
 @Component
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -87,18 +86,16 @@ public class IntegrationFrameworkBootstrap {
     @PostConstruct
     public void validate() {
         List<String> violations = new ArrayList<>();
-        // Descriptor rules first: they are about the domain's own vocabulary and hold regardless of which
-        // vendors are enabled, so reporting them before the per-vendor ones puts the root cause on top.
+        // Descriptor rules first: they hold regardless of which vendors are enabled, so reporting them
+        // ahead of the per-vendor ones puts the root cause on top.
         violations.addAll(reviewContract.validateDescriptors());
         for (IntegrationKind kind : manifests.registeredKinds()) {
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
             if (!manifest.enabled()) {
                 // A disabled integration wires none of the beans these rules look for, so running them
-                // would only report the feature flag back as a wall of violations. The manifest is still
-                // registered — its ReviewContribution is what tells a workspace that connecting this
-                // vendor would light up a dormant practice, and that answer must not depend on whether
-                // this particular deployment happens to have it switched on. The rules skipped here are
-                // enforced at build time instead, by the per-manifest IntegrationManifestContractTest.
+                // would report the feature flag back as a wall of violations. The manifest stays
+                // registered anyway, and the skipped rules are enforced at build time — see
+                // IntegrationManifest#enabled().
                 log.info("Integration {} is disabled; skipping its capability and provenance checks", kind);
                 continue;
             }

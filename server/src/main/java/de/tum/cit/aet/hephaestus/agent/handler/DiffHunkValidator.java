@@ -199,7 +199,7 @@ class DiffHunkValidator {
             }
 
             // Only the position changes — preserve the finding's correlation key so the snapped note still
-            // maps back to its persisted finding (ADR 0021 C2).
+            // maps back to its persisted finding (ADR 0021).
             corrected.add(new DiffNote(note.filePath(), nearest, correctedEnd, note.body(), note.recurrenceKey()));
         }
 

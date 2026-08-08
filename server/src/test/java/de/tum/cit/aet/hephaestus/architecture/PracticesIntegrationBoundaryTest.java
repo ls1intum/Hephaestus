@@ -15,13 +15,12 @@ import org.junit.jupiter.api.Test;
 /**
  * The practices module may know the integration <em>contract</em> and nothing about who implements it.
  *
- * <p>This is the boundary the whole review contract exists to establish. When practices depends on
- * {@code integration.scm}, adding a document trigger means editing practices — which is exactly the
- * reason Outline ingests thirteen events that can trigger nothing. Once the only permitted imports are
- * the vendor-neutral ports, a new domain becomes bindable by shipping a descriptor and a manifest, with
- * no edit here at all.
+ * <p>This is the boundary the whole review contract exists to establish. While practices depends on
+ * {@code integration.scm}, making a new domain reviewable means editing practices; once the only
+ * permitted imports are the vendor-neutral ports, a domain becomes bindable by shipping a descriptor and
+ * a manifest, with no edit here at all.
  *
- * <p>The boundary is not clean today, so the rule freezes what exists rather than failing the build.
+ * <p>The boundary is not yet clean, so the rule freezes what exists rather than failing the build.
  * {@link #FROZEN_VIOLATIONS} may only shrink: {@link #frozenViolationsHaveNotGrown()} fails on a new
  * entry, and {@link #frozenViolationsAreStillReal()} fails on a stale one, so the list cannot quietly
  * become a permanent exemption list. Each entry names what removes it.
@@ -54,17 +53,14 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
      *   <li>{@code User}/{@code UserRepository} — a {@code practices.spi} port for "who is the current
      *       developer", implemented in the SCM domain, the same shape as {@code UserRoleChecker}.
      *   <li>{@code PullRequest}/{@code Issue}/{@code Repository}/{@code IdentityProvider} in the detection
-     *       gate — bindings (slice 6), after which the gate takes a recorded signal and a workspace rather
-     *       than an entity and walks nothing. This is also what unblocks driving the gate from the
-     *       conformance fixture, which is why that test currently stops at the framework.
+     *       gate — a gate that takes a recorded signal and a workspace rather than an entity, and walks
+     *       nothing. That is also what would let the conformance fixture drive the gate.
      * </ul>
      *
      * <p>One known blind spot, stated because a silent one would be worse: ArchUnit reads bytecode, and
-     * javac inlines {@code String} constants, so a use of {@code ScmDomainEvent.TriggerEventNames} from
-     * this module would leave no dependency to see. Nothing in {@code src/main} does that any more —
-     * the trigger catalog that did was replaced by the {@code ArtifactCatalog} and {@code SignalVocabulary}
-     * ports — but this rule could not have been the thing that noticed, so do not read its silence as
-     * proof.
+     * javac inlines {@code String} constants, so a practices-side use of a constant such as
+     * {@code ScmDomainEvent.TriggerEventNames} leaves no dependency for this rule to see. Do not read its
+     * silence as proof that none exists.
      */
     private static final Set<String> FROZEN_VIOLATIONS = Set.of(
         "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",

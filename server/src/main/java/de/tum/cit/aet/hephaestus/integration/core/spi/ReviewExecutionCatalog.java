@@ -6,12 +6,10 @@ import java.util.Set;
 /**
  * The kinds of work a review can actually be <em>run</em> on in this build.
  *
- * <p>Every other rule in the review contract is about a declaration: a kind names its signals, its roles,
- * its lanes, what its evidence cannot settle, and a builder claims it can assemble the context. All of
- * that passed for {@code docs.document} while there was no job type to submit, no handler to prepare
- * inputs and nothing to deliver — so a workspace with the integration connected saw the bundled practice
- * as live, and it could never fire. That is the same class of defect as a freshness value that could
- * never fail: a declaration nothing can falsify.
+ * <p>Every other rule in the review contract checks one declaration against another: a kind names its
+ * signals, its roles, its lanes, what its evidence cannot settle, and a builder claims it can assemble
+ * the context. A kind can satisfy all of that with no job type to submit, no handler to prepare inputs
+ * and nothing to deliver — and a workspace then sees a bundled practice as live that can never fire.
  *
  * <p>This is the falsifier. The execution machinery — job types and their registered handlers — lives
  * downstream of the contract and cannot be named from here, so it reports back through this seam

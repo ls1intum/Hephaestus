@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.util.Objects;
 
-/** Available captures retain collection facts; freshness is assessed later from recorded watermarks. */
+/** How a source turned out for one capture: available with its facts, or absent with a reason. */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "availability")
 @JsonSubTypes(
     {

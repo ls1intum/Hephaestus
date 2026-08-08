@@ -12,10 +12,8 @@ import org.jspecify.annotations.Nullable;
  * What a review run decided, for a surface that has only its id.
  *
  * <p>A port for the same reason {@link ReviewRunTargetLookup} is one: the practices module owns the
- * question "what became of this practice" and must not import the orchestrator that answers it. The
- * orchestrator implements this against {@code agent_job}, including the readiness report it wrote
- * there — parsing that report belongs beside the code that writes it, not beside the code that renders
- * it.
+ * question and must not import the orchestrator that answers it. The orchestrator implements this
+ * against {@code agent_job}, parsing the readiness report beside the code that writes it.
  */
 public interface ReviewOutcomeLookup {
     /** @return outcomes by review id; a run this workspace does not own is simply absent */
@@ -42,9 +40,8 @@ public interface ReviewOutcomeLookup {
     record PracticeReadinessOutcome(boolean ready, @NonNull List<String> blockers) {}
 
     /**
-     * The three states a trace can distinguish. Deliberately coarser than the orchestrator's job
-     * status: a trace has nothing different to say about a run that timed out and one that was
-     * cancelled, and a vocabulary with distinctions nobody renders is one that drifts.
+     * Deliberately coarser than the orchestrator's job status: a trace has nothing different to say
+     * about a run that timed out and one that was cancelled, and a distinction nobody renders drifts.
      */
     enum ReviewRunState {
         IN_PROGRESS,

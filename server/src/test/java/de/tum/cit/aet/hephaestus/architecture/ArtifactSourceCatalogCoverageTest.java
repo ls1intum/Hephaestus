@@ -20,15 +20,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * The catalog and the collectors must describe the same world.
- *
- * <p>Authorization, privacy class, and retention are all looked up by source kind, so a kind a
- * collector emits but the catalog omits is evidence that no governance decision covers. In the other
- * direction, a catalog kind nothing collects is a promise the runtime cannot keep: a practice may
- * require it and then abstain on every run, which reads as a broken product rather than a missing
- * collector.
- */
+/** The catalog and the collectors must describe the same world, in both directions. */
 @Tag("architecture")
 class ArtifactSourceCatalogCoverageTest {
 
@@ -79,7 +71,10 @@ class ArtifactSourceCatalogCoverageTest {
     @DisplayName("every collected source kind is governed by the catalog")
     void everyCollectedKindIsGoverned() {
         assertThat(COLLECTED_KINDS)
-            .as("a kind the catalog omits carries no privacy class and no use decision")
+            .as(
+                "a kind the catalog omits carries no privacy class, no retention and no use decision — " +
+                    "authorization is looked up by source kind, so it is evidence no governance covers"
+            )
             .isSubsetOf(CATALOG_KINDS);
     }
 
@@ -87,7 +82,10 @@ class ArtifactSourceCatalogCoverageTest {
     @DisplayName("every catalog source kind has a collector")
     void everyCatalogKindIsCollectable() {
         assertThat(CATALOG_KINDS)
-            .as("a catalog kind nothing collects can only ever be reported absent")
+            .as(
+                "a catalog kind nothing collects can only ever be reported absent: a practice requiring " +
+                    "it abstains on every run, which reads as a broken product rather than a missing collector"
+            )
             .isSubsetOf(COLLECTED_KINDS);
     }
 }

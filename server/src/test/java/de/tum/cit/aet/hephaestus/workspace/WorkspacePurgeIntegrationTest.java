@@ -733,7 +733,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Workspace a = createBareWorkspace("slack-conv-a");
             Workspace b = createBareWorkspace("slack-conv-b");
 
-            // Seed a slack_thread + its derived chat.conversation_thread observation/feedback for each workspace.
             SlackThread threadA = new SlackThread();
             threadA.setWorkspaceId(a.getId());
             threadA.setSlackChannelId("CA");

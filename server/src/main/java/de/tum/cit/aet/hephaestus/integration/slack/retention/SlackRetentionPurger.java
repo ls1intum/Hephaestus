@@ -59,7 +59,6 @@ public class SlackRetentionPurger {
         String cutoffTs = SlackTs.ofInstant(cutoff);
         List<Long> agedThreadIds = slackThreadRepository.findAgedThreadIds(workspaceId, cutoffTs);
 
-        // 1) Erase the derived chat.conversation_thread feedback/observations BEFORE dropping the aggregates they point at.
         conversationFeedbackErasure.eraseForThreads(workspaceId, agedThreadIds);
 
         if (agedThreadIds.isEmpty()) {

@@ -1,16 +1,5 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-/**
- * Service for workspace configuration and settings management.
- *
- * <p>Handles:
- * <ul>
- *   <li>Leaderboard schedule configuration</li>
- *   <li>Notification settings (Slack integration)</li>
- *   <li>Token/credential management</li>
- *   <li>Visibility settings</li>
- * </ul>
- */
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;

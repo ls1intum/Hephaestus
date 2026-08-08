@@ -17,16 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Writes a document's lifecycle into the signal ledger.
  *
- * <p>Recording is unconditional and separate from triggering: the row says that a document was
- * published, and whether a review starts is a later, policy question. That separation is the whole
- * reason the ledger exists — it makes <em>"why did nothing happen?"</em> answerable, rather than leaving
- * a publish that nobody reviewed indistinguishable from a publish that never arrived.
- *
- * <p>Only some document events map to a signal. The rest return empty from
- * {@link DocsSignals#forOutlineEvent} and are silently not recorded, which is the honest answer for a
- * document that merely moved. Outline also subscribes collection events, which never reach this class
- * at all: they change the catalog a document sits in rather than the document, so there is nothing
- * about a document for them to record.
+ * <p>Recording is unconditional and separate from triggering: the row says a document was published,
+ * and whether a review starts is a later, policy question. That separation makes <em>"why did nothing
+ * happen?"</em> answerable, rather than leaving a publish nobody reviewed indistinguishable from a
+ * publish that never arrived.
  */
 @Component
 public class OutlineDocumentSignalRecorder {
@@ -42,16 +36,16 @@ public class OutlineDocumentSignalRecorder {
     /**
      * Records the signal an Outline event raises about a mirrored document, if any.
      *
-     * <p>Runs in its own transaction because the sync path that calls it is deliberately not one — it
-     * makes HTTP calls to Outline — and the recorder demands an existing transaction so that no caller
-     * can write a ledger row outside the unique constraint that makes it a dedup key.
+     * <p>Opens its own transaction because the sync path that calls it is deliberately not one — it makes
+     * HTTP calls to Outline — while {@link SignalRecorder} demands an existing transaction so that no
+     * caller can write a ledger row outside the unique constraint that makes it a dedup key.
      *
      * @param document the mirror row as it stands <em>after</em> the refresh, so a content-shaped signal
      *                 is keyed on the content the review would actually read
-     * @return the ledger identity of the occurrence when it was new, empty when the same revision was
-     *         already recorded (which is what makes a redelivered webhook inert) or when the event carries
-     *         no signal at all. The key rather than a boolean because the caller's next move — offering the
-     *         occurrence for review — needs the identity to settle the very row this wrote.
+     * @return the ledger identity when the occurrence was new; empty when the same revision was already
+     *         recorded, which is what makes a redelivered webhook inert. A key rather than a boolean
+     *         because the caller's next move — offering the occurrence for review — needs the identity to
+     *         settle the very row this wrote.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<SignalKey> record(
@@ -76,8 +70,8 @@ public class OutlineDocumentSignalRecorder {
             document.title()
         );
         if (key.isEmpty()) {
-            // No stable identity — an evicted body has no hash to key a content-shaped signal on. Skipping
-            // is right: a made-up revision would either dedup away every future occurrence or none of them.
+            // An evicted body has no hash to key a content-shaped signal on, and a made-up revision would
+            // either dedup away every future occurrence or none of them.
             log.debug(
                 "Outline document signal has no revision, not recorded: documentId={}, signal={}",
                 document.id(),

@@ -42,10 +42,9 @@ import org.junit.jupiter.api.Test;
  * requests were deleted from the codebase, and every one of them fails the moment somebody reaches for a
  * concrete kind on either side of the contract.
  *
- * <p>What is deliberately absent: the trigger gate. {@code PracticeReviewDetectionGate} still takes a
- * {@code PullRequest} or an {@code Issue} directly, so a fixture kind cannot reach it. That coupling is
- * frozen and shrinking under {@code PracticesIntegrationBoundaryTest}; when it goes, the gate joins this
- * test rather than getting a fixture of its own.
+ * <p>What is deliberately absent: the trigger gate. {@code PracticeReviewDetectionGate} takes a
+ * {@code PullRequest} or an {@code Issue} directly, so a fixture kind cannot reach it — a gap frozen and
+ * shrinking under {@code PracticesIntegrationBoundaryTest}, not a claim this test makes.
  */
 class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 

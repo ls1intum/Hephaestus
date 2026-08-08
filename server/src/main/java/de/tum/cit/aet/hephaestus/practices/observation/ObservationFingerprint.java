@@ -9,7 +9,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Deterministic cross-run identity for a {@code Observation} (ADR 0021, C2).
+ * Deterministic cross-run identity for a {@code Observation} (ADR 0021).
  *
  * <p>The recurrence key answers "is this the <em>same</em> observation we surfaced on an earlier agent
  * run?" so feedback can supersede rather than re-post, and a developer's reaction history can follow

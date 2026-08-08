@@ -19,10 +19,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The practices module restates two kind literals the SCM domain owns, because it may not import the
- * module that declares them. A restated literal is a fork waiting to happen — that is exactly how
- * {@code CONVERSATION_THREAD} and {@code SLACK_MESSAGE_THREAD} came to name one thing — so the two
- * spellings are held together here, in test code, which may see both sides.
+ * The practices module restates kind literals the owning domains declare, because it may not import
+ * them. A restated literal is a fork waiting to happen — two spellings of one kind, discovered only when
+ * a row written under one stops matching the other — so both sides are held together here, in test code,
+ * which may see them.
  */
 class ArtifactKindsAgreementTest extends BaseUnitTest {
 
@@ -66,7 +66,7 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
         // The authority is the descriptor's FeedbackLane.IN_CONTEXT_INLINE; ArtifactKinds restates it
         // because DeliveryComposer is static and has no registry to ask. A restated fact is a fork
         // waiting to happen, so the two are held together here rather than by a comment promising they
-        // agree. Asked of every shipped descriptor, so a fourth kind cannot arrive with the shortcut
+        // agree. Asked of every shipped descriptor, so a new kind cannot arrive with the shortcut
         // silently wrong about it.
         for (ArtifactDescriptor descriptor : List.of(
             new PullRequestArtifactDescriptor(),
@@ -83,8 +83,8 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
     @Test
     @DisplayName("a kind is equal by value, so a freshly parsed one matches the constant")
     void equalByValue() {
-        // The enums this replaced were compared with ==, and every one of those comparisons had to be
-        // rewritten. A kind read back out of a column is a different instance and must still match.
+        // A kind read back out of a column is a different instance, so any comparison by reference is
+        // wrong even where it happens to pass on the constants.
         assertThat(ArtifactKind.of("scm.pull_request")).isEqualTo(ArtifactKinds.PULL_REQUEST);
         assertThat(List.of(ArtifactKinds.PULL_REQUEST)).contains(ArtifactKind.of("scm.pull_request"));
     }

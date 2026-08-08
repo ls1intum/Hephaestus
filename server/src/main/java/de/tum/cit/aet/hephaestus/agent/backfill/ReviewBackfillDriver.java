@@ -22,35 +22,18 @@ import org.springframework.stereotype.Component;
 /**
  * Walks each confirmed campaign through its scope, one bounded batch per tick.
  *
- * <h2>Why it pauses instead of skipping</h2>
+ * <p>A campaign that finds its purse exhausted pauses with the cursor exactly where it was, rather than
+ * carrying on and letting each submission be refused. Skipping would leave a baseline in which "not
+ * reviewed" and "reviewed, nothing found" are the same absence; a truncated baseline is legible, a
+ * gap-toothed one is not.
  *
- * <p>The budget is checked once <em>before</em> each batch, and a campaign that finds its purse
- * exhausted stops with the cursor exactly where it was — so the artifacts it has not reached are still
- * owed, and it resumes at the first of them. A campaign that instead carried on and let each submission
- * be refused would leave a baseline in which "not reviewed" and "reviewed, nothing found" are the same
- * absence, and nothing downstream could tell them apart. A truncated baseline is legible; a
- * gap-toothed one is a lie.
+ * <p>For the batch that crosses the cap part-way, a submission refused for budget lands in a PENDING
+ * ledger state that {@code PendingSignalReaper} re-offers later. The pause bounds the overshoot; the
+ * ledger catches what the overshoot touched.
  *
- * <p>There is a second guarantee underneath, for the batch that crosses the cap part-way: a submission
- * refused for budget is recorded against its ledger row as {@code BUDGET_EXHAUSTED}, which is a PENDING
- * state, and {@code PendingSignalReaper} re-offers it later. So even the artifacts the cursor walked past
- * during the crossing are re-offered rather than lost — the pause bounds the overshoot, the ledger
- * catches what the overshoot touched.
- *
- * <h2>The artifact that throws</h2>
- *
- * <p>Counted as failed, never as passed. A submission that throws unwinds its own {@code REQUIRES_NEW}
- * transaction and takes its ledger row with it, so there is no artifact-level trace left of it anywhere
- * — which means the run's own counters are the only place the hole can be reported. Folding those
- * artifacts into the passes would make {@code submitted + passed} reach the estimate and the campaign
- * announce COMPLETED, producing by arithmetic exactly the gap-toothed baseline the pause exists to
- * prevent. A campaign that finishes with a non-zero failure count has told the truth about itself.
- *
- * <h2>Resuming</h2>
- *
- * <p>A paused campaign is retried on every tick and returns to RUNNING as soon as the reason clears — a
- * new calendar month, a raised cap, a re-enabled binding. Nothing has to be re-confirmed, because the
- * estimate the admin approved covers the whole scope and pausing did not change it.
+ * <p>A paused campaign is retried on every tick and returns to RUNNING as soon as the reason clears.
+ * Nothing has to be re-confirmed: the estimate the admin approved covers the whole scope and pausing
+ * did not change it.
  */
 @ConditionalOnServerRole
 @Component
@@ -99,11 +82,9 @@ public class ReviewBackfillDriver {
                 advance(run);
             } catch (RuntimeException e) {
                 // One campaign's failure must not stop the others. What lands here is a whole-run failure
-                // — the scope query, or a losing optimistic-lock write because somebody changed the run
-                // under us — not a single artifact's, which `advance` walks past itself. The run keeps its
-                // persisted cursor, so the next tick re-reads it and resumes from the last batch that
-                // committed; the work between that cursor and the failure is re-offered, and the ledger's
-                // unique key is what keeps re-offering from re-reviewing.
+                // (the scope query, or a losing optimistic-lock write), not a single artifact's. The run
+                // keeps its persisted cursor, so the next tick resumes from the last batch that
+                // committed; the ledger's unique key is what keeps re-offering from re-reviewing.
                 log.warn("Review backfill batch failed: runId={}", run.getId(), e);
             }
         }
@@ -160,13 +141,11 @@ public class ReviewBackfillDriver {
             try {
                 outcome = submitter.offer(run, artifactId);
             } catch (RuntimeException e) {
-                // The cursor advances past a failure on purpose. Each offer is REQUIRES_NEW, so this
-                // artifact's failure has already unwound by itself and nothing behind it is at risk — but
-                // if the batch aborted here the cursor would never be written, and the next tick would
-                // re-walk these same ids and fail on this same artifact. A deterministically failing
-                // artifact would freeze the campaign for good, with the run still reading RUNNING and its
-                // counts never moving. One artifact is allowed to be unreviewable; a campaign is not
-                // allowed to stop because of it.
+                // The cursor advances past a failure on purpose: aborting the batch here would leave the
+                // cursor unwritten, and a deterministically failing artifact would then freeze the
+                // campaign for good. The failure is counted, never folded into the passes — that would
+                // let submitted + passed reach the estimate and report COMPLETED over a baseline with a
+                // hole in it.
                 log.warn(
                     "Review backfill artifact failed, walking past it: runId={}, artifactId={}",
                     run.getId(),

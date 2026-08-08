@@ -24,7 +24,7 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
      * The gate passed: the practice review agent should run.
      *
      * @param workspace         the resolved workspace for this PR's repository
-     * @param matchedPractices practices used in new reviews whose trigger events match the current event
+     * @param matchedPractices practices bound to the observed signal and above {@code OFF}
      */
     record Detect(Workspace workspace, List<Practice> matchedPractices) implements GateDecision {
         public Detect {
@@ -38,10 +38,9 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
      *
      * @param reason a short, human-readable reason for the skip (for logging/diagnostics)
      * @param signalReason the controlled-vocabulary reason to record the refused signal under, or
-     *     {@code null} to let the caller keep its default of {@link SignalStateReason#GATE_SKIPPED}. Most
-     *     skips are diagnostic detail on one class of answer and stay null; a skip names a reason here
-     *     only when the class of answer itself differs — a practice silenced to {@code OFF} is a
-     *     different fact from "the gate declined", and only one of them is lifted by an admin.
+     *     {@code null} for the default {@link SignalStateReason#GATE_SKIPPED}. Name a reason only when
+     *     the <em>class</em> of answer differs — a practice silenced to {@code OFF} is a different fact
+     *     from "the gate declined", and only one of them is lifted by an admin.
      */
     record Skip(String reason, @Nullable SignalStateReason signalReason) implements GateDecision {
         /** A skip that carries only diagnostic prose; the signal is recorded as {@code GATE_SKIPPED}. */

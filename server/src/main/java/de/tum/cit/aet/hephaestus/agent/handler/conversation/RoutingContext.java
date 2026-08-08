@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 /**
  * The audience context for one conversational-routing pass: the {@link RecipientRole} the observations in this
- * pass are addressed to (see {@link RecipientRole} for the ADR-0021-C2 reviewer deferral).
+ * pass are addressed to (see {@link RecipientRole} for the ADR 0021 reviewer deferral).
  */
 public record RoutingContext(RecipientRole recipientRole) {
     public RoutingContext {
@@ -16,7 +16,7 @@ public record RoutingContext(RecipientRole recipientRole) {
         return new RoutingContext(RecipientRole.AUTHOR);
     }
 
-    /** Reviewer-targeted routing - deferred (ADR-0021-C2). */
+    /** Reviewer-targeted routing - deferred (ADR 0021). */
     public static RoutingContext reviewer() {
         return new RoutingContext(RecipientRole.REVIEWER);
     }

@@ -164,10 +164,10 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 int number = entry.getKey();
                 Optional<Issue> resolved = issueRepository.findByRepositoryIdAndNumber(repositoryId, number);
                 if (resolved.isEmpty()) {
-                    // A reference naming an issue in another repository or an external tracker is
-                    // not a gap in the enumeration: it was found, and it points to work this
-                    // repository does not mirror. Reporting it as incomplete evidence permanently
-                    // skipped the linked-work-item practices for any branch named "<issue>-slug".
+                    // A reference naming an issue in another repository or an external tracker is not a
+                    // gap in the enumeration: it was found, and it points to work this repository does
+                    // not mirror. Reporting it as incomplete evidence would skip the linked-work-item
+                    // practices for every branch named "<issue>-slug".
                     unresolved.add(number);
                     continue;
                 }

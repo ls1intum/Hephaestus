@@ -25,14 +25,14 @@ import org.springframework.core.io.Resource;
 /**
  * The commit-enrichment request is the one GitHub query this codebase assembles at runtime: the batch
  * aliases {@code commit0…commitN} are syntax that no variable can stand in for and no static document
- * can enumerate. That put the whole request outside both GraphQL guards —
+ * can enumerate. An assembled request is outside both GraphQL guards —
  * {@code GraphQlOperationDocumentValidationTest} (schema-validity of what we ask for) and
  * {@code GraphQlResponseStubValidator} (honesty of what tests pretend GitHub answered) — so a field typo
- * came back as a GraphQL error, which every caller here treats as "commit not found" and skips.
+ * in it comes back as a GraphQL error, which every caller here treats as "commit not found" and skips.
  *
- * <p>The selection set now lives in a checked-in fragment, so those two guards cover the fields. This
- * test covers what is left: the assembled envelope, parsed and validated against the same checked-in
- * schema the guards use.
+ * <p>Keeping the selection set in a checked-in fragment hands the fields back to those guards. This test
+ * covers what is left: the assembled envelope, parsed and validated against the same checked-in schema
+ * the guards use.
  */
 class CommitMetadataEnrichmentServiceQueryTest extends BaseUnitTest {
 

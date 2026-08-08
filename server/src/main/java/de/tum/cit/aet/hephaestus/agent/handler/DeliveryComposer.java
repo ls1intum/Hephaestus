@@ -1162,7 +1162,7 @@ class DeliveryComposer {
                 // synthesized branch uses: the agent body is raw model output and can echo grading-meta that
                 // the student must never see (the synthesized path scrubs via appendStudentText, this one did
                 // not). Carry the finding's correlation key so the inline channel can match the delivered
-                // placement back to its persisted finding (ADR 0021 C2).
+                // placement back to its persisted finding (ADR 0021).
                 DiffNote suggested = f.suggestedDiffNotes().get(0);
                 // GROUNDING GUARD (M1): drop the inline ANCHOR if it is ungrounded — a path absent from the
                 // diff's changed-file set whose finding-evidence snippet is not substring-present in that

@@ -14,9 +14,8 @@ import org.springframework.stereotype.Component;
  * Per-kind {@link ArtifactDescriptor} registry, built from constructor-injected beans.
  *
  * <p>Two descriptors for one kind is fatal rather than last-one-wins: the descriptor decides which
- * signals exist and which lanes a kind has, so shadowing one with another would change what practices
- * can be bound to depending on bean ordering. Same reasoning as {@code IntegrationManifestRegistry},
- * and the message names both offenders for the same reason.
+ * signals exist and which lanes a kind has, so shadowing one with another would make what practices can
+ * be bound to depend on bean ordering.
  */
 @Component
 public class ArtifactDescriptorRegistry implements ArtifactCatalog {

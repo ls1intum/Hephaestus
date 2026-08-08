@@ -20,13 +20,13 @@ class FeedbackAdmissionTest extends BaseUnitTest {
     class Provenance {
 
         /**
-         * The load-bearing decision of this slice, written as a derivation rather than as a constant.
+         * Written as a derivation rather than as a constant.
          *
          * <p>A backfilled observation is entitled to PROFILE and to nothing else, and PROFILE has no
-         * producer anywhere in {@code src/main} — so a backfill is, today, measured and delivered
-         * nowhere. Recording that as "backfills produce no feedback" would be a claim about a decision;
-         * recording it this way makes it a consequence of two facts that are each independently true and
-         * each independently tested.
+         * producer anywhere in {@code src/main} — so a backfill is measured and delivered nowhere.
+         * Asserting "backfills produce no feedback" directly would state a decision; asserting it this
+         * way makes it a consequence of two facts that are each independently true and independently
+         * tested.
          *
          * <p><strong>This test fails the day a PROFILE producer appears.</strong> It cannot appear
          * without {@code PracticeReviewTier.delivers(PROFILE)} becoming true for some tier, which trips

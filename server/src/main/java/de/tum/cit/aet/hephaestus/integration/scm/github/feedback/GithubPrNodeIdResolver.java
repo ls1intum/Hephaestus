@@ -9,11 +9,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Resolves a GitHub pull request's node ID via the {@code GetPullRequestNodeId}
- * GraphQL query. Shared by the three GitHub feedback adapters
- * ({@link GithubSummaryChannel}, {@link GithubInlineFindingChannel},
- * {@link GithubApprovalChannel}) — all of them need the node ID before issuing the
- * corresponding mutation, and centralising the lookup keeps mutation timeouts +
- * error-shape handling in one place.
+ * GraphQL query. Shared by the GitHub feedback adapters — each needs the node ID before issuing its
+ * mutation, and centralising the lookup keeps mutation timeouts and error-shape handling in one place.
  *
  * <p>Throws {@link FeedbackDeliveryException} on any failure so callers can mark
  * delivery as failed with a clear reason.

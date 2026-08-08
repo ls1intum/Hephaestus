@@ -12,10 +12,7 @@ import java.util.function.Function;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Names the two SCM artifact kinds, from the shared domain rather than from either vendor — the same
- * placement, and the same reason, as the descriptors next door: one entity, one label.
- */
+/** Names SCM artifacts from the shared domain rather than from either vendor: one entity, one label. */
 @Configuration(proxyBeanMethods = false)
 public class ScmArtifactIdentityConfiguration {
 
@@ -30,9 +27,9 @@ public class ScmArtifactIdentityConfiguration {
     }
 
     /**
-     * A deleted artifact still gets a title and loses its link. Dropping it would make work whose
-     * review history we hold look like work we never saw — the reading the ledger exists to prevent —
-     * and keeping the link would offer a door that no longer opens.
+     * A deleted artifact keeps its title and loses its link: dropping it would make work we still hold a
+     * review history for look like work we never saw, while keeping the link would offer a door that no
+     * longer opens.
      */
     private record ScmIdentityResolver(
         ArtifactKind kind,

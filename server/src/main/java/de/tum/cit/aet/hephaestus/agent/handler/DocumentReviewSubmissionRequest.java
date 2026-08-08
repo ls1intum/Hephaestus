@@ -8,7 +8,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#DOCUMENT_REVIEW} jobs: one
+ * Submission request for {@code DOCUMENT_REVIEW} jobs: one
  * mirrored wiki document, and the member the observations are filed against.
  *
  * <p>The subject is carried explicitly rather than resolved at delivery, the same way a conversation

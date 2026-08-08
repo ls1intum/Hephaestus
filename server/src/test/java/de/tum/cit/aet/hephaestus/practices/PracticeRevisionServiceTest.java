@@ -97,9 +97,8 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
         when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
         String before = service.append(practice).getReviewRuleFingerprint();
 
-        // Evidence is declared per binding now, so this is where an evidence edit lands. The
-        // fingerprint has to follow it: a review that reads a different set of sources is a
-        // different rule, and a stale digest would report it as the shipped one.
+        // The fingerprint has to follow an evidence edit: a review that reads a different set of
+        // sources is a different rule, and a stale digest would report it as the shipped one.
         practice.setBindings(
             List.of(
                 PracticeBinding.on(

@@ -29,11 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
  * mounted and {@code app_admin} gates who may call it — anything less and enabling the flag on a
  * reachable deployment hands unauthenticated callers a spend button bounded only by the monthly cap.
  *
- * <p>The artifact is loaded <em>through</em> the named workspace, not merely alongside it. Both are
- * request parameters and nothing about the two ids relates them, so an artifact fetched by surrogate id
- * alone and then submitted under whichever workspace was named would bill that workspace's
- * {@code agent_job} and LLM usage ledger for another's work — and the backfill cost estimator reads that
- * ledger, so the misattribution outlives the request.
+ * <p>The artifact is loaded <em>through</em> the named workspace via {@link ReviewableArtifactLoader},
+ * never by surrogate id alone — see that class for why the two request parameters must be joined.
  *
  * <p>Two modes:
  * <ul>

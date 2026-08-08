@@ -23,8 +23,8 @@ spring:
         timeout-per-shutdown-phase: 6m
 
 server:
-    # A REAL port — never -1. The LLM proxy is the ONLY LLM credential path (ADR 0006's
-    # 2026-07-22 amendment): LlmProxyController/LlmProxySecurityConfig wire wherever the worker /
+    # A REAL port — never -1. The LLM proxy is the ONLY LLM credential path (ADR 0006):
+    # LlmProxyController/LlmProxySecurityConfig wire wherever the worker /
     # sandbox capability is present. Disabling the HTTP connector (-1) leaves that proxy
     # controller wired as a bean but unreachable — the sandbox's
     # `http://<thisPod>:<serverPort>/internal/llm` target resolves to a negative port, so every

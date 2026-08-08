@@ -8,7 +8,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#PULL_REQUEST_REVIEW}
+ * Submission request for {@code PULL_REQUEST_REVIEW}
  * jobs.
  *
  * <p>Combines the async-safe {@link ScmEventPayload.PullRequestData} snapshot with branch

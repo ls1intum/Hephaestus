@@ -13,11 +13,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The occasion a practice is reviewed on, and the evidence that occasion reads.
  *
- * <p>Two of these claims are ported rather than new: the duplicate-source rule and the canonical order
- * of the sources used to be asserted of {@code PracticeAutomatedReviewPolicy}, which is where the list
- * lived. Both are still load-bearing for the same reason — the list is digested into the review-rule
- * fingerprint, so two authors writing the same thing differently must not read as two different rules,
- * and a source named twice has no answer to which stance won.
+ * <p>The source list is digested into the review-rule fingerprint, so two authors writing the same thing
+ * in a different order must not read as two different rules, and a source named twice has no answer to
+ * which stance won.
  */
 class PracticeBindingTest extends BaseUnitTest {
 
@@ -83,8 +81,9 @@ class PracticeBindingTest extends BaseUnitTest {
     }
 
     /**
-     * The rule that replaced the fleet-wide draft veto. The veto ran before everything and defaulted to
-     * skipping, so a practice about how a change is handed over could never reach a draft at all.
+     * Whether a draft occasions a review is a property of the binding, not of the workspace: judging how
+     * a change was handed over is exactly what one wants to say about a draft, and a fleet-wide veto puts
+     * such a practice out of reach of the only artifact it is about.
      */
     @Test
     void aDraftOccasionsOnlyTheBindingThatSaysSo() {
@@ -123,9 +122,9 @@ class PracticeBindingTest extends BaseUnitTest {
 
     /**
      * A binding that says nothing about drafts is a binding that does not run on them. Stated in the
-     * reader because the component is a primitive: without a default, every one of the 36 bundled
-     * practices and every client would have to write {@code "onDrafts": false}, and a shape that must be
-     * written out is a shape that will be written out wrong.
+     * reader because the component is a primitive: without a default, every bundled practice and every
+     * client would have to write {@code "onDrafts": false}, and a shape that must be written out is a
+     * shape that will be written out wrong.
      */
     @Test
     void aBindingThatSaysNothingAboutDraftsDoesNotRunOnThem() {

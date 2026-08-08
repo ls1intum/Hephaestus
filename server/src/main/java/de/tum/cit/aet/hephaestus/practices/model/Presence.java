@@ -15,11 +15,10 @@ package de.tum.cit.aet.hephaestus.practices.model;
  * <p>Orthogonal to {@link Severity}: presence captures whether the signal was seen, severity captures
  * impact (critical vs informational) and is meaningful only for a {@link Assessment#BAD} observation.
  *
- * <p><b>Every value here is a measurement about the world.</b> "We could not look" is a fact about the
- * instrument, not about the developer, and it is deliberately not representable: a source that was
- * missing, errored, or governance-blocked produces a readiness refusal recorded on the review
- * ({@code AutomatedReviewReadinessDecision}) and no {@link Observation} at all. That boundary is what
- * lets the whole table be read as behaviour.
+ * <p><b>Every value here is a measurement about the world</b>, which is what lets the whole table be
+ * read as behaviour. "We could not look" is a fact about the instrument and is deliberately not
+ * representable: a source that was missing, errored, or governance-blocked produces an
+ * {@code AutomatedReviewReadinessDecision} on the review and no {@link Observation} at all.
  */
 public enum Presence {
     /** The target signal is present in the developer's changed work. */
@@ -29,21 +28,14 @@ public enum Presence {
     /** The practice does not apply to the changed work (e.g., no network calls → error-state-handling is irrelevant). */
     NOT_APPLICABLE,
     /**
-     * The evidence the practice needs was present and was read, and it does not settle the question either
-     * way.
+     * The evidence the practice needs was present and was read, and does not settle the question either
+     * way. Carries no valence, so {@link Assessment} is null — the same coupling as NOT_APPLICABLE.
      *
-     * <p>Distinct from {@link #NOT_APPLICABLE} on purpose, and the distinction is a research-integrity
-     * line rather than a nicety. NOT_APPLICABLE is a claim about the work — this practice has no subject
-     * here — and a detector that says it when it merely could not decide has laundered its own uncertainty
-     * into a statement about the developer, which then enters the behaviour series as "nothing to see".
-     * INDETERMINATE says the honest thing: we looked and could not tell.
-     *
-     * <p>This value is also what makes an {@code exhaustive} evidence stance safe to author. A practice
-     * that asserts <em>absence</em> ("merged with no decision recorded") may only warrant ABSENT when the
-     * corpus it searched was complete; when it was not, the answer is INDETERMINATE, never a quiet
-     * NOT_APPLICABLE.
-     *
-     * <p>Carries no valence, so {@link Assessment} is null — same coupling as NOT_APPLICABLE.
+     * <p>Chosen over {@link #NOT_APPLICABLE} whenever the detector could not decide. NOT_APPLICABLE is a
+     * claim about the work — this practice has no subject here — so saying it under uncertainty enters
+     * the behaviour series as "nothing to see". It is also the only correct answer for a practice with an
+     * {@code exhaustive} stance whose corpus turned out incomplete: such a practice may warrant ABSENT
+     * only when the corpus it searched was whole.
      */
     INDETERMINATE;
 
@@ -51,9 +43,9 @@ public enum Presence {
      * Whether an observation with this presence carries a good/bad direction — i.e. whether
      * {@link Assessment} is required rather than forbidden.
      *
-     * <p>One method rather than a repeated {@code != NOT_APPLICABLE} test, because that test was written
-     * out in six places and every one of them would have silently accepted an INDETERMINATE row with an
-     * assessment attached. The DB CHECK {@code chk_observation_presence_assessment} is the same predicate.
+     * <p>The same predicate as the DB CHECK {@code chk_observation_presence_assessment}. Asked here
+     * rather than by an open-coded {@code != NOT_APPLICABLE}, which silently accepts an INDETERMINATE
+     * row with an assessment attached.
      */
     public boolean carriesValence() {
         return this == PRESENT || this == ABSENT;

@@ -22,11 +22,10 @@ import org.jspecify.annotations.Nullable;
  * <p>Names are vendor-neutral because {@code PullRequest} and {@code Issue} already are: a practice
  * writes {@code scm.pull_request.merged} once and it works on GitHub and GitLab alike.
  *
- * <p>The revision scheme is the interesting part, and it is per signal rather than per kind. An issue
- * has no commits at all, so keying its signals on anything code-shaped is impossible; and even for a
- * pull request, editing the description moves no SHA, which is why a description-shaped signal must
- * digest what was written instead. A terminal signal gets a constant revision because it can only
- * happen once — that is precisely what makes a redelivered merge webhook inert.
+ * <p>The revision scheme is per signal rather than per kind. An issue has no commits at all, so keying
+ * its signals on anything code-shaped is impossible; and even for a pull request, editing the
+ * description moves no SHA, which is why a description-shaped signal must digest what was written
+ * instead.
  */
 public final class ScmSignals {
 
@@ -46,10 +45,6 @@ public final class ScmSignals {
     public static final SignalName ISSUE_CLOSED = SignalName.of("scm.issue.closed");
     public static final SignalName ISSUE_REVIEW_REQUESTED = SignalName.of("scm.issue.review_requested");
 
-    /**
-     * The bridge from the trigger-event literals practices already subscribe to. Both vocabularies
-     * exist for now; the practice definitions move onto signal names when bindings land.
-     */
     private static final Map<String, SignalName> BY_TRIGGER_EVENT = Map.of(
         TriggerEventNames.PULL_REQUEST_CREATED,
         PULL_REQUEST_OPENED,
@@ -91,7 +86,6 @@ public final class ScmSignals {
 
     private ScmSignals() {}
 
-    /** The signal a domain event raises, if any practice vocabulary covers it. */
     public static Optional<SignalName> forTriggerEvent(@Nullable String triggerEventName) {
         return Optional.ofNullable(triggerEventName).map(BY_TRIGGER_EVENT::get);
     }
@@ -136,11 +130,7 @@ public final class ScmSignals {
         );
     }
 
-    /**
-     * The ledger identity of an issue signal. An issue has no commits at all, so what an author wrote
-     * is the only thing a re-measurement can be keyed on — and it is also the right thing, since the
-     * practices that watch issues are about how the issue is written.
-     */
+    /** The ledger identity of an issue signal, keyed on what its author wrote. */
     public static Optional<SignalKey> issueKey(
         long workspaceId,
         long issueId,

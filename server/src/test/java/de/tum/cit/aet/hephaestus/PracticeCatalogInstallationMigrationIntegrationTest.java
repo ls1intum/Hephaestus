@@ -342,9 +342,9 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("practice revisions are immutable");
 
-        // The current revision only. The vocabulary moves cleared the fingerprint on every stored
-        // revision, so "whichever one is still null" now names more than one row, and the point here is
-        // that a fingerprint can be written once and then not again.
+        // Scoped to the current revision: the migration clears the fingerprint on every stored revision,
+        // so "whichever one is still null" names more than one row. The claim under test is that a
+        // fingerprint can be written once and then not again.
         execute(
             """
             UPDATE practice_revision

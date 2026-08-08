@@ -22,8 +22,8 @@ import org.w3c.dom.NodeList;
 
 /**
  * Reads the European Central Bank's daily euro foreign-exchange reference rates. Rates are quoted as
- * foreign units per ONE euro, so the USD entry reads {@code 1.1377} = "1 EUR buys 1.1377 USD"; that
- * direction is stored verbatim and inverted once, on read, in {@link FxRateInfoDTO#fromEcbRate}.
+ * foreign units per ONE euro, so the USD entry reads "how many USD one EUR buys"; that direction is
+ * stored verbatim and inverted once, on read, in {@link FxRateInfoDTO#fromEcbRate}.
  *
  * <p>Never throws: every failure comes back as {@link Optional#empty()}, so a display-only nicety
  * cannot fail a scheduled tick and the last stored rate simply stays in place.

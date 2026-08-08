@@ -262,15 +262,14 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * {@code feedback.agent_job_id} used to CASCADE, deleting append-only research data with any
-     * agent_job delete; this exercises the RESTRICT hardening rather than just asserting it from the
-     * catalog.
+     * Feedback is append-only research data, so it outlives the job that produced it. The delete is
+     * attempted rather than read off {@code pg_constraint}: what has to hold is that the row survives.
      */
     @Test
     @Order(13)
-    void deletingAnAgentJobNoLongerTakesItsFeedbackWithIt() throws SQLException {
+    void deletingAnAgentJobIsRefusedWhileItsFeedbackExists() throws SQLException {
         assertThatThrownBy(() -> execute("DELETE FROM agent_job WHERE id = '9a000000-0000-0000-0000-000000000001'"))
-            .as("the FK is RESTRICT now, so the delete is refused instead of cascading")
+            .as("the FK is RESTRICT, so the delete is refused instead of cascading")
             .hasMessageContaining("sfk_feedback_agent_job");
 
         assertThat(scalar("SELECT count(*)::text FROM feedback")).isEqualTo("1");
@@ -355,8 +354,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .isEqualTo("7");
     }
 
-    // ── migration driver ────────────────────────────────────────────────────────────────────────
-
     /** @return how many changesets the release changelog contributes, i.e. how many were NOT applied. */
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
@@ -393,8 +390,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
     private static Contexts contexts() {
         return new Contexts("prod");
     }
-
-    // ── fixtures ────────────────────────────────────────────────────────────────────────────────
 
     private static void seedLegacyConfiguration() throws SQLException {
         execute(
@@ -468,8 +463,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
         );
     }
 
-    // ── queries ─────────────────────────────────────────────────────────────────────────────────
-
     /** Every carried-over connection: (workspace slug, connection slug, endpoint, key, model id). */
     private static List<String[]> carriedConnectionRows() throws SQLException {
         return query(
@@ -533,8 +526,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
         }
         return bound;
     }
-
-    // ── plumbing ────────────────────────────────────────────────────────────────────────────────
 
     private static Connection connect() throws SQLException {
         return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());

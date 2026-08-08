@@ -14,11 +14,9 @@ import org.junit.jupiter.api.Test;
 /**
  * The rules that need to see a practice whole.
  *
- * <p>The two evidence rules here were asserted of {@code PracticeAutomatedReviewPolicy} while the
- * sources and the review mode sat in one record. With the sources on the bindings, only the definition
- * can see both, so it is the definition that enforces them — and it enforces them per binding, which is
- * stricter than the old rule and is the point: a practice that reads nothing it must read when a change
- * merges is not saved by reading something when the change was opened.
+ * <p>The sources sit on the bindings and the review mode sits on the policy, so only the definition can
+ * see both — and it enforces the two evidence rules per binding: a practice that reads nothing it must
+ * read when a change merges is not saved by reading something when the change was opened.
  */
 class PracticeDefinitionTest extends BaseUnitTest {
 

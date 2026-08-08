@@ -5,7 +5,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#CONVERSATION_REVIEW} jobs:
+ * Submission request for {@code CONVERSATION_REVIEW} jobs:
  * one settled Slack thread, identified by {@code (channelId, threadTs)}, and the single participant the
  * findings are filed against.
  *

@@ -13,9 +13,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * The facts a trace is derived from, flattened out of their entities.
  *
- * <p>Plain values so {@link PracticeTraceDeriver} can be exercised without a database, a Spring
- * context or a mirror. The derivation is where every judgement in this feature lives, and a judgement
- * that can only be tested through five joins does not get tested.
+ * <p>Plain values so {@link PracticeTraceDeriver}, which holds every judgement in this feature, can be
+ * exercised without a database, a Spring context or a mirror.
  */
 final class TraceInputs {
 
@@ -39,10 +38,9 @@ final class TraceInputs {
     /**
      * One ledger row.
      *
-     * @param id the row's own identity. Carried so a practice's answer can point at the <em>exact</em>
-     *           occurrence it rests on: a signal name cannot, because the same signal recurs on every
-     *           new revision, and "assessed when new commits were pushed" is a different claim
-     *           depending on which push
+     * @param id the row's own identity. Carried because a signal name cannot identify the occurrence an
+     *           answer rests on: the same signal recurs on every new revision, and "assessed when new
+     *           commits were pushed" is a different claim depending on which push
      */
     record SignalOccurrence(
         UUID id,

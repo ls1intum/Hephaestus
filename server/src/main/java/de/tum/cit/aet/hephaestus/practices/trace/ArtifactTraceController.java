@@ -30,11 +30,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 /**
  * "Why didn't Hephaestus say anything about my merge request?" — answerable without a SQL console.
  *
- * <p>Open to any workspace <em>member</em>, not just an admin, because the question is a developer's
- * before it is an operator's: mentoring silence is indistinguishable from having nothing to say, and a
- * person who cannot find out which of the two they are looking at stops trusting the tool. Membership
- * is the same bar {@code ObservationController} already sets for reading every developer's findings on
- * a pull request, and this surface carries counts rather than content, so it exposes strictly less.
+ * <p>Open to any workspace <em>member</em>, not just an admin: the question is a developer's before it
+ * is an operator's. Membership is the bar {@code ObservationController} already sets for reading every
+ * developer's findings on a pull request, and this surface carries counts rather than content.
  *
  * <p>A GET under {@code /workspaces/**} is {@code permitAll} at the filter chain and a public-read
  * workspace admits anonymous callers, so the membership check has to be made here or it is not made.

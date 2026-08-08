@@ -8,7 +8,7 @@ import java.util.UUID;
  *
  * @param agentJobId      the agent job that produced these observations
  * @param workspaceId     the workspace context
- * @param artifactKind      the target entity type (e.g., {@link ArtifactKind#PULL_REQUEST})
+ * @param artifactKind      the target entity type, e.g. {@code scm.pull_request}
  * @param artifactId        the target entity ID
  * @param developerId   the user the observations are about (ADR-0022 {@code aboutUserId})
  * @param findingsInserted number of new observations persisted

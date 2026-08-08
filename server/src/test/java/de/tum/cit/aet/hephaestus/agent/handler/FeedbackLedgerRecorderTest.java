@@ -43,7 +43,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 
-/** Unit tests for the delivered-feedback ledger writer (ADR 0021 C6 + C3 composer-withheld binding). */
+/** The delivered-feedback ledger writer (ADR 0021). */
 @org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
@@ -84,8 +84,6 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     @Test
     void composerWithheld_bindsEachFindingExactlyOnce_keptToDeliveredDroppedToSuppressed() {
-        // 5 MINOR problems where the composer reported 2 as volume-capped → 3 kept (DELIVERED), 2 withheld
-        // (each its own SUPPRESSED unit). Guard: a withheld finding must bind to exactly one unit, never both.
         List<Observation> findings = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             findings.add(problem(0.9f - i * 0.1f)); // distinct confidences so the cap is deterministic
@@ -112,7 +110,6 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         );
         assertThat(boundFindingIds.getAllValues()).doesNotHaveDuplicates().hasSize(5);
 
-        // Two SUPPRESSED / VOLUME_CAPPED units were written for the dropped tail.
         var saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository, org.mockito.Mockito.atLeast(3)).save(saved.capture());
         long suppressed = saved
@@ -211,7 +208,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     @Test
     void b2AndComposerWithheldOverlap_aSuppressedFindingIsNeverBoundTwice() {
-        // B2 × C3 interaction: a finding B2 already suppressed must NOT also be written as a composer-withheld
+        // A finding reaction suppression already withheld must NOT also be written as a composer-withheld
         // unit even when the composer reports its key — it is bound exactly once across all units.
         List<Observation> findings = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -241,7 +238,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     @Test
     void alreadySuppressedFinding_isExcludedFromDeliveredUnit() {
-        // A finding withheld earlier in the flow (B2 reaction suppression wrote a SUPPRESSED unit for it) must
+        // A finding withheld earlier in the flow (reaction suppression wrote a SUPPRESSED unit for it) must
         // NOT also be bound to the DELIVERED unit — else it is double-counted as delivered.
         var kept = problem(0.9f);
         var b2Suppressed = problem(0.8f);
@@ -553,9 +550,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     @Test
     void recordSuppressedUnit_persistsGateReasonAndBody_bindsFindings_noConversationSignal() {
-        // A whole-review delivery gate (issue #1363): ONE SUPPRESSED unit at ordinal 5000 with the gate reason
-        // and the composed body, binding the assessed findings — and NO conversational signal (a gate decision
-        // applies to every channel, so the loci must not be re-raised in a mentor turn).
+        // A gate decision applies to every channel, so the whole review collapses to ONE suppressed unit
+        // and the loci must not be re-raised as a conversational signal in a mentor turn.
         Observation bad = problem(0.9f);
         Observation good = strength();
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad, good));

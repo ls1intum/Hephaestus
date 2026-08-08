@@ -14,16 +14,15 @@ import org.springframework.stereotype.Component;
  * Answers the review contract's executability question with the only thing that can settle it: the
  * handlers this build actually registered.
  *
- * <p>Derived rather than declared. A hand-written list of executable kinds would be one more
- * declaration to keep in step, and the defect this closes was exactly a declaration nobody kept in step
- * — {@link ArtifactDescriptor#reviewable()} returning true for a kind with no way to run. Reading the
- * registered {@link JobTypeHandler} beans means the answer cannot be stale: deleting a handler makes its
- * kind unexecutable in the same commit, and the contract refuses to start.
+ * <p>Derived rather than declared. A hand-written list of executable kinds is one more declaration to keep
+ * in step, and the failure it permits is {@link ArtifactDescriptor#reviewable()} returning true for a kind
+ * with no way to run. Reading the registered {@link JobTypeHandler} beans means the answer cannot go
+ * stale: deleting a handler makes its kind unexecutable in the same commit, and the contract refuses to
+ * start.
  *
- * <p>Takes the handler beans directly instead of {@link de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry}
- * only to keep the dependency one bean shallower; the registry's own constructor already refuses a build
- * where an {@code AgentJobType} has no handler, so the two facts this class needs — a job type exists,
- * and something handles it — are enforced from both ends.
+ * <p>Takes the handler beans directly instead of {@link JobTypeHandlerRegistry} only to keep the
+ * dependency one bean shallower; the registry's own constructor already refuses a build where an
+ * {@code AgentJobType} has no handler.
  */
 @Component
 public class JobTypeReviewExecutionCatalog implements ReviewExecutionCatalog {

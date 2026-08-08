@@ -30,7 +30,7 @@ public record SignalRevision(String value) {
      */
     private static final Pattern GRAMMAR = Pattern.compile("[A-Za-z0-9_.~-]+");
 
-    /** 128 bits of digest: collision-free for this purpose and short enough to read in a trace. */
+    /** Truncated digest: wide enough to be collision-free here, short enough to read in a trace. */
     private static final int DIGEST_HEX_LENGTH = 32;
 
     private static final byte ABSENT_PART = 1;

@@ -54,9 +54,8 @@ public class PracticeService {
     /**
      * Every practice this workspace actually reviews, at any tier above {@code OFF}.
      *
-     * <p>Includes {@code MEASURE}. That tier promises the developer no <em>feedback</em>, not concealment:
-     * a practice we measure someone against and hide from them is the worse of the two failures, so the
-     * learner-facing catalogue lists what is observed while the tier still governs what is said.
+     * <p>Includes {@code MEASURE}: that tier promises the developer no <em>feedback</em>, not concealment,
+     * so the learner-facing catalogue lists what is observed while the tier governs what is said.
      */
     @Transactional(readOnly = true)
     public List<Practice> listReviewedPractices(WorkspaceContext ctx) {

@@ -111,13 +111,9 @@ class ObservationFingerprintTest extends BaseUnitTest {
     void goldenVector() {
         // A change to the field set, separator, normalization, or hash algorithm would silently
         // re-identify EVERY historical observation (breaking cross-run supersession). Pin one vector so
-        // such a change must be a deliberate, reviewed edit to this expectation.
-        //
-        // Edited once, deliberately: the artifact kind fed in here went from PULL_REQUEST to
-        // scm.pull_request when the two forked artifact enums merged, so every key computed after that
-        // change differs from the ones already stored. Observations recorded before it keep their old
-        // key and stop correlating with new ones — at most one re-posted piece of feedback per open
-        // artifact, which is why the vocabulary change was worth making once rather than twice.
+        // such a change must be a deliberate, reviewed edit to this expectation. The cost of making it
+        // is that observations recorded under the old key stop correlating with new ones — at most one
+        // re-posted piece of feedback per open artifact.
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift")).isEqualTo(
             "a8b20bf6e20b28b3315420a241577853676ceed52e7be2976f94d3978cfa830d"
         );

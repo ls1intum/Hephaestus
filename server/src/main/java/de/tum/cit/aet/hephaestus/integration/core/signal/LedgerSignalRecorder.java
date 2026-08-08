@@ -30,13 +30,10 @@ public class LedgerSignalRecorder implements SignalRecorder {
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean record(SignalKey key, Instant occurredAt, DiscoveredVia discoveredVia) {
         Instant now = Instant.now();
-        // A reconciliation pass knows that something happened, not that it is the right one to act on
-        // it, so it may only ever add a row; a live or requested observation may additionally take over
-        // one nobody has decided yet.
-        //
-        // A BACKFILL deliberately takes the second branch, and that is the whole mechanism: a first sync
-        // leaves thousands of rows RECORDED-but-undecided precisely so it does not fire thousands of
-        // reviews, and a confirmed campaign is the thing that is finally entitled to claim them.
+        // A reconciliation pass knows that something happened, not that it is the right one to act on it,
+        // so it may only ever add a row; a live or requested observation may also take over one nobody
+        // has decided yet. BACKFILL takes that second branch on purpose — a first sync leaves its rows
+        // RECORDED-but-undecided so it fires nothing, and a confirmed campaign is what may claim them.
         int affected =
             discoveredVia == DiscoveredVia.SYNC
                 ? repository.insertIfAbsent(key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now)
@@ -89,9 +86,8 @@ public class LedgerSignalRecorder implements SignalRecorder {
     }
 
     /**
-     * A settle that matched nothing. Either the row is gone, or somebody already decided it — both mean
-     * this caller's decision is void, and both are worth saying out loud rather than discarding: the
-     * ledger's whole purpose is that no signal ends up with no explanation.
+     * A settle that matched nothing: the row is gone, or somebody already decided it. Either way this
+     * caller's decision is void, and the ledger's purpose is that no signal ends up with no explanation.
      */
     private void logUnsettled(String attempted, SignalKey key) {
         log.warn(

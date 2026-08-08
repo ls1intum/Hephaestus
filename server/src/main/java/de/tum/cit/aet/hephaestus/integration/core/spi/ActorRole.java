@@ -11,18 +11,15 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
  * observation with nobody to deliver it to.
  */
 public enum ActorRole {
-    /** Produced the artifact. The subject of practically every observation the system records today. */
+    /** Produced the artifact. */
     AUTHOR,
 
     /**
-     * Holds the artifact. This is the relation the review gate checks a permission against, so an
-     * artifact kind with no notion of assignment cannot be gated the way pull requests and issues are.
+     * Holds the artifact. This is the relation the review gate checks a permission against, so a kind
+     * with no notion of assignment cannot be gated that way.
      */
     ASSIGNEE,
 
-    /**
-     * Responded to the artifact. Named by the signals about responses ({@code scm.pull_request.reviewed}),
-     * and the only relation a practice about the quality of reviewing can be about.
-     */
+    /** Responded to the artifact — the only relation a practice about reviewing can be about. */
     REVIEWER,
 }

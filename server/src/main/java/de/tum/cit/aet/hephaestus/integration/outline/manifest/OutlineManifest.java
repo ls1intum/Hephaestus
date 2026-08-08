@@ -38,23 +38,14 @@ public class OutlineManifest implements IntegrationManifest {
     public Set<Capability> declaredCapabilities() {
         // Outline change notifications ride the unified /webhooks/{kind} JetStream lane (ADR 0023 §3):
         // a signature-verified delivery is published to the durable `outline` stream and consumed to
-        // trigger a whole-workspace reconcile. WEBHOOK_INGEST binds the four SPI beans the bootstrap
-        // validates — OutlineWebhookSignatureVerifier, OutlineWebhookSecretSource, OutlineSubjectKeyDeriver,
-        // OutlineSubjectParser.
+        // trigger a whole-workspace reconcile.
         return Set.of(Capability.WEBHOOK_INGEST);
     }
 
     /**
-     * Documents, and the three events about them that carry review meaning.
-     *
-     * <p><b>Raises is a subset, and deliberately.</b> The descriptor lists what can happen to a document
-     * in general; Outline raises the three it actually delivers. It observes {@code docs.document}
-     * because it is the module that writes the mirror those documents live in.
-     *
-     * <p><b>Delivers nothing.</b> Outline's API would take a comment on a document, but no
-     * {@code SummaryChannel} for it exists, so there is no lane to claim. A review of a document
-     * therefore records its observations and shows them on the Hephaestus surface — which is what the
-     * descriptor's {@code PROFILE}-only lane says — instead of a delivery promise nothing keeps.
+     * No delivery lanes: Outline's API would take a comment on a document, but no {@code SummaryChannel}
+     * for it exists, and a claimed lane no channel fills is a delivery promise nothing keeps. Feedback
+     * about a document lands on the Hephaestus surface instead.
      */
     @Override
     public ReviewContribution reviewContribution() {

@@ -101,9 +101,9 @@ public class OutlineDocumentSyncService {
     private final OutlineDocumentSignalRecorder signalRecorder;
 
     /**
-     * Optional because the agent subsystem can be switched off (and is, in the worker and webhook roles),
-     * and a mirror that cannot ask for a review must still keep its ledger. The signal is recorded either
-     * way; only the offer is skipped, and the reaper picks the row up if an agent-capable node exists.
+     * Optional because the agent subsystem can be switched off, and is in the worker and webhook roles. A
+     * mirror that cannot ask for a review must still keep its ledger: the signal is recorded either way
+     * and only the offer is skipped, leaving the row for an agent-capable node to pick up.
      */
     private final ObjectProvider<DocumentReviewTrigger> reviewTrigger;
 
@@ -132,11 +132,11 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Record the occurrence, then offer it for review — the two halves of the same event, kept apart.
+     * Records the occurrence, then offers it for review.
      *
-     * <p>The offer runs outside any transaction of ours on purpose: submission opens one of its own and
-     * locks the workspace inside it. Never fails the sync: a mirror that could not ask for a review has
-     * still mirrored the document, and the ledger row it just wrote is what the reaper re-offers.
+     * <p>The offer must run outside any transaction of ours: submission opens one of its own and locks
+     * the workspace inside it. A failed offer never fails the sync — the document is mirrored either way,
+     * and the ledger row this wrote is what a later pass re-offers.
      */
     private void recordAndOffer(
         long workspaceId,

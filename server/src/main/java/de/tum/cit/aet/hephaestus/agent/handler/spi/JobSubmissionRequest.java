@@ -23,7 +23,7 @@ public interface JobSubmissionRequest {
      * incomparable samples into one trend.
      *
      * <p>Defaults to {@link ObservationOrigin#LIVE}: a request type that has not thought about this is
-     * event-driven, which is what every one of them was when the axis was introduced.
+     * event-driven.
      */
     default ObservationOrigin observationOrigin() {
         return ObservationOrigin.LIVE;

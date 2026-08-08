@@ -49,10 +49,9 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     /**
      * Record an observation, taking over a row that was merely observed and never decided on.
      *
-     * <p>Without the takeover a reconciliation pass that saw a transition seconds before the provider
-     * announced it would leave a {@code RECORDED} row behind, and the live announcement would lose the
-     * insert and be dropped — a backfill would quietly disable live reviews for everything it touched.
-     * The {@code WHERE} clause is what keeps that from also letting a redelivery re-run a signal
+     * <p>Without the takeover, a reconciliation pass that saw a transition just before the provider
+     * announced it would leave a {@code RECORDED} row that makes the live announcement lose its insert
+     * and be dropped. The {@code WHERE} clause keeps that from also letting a redelivery re-run a signal
      * somebody already ruled on.
      *
      * @return 1 when this call now owns the signal, 0 when someone already decided it
@@ -116,13 +115,9 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * decision, and in particular must not walk a {@code LAPSED} row back to {@code PENDING}, which would
      * re-enter it into the reaper's sweep and defeat the deadline that retired it.
      *
-     * <p>{@code state_changed_at} moves only when the state does. Nearly every refusal here is the
-     * reaper's re-offer being refused again, which leaves a {@code PENDING} row {@code PENDING}; stamping
-     * it anyway would postpone the lapse deadline by one retry interval every retry interval, so a signal
-     * whose blocker never clears would never lapse and the wait this column reports would always read as
-     * minutes no matter how many days it had really been. The reason may still change — a workspace that
-     * went inactive while its budget was also spent — and that is recorded without disturbing the clock,
-     * because what an operator is owed is how long this has been stuck, not when we last said so.
+     * <p>{@code state_changed_at} moves only when the state does. A re-offer refused again for a new
+     * reason records the reason and leaves the clock alone, because restamping on every refusal would
+     * push the lapse deadline out by one retry interval per retry interval and nothing would ever lapse.
      *
      * @return rows updated (0 or 1); 0 means the signal was not where the caller left it.
      */
@@ -153,18 +148,13 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * Claim a swept batch by stamping its retry clock, before any of it is re-offered.
      *
      * <p>This is what makes {@link #findRetryablePending}'s ordering a queue rather than a treadmill. The
-     * sweep is ordered longest-since-attempt first and bounded; a re-offer that throws leaves the row
-     * untouched, so without this claim the same batch returns to the head of the very next sweep and a
-     * batch-sized population of permanently-failing signals starves every other workspace on the instance
-     * until the lapse deadline retires them — days later.
+     * sweep is ordered longest-since-attempt first and bounded; a re-offer that throws — or never returns
+     * at all — leaves the row untouched, so without an up-front claim the same batch returns to the head
+     * of the very next sweep and permanently-failing signals starve every other workspace until the lapse
+     * deadline retires them.
      *
-     * <p>Claiming up front rather than stamping per row afterwards also covers the re-offer that never
-     * returns at all (a crash, a lock timeout mid-batch).
-     *
-     * <p>Deliberately its own column rather than {@code state_changed_at}. Claiming on the column the
-     * lapse deadline measures would mean every sweep pushed that deadline out by a sweep — with a retry
-     * delay shorter than the deadline, which is the only configuration that makes sense, no signal could
-     * ever reach it and the ledger would fill with rows re-running the full gate forever.
+     * <p>Its own column rather than {@code state_changed_at}: claiming on the column the lapse deadline
+     * measures would push that deadline out by one sweep every sweep, so nothing could ever reach it.
      *
      * @return how many rows were still {@code PENDING} to claim
      */
@@ -185,12 +175,11 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * starves.
      *
      * <p>{@code last_attempted_at} is null until the reaper first claims a row, so the fallback is when
-     * the signal entered the state — a signal nobody has re-offered yet has been waiting since then.
+     * the signal entered the state.
      *
-     * <p>The id tiebreak is not cosmetic. A claim stamps one batch with a single timestamp, so above one
-     * batch-size of due rows the ordering key alone is a tie across all of them and the database may
-     * return whichever it likes — including the same rows every sweep. The tiebreak is what makes the
-     * batch after this one a different batch.
+     * <p>The id tiebreak is not cosmetic: a claim stamps a whole batch with one timestamp, so beyond one
+     * batch of due rows the ordering key alone ties across all of them and the database may keep
+     * returning the same rows. The tiebreak is what makes the next sweep a different batch.
      */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
     @Query(
@@ -222,10 +211,9 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     /**
      * Everything this workspace ever recorded about one artifact, oldest first.
      *
-     * <p>Empty is the answer that decides whether a trace exists at all: the ledger row is the only
-     * workspace-scoped fact about a mirrored artifact — a repository belongs to a workspace through a
-     * monitor mapping rather than a column — so a caller asking about an id it does not own gets an
-     * empty list here and a 404 rather than another tenant's title.
+     * <p>This is also the tenancy check: the ledger row is the only workspace-scoped fact about a
+     * mirrored artifact — a repository belongs to a workspace through a monitor mapping rather than a
+     * column — so an id the caller does not own comes back empty here, and a 404 rather than a title.
      */
     @Query(
         "SELECT s FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
@@ -264,17 +252,10 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     /**
      * Every signal this workspace has ever actually recorded.
      *
-     * <p>Evidence against a dormancy claim. Coverage is derived from which integrations are registered
-     * as connected, which is the right answer to "will this ever fire" and the wrong one to "has this
-     * ever fired": a signal sitting in the ledger demonstrably arrives here whatever the connection
-     * registry currently says. Telling somebody a practice is waiting for an integration when the very
-     * signal it waits on is in the log would be a confidently wrong answer on the page whose entire job
-     * is to be right about silence.
-     *
-     * <p>The <em>result</em> is bounded by the signal vocabulary; the work is not. There is no index on
-     * {@code signal_name}, so this scans the workspace's ledger rows and distinct-ifies them — cheap on a
-     * young workspace, and worth an index before it is asked for on a hot path rather than once per
-     * dormancy report.
+     * <p>Evidence against a dormancy claim, which is otherwise derived from which integrations are
+     * connected. That derivation answers "will this ever fire" and not "has this ever fired", so a
+     * signal already in the ledger overrules it — reporting a practice as waiting on an integration
+     * whose signal is in the log would be wrong on the one surface whose job is explaining silence.
      */
     @Query("SELECT DISTINCT s.signalName FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId")
     List<String> findRecordedSignalNames(@Param("workspaceId") Long workspaceId);

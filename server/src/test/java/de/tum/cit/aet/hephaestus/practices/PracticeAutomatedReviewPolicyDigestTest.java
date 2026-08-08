@@ -10,10 +10,9 @@ import org.junit.jupiter.api.Test;
 /**
  * The digest of the review frame.
  *
- * <p>What a review reads is no longer part of it — that moved to the bindings and is digested by
- * {@code ReviewRuleFingerprint}, where {@code ReviewRuleFingerprintTest} holds it. What is left here is
- * the frame: the contract version, whether a model runs, what happens when the evidence does not pass,
- * and the claims it can never support.
+ * <p>The frame is the contract version, whether a model runs, what happens when the evidence does not
+ * pass, and the claims the practice can never support. What a review <em>reads</em> lives on the
+ * bindings and is digested by {@code ReviewRuleFingerprint}.
  */
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 

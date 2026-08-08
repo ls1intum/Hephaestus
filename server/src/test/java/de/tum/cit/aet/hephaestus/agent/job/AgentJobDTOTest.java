@@ -47,8 +47,6 @@ class AgentJobDTOTest extends BaseUnitTest {
     /**
      * A budget-held job is QUEUED like any other, so without these two fields the console shows it as
      * "waiting for a worker" and an admin has no way to tell that raising the cap is what releases it.
-     * The pair is the signal: {@code availableAt} in the future says waiting, {@code holdReason} says
-     * why — and says it is an admin's to undo, unlike an ordinary retry backoff.
      */
     @Test
     void carriesTheHoldReasonAndReleaseTimeOfABudgetHeldJob() {

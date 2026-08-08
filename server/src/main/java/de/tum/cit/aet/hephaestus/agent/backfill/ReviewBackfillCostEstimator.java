@@ -19,8 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
  * the closest available predictor.
  *
  * <p>Deliberately returns {@code null}, not zero, when there is nothing to derive from. A fresh workspace
- * — the one most likely to want a backfill — has no history at all, and a zero on the confirmation screen
- * would read as "this is free", which is the single most damaging thing this estimate could say.
+ * — the one most likely to want a backfill — has no history at all, and a zero on the confirmation
+ * screen reads as "this is free".
  */
 @Component
 public class ReviewBackfillCostEstimator {
@@ -37,9 +37,9 @@ public class ReviewBackfillCostEstimator {
      * The mean priced cost of one review of this job type in this workspace, or {@code null} when none of
      * its recent reviews carried a resolvable price.
      *
-     * <p>Both purses are summed here, which is the one place in the system that is allowed to: a budget
-     * decision must never mix them, but a forecast of "what will this campaign cost" is about the work,
-     * not about who pays. Unpriced runs are excluded from the denominator as well as the numerator, so an
+     * <p>Both purses are summed here, which a budget decision must never do: a forecast of "what will
+     * this campaign cost" is about the work, not about who pays. Unpriced runs are excluded from the
+     * denominator as well as the numerator, so an
      * instance with a half-priced catalogue reports the mean of what it could price rather than a mean
      * dragged toward zero by rows it could not.
      *

@@ -358,8 +358,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         assertThat(body).doesNotContain("sk-workspace-secret");
     }
 
-    // ─── Access control ────────────────────────────────────────────────────────────────────────
-
     @Test
     @WithMentorUser
     void aWorkspaceMemberCannotReachAnyModelEndpoint() {

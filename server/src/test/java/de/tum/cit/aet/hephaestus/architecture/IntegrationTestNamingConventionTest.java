@@ -27,14 +27,12 @@ import org.junit.jupiter.api.Test;
  * {@code **&#47;*LiquibaseTest.java} (see {@code pom.xml}), while Surefire runs only
  * {@code @Tag("unit")}. A concrete {@code BaseIntegrationTest} subclass is
  * {@code @Tag("integration")} (inherited), so it must use the {@code IntegrationTest} suffix or no
- * runner executes it. This actually happened to three tests, including two security guards, before
- * this rule was added.
+ * runner executes it — and a test no runner executes is indistinguishable from a passing one.
  *
- * <p>The scan resolves {@code extends} transitively. The first version inspected only classes that
- * literally wrote {@code extends BaseIntegrationTest}, leaving the intermediate bases uncovered —
- * {@code AbstractWorkspaceIntegrationTest} above all, which 40-odd controller tests extend.
- * {@code AgentsPathDispatchTest} and {@code WorkspaceScopedControllerComplianceTest} were dead through
- * exactly that hole, the latter since the module was created.
+ * <p>The scan resolves {@code extends} transitively. Most controller tests reach
+ * {@code BaseIntegrationTest} through an intermediate base such as
+ * {@code AbstractWorkspaceIntegrationTest}, so a scan that only matched a literal
+ * {@code extends BaseIntegrationTest} would leave the bulk of the suite uncovered.
  *
  * <p>It is a source scan (mirroring {@link NoMockingOwnedEntitiesTest}) rather than an ArchUnit class
  * scan, because the defect is about <em>file names</em> — all Failsafe looks at — and a compiled class

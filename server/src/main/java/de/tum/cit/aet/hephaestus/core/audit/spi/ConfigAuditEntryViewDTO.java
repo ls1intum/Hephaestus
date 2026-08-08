@@ -7,11 +7,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * One audit row, flattened for a viewer. Crosses the module boundary, so it carries no entity.
  *
- * @param actor        resolved identity of {@link #actorAccountId}; null for SYSTEM rows or once the
- *                     account is gone. Read together with {@link #actorKind} — that is what keeps
+ * @param actor        resolved identity of {@code actorAccountId}; null for SYSTEM rows or once the
+ *                     account is gone. Read together with {@code actorKind} — that is what keeps
  *                     "a system did this" distinct from "we no longer know who did this".
  * @param actingActor  resolved impersonator, present only for {@link ConfigAuditActorKind#IMPERSONATED}
- * @param changedKeys  dot-paths that differ between {@link #oldValue} and {@link #newValue}
+ * @param changedKeys  dot-paths that differ between {@code oldValue} and {@code newValue}
  */
 public record ConfigAuditEntryViewDTO(
     Long id,

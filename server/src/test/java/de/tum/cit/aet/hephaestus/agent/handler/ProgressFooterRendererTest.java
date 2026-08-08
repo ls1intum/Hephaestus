@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for the cross-run progress-delta footer (ADR 0021, B1/B3). */
+/** Unit tests for the cross-run progress-delta footer (ADR 0021). */
 class ProgressFooterRendererTest extends BaseUnitTest {
 
     @Test

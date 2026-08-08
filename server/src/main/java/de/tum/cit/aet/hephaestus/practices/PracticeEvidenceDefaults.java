@@ -11,23 +11,15 @@ import org.springframework.stereotype.Component;
 
 /**
  * The frame a practice on an artifact kind starts with: the evidence a binding reads by default, and the
- * standing caveats every review of that kind carries.
+ * review limitations every review of that kind carries.
  *
- * <p>Neither answer is given here. The module is not supposed to know which kinds exist, and
- * {@link #policyFor} is called for <em>every</em> bundled practice — so a per-kind chain in this file
- * would mean no kind could be added to the catalog without editing it first:
+ * <p>Both answers are looked up rather than listed here, so that a kind becomes authorable by being
+ * declared rather than by an edit to this file — the source contracts say which sources are a kind's
+ * starting evidence, and each kind's {@code ArtifactDescriptor} states what its evidence can never
+ * settle.
  *
- * <ul>
- *   <li><b>Which sources a binding starts with</b> is a fact about the sources, and each source contract
- *       now states whether it is part of the starting evidence of the kinds it applies to.</li>
- *   <li><b>What the evidence can never settle</b> is a fact about the domain, and each kind's
- *       {@code ArtifactDescriptor} now states it. The contract validator refuses to start when a kind
- *       calls itself reviewable and names none, so the answer cannot go missing.</li>
- * </ul>
- *
- * <p>An unknown kind still throws rather than falling back to a pull request's requirements — a silently
- * borrowed default would demand a diff of something that has none and refuse every review — but "unknown"
- * now means "no source and no descriptor declares it", which is the same thing a misspelling means.
+ * <p>An unknown kind throws rather than borrowing a pull request's requirements, which would demand a
+ * diff of something that has none and so refuse every review.
  */
 @Component
 public class PracticeEvidenceDefaults {
@@ -43,11 +35,8 @@ public class PracticeEvidenceDefaults {
     /**
      * The evidence a binding on this kind starts with when the author has not said otherwise.
      *
-     * <p>Every default is {@code REQUIRED}, which is where every shipped practice already put them.
-     * The stance is what separates "there were no comments" from "we failed to collect the comments",
-     * and only the first of those is a fact about a developer. How strictly each source must then be
-     * captured is not stated here at all: it belongs to the source contract, which every practice
-     * agreed with anyway.
+     * <p>Every default is {@code REQUIRED}: the stance is what separates "there were no comments" from
+     * "we failed to collect the comments", and only the first is a fact about a developer.
      */
     public List<PracticeEvidenceRequirement> needsFor(ArtifactKind artifact) {
         List<SourceKind> defaults = catalogs.requireDefaultSourcesFor(catalogs.current().version(), artifact.value());
@@ -61,8 +50,8 @@ public class PracticeEvidenceDefaults {
     }
 
     /**
-     * The review frame a practice on this kind starts with: the contract it reads under and the claims
-     * that kind of evidence can never support, whatever the occasion.
+     * The review frame a practice on this kind starts with: the source-catalog version it reads under
+     * and the claims that kind of evidence can never support, whatever the occasion.
      */
     public PracticeAutomatedReviewPolicy policyFor(ArtifactKind artifact) {
         List<ReviewLimitation> limitations = artifacts
