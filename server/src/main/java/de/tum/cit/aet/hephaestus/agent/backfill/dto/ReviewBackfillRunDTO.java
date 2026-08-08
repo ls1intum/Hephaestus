@@ -18,7 +18,9 @@ import org.jspecify.annotations.NonNull;
  *     invite exactly the unconsidered spend the confirmation step exists to prevent.
  * @param submittedCount artifacts for which a review job was created
  * @param passedCount artifacts walked past without one: already measured at their current state, or
- *     refused by the review gate. Together with {@code submittedCount} this is how far the walk has got.
+ *     refused by the review gate. The campaign looked at each of these and decided.
+ * @param failedCount artifacts whose submission threw, leaving no job and no recorded decision. Non-zero
+ *     means this campaign's baseline has holes in it, which is why it is reported apart from a pass.
  */
 public record ReviewBackfillRunDTO(
     @NonNull UUID id,
@@ -32,6 +34,7 @@ public record ReviewBackfillRunDTO(
     BigDecimal estimatedCostUsd,
     @NonNull Integer submittedCount,
     @NonNull Integer passedCount,
+    @NonNull Integer failedCount,
     @NonNull Long requestedByAccountId,
     @Schema(description = "Who authorised the spend; absent until the run is confirmed") Long confirmedByAccountId,
     @NonNull Instant createdAt,
@@ -50,6 +53,7 @@ public record ReviewBackfillRunDTO(
             run.getEstimatedCostUsd(),
             run.getSubmittedCount(),
             run.getPassedCount(),
+            run.getFailedCount(),
             run.getRequestedByAccountId(),
             run.getConfirmedByAccountId(),
             run.getCreatedAt(),

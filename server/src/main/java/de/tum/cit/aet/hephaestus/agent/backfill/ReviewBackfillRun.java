@@ -170,6 +170,20 @@ public class ReviewBackfillRun {
     @Column(name = "passed_count", nullable = false)
     private Integer passedCount = 0;
 
+    /**
+     * Artifacts whose submission threw, and which therefore have no ledger row, no observation and no
+     * decision recorded anywhere.
+     *
+     * <p>Its own counter rather than folded into {@link #passedCount}, because the two are opposite
+     * facts. A pass means the campaign looked and decided; a failure means it never got an answer. Adding
+     * a crash to the passes makes {@code submitted + passed} reach the estimate and the campaign report
+     * COMPLETED over a baseline with holes in it — which is the one outcome this whole class is built to
+     * prevent, arrived at by the accounting instead of by the walk.
+     */
+    @NotNull
+    @Column(name = "failed_count", nullable = false)
+    private Integer failedCount = 0;
+
     @NotNull
     @Column(name = "requested_by_account_id", nullable = false, updatable = false)
     private Long requestedByAccountId;

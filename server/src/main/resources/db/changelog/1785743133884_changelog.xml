@@ -2050,4 +2050,24 @@
         </rollback>
     </changeSet>
 
+    <!-- An artifact whose submission threw was counted as passed. A pass means the campaign looked and
+         decided; a throw means it never got an answer, and because the submission is REQUIRES_NEW the
+         rollback took its ledger row with it — so nothing anywhere recorded that the artifact had been
+         reached. submitted + passed then added up to the estimate and the campaign reported COMPLETED
+         over a baseline with holes in it, which is the one thing the driver exists to prevent. -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-35">
+        <preConditions onFail="MARK_RAN" onFailMessage="review_backfill_run.failed_count already present">
+            <not><columnExists tableName="review_backfill_run" columnName="failed_count"/></not>
+        </preConditions>
+        <comment>Count a backfill artifact that crashed as failed rather than as walked past.</comment>
+        <addColumn tableName="review_backfill_run">
+            <column name="failed_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="review_backfill_run" columnName="failed_count"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

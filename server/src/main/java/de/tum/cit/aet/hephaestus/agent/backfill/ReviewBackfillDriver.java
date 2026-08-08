@@ -37,6 +37,15 @@ import org.springframework.stereotype.Component;
  * during the crossing are re-offered rather than lost — the pause bounds the overshoot, the ledger
  * catches what the overshoot touched.
  *
+ * <h2>The artifact that throws</h2>
+ *
+ * <p>Counted as failed, never as passed. A submission that throws unwinds its own {@code REQUIRES_NEW}
+ * transaction and takes its ledger row with it, so there is no artifact-level trace left of it anywhere
+ * — which means the run's own counters are the only place the hole can be reported. Folding those
+ * artifacts into the passes would make {@code submitted + passed} reach the estimate and the campaign
+ * announce COMPLETED, producing by arithmetic exactly the gap-toothed baseline the pause exists to
+ * prevent. A campaign that finishes with a non-zero failure count has told the truth about itself.
+ *
  * <h2>Resuming</h2>
  *
  * <p>A paused campaign is retried on every tick and returns to RUNNING as soon as the reason clears — a
@@ -131,10 +140,11 @@ public class ReviewBackfillDriver {
         List<Long> batch = nextBatch(run);
         if (batch.isEmpty()) {
             log.info(
-                "Review backfill complete: runId={}, submitted={}, passed={}",
+                "Review backfill complete: runId={}, submitted={}, passed={}, failed={}",
                 run.getId(),
                 run.getSubmittedCount(),
-                run.getPassedCount()
+                run.getPassedCount(),
+                run.getFailedCount()
             );
             run.transitionTo(ReviewBackfillStatus.COMPLETED, null);
             runRepository.save(run);
@@ -143,9 +153,10 @@ public class ReviewBackfillDriver {
 
         int submitted = 0;
         int passed = 0;
+        int failed = 0;
         long cursor = run.getCursorArtifactId() == null ? 0L : run.getCursorArtifactId();
         for (Long artifactId : batch) {
-            ReviewBackfillSubmitter.Outcome outcome;
+            ReviewBackfillSubmitter.Outcome outcome = null;
             try {
                 outcome = submitter.offer(run, artifactId);
             } catch (RuntimeException e) {
@@ -162,11 +173,11 @@ public class ReviewBackfillDriver {
                     artifactId,
                     e
                 );
-                outcome = null;
+                failed++;
             }
             if (outcome == ReviewBackfillSubmitter.Outcome.SUBMITTED) {
                 submitted++;
-            } else {
+            } else if (outcome != null) {
                 passed++;
             }
             cursor = artifactId;
@@ -174,13 +185,15 @@ public class ReviewBackfillDriver {
         run.setCursorArtifactId(cursor);
         run.setSubmittedCount(run.getSubmittedCount() + submitted);
         run.setPassedCount(run.getPassedCount() + passed);
+        run.setFailedCount(run.getFailedCount() + failed);
         run.setUpdatedAt(java.time.Instant.now());
         runRepository.save(run);
         log.info(
-            "Review backfill batch: runId={}, submitted={}, passed={}, cursor={}",
+            "Review backfill batch: runId={}, submitted={}, passed={}, failed={}, cursor={}",
             run.getId(),
             submitted,
             passed,
+            failed,
             cursor
         );
     }
