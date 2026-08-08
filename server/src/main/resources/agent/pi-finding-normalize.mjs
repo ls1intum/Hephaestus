@@ -1,3 +1,22 @@
+// ── Vocabularies shared with Java ────────────────────────────────────────────
+// Each list mirrors an enum on the server. They are hand-maintained on both sides, so
+// PresenceVocabularyParityTest parses these literals and asserts equality with the Java enum's
+// values(); it exists because presence drifted once and silently laundered INDETERMINATE into
+// NOT_APPLICABLE. Add a value here and to the Java enum in the same change, or the test fails.
+export const PRESENCE_VALUES = ["PRESENT", "ABSENT", "NOT_APPLICABLE", "INDETERMINATE"];
+export const ASSESSMENT_VALUES = ["GOOD", "BAD"];
+export const SEVERITY_VALUES = ["CRITICAL", "MAJOR", "MINOR", "INFO"];
+
+/**
+ * Whether an observation with this presence carries a good/bad direction — the exact twin of
+ * Presence.carriesValence() in Java and of the DB CHECK chk_observation_presence_assessment.
+ * Asked rather than open-coding `!== "NOT_APPLICABLE"`, which silently demands an assessment on
+ * INDETERMINATE and rejects the honest answer.
+ */
+export function carriesValence(presence) {
+    return presence === "PRESENT" || presence === "ABSENT";
+}
+
 export function normalizeDiffNote(note) {
     if (!note || typeof note !== "object") throw new Error("diff note must be an object");
     const filePath = String(note.filePath ?? "").trim();
@@ -50,13 +69,14 @@ export function normalizeFinding(finding) {
     const presence = String(finding.presence ?? "")
         .trim()
         .toUpperCase();
-    // assessment has no valence when presence=NOT_APPLICABLE; the parser ignores/nulls it there.
-    const isNa = presence === "NOT_APPLICABLE";
-    const assessment = isNa
-        ? null
-        : String(finding.assessment ?? "")
+    // NOT_APPLICABLE and INDETERMINATE are both silence and carry no direction; the Java parser
+    // nulls any assessment attached to either, so drop it here rather than demanding one.
+    const hasValence = carriesValence(presence);
+    const assessment = hasValence
+        ? String(finding.assessment ?? "")
               .trim()
-              .toUpperCase();
+              .toUpperCase()
+        : null;
     // severity is meaningful only for assessment=BAD; default INFO when absent (parser re-derives it).
     const severity = finding.severity == null ? "INFO" : String(finding.severity).trim().toUpperCase() || "INFO";
     // Salvage percentage-style confidence (value in (1,100] -> /100), mirroring the Java consumer
@@ -67,9 +87,9 @@ export function normalizeFinding(finding) {
     const guidance = String(finding.guidance ?? "").trim();
     if (!practiceSlug) throw new Error("practiceSlug is required");
     if (!title) throw new Error("title is required");
-    if (!["PRESENT", "ABSENT", "NOT_APPLICABLE"].includes(presence)) throw new Error(`invalid presence '${presence}'`);
-    if (!isNa && !["GOOD", "BAD"].includes(assessment)) throw new Error(`invalid assessment '${assessment}'`);
-    if (!["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(severity)) throw new Error(`invalid severity '${severity}'`);
+    if (!PRESENCE_VALUES.includes(presence)) throw new Error(`invalid presence '${presence}'`);
+    if (hasValence && !ASSESSMENT_VALUES.includes(assessment)) throw new Error(`invalid assessment '${assessment}'`);
+    if (!SEVERITY_VALUES.includes(severity)) throw new Error(`invalid severity '${severity}'`);
     if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
         throw new Error("confidence must be between 0 and 1");
     if (!reasoning) throw new Error("reasoning is required");
@@ -89,7 +109,7 @@ export function normalizeFinding(finding) {
         guidance,
         suggestedDiffNotes,
     };
-    if (!isNa) out.assessment = assessment;
+    if (hasValence) out.assessment = assessment;
     return out;
 }
 

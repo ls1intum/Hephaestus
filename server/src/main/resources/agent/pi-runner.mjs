@@ -12,6 +12,10 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import {
+    ASSESSMENT_VALUES,
+    PRESENCE_VALUES,
+    SEVERITY_VALUES,
+    carriesValence,
     citationMatchesArtifact,
     dedupeKeyForFinding,
     normalizeFinding,
@@ -86,9 +90,12 @@ const reviewState = {
     findings: [],
     findingKeys: [],
 };
-const presenceSchema = { type: "string", enum: ["PRESENT", "ABSENT", "NOT_APPLICABLE"] };
-const assessmentSchema = { type: "string", enum: ["GOOD", "BAD"] };
-const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
+// The tool schema the model sees is generated from the SAME vocabulary the normalizer validates
+// against, so the SDK boundary can no longer accept a value the normalizer rejects (or, as happened
+// with INDETERMINATE, reject one the orchestrator instructs the model to emit).
+const presenceSchema = { type: "string", enum: PRESENCE_VALUES };
+const assessmentSchema = { type: "string", enum: ASSESSMENT_VALUES };
+const severitySchema = { type: "string", enum: SEVERITY_VALUES };
 const evidenceSchema = {
     type: "object",
     additionalProperties: false,
@@ -180,8 +187,9 @@ function isValidFinding(f) {
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
     if (typeof f.title !== "string" || !f.title.trim()) return false;
     if (typeof f.presence !== "string") return false;
-    // assessment is required unless presence=NOT_APPLICABLE (which has no valence).
-    if (f.presence !== "NOT_APPLICABLE" && typeof f.assessment !== "string") return false;
+    // assessment is required only for a presence that carries valence; NOT_APPLICABLE and
+    // INDETERMINATE are both silence and must NOT carry one (mirrors Presence.carriesValence()).
+    if (carriesValence(f.presence) && typeof f.assessment !== "string") return false;
     // Number(null) === 0 — reject nullish before isNaN check.
     if (f.confidence == null || f.confidence === "") return false;
     if (Number.isNaN(Number(f.confidence))) return false;
@@ -487,6 +495,7 @@ function loadPracticeSlugs() {
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
     `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +
+    `For an INDETERMINATE finding, guidance states in one sentence what would have decided it. ` +
     `Only keep GOOD findings that add real review value. ` +
     `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
     `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
@@ -705,7 +714,9 @@ async function main() {
                     `Coverage check. You have NOT yet reported a finding for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
                     `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
-                    `— set presence (PRESENT/ABSENT/NOT_APPLICABLE) and, unless NOT_APPLICABLE, assessment (GOOD/BAD).`;
+                    `— set presence (${PRESENCE_VALUES.join("/")}) and, unless it is NOT_APPLICABLE or INDETERMINATE, ` +
+                    `assessment (GOOD/BAD). If you read the evidence and it does not settle the question, say ` +
+                    `INDETERMINATE — do NOT reach for NOT_APPLICABLE, which claims there was nothing here to see.`;
                 try {
                     await session.prompt(gatePrompt);
                 } catch (err) {
