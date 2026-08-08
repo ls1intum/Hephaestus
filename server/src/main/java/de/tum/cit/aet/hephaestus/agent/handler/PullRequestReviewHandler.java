@@ -196,7 +196,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.PracticeReviewRequest(job),
-            EvidencePlan.compile(practices, signal)
+            EvidencePlan.compile(practices)
         );
         var artifactSourceManifest = prepared.manifest();
         var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
@@ -238,7 +238,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 )
             );
         }
-        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices, signal));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
 
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));

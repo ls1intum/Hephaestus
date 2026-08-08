@@ -60,6 +60,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     private static final SourceKind LINKED_ITEMS = new SourceKind("scm.linked-work-items");
     private static final SourceKind REPOSITORY_TREE = new SourceKind("scm.repository.tree");
     private static final SourceKind OUTLINE = new SourceKind("outline.documents");
+    private static final SourceKind PROJECT_INVENTORY = new SourceKind("workspace.project-inventory");
     private static final Instant NOW = Instant.parse("2026-08-03T10:00:00Z");
 
     @TempDir
@@ -82,7 +83,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         byte[] diff = "diff --git a b".getBytes(StandardCharsets.UTF_8);
         files.put("inputs/context/diff.patch", diff);
-        EvidencePlan plan = plan(Set.of(DIFF));
+        EvidencePlan plan = plan();
 
         builder.augment(
             files,
@@ -114,19 +115,53 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(cas.get(sha)).contains(diff);
     }
 
+    /**
+     * A source nothing collected is reported as a fact about this deployment, never as a decision about
+     * this review. There is no longer any such decision to report: relevance stopped being a reason a
+     * source is missing when the plan stopped choosing sources.
+     */
     @Test
-    void shouldRepresentMinimizedSourcesAsNotCollected() {
+    void shouldReportASourceWithNoCollectorAsUnavailableRatherThanUnwanted() {
         Map<String, byte[]> files = new LinkedHashMap<>();
 
-        builder.augment(files, Map.of(), "job-7", plan(Set.of(COMMENTS)), metadata(COMMENTS, NOW));
+        builder.augment(files, Map.of(), "job-7", plan(), metadata(COMMENTS, NOW));
 
         JsonNode visible = mapper.readTree(files.get("inputs/manifest.json"));
         JsonNode diff = findSource(visible, DIFF.value());
-        assertThat(diff.path("state").path("availability").asString()).isEqualTo("NOT_COLLECTED");
+        assertThat(diff.path("state").path("availability").asString()).isEqualTo("UNAVAILABLE");
+        assertThat(diff.path("state").path("reasonCode").asString()).isEqualTo("NO_PROVIDER");
         assertThat(diff.has("paths")).isFalse();
         JsonNode comments = findSource(visible, COMMENTS.value());
         assertThat(comments.path("state").path("content").asString()).isEqualTo("EMPTY");
         assertThat(comments.path("state").path("completeness").asString()).isEqualTo("COMPLETE");
+    }
+
+    /**
+     * The bug this slice exists to close: {@code workspace.project-inventory} is declared by none of the
+     * 37 shipped practices, so the old per-practice union never selected it and the orchestrator prompt
+     * pointed the model at a file that was never written.
+     */
+    @Test
+    void shouldStageASourceNoPracticeDeclares() {
+        assertThat(builder.stagedSources(plan())).contains(PROJECT_INVENTORY, OUTLINE, REPOSITORY_TREE);
+    }
+
+    @Test
+    void shouldStageEverySourceTheContractAppliesToTheReviewedKind() {
+        ArtifactSourceCatalogRegistry realCatalogs = new ClasspathArtifactSourceCatalogRegistry(
+            mapper,
+            Clock.systemUTC()
+        );
+
+        assertThat(builder.stagedSources(plan())).isEqualTo(
+            realCatalogs.requireSourcesFor(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST.value())
+        );
+        assertThat(builder.stagedSources(conversationPlan())).isEqualTo(
+            realCatalogs.requireSourcesFor(
+                new SourceContractVersion("1.0.0"),
+                ArtifactKinds.CONVERSATION_THREAD.value()
+            )
+        );
     }
 
     @Test
@@ -148,7 +183,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of(),
             "job-redacted",
-            plan(Set.of(COMMENTS)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(),
                 Map.of(),
@@ -192,7 +227,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of(path, DIFF),
             "job-empty-diff",
-            plan(Set.of(DIFF)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(DIFF, SourceCompleteness.COMPLETE),
                 Map.of(DIFF, SourceContentState.EMPTY),
@@ -231,7 +266,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             new LinkedHashMap<>(),
             Map.of(),
             "job-absent-diff",
-            plan(Set.of(DIFF)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Set.of())
         );
 
@@ -256,7 +291,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of(path, DIFF),
             "job-good-diff",
-            plan(Set.of(DIFF)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(DIFF, SourceCompleteness.COMPLETE),
                 Map.of(DIFF, SourceContentState.NON_EMPTY),
@@ -293,7 +328,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of(path, COMMENTS),
             "job-empty-comments",
-            plan(Set.of(COMMENTS)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(COMMENTS, SourceCompleteness.COMPLETE),
                 Map.of(COMMENTS, SourceContentState.EMPTY),
@@ -326,7 +361,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of(path, COMMENTS),
             "job-partial-comments",
-            plan(Set.of(COMMENTS)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(COMMENTS, SourceCompleteness.PARTIAL),
                 Map.of(COMMENTS, SourceContentState.NON_EMPTY),
@@ -494,7 +529,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     @Test
     void shouldAcceptCompleteCurrentEmptyEvidence() {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        var manifest = builder.augment(files, Map.of(), "job-empty", plan(Set.of(COMMENTS)), metadata(COMMENTS, NOW));
+        var manifest = builder.augment(files, Map.of(), "job-empty", plan(), metadata(COMMENTS, NOW));
         Practice practice = practiceRequiringComments();
 
         assertThat(
@@ -505,7 +540,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     @Test
     void shouldRejectEmptyContentWhenTheSourceContractForbidsIt() {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        builder.augment(files, Map.of(), "job-invalid-empty", plan(Set.of(CORE)), metadata(CORE, NOW));
+        builder.augment(files, Map.of(), "job-invalid-empty", plan(), metadata(CORE, NOW));
 
         JsonNode core = findSource(mapper.readTree(files.get("inputs/manifest.json")), CORE.value());
         assertThat(core.path("state").path("availability").asString()).isEqualTo("UNAVAILABLE");
@@ -518,7 +553,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of(),
             "job-old-contract",
-            plan(Set.of(COMMENTS)),
+            plan(),
             metadata(COMMENTS, NOW)
         );
         ArtifactSourceManifest changedContract = new ArtifactSourceManifest(
@@ -596,7 +631,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of("inputs/context/metadata.json", CORE),
             "job-delayed",
-            plan(Set.of(CORE)),
+            plan(),
             metadata(CORE, NOW)
         );
         Practice practice = practiceRequiring(CORE, "pr-core");
@@ -624,7 +659,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of("inputs/context/linked_work_items.json", LINKED_ITEMS),
             "job-unreported-completeness",
-            plan(Set.of(LINKED_ITEMS)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(),
                 Map.of(),
@@ -640,15 +675,9 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectSourcesThatDoNotApplyToTheReviewedKind() {
+    void shouldRejectCaptureFactsForSourcesThatDoNotApplyToTheReviewedKind() {
         assertThatThrownBy(() ->
-            builder.augment(
-                new LinkedHashMap<>(),
-                Map.of(),
-                "job-invalid-plan",
-                plan(Set.of(CONVERSATION)),
-                metadata(CONVERSATION, NOW)
-            )
+            builder.augment(new LinkedHashMap<>(), Map.of(), "job-invalid-plan", plan(), metadata(CONVERSATION, NOW))
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("do not apply to scm.pull_request");
@@ -657,7 +686,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     @Test
     void shouldRejectAbsenceStateForbiddenByTheSourceContract() {
         var realCatalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC());
-        ArtifactSourceContract diff = realCatalogs.requireSource(plan(Set.of(DIFF)).contractVersion(), DIFF);
+        ArtifactSourceContract diff = realCatalogs.requireSource(plan().contractVersion(), DIFF);
         ArtifactSourceContract restrictedDiff = new ArtifactSourceContract(
             diff.kind(),
             diff.displayName(),
@@ -691,13 +720,22 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             Clock.systemUTC()
         );
 
+        // The live NOT_COLLECTED path: governance refused the source, and this contract says the diff may
+        // never be reported that way.
         assertThatThrownBy(() ->
             restrictedBuilder.augment(
                 new LinkedHashMap<>(),
                 Map.of(),
                 "job-unsupported-absence-state",
-                plan(Set.of(COMMENTS)),
-                metadata(COMMENTS, NOW)
+                plan(),
+                new ContextManifestBuilder.CaptureMetadata(
+                    Map.of(),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(DIFF, new SourceCaptureState.NotCollected(SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE)),
+                    Set.of()
+                )
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
@@ -710,7 +748,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             new LinkedHashMap<>(),
             Map.of(),
             "job-profile-mismatch",
-            plan(Set.of(COMMENTS)),
+            plan(),
             metadata(COMMENTS, NOW)
         );
 
@@ -747,46 +785,13 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldPreserveExplicitAbsenceWhenMinimizingPreparedEvidence() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        ArtifactSourceManifest manifest = builder.augment(
-            files,
-            Map.of(),
-            "job-minimized",
-            plan(Set.of(CORE, COMMENTS)),
-            new ContextManifestBuilder.CaptureMetadata(
-                Map.of(CORE, SourceCompleteness.COMPLETE, COMMENTS, SourceCompleteness.COMPLETE),
-                Map.of(CORE, "commit:core"),
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Set.of(CORE, COMMENTS)
-            )
-        );
-
-        PreparedEvidence restricted = builder.restrictTo(new PreparedEvidence(files, manifest), plan(Set.of(CORE)));
-
-        assertThat(restricted.manifest().sources()).hasSameSizeAs(manifest.sources());
-        assertThat(
-            restricted
-                .manifest()
-                .sources()
-                .stream()
-                .filter(source -> source.kind().equals(COMMENTS))
-                .findFirst()
-                .orElseThrow()
-                .state()
-        ).isEqualTo(new SourceCaptureState.NotCollected(SourceAbsenceReason.NOT_NEEDED_BY_READY_PRACTICES));
-    }
-
-    @Test
     void shouldTreatAnEmptyRepositoryTreeAsValidCompleteEvidence() {
         Map<String, byte[]> files = new LinkedHashMap<>();
         builder.augment(
             files,
             Map.of(),
             "job-empty-tree",
-            plan(Set.of(REPOSITORY_TREE)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(REPOSITORY_TREE, SourceCompleteness.COMPLETE),
                 Map.of(REPOSITORY_TREE, "commit:tree"),
@@ -810,7 +815,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             files,
             Map.of(),
             "job-empty-outline",
-            plan(Set.of(OUTLINE)),
+            plan(),
             new ContextManifestBuilder.CaptureMetadata(
                 Map.of(),
                 Map.of(),
@@ -856,8 +861,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             .hasMessageContaining("Unknown source kind");
     }
 
-    private static EvidencePlan plan(Set<SourceKind> sources) {
-        return new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST, sources);
+    private static EvidencePlan plan() {
+        return new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
     }
 
     private ContextManifestBuilder builderAt(Instant instant) {
@@ -874,15 +879,11 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         String path = "inputs/context/metadata.json";
         files.put(path, "{}".getBytes(StandardCharsets.UTF_8));
-        return target.augment(files, Map.of(path, CORE), jobId, plan(Set.of(CORE)), metadata(CORE, observedAt));
+        return target.augment(files, Map.of(path, CORE), jobId, plan(), metadata(CORE, observedAt));
     }
 
     private static EvidencePlan conversationPlan() {
-        return new EvidencePlan(
-            new SourceContractVersion("1.0.0"),
-            ArtifactKinds.CONVERSATION_THREAD,
-            Set.of(CONVERSATION)
-        );
+        return new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.CONVERSATION_THREAD);
     }
 
     private static ContextManifestBuilder.CaptureMetadata metadata(SourceKind kind, Instant observedAt) {

@@ -7,17 +7,6 @@ package de.tum.cit.aet.hephaestus.evidence;
  * what makes the absence actionable for an operator, an auditor, or the review prompt.
  */
 public enum SourceAbsenceReason {
-    /**
-     * {@code NOT_COLLECTED}: no practice that survived the readiness gate reads this source, so it is not
-     * staged into the sandbox view.
-     *
-     * <p>Named for what it does rather than for what it once meant. The source <em>was</em> collected and
-     * <em>is</em> retained — retention is unchanged by a hair — so calling this "minimised" claimed a data
-     * minimisation the code does not perform, and pointed an auditor at the wrong control. What actually
-     * happened is narrower and duller: practices refused for insufficient evidence dropped out, and the
-     * sources only they read had nothing left to serve.
-     */
-    NOT_NEEDED_BY_READY_PRACTICES,
     /** {@code NOT_COLLECTED}: no unexpired use decision permits this source for this purpose. */
     GOVERNANCE_NOT_EFFECTIVE,
     /** {@code NOT_COLLECTED}: collection is switched off for this source in this deployment. */

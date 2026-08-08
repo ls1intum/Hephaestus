@@ -122,7 +122,7 @@ public class DocumentReviewHandler implements JobTypeHandler {
         List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.DOCUMENT);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
             new ContextRequest.DocumentReviewRequest(job),
-            EvidencePlan.compile(practices, signal)
+            EvidencePlan.compile(practices)
         );
         var artifactSourceManifest = prepared.manifest();
         var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
@@ -164,7 +164,6 @@ public class DocumentReviewHandler implements JobTypeHandler {
                 )
             );
         }
-        prepared = workspaceContextBuilder.restrictTo(prepared, EvidencePlan.compile(practices, signal));
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, ArtifactKinds.DOCUMENT, practices);

@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
-import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -77,17 +76,17 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     private static final Logger log = LoggerFactory.getLogger(ReviewHistoryContentSource.class);
 
     /**
-     * The kinds this collector answers for.
+     * What earlier reviews recorded about the person whose work is under review.
      *
-     * <p>Aliases rather than definitions: the plan owns them, because the plan is what decides they are
-     * staged for every review rather than on request. They are restated here as static
-     * {@link SourceKind} fields because that is how the catalog-coverage and completeness-reporting
-     * architecture rules discover which collector covers which catalog entry — a collector that names its
-     * kinds only through a method is invisible to both, and the catalog entry would read as uncollected.
+     * <p>Declared as a static {@link SourceKind} field rather than only inside {@link #sourceKinds()}
+     * because that is how the catalog-coverage and completeness-reporting architecture rules discover
+     * which collector covers which catalog entry — a collector that names its kinds only through a method
+     * is invisible to both, and the catalog entry would read as uncollected.
      */
-    static final SourceKind OBSERVATION_HISTORY = EvidencePlan.OBSERVATION_HISTORY;
+    static final SourceKind OBSERVATION_HISTORY = new SourceKind("hephaestus.observation-history");
 
-    static final SourceKind FEEDBACK_HISTORY = EvidencePlan.FEEDBACK_HISTORY;
+    /** What earlier reviews already said to that person, and through which channel. */
+    static final SourceKind FEEDBACK_HISTORY = new SourceKind("hephaestus.feedback-history");
 
     static final String OBSERVATIONS_FILE = SandboxLayout.HISTORY_PREFIX + "observations.json";
     static final String FEEDBACK_FILE = SandboxLayout.HISTORY_PREFIX + "feedback.json";
@@ -121,12 +120,12 @@ public class ReviewHistoryContentSource implements EvidenceSource {
 
     @Override
     public Set<SourceKind> sourceKinds() {
-        return EvidencePlan.WORKSPACE_CONTEXT_SOURCES;
+        return Set.of(OBSERVATION_HISTORY, FEEDBACK_HISTORY);
     }
 
     @Override
     public SourceKind sourceKindFor(String path) {
-        return FEEDBACK_FILE.equals(path) ? EvidencePlan.FEEDBACK_HISTORY : EvidencePlan.OBSERVATION_HISTORY;
+        return FEEDBACK_FILE.equals(path) ? FEEDBACK_HISTORY : OBSERVATION_HISTORY;
     }
 
     /** Owns {@code inputs/history/}, not the per-event {@code inputs/context/} namespace. */
@@ -194,21 +193,16 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             files,
             // A window over a growing record. It can show that something recurred; it can never show
             // that something never happened, so COMPLETE is not a state this source may report.
-            Map.of(
-                EvidencePlan.OBSERVATION_HISTORY,
-                SourceCompleteness.PARTIAL,
-                EvidencePlan.FEEDBACK_HISTORY,
-                SourceCompleteness.PARTIAL
-            ),
+            Map.of(OBSERVATION_HISTORY, SourceCompleteness.PARTIAL, FEEDBACK_HISTORY, SourceCompleteness.PARTIAL),
             Map.of(),
             Map.of(),
             Map.of(),
             // Reported rather than inferred from the staged file list: both files are always written, so
             // "there is a file" would answer NON_EMPTY for a person with no history at all.
             Map.of(
-                EvidencePlan.OBSERVATION_HISTORY,
+                OBSERVATION_HISTORY,
                 observations.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY,
-                EvidencePlan.FEEDBACK_HISTORY,
+                FEEDBACK_HISTORY,
                 delivered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
             )
         );

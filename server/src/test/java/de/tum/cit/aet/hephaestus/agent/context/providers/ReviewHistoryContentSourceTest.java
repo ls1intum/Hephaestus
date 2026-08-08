@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -87,16 +86,17 @@ class ReviewHistoryContentSourceTest {
     }
 
     /**
-     * The reason this source is selected in {@code EvidencePlan.compile} rather than declared per
-     * practice: a review's history must not depend on 37 practice authors remembering to ask for it.
+     * Staged by every review without any practice declaring it — as every source now is. The history was
+     * the first source that had to escape the per-practice union, because a review's record of the person
+     * must not depend on 37 practice authors remembering to ask for it. That escape hatch is gone with
+     * the union it escaped.
      */
     @Test
-    void isSelectedByEveryPlanWithoutAnyPracticeDeclaringIt() {
-        assertThat(EvidencePlan.WORKSPACE_CONTEXT_SOURCES).containsExactlyInAnyOrder(
-            EvidencePlan.OBSERVATION_HISTORY,
-            EvidencePlan.FEEDBACK_HISTORY
+    void answersForBothHistoryKindsWithoutAnyPracticeDeclaringThem() {
+        assertThat(provider.sourceKinds()).containsExactlyInAnyOrder(
+            ReviewHistoryContentSource.OBSERVATION_HISTORY,
+            ReviewHistoryContentSource.FEEDBACK_HISTORY
         );
-        assertThat(provider.sourceKinds()).isEqualTo(EvidencePlan.WORKSPACE_CONTEXT_SOURCES);
     }
 
     @Test
@@ -125,8 +125,8 @@ class ReviewHistoryContentSourceTest {
         assertThat(observations.get("observations")).isEmpty();
         assertThat(feedback.get("feedback")).isEmpty();
         assertThat(captured.contentStates())
-            .containsEntry(EvidencePlan.OBSERVATION_HISTORY, SourceContentState.EMPTY)
-            .containsEntry(EvidencePlan.FEEDBACK_HISTORY, SourceContentState.EMPTY);
+            .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.EMPTY)
+            .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.EMPTY);
     }
 
     @Test
@@ -142,7 +142,7 @@ class ReviewHistoryContentSourceTest {
         assertThat(entry.get("recurrenceKey").asString()).isEqualTo("rec-1");
         assertThat(entry.get("title").asString()).isEqualTo("Caught and ignored");
         assertThat(captured.contentStates()).containsEntry(
-            EvidencePlan.OBSERVATION_HISTORY,
+            ReviewHistoryContentSource.OBSERVATION_HISTORY,
             SourceContentState.NON_EMPTY
         );
     }
@@ -164,7 +164,10 @@ class ReviewHistoryContentSourceTest {
         JsonNode entry = read(captured.files().get("inputs/history/feedback.json")).get("feedback").get(0);
         assertThat(entry.get("channel").asString()).isEqualTo("IN_CONTEXT");
         assertThat(entry.get("body").asString()).contains("rather than logging it");
-        assertThat(captured.contentStates()).containsEntry(EvidencePlan.FEEDBACK_HISTORY, SourceContentState.NON_EMPTY);
+        assertThat(captured.contentStates()).containsEntry(
+            ReviewHistoryContentSource.FEEDBACK_HISTORY,
+            SourceContentState.NON_EMPTY
+        );
     }
 
     /**
@@ -189,7 +192,10 @@ class ReviewHistoryContentSourceTest {
         var captured = provider.capture(prRequest(), provider.sourceKinds());
 
         assertThat(read(captured.files().get("inputs/history/observations.json")).get("observations")).isEmpty();
-        assertThat(captured.contentStates()).containsEntry(EvidencePlan.OBSERVATION_HISTORY, SourceContentState.EMPTY);
+        assertThat(captured.contentStates()).containsEntry(
+            ReviewHistoryContentSource.OBSERVATION_HISTORY,
+            SourceContentState.EMPTY
+        );
     }
 
     /**

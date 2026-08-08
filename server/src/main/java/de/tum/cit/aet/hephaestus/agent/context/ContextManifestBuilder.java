@@ -37,7 +37,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -146,15 +145,21 @@ public class ContextManifestBuilder {
         CaptureMetadata metadata
     ) {
         Instant capturedAt = clock.instant();
-        Set<SourceKind> applicableSources = catalogs.requireSourcesFor(
-            plan.contractVersion(),
-            plan.artifactKind().value()
-        );
-        if (!applicableSources.containsAll(plan.selectedSources())) {
-            Set<SourceKind> disallowed = new HashSet<>(plan.selectedSources());
-            disallowed.removeAll(applicableSources);
+        Set<SourceKind> applicableSources = stagedSources(plan);
+        // The manifest enumerates the applicable sources and nothing else, so a fact reported for a
+        // source outside them would be dropped in silence. A collector that got here with one has a
+        // wiring bug worth failing on, not a capture worth publishing minus the part nobody can read.
+        Set<SourceKind> reported = new HashSet<>(metadata.attemptedKinds());
+        reported.addAll(metadata.stateOverrides().keySet());
+        reported.addAll(metadata.reportedCompleteness().keySet());
+        reported.addAll(metadata.reportedContentStates().keySet());
+        reported.addAll(metadata.immutableIdentities().keySet());
+        reported.addAll(metadata.observedAt().keySet());
+        reported.addAll(metadata.sourceEffectiveAt().keySet());
+        reported.removeAll(applicableSources);
+        if (!reported.isEmpty()) {
             throw new IllegalArgumentException(
-                "Evidence plan selects sources that do not apply to " + plan.artifactKind() + ": " + disallowed
+                "Capture reports sources that do not apply to " + plan.artifactKind() + ": " + reported
             );
         }
         List<SourceCapture> captures = applicableSources
@@ -199,6 +204,19 @@ public class ContextManifestBuilder {
         return catalogs.isSourceUsePermitted(version, kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
     }
 
+    /**
+     * Every source this capture stages: all of them, for the artifact kind under review.
+     *
+     * <p>There is no per-run selection to apply on top. A source that applies to the kind is attempted;
+     * what comes back — available, withheld for want of a use decision, unavailable for want of a
+     * collector, or a collection error — is recorded per source in the manifest and is the model's to
+     * read. The one thing that never happens any more is a source being dropped because no practice
+     * asked for it.
+     */
+    Set<SourceKind> stagedSources(EvidencePlan plan) {
+        return catalogs.requireSourcesFor(plan.contractVersion(), plan.artifactKind().value());
+    }
+
     public PreparedAutomatedReviewReadiness prepareAutomatedReviewReadiness(
         ArtifactSourceManifest manifest,
         List<Practice> practices,
@@ -226,56 +244,6 @@ public class ContextManifestBuilder {
         );
         persistInternalJson(jobId, AUTOMATED_REVIEW_READINESS_REPORT_FILE, objectMapper.writeValueAsBytes(report));
         return new PreparedAutomatedReviewReadiness(result.readyPractices(), report);
-    }
-
-    PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {
-        List<SourceCapture> sources = prepared
-            .manifest()
-            .sources()
-            .stream()
-            .map(source ->
-                plan.selectedSources().contains(source.kind())
-                    ? source
-                    : new SourceCapture(
-                          source.kind(),
-                          new SourceCaptureState.NotCollected(SourceAbsenceReason.NOT_NEEDED_BY_READY_PRACTICES),
-                          List.of()
-                      )
-            )
-            .toList();
-        Set<String> retainedArtifacts = sources
-            .stream()
-            .filter(source -> plan.selectedSources().contains(source.kind()))
-            .flatMap(source -> source.artifacts().stream())
-            .map(SourceArtifact::path)
-            .collect(java.util.stream.Collectors.toSet());
-        Set<String> allArtifacts = prepared
-            .manifest()
-            .sources()
-            .stream()
-            .flatMap(source -> source.artifacts().stream())
-            .map(SourceArtifact::path)
-            .collect(java.util.stream.Collectors.toSet());
-        Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
-        Map<String, java.nio.file.Path> filesOnDisk = new LinkedHashMap<>(prepared.filesOnDisk());
-        allArtifacts
-            .stream()
-            .filter(path -> !retainedArtifacts.contains(path))
-            .forEach(path -> {
-                files.remove(path);
-                filesOnDisk.remove(path);
-            });
-        ArtifactSourceManifest restricted = new ArtifactSourceManifest(
-            prepared.manifest().contractVersion(),
-            prepared.manifest().catalogDigest(),
-            prepared.manifest().artifactKind(),
-            prepared.manifest().capturedAt(),
-            sources
-        );
-        files.put(SandboxLayout.MANIFEST_PATH, objectMapper.writeValueAsBytes(restricted));
-        // The cleanups travel with the restricted view: minimising a source hides it from the sandbox
-        // but does not make its staging directory somebody else's to delete.
-        return new PreparedEvidence(files, filesOnDisk, prepared.cleanups(), restricted);
     }
 
     /**
@@ -437,12 +405,6 @@ public class ContextManifestBuilder {
         Set<SourceKind> attemptedKinds
     ) {
         ArtifactSourceContract contract = catalogs.requireSource(plan.contractVersion(), kind);
-        if (!plan.selectedSources().contains(kind)) {
-            return missingCapture(
-                contract,
-                new SourceCaptureState.NotCollected(SourceAbsenceReason.NOT_NEEDED_BY_READY_PRACTICES)
-            );
-        }
         SourceCaptureState override = stateOverrides.get(kind);
         if (override != null) {
             return missingCapture(contract, override);

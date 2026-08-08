@@ -334,7 +334,6 @@
 								},
 								"reasonCode": {
 									"enum": [
-										"NOT_NEEDED_BY_READY_PRACTICES",
 										"GOVERNANCE_NOT_EFFECTIVE",
 										"DISABLED",
 										"NO_PROVIDER",
@@ -364,7 +363,6 @@
 								},
 								"errorCode": {
 									"enum": [
-										"NOT_NEEDED_BY_READY_PRACTICES",
 										"GOVERNANCE_NOT_EFFECTIVE",
 										"DISABLED",
 										"NO_PROVIDER",

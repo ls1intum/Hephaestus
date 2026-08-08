@@ -118,13 +118,6 @@ public class WorkspaceContextBuilder {
         return manifestBuilder.prepareAutomatedReviewReadiness(manifest, practices, jobId, temporalAnchor, signal);
     }
 
-    public PreparedEvidence restrictTo(PreparedEvidence prepared, EvidencePlan plan) {
-        if (manifestBuilder == null) {
-            throw new IllegalStateException("Evidence restriction requires a manifest builder");
-        }
-        return manifestBuilder.restrictTo(prepared, plan);
-    }
-
     private Map<String, byte[]> buildWithoutManifest(ContextRequest request) {
         Long repoKey = repoKey(request);
         ReentrantLock lock = repoKey == null ? null : stripeFor(repoKey);
@@ -153,6 +146,16 @@ public class WorkspaceContextBuilder {
     ) {}
 
     private BuildResult buildLocked(ContextRequest request, @Nullable EvidencePlan evidencePlan) {
+        // Every source the contract says applies to this artifact kind — not a subset chosen for the
+        // practices in scope. What a practice needs before it may be reviewed is a separate question,
+        // asked later by the readiness check; this one is only "what can the model see".
+        Set<SourceKind> stagedSources = Set.of();
+        if (evidencePlan != null) {
+            if (manifestBuilder == null) {
+                throw new IllegalStateException("Detector evidence capture requires a source manifest builder");
+            }
+            stagedSources = manifestBuilder.stagedSources(evidencePlan);
+        }
         Map<String, byte[]> files = new LinkedHashMap<>();
         Map<String, String> keyOwner = new HashMap<>();
         Map<String, SourceKind> keySourceKind = new HashMap<>();
@@ -178,12 +181,16 @@ public class WorkspaceContextBuilder {
             String providerName = provider.getClass().getSimpleName();
             Map<String, byte[]> contributionFiles;
             if (evidencePlan != null && provider instanceof EvidenceSource evidenceSource) {
-                if (evidenceSource.sourceKinds().stream().noneMatch(evidencePlan.selectedSources()::contains)) {
+                // A collector whose kinds do not apply to this artifact kind at all — the Slack thread
+                // reader on a pull-request review — has nothing to say here. The manifest already reports
+                // only the kinds that apply, so there is no absence to record for it either.
+                if (evidenceSource.sourceKinds().stream().noneMatch(stagedSources::contains)) {
                     continue;
                 }
                 contributionFiles = captureIndependently(
                     request,
                     evidencePlan,
+                    stagedSources,
                     evidenceSource,
                     providerName,
                     completeness,
@@ -244,8 +251,10 @@ public class WorkspaceContextBuilder {
                             providerName + " mapped output to undeclared source kind " + kind
                         );
                     }
-                    if (evidencePlan != null && !evidencePlan.selectedSources().contains(kind)) {
-                        throw new IllegalStateException(providerName + " emitted unselected source kind " + kind);
+                    if (evidencePlan != null && !stagedSources.contains(kind)) {
+                        throw new IllegalStateException(
+                            providerName + " emitted source kind " + kind + ", which does not apply to this artifact"
+                        );
                     }
                     keySourceKind.put(key, kind);
                 } else if (evidencePlan != null) {
@@ -293,6 +302,7 @@ public class WorkspaceContextBuilder {
     private Map<String, byte[]> captureIndependently(
         ContextRequest request,
         EvidencePlan plan,
+        Set<SourceKind> stagedSources,
         EvidenceSource source,
         String providerName,
         Map<SourceKind, SourceCompleteness> completeness,
@@ -307,7 +317,7 @@ public class WorkspaceContextBuilder {
     ) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         Set<SourceKind> selectedKinds = new HashSet<>(source.sourceKinds());
-        selectedKinds.retainAll(plan.selectedSources());
+        selectedKinds.retainAll(stagedSources);
         if (manifestBuilder != null) {
             for (SourceKind kind : Set.copyOf(selectedKinds)) {
                 if (!manifestBuilder.isSourceUsePermitted(plan.contractVersion(), kind)) {

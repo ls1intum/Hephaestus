@@ -116,9 +116,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             )
         );
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));
-        lenient()
-            .when(workspaceContextBuilder.restrictTo(any(), any()))
-            .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private PullRequestReviewSubmissionRequest sampleRequest() {
@@ -228,9 +225,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         lenient()
             .when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any()))
             .thenAnswer(invocation -> readiness(invocation.getArgument(1)));
-        lenient()
-            .when(workspaceContextBuilder.restrictTo(any(), any()))
-            .thenAnswer(invocation -> invocation.getArgument(0));
         lenient()
             .when(
                 practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(

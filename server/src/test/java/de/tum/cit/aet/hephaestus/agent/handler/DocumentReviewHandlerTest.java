@@ -204,7 +204,6 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
                     mock(AutomatedReviewReadinessReport.class)
                 )
             );
-            when(workspaceContextBuilder.restrictTo(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
 
             Map<String, byte[]> files = handler.prepareInputs(job).files();
 
