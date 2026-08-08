@@ -59,16 +59,19 @@ public class PracticeSignalCoverage {
      * Asserts that the authoring vocabulary offers no signal nothing can raise.
      *
      * <p>Checks the offered vocabulary rather than the stored practices, and that is the whole point: what
-     * an author is offered is compiled in and identical on every deployment. So this is a fact about the
-     * build, and {@code PracticeSignalCoverageTest} — a {@code @Tag("unit")} test that calls exactly this
-     * method against the real options — is where it is established, before anything is deployed.
+     * an author is offered is compiled in and identical on every deployment, so this is a fact about the
+     * build rather than about an installation.
      *
-     * <p>Deliberately <em>not</em> a {@code @PostConstruct}. This class is an ungated {@code @Service}, so
-     * a throw here would run in all three runtime roles and crash-loop the webhook pod — which exists
-     * precisely so that webhook reception survives an app-server failure, and whose missed push events
-     * cannot be redelivered. A compile-time fact must not be able to take down the one process whose job
-     * is to keep receiving while everything else is broken. The check is the same; the place it fails is
-     * CI, where it is free, instead of production, where it is not.
+     * <p>The two sets must stay independently derived for the comparison to mean anything. The offered
+     * side comes from the registered artifact descriptors; the compiled side comes, through
+     * {@link SignalCoverage}, from what the shipped manifests declare they raise. Anything that computes
+     * one from the other — including a test fixture that does — turns this into a tautology that passes
+     * with every manifest empty.
+     *
+     * <p>Run twice, on purpose. {@code PracticeSignalCoverageIntegrationTest} calls it against the real
+     * registries so a gap fails in CI, where it is free; {@link PracticeSignalVocabularyCheck} calls it at
+     * boot so a gap in an image built outside that gate still cannot serve an authoring UI full of
+     * switches that do nothing.
      */
     void validateAuthoringVocabulary() {
         List<String> violations = new ArrayList<>();

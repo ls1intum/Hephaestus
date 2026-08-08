@@ -21,12 +21,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The boot-time half of the coverage question: an authoring option that can never fire must stop the
- * application, because it is a mistake in the build rather than a fact about a deployment.
+ * The <em>logic</em> of the boot-time coverage check: which disagreements between the two sets it
+ * reports, and which it deliberately tolerates.
  *
- * <p>Checked against the offered vocabulary rather than against stored practices on purpose. What an
- * author is offered is identical on every instance, so a gap fails here and in CI instead of on
- * whichever installation first happened to pick the broken option.
+ * <p>It cannot establish that the shipped build has no gap, and must not be read as doing so. The
+ * {@link SignalCoverage} below is constructed here from the very options it is then compared against, so
+ * the violation predicate is unsatisfiable by construction and these tests would all pass with every
+ * shipped manifest declaring it raises nothing. {@code PracticeSignalCoverageIntegrationTest} is where
+ * the two sides come from the container independently, and is the only place the fact is checked.
  */
 class PracticeSignalCoverageTest extends BaseUnitTest {
 
@@ -34,8 +36,8 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     private final PracticeSignalOptions options = PracticeSignalOptionsFixture.real();
 
     @Test
-    @DisplayName("every signal an author can bind to is one the shipped integrations declare they raise")
-    void everySignalAnAuthorCanPickIsBackedByTheShippedIntegrations() {
+    @DisplayName("a vocabulary whose every ingested signal is covered is accepted")
+    void aFullyCoveredVocabularyIsAccepted() {
         assertThatCode(coverage(everyIngestedSignal())::validateAuthoringVocabulary).doesNotThrowAnyException();
     }
 
