@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.signal;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,16 +29,38 @@ public class LedgerSignalRecorder implements SignalRecorder {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public boolean record(SignalKey key, Instant occurredAt, DiscoveredVia discoveredVia) {
+    public boolean record(
+        SignalKey key,
+        Instant occurredAt,
+        DiscoveredVia discoveredVia,
+        @Nullable Long requestedByUserId
+    ) {
         Instant now = Instant.now();
         // A reconciliation pass knows that something happened, not that it is the right one to act on it,
         // so it may only ever add a row; a live or requested observation may also take over one nobody
         // has decided yet. BACKFILL takes that second branch on purpose — a first sync leaves its rows
         // RECORDED-but-undecided so it fires nothing, and a confirmed campaign is what may claim them.
-        int affected =
-            discoveredVia == DiscoveredVia.SYNC
-                ? repository.insertIfAbsent(key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now)
-                : repository.insertOrClaimUndecided(key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now);
+        if (discoveredVia == DiscoveredVia.SYNC) {
+            // A sync notices what already happened; nobody asked it to. Attributing one to a requester
+            // would let a person's request quota be spent by a background pass they never triggered.
+            if (requestedByUserId != null) {
+                throw new IllegalArgumentException("A sync-discovered signal has no requester to attribute it to");
+            }
+            int recorded = repository.insertIfAbsent(key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now);
+            return ownsSignal(recorded, key);
+        }
+        int affected = repository.insertOrClaimUndecided(
+            key,
+            UUID.randomUUID(),
+            occurredAt,
+            discoveredVia.name(),
+            now,
+            requestedByUserId
+        );
+        return ownsSignal(affected, key);
+    }
+
+    private boolean ownsSignal(int affected, SignalKey key) {
         if (affected == 0) {
             log.debug(
                 "Signal already settled, not acting: workspaceId={}, signal={}, artifactId={}, revision={}",

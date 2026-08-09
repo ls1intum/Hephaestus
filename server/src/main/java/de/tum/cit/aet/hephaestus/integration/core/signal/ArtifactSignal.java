@@ -104,6 +104,19 @@ public class ArtifactSignal {
     private UUID jobId;
 
     /**
+     * The SCM user who asked for this, on the occasions a person asked at all — null for everything the
+     * system noticed by itself.
+     *
+     * <p>A raw id rather than an association: this module owns the ledger and must not depend on the SCM
+     * domain to write a row (ADR 0017 keeps that edge one-way). It is also what the per-person request
+     * limit counts, so it is written by the recorder in the same statement as the row it attributes,
+     * never patched in afterwards — a limit whose input can be absent for a moment is not a limit.
+     */
+    @Nullable
+    @Column(name = "requested_by_user_id")
+    private Long requestedByUserId;
+
+    /**
      * When the {@link #state} last actually changed — and therefore how long this signal has been
      * waiting in the one it is in. Only a change of state moves it, which is what the lapse deadline
      * measures; a re-offer refused again for the same class of reason leaves the wait running.

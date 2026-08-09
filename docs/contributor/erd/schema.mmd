@@ -110,6 +110,7 @@ erDiagram
         UUID job_id
         TIMESTAMPTZ state_changed_at "NOT NULL"
         TIMESTAMPTZ last_attempted_at
+        BIGINT requested_by_user_id FK
     }
 
     AuthEvent {
@@ -1410,6 +1411,7 @@ erDiagram
     Repository ||--o{ ActivityEvent : has
     Workspace ||--o{ ActivityEvent : has
     Workspace ||--o{ AgentJob : has
+    User ||--o{ ArtifactSignal : has
     Workspace ||--o{ ArtifactSignal : has
     Account ||--o{ AuthEvent : account_id
     Account ||--o{ AuthEvent : acting_account_id

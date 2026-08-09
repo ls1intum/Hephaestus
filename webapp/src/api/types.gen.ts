@@ -1396,7 +1396,7 @@ export type TracedSignal = {
     /**
      * Why it ended in that state; null once it triggered a review
      */
-    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'BINDING_DISABLED' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'BINDING_DISABLED' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
 };
 
 /**
@@ -1903,6 +1903,28 @@ export type ReviewFeedbackCounts = {
     prepared: number;
     superseded: number;
     suppressed: number;
+};
+
+/**
+ * What came of asking for a review
+ */
+export type ReviewRequestOutcome = {
+    /**
+     * The review that is now running; absent when none was started
+     */
+    jobId?: string;
+    /**
+     * The controlled-vocabulary reason nothing was started; absent when a review was started
+     */
+    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'BINDING_DISABLED' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    /**
+     * The reason as one sentence for the person who asked. Render it verbatim: it is written next to the reason it explains so that every surface says the same thing, and a re-worded copy is how a screen and a support answer come to disagree.
+     */
+    reasonDescription?: string;
+    /**
+     * Whether a review is now running, or nothing was started
+     */
+    status: 'SUBMITTED' | 'REFUSED';
 };
 
 export type ReviewPracticeArea = {
@@ -4637,6 +4659,20 @@ export type CreateWorkspaceLlmConnectionRequest = {
      * Optional internal slug; generated from displayName when omitted
      */
     slug?: string;
+};
+
+/**
+ * The piece of work a review is being asked for
+ */
+export type CreateReviewRequest = {
+    /**
+     * The artifact's internal id, as the trace and review listings report it
+     */
+    artifactId: number;
+    /**
+     * The artifact kind's wire id, e.g. scm.pull_request. A raw string rather than a closed enum because kinds are an open vocabulary: a build that has never heard of a kind should refuse it by name, not fail to parse the request.
+     */
+    artifactKind: string;
 };
 
 /**
@@ -9283,6 +9319,44 @@ export type ReorderPracticesResponses = {
 };
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
+
+export type RequestPracticeReviewData = {
+    body: CreateReviewRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-requests';
+};
+
+export type RequestPracticeReviewErrors = {
+    /**
+     * The artifact kind is not one that can be asked for
+     */
+    400: ProblemDetail;
+    /**
+     * The caller is neither the work's author or assignee nor a workspace admin
+     */
+    403: ProblemDetail;
+    /**
+     * No such artifact in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type RequestPracticeReviewError = RequestPracticeReviewErrors[keyof RequestPracticeReviewErrors];
+
+export type RequestPracticeReviewResponses = {
+    /**
+     * The ask was understood: a review is running, or the body names what stopped it
+     */
+    200: ReviewRequestOutcome;
+};
+
+export type RequestPracticeReviewResponse = RequestPracticeReviewResponses[keyof RequestPracticeReviewResponses];
 
 export type GetPracticeReviewSettingsData = {
     body?: never;

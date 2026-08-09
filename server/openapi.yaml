@@ -56,6 +56,8 @@ tags:
   name: Agents
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
+- description: Asking for a review of a piece of work by hand
+  name: Practice review requests
 - description: "User account management (settings, deletion)"
   name: Account
 - description: Read-only access to practice evaluation observations
@@ -4772,6 +4774,56 @@ paths:
       summary: Reorder the practices within an area
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/review-requests:
+    post:
+      description: "Answers 200 both when a review starts and when one deliberately\
+        \ does not; the body says which, and why. 403 only when the caller has no\
+        \ standing on the artifact."
+      operationId: requestPracticeReview
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRequestOutcome"
+          description: "The ask was understood: a review is running, or the body names\
+            \ what stopped it"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The artifact kind is not one that can be asked for
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller is neither the work's author or assignee nor a workspace
+            admin
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such artifact in this workspace
+      summary: Ask for a review of a piece of work now
+      tags:
+      - Practice review requests
   /workspaces/{workspaceSlug}/practices/review-settings:
     get:
       operationId: getPracticeReviewSettings
@@ -8063,6 +8115,26 @@ components:
       - artifactKind
       - fromAt
       - toAt
+    CreateReviewRequest:
+      type: object
+      description: The piece of work a review is being asked for
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: "The artifact's internal id, as the trace and review listings\
+            \ report it"
+        artifactKind:
+          type: string
+          description: "The artifact kind's wire id, e.g. scm.pull_request. A raw\
+            \ string rather than a closed enum because kinds are an open vocabulary:\
+            \ a build that has never heard of a kind should refuse it by name, not\
+            \ fail to parse the request."
+          example: scm.pull_request
+          minLength: 1
+      required:
+      - artifactId
+      - artifactKind
     CreateWorkspaceLlmConnectionRequest:
       type: object
       description: Connect your own AI provider
@@ -12026,6 +12098,49 @@ components:
       required:
       - name
       - slug
+    ReviewRequestOutcome:
+      type: object
+      description: What came of asking for a review
+      properties:
+        jobId:
+          type: string
+          format: uuid
+          description: The review that is now running; absent when none was started
+        reason:
+          type: string
+          description: The controlled-vocabulary reason nothing was started; absent
+            when a review was started
+          enum:
+          - GATE_SKIPPED
+          - COOLDOWN_ACTIVE
+          - REQUEST_COOLDOWN_ACTIVE
+          - REQUESTER_QUOTA_EXHAUSTED
+          - CONCURRENT_DUPLICATE
+          - OUT_OF_REVIEW_SCOPE
+          - WORKSPACE_INACTIVE
+          - PRACTICES_DISABLED
+          - NO_ACTIVE_PRACTICE
+          - BINDING_DISABLED
+          - PRACTICE_TIER_OFF
+          - BUDGET_EXHAUSTED
+          - SUBJECT_UNLINKED
+          - MODEL_UNAVAILABLE
+          - PENDING_DEADLINE_EXCEEDED
+          - ARTIFACT_GONE
+        reasonDescription:
+          type: string
+          description: "The reason as one sentence for the person who asked. Render\
+            \ it verbatim: it is written next to the reason it explains so that every\
+            \ surface says the same thing, and a re-worded copy is how a screen and\
+            \ a support answer come to disagree."
+        status:
+          type: string
+          description: "Whether a review is now running, or nothing was started"
+          enum:
+          - SUBMITTED
+          - REFUSED
+      required:
+      - status
     ReviewRunSummary:
       type: object
       description: A review run with finding and feedback outcome counts
@@ -12683,6 +12798,8 @@ components:
           enum:
           - GATE_SKIPPED
           - COOLDOWN_ACTIVE
+          - REQUEST_COOLDOWN_ACTIVE
+          - REQUESTER_QUOTA_EXHAUSTED
           - CONCURRENT_DUPLICATE
           - OUT_OF_REVIEW_SCOPE
           - WORKSPACE_INACTIVE

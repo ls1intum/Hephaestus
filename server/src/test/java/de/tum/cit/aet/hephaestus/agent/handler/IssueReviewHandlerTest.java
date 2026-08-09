@@ -99,7 +99,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
                 repositoryToMonitorRepository,
                 workspaceRepository,
                 accountPreferencesQuery,
-                new PracticeReviewProperties(false, false, 15, false, false),
+                new PracticeReviewProperties(false, false, 15, 5, false, false),
                 () -> silentModeEngaged
             ),
             new PracticeFeedbackCommentFormatter(

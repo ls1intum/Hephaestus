@@ -2101,4 +2101,47 @@
         ]]></rollback>
     </changeSet>
 
+    <!-- Who asked. Every other column on artifact_signal describes the artifact or the decision; this one
+         names the person, and it exists because the only rate limit that catches somebody asking for one
+         review each of twenty colleagues' merge requests is a per-person one, and a per-person limit needs
+         a per-person column to count.
+
+         Nullable and null nearly always: an event, a sync and a backfill campaign all happen without
+         anyone asking, and writing an id there would put a person's name on work they never commissioned.
+
+         ON DELETE SET NULL rather than CASCADE or RESTRICT. RESTRICT would make an account erasure fail
+         against the ledger; CASCADE would delete the record that an occurrence was seen and settled,
+         which is the one thing this table exists to never lose. Dropping the attribution and keeping the
+         occurrence is what erasure actually asks for. -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-37">
+        <preConditions onFail="MARK_RAN" onFailMessage="artifact_signal already records who asked">
+            <not>
+                <columnExists tableName="artifact_signal" columnName="requested_by_user_id"/>
+            </not>
+        </preConditions>
+        <comment>Let the signal ledger name the person who asked for a review by hand.</comment>
+        <addColumn tableName="artifact_signal">
+            <column name="requested_by_user_id" type="BIGINT"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="artifact_signal"
+            baseColumnNames="requested_by_user_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_artifact_signal_requested_by"
+            onDelete="SET NULL"/>
+        <!-- Partial: the per-person hourly limit reads only rows that name a requester, and those are a
+             rounding error beside the event-discovered rows the table is mostly made of. -->
+        <sql splitStatements="false"><![CDATA[
+            CREATE INDEX IF NOT EXISTS idx_artifact_signal_requested_by
+                ON artifact_signal (requested_by_user_id, occurred_at)
+                WHERE requested_by_user_id IS NOT NULL;
+        ]]></sql>
+        <rollback><![CDATA[
+            DROP INDEX IF EXISTS idx_artifact_signal_requested_by;
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS fk_artifact_signal_requested_by;
+            ALTER TABLE artifact_signal DROP COLUMN IF EXISTS requested_by_user_id;
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

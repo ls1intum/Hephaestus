@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.signal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,7 +29,7 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
 
     @Test
     void shouldTellOnlyTheWinnerToActWhenTwoObservationsRace() {
-        when(repository.insertOrClaimUndecided(any(), any(), any(), anyString(), any())).thenReturn(1, 0);
+        when(repository.insertOrClaimUndecided(any(), any(), any(), anyString(), any(), any())).thenReturn(1, 0);
 
         assertThat(recorder.record(KEY, Instant.now(), DiscoveredVia.EVENT)).isTrue();
         assertThat(recorder.record(KEY, Instant.now(), DiscoveredVia.EVENT)).isFalse();
@@ -41,7 +42,7 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
         recorder.record(KEY, Instant.now(), DiscoveredVia.SYNC);
 
         verify(repository).insertIfAbsent(eq(KEY), any(), any(), eq("SYNC"), any());
-        verify(repository, never()).insertOrClaimUndecided(any(), any(), any(), anyString(), any());
+        verify(repository, never()).insertOrClaimUndecided(any(), any(), any(), anyString(), any(), any());
     }
 
     @Test
@@ -50,7 +51,7 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
         // announced it must not silently disable the live review.
         recorder.record(KEY, Instant.now(), DiscoveredVia.EVENT);
 
-        verify(repository).insertOrClaimUndecided(eq(KEY), any(), any(), eq("EVENT"), any());
+        verify(repository).insertOrClaimUndecided(eq(KEY), any(), any(), eq("EVENT"), any(), any());
         verify(repository, never()).insertIfAbsent(any(), any(), any(), anyString(), any());
     }
 
@@ -88,7 +89,26 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
             any(),
             any(),
             anyString(),
+            any(),
             any()
+        );
+    }
+
+    @Test
+    void shouldAttributeAHandRequestedSignalToWhoeverAskedForIt() {
+        // The per-person request allowance counts these rows, so the requester has to land in the same
+        // statement as the row. Written afterwards, there is a window in which the limit cannot see it.
+        recorder.record(KEY, Instant.now(), DiscoveredVia.MANUAL, 99L);
+
+        verify(repository).insertOrClaimUndecided(eq(KEY), any(), any(), eq("MANUAL"), any(), eq(99L));
+    }
+
+    @Test
+    void shouldRefuseToAttributeASyncDiscoveryToAPerson() {
+        // A sync notices what already happened; nobody asked it to. Letting a background pass name a
+        // requester would spend that person's hourly allowance on work they never commissioned.
+        assertThatThrownBy(() -> recorder.record(KEY, Instant.now(), DiscoveredVia.SYNC, 99L)).isInstanceOf(
+            IllegalArgumentException.class
         );
     }
 }

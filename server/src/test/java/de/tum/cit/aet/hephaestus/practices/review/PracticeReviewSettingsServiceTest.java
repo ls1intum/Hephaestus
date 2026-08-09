@@ -35,6 +35,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         false,
         false,
         15,
+        5,
         false,
         false
     );

@@ -105,7 +105,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.class
                 ),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(false, false, 15, false, false)
+                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(
+                    false,
+                    false,
+                    15,
+                    5,
+                    false,
+                    false
+                )
             ),
             // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
             // therefore admitted, so these tests exercise delivery rather than the tier.

@@ -15,6 +15,27 @@ public enum SignalStateReason {
     /** Rate limiting, not correctness. Retrying later would defeat the limit the workspace asked for. */
     COOLDOWN_ACTIVE(SignalState.SUPPRESSED),
 
+    /**
+     * The workspace's cooldown, applied to asking rather than to running: somebody already asked for a
+     * review of this artifact inside the window.
+     *
+     * <p>Its own reason rather than {@link #COOLDOWN_ACTIVE} because the two are true at different
+     * times and send the reader to different places. {@code COOLDOWN_ACTIVE} says a review <em>ran</em>
+     * recently, so waiting produces one about newer work; this one says an <em>ask</em> was made
+     * recently, and that ask may itself have been refused — telling the asker a review ran would send
+     * them looking for feedback that does not exist.
+     */
+    REQUEST_COOLDOWN_ACTIVE(SignalState.SUPPRESSED),
+
+    /**
+     * The person asking has spent their hour's allowance of hand-requested reviews.
+     *
+     * <p>The one limit here that is about a person rather than an artifact. Every other rate limit is
+     * keyed on the work, so asking for one review each of twenty colleagues' merge requests passes all
+     * of them while being precisely the pattern that turns a coaching tool into a way to nag a team.
+     */
+    REQUESTER_QUOTA_EXHAUSTED(SignalState.SUPPRESSED),
+
     /** Another submission for the same subject won the idempotency race; it carries the review. */
     CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
 
@@ -97,6 +118,8 @@ public enum SignalStateReason {
         return switch (this) {
             case GATE_SKIPPED -> "The workspace's review gate declined this occurrence.";
             case COOLDOWN_ACTIVE -> "Another review ran on this artifact inside the workspace's cooldown window.";
+            case REQUEST_COOLDOWN_ACTIVE -> "A review of this was already asked for inside the workspace's cooldown window.";
+            case REQUESTER_QUOTA_EXHAUSTED -> "You have asked for as many reviews as an hour allows; the allowance refills.";
             case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
             case OUT_OF_REVIEW_SCOPE -> "This artifact is outside the branches and repositories this workspace reviews.";
             case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";

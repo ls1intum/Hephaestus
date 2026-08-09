@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.signal;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -61,15 +62,16 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
         value = """
         INSERT INTO artifact_signal (
             id, workspace_id, artifact_kind, artifact_id, signal_name, revision,
-            occurred_at, discovered_via, state, state_changed_at
+            occurred_at, discovered_via, state, state_changed_at, requested_by_user_id
         ) VALUES (
             :id, :#{#key.workspaceId()}, :#{#key.artifactKind().value()}, :#{#key.artifactId()},
             :#{#key.signalName().value()}, :#{#key.revision().value()},
-            :occurredAt, :discoveredVia, 'RECORDED', :now
+            :occurredAt, :discoveredVia, 'RECORDED', :now, :requestedByUserId
         ) ON CONFLICT (workspace_id, artifact_kind, artifact_id, signal_name, revision) DO UPDATE
         SET discovered_via = EXCLUDED.discovered_via,
             occurred_at = EXCLUDED.occurred_at,
-            state_changed_at = EXCLUDED.state_changed_at
+            state_changed_at = EXCLUDED.state_changed_at,
+            requested_by_user_id = EXCLUDED.requested_by_user_id
         WHERE artifact_signal.state = 'RECORDED'
         """,
         nativeQuery = true
@@ -79,7 +81,50 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
         @Param("id") UUID id,
         @Param("occurredAt") Instant occurredAt,
         @Param("discoveredVia") String discoveredVia,
-        @Param("now") Instant now
+        @Param("now") Instant now,
+        @Param("requestedByUserId") @Nullable Long requestedByUserId
+    );
+
+    /**
+     * Whether anybody has asked for a review of this artifact since {@code since}.
+     *
+     * <p>The artifact half of the limit on hand-requested reviews, and the reason the workspace's
+     * ordinary cooldown cannot serve as it: that cooldown is keyed on an agent-job idempotency key
+     * whose phase segment is the trigger signal, and a request occupies a phase of its own, so a
+     * requested review never lands in the same cooldown lane as the lifecycle review it repeats.
+     *
+     * <p>It counts asks, not reviews. An ask that was refused still consumed the workspace's attention
+     * and would be refused again for the same reason a second later, so re-asking immediately is the
+     * behaviour to damp — and an ask that succeeded is covered by this too.
+     */
+    @Query(
+        "SELECT COUNT(s) > 0 FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
+            " AND s.artifactKind = :artifactKind AND s.artifactId = :artifactId" +
+            " AND s.discoveredVia = de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia.MANUAL" +
+            " AND s.occurredAt >= :since"
+    )
+    boolean existsManualRequestSince(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") String artifactKind,
+        @Param("artifactId") Long artifactId,
+        @Param("since") Instant since
+    );
+
+    /**
+     * How many reviews these identities have asked for in this workspace since {@code since}.
+     *
+     * <p>Takes a collection because one person is several SCM identities: a Hephaestus account can link
+     * a GitLab and a GitHub login, and counting per identity would hand a linked account one allowance
+     * per provider — which is the same person asking twice as often, exactly what this bounds.
+     */
+    @Query(
+        "SELECT COUNT(s) FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
+            " AND s.requestedByUserId IN :requesterIds AND s.occurredAt >= :since"
+    )
+    long countRequestsBySince(
+        @Param("workspaceId") Long workspaceId,
+        @Param("requesterIds") Collection<Long> requesterIds,
+        @Param("since") Instant since
     );
 
     /**

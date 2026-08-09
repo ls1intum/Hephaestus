@@ -1015,7 +1015,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private static PracticeReviewProperties reviewProperties(boolean progressFooter) {
-        return new PracticeReviewProperties(false, false, 15, progressFooter, false);
+        return new PracticeReviewProperties(false, false, 15, 5, progressFooter, false);
     }
 
     private static TrendDelta resolvedTrend() {

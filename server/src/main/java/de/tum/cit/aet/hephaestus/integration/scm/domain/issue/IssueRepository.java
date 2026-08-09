@@ -57,9 +57,15 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * Fetches an issue with the associations {@code PracticeReviewDetectionGate.evaluateIssue} needs:
      * repository (workspace resolution) and assignees (role check). Restricted to {@code TYPE(i) = Issue}
      * so a pull-request row never enters the issue-detection path.
+     *
+     * <p>The author comes along because the same load feeds
+     * {@code ReviewRequestAuthority}, which asks whether the requester is the person the review is
+     * <em>about</em>. Author is a lazy {@code @ManyToOne} and this graph is read outside a session, so
+     * without the fetch that question is answered by a {@code LazyInitializationException} — or, worse
+     * under a future session, by a null that refuses an issue's own author a review of their own work.
      */
     @Query(
-        "SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.assignees " +
+        "SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.author LEFT JOIN FETCH i.assignees " +
             "WHERE TYPE(i) = Issue AND i.id = :id"
     )
     Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);

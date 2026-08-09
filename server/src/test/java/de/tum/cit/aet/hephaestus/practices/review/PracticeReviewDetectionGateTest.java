@@ -73,7 +73,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, false, 15, false, false);
+        PracticeReviewProperties properties = new PracticeReviewProperties(false, false, 15, 5, false, false);
         gate = new PracticeReviewDetectionGate(
             properties,
             userRoleChecker,
@@ -506,7 +506,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
         @Test
         void detectWhenRunForAllUsers() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, false, 15, false, false);
+            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, false, 15, 5, false, false);
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,

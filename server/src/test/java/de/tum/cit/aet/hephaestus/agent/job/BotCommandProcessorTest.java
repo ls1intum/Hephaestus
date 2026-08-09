@@ -88,7 +88,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event(command));
 
-            verify(manualReviewRequests).requestPullRequestReview(eq(workspace), eq(pr), eq(commenter));
+            verify(manualReviewRequests).requestPullRequestReview(eq(workspace), eq(pr), eq(List.of(commenter)));
         }
 
         @ParameterizedTest(name = "{0} is ignored")
@@ -123,18 +123,19 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             verify(userRepository).findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID);
             verify(userRepository, never()).findByLogin(any());
-            var captor = ArgumentCaptor.forClass(User.class);
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<java.util.Collection<User>> captor = ArgumentCaptor.forClass(java.util.Collection.class);
             verify(manualReviewRequests).requestPullRequestReview(any(), any(), captor.capture());
-            assertThat(captor.getValue()).isSameAs(commenter);
+            assertThat(captor.getValue()).containsExactly(commenter);
         }
 
         /**
          * A comment from an account the mirror has never synced is still an ask that must be answered
          * for. It is handed on as null, which the authority refuses — an unattributable request cannot
-         * be shown to be an authorized one.
+         * be shown to be an authorized one — an empty identity set has nobody with standing in it.
          */
         @Test
-        void anUnknownCommenterIsHandedOnAsNull_ratherThanSkippingTheCheck() {
+        void anUnknownCommenterIsHandedOnAsNobody_ratherThanSkippingTheCheck() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             mockWorkspace();
@@ -147,7 +148,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(manualReviewRequests).requestPullRequestReview(any(), any(), eq(null));
+            verify(manualReviewRequests).requestPullRequestReview(any(), any(), eq(List.of()));
         }
 
         @Test

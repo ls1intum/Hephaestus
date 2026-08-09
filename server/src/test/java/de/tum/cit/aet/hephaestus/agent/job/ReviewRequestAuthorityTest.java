@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +109,45 @@ class ReviewRequestAuthorityTest extends BaseUnitTest {
         orphan.setAssignees(Set.of());
 
         assertThat(authority.mayRequest(WORKSPACE_ID, orphan, user(BYSTANDER_ID))).isFalse();
+    }
+
+    /**
+     * The multi-identity case, and the reason the collection overload exists. A Hephaestus account can
+     * link a GitLab and a GitHub login; workspace membership is keyed on the SCM user. Asking the
+     * question of one identity at a time refuses an admin for having signed in through the other one.
+     */
+    @Test
+    void anAdminUnderOneOfTheirLinkedIdentitiesMayAsk() {
+        givenMembership(BYSTANDER_ID, WorkspaceRole.ADMIN);
+
+        Optional<User> standing = authority.standingOf(
+            WORKSPACE_ID,
+            artifact(),
+            List.of(user(999L), user(BYSTANDER_ID))
+        );
+
+        assertThat(standing).map(User::getId).contains(BYSTANDER_ID);
+    }
+
+    /**
+     * Returns the identity that actually qualified, not merely "yes". The ledger row is filed under it,
+     * and a row naming somebody the rule did not accept would misattribute the request that spent the
+     * budget — and misdirect the per-person allowance that counts those rows.
+     */
+    @Test
+    void theIdentityHandedBackIsTheOneThatQualified() {
+        Optional<User> standing = authority.standingOf(
+            WORKSPACE_ID,
+            artifact(),
+            List.of(user(BYSTANDER_ID), user(AUTHOR_ID))
+        );
+
+        assertThat(standing).map(User::getId).contains(AUTHOR_ID);
+    }
+
+    @Test
+    void anEmptyIdentitySetHasNobodyWithStanding() {
+        assertThat(authority.standingOf(WORKSPACE_ID, artifact(), List.of())).isEmpty();
     }
 
     // Fixtures

@@ -22,10 +22,12 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -60,6 +62,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * default. The default reads the trigger signal, so it is right only for as long as the metadata signal
  * stays null; stating it here means a later change to that contract cannot quietly file a self-selected
  * sample into the population the LIVE trend line is read from.
+ *
+ * <h2>Order of the checks, which is load-bearing</h2>
+ * <p>Standing, then the rate limits, then the ledger row, then the gate. Authorizing first means the
+ * limits only ever count asks the product was willing to entertain, so a stranger cannot consume a
+ * team's allowance by being refused repeatedly. Limiting before recording means a declined ask leaves
+ * no row — see {@link ManualReviewRateLimits} for why counting one's own refusals would make the limit
+ * tighten under retry. The gate comes last because it is the only step whose answer belongs in the
+ * artifact's trace: by then there is a row for it to settle.
  */
 @Service
 public class ManualReviewRequests {
@@ -67,6 +77,7 @@ public class ManualReviewRequests {
     private static final Logger log = LoggerFactory.getLogger(ManualReviewRequests.class);
 
     private final ReviewRequestAuthority authority;
+    private final ManualReviewRateLimits rateLimits;
     private final PracticeReviewDetectionGate gate;
     private final PracticeSignalOptions signalOptions;
     private final SignalRecorder signalRecorder;
@@ -75,6 +86,7 @@ public class ManualReviewRequests {
 
     public ManualReviewRequests(
         ReviewRequestAuthority authority,
+        ManualReviewRateLimits rateLimits,
         PracticeReviewDetectionGate gate,
         PracticeSignalOptions signalOptions,
         SignalRecorder signalRecorder,
@@ -82,6 +94,7 @@ public class ManualReviewRequests {
         TransactionTemplate transactionTemplate
     ) {
         this.authority = authority;
+        this.rateLimits = rateLimits;
         this.gate = gate;
         this.signalOptions = signalOptions;
         this.signalRecorder = signalRecorder;
@@ -95,18 +108,24 @@ public class ManualReviewRequests {
      * <p><strong>Must not be called inside a transaction</strong> — {@link AgentJobService#submit} opens
      * its own and says why. The pull request's associations (author, assignees, repository, branch refs)
      * must already be fetched; nothing here reopens a session to read them.
+     *
+     * @param requesters every SCM identity of the person asking. A collection rather than one identity
+     *     because a Hephaestus account may link several, and asking the question of one of them at a
+     *     time refuses an admin for signing in through the wrong provider. Empty means nobody was
+     *     identified, which is itself a refusal.
      */
     public ManualReviewOutcome requestPullRequestReview(
         Workspace workspace,
         PullRequest pullRequest,
-        @Nullable User requester
+        Collection<User> requesters
     ) {
-        if (!authority.mayRequest(workspace.getId(), pullRequest, requester)) {
+        User requester = authority.standingOf(workspace.getId(), pullRequest, requesters).orElse(null);
+        if (requester == null) {
             log.info(
-                "Manual review request refused: no standing on the artifact, workspaceId={}, prId={}, requesterId={}",
+                "Manual review request refused: no standing on the artifact, workspaceId={}, prId={}, identities={}",
                 workspace.getId(),
                 pullRequest.getId(),
-                requester == null ? null : requester.getId()
+                requesters.size()
             );
             return ManualReviewOutcome.forbidden();
         }
@@ -122,7 +141,7 @@ public class ManualReviewRequests {
         return run(
             workspace,
             pullRequest,
-            requester,
+            new Asker(requester, identityIds(requesters)),
             signal -> gate.evaluate(pullRequest, signal, TriggerMode.MANUAL),
             AgentJobType.PULL_REQUEST_REVIEW,
             () ->
@@ -138,13 +157,14 @@ public class ManualReviewRequests {
     }
 
     /** Issue-shaped counterpart of {@link #requestPullRequestReview}, with the same preconditions. */
-    public ManualReviewOutcome requestIssueReview(Workspace workspace, Issue issue, @Nullable User requester) {
-        if (!authority.mayRequest(workspace.getId(), issue, requester)) {
+    public ManualReviewOutcome requestIssueReview(Workspace workspace, Issue issue, Collection<User> requesters) {
+        User requester = authority.standingOf(workspace.getId(), issue, requesters).orElse(null);
+        if (requester == null) {
             log.info(
-                "Manual review request refused: no standing on the artifact, workspaceId={}, issueId={}, requesterId={}",
+                "Manual review request refused: no standing on the artifact, workspaceId={}, issueId={}, identities={}",
                 workspace.getId(),
                 issue.getId(),
-                requester == null ? null : requester.getId()
+                requesters.size()
             );
             return ManualReviewOutcome.forbidden();
         }
@@ -154,7 +174,7 @@ public class ManualReviewRequests {
         return run(
             workspace,
             issue,
-            requester,
+            new Asker(requester, identityIds(requesters)),
             signal -> gate.evaluateIssue(issue, signal, TriggerMode.MANUAL),
             AgentJobType.ISSUE_REVIEW,
             () ->
@@ -174,11 +194,20 @@ public class ManualReviewRequests {
         );
     }
 
-    /** Which signal this kind says a person raises by asking, the gate, the ledger, the submission. */
+    /**
+     * The person asking, as both halves of what a request needs to know about them.
+     *
+     * @param standing the identity the authority accepted, and the one the ledger row is filed under
+     * @param identityIds every identity of that same person, which is what the hourly allowance counts —
+     *     counting only the accepted one would hand a linked account one allowance per provider
+     */
+    private record Asker(User standing, List<Long> identityIds) {}
+
+    /** Which signal this kind says a person raises by asking, the limits, the ledger, the gate, the job. */
     private ManualReviewOutcome run(
         Workspace workspace,
         Issue artifact,
-        @Nullable User requester,
+        Asker asker,
         Function<SignalName, GateDecision> evaluate,
         AgentJobType jobType,
         Supplier<JobSubmissionRequest> submission
@@ -192,12 +221,26 @@ public class ManualReviewRequests {
             return ManualReviewOutcome.refused(SignalStateReason.NO_ACTIVE_PRACTICE);
         }
 
+        SignalStateReason limited = rateLimits
+            .refusalFor(workspace, kind, artifact.getId(), asker.identityIds())
+            .orElse(null);
+        if (limited != null) {
+            log.info(
+                "Manual review request: rate limited, workspaceId={}, artifactId={}, requesterId={}, reason={}",
+                workspace.getId(),
+                artifact.getId(),
+                asker.standing().getId(),
+                limited
+            );
+            return ManualReviewOutcome.refused(limited);
+        }
+
         // A fresh run id per ask, which is what makes two people asking two occasions rather than one
         // deduplicated against the other — and what keeps a request from consuming the ledger entry an
         // ordinary event was going to use.
         SignalKey key = ScmSignals.manualKey(workspace.getId(), artifact.getId(), requestSignal, UUID.randomUUID());
         transactionTemplate.executeWithoutResult(status ->
-            signalRecorder.record(key, Instant.now(), DiscoveredVia.MANUAL)
+            signalRecorder.record(key, Instant.now(), DiscoveredVia.MANUAL, asker.standing().getId())
         );
 
         GateDecision decision = evaluate.apply(requestSignal);
@@ -227,8 +270,13 @@ public class ManualReviewRequests {
             outcome.job().getId(),
             workspace.getId(),
             artifact.getId(),
-            requester == null ? null : requester.getId()
+            asker.standing().getId()
         );
         return ManualReviewOutcome.submitted(outcome.job().getId());
+    }
+
+    /** Ids only: the limit counts rows, and a detached {@link User} is more than it needs to hold. */
+    private static List<Long> identityIds(Collection<User> requesters) {
+        return requesters.stream().map(User::getId).filter(Objects::nonNull).toList();
     }
 }

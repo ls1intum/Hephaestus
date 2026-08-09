@@ -54,9 +54,13 @@ class ManualReviewRequestsTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
     private static final long PR_ID = 500L;
+    private static final long REQUESTER_ID = 4242L;
 
     @Mock
     private ReviewRequestAuthority authority;
+
+    @Mock
+    private ManualReviewRateLimits rateLimits;
 
     @Mock
     private PracticeReviewDetectionGate gate;
@@ -81,6 +85,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     void setUp() {
         requests = new ManualReviewRequests(
             authority,
+            rateLimits,
             gate,
             signalOptions,
             signalRecorder,
@@ -96,7 +101,10 @@ class ManualReviewRequestsTest extends BaseUnitTest {
             })
             .when(transactionTemplate)
             .executeWithoutResult(any());
-        lenient().when(authority.mayRequest(anyLong(), any(), any())).thenReturn(true);
+        lenient()
+            .when(authority.standingOf(anyLong(), any(), any()))
+            .thenAnswer(inv -> requesters().stream().findFirst());
+        lenient().when(rateLimits.refusalFor(any(), any(), anyLong(), any())).thenReturn(Optional.empty());
         lenient()
             .when(signalOptions.manualRequestSignalFor(ScmSignals.PULL_REQUEST))
             .thenReturn(Optional.of(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED));
@@ -104,9 +112,9 @@ class ManualReviewRequestsTest extends BaseUnitTest {
 
     @Test
     void anAskFromSomebodyWithNoStandingSpendsNothingAndRecordsNothing() {
-        when(authority.mayRequest(anyLong(), any(), any())).thenReturn(false);
+        when(authority.standingOf(anyLong(), any(), any())).thenReturn(Optional.empty());
 
-        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.FORBIDDEN);
         verifyNoInteractions(signalRecorder, gate, agentJobService);
@@ -122,7 +130,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         givenGateDetects();
         givenSubmissionSucceeds();
 
-        requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         verify(gate).evaluate(any(), eq(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED), eq(TriggerMode.MANUAL));
         verify(gate, never()).evaluate(any(), eq(ScmSignals.PULL_REQUEST_OPENED), any());
@@ -138,7 +146,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         givenGateDetects();
         givenSubmissionSucceeds();
 
-        requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
         verify(agentJobService).submitWithOutcome(
@@ -156,10 +164,10 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         givenGateDetects();
         givenSubmissionSucceeds();
 
-        requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         var captor = ArgumentCaptor.forClass(SignalKey.class);
-        verify(signalRecorder).record(captor.capture(), any(), eq(DiscoveredVia.MANUAL));
+        verify(signalRecorder).record(captor.capture(), any(), eq(DiscoveredVia.MANUAL), eq(REQUESTER_ID));
         SignalKey key = captor.getValue();
         assertThat(key.workspaceId()).isEqualTo(WORKSPACE_ID);
         assertThat(key.artifactId()).isEqualTo(PR_ID);
@@ -176,11 +184,16 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         givenGateDetects();
         givenSubmissionSucceeds();
 
-        requests.requestPullRequestReview(workspace, pullRequest(), requester());
-        requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        requests.requestPullRequestReview(workspace, pullRequest(), requesters());
+        requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         var captor = ArgumentCaptor.forClass(SignalKey.class);
-        verify(signalRecorder, org.mockito.Mockito.times(2)).record(captor.capture(), any(), eq(DiscoveredVia.MANUAL));
+        verify(signalRecorder, org.mockito.Mockito.times(2)).record(
+            captor.capture(),
+            any(),
+            eq(DiscoveredVia.MANUAL),
+            eq(REQUESTER_ID)
+        );
         assertThat(captor.getAllValues().get(0)).isNotEqualTo(captor.getAllValues().get(1));
     }
 
@@ -191,7 +204,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
             new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_TIER_OFF)
         );
 
-        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.REFUSED);
         assertThat(outcome.reason()).isEqualTo(SignalStateReason.PRACTICE_TIER_OFF);
@@ -208,7 +221,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
             SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED)
         );
 
-        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.REFUSED);
         assertThat(outcome.reason()).isEqualTo(SignalStateReason.BUDGET_EXHAUSTED);
@@ -219,10 +232,59 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     void aKindThatDeclaresNoRequestSignalRefusesRatherThanInventingOne() {
         when(signalOptions.manualRequestSignalFor(ScmSignals.PULL_REQUEST)).thenReturn(Optional.empty());
 
-        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requester());
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.REFUSED);
         verifyNoInteractions(signalRecorder, agentJobService);
+    }
+
+    /**
+     * A request that trips a limit leaves no ledger row. The limits count manual rows, so recording
+     * refusals would make the population they count self-inflating: each declined ask would tighten the
+     * allowance for the next one, and somebody who hit the limit once would be pushed further past it by
+     * their own retries.
+     */
+    @Test
+    void aRateLimitedAskSpendsNothingAndRecordsNothing() {
+        when(rateLimits.refusalFor(any(), any(), anyLong(), any())).thenReturn(
+            Optional.of(SignalStateReason.REQUESTER_QUOTA_EXHAUSTED)
+        );
+
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
+
+        assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.REFUSED);
+        assertThat(outcome.reason()).isEqualTo(SignalStateReason.REQUESTER_QUOTA_EXHAUSTED);
+        assertThat(outcome.describeReason()).isEqualTo(SignalStateReason.REQUESTER_QUOTA_EXHAUSTED.describe());
+        verifyNoInteractions(signalRecorder, gate, agentJobService);
+    }
+
+    /**
+     * Standing is established before the limits are consulted. The other order would let a stranger burn
+     * a team's allowance simply by being refused over and over.
+     */
+    @Test
+    void anAskFromSomebodyWithNoStandingNeverReachesTheLimits() {
+        when(authority.standingOf(anyLong(), any(), any())).thenReturn(Optional.empty());
+
+        requests.requestPullRequestReview(workspace, pullRequest(), requesters());
+
+        verifyNoInteractions(rateLimits);
+    }
+
+    /** The limit is asked about every identity of the asker, not just the one that granted standing. */
+    @Test
+    void theLimitCountsEveryIdentityOfTheSamePerson() {
+        givenGateDetects();
+        givenSubmissionSucceeds();
+        User second = new User();
+        second.setId(7777L);
+
+        requests.requestPullRequestReview(workspace, pullRequest(), List.of(requesters().get(0), second));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Collection<Long>> ids = ArgumentCaptor.forClass(java.util.Collection.class);
+        verify(rateLimits).refusalFor(eq(workspace), eq(ScmSignals.PULL_REQUEST), eq(PR_ID), ids.capture());
+        assertThat(ids.getValue()).containsExactly(REQUESTER_ID, 7777L);
     }
 
     /** A mirror that has not caught up with the branch cannot be cloned or diffed. */
@@ -231,7 +293,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         PullRequest pr = pullRequest();
         pr.setHeadRefOid(null);
 
-        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pr, requester());
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pr, requesters());
 
         assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.REFUSED);
         assertThat(outcome.reason()).isEqualTo(SignalStateReason.ARTIFACT_GONE);
@@ -270,10 +332,10 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         return pr;
     }
 
-    private User requester() {
+    private List<User> requesters() {
         User user = new User();
-        user.setId(4242L);
+        user.setId(REQUESTER_ID);
         user.setLogin("student1");
-        return user;
+        return List.of(user);
     }
 }
