@@ -45,5 +45,17 @@ final class ScmEventSources {
         return new Signal(name, displayName, producedBy, ScmSignals.revisionScheme(name), true);
     }
 
+    /**
+     * As {@link #declare}, for the signal a person raises by asking for a review of this artifact now.
+     *
+     * <p>Takes no {@code producedBy} because there is nothing to take: a request is raised inside
+     * Hephaestus, and the empty provenance is what stops a vendor from claiming it can deliver one. Not
+     * offered to authors either — a practice binds the occasions it measures, and "somebody asked" is not
+     * one of them; the request runs every practice on the kind instead.
+     */
+    static Signal declareManualRequest(SignalName name, String displayName) {
+        return new Signal(name, displayName, Set.of(), ScmSignals.revisionScheme(name), false, true);
+    }
+
     private ScmEventSources() {}
 }

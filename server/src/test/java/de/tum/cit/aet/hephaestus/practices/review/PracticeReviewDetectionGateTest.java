@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -61,6 +62,13 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     @Mock
     private WorkspaceResolver workspaceResolver;
 
+    /**
+     * Lenient because most tests never reach the manual-request question; an unstubbed answer of {@code false}
+     * is exactly "this signal is an ordinary occasion", which is what they are about.
+     */
+    @Mock(strictness = Mock.Strictness.LENIENT)
+    private PracticeSignalOptions signalOptions;
+
     private PracticeReviewDetectionGate gate;
 
     @BeforeEach
@@ -71,7 +79,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             userRoleChecker,
             practiceDetectionReadiness,
             practiceRepository,
-            workspaceResolver
+            workspaceResolver,
+            signalOptions
         );
     }
 
@@ -166,6 +175,86 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
      * veto puts the draft-specific criteria of a practice like {@code ready-and-traceable-handoff} out of
      * reach of the only artifact they apply to.
      */
+    /**
+     * A review somebody asked for by hand. No bundled practice binds {@code scm.pull_request.review_requested}
+     * — nothing in {@code default-catalog.json} mentions it — so matching a request by signal would refuse
+     * every one of them with "no matching practices", which reads to a developer as a broken workspace. The
+     * request instead admits every practice on the kind.
+     */
+    @Nested
+    class ManualRequestTests {
+
+        private static final SignalName REQUEST = ScmSignals.PULL_REQUEST_REVIEW_REQUESTED;
+
+        @BeforeEach
+        void treatTheRequestSignalAsARequest() {
+            when(signalOptions.isManualRequest(REQUEST)).thenReturn(true);
+        }
+
+        @Test
+        @DisplayName("a request admits practices bound to entirely different signals of the same kind")
+        void requestAdmitsEveryPracticeOnTheKind() {
+            PullRequest pr = createPullRequest();
+            Practice onOpened = createPractice(ScmSignals.PULL_REQUEST_OPENED);
+            Practice onMerged = createPractice(ScmSignals.PULL_REQUEST_MERGED);
+            Workspace workspace = setupThroughPracticeMatching(pr, onOpened, onMerged);
+            // Past the role gate, which is a question about who the work belongs to rather than about
+            // which practices a request occasions.
+            workspace.getReviewSettings().applyPatch(true, null, null);
+
+            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
+
+            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
+            assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactlyInAnyOrder(
+                onOpened,
+                onMerged
+            );
+        }
+
+        @Test
+        @DisplayName("a request about a draft is honoured: the person asking has answered that question")
+        void requestIgnoresTheDraftFilter() {
+            PullRequest pr = createPullRequest();
+            pr.setDraft(true);
+            Practice notOnDrafts = createPractice(ScmSignals.PULL_REQUEST_OPENED);
+            Workspace workspace = setupThroughPracticeMatching(pr, notOnDrafts);
+            workspace.getReviewSettings().applyPatch(true, null, null);
+
+            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
+
+            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
+            assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactly(notOnDrafts);
+        }
+
+        @Test
+        @DisplayName("Off still means off, however the review was occasioned")
+        void requestDoesNotOverrideTheTier() {
+            PullRequest pr = createPullRequest();
+            Practice silenced = createPractice(ScmSignals.PULL_REQUEST_OPENED);
+            silenced.setReviewTier(PracticeReviewTier.OFF);
+            setupThroughPracticeMatching(pr, silenced);
+
+            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).resolvedSignalReason()).isEqualTo(
+                SignalStateReason.PRACTICE_TIER_OFF
+            );
+        }
+
+        @Test
+        @DisplayName("a practice on another kind is not dragged in by a pull-request request")
+        void requestStaysWithinItsKind() {
+            PullRequest pr = createPullRequest();
+            Practice onIssues = createPractice(ScmSignals.ISSUE_OPENED);
+            setupThroughPracticeMatching(pr, onIssues);
+
+            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+        }
+    }
+
     @Nested
     class DraftGateTests {
 
@@ -423,7 +512,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 userRoleChecker,
                 practiceDetectionReadiness,
                 practiceRepository,
-                workspaceResolver
+                workspaceResolver,
+                signalOptions
             );
 
             PullRequest pr = createPullRequest();

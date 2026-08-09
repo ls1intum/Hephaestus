@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
@@ -68,6 +69,7 @@ public class PracticeReviewDetectionGate {
     private final PracticeReviewReadiness practiceDetectionReadiness;
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
+    private final PracticeSignalOptions signalOptions;
 
     private final AtomicLong skippedDueToUnhealthyCount = new AtomicLong(0);
     private final AtomicReference<Instant> lastSkipWarningTime = new AtomicReference<>(Instant.EPOCH);
@@ -77,13 +79,15 @@ public class PracticeReviewDetectionGate {
         UserRoleChecker userRoleChecker,
         PracticeReviewReadiness practiceDetectionReadiness,
         PracticeRepository practiceRepository,
-        WorkspaceResolver workspaceResolver
+        WorkspaceResolver workspaceResolver,
+        PracticeSignalOptions signalOptions
     ) {
         this.properties = properties;
         this.userRoleChecker = userRoleChecker;
         this.practiceDetectionReadiness = practiceDetectionReadiness;
         this.practiceRepository = practiceRepository;
         this.workspaceResolver = workspaceResolver;
+        this.signalOptions = signalOptions;
     }
 
     /**
@@ -402,7 +406,23 @@ public class PracticeReviewDetectionGate {
      */
     private record SignalMatch(List<Practice> admitted, boolean silencedByTier) {}
 
+    /**
+     * The practices a signal occasions.
+     *
+     * <p>A review somebody asked for by hand is matched differently, and deliberately so. No bundled practice
+     * binds a {@code *.review_requested} signal, and none should have to: a person asking "review this now"
+     * is asking for the practices this workspace measures on this kind of work, not for a separate catalog
+     * somebody has to remember to maintain in parallel. Matching by signal would refuse every such request
+     * with "no matching practices", which reads as a broken workspace.
+     *
+     * <p>So a manual request admits every practice with any binding of the artifact's kind, and ignores the
+     * draft filter — {@code onDrafts} exists to stop <em>automatic</em> review of work in progress, and a
+     * person asking about their own draft has already answered that question. The rule is kind-generic and
+     * asks the descriptor which signal that is, so a new domain's manual request works with no edit here.
+     * The tier is still honoured below: Off means off, however the review was occasioned.
+     */
     private SignalMatch findMatchingPractices(Long workspaceId, SignalName signal, boolean draft) {
+        boolean requestedByHand = signalOptions.isManualRequest(signal);
         List<Practice> bound = practiceRepository
             .findByWorkspaceId(workspaceId)
             .stream()
@@ -410,7 +430,9 @@ public class PracticeReviewDetectionGate {
                 p
                     .getBindings()
                     .stream()
-                    .anyMatch(binding -> binding.occasionedBy(signal, draft))
+                    .anyMatch(binding ->
+                        requestedByHand ? binding.appliesTo(signal.artifactKind()) : binding.occasionedBy(signal, draft)
+                    )
             )
             .toList();
         List<Practice> admitted = bound

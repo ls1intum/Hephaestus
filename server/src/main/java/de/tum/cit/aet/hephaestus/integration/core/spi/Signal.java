@@ -28,17 +28,33 @@ import java.util.Set;
  * @param recommendedForAuthoring whether a practice written against this artifact should start out
  *                    watching this signal — the domain's opinion, which the authoring surface
  *                    pre-selects and the author is free to overrule
+ * @param requestedByHand whether this is the signal a person raises by asking for a review of this kind
+ *                    of work now. Declared on the signal rather than as another descriptor method
+ *                    because it is a fact about one signal, and because saying it here makes "the kind
+ *                    named a request signal it never declared" impossible rather than merely checked
  */
 public record Signal(
     SignalName name,
     String displayName,
     Set<EventTypeKey> producedBy,
     RevisionScheme revision,
-    boolean recommendedForAuthoring
+    boolean recommendedForAuthoring,
+    boolean requestedByHand
 ) {
     /** A signal the authoring surface offers but does not pre-select. */
     public Signal(SignalName name, String displayName, Set<EventTypeKey> producedBy, RevisionScheme revision) {
-        this(name, displayName, producedBy, revision, false);
+        this(name, displayName, producedBy, revision, false, false);
+    }
+
+    /** A signal an ingested event raises, which the authoring surface may pre-select. */
+    public Signal(
+        SignalName name,
+        String displayName,
+        Set<EventTypeKey> producedBy,
+        RevisionScheme revision,
+        boolean recommendedForAuthoring
+    ) {
+        this(name, displayName, producedBy, revision, recommendedForAuthoring, false);
     }
 
     public Signal {

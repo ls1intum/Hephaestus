@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -58,6 +59,34 @@ public class PracticeSignalOptions {
             .stream()
             .map(signal -> new SignalOption(signal.name(), signal.displayName(), signal.recommendedForAuthoring()))
             .toList();
+    }
+
+    /** The signal a person's explicit "review this now" raises for this kind, if the kind admits one. */
+    public Optional<SignalName> manualRequestSignalFor(ArtifactKind kind) {
+        return artifacts
+            .descriptorFor(kind)
+            .stream()
+            .flatMap(descriptor -> descriptor.signals().stream())
+            .filter(Signal::requestedByHand)
+            .map(Signal::name)
+            .findFirst();
+    }
+
+    /**
+     * Whether this signal is the one a person raises by asking for a review of this kind of work.
+     *
+     * <p>The single place that question is answered, because two places already answer the closely related
+     * "which practices does this signal occasion" and they have drifted apart once before: the detection gate
+     * decides whether a review runs at all, and the catalog injector decides which practices the run actually
+     * loads. A hand-requested review has to be admitted by <em>both</em> — admitting it at the gate alone
+     * buys a job that then fails to prepare, having found no practice bound to a signal no practice binds to.
+     *
+     * <p>Derived from the descriptor rather than from the signal's spelling. Matching a {@code review_requested}
+     * suffix here would encode one domain's naming habit as a core rule and quietly fail for a kind that
+     * spells its request differently.
+     */
+    public boolean isManualRequest(SignalName signal) {
+        return manualRequestSignalFor(signal.artifactKind()).filter(signal::equals).isPresent();
     }
 
     /** The signals a practice on this kind may bind to. */

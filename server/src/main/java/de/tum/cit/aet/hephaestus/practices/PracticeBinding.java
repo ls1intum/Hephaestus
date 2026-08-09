@@ -118,6 +118,17 @@ public record PracticeBinding(
     }
 
     /**
+     * Whether this binding is about this kind of work at all, whatever occasioned the review.
+     *
+     * <p>The question a review somebody asked for by hand asks. Such a request names no narrower occasion —
+     * it is "look at this now" — so matching it against the binding's signals would find nothing, because no
+     * practice binds a request signal and none should have to.
+     */
+    public boolean appliesTo(ArtifactKind kind) {
+        return artifactKind().equals(kind);
+    }
+
+    /**
      * Whether an artifact in the given draft state occasions this review: a non-draft one always does,
      * a draft one only where the author said so.
      */

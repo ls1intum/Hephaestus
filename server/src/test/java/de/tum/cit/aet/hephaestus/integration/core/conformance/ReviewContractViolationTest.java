@@ -228,6 +228,116 @@ class ReviewContractViolationTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * A kind that admits a review somebody asks for by hand has to be able to record the ask. Each rule here
+     * stops a failure that would otherwise be silent — a vanished request, a consumed event occasion, or a
+     * healthy workspace reported as having a broken producer.
+     */
+    @Nested
+    class RequestSignalsMustBeRecordable {
+
+        private static final SignalName REQUESTED = SignalName.of("fixture.widget.review_requested");
+
+        private static ArtifactDescriptor withRequestSignal(Signal request) {
+            return FixtureIntegration.descriptor(
+                List.of(
+                    new Signal(
+                        FixtureIntegration.WIDGET_ASSEMBLED,
+                        "Widget assembled",
+                        Set.of(FixtureIntegration.ASSEMBLY_EVENT),
+                        RevisionScheme.CONTENT_DIGEST
+                    ),
+                    request
+                ),
+                true,
+                Set.of(ActorRole.AUTHOR),
+                Set.of(FeedbackLane.IN_CONTEXT_SUMMARY)
+            );
+        }
+
+        @Test
+        @DisplayName("a request keyed on anything but RUN_ID would deduplicate the second person's ask away")
+        void aRequestSignalKeyedOnContentIsRefused() {
+            Signal request = new Signal(
+                REQUESTED,
+                "Review requested by hand",
+                Set.of(),
+                RevisionScheme.CONTENT_DIGEST,
+                false,
+                true
+            );
+
+            assertThat(validateDescriptors(withRequestSignal(request)))
+                .singleElement()
+                .asString()
+                .contains("anything other than RUN_ID deduplicates");
+        }
+
+        @Test
+        @DisplayName("a request an ingested event claims to raise is refused: a request comes from a person")
+        void aRequestSignalWithProvenanceIsRefused() {
+            Signal request = new Signal(
+                REQUESTED,
+                "Review requested by hand",
+                Set.of(FixtureIntegration.ASSEMBLY_EVENT),
+                RevisionScheme.RUN_ID,
+                false,
+                true
+            );
+
+            assertThat(validateDescriptors(withRequestSignal(request)))
+                .singleElement()
+                .asString()
+                .contains("a request comes from a person");
+        }
+
+        @Test
+        @DisplayName("two request signals make a request's ledger identity depend on declaration order")
+        void twoRequestSignalsAreRefused() {
+            ArtifactDescriptor twoRequests = FixtureIntegration.descriptor(
+                List.of(
+                    new Signal(REQUESTED, "Review requested", Set.of(), RevisionScheme.RUN_ID, false, true),
+                    new Signal(
+                        SignalName.of("fixture.widget.recheck_requested"),
+                        "Recheck requested",
+                        Set.of(),
+                        RevisionScheme.RUN_ID,
+                        false,
+                        true
+                    )
+                ),
+                true,
+                Set.of(ActorRole.AUTHOR),
+                Set.of(FeedbackLane.IN_CONTEXT_SUMMARY)
+            );
+
+            assertThat(validateDescriptors(twoRequests)).anySatisfy(violation ->
+                assertThat(violation).contains("must resolve exactly one")
+            );
+        }
+
+        @Test
+        @DisplayName("a kind that admits no hand-requested review declares none, and that is not a gap")
+        void noRequestSignalIsLegal() {
+            assertThat(validateDescriptors(FixtureIntegration.descriptor())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a well-formed request signal passes")
+        void aRunIdKeyedRequestWithNoProvenancePasses() {
+            Signal request = new Signal(
+                REQUESTED,
+                "Review requested by hand",
+                Set.of(),
+                RevisionScheme.RUN_ID,
+                false,
+                true
+            );
+
+            assertThat(validateDescriptors(withRequestSignal(request))).isEmpty();
+        }
+    }
+
     @Nested
     class LanesMustBeBacked {
 

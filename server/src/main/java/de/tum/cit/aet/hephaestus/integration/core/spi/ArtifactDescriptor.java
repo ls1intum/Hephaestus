@@ -19,6 +19,12 @@ import java.util.Set;
  * declared separately in {@link IntegrationManifest.ReviewContribution}, and the gap between the two is
  * the point — a vendor that raises only some of a kind's signals says so, instead of the rest simply
  * never firing.
+ *
+ * <p>Whether the kind can be reviewed on demand is <em>not</em> another method here: it is
+ * {@link Signal#requestedByHand()} on one of {@link #signals()}. A kind that admits a hand-requested
+ * review declares that signal; one that does not, declares none. Keeping it on the signal makes "named a
+ * request signal the kind never declared" unrepresentable rather than merely validated, and keeps this
+ * interface at the size the SPI focus rule allows.
  */
 public interface ArtifactDescriptor {
     /** The family this descriptor defines. Unique across the application context. */

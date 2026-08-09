@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.signal;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITHUB_ISSUES;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITLAB_ISSUE;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declare;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declareManualRequest;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declareRecommended;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -33,7 +34,7 @@ public class IssueArtifactDescriptor implements ArtifactDescriptor {
         // one per newly added label off the update event, so the provenance is real.
         declareRecommended(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
         declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
-        declare(ScmSignals.ISSUE_REVIEW_REQUESTED, "Review requested by hand", Set.of())
+        declareManualRequest(ScmSignals.ISSUE_REVIEW_REQUESTED, "Review requested by hand")
     );
 
     @Override

@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSo
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITLAB_MERGE_REQUEST;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.GITLAB_NOTE;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declare;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declareManualRequest;
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmEventSources.declareRecommended;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -60,7 +61,7 @@ public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
         ),
         // No ingested event raises this one: it is somebody asking for a review by hand. Declaring the
         // empty provenance is what stops a vendor from claiming it can raise it.
-        declare(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED, "Review requested by hand", Set.of())
+        declareManualRequest(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED, "Review requested by hand")
     );
 
     @Override

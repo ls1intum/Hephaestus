@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.framework;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
@@ -118,6 +119,7 @@ public class ReviewContractValidator {
             if (distinctNames != descriptor.signals().size()) {
                 violations.add(kind + " declares the same signal name twice");
             }
+            validateManualRequestSignal(descriptor, kind, violations);
             if (descriptor.reviewable()) {
                 if (!contextBuilders.containsKey(kind)) {
                     violations.add(
@@ -154,6 +156,74 @@ public class ReviewContractValidator {
             }
         }
         return violations;
+    }
+
+    /**
+     * A kind that says it can be reviewed on demand has to be able to record the ask.
+     *
+     * <p>Three ways that fails silently rather than loudly, which is why each is checked at startup.
+     *
+     * <p><b>Two request signals.</b> The manual path has to resolve one signal for the kind; with two, which
+     * one it picks is an accident of declaration order, and the ledger identity of a request would depend on
+     * it.
+     *
+     * <p><b>A scheme other than {@code RUN_ID}.</b> Two people asking about the same unchanged artifact would
+     * derive the same revision, so the second ask would be deduplicated against the first by
+     * {@code uq_artifact_signal} and simply vanish — and worse, a hand-requested review would consume the
+     * ledger entry an ordinary event was going to use, so the event's own review would never run.
+     *
+     * <p><b>A non-empty provenance.</b> A request is raised inside Hephaestus. Claiming an ingested event
+     * raises it would put it back under the coverage and dormancy checks, which would then report a healthy
+     * workspace as having a broken producer for a signal no producer was ever meant to have.
+     */
+    private void validateManualRequestSignal(
+        ArtifactDescriptor descriptor,
+        ArtifactKind kind,
+        List<String> violations
+    ) {
+        List<Signal> requests = descriptor.signals().stream().filter(Signal::requestedByHand).toList();
+        if (requests.isEmpty()) {
+            return;
+        }
+        if (requests.size() > 1) {
+            violations.add(
+                kind +
+                    " declares " +
+                    requests.size() +
+                    " signals as the one a person's review request raises (" +
+                    requests
+                        .stream()
+                        .map(signal -> signal.name().value())
+                        .sorted()
+                        .toList() +
+                    ") — the manual path must resolve exactly one, or a request's ledger identity depends on " +
+                    "declaration order"
+            );
+        }
+        for (Signal request : requests) {
+            if (request.revision() != RevisionScheme.RUN_ID) {
+                violations.add(
+                    kind +
+                        " raises " +
+                        request.name() +
+                        " when somebody asks for a review, but keys it on " +
+                        request.revision() +
+                        " — a request has no identity but its own, so anything other than RUN_ID deduplicates " +
+                        "a second person's ask against the first, or against an event's"
+                );
+            }
+            if (!request.producedBy().isEmpty()) {
+                violations.add(
+                    kind +
+                        " raises " +
+                        request.name() +
+                        " when somebody asks for a review, yet declares ingested events " +
+                        request.producedBy() +
+                        " produce it — a request comes from a person, and claiming otherwise puts it back " +
+                        "under the coverage checks it is rightly exempt from"
+                );
+            }
+        }
     }
 
     /** Rules about what one enabled integration claims to contribute. */
