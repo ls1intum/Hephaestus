@@ -121,6 +121,8 @@ tags:
   name: Practice Catalog
 - description: Workspace-scoped team settings management
   name: Team Settings
+- description: Recurring reviews of recent work
+  name: Practice Review Sweep
 - description: Developer reactions to delivered feedback
   name: Feedback Reaction
 - description: Identity provider discovery (public)
@@ -374,6 +376,7 @@ paths:
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
             - REVIEW_BACKFILL_RUN
+            - REVIEW_SWEEP_SCHEDULE
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -2343,6 +2346,7 @@ paths:
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
             - REVIEW_BACKFILL_RUN
+            - REVIEW_SWEEP_SCHEDULE
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -5311,6 +5315,141 @@ paths:
       summary: Get a finding with its evidence and linked feedback
       tags:
       - Practice reviews
+  /workspaces/{workspaceSlug}/practices/sweep-schedules:
+    get:
+      operationId: listSweepSchedules
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewSweepSchedule"
+          description: Schedules returned
+      summary: List this workspace's sweep schedules
+      tags:
+      - Practice Review Sweep
+    post:
+      description: Authorises the recurring spend. The first sweep runs within the
+        hour.
+      operationId: createSweepSchedule
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewSweepScheduleRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSweepSchedule"
+          description: Schedule created
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The kind cannot be swept, or the lookback is longer than the\
+            \ cadence allows"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: This workspace already sweeps that kind of work
+      summary: Start sweeping a kind of work on a cadence
+      tags:
+      - Practice Review Sweep
+  /workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}:
+    delete:
+      description: Removes the instruction. Campaigns it already opened keep their
+        records.
+      operationId: deleteSweepSchedule
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: scheduleId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Schedule removed
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such schedule in this workspace
+      summary: Stop sweeping
+      tags:
+      - Practice Review Sweep
+    put:
+      description: "Changes the cadence, the window, or whether the sweep runs at\
+        \ all."
+      operationId: replaceSweepSchedule
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: scheduleId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReviewSweepScheduleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSweepSchedule"
+          description: Schedule updated
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such schedule in this workspace
+      summary: Replace a sweep schedule's terms
+      tags:
+      - Practice Review Sweep
   /workspaces/{workspaceSlug}/practices/trace:
     get:
       description: "Built from the signal ledger, so it includes work that was never\
@@ -7535,6 +7674,7 @@ components:
           - WORKSPACE_LLM_BUDGET
           - WORKSPACE_BYO_LLM_BUDGET
           - REVIEW_BACKFILL_RUN
+          - REVIEW_SWEEP_SCHEDULE
           - WORKSPACE_LLM_CONNECTION
           - WORKSPACE_LLM_MODEL
         id:
@@ -8135,6 +8275,42 @@ components:
       required:
       - artifactId
       - artifactKind
+    CreateReviewSweepScheduleRequest:
+      type: object
+      description: |-
+        Create a standing instruction to sweep this workspace's recent work.
+
+         <p>Unlike a backfill campaign there is no separate confirmation step: this request <em>is</em> the
+         authorisation to spend on the cadence it names, and it is recorded against the account that made it.
+
+         <p>There is deliberately no repository or author list. Which repositories are reviewed is the
+         workspace's review scope and whose work is reviewed is the practice-review role; both already apply to
+         every review this workspace runs, a sweep included.
+      properties:
+        artifactKind:
+          type: string
+          description: Kind of work to sweep
+          enum:
+          - scm.pull_request
+          - scm.issue
+          example: scm.pull_request
+        cadence:
+          type: string
+          description: How often the sweep runs
+          enum:
+          - DAILY
+          - WEEKLY
+        lookbackDays:
+          type: integer
+          format: int32
+          description: "How far back each sweep looks, in days"
+          example: 2
+          maximum: 7
+          minimum: 1
+      required:
+      - artifactKind
+      - cadence
+      - lookbackDays
     CreateWorkspaceLlmConnectionRequest:
       type: object
       description: Connect your own AI provider
@@ -11402,6 +11578,16 @@ components:
         createdAt:
           type: string
           format: date-time
+        discoveredVia:
+          type: string
+          description: "BACKFILL for a campaign an admin scoped by hand, SWEEP for\
+            \ one a recurring schedule opened"
+          enum:
+          - EVENT
+          - SYNC
+          - MANUAL
+          - BACKFILL
+          - SWEEP
         estimatedArtifacts:
           type: integer
           format: int32
@@ -11456,12 +11642,18 @@ components:
           type: integer
           format: int32
           description: artifacts for which a review job was created
+        sweepScheduleId:
+          type: string
+          format: uuid
+          description: The schedule that opened this run; absent for a campaign an
+            admin scoped by hand
         toAt:
           type: string
           format: date-time
       required:
       - artifactKind
       - createdAt
+      - discoveredVia
       - estimatedArtifacts
       - failedCount
       - fromAt
@@ -12222,6 +12414,56 @@ components:
       required:
       - id
       - login
+    ReviewSweepSchedule:
+      type: object
+      description: "A standing instruction to review recent work on a cadence, as\
+        \ an admin sees it."
+      properties:
+        artifactKind:
+          type: string
+        cadence:
+          type: string
+          enum:
+          - DAILY
+          - WEEKLY
+        createdAt:
+          type: string
+          format: date-time
+        createdByAccountId:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        lastRunAt:
+          type: string
+          format: date-time
+          description: When a campaign was last opened from this schedule; absent
+            until the first one
+        lookbackDays:
+          type: integer
+          format: int32
+          description: |-
+            how far back each sweep looks. Bounded at write time to twice the cadence and
+                 never more than a week, which is what keeps a sweep's findings admissible in the same trend line
+                 as reviews that events triggered.
+        nextRunAt:
+          type: string
+          format: date-time
+          description: |-
+            when the next sweep is due. Shown because it is the only way to tell a schedule that
+                 is working from one whose workspace has been skipping it.
+      required:
+      - artifactKind
+      - cadence
+      - createdAt
+      - createdByAccountId
+      - enabled
+      - id
+      - lookbackDays
+      - nextRunAt
     RevokeSessionsResult:
       type: object
       properties:
@@ -12759,6 +13001,7 @@ components:
           - SYNC
           - MANUAL
           - BACKFILL
+          - SWEEP
         displayName:
           type: string
           description: "Human label for the signal, from the artifact kind's descriptor"
@@ -13231,6 +13474,36 @@ components:
           - CANCELLED
       required:
       - status
+    UpdateReviewSweepScheduleRequest:
+      type: object
+      description: |-
+        Replace a sweep schedule's terms.
+
+         <p>Every field is required: a schedule is three numbers that only mean anything together — a cadence
+         changed without its lookback can silently make a window illegal, or leave days nothing ever sweeps.
+         The artifact kind is not among them; a schedule for a different kind of work is a different schedule.
+      properties:
+        cadence:
+          type: string
+          description: How often the sweep runs
+          enum:
+          - DAILY
+          - WEEKLY
+        enabled:
+          type: boolean
+          description: Whether the scheduler acts on this row; a disabled schedule
+            keeps its terms
+        lookbackDays:
+          type: integer
+          format: int32
+          description: "How far back each sweep looks, in days"
+          example: 2
+          maximum: 7
+          minimum: 1
+      required:
+      - cadence
+      - enabled
+      - lookbackDays
     UpdateSilentModeRequest:
       type: object
       properties:

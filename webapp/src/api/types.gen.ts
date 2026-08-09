@@ -932,6 +932,28 @@ export type UpdateSilentModeRequest = {
 };
 
 /**
+ * Replace a sweep schedule's terms.
+ *
+ * <p>Every field is required: a schedule is three numbers that only mean anything together — a cadence
+ * changed without its lookback can silently make a window illegal, or leave days nothing ever sweeps.
+ * The artifact kind is not among them; a schedule for a different kind of work is a different schedule.
+ */
+export type UpdateReviewSweepScheduleRequest = {
+    /**
+     * How often the sweep runs
+     */
+    cadence: 'DAILY' | 'WEEKLY';
+    /**
+     * Whether the scheduler acts on this row; a disabled schedule keeps its terms
+     */
+    enabled: boolean;
+    /**
+     * How far back each sweep looks, in days
+     */
+    lookbackDays: number;
+};
+
+/**
  * The lifecycle transitions an admin can ask for.
  *
  * <p><code>RUNNING</code> is the confirmation: it is the point at which somebody accepts the estimate they
@@ -1367,7 +1389,7 @@ export type TracedSignal = {
     /**
      * How we came to know: by event, by sync, by hand, or by backfill
      */
-    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL';
+    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL' | 'SWEEP';
     /**
      * Human label for the signal, from the artifact kind's descriptor
      */
@@ -1831,6 +1853,33 @@ export type SessionView = {
 
 export type RevokeSessionsResult = {
     revoked?: number;
+};
+
+/**
+ * A standing instruction to review recent work on a cadence, as an admin sees it.
+ */
+export type ReviewSweepSchedule = {
+    artifactKind: string;
+    cadence: 'DAILY' | 'WEEKLY';
+    createdAt: Date;
+    createdByAccountId: number;
+    enabled: boolean;
+    id: string;
+    /**
+     * When a campaign was last opened from this schedule; absent until the first one
+     */
+    lastRunAt?: Date;
+    /**
+     * how far back each sweep looks. Bounded at write time to twice the cadence and
+     * never more than a week, which is what keeps a sweep's findings admissible in the same trend line
+     * as reviews that events triggered.
+     */
+    lookbackDays: number;
+    /**
+     * when the next sweep is due. Shown because it is the only way to tell a schedule that
+     * is working from one whose workspace has been skipping it.
+     */
+    nextRunAt: Date;
 };
 
 export type ReviewSubject = {
@@ -2320,6 +2369,10 @@ export type ReviewBackfillRun = {
      */
     confirmedByAccountId?: number;
     createdAt: Date;
+    /**
+     * BACKFILL for a campaign an admin scoped by hand, SWEEP for one a recurring schedule opened
+     */
+    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL' | 'SWEEP';
     estimatedArtifacts: number;
     /**
      * Forecast total spend in USD; absent when the workspace has no priced review history
@@ -2349,6 +2402,10 @@ export type ReviewBackfillRun = {
      * artifacts for which a review job was created
      */
     submittedCount: number;
+    /**
+     * The schedule that opened this run; absent for a campaign an admin scoped by hand
+     */
+    sweepScheduleId?: string;
     toAt: Date;
 };
 
@@ -3433,7 +3490,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -4662,6 +4719,31 @@ export type CreateWorkspaceLlmConnectionRequest = {
 };
 
 /**
+ * Create a standing instruction to sweep this workspace's recent work.
+ *
+ * <p>Unlike a backfill campaign there is no separate confirmation step: this request <em>is</em> the
+ * authorisation to spend on the cadence it names, and it is recorded against the account that made it.
+ *
+ * <p>There is deliberately no repository or author list. Which repositories are reviewed is the
+ * workspace's review scope and whose work is reviewed is the practice-review role; both already apply to
+ * every review this workspace runs, a sweep included.
+ */
+export type CreateReviewSweepScheduleRequest = {
+    /**
+     * Kind of work to sweep
+     */
+    artifactKind: 'scm.pull_request' | 'scm.issue';
+    /**
+     * How often the sweep runs
+     */
+    cadence: 'DAILY' | 'WEEKLY';
+    /**
+     * How far back each sweep looks, in days
+     */
+    lookbackDays: number;
+};
+
+/**
  * The piece of work a review is being asked for
  */
 export type CreateReviewRequest = {
@@ -5473,7 +5555,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -7265,7 +7347,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -9634,6 +9716,123 @@ export type GetPracticeReviewFindingResponses = {
 };
 
 export type GetPracticeReviewFindingResponse = GetPracticeReviewFindingResponses[keyof GetPracticeReviewFindingResponses];
+
+export type ListSweepSchedulesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules';
+};
+
+export type ListSweepSchedulesResponses = {
+    /**
+     * Schedules returned
+     */
+    200: Array<ReviewSweepSchedule>;
+};
+
+export type ListSweepSchedulesResponse = ListSweepSchedulesResponses[keyof ListSweepSchedulesResponses];
+
+export type CreateSweepScheduleData = {
+    body: CreateReviewSweepScheduleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules';
+};
+
+export type CreateSweepScheduleErrors = {
+    /**
+     * The kind cannot be swept, or the lookback is longer than the cadence allows
+     */
+    400: ProblemDetail;
+    /**
+     * This workspace already sweeps that kind of work
+     */
+    409: ProblemDetail;
+};
+
+export type CreateSweepScheduleError = CreateSweepScheduleErrors[keyof CreateSweepScheduleErrors];
+
+export type CreateSweepScheduleResponses = {
+    /**
+     * Schedule created
+     */
+    201: ReviewSweepSchedule;
+};
+
+export type CreateSweepScheduleResponse = CreateSweepScheduleResponses[keyof CreateSweepScheduleResponses];
+
+export type DeleteSweepScheduleData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scheduleId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}';
+};
+
+export type DeleteSweepScheduleErrors = {
+    /**
+     * No such schedule in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type DeleteSweepScheduleError = DeleteSweepScheduleErrors[keyof DeleteSweepScheduleErrors];
+
+export type DeleteSweepScheduleResponses = {
+    /**
+     * Schedule removed
+     */
+    204: void;
+};
+
+export type DeleteSweepScheduleResponse = DeleteSweepScheduleResponses[keyof DeleteSweepScheduleResponses];
+
+export type ReplaceSweepScheduleData = {
+    body: UpdateReviewSweepScheduleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scheduleId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}';
+};
+
+export type ReplaceSweepScheduleErrors = {
+    /**
+     * No such schedule in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type ReplaceSweepScheduleError = ReplaceSweepScheduleErrors[keyof ReplaceSweepScheduleErrors];
+
+export type ReplaceSweepScheduleResponses = {
+    /**
+     * Schedule updated
+     */
+    200: ReviewSweepSchedule;
+};
+
+export type ReplaceSweepScheduleResponse = ReplaceSweepScheduleResponses[keyof ReplaceSweepScheduleResponses];
 
 export type ListTracedArtifactsData = {
     body?: never;
