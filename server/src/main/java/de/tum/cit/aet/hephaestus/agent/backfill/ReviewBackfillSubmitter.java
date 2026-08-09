@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.job.SignalOrigins;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
@@ -33,12 +34,18 @@ import org.springframework.transaction.annotation.Transactional;
  * differs only in these deliberate ways:
  *
  * <ul>
- *   <li>The signal is recorded with {@link DiscoveredVia#BACKFILL}, which is what lets it claim a row a
- *       first sync left undecided, and what keeps thousands of campaign rows out of the health
+ *   <li>The signal is recorded with the run's own {@link DiscoveredVia}, which is what lets it claim a
+ *       row a first sync left undecided, and what keeps thousands of campaign rows out of the health
  *       measurement that watches how signals normally arrive.
- *   <li>The submission carries {@link ObservationOrigin#BACKFILL} explicitly, so the measurement is
- *       filed against the population it belongs to no matter how many hops it takes to get submitted.
+ *   <li>The submission states its {@link ObservationOrigin} explicitly, so the measurement is filed
+ *       against the population it belongs to no matter how many hops it takes to get submitted.
  * </ul>
+ *
+ * <p>Both come from {@link ReviewBackfillRun#getDiscoveredVia()} through the one mapping in
+ * {@code SignalOrigins}, and neither is written here. A campaign an admin scoped by hand is BACKFILL and
+ * measures a corpus somebody chose; a run a {@link ReviewSweepSchedule} opened is SWEEP and measures the
+ * last few days, which is the population the event path measures. Hard-coding either would make this
+ * class the place the two quietly became the same thing.
  *
  * <p>The gate is asked in {@link TriggerMode#MANUAL} mode, which is the honest reading: no event
  * occasioned this review, a person did. That means a workspace which has turned manual triggering off
@@ -100,7 +107,7 @@ public class ReviewBackfillSubmitter {
         }
         long workspaceId = run.getWorkspace().getId();
         Optional<SignalKey> key = ReviewBackfillSignals.keyFor(workspaceId, pr);
-        if (key.isEmpty() || !claim(key.get(), occurredAt(pr.getUpdatedAt(), pr.getCreatedAt()))) {
+        if (key.isEmpty() || !claim(run, key.get(), occurredAt(pr.getUpdatedAt(), pr.getCreatedAt()))) {
             return Outcome.PASSED;
         }
 
@@ -120,7 +127,7 @@ public class ReviewBackfillSubmitter {
                         pr.getHeadRefOid(),
                         pr.getBaseRefName(),
                         key.get().signalName(),
-                        ObservationOrigin.BACKFILL
+                        SignalOrigins.observationOriginOf(run.getDiscoveredVia())
                     ),
                     key.get()
                 );
@@ -136,7 +143,7 @@ public class ReviewBackfillSubmitter {
         }
         long workspaceId = run.getWorkspace().getId();
         Optional<SignalKey> key = ReviewBackfillSignals.keyFor(workspaceId, issue);
-        if (key.isEmpty() || !claim(key.get(), occurredAt(issue.getUpdatedAt(), issue.getCreatedAt()))) {
+        if (key.isEmpty() || !claim(run, key.get(), occurredAt(issue.getUpdatedAt(), issue.getCreatedAt()))) {
             return Outcome.PASSED;
         }
 
@@ -161,7 +168,7 @@ public class ReviewBackfillSubmitter {
                         issue.getHtmlUrl(),
                         issue.getUpdatedAt(),
                         key.get().signalName(),
-                        ObservationOrigin.BACKFILL
+                        SignalOrigins.observationOriginOf(run.getDiscoveredVia())
                     ),
                     key.get()
                 );
@@ -170,9 +177,17 @@ public class ReviewBackfillSubmitter {
         }
     }
 
-    /** Whether this campaign now owns the occurrence and may act on it. */
-    private boolean claim(SignalKey key, Instant occurredAt) {
-        return signalRecorder.record(key, occurredAt, DiscoveredVia.BACKFILL);
+    /**
+     * Whether this campaign now owns the occurrence and may act on it.
+     *
+     * <p>This one call is the whole spend guard for a recurring sweep. The key comes from
+     * {@link ReviewBackfillSignals}, which derives the signal from the artifact's <em>current</em> state
+     * using the live revision derivation, so a second sweep over an artifact nobody touched produces the
+     * identical key, {@code uq_artifact_signal} refuses the insert, and this returns false. Mint a
+     * per-run revision instead and every sweep would re-review everything, forever.
+     */
+    private boolean claim(ReviewBackfillRun run, SignalKey key, Instant occurredAt) {
+        return signalRecorder.record(key, occurredAt, run.getDiscoveredVia());
     }
 
     /**

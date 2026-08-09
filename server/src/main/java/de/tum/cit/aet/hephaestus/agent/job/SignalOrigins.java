@@ -25,7 +25,15 @@ public final class SignalOrigins {
         return switch (discoveredVia) {
             // Reconciliation never triggers a review on its own; a row it left behind is only ever acted
             // on by a live redelivery or a campaign, each of which re-records with its own mode first.
-            case EVENT, SYNC -> ObservationOrigin.LIVE;
+            //
+            // A scheduled sweep is LIVE and not BACKFILL. Its window is bounded to the recent past at
+            // creation (at most twice its own cadence, never more than a week), so it measures the same
+            // population the event path measures and differs only in having found it by polling. Filing
+            // it as BACKFILL would be the more cautious-looking choice and the wrong one twice over: the
+            // reflection read model treats campaign rows apart, so every sweep finding would be invisible
+            // to the developer it is about, and ObservationOrigin.BACKFILL withholds every channel but
+            // PROFILE, so a sweep would silently never speak.
+            case EVENT, SYNC, SWEEP -> ObservationOrigin.LIVE;
             case MANUAL -> ObservationOrigin.MANUAL;
             case BACKFILL -> ObservationOrigin.BACKFILL;
         };

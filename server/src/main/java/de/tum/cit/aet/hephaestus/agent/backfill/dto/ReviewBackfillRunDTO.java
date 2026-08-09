@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillPauseReason;
 import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillRun;
 import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillStatus;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,6 +29,11 @@ public record ReviewBackfillRunDTO(
     @NonNull Instant fromAt,
     @NonNull Instant toAt,
     @NonNull ReviewBackfillStatus status,
+    @Schema(description = "BACKFILL for a campaign an admin scoped by hand, SWEEP for one a recurring schedule opened")
+    @NonNull
+    DiscoveredVia discoveredVia,
+    @Schema(description = "The schedule that opened this run; absent for a campaign an admin scoped by hand")
+    UUID sweepScheduleId,
     @Schema(description = "Set only while the run is PAUSED") ReviewBackfillPauseReason pauseReason,
     @NonNull Integer estimatedArtifacts,
     @Schema(description = "Forecast total spend in USD; absent when the workspace has no priced review history")
@@ -48,6 +54,8 @@ public record ReviewBackfillRunDTO(
             run.getFromAt(),
             run.getToAt(),
             run.getStatus(),
+            run.getDiscoveredVia(),
+            run.getSweepScheduleId(),
             run.getPauseReason(),
             run.getEstimatedArtifacts(),
             run.getEstimatedCostUsd(),

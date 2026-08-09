@@ -58,6 +58,14 @@ public enum ConfigAuditEntityType {
      */
     REVIEW_BACKFILL_RUN,
 
+    /**
+     * A standing instruction to review recent work on a cadence. On this trail because, unlike a
+     * campaign, it is authorised once and spends every night afterwards — so the decision that matters
+     * is the one recorded here, and "who set this workspace sweeping, on what terms, and when did the
+     * terms change?" has to be answerable long after the person who did it has moved on.
+     */
+    REVIEW_SWEEP_SCHEDULE,
+
     WORKSPACE_LLM_CONNECTION,
     /** A model on a workspace's own BYO connection, including its inline price and enablement. */
     WORKSPACE_LLM_MODEL,

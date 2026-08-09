@@ -41,6 +41,25 @@ class SignalOriginsTest extends BaseUnitTest {
         assertThat(SignalOrigins.observationOriginOf(DiscoveredVia.SYNC)).isEqualTo(ObservationOrigin.LIVE);
     }
 
+    /**
+     * The distinction the recurring sweep rests on, and the one that was easiest to get wrong.
+     *
+     * <p>A sweep arrives through the campaign machinery, so filing it as BACKFILL would look like the
+     * cautious choice. It is the wrong one twice over. The reflection read model separates campaign rows
+     * from the rest, so every sweep finding would be invisible to the developer it is about — the exact
+     * defect item A of this branch existed to fix, reproduced nightly. And
+     * {@code ObservationOrigin.BACKFILL} is entitled to the profile channel and no other, so a sweep
+     * would run every night, cost money every night, and never say anything.
+     *
+     * <p>LIVE is also the honest reading. A sweep's window is bounded at creation to at most twice its
+     * cadence and never more than a week, so its corpus is "what happened recently" — the same
+     * population the event path measures, found by polling instead of by being told.
+     */
+    @Test
+    void aScheduledSweepMeasuresTheSamePopulationTheEventPathMeasures() {
+        assertThat(SignalOrigins.observationOriginOf(DiscoveredVia.SWEEP)).isEqualTo(ObservationOrigin.LIVE);
+    }
+
     /** A new discovery mode must state its population rather than inherit one by accident. */
     @ParameterizedTest
     @EnumSource(DiscoveredVia.class)

@@ -2150,4 +2150,189 @@
         ]]></rollback>
     </changeSet>
 
+    <!-- ==========================================================================================
+         The scheduled recurring sweep.
+
+         Every other way into the review path needs something to have happened first: an event, a
+         reconciliation, a person asking, an admin scoping a campaign. So an artifact nothing ever
+         announced has no ledger row at all, and "we never looked at this" is indistinguishable from
+         "we looked and declined" for exactly the work a missed webhook would have dropped.
+
+         A recurring workspace-wide review is a campaign plus a recurrence, so these rows create
+         review_backfill_run rows and nothing else drives artifacts. The one thing that had to be
+         added to the campaign itself is a discovery mode: a sweep's window is bounded to the recent
+         past by rule, so its findings belong in the same population as reviews that events triggered,
+         while a hand-scoped campaign's do not.
+         ========================================================================================== -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-38">
+        <preConditions onFail="MARK_RAN" onFailMessage="review_sweep_schedule already present">
+            <not><tableExists tableName="review_sweep_schedule"/></not>
+        </preConditions>
+        <comment>A standing instruction to review a workspace's recent work on a cadence.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            CREATE TABLE review_sweep_schedule (
+                id                      UUID PRIMARY KEY,
+                version                 BIGINT       NOT NULL DEFAULT 0,
+                workspace_id            BIGINT       NOT NULL,
+                artifact_kind           VARCHAR(64)  NOT NULL,
+                cadence                 VARCHAR(16)  NOT NULL,
+                lookback_days           INTEGER      NOT NULL,
+                enabled                 BOOLEAN      NOT NULL DEFAULT TRUE,
+                next_run_at             TIMESTAMPTZ  NOT NULL,
+                -- When a campaign was last actually opened, not when the schedule last came due. It
+                -- anchors the next window, so a tick that looked at nothing must not move it.
+                last_run_at             TIMESTAMPTZ,
+                created_by_account_id   BIGINT       NOT NULL,
+                created_at              TIMESTAMPTZ  NOT NULL,
+                updated_at              TIMESTAMPTZ  NOT NULL,
+                CONSTRAINT fk_review_sweep_schedule_workspace FOREIGN KEY (workspace_id)
+                    REFERENCES workspace (id) ON DELETE CASCADE,
+                CONSTRAINT ck_review_sweep_schedule_cadence CHECK (cadence IN ('DAILY','WEEKLY')),
+                CONSTRAINT ck_review_sweep_schedule_kind
+                    CHECK (artifact_kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(artifact_kind) <= 64),
+                -- The rule that keeps a sweep admissible as a live measurement, written where it cannot
+                -- be bypassed: at most twice the cadence, never more than a week. Longer than that and
+                -- the corpus was chosen with hindsight, which is a backfill campaign and records itself
+                -- as one. Expressed as a CASE rather than a flat "<= 7" so the cadence half of the rule
+                -- survives someone widening the cap.
+                CONSTRAINT ck_review_sweep_schedule_lookback
+                    CHECK (lookback_days >= 1
+                           AND lookback_days <= CASE cadence WHEN 'DAILY' THEN 2 WHEN 'WEEKLY' THEN 7 END)
+            );
+
+            -- One schedule per kind of work per workspace. Two would each read the other's ledger rows
+            -- as already covered, and only one could ever hold the workspace's single active campaign
+            -- slot, so the loser would look enabled for ever while sweeping nothing.
+            ALTER TABLE review_sweep_schedule ADD CONSTRAINT uq_review_sweep_schedule_workspace_kind
+                UNIQUE (workspace_id, artifact_kind);
+
+            CREATE INDEX idx_review_sweep_schedule_due ON review_sweep_schedule (enabled, next_run_at);
+        ]]></sql>
+        <rollback><![CDATA[
+            DROP TABLE IF EXISTS review_sweep_schedule;
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-39">
+        <preConditions onFail="MARK_RAN" onFailMessage="signal discovery modes already admit SWEEP">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_artifact_signal_discovered_via'
+                  AND conrelid = 'artifact_signal'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%SWEEP%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit a recurring sweep as a way a signal came to be known.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- Apart from EVENT although both measure the population events measure: this column answers
+            -- "did the provider tell us", and a sustained gap between what a sweep finds and what
+            -- arrived live is precisely the delivery failure the schedule exists to expose.
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS ck_artifact_signal_discovered_via;
+            ALTER TABLE artifact_signal ADD CONSTRAINT ck_artifact_signal_discovered_via
+                CHECK (discovered_via IN ('EVENT','SYNC','MANUAL','BACKFILL','SWEEP'));
+        ]]></sql>
+        <rollback><![CDATA[
+            -- Same reasoning as the BACKFILL widening: narrowing the vocabulary makes these rows
+            -- unrepresentable, and deleting one returns its occurrence to "never seen", which without
+            -- the sweep that recorded it is the truth. The reviews it triggered keep their own rows.
+            DELETE FROM artifact_signal WHERE discovered_via = 'SWEEP';
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS ck_artifact_signal_discovered_via;
+            ALTER TABLE artifact_signal ADD CONSTRAINT ck_artifact_signal_discovered_via
+                CHECK (discovered_via IN ('EVENT','SYNC','MANUAL','BACKFILL'));
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-40">
+        <preConditions onFail="MARK_RAN" onFailMessage="review_backfill_run already states its discovery mode">
+            <not>
+                <columnExists tableName="review_backfill_run" columnName="discovered_via"/>
+            </not>
+        </preConditions>
+        <comment>Let a campaign say whether an admin scoped it or a schedule opened it.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- Existing rows are all hand-scoped campaigns; there was no other kind before this changeset.
+            ALTER TABLE review_backfill_run
+                ADD COLUMN discovered_via VARCHAR(16) NOT NULL DEFAULT 'BACKFILL';
+
+            -- Only these two. A campaign is never an event or a reconciliation, and a person asking about
+            -- one artifact is not a campaign at all.
+            ALTER TABLE review_backfill_run ADD CONSTRAINT ck_review_backfill_run_discovered_via
+                CHECK (discovered_via IN ('BACKFILL','SWEEP'));
+
+            -- No foreign key on purpose. A constraint would force a choice between refusing to delete a
+            -- schedule and nulling this column when one is deleted, and the second erases, from a row
+            -- describing money that was spent, the record of what authorised spending it.
+            ALTER TABLE review_backfill_run ADD COLUMN sweep_schedule_id UUID;
+
+            CREATE INDEX idx_review_backfill_run_sweep_schedule
+                ON review_backfill_run (sweep_schedule_id)
+                WHERE sweep_schedule_id IS NOT NULL;
+
+            -- A sweep's run is confirmed the moment it is created, by the account that created the
+            -- schedule; there is no state in which one waits for a click.
+            ALTER TABLE review_backfill_run ADD CONSTRAINT ck_review_backfill_run_sweep_confirmed
+                CHECK (discovered_via <> 'SWEEP'
+                       OR (sweep_schedule_id IS NOT NULL AND confirmed_by_account_id IS NOT NULL));
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_sweep_confirmed;
+            DROP INDEX IF EXISTS idx_review_backfill_run_sweep_schedule;
+            ALTER TABLE review_backfill_run DROP COLUMN IF EXISTS sweep_schedule_id;
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_discovered_via;
+            ALTER TABLE review_backfill_run DROP COLUMN IF EXISTS discovered_via;
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-41">
+        <preConditions onFail="MARK_RAN" onFailMessage="audit entity types already admit REVIEW_SWEEP_SCHEDULE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND conrelid = 'config_audit_event'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%REVIEW_SWEEP_SCHEDULE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Put "who set this workspace sweeping, on what terms" on the configuration audit trail.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT IF EXISTS ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE', 'PRACTICE_USAGE',
+                    'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                    'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET', 'REVIEW_BACKFILL_RUN',
+                    'REVIEW_SWEEP_SCHEDULE', 'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                ));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+            DO $rollback$
+            BEGIN
+                -- The trail is append-only by trigger, so a row written under this value can only be
+                -- left where it is; narrowing the constraint under it would make the table unreadable
+                -- to its own guard. Warn and keep the wider vocabulary.
+                IF EXISTS (SELECT 1 FROM config_audit_event WHERE entity_type = 'REVIEW_SWEEP_SCHEDULE') THEN
+                    RAISE WARNING 'The audit entity-type constraint remains widened because append-only history contains REVIEW_SWEEP_SCHEDULE rows';
+                    RETURN;
+                END IF;
+
+                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN (
+                        'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE', 'PRACTICE_USAGE',
+                        'PRACTICE_DEFINITION', 'PRACTICE_AREA', 'CURATED_PRACTICE', 'CURATED_PRACTICE_AREA',
+                        'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                        'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET', 'REVIEW_BACKFILL_RUN',
+                        'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                    ));
+            END
+            $rollback$;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

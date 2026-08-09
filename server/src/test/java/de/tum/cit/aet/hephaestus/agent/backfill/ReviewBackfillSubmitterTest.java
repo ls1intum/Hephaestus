@@ -98,6 +98,36 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
     }
 
     /**
+     * The same two stamps, taken from the run instead of written here.
+     *
+     * <p>A sweep's window is bounded to the recent past, so it measures the population events measure and
+     * its findings belong in the live trend line. Had this class kept hard-coding BACKFILL, every
+     * scheduled review would have filed itself as a hindsight-selected corpus — invisible to the
+     * developer it is about, because the reflection read model separates campaign rows, and silent,
+     * because {@code ObservationOrigin.BACKFILL} withholds every channel but the profile.
+     */
+    @Test
+    void aScheduledSweepIsStampedAsASweepAndMeasuredAsLiveWork() {
+        PullRequest pr = mergedPullRequest();
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
+        when(signalRecorder.record(any(), any(), eq(DiscoveredVia.SWEEP))).thenReturn(true);
+        when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL))).thenReturn(
+            new GateDecision.Detect(workspace(), List.of())
+        );
+        ReviewBackfillRun run = run();
+        run.setDiscoveredVia(DiscoveredVia.SWEEP);
+
+        assertThat(submitter().offer(run, PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.SUBMITTED);
+
+        verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SWEEP));
+        ArgumentCaptor<PullRequestReviewSubmissionRequest> request = ArgumentCaptor.forClass(
+            PullRequestReviewSubmissionRequest.class
+        );
+        verify(agentJobService).submit(eq(WORKSPACE_ID), any(), request.capture(), any(SignalKey.class));
+        assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
+    }
+
+    /**
      * Already settled — the live path measured this occurrence, or an earlier batch did. Nothing new to
      * say and nothing to pay for.
      */

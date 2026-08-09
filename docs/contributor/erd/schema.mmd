@@ -1108,6 +1108,23 @@ erDiagram
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
         INTEGER failed_count "NOT NULL"
+        VARCHAR(16) discovered_via "NOT NULL"
+        UUID sweep_schedule_id
+    }
+
+    ReviewSweepSchedule {
+        UUID id PK
+        BIGINT version "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) artifact_kind UK "NOT NULL"
+        VARCHAR(16) cadence "NOT NULL"
+        INTEGER lookback_days "NOT NULL"
+        BOOLEAN enabled "NOT NULL"
+        TIMESTAMPTZ next_run_at "NOT NULL"
+        TIMESTAMPTZ last_run_at
+        BIGINT created_by_account_id "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
     }
 
     Shedlock {
@@ -1519,6 +1536,7 @@ erDiagram
     IdentityProvider ||--o{ Repository : references
     Workspace ||--o{ RepositoryToMonitor : monitors
     Workspace ||--o{ ReviewBackfillRun : reviewed
+    Workspace ||--o{ ReviewSweepSchedule : reviewed
     User ||--o{ SlackChannelConsentEvent : has
     Workspace ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackMessage : authored_by

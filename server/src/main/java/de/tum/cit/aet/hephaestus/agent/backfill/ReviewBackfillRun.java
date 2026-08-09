@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.backfill;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -84,6 +85,37 @@ public class ReviewBackfillRun {
     @NotNull
     @Column(name = "artifact_kind", nullable = false, updatable = false, length = ArtifactKind.MAX_LENGTH)
     private String artifactKind;
+
+    /**
+     * How the signals this run records came to be known — {@link DiscoveredVia#BACKFILL} for a campaign
+     * an admin scoped and confirmed by hand, {@link DiscoveredVia#SWEEP} for one a
+     * {@link ReviewSweepSchedule} opened over recent work.
+     *
+     * <p>Carried on the run rather than decided at the submitter, because by the time an artifact is
+     * offered nothing else remembers which of the two this was, and the answer decides both the ledger's
+     * discovery mode and — through {@code SignalOrigins} — the population every resulting measurement is
+     * filed in. A submitter that hard-coded BACKFILL would file a nightly sweep as a hindsight-selected
+     * corpus, and the reflection read model would hide every finding it produced.
+     */
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'BACKFILL'")
+    @Column(name = "discovered_via", nullable = false, updatable = false, length = 16)
+    private DiscoveredVia discoveredVia = DiscoveredVia.BACKFILL;
+
+    /**
+     * The schedule that opened this run, or null for a campaign an admin scoped by hand.
+     *
+     * <p>A plain column rather than an association, and deliberately without a foreign key. The driver
+     * never navigates to the schedule, so a lazy association here would only be a proxy waiting to be
+     * touched outside the transaction that loaded it. And a constraint would force a choice between
+     * refusing to delete a schedule and nulling this column when one is deleted — the second of which
+     * erases, from a row describing money that was spent, the record of what authorised spending it.
+     * A soft reference that may name something gone is the honest shape for history.
+     */
+    @Nullable
+    @Column(name = "sweep_schedule_id", updatable = false, columnDefinition = "UUID")
+    private UUID sweepScheduleId;
 
     /**
      * Window start, inclusive, over the artifact's creation time.
