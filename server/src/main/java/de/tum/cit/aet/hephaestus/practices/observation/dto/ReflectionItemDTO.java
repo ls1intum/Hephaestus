@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.observation.dto;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
@@ -19,7 +20,13 @@ public record ReflectionItemDTO(
     @Nullable @Schema(description = "Impact level (null unless assessed BAD)") Severity severity,
     @NonNull @Schema(description = "The kind of work this is about (PR / issue)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
-    @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
+    @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator,
+    @NonNull
+    @Schema(
+        description = "What occasioned the measurement. BACKFILL means it came from a review of past work " +
+            "rather than from something that just happened, and nothing was posted anywhere at the time."
+    )
+    ObservationOrigin origin
 ) {
     public static ReflectionItemDTO from(Observation observation, @Nullable String deliveredGuidance) {
         return new ReflectionItemDTO(
@@ -29,7 +36,8 @@ public record ReflectionItemDTO(
             observation.getSeverity(),
             observation.getArtifactKind(),
             observation.getArtifactId(),
-            locatorOf(observation.getEvidence())
+            locatorOf(observation.getEvidence()),
+            observation.getOrigin()
         );
     }
 

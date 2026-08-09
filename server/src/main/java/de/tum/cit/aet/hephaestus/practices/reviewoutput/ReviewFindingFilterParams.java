@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationQueryFilter;
@@ -38,6 +39,15 @@ public record ReviewFindingFilterParams(
     @Nullable
     Long artifactId,
     @RequestParam(required = false) @Positive @Nullable Long subjectUserId,
+    /**
+     * What occasioned the measurement. Without it this surface cannot separate a campaign's findings from
+     * live ones — a population-mixing hazard in exactly the place an operator judges whether a campaign was
+     * worth what it cost.
+     */
+    @Parameter(description = "What occasioned the measurement: LIVE, MANUAL or BACKFILL")
+    @RequestParam(required = false)
+    @Nullable
+    List<ObservationOrigin> origin,
     @Parameter(description = "Inclusive lower bound")
     @RequestParam(required = false)
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -67,6 +77,7 @@ public record ReviewFindingFilterParams(
             kind,
             artifactId,
             subjectUserId,
+            origin,
             from,
             to
         );

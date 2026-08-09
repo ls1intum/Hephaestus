@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -853,6 +854,121 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             pr.setCreatedAt(Instant.now());
             pr.setUpdatedAt(Instant.now());
             return pullRequestRepository.save(pr);
+        }
+    }
+
+    /**
+     * A confirmed campaign spends real money. Before this, nine {@code origin <> 'BACKFILL'} predicates kept
+     * every one of its observations off every developer read surface, so it produced something nobody could
+     * see. The reflective surface admits them; the per-practice summary, which is read as a trend, still does
+     * not.
+     */
+    @Nested
+    class BackfillVisibilityTests {
+
+        private AgentJob campaignJob() {
+            AgentJob job = new AgentJob();
+            job.setWorkspace(workspace);
+            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            return agentJobRepository.save(job);
+        }
+
+        private void insert(String key, UUID jobId, long artifactId, Instant at, String origin) {
+            observationRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                jobId,
+                practice.getId(),
+                null,
+                "scm.pull_request",
+                artifactId,
+                aboutUser.getId(),
+                "Backfill visibility observation",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                0.9f,
+                null,
+                null,
+                null,
+                at,
+                origin
+            );
+        }
+
+        @Test
+        @DisplayName("a campaign's finding on the developer's own work reaches the reflective surface")
+        void backfilledObservationsAreVisibleToTheDeveloper() {
+            insert("bf-only", campaignJob().getId(), 900L, Instant.parse("2026-03-20T10:00:00Z"), "BACKFILL");
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 50)
+            );
+
+            assertThat(recent)
+                .as(
+                    "a backfilled BAD on the developer's own pull request is exactly what 'what should I work on' asks for"
+                )
+                .extracting(Observation::getArtifactId)
+                .containsExactly(900L);
+        }
+
+        @Test
+        @DisplayName("a later campaign does not erase already-delivered live feedback")
+        void aCampaignDoesNotDisplaceTheLiveReading() {
+            // Same artifact, campaign strictly newer. An origin-blind latest-run correlation would make the
+            // campaign's job "the latest run" and drop the live row the developer was actually sent.
+            insert("live-reading", agentJob.getId(), 901L, Instant.parse("2026-03-20T10:00:00Z"), "LIVE");
+            insert("campaign-reading", campaignJob().getId(), 901L, Instant.parse("2026-03-21T10:00:00Z"), "BACKFILL");
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 50)
+            );
+
+            assertThat(recent)
+                .as("the latest run is selected within each origin class, so both readings survive")
+                .extracting(Observation::getOrigin)
+                .containsExactlyInAnyOrder(ObservationOrigin.BACKFILL, ObservationOrigin.LIVE);
+        }
+
+        @Test
+        @DisplayName("the re-review multiplier is still deduped within the campaign's own origin class")
+        void latestRunStillDedupesWithinTheBackfillClass() {
+            insert("bf-older", campaignJob().getId(), 902L, Instant.parse("2026-03-20T10:00:00Z"), "BACKFILL");
+            insert("bf-newer", campaignJob().getId(), 902L, Instant.parse("2026-03-21T10:00:00Z"), "BACKFILL");
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 50)
+            );
+
+            assertThat(recent).hasSize(1);
+            assertThat(recent.get(0).getObservedAt()).isEqualTo(Instant.parse("2026-03-21T10:00:00Z"));
+        }
+
+        @Test
+        @DisplayName("the per-practice summary still excludes the campaign: a hindsight sweep is not a trend point")
+        void theSummaryTrendStaysLiveOnly() {
+            insert("summary-live", agentJob.getId(), 903L, Instant.parse("2026-03-20T10:00:00Z"), "LIVE");
+            insert("summary-backfill", campaignJob().getId(), 904L, Instant.parse("2026-03-21T10:00:00Z"), "BACKFILL");
+
+            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+
+            assertThat(summary).hasSize(1);
+            assertThat(summary.get(0).getTotalObservations()).isEqualTo(1L);
+            assertThat(summary.get(0).getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
         }
     }
 }

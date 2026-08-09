@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -414,7 +415,27 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * coaching on it would invite the mentor to invent a direction the measurement declined to take. Both
      * totals still reach the mentor via the presence-count summary; this is the drill-down list only, and
      * stays recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
-     * Aggregate policy matches {@link #findSummaryByDeveloperAndWorkspace}.
+     *
+     * <p><strong>Backfilled observations are included, partitioned by origin class.</strong> A campaign spends
+     * real money reviewing work that already existed, and a {@code BAD} it found on the developer's own pull
+     * request is exactly what "what should I work on" is asking for. Excluding it made the campaign produce
+     * something no developer could see anywhere. The latest-run correlation stays, but is evaluated
+     * <em>within</em> each origin class ({@code (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')}) rather
+     * than over the union, for two reasons:
+     * <ul>
+     *   <li>Dropping the outer predicate alone would be a no-op — the row must still equal the latest
+     *       <em>non-backfill</em> job id, which a backfilled row never does.</li>
+     *   <li>Making the correlation origin-blind would let a campaign <em>erase</em> already-delivered live
+     *       feedback from the dashboard, because the campaign's job would become "the latest run".</li>
+     * </ul>
+     * The two classes cannot in practice describe the same occasion: a campaign keys its ledger entry with the
+     * same revision derivation as the live path, so {@code uq_artifact_signal} makes it skip any artifact the
+     * live path already reviewed at that occasion. {@code ReflectionItemDTO.origin()} carries the class through
+     * so the surface can label a backfilled item rather than pass it off as live.
+     *
+     * <p>Aggregate policy deliberately DIVERGES from {@link #findSummaryByDeveloperAndWorkspace} here: the
+     * summary is a per-practice good/bad ratio read as a trend, and a hindsight campaign is not a point on a
+     * trend line.
      */
     @Query(
         value = """
@@ -434,13 +455,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           )
           AND f.observed_at >= :since
           AND f.presence IN ('PRESENT', 'ABSENT')
-          AND f.origin <> 'BACKFILL'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
-                AND f2.origin <> 'BACKFILL'
+                AND (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         ORDER BY f.observed_at DESC
@@ -638,6 +658,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR o.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
           AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR o.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
           AND (CAST(:#{#f.aboutUserId()} AS bigint) IS NULL OR o.about_user_id = CAST(:#{#f.aboutUserId()} AS bigint))
+          AND (CAST(:#{#f.originNames()} AS text[]) IS NULL OR o.origin = ANY(CAST(:#{#f.originNames()} AS text[])))
           AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR o.observed_at >= CAST(:#{#f.from()} AS timestamptz))
           AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR o.observed_at < CAST(:#{#f.to()} AS timestamptz))
         """;
@@ -661,6 +682,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    o.severity AS "severity",
                    o.confidence AS "confidence",
                    o.recurrence_key AS "recurrenceKey",
+                   o.origin AS "origin",
                    o.practice_revision_id AS "practiceRevisionId",
                    evaluated_revision.review_rule_fingerprint AS "practiceRevisionFingerprint",
                    current_revision.review_rule_fingerprint AS "currentPracticeRevisionFingerprint",
@@ -726,6 +748,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Severity getSeverity();
         Float getConfidence();
         String getRecurrenceKey();
+        /**
+         * What occasioned the measurement. Without it the operator surface cannot tell a campaign's findings
+         * from live ones, which is a population-mixing hazard in exactly the surface used to judge whether a
+         * campaign was worth its cost.
+         */
+        ObservationOrigin getOrigin();
         Long getPracticeRevisionId();
         String getPracticeRevisionFingerprint();
         String getCurrentPracticeRevisionFingerprint();

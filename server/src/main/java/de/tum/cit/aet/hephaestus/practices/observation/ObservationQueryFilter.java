@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.time.Instant;
@@ -19,6 +20,7 @@ public record ObservationQueryFilter(
     @Nullable ArtifactKind artifactKind,
     @Nullable Long artifactId,
     @Nullable Long aboutUserId,
+    @Nullable List<ObservationOrigin> origins,
     @Nullable Instant from,
     @Nullable Instant to
 ) {
@@ -46,6 +48,10 @@ public record ObservationQueryFilter(
 
     public String@Nullable [] severityNames() {
         return names(severities);
+    }
+
+    public String@Nullable [] originNames() {
+        return names(origins);
     }
 
     public @Nullable String artifactKindValue() {

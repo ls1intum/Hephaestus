@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
 import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ObservationFeedbackDisposition;
@@ -28,6 +29,12 @@ public record ReviewFindingDTO(
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "Finding confidence", minimum = "0", maximum = "1") Float confidence,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
+    @NonNull
+    @Schema(
+        description = "What occasioned the measurement. BACKFILL came from a confirmed campaign over work " +
+            "that already existed, so it is not a point on the live trend line."
+    )
+    ObservationOrigin origin,
     @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt,
     @NonNull
@@ -54,6 +61,7 @@ public record ReviewFindingDTO(
             row.getSeverity(),
             row.getConfidence(),
             row.getRecurrenceKey(),
+            row.getOrigin(),
             ReviewClaimCurrentness.of(
                 row.getPracticeRevisionFingerprint(),
                 row.getCurrentPracticeRevisionFingerprint()
