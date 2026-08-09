@@ -2112,7 +2112,13 @@
          ON DELETE SET NULL rather than CASCADE or RESTRICT. RESTRICT would make an account erasure fail
          against the ledger; CASCADE would delete the record that an occurrence was seen and settled,
          which is the one thing this table exists to never lose. Dropping the attribution and keeping the
-         occurrence is what erasure actually asks for. -->
+         occurrence is what erasure actually asks for.
+
+         sfk_ rather than fk_ (ADR 0017's scalar-foreign-key convention): the column is a plain BIGINT with
+         no @ManyToOne behind it, because integration.core must not depend on the SCM domain to write a
+         ledger row. Hibernate therefore emits the column and never the constraint, and the JPA-vs-DB drift
+         gate excludes sfk_* for exactly that reason; an fk_-named constraint here reads as schema drift
+         and fails the Database quality gate. -->
     <changeSet author="hephaestus-readiness" id="1785743133884-37">
         <preConditions onFail="MARK_RAN" onFailMessage="artifact_signal already records who asked">
             <not>
@@ -2128,7 +2134,7 @@
             baseColumnNames="requested_by_user_id"
             referencedTableName="user"
             referencedColumnNames="id"
-            constraintName="fk_artifact_signal_requested_by"
+            constraintName="sfk_artifact_signal_requested_by"
             onDelete="SET NULL"/>
         <!-- Partial: the per-person hourly limit reads only rows that name a requester, and those are a
              rounding error beside the event-discovered rows the table is mostly made of. -->
@@ -2139,7 +2145,7 @@
         ]]></sql>
         <rollback><![CDATA[
             DROP INDEX IF EXISTS idx_artifact_signal_requested_by;
-            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS fk_artifact_signal_requested_by;
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS sfk_artifact_signal_requested_by;
             ALTER TABLE artifact_signal DROP COLUMN IF EXISTS requested_by_user_id;
         ]]></rollback>
     </changeSet>
