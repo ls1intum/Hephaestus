@@ -167,44 +167,71 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         }
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
-        List<Observation> observations = observationRepository
-            .findRecentByDeveloperAndWorkspace(subjectUserId, workspaceId, since, PageRequest.of(0, MAX_OBSERVATIONS))
-            .stream()
-            .filter(o -> visibilityPolicy.permits(workspaceId, o, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
-            .toList();
-        List<Feedback> delivered = feedbackRepository.findRecentDeliveredForRecipient(
-            workspaceId,
-            subjectUserId,
-            since,
-            PageRequest.of(0, MAX_FEEDBACK)
-        );
-
+        // Both halves are answered only when both are asked for. The two kinds are captured
+        // independently — one call per kind — so reporting the other one's completeness or content
+        // state here is reporting a fact about a source this capture was not asked about, which the
+        // builder rejects outright. Guarding the queries too keeps an unselected half from costing a
+        // read nobody wanted.
         Map<String, byte[]> files = new LinkedHashMap<>();
-        files.put(OBSERVATIONS_FILE, serialize(observationsPayload(observations, since), OBSERVATIONS_FILE));
-        files.put(FEEDBACK_FILE, serialize(feedbackPayload(delivered, since), FEEDBACK_FILE));
+        Map<SourceKind, SourceCompleteness> completeness = new LinkedHashMap<>();
+        Map<SourceKind, SourceContentState> contentStates = new LinkedHashMap<>();
+        int observationCount = -1;
+        int feedbackCount = -1;
+
+        if (selectedKinds.contains(OBSERVATION_HISTORY)) {
+            List<Observation> observations = observationRepository
+                .findRecentByDeveloperAndWorkspace(
+                    subjectUserId,
+                    workspaceId,
+                    since,
+                    PageRequest.of(0, MAX_OBSERVATIONS)
+                )
+                .stream()
+                .filter(o -> visibilityPolicy.permits(workspaceId, o, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .toList();
+            observationCount = observations.size();
+            files.put(OBSERVATIONS_FILE, serialize(observationsPayload(observations, since), OBSERVATIONS_FILE));
+            // A window over a growing record. It can show that something recurred; it can never show
+            // that something never happened, so COMPLETE is not a state this source may report.
+            completeness.put(OBSERVATION_HISTORY, SourceCompleteness.PARTIAL);
+            // Reported rather than inferred from the staged file list: the file is always written, so
+            // "there is a file" would answer NON_EMPTY for a person with no history at all.
+            contentStates.put(
+                OBSERVATION_HISTORY,
+                observations.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
+            );
+        }
+
+        if (selectedKinds.contains(FEEDBACK_HISTORY)) {
+            List<Feedback> delivered = feedbackRepository.findRecentDeliveredForRecipient(
+                workspaceId,
+                subjectUserId,
+                since,
+                PageRequest.of(0, MAX_FEEDBACK)
+            );
+            feedbackCount = delivered.size();
+            files.put(FEEDBACK_FILE, serialize(feedbackPayload(delivered, since), FEEDBACK_FILE));
+            completeness.put(FEEDBACK_HISTORY, SourceCompleteness.PARTIAL);
+            contentStates.put(
+                FEEDBACK_HISTORY,
+                delivered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
+            );
+        }
+
         log.debug(
             "Review history: workspaceId={}, subjectUserId={}, observations={}, feedback={}",
             workspaceId,
             subjectUserId,
-            observations.size(),
-            delivered.size()
+            observationCount,
+            feedbackCount
         );
         return new EvidenceContribution(
             files,
-            // A window over a growing record. It can show that something recurred; it can never show
-            // that something never happened, so COMPLETE is not a state this source may report.
-            Map.of(OBSERVATION_HISTORY, SourceCompleteness.PARTIAL, FEEDBACK_HISTORY, SourceCompleteness.PARTIAL),
+            Map.copyOf(completeness),
             Map.of(),
             Map.of(),
             Map.of(),
-            // Reported rather than inferred from the staged file list: both files are always written, so
-            // "there is a file" would answer NON_EMPTY for a person with no history at all.
-            Map.of(
-                OBSERVATION_HISTORY,
-                observations.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY,
-                FEEDBACK_HISTORY,
-                delivered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
-            )
+            Map.copyOf(contentStates)
         );
     }
 

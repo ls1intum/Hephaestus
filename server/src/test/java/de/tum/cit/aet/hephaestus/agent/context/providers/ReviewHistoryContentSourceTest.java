@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -31,8 +33,10 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -107,6 +111,46 @@ class ReviewHistoryContentSourceTest {
             "inputs/history/observations.json",
             "inputs/history/feedback.json"
         );
+    }
+
+    /**
+     * The shape production actually asks for. {@code WorkspaceContextBuilder} captures each source kind
+     * on its own — one {@code capture} call per kind, so that one failing collector costs only its own
+     * source — and then rejects a contribution that reports anything about a kind it did not ask about.
+     * A collector that answers for both halves whichever half was requested therefore fails every
+     * review, not just the half it overreached on.
+     *
+     * <p>Asking for both at once, as the tests around this one do, is the one call shape production
+     * never makes; it is why this went unseen until a real review ran.
+     */
+    @Nested
+    class WhenOnlyOneHalfIsAskedFor {
+
+        @Test
+        void observationHistoryAloneAnswersForObservationHistoryOnly() {
+            var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
+
+            assertThat(captured.files()).containsOnlyKeys("inputs/history/observations.json");
+            assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
+            assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
+        }
+
+        @Test
+        void feedbackHistoryAloneAnswersForFeedbackHistoryOnly() {
+            var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
+
+            assertThat(captured.files()).containsOnlyKeys("inputs/history/feedback.json");
+            assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
+            assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
+        }
+
+        /** An unasked-for half must not cost the read that answers it. */
+        @Test
+        void theUnaskedHalfIsNotQueried() {
+            provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
+
+            verify(feedbackRepository, never()).findRecentDeliveredForRecipient(any(), any(), any(), any());
+        }
     }
 
     /**
