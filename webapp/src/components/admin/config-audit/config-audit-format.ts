@@ -31,6 +31,7 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	WORKSPACE_INSTANCE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_OWN_PROVIDER_LLM_BUDGET: "Own-provider AI cap",
 	REVIEW_BACKFILL_RUN: "Review of past work",
+	REVIEW_SWEEP_SCHEDULE: "Recurring check for new work",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",
 	WORKSPACE_LLM_MODEL: "Workspace model",
 	...RENAMED_ENTITY_TYPE_LABELS,

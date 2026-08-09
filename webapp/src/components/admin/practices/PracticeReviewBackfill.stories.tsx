@@ -17,6 +17,9 @@ const run = (overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRu
 		fromAt: "2026-07-08T00:00:00Z",
 		toAt: "2026-08-07T00:00:00Z",
 		status: "AWAITING_CONFIRMATION",
+		// A campaign an admin scoped by hand. The other value, SWEEP, belongs to a run a recurring
+		// check opened, and those are shown by the schedule card rather than here.
+		discoveredVia: "BACKFILL",
 		estimatedArtifacts: 128,
 		estimatedCostUsd: 15.36,
 		submittedCount: 0,

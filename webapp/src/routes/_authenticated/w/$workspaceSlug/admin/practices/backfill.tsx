@@ -3,13 +3,23 @@ import { createFileRoute } from "@tanstack/react-router";
 import { History } from "lucide-react";
 import { toast } from "sonner";
 import {
+	createSweepScheduleMutation,
+	deleteSweepScheduleMutation,
 	listBackfillRunsOptions,
 	listBackfillRunsQueryKey,
+	listSweepSchedulesOptions,
+	listSweepSchedulesQueryKey,
 	preflightBackfillRunMutation,
+	replaceSweepScheduleMutation,
 	updateBackfillRunStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { CreateReviewBackfillRunRequest } from "@/api/types.gen";
+import type {
+	CreateReviewBackfillRunRequest,
+	CreateReviewSweepScheduleRequest,
+	UpdateReviewSweepScheduleRequest,
+} from "@/api/types.gen";
 import { PracticeReviewBackfill } from "@/components/admin/practices/PracticeReviewBackfill";
+import { PracticeReviewSweepSchedule } from "@/components/admin/practices/PracticeReviewSweepSchedule";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -48,6 +58,37 @@ function BackfillContainer() {
 		},
 	});
 
+	const schedulesQueryKey = listSweepSchedulesQueryKey({ path: { workspaceSlug } });
+	const schedulesQuery = useQuery(listSweepSchedulesOptions({ path: { workspaceSlug } }));
+	const invalidateSchedules = () => queryClient.invalidateQueries({ queryKey: schedulesQueryKey });
+
+	const scheduleError = (verb: string) => (error: unknown) =>
+		toast.error(`Couldn't ${verb} this recurring check`, { description: problemDetailOf(error) });
+
+	const createSchedule = useMutation({
+		...createSweepScheduleMutation(),
+		onSuccess: () => {
+			void invalidateSchedules();
+			toast.success("Recurring check started");
+		},
+		onError: scheduleError("start"),
+	});
+
+	const replaceSchedule = useMutation({
+		...replaceSweepScheduleMutation(),
+		onSuccess: () => void invalidateSchedules(),
+		onError: scheduleError("update"),
+	});
+
+	const deleteSchedule = useMutation({
+		...deleteSweepScheduleMutation(),
+		onSuccess: () => {
+			void invalidateSchedules();
+			toast.success("Recurring check removed");
+		},
+		onError: scheduleError("remove"),
+	});
+
 	const updateStatus = useMutation({
 		...updateBackfillRunStatusMutation(),
 		onSuccess: (run) => {
@@ -68,9 +109,27 @@ function BackfillContainer() {
 			<PageHeader
 				icon={<History />}
 				title="Review past work"
-				description="Measure work that existed before practice reviews were switched on."
+				description="Measure work that existed before practice reviews were switched on, and keep checking for work nothing announced."
 			/>
-			<div className="max-w-3xl">
+			<div className="max-w-3xl space-y-6">
+				<PracticeReviewSweepSchedule
+					schedules={schedulesQuery.data ?? []}
+					isLoading={schedulesQuery.isLoading}
+					isError={schedulesQuery.isError}
+					onRetry={() => void schedulesQuery.refetch()}
+					isSaving={
+						createSchedule.isPending || replaceSchedule.isPending || deleteSchedule.isPending
+					}
+					onCreate={(request: CreateReviewSweepScheduleRequest) =>
+						createSchedule.mutate({ path: { workspaceSlug }, body: request })
+					}
+					onReplace={(scheduleId: string, request: UpdateReviewSweepScheduleRequest) =>
+						replaceSchedule.mutate({ path: { workspaceSlug, scheduleId }, body: request })
+					}
+					onDelete={(scheduleId: string) =>
+						deleteSchedule.mutate({ path: { workspaceSlug, scheduleId } })
+					}
+				/>
 				<PracticeReviewBackfill
 					runs={runsQuery.data ?? []}
 					isLoading={runsQuery.isLoading}

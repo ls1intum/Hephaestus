@@ -82,6 +82,7 @@ export const DISCOVERED_VIA_LABELS: Record<DiscoveredVia, string> = {
 	SYNC: "Noticed during a sync",
 	MANUAL: "Requested by hand",
 	BACKFILL: "Backfill of past work",
+	SWEEP: "Found by a recurring check",
 };
 
 export const DISCOVERED_VIA_DESCRIPTIONS: Record<DiscoveredVia, string> = {
@@ -89,6 +90,8 @@ export const DISCOVERED_VIA_DESCRIPTIONS: Record<DiscoveredVia, string> = {
 	SYNC: "Spotted by a scheduled sync, so the time is only as precise as the sync.",
 	MANUAL: "Someone asked for this review explicitly.",
 	BACKFILL: "Recorded while catching up on work that predates the connection.",
+	SWEEP:
+		"Found by the recurring check over recent work, not announced by the provider — so the time is only as precise as the check.",
 };
 
 /**
