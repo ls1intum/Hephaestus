@@ -89,9 +89,18 @@ public class BotCommandProcessor {
         this.reactionSinks = map;
     }
 
+    /**
+     * No transaction, deliberately. {@link AgentJobService#submit} states that callers must not wrap it
+     * in one: it opens its own so that the idempotency-key race it absorbs rolls back that insert alone.
+     * Joined to an outer transaction — which {@code REQUIRES_NEW} here used to supply — the same race
+     * marks the whole unit of work rollback-only, so a second person asking at the same moment as the
+     * first would not merely be deduplicated: the ledger row recording that they asked would roll back
+     * with it, and the ask would vanish leaving no reason for the silence. Everything this method reads
+     * is fetched with its association graph and used detached.
+     */
     @Async
     @TransactionalEventListener
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void onBotCommandReceived(BotCommandReceivedEvent event) {
         // The ack is itself an external write: while silenced it would promise a review that won't post.
         if (!silentModeQuery.isSilentModeEngaged()) {
@@ -171,9 +180,14 @@ public class BotCommandProcessor {
             // The commenter by the identity the provider knows them by, never by login: a login is
             // provider-scoped and its owner can change it, so authorizing on one authorizes whoever
             // holds it today. An unknown commenter resolves to null, which the authority refuses.
-            User commenter = userRepository
+            //
+            // Exactly one identity, never the account's whole set: a comment carries no Hephaestus
+            // account, so the set would have to be inferred from this identity — and an admin under a
+            // second provider would then be authorized by a link this comment does not prove they hold.
+            List<User> commenter = userRepository
                 .findByNativeIdAndProviderId(event.authorNativeId(), event.providerId())
-                .orElse(null);
+                .map(List::of)
+                .orElseGet(List::of);
 
             ManualReviewOutcome outcome = manualReviewRequests.requestPullRequestReview(workspace, pr, commenter);
             switch (outcome.status()) {
