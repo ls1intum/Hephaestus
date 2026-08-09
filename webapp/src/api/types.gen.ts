@@ -2108,6 +2108,10 @@ export type ReviewFinding = {
     feedbackDisposition: ReviewFeedbackDisposition;
     id: string;
     observedAt: Date;
+    /**
+     * What occasioned the measurement. BACKFILL came from a confirmed campaign over work that already existed, so it is not a point on the live trend line.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
     practiceName: string;
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
@@ -2472,6 +2476,10 @@ export type ReflectionItem = {
      * Observation id — handle to open the full detail
      */
     observationId: string;
+    /**
+     * What occasioned the measurement. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
     /**
      * Impact level (null unless assessed BAD)
      */
@@ -9488,6 +9496,10 @@ export type ListPracticeReviewFindingsData = {
          */
         artifactId?: number;
         subjectUserId?: number;
+        /**
+         * What occasioned the measurement: LIVE, MANUAL or BACKFILL
+         */
+        origin?: Array<'LIVE' | 'MANUAL' | 'BACKFILL'>;
         /**
          * Inclusive lower bound
          */

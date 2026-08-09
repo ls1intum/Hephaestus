@@ -5184,6 +5184,18 @@ paths:
           type: integer
           format: int64
           exclusiveMinimum: 0
+      - description: "What occasioned the measurement: LIVE, MANUAL or BACKFILL"
+        in: query
+        name: origin
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - LIVE
+            - MANUAL
+            - BACKFILL
       - description: Inclusive lower bound
         in: query
         name: from
@@ -11052,6 +11064,15 @@ components:
           type: string
           format: uuid
           description: Observation id — handle to open the full detail
+        origin:
+          type: string
+          description: "What occasioned the measurement. BACKFILL means it came from\
+            \ a review of past work rather than from something that just happened,\
+            \ and nothing was posted anywhere at the time."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         severity:
           type: string
           description: Impact level (null unless assessed BAD)
@@ -11067,6 +11088,7 @@ components:
       - artifactId
       - artifactKind
       - observationId
+      - origin
       - title
     ReflectionPractice:
       type: object
@@ -11775,6 +11797,15 @@ components:
         observedAt:
           type: string
           format: date-time
+        origin:
+          type: string
+          description: "What occasioned the measurement. BACKFILL came from a confirmed\
+            \ campaign over work that already existed, so it is not a point on the\
+            \ live trend line."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         practiceName:
           type: string
         practiceSlug:
@@ -11811,6 +11842,7 @@ components:
       - feedbackDisposition
       - id
       - observedAt
+      - origin
       - practiceName
       - practiceSlug
       - presence

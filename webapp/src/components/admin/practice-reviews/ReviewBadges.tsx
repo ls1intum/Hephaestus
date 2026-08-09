@@ -77,6 +77,23 @@ export function FindingResultBadge({ finding }: { finding: FindingResult }) {
 	);
 }
 
+/**
+ * What occasioned a measurement, shown only when it was not the ordinary case.
+ *
+ * <p>LIVE renders nothing: badging the overwhelming majority of rows says nothing and buries the two
+ * that matter. A campaign's finding and one somebody asked for by hand are both self-selected rather
+ * than a random draw from the work, so reading them as though they were live is the mistake this
+ * exists to prevent.
+ */
+export function ObservationOriginBadge({ origin }: { origin: ReviewFinding["origin"] }) {
+	if (origin === "LIVE") return null;
+	return (
+		<Badge variant="outline">
+			{origin === "BACKFILL" ? "From a review of past work" : "Requested by hand"}
+		</Badge>
+	);
+}
+
 export function ClaimCurrentnessBadge({
 	currentness,
 }: {

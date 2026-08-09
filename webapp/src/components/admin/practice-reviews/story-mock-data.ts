@@ -60,6 +60,7 @@ export const reviewFindings = [
 		confidence: 0.94,
 		feedbackDisposition: { delivered: 1, failed: 0, prepared: 1, superseded: 0, suppressed: 0 },
 		observedAt: new Date("2026-07-28T13:40:00Z"),
+		origin: "LIVE",
 		practiceName: "Thin controllers",
 		practiceSlug: "thin-controllers",
 		presence: "PRESENT",
@@ -76,6 +77,8 @@ export const reviewFindings = [
 		confidence: 0.87,
 		feedbackDisposition: { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 1 },
 		observedAt: new Date("2026-07-28T12:08:00Z"),
+		// A campaign's finding, so the surface can be seen distinguishing it from a live one.
+		origin: "BACKFILL",
 		practiceName: "Product language",
 		practiceSlug: "product-language",
 		presence: "PRESENT",
