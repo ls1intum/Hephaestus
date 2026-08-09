@@ -65,3 +65,12 @@ hephaestus:
         nats:
             enabled: false
             server: "nats://localhost:4222"
+
+springdoc:
+    # The one profile whose entire job is to publish the description. Everywhere else it defaults off
+    # (see application.yml) because the security carve-out that lets this profile scrape it without a
+    # JwtDecoder applies on every chain, not just this one.
+    api-docs:
+        enabled: true
+    swagger-ui:
+        enabled: true

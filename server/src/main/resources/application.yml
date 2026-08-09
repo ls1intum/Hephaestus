@@ -150,6 +150,17 @@ management:
                 include: readinessState,integrationConsumer
 
 springdoc:
+    # Off unless a profile asks for it. SecurityConfig permitAll()s /v3/api-docs/** and /swagger-ui/**
+    # on both filter chains so the `specs` profile — which boots with no JwtDecoder — can scrape the
+    # description; that carve-out is not profile-guarded, so wherever springdoc registers its endpoints
+    # they answer unauthenticated. Defaulting on therefore published the complete route list, admin
+    # routes included, from every deployment that was not `prod`. springdoc's own
+    # SpringDocConfiguration is @ConditionalOnProperty on this flag, so `false` means the endpoints are
+    # never registered and the permitAll matchers match nothing.
+    api-docs:
+        enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+    swagger-ui:
+        enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
     default-produces-media-type: application/json
     writer-with-order-by-keys: true
 
