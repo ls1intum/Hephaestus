@@ -60,6 +60,8 @@ export const SIGNAL_STATE_LABELS: Record<SignalState, string> = {
 export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	GATE_SKIPPED: "A review gate on this workspace turned it away",
 	COOLDOWN_ACTIVE: "This work was reviewed too recently",
+	REQUEST_COOLDOWN_ACTIVE: "A review of this was already asked for a moment ago",
+	REQUESTER_QUOTA_EXHAUSTED: "You have asked for as many reviews as an hour allows",
 	CONCURRENT_DUPLICATE: "The same review was already running",
 	OUT_OF_REVIEW_SCOPE: "This repository or branch is outside the workspace's review scope",
 	WORKSPACE_INACTIVE: "The workspace was not active",

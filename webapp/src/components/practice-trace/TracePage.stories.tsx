@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { artifactTrace, untouchedArtifactTrace } from "./story-mock-data";
 import { TracePage } from "./TracePage";
 
 const TRACE_URL = "*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId";
+const REQUEST_URL = "*/workspaces/:workspaceSlug/practices/review-requests";
+
+const traceHandler = http.get(TRACE_URL, () => HttpResponse.json(artifactTrace));
 
 const meta = {
 	title: "Practice trace/Review activity detail",
@@ -191,5 +194,93 @@ export const Mobile: Story = {
 		await expect(await canvas.findByText("Thin controllers")).toBeVisible();
 		await expect(canvas.getByText("Waiting on a connection")).toBeVisible();
 		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * The refusal is the point. A workspace turns an ask down for reasons the person asking can neither
+ * see nor fix, so the answer is a 200 carrying a sentence — and that sentence is printed exactly as
+ * the server phrased it, because a re-worded copy is how a screen and a support answer start
+ * disagreeing about the same refusal.
+ */
+export const RefusesTheAskInTheServersWords: Story = {
+	parameters: {
+		msw: {
+			handlers: [
+				traceHandler,
+				http.post(REQUEST_URL, () =>
+					HttpResponse.json({
+						status: "REFUSED",
+						reason: "REQUESTER_QUOTA_EXHAUSTED",
+						reasonDescription:
+							"You have asked for as many reviews as an hour allows; the allowance refills.",
+					}),
+				),
+			],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
+		await expect(await canvas.findByText("No review was started")).toBeVisible();
+		await expect(
+			canvas.getByText(
+				"You have asked for as many reviews as an hour allows; the allowance refills.",
+			),
+		).toBeVisible();
+	},
+};
+
+/** A started review clears any earlier refusal instead of leaving a stale explanation on screen. */
+export const StartsAReview: Story = {
+	parameters: {
+		msw: {
+			handlers: [
+				traceHandler,
+				http.post(REQUEST_URL, () =>
+					HttpResponse.json({
+						status: "SUBMITTED",
+						jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
+					}),
+				),
+			],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
+		await expect(await canvas.findByRole("button", { name: "Review this now" })).toBeEnabled();
+		await expect(canvas.queryByText("No review was started")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Standing on the work is not the same as reaching it, so this one really is a 403 — and the page
+ * says so through the error channel rather than pretending the workspace declined.
+ */
+export const RefusesSomebodyWithNoStanding: Story = {
+	parameters: {
+		msw: {
+			handlers: [
+				traceHandler,
+				http.post(REQUEST_URL, () =>
+					HttpResponse.json(
+						{
+							status: 403,
+							title: "Access denied",
+							detail:
+								"Only the work's author or assignees, or a workspace admin, can ask for a review of it.",
+						},
+						{ status: 403, headers: { "Content-Type": "application/problem+json" } },
+					),
+				),
+			],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
+		await expect(await canvas.findByRole("button", { name: "Review this now" })).toBeEnabled();
+		await expect(canvas.queryByText("No review was started")).not.toBeInTheDocument();
 	},
 };

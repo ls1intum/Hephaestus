@@ -1,15 +1,24 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ArrowUpIcon, ExternalLinkIcon, RadarIcon } from "lucide-react";
-import { getArtifactTraceOptions } from "@/api/@tanstack/react-query.gen";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+	getArtifactTraceOptions,
+	getArtifactTraceQueryKey,
+	requestPracticeReviewMutation,
+} from "@/api/@tanstack/react-query.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
+import { problemDetailOf } from "@/lib/problem-detail";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import {
 	artifactKindIcon,
@@ -35,8 +44,33 @@ export interface TracePageProps {
  * a "show more": a practice that did nothing is precisely what the reader came to find.
  */
 export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePageProps) {
+	const queryClient = useQueryClient();
 	const query = useQuery({
 		...getArtifactTraceOptions({ path: { workspaceSlug, artifactKind, artifactId } }),
+	});
+	// Kept on the page rather than raised as a toast: a refusal is the answer to the question this
+	// whole page exists to answer, and a toast is gone before the reader has finished reading it.
+	const [refusal, setRefusal] = useState<string | null>(null);
+	const requestReview = useMutation({
+		...requestPracticeReviewMutation(),
+		onMutate: () => setRefusal(null),
+		onSuccess: (outcome) => {
+			if (outcome.status === "SUBMITTED") {
+				void queryClient.invalidateQueries({
+					queryKey: getArtifactTraceQueryKey({ path: { workspaceSlug, artifactKind, artifactId } }),
+				});
+				toast.success("Review started");
+				return;
+			}
+			// Printed exactly as the server phrased it. The sentence lives next to the reason it explains
+			// so that a screen, a bot comment and a support answer cannot come to say different things
+			// about the same refusal; re-wording it here is how that guarantee is lost.
+			setRefusal(outcome.reasonDescription ?? "No review was started.");
+		},
+		onError: (error) =>
+			toast.error("Couldn't ask for a review", {
+				description: problemDetailOf(error, "Try again in a moment."),
+			}),
 	});
 	const backLink = (
 		<Link
@@ -85,34 +119,59 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{backLink}
 
-			<header className="min-w-0 space-y-3">
-				<p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-					<KindIcon className="size-4 shrink-0" aria-hidden />
-					{artifactKindLabel(trace.artifactKind)}
-				</p>
-				<h1 className="break-words text-2xl font-semibold tracking-tight">
-					{trace.title}
-					{trace.number != null && (
-						<span className="ml-2 font-normal text-muted-foreground tabular-nums">
-							#{trace.number}
-						</span>
-					)}
-				</h1>
-				<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-					{trace.container && <span className="break-all">{trace.container}</span>}
-					{trace.url && (
-						<a
-							href={trace.url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
-						>
-							Open the original
-							<ExternalLinkIcon className="size-3.5 shrink-0" aria-hidden />
-							<span className="sr-only"> (opens in a new tab)</span>
-						</a>
-					)}
+			<header className="min-w-0 space-y-4">
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+					<div className="min-w-0 space-y-3">
+						<p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+							<KindIcon className="size-4 shrink-0" aria-hidden />
+							{artifactKindLabel(trace.artifactKind)}
+						</p>
+						<h1 className="break-words text-2xl font-semibold tracking-tight">
+							{trace.title}
+							{trace.number != null && (
+								<span className="ml-2 font-normal text-muted-foreground tabular-nums">
+									#{trace.number}
+								</span>
+							)}
+						</h1>
+						<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+							{trace.container && <span className="break-all">{trace.container}</span>}
+							{trace.url && (
+								<a
+									href={trace.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
+								>
+									Open the original
+									<ExternalLinkIcon className="size-3.5 shrink-0" aria-hidden />
+									<span className="sr-only"> (opens in a new tab)</span>
+								</a>
+							)}
+						</div>
+					</div>
+					{/* On this page and not only on the listing: this is where a developer is already
+					    asking why nothing happened, and the answer is often "nothing has asked yet". */}
+					<Button
+						variant="outline"
+						className="shrink-0 sm:self-start"
+						disabled={requestReview.isPending}
+						onClick={() =>
+							requestReview.mutate({
+								path: { workspaceSlug },
+								body: { artifactKind, artifactId },
+							})
+						}
+					>
+						{requestReview.isPending ? "Asking…" : "Review this now"}
+					</Button>
 				</div>
+				{refusal && (
+					<Alert variant="warning">
+						<AlertTitle>No review was started</AlertTitle>
+						<AlertDescription>{refusal}</AlertDescription>
+					</Alert>
+				)}
 			</header>
 
 			<section aria-labelledby="trace-signals-heading" className="min-w-0 space-y-3">
