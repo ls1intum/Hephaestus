@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionReques
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
@@ -15,6 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
+import java.time.Instant;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -85,18 +88,30 @@ public class DevTriggerController {
         this.signalRecorder = signalRecorder;
     }
 
-    /** Outcome of the session-bound prep phase: a request ready to submit, or a terminal message. */
-    private record Prepared(@Nullable AgentJobType jobType, @Nullable Object request, @Nullable String message) {
-        static Prepared review(@Nullable PullRequestReviewSubmissionRequest request) {
-            return new Prepared(AgentJobType.PULL_REQUEST_REVIEW, request, null);
+    /**
+     * Outcome of the session-bound prep phase: a request ready to submit, or a terminal message.
+     *
+     * @param signalKey the ledger identity this run is recorded under. Present for the gate-bypass mode,
+     *     where the run has no signal of its own and is exactly what the manual-request vocabulary is
+     *     for; null in gate-routed mode, where the caller named a real signal and
+     *     {@code preparePullRequest} already keyed the ledger on it.
+     */
+    private record Prepared(
+        @Nullable AgentJobType jobType,
+        @Nullable Object request,
+        @Nullable String message,
+        @Nullable SignalKey signalKey
+    ) {
+        static Prepared review(@Nullable PullRequestReviewSubmissionRequest request, @Nullable SignalKey key) {
+            return new Prepared(AgentJobType.PULL_REQUEST_REVIEW, request, null, key);
         }
 
-        static Prepared issue(@Nullable IssueReviewSubmissionRequest request) {
-            return new Prepared(AgentJobType.ISSUE_REVIEW, request, null);
+        static Prepared issue(@Nullable IssueReviewSubmissionRequest request, @Nullable SignalKey key) {
+            return new Prepared(AgentJobType.ISSUE_REVIEW, request, null, key);
         }
 
         static Prepared done(String message) {
-            return new Prepared(null, null, message);
+            return new Prepared(null, null, message, null);
         }
     }
 
@@ -122,16 +137,22 @@ public class DevTriggerController {
         if (prepared == null || prepared.request() == null) {
             return prepared == null ? "No submission prepared" : prepared.message();
         }
-        // Null signal key on purpose. A key minted per click is a key that never repeats, and
-        // AgentJobService only applies its in-flight deduplication when it has no key to trust
-        // (`signalKey == null`) — so a per-click key does not make the trigger idempotent, it disables
-        // the only deduplication this path has. Passing null restores it: a second click while the first
-        // review is still running joins that run instead of paying for a second one.
+        // The bypass mode carries the kind's manual-request key, so the run this endpoint starts leaves
+        // the same trace any other requested review does — and the artifact trace can answer "why did a
+        // review run here" instead of showing a job with no occasion behind it.
+        //
+        // It used to pass null with the argument that a per-click key disables the in-flight
+        // deduplication (AgentJobService only consults `findByWorkspaceIdAndIdempotencyKeyAndStatusIn`
+        // when `signalKey == null`). That is half true and the wrong half: the partial unique index
+        // `uk_agent_job_idempotency` still refuses the second concurrent insert on the same key, so a
+        // double click is answered with CONCURRENT_DUPLICATE rather than silently paying twice. The only
+        // thing lost is that the second click no longer reports the first click's job id, and it now
+        // reports a sentence saying why instead.
         return agentJobService.submitPrepared(
             workspaceId,
             prepared.jobType(),
             (JobSubmissionRequest) prepared.request(),
-            null
+            prepared.signalKey()
         );
     }
 
@@ -161,7 +182,14 @@ public class DevTriggerController {
             }
         }
         PullRequestReviewSubmissionRequest request = agentJobService.buildReviewRequest(pr, triggerSignal);
-        return request == null ? Prepared.done("PR missing branch info: prId=" + pr.getId()) : Prepared.review(request);
+        return request == null
+            ? Prepared.done("PR missing branch info: prId=" + pr.getId())
+            : Prepared.review(
+                  request,
+                  triggerSignal == null
+                      ? recordManualRequest(workspaceId, pr.getId(), ScmSignals.PULL_REQUEST_REVIEW_REQUESTED)
+                      : null
+              );
     }
 
     private Prepared prepareIssue(Long workspaceId, Long issueId, @Nullable String signal) {
@@ -190,7 +218,25 @@ public class DevTriggerController {
         IssueReviewSubmissionRequest request = agentJobService.buildIssueRequest(issue, triggerSignal);
         return request == null
             ? Prepared.done("Issue missing repository: issueId=" + issue.getId())
-            : Prepared.issue(request);
+            : Prepared.issue(
+                  request,
+                  triggerSignal == null
+                      ? recordManualRequest(workspaceId, issue.getId(), ScmSignals.ISSUE_REVIEW_REQUESTED)
+                      : null
+              );
+    }
+
+    /**
+     * Open a ledger entry for a run this endpoint occasioned itself, and hand back its key.
+     *
+     * <p>A fresh run id per call, which is the whole point of the {@code RUN_ID} scheme: an ask is its
+     * own occasion, so two of them are two rows rather than one deduplicated against the other, and
+     * neither consumes the entry an ordinary lifecycle event was going to use.
+     */
+    private SignalKey recordManualRequest(long workspaceId, long artifactId, SignalName requestSignal) {
+        SignalKey key = ScmSignals.manualKey(workspaceId, artifactId, requestSignal, UUID.randomUUID());
+        signalRecorder.record(key, Instant.now(), DiscoveredVia.MANUAL);
+        return key;
     }
 
     /**

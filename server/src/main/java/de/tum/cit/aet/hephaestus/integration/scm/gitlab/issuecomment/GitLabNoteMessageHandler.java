@@ -230,6 +230,19 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
+        // A command whose author the payload does not name cannot be authorized downstream, and the
+        // subscriber spends real budget on it. Dropped here rather than published as unattributed, so
+        // that "who asked for this" has one answer at every point after publication.
+        if (event.user() == null || event.user().id() == null || context.providerId() == null) {
+            log.warn(
+                "Bot command: no identifiable author on the note payload, projectPath={}, mrIid={}, noteId={}",
+                safeProjectPath,
+                mr.iid(),
+                event.objectAttributes().id()
+            );
+            return;
+        }
+
         log.info(
             "Bot command detected: command={}, projectPath={}, mrIid={}, author={}, noteId={}",
             event.objectAttributes().note().strip(),
@@ -246,6 +259,8 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
                 mr.iid(),
                 event.objectAttributes().note(),
                 event.user().username(),
+                context.providerId(),
+                event.user().id().longValue(),
                 event.objectAttributes().id(),
                 context.scopeId()
             )

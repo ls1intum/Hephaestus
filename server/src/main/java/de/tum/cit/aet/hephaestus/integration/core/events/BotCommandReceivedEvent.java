@@ -20,7 +20,15 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
  * @param repositoryId the repository's DB id
  * @param mrNumber     the PR / MR number (project-scoped)
  * @param noteBody     the raw comment body
- * @param noteAuthor   the login of the comment author
+ * @param noteAuthor   the login of the comment author, for logs only. A login is provider-scoped and
+ *                     the person can change it, so nothing may be authorized on it — see
+ *                     {@code providerId} / {@code authorNativeId}, which together are the identity the
+ *                     subscriber resolves the commenter by
+ * @param providerId   the git provider the comment arrived from, the first half of the commenter's
+ *                     stable identity
+ * @param authorNativeId the provider's own numeric id for the comment author, the second half. Never
+ *                     null: a command from an actor the publisher cannot name is not published at all,
+ *                     because a subscriber that spends budget has to be able to ask who is asking
  * @param commentId    the comment's native id (vendor-shape Long), used by reaction
  *                     SPI implementations to add an emoji reaction
  * @param scopeId      the workspace scope ID, for credential resolution; null when
@@ -32,6 +40,8 @@ public record BotCommandReceivedEvent(
     int mrNumber,
     String noteBody,
     String noteAuthor,
+    long providerId,
+    long authorNativeId,
     Long commentId,
     Long scopeId
 ) {}

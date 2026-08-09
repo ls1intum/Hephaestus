@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -114,6 +115,14 @@ public class AgentJobService {
      * Build a detached PR review submission request. Reads the PR's lazy associations, so it MUST be
      * called inside the caller's open session/transaction and the resulting request submitted OUTSIDE it
      * via {@link #submitPrepared}. Null when the branch refs needed to clone/diff are absent.
+     *
+     * <p>The origin is {@link ObservationOrigin#MANUAL} on both of these builders and not negotiable,
+     * because the only caller is the dev trigger and every run it starts is one an admin picked an
+     * artifact for. The trigger signal it replays does not change that: naming
+     * {@code scm.pull_request.merged} makes the run <em>reproduce</em> what a merge would have
+     * occasioned, but the corpus is still one artifact somebody chose. Left to the submission request's
+     * default — LIVE whenever a trigger signal is present — a handful of hand-picked replays would be
+     * read as part of the population the behavioural trend line is drawn from.
      */
     @Nullable
     PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable SignalName triggerSignal) {
@@ -126,7 +135,8 @@ public class AgentJobService {
             pr.getHeadRefName(),
             pr.getHeadRefOid(),
             pr.getBaseRefName(),
-            triggerSignal
+            triggerSignal,
+            ObservationOrigin.MANUAL
         );
     }
 
@@ -147,7 +157,8 @@ public class AgentJobService {
             issue.getState() != null ? issue.getState().name() : "OPEN",
             issue.getHtmlUrl(),
             issue.getUpdatedAt(),
-            triggerSignal
+            triggerSignal,
+            ObservationOrigin.MANUAL
         );
     }
 
