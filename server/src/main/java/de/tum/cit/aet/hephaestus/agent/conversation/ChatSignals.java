@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.conversation;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
 
 /**
  * The signal vocabulary of a chat conversation thread.
@@ -24,5 +27,43 @@ public final class ChatSignals {
      */
     public static final SignalName CONVERSATION_THREAD_SETTLED = SignalName.of("chat.conversation_thread.settled");
 
+    /**
+     * A thread has no commits and no version of its own, so an occurrence is identified by what the
+     * thread was at the moment it settled: where it starts, where it currently ends, and how much was
+     * said. Two sweeps over an unchanged thread therefore derive the same identity and the second one
+     * loses the ledger's insert, which is what makes the ledger the dedup.
+     */
+    public static final RevisionScheme REVISION_SCHEME = RevisionScheme.CONTENT_DIGEST;
+
     private ChatSignals() {}
+
+    /**
+     * The ledger identity of one settled-thread occurrence.
+     *
+     * <p>The turn count is part of the digest and not merely decoration: without it, a thread that grew
+     * by replies which were then all tombstoned would come back with the same root and last {@code ts}
+     * and be silently deduplicated against an occurrence that measured different content.
+     *
+     * <p>This identity is deliberately <em>not</em> the growth gate. It moves on a single new turn,
+     * while the scheduler requires two — swapping one for the other would quietly raise how often
+     * conversations are reviewed, and a step in that rate is indistinguishable, after the fact, from a
+     * change in how teams talk.
+     *
+     * @param threadId the {@code slack_thread} row id, which is what the delivery and trace surfaces
+     *     already call this artifact
+     */
+    public static SignalKey threadSettledKey(
+        long workspaceId,
+        long threadId,
+        String threadTs,
+        String lastTs,
+        long liveTurnCount
+    ) {
+        return new SignalKey(
+            workspaceId,
+            threadId,
+            CONVERSATION_THREAD_SETTLED,
+            SignalRevision.ofContentDigest(threadTs, lastTs, Long.toString(liveTurnCount))
+        );
+    }
 }

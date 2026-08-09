@@ -164,6 +164,36 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     )
     List<SettledCandidateRow> findSettledCandidateRows(@Param("minMessageCount") int minMessageCount);
 
+    /**
+     * One thread by id, carrying the same consent condition the sweep applies.
+     *
+     * <p>Workspace-pinned, and the {@code ACTIVE} join is not optional: this is the lookup the pending-
+     * signal reaper uses days after the fact, and a channel whose consent was withdrawn in the meantime
+     * must stop producing reviews immediately rather than at the next sweep.
+     */
+    @Query(
+        """
+        SELECT t.workspaceId AS workspaceId,
+               t.id AS threadId,
+               t.slackChannelId AS slackChannelId,
+               c.channelName AS slackChannelName,
+               t.slackThreadTs AS slackThreadTs,
+               t.lastTs AS lastTs,
+               t.lastReviewedTs AS lastReviewedTs,
+               t.participantMemberIds AS participantMemberIds
+        FROM SlackThread t
+        JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId
+        WHERE c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
+          AND t.workspaceId = :workspaceId
+          AND t.id = :threadId
+          AND t.lastTs IS NOT NULL
+        """
+    )
+    Optional<SettledCandidateRow> findConsentedCandidateRow(
+        @Param("workspaceId") long workspaceId,
+        @Param("threadId") long threadId
+    );
+
     interface SettledCandidateRow {
         long getWorkspaceId();
         long getThreadId();

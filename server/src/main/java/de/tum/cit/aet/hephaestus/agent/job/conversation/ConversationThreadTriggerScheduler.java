@@ -1,12 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.job.conversation;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationCandidateSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
-import de.tum.cit.aet.hephaestus.agent.handler.ConversationReviewSubmissionRequest;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.job.ConversationReviewSubmitter;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import java.time.Instant;
 import java.util.List;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -16,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Detects settled Slack conversation threads that are ready for a communication-practice review and enqueues
@@ -31,8 +35,23 @@ import org.springframework.stereotype.Component;
  *
  * <p>The watermark is advanced to the thread's newest {@code ts} only <em>after</em> a job is enqueued. Cooldown
  * is keyed on the thread + subject alone (via the idempotency-key prefix, freshness stripped by
- * {@link AgentJobService#extractCooldownKeyPrefix}), NOT on {@code threadId + lastTs}, so a late reply does not
+ * {@code AgentJobService#extractCooldownKeyPrefix}), NOT on {@code threadId + lastTs}, so a late reply does not
  * immediately re-fire — only genuine growth past the watermark does.
+ *
+ * <h2>Every decision reaches the ledger</h2>
+ * <p>A thread that passes the gates is recorded as one {@code chat.conversation_thread.settled} occurrence
+ * before anything is submitted, and {@link ConversationReviewSubmitter} settles that row with what came of
+ * it. This path used to submit with no signal key at all, which put conversations outside everything the
+ * ledger provides: no row for the artifact trace to explain a silence with, no reaper coverage for a
+ * thread refused because a budget was exhausted, and nothing in the "how many reviews did this instance
+ * not run, and why" answer.
+ *
+ * <p>The three gates stay <em>in front of</em> the ledger rather than being replaced by the occurrence's
+ * identity. They are not the same rule: the identity moves on a single new turn and {@link #MIN_GROWTH}
+ * requires two, so recording every gate-passing candidate and letting the digest dedup would quietly
+ * raise how often conversations are reviewed — a step in the rate that is indistinguishable, later, from
+ * a change in how teams talk. Recording only what the gates admit also keeps the ledger a record of
+ * occasions rather than of every sweep tick.
  *
  * <p><b>Tenancy &amp; ownership.</b> The scheduler owns none of the Slack schema: candidate scan, turn counts,
  * and watermark advance go through the agent-owned {@link ConversationCandidateSource} SPI implemented by
@@ -61,7 +80,9 @@ public class ConversationThreadTriggerScheduler {
     static final int MIN_GROWTH = 2;
 
     private final ConversationCandidateSource candidateSource;
-    private final AgentJobService agentJobService;
+    private final ConversationReviewSubmitter submitter;
+    private final SignalRecorder signalRecorder;
+    private final TransactionTemplate transactionTemplate;
 
     /**
      * Capability flag, available by default. When {@code false} the sweep no-ops, keeping the conversation-detection
@@ -73,11 +94,15 @@ public class ConversationThreadTriggerScheduler {
 
     public ConversationThreadTriggerScheduler(
         ConversationCandidateSource candidateSource,
-        AgentJobService agentJobService,
+        ConversationReviewSubmitter submitter,
+        SignalRecorder signalRecorder,
+        TransactionTemplate transactionTemplate,
         @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}") boolean conversationIngestEnabled
     ) {
         this.candidateSource = candidateSource;
-        this.agentJobService = agentJobService;
+        this.submitter = submitter;
+        this.signalRecorder = signalRecorder;
+        this.transactionTemplate = transactionTemplate;
         this.conversationIngestEnabled = conversationIngestEnabled;
     }
 
@@ -111,40 +136,30 @@ public class ConversationThreadTriggerScheduler {
             if (!passesGates(now, c.lastTs(), totalTurns, growth, QUIESCENCE_MINUTES, MIN_HUMAN_TURNS, MIN_GROWTH)) {
                 continue;
             }
-            boolean enqueuedAny = false;
-            for (long participant : c.participantMemberIds()) {
-                if (participant <= 0) {
-                    continue;
-                }
-                try {
-                    var request = new ConversationReviewSubmissionRequest(
-                        c.threadId(),
-                        c.channelId(),
-                        c.channelName(),
-                        c.threadTs(),
-                        participant,
-                        c.lastTs()
-                    );
-                    if (
-                        agentJobService
-                            .submit(c.workspaceId(), AgentJobType.CONVERSATION_REVIEW, request, null)
-                            .isPresent()
-                    ) {
-                        enqueuedAny = true;
-                        enqueued++;
-                    }
-                } catch (RuntimeException e) {
-                    log.warn(
-                        "conversation.detect: enqueue failed for threadId={}, participant={}: {}",
-                        c.threadId(),
-                        participant,
-                        e.toString()
-                    );
-                }
+            // The occurrence goes into the ledger BEFORE anything is submitted, and the ledger's own
+            // uniqueness decides whether this sweep is the one that acts on it. That is what makes a
+            // conversation review explainable at all: until now this path submitted with no signal key,
+            // so a thread that was passed over left nothing behind saying why, and the artifact trace —
+            // whose whole job is that silence always has a reason — could not see chat at all.
+            SignalKey key = ChatSignals.threadSettledKey(
+                c.workspaceId(),
+                c.threadId(),
+                c.threadTs(),
+                c.lastTs(),
+                totalTurns
+            );
+            boolean ours = transactionTemplate.execute(status -> signalRecorder.record(key, now, DiscoveredVia.SYNC));
+            if (!Boolean.TRUE.equals(ours)) {
+                // Another sweep already decided this exact occurrence. Not a race guard bolted on: the
+                // gates above run on counts read a moment ago, so two overlapping sweeps genuinely can
+                // agree that the same thread is ready.
+                continue;
             }
+            long started = submitter.submitAndSettle(c, key);
+            enqueued += started;
             // Advance the watermark ONLY after at least one job was enqueued, so a workspace with no enabled
             // agent config keeps re-appearing as a candidate and catches up once one is configured.
-            if (enqueuedAny) {
+            if (started > 0) {
                 candidateSource.markReviewed(c.workspaceId(), c.threadId(), c.lastTs());
             }
         }

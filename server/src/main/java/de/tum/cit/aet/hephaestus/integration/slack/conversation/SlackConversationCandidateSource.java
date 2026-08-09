@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import java.util.List;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -51,6 +52,13 @@ public class SlackConversationCandidateSource implements ConversationCandidateSo
             row.getLastReviewedTs(),
             row.getParticipantMemberIds()
         );
+    }
+
+    @Override
+    public Optional<ConversationThreadCandidate> candidateById(long workspaceId, long threadId) {
+        return threadRepository
+            .findConsentedCandidateRow(workspaceId, threadId)
+            .map(SlackConversationCandidateSource::toCandidate);
     }
 
     @Override
