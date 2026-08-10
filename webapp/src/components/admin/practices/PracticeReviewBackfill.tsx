@@ -59,11 +59,12 @@ const WINDOWS = [
 	{ value: "180", label: "The last 180 days" },
 ] as const;
 
+/** Each one names what stopped it and the single thing that restarts it — never just the cause. */
 const PAUSE_EXPLANATIONS: Record<NonNullable<ReviewBackfillRun["pauseReason"]>, string> = {
 	BUDGET_EXHAUSTED:
 		"The monthly AI budget funding these reviews is used up. Nothing has been skipped — the backfill continues from where it stopped once the budget resets or the cap is raised.",
 	REVIEW_MODEL_UNBOUND:
-		"There is no enabled review model for this workspace. Nothing has been skipped — the backfill continues once a model is bound.",
+		"This workspace has no review model that can run. Nothing has been skipped — the backfill continues once one is chosen under AI models.",
 	WORKSPACE_UNAVAILABLE:
 		"Practice reviews are off for this workspace, or the workspace is not active. Nothing has been skipped — the backfill continues once they are back on.",
 };
@@ -110,6 +111,9 @@ export function PracticeReviewBackfill({
 					<AlertCircle />
 					<AlertTitle>Backfills couldn't be loaded</AlertTitle>
 					<AlertDescription>
+						{/* A backfill that is already running keeps running; saying so stops an admin starting a
+						    second one because the first appeared to have vanished. */}
+						<p>Any backfill already running is unaffected — this is only about showing it here.</p>
 						<Button variant="outline" size="sm" onClick={onRetry}>
 							Try again
 						</Button>
@@ -293,12 +297,19 @@ function ConfirmationCard({
 					>
 						{isUpdating ? <Spinner /> : null}
 						{nothingToDo
-							? "Nothing in range"
+							? "Nothing to review"
 							: `Review ${countOf(run.estimatedArtifacts, run.artifactKind)}`}
 					</Button>
 					<Button variant="outline" onClick={() => onCancel(run.id)} disabled={isUpdating}>
 						Discard
 					</Button>
+					{/* A disabled button says what cannot happen; this says what to do instead, which is the
+					    half an estimate of nothing usually leaves out. */}
+					{nothingToDo ? (
+						<p className="text-muted-foreground text-sm">
+							Nothing was opened in that stretch. Discard this and try a longer one.
+						</p>
+					) : null}
 				</div>
 			</CardContent>
 		</Card>

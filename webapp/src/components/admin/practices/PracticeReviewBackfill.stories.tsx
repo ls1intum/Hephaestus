@@ -105,11 +105,16 @@ export const CostUnknown: Story = {
 	},
 };
 
+/**
+ * An estimate of nothing is a dead end unless the screen says how to get out of it: the disabled
+ * button states what cannot happen, and the line beside it names the next move.
+ */
 export const NothingInRange: Story = {
 	args: { runs: [run({ estimatedArtifacts: 0, estimatedCostUsd: 0 })] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /nothing in range/i })).toBeDisabled();
+		await expect(canvas.getByRole("button", { name: /nothing to review/i })).toBeDisabled();
+		await expect(canvas.getByText(/discard this and try a longer one/i)).toBeInTheDocument();
 	},
 };
 
@@ -197,6 +202,15 @@ export const Loading: Story = {
 	args: { isLoading: true },
 };
 
+/**
+ * The failure is about this list, not about the campaign. Left at "couldn't be loaded", an admin reads
+ * it as "stopped" and confirms a second backfill over the same stretch of history — twice the spend.
+ */
 export const LoadFailed: Story = {
 	args: { isError: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/backfills couldn't be loaded/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/already running is unaffected/i)).toBeInTheDocument();
+	},
 };

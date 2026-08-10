@@ -20,6 +20,12 @@ export function FindingEvidence({ evidence }: FindingEvidenceProps) {
 		<div className="space-y-4">
 			<div>
 				<h4 className="text-sm font-medium">Sources</h4>
+				{/* The ids are the provenance, so they stay verbatim — but a bare row of them leaves an
+				    admin guessing what they are looking at. */}
+				<p className="mt-1 text-xs text-muted-foreground">
+					The registered inputs this finding was drawn from, named as the source contract names
+					them.
+				</p>
 				<div className="mt-2 flex flex-wrap gap-2">
 					{sourceKinds.map((sourceKind) => (
 						<Badge key={sourceKind} variant="outline" className="font-mono">
@@ -30,6 +36,9 @@ export function FindingEvidence({ evidence }: FindingEvidenceProps) {
 			</div>
 			<div>
 				<h4 className="text-sm font-medium">Citations</h4>
+				<p className="mt-1 text-xs text-muted-foreground">
+					The exact passages the review quoted, and where each one came from.
+				</p>
 				<ul className="mt-2 space-y-3">
 					{evidence.citations.map((citation, index) => (
 						<li key={`${citationKey(citation)}:${index}`} className="rounded-md border p-3">
