@@ -1,4 +1,4 @@
-import type { Practice } from "@/api/types.gen";
+import type { Practice, PracticeReviewSettings } from "@/api/types.gen";
 
 /**
  * How much autonomy the system has over one practice, in the words every surface has to use.
@@ -65,3 +65,87 @@ export const REVIEW_TIER_DESCRIPTIONS: Record<ReviewTier, string> = {
 	PROPOSE: "Feedback prepared for a person to approve. Not available yet.",
 	DELIVER: "Reviewed, and feedback delivered without asking.",
 };
+
+/**
+ * The same four tiers said as a ladder: what each rung *adds* to the one below it.
+ *
+ * <p>A second set rather than a rewrite of {@link REVIEW_TIER_DESCRIPTIONS}, because the two answer
+ * different questions. The descriptions above answer "what is this practice doing" for a reader who
+ * sees one tier alone; these answer "what changes if I move one step right" for a reader looking at
+ * all four at once. Folding them together would leave the standalone tooltip saying "Adds…" with
+ * nothing to add to.
+ *
+ * <p>Off is the floor and adds nothing, so it says what it removes instead.
+ */
+export const REVIEW_TIER_ADDS: Record<ReviewTier, string> = {
+	OFF: "Nothing runs. No review, no record, nothing said.",
+	OBSERVE: "Adds the review. Every observation is recorded, and nobody is told.",
+	PROPOSE: "Adds prepared feedback, held back until a person approves it.",
+	DELIVER: "Adds sending. Feedback goes out without waiting to be approved.",
+};
+
+/** Where a workspace lets feedback go at all. ANDed with every tier, so it can only ever silence. */
+export type FeedbackReach = PracticeReviewSettings["feedbackReach"];
+
+/**
+ * Narrowest first, so the pair reads the same way the tier ladder does — left is less.
+ */
+export const FEEDBACK_REACH_ORDER = [
+	"CONVERSATION",
+	"ON_THE_WORK",
+] as const satisfies readonly FeedbackReach[];
+
+export const FEEDBACK_REACH_LABELS: Record<FeedbackReach, string> = {
+	CONVERSATION: "In the mentor conversation",
+	ON_THE_WORK: "On the work as well",
+};
+
+/**
+ * Neither sentence promises feedback: reach is ANDed with the tier, so it can stop a practice speaking
+ * in a place but never make a quiet one speak. "Also" carries that in the wider of the two.
+ */
+export const FEEDBACK_REACH_DESCRIPTIONS: Record<FeedbackReach, string> = {
+	CONVERSATION: "Feedback reaches the person in their mentor conversation and nowhere else.",
+	ON_THE_WORK:
+		"Feedback also lands on the work itself — pull request summaries, inline notes and issue comments.",
+};
+
+export interface ReviewTierCount {
+	tier: ReviewTier;
+	count: number;
+}
+
+/**
+ * A tier count map as an ordered list, with the empty tiers dropped.
+ *
+ * <p>The rollup carries every tier as a key even at zero, which is what lets a caller render a
+ * distribution without gap-filling — but printing "0 propose" on every workspace would spend the
+ * summary line on the one tier nobody can select. Ladder order, not count order: an admin reading
+ * "12 off · 84 observe" twice in a row should see the same shape both times.
+ */
+export function tierDistribution(counts: Record<string, number>): ReviewTierCount[] {
+	return REVIEW_TIER_ORDER.map((tier) => ({ tier, count: counts[tier] ?? 0 })).filter(
+		({ count }) => count > 0,
+	);
+}
+
+export function tierTotal(counts: Record<string, number>): number {
+	return REVIEW_TIER_ORDER.reduce((total, tier) => total + (counts[tier] ?? 0), 0);
+}
+
+/**
+ * The distribution as one spoken sentence, for the live region that announces it.
+ *
+ * <p>The visible line separates counts with a middot, which a screen reader either skips or reads as
+ * "middle dot"; neither is the sentence an admin needs to hear when a bulk change lands.
+ */
+export function tierDistributionSentence(counts: Record<string, number>): string {
+	const parts = tierDistribution(counts).map(
+		({ tier, count }) => `${count} ${REVIEW_TIER_LABELS[tier].toLowerCase()}`,
+	);
+	if (parts.length === 0) return "No practices yet.";
+	const total = tierTotal(counts);
+	const listed =
+		parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+	return `${total} ${total === 1 ? "practice" : "practices"}: ${listed}.`;
+}
