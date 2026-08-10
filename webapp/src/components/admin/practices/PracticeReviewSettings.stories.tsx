@@ -125,9 +125,34 @@ export const ReviewRoleOnly: Story = {
 	},
 };
 
+/**
+ * Both ways in switched off is the state where practice reviews are "on" and nothing can ever start
+ * one. The status line has to say that outright, or the page reads as working.
+ */
 export const TriggersOff: Story = {
 	args: {
 		workspace: { ...workspace, autoTriggerEnabled: false, manualTriggerEnabled: false },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/both ways in are switched off/i)).toBeVisible();
+	},
+};
+
+/**
+ * One switch, four doors. Naming only `/hephaestus review` promised a GitHub workspace a command
+ * only GitLab publishes, and hid that the same switch stops backfills and recurring checks.
+ */
+export const RequestedReviewsNamesEveryDoor: Story = {
+	play: async ({ canvas }) => {
+		const requested = canvas.getByRole("switch", { name: "Reviews somebody asks for" });
+		await expect(requested).toBeVisible();
+
+		const description = canvas.getByText(/Turning this off stops every one of them/i);
+		await expect(description).toHaveTextContent("Review this now");
+		await expect(description).toHaveTextContent("backfill of past work");
+		await expect(description).toHaveTextContent("recurring check");
+		// Scoped to the provider that publishes the comment event, not promised to every workspace.
+		await expect(description).toHaveTextContent("GitLab merge request comment");
 	},
 };
 

@@ -89,7 +89,7 @@ describe("PracticeReviewSettings", () => {
 			},
 		});
 
-		const automatic = await screen.findByRole("switch", { name: "Automatic reviews" });
+		const automatic = await screen.findByRole("switch", { name: "Reviews the work starts" });
 		expect(automatic.getAttribute("aria-disabled")).not.toBe("true");
 		expect(
 			screen.getByRole("switch", { name: "Start practice reviews" }).getAttribute("aria-disabled"),

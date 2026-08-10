@@ -99,7 +99,7 @@ function ProjectReviewStatusCard({
 		else if (!modelRunnable)
 			status = "Practice reviews are on, but none can start until the review model is ready.";
 		else if (!hasTrigger)
-			status = "Practice reviews are on. Automatic and manual project triggers are off.";
+			status = "Practice reviews are on, but nothing can start one: both ways in are switched off.";
 		else status = "Practice reviews can start when their source and review rules allow it.";
 	} else if (model.isLoading || model.isError || !modelRunnable) {
 		status = "Choose a runnable review model before starting reviews.";
@@ -222,19 +222,19 @@ function ReviewTimingCard({
 		<Card>
 			<CardHeader>
 				<CardTitle>
-					<h2>Project review triggers</h2>
+					<h2>How reviews start</h2>
 				</CardTitle>
 				<CardDescription>
-					Choose how connected GitHub or GitLab work can start a review.
+					Two ways in: the work itself reaches a moment a practice watches for, or somebody asks.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<Field orientation="horizontal">
 					<FieldContent>
-						<FieldLabel htmlFor="trigger-auto">Automatic reviews</FieldLabel>
+						<FieldLabel htmlFor="trigger-auto">Reviews the work starts</FieldLabel>
 						<FieldDescription>
-							Start reviews from the GitHub or GitLab events selected on each practice used in new
-							reviews.
+							Connected work reaching one of the moments a practice watches for — opened, merged,
+							published — starts a review on its own.
 						</FieldDescription>
 					</FieldContent>
 					<Switch
@@ -248,9 +248,14 @@ function ReviewTimingCard({
 				</Field>
 				<Field orientation="horizontal">
 					<FieldContent>
-						<FieldLabel htmlFor="trigger-manual">Manual reviews</FieldLabel>
+						{/* One switch, four doors. Naming only the comment command — which GitLab publishes and
+						    GitHub does not — promised a GitHub workspace something that cannot happen, and hid
+						    that turning this off silently stops backfills and recurring checks too. */}
+						<FieldLabel htmlFor="trigger-manual">Reviews somebody asks for</FieldLabel>
 						<FieldDescription>
-							Allow <code>/hephaestus review</code> in a pull or merge request comment.
+							The <strong>Review this now</strong> button, a backfill of past work, a recurring
+							check, and <code>/hephaestus review</code> in a GitLab merge request comment. Turning
+							this off stops every one of them.
 						</FieldDescription>
 					</FieldContent>
 					<Switch
