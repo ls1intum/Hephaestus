@@ -15,4 +15,4 @@ This changes nothing about what is collected or kept: every one of these sources
 and stored for every review; the cut only decided what the reviewing model was shown. Sources still
 require an unexpired use decision before they are read, a source with no collector in a deployment is
 reported as such rather than silently missing, and a practice whose required evidence did not arrive
-is still refused rather than reviewed on a guess.
+is still skipped rather than reviewed on a guess.

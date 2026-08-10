@@ -11,6 +11,6 @@ always required a login, but the map of them no longer needs to be public.
 This now holds for every way the server is run, not only production: a staging or evaluation instance
 reachable from the internet published the same list.
 
-**Operators:** no action needed. If you deliberately published the API description — for a client
-generator or an internal integration — set `SPRINGDOC_API_DOCS_ENABLED=true` (and
-`SPRINGDOC_SWAGGER_UI_ENABLED=true` for the browser UI) to keep it reachable.
+Nothing is required of you at upgrade. If you deliberately published the API description — for a
+client generator or an internal integration — set `SPRINGDOC_API_DOCS_ENABLED=true`, and
+`SPRINGDOC_SWAGGER_UI_ENABLED=true` for the browser UI, to keep it reachable.

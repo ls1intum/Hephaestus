@@ -6,4 +6,4 @@ Adds a "Review this now" button to a piece of work's review activity page, so yo
 
 Asking is rate limited twice: a second ask about the same piece of work inside the workspace's review cooldown is turned down, and one person can ask for at most 5 reviews an hour in a workspace.
 
-**Operators:** the per-person hourly allowance is `HEPHAESTUS_PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR` (optional, default 5; 0 switches it off). The per-work limit reuses the review cooldown you already configure.
+The per-person hourly allowance is `HEPHAESTUS_PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR` (optional, default 5; 0 switches it off), and the per-work limit reuses the review cooldown you already configure.
