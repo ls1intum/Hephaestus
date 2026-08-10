@@ -276,9 +276,13 @@ function WorkspaceDecisionCard({
 					{tierChosen ? (
 						<div className="text-left">
 							{/* The name opens with the visible words, so a voice-control user can say what they
-							    read (WCAG 2.2 SC 2.5.3). Spelled as an `aria-label` rather than an `sr-only`
-							    tail: name computation trims each text node it walks, so " for …" in a second
-							    node is announced welded to the word before it. */}
+							    read (WCAG 2.2 SC 2.5.3). Spelled as an `aria-label` rather than the house
+							    `sr-only` tail because it states the whole name in one place, independent of
+							    CSS. The `sr-only` tail is NOT broken — `position: absolute` blockifies the
+							    span, and every engine inserts a separating space between non-inline children,
+							    so "Add" + " to target branches" is announced "Add to target branches". It
+							    only reads welded in jsdom, which loads no stylesheet; do not "fix" the
+							    sr-only sites on the strength of a jsdom-only reproduction. */}
 							<Button
 								variant="link"
 								size="sm"
