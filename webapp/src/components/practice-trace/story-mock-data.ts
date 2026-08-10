@@ -49,6 +49,17 @@ export const tracedArtifacts = [
 		signalCount: 1,
 		reviewedSignalCount: 0,
 	},
+	{
+		// A written document is reviewable work this release ships, so it has to have a name here.
+		artifactKind: "docs.document",
+		artifactId: 512,
+		title: "Onboarding: your first week",
+		container: "Engineering handbook",
+		url: "https://outline.example.com/doc/onboarding-your-first-week",
+		lastSignalAt: "2026-08-03T14:15:00Z",
+		signalCount: 2,
+		reviewedSignalCount: 1,
+	},
 ] satisfies Wire<TracedArtifact>[];
 
 /**
@@ -312,6 +323,45 @@ export const untouchedArtifactTrace = {
 			observationCount: 0,
 			deliveredCount: 0,
 			withheldReasons: [],
+		},
+	],
+} satisfies Wire<ArtifactTrace>;
+
+/**
+ * A kind with no front door for asking: a document is reviewed when its source publishes it, and the
+ * request endpoint refuses it — so this trace must not offer a button whose only outcome is an error.
+ */
+export const documentArtifactTrace = {
+	artifactKind: "docs.document",
+	artifactId: 512,
+	title: "Onboarding: your first week",
+	container: "Engineering handbook",
+	url: "https://outline.example.com/doc/onboarding-your-first-week",
+	signals: [
+		{
+			id: "sig-doc-published",
+			signal: "docs.document.published",
+			displayName: "Published",
+			revision: "4",
+			occurredAt: "2026-08-03T14:15:00Z",
+			discoveredVia: "EVENT",
+			state: "TRIGGERED",
+		},
+	],
+	practices: [
+		{
+			practiceSlug: "written-for-a-newcomer",
+			practiceName: "Written for a newcomer",
+			reviewTier: "MEASURE",
+			outcome: "REVIEWED",
+			explanation: "Assessed on this artifact.",
+			watches: ["docs.document.published"],
+			occasionedBy: "sig-doc-published",
+			occasionedById: "sig-doc-published",
+			decidedAt: "2026-08-03T14:19:00Z",
+			observationCount: 3,
+			deliveredCount: 0,
+			withheldReasons: ["PRACTICE_TIER_QUIET"],
 		},
 	],
 } satisfies Wire<ArtifactTrace>;

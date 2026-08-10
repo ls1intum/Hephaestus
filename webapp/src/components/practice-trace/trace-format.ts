@@ -1,14 +1,11 @@
-import { CircleDotIcon, FileTextIcon, GitPullRequestIcon, MessagesSquareIcon } from "lucide-react";
 import type { PracticeTraceEntry, TracedSignal } from "@/api/types.gen";
 import { SUPPRESSION_REASON_LABELS } from "@/components/admin/practice-reviews/review-format";
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
 
 /**
  * Labels key off the generated wire union rather than a hand-kept string list, so a value the
  * server adds or renames fails `typecheck:webapp` here instead of rendering as a blank cell.
  */
 export type TraceOutcome = PracticeTraceEntry["outcome"];
-export type ReviewTier = PracticeTraceEntry["reviewTier"];
 export type WithheldReason = PracticeTraceEntry["withheldReasons"][number];
 export type SignalState = TracedSignal["state"];
 export type SignalStateReason = NonNullable<TracedSignal["stateReason"]>;
@@ -34,27 +31,6 @@ export const OUTCOME_LABELS: Record<TraceOutcome, string> = {
 
 export const OUTCOMES = Object.keys(OUTCOME_LABELS) as TraceOutcome[];
 
-/** The upper bound on what a practice could ever say to a person. */
-export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
-	OFF: "Off",
-	MEASURE: "Measure only",
-	COACH: "Coach",
-	ENGAGE: "Engage",
-};
-
-/**
- * What each tier reaches, in the server's terms: `COACH` is the mentor conversation and nothing else,
- * and `ENGAGE` adds the artifact on top of it. Saying it the other way round — the conversation as
- * `ENGAGE`'s addition — tells a workspace admin that turning a practice down to `COACH` will stop the
- * mentor chat, which is the opposite of what happens.
- */
-export const REVIEW_TIER_DESCRIPTIONS: Record<ReviewTier, string> = {
-	OFF: "Not run at all on this workspace.",
-	MEASURE: "Measured for reporting, never spoken about.",
-	COACH: "Measured, and raised in the developer's mentor chat.",
-	ENGAGE: "Measured, raised in the mentor chat, and posted on the pull request or issue.",
-};
-
 export const SIGNAL_STATE_LABELS: Record<SignalState, string> = {
 	RECORDED: "Recorded",
 	TRIGGERED: "Started a review",
@@ -63,21 +39,26 @@ export const SIGNAL_STATE_LABELS: Record<SignalState, string> = {
 	LAPSED: "Expired before it was reviewed",
 };
 
+/**
+ * Written in the third person throughout. Any member of the workspace can open this page, so the
+ * occurrence being explained is usually somebody else's — "you have used your allowance" would tell
+ * the wrong person off for a limit they never reached.
+ */
 export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
-	GATE_SKIPPED: "A review gate on this workspace turned it away",
-	COOLDOWN_ACTIVE: "This work was reviewed too recently",
+	GATE_SKIPPED: "This workspace's review settings turned it away",
+	COOLDOWN_ACTIVE: "This work was reviewed too recently; a later change gets its own review",
 	REQUEST_COOLDOWN_ACTIVE: "A review of this was already asked for a moment ago",
-	REQUESTER_QUOTA_EXHAUSTED: "You have asked for as many reviews as an hour allows",
+	REQUESTER_QUOTA_EXHAUSTED: "Whoever asked had used up their hour's allowance, which refills",
 	CONCURRENT_DUPLICATE: "The same review was already running",
 	OUT_OF_REVIEW_SCOPE: "This repository or branch is outside the workspace's review scope",
 	WORKSPACE_INACTIVE: "The workspace was not active",
 	PRACTICES_DISABLED: "Practice reviews are switched off for this workspace",
-	NO_ACTIVE_PRACTICE: "No practice was active for this kind of work",
-	REVIEW_MODEL_UNBOUND: "No AI model is set up to run reviews for this workspace",
-	PRACTICE_TIER_OFF: "The practices that watch this are set to off",
-	BUDGET_EXHAUSTED: "The workspace's AI budget was used up",
-	SUBJECT_UNLINKED: "The author is not linked to a Hephaestus account",
-	MODEL_UNAVAILABLE: "No AI model was available",
+	NO_ACTIVE_PRACTICE: "No practice was watching for this when it happened",
+	REVIEW_MODEL_UNBOUND: "No AI model is set up to run reviews; choose one under AI models",
+	PRACTICE_TIER_OFF: "Every practice watching this is turned off; raising one lets it run",
+	BUDGET_EXHAUSTED: "The workspace's AI budget was used up; it refills",
+	SUBJECT_UNLINKED: "The author has not linked their account to Hephaestus",
+	MODEL_UNAVAILABLE: "The AI model set for reviews is no longer available",
 	PENDING_DEADLINE_EXCEEDED: "It waited too long to be picked up",
 	ARTIFACT_GONE: "The work no longer exists",
 };
@@ -113,36 +94,27 @@ export function occurrenceDomId(signalId: string): string {
 }
 
 /**
- * Kinds are an open vocabulary: a kind this build has never heard of gets a generic icon rather
- * than a hole, on the page whose whole job is to omit nothing.
+ * "Moment", not "signal": the authoring screens already call the thing a practice waits for a moment,
+ * and the ledger's name for it belongs in the ledger. The second half counts the moments that started
+ * a review, which is the number a reader is really asking about.
  */
-export function artifactKindIcon(kind: string) {
-	switch (kind) {
-		case ARTIFACT_KIND.pullRequest:
-			return GitPullRequestIcon;
-		case ARTIFACT_KIND.issue:
-			return CircleDotIcon;
-		case ARTIFACT_KIND.conversationThread:
-			return MessagesSquareIcon;
-		default:
-			return FileTextIcon;
-	}
-}
-
 export function signalCountsLabel(signalCount: number, reviewedSignalCount: number): string {
-	const signals = `${signalCount} ${signalCount === 1 ? "signal" : "signals"}`;
-	return `${signals} · ${reviewedSignalCount} reviewed`;
+	const moments = signalCount === 1 ? "1 moment recorded" : `${signalCount} moments recorded`;
+	return `${moments} · ${reviewedSignalCount} started a review`;
 }
 
 /**
  * Never collapsed into the outcome badge: "Reviewed" with nothing delivered is a configured state,
  * and the reader has to see both halves to know which one to go and change.
+ *
+ * <p>Third person, because any member of the workspace can open this page and the work is usually
+ * somebody else's.
  */
 export function deliveryLabel(entry: PracticeTraceEntry): string {
 	if (entry.deliveredCount > 0) {
 		return entry.deliveredCount === 1
-			? "1 piece of feedback reached you"
-			: `${entry.deliveredCount} pieces of feedback reached you`;
+			? "1 piece of feedback reached the developer"
+			: `${entry.deliveredCount} pieces of feedback reached the developer`;
 	}
 	if (entry.observationCount === 0) {
 		return "Nothing was measured, so nothing was sent";

@@ -17,17 +17,15 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { artifactKindLabel } from "@/lib/artifact-kinds";
+import { ARTIFACT_KIND, artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 import { problemDetailOf } from "@/lib/problem-detail";
+import { REVIEW_TIER_DESCRIPTIONS, REVIEW_TIER_LABELS } from "@/lib/review-tiers";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import {
-	artifactKindIcon,
 	DISCOVERED_VIA_DESCRIPTIONS,
 	DISCOVERED_VIA_LABELS,
 	deliveryLabel,
 	occurrenceDomId,
-	REVIEW_TIER_DESCRIPTIONS,
-	REVIEW_TIER_LABELS,
 	SIGNAL_STATE_LABELS,
 	SIGNAL_STATE_REASON_LABELS,
 	WITHHELD_REASON_LABELS,
@@ -38,6 +36,16 @@ export interface TracePageProps {
 	artifactKind: string;
 	artifactId: number;
 }
+
+/**
+ * The kinds a person can point at and ask about. A conversation thread and a document are reviewed on
+ * the occasion their source produces, and the request endpoint refuses them — so offering the button
+ * there would be a control whose only outcome is an error.
+ *
+ * <p>Kept here because nothing on the wire says which kinds have a front door; the durable answer is a
+ * flag on the trace itself. Being wrong in this direction costs a missing button, not a broken one.
+ */
+const REVIEWABLE_ON_DEMAND: readonly string[] = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue];
 
 /**
  * One piece of work and every practice's answer, the quiet ones included. Nothing collapses behind
@@ -152,19 +160,21 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 					</div>
 					{/* On this page and not only on the listing: this is where a developer is already
 					    asking why nothing happened, and the answer is often "nothing has asked yet". */}
-					<Button
-						variant="outline"
-						className="shrink-0 sm:self-start"
-						disabled={requestReview.isPending}
-						onClick={() =>
-							requestReview.mutate({
-								path: { workspaceSlug },
-								body: { artifactKind, artifactId },
-							})
-						}
-					>
-						{requestReview.isPending ? "Asking…" : "Review this now"}
-					</Button>
+					{REVIEWABLE_ON_DEMAND.includes(trace.artifactKind) && (
+						<Button
+							variant="outline"
+							className="shrink-0 sm:self-start"
+							disabled={requestReview.isPending}
+							onClick={() =>
+								requestReview.mutate({
+									path: { workspaceSlug },
+									body: { artifactKind, artifactId },
+								})
+							}
+						>
+							{requestReview.isPending ? "Asking…" : "Review this now"}
+						</Button>
+					)}
 				</div>
 				{refusal && (
 					<Alert variant="warning">
@@ -240,7 +250,7 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 					</h2>
 					<p className="max-w-2xl text-sm text-muted-foreground">
 						Every practice this workspace runs against this kind of work is listed, including the
-						ones that stayed quiet. Whether a practice was measured and whether anything reached you
+						ones that stayed quiet. Whether a practice was measured and whether anything was said
 						are two separate things — a practice can be reviewed and still, by design, say nothing.
 					</p>
 				</div>
@@ -278,11 +288,11 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 											</p>
 											<dl className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 												<div className="flex min-w-0 items-center gap-1">
-													<dt className="sr-only">Reached you</dt>
+													<dt className="sr-only">Feedback delivered</dt>
 													<dd className="break-words">{deliveryLabel(entry)}</dd>
 												</div>
 												<div className="flex min-w-0 items-center gap-1">
-													<dt className="sr-only">Loudness</dt>
+													<dt className="sr-only">Loudness tier</dt>
 													<dd>
 														<Tooltip>
 															<TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-4">
@@ -342,8 +352,17 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 												</ul>
 											)}
 											{entry.watches.length > 0 && (
+												// Set as identifiers, because that is what they are: this endpoint sends
+												// signal names and no display names, and inventing labels here would
+												// disagree with the timeline above, which prints the ones the server owns.
 												<p className="w-full min-w-0 break-words text-xs text-muted-foreground">
-													Watches for: {entry.watches.join(", ")}
+													Starts a review on:{" "}
+													{entry.watches.map((signal, index) => (
+														<span key={signal}>
+															{index > 0 && ", "}
+															<code className="break-all">{signal}</code>
+														</span>
+													))}
 												</p>
 											)}
 										</ItemContent>

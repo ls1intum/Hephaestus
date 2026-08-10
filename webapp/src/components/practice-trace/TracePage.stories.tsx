@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, userEvent, within } from "storybook/test";
+import { REVIEW_TIER_LABELS } from "@/lib/review-tiers";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { artifactTrace, untouchedArtifactTrace } from "./story-mock-data";
+import { artifactTrace, documentArtifactTrace, untouchedArtifactTrace } from "./story-mock-data";
 import { TracePage } from "./TracePage";
 
 const TRACE_URL = "*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId";
@@ -42,6 +43,9 @@ export const EveryOutcome: Story = {
 			canvas.getByText("Measured, kept quiet by the practice's loudness tier"),
 		).toBeVisible();
 		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
+		// The tier is named exactly as the catalog names it, from one shared list. This screen used to
+		// say "Measure only" for the tier the catalog called "Measure".
+		await expect(canvas.getByText(REVIEW_TIER_LABELS.MEASURE)).toBeVisible();
 	},
 };
 
@@ -83,7 +87,13 @@ export const SignalsExplainThemselves: Story = {
 		// practice row that rests on it, so a page-wide query is ambiguous by design.
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
 		await expect(timeline.getByText("Marked ready for review")).toBeVisible();
-		await expect(timeline.getByText("This work was reviewed too recently.")).toBeVisible();
+		// Names the cause and what follows from it: a cooldown is not the end of the matter, and a
+		// reason that stops at the cause leaves the reader thinking it is.
+		await expect(
+			timeline.getByText(
+				"This work was reviewed too recently; a later change gets its own review.",
+			),
+		).toBeVisible();
 		await expect(timeline.getByText("It waited too long to be picked up.")).toBeVisible();
 	},
 };
@@ -97,7 +107,9 @@ export const NothingWasReviewed: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Opened")).toBeVisible();
-		await expect(canvas.getByText("No practice was active for this kind of work.")).toBeVisible();
+		await expect(
+			canvas.getByText("No practice was watching for this when it happened."),
+		).toBeVisible();
 		await expect(canvas.getByText("Turned off")).toBeVisible();
 	},
 };
@@ -129,7 +141,11 @@ export const OccurrenceMissingFromTheTimeline: Story = {
 		const row = (await canvas.findByText("Small, reviewable changes")).closest('[role="listitem"]');
 		if (!(row instanceof HTMLElement)) throw new Error("No row for the skipped practice");
 
-		await expect(within(row).getByText("scm.pull_request.synchronized")).toBeVisible();
+		// Scoped to "Rests on": the same signal name also appears in the row's "Starts a review on"
+		// list, and a row-wide query cannot say which of the two is the fallback under test.
+		const restsOn = within(row).getByText("Rests on").closest("div");
+		if (!(restsOn instanceof HTMLElement)) throw new Error("No 'Rests on' entry on the row");
+		await expect(within(restsOn).getByText("scm.pull_request.synchronized")).toBeVisible();
 		await expect(within(row).queryByRole("link", { name: /^Jump to:/ })).toBeNull();
 		// The rows whose occurrence does resolve are untouched, so this is a fallback and not a mode.
 		const resolved = canvas.getByText("Drafts are not left open").closest('[role="listitem"]');
@@ -161,6 +177,27 @@ export const NothingReachedIt: Story = {
 		await expect(canvas.getByText("No practice covers this kind of work")).toBeVisible();
 		// Named in the reader's words, not as `scm.issue`.
 		await expect(canvas.getByText(/runs no practice against issue/)).toBeVisible();
+	},
+};
+
+/**
+ * A written document: named in the reader's words rather than as `docs.document`, and without the
+ * "Review this now" button — a document is reviewed when its source publishes it, and asking for one
+ * by hand is refused, so the button could only ever produce an error.
+ */
+export const DocumentHasNoButtonToAsk: Story = {
+	args: { artifactKind: "docs.document", artifactId: 512 },
+	parameters: {
+		msw: { handlers: [http.get(TRACE_URL, () => HttpResponse.json(documentArtifactTrace))] },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(
+			await canvas.findByRole("heading", { name: /Onboarding: your first week/ }),
+		).toBeVisible();
+		await expect(canvas.getByText("Document")).toBeVisible();
+		await expect(canvas.queryByText("docs.document")).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: "Review this now" })).not.toBeInTheDocument();
 	},
 };
 

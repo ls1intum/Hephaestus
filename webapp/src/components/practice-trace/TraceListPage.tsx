@@ -34,10 +34,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	ARTIFACT_KIND_VALUES,
+	artifactKindIcon,
 	artifactKindLabel,
 	artifactKindPluralLabel,
 } from "@/lib/artifact-kinds";
-import { artifactKindIcon, signalCountsLabel } from "./trace-format";
+import { signalCountsLabel } from "./trace-format";
 import type { TraceSearch } from "./trace-search";
 
 const PAGE_SIZE = 20;

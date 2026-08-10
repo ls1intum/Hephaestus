@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { tracedArtifactPage, tracedArtifacts } from "./story-mock-data";
@@ -37,7 +37,7 @@ export const Default: Story = {
 			await canvas.findByText(`${tracedArtifacts.length} pieces of work.`),
 		).toBeVisible();
 		await expect(canvas.getByRole("link", { name: /Member-facing review activity/ })).toBeVisible();
-		await expect(canvas.getByText("6 signals · 2 reviewed")).toBeVisible();
+		await expect(canvas.getByText("6 moments recorded · 2 started a review")).toBeVisible();
 	},
 };
 
@@ -53,7 +53,24 @@ export const UnlinkableArtifact: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("1 piece of work.")).toBeVisible();
-		await expect(canvas.getByText("1 signal · 0 reviewed")).toBeVisible();
+		await expect(canvas.getByText("1 moment recorded · 0 started a review")).toBeVisible();
+	},
+};
+
+/**
+ * Every kind this build knows carries a name a person can read. A raw `docs.document` in the picker
+ * is the failure this list already fixed once for pull requests, and documents ship reviewable now.
+ */
+export const EveryKindIsNamed: Story = {
+	play: async ({ canvasElement, userEvent }) => {
+		const canvas = within(canvasElement);
+		await expect(await canvas.findByText("Onboarding: your first week")).toBeVisible();
+		await expect(canvas.queryByText("docs.document")).not.toBeInTheDocument();
+
+		await userEvent.click(canvas.getByRole("combobox", { name: /Show/ }));
+		// Base UI portals the listbox outside the story's subtree.
+		await expect(await screen.findByRole("option", { name: "Documents" })).toBeVisible();
+		await expect(screen.getByRole("option", { name: "Conversations" })).toBeVisible();
 	},
 };
 
