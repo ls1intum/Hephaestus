@@ -305,7 +305,7 @@ class DeliveryComposer {
         if (negatives.isEmpty()) {
             List<ValidatedFinding> observed = findings.stream().filter(DeliveryComposer::isStrength).toList();
             if (observed.isEmpty()) {
-                // Nothing decided either way (every finding NOT_APPLICABLE or INDETERMINATE): the artifact
+                // Nothing decided either way (every finding NOT_APPLICABLE or INCONCLUSIVE): the artifact
                 // was not actually assessed against any active practice, so deliver nothing rather than a
                 // misleading "nothing to change here" all-clear on work that was never actually evaluated.
                 return null;

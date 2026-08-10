@@ -14,7 +14,7 @@ public record ReviewFindingCountsDTO(
             "reported apart from notApplicable because one says there was nothing here to judge and the " +
             "other says we could not tell"
     )
-    Long indeterminate
+    Long inconclusive
 ) {
     public static ReviewFindingCountsDTO empty() {
         return new ReviewFindingCountsDTO(0L, 0L, 0L, 0L);

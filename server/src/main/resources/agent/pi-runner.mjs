@@ -21,6 +21,7 @@ import {
     normalizeFinding,
     validateEvidenceSources,
     validateSearchScope,
+    validateInapplicabilityScope,
 } from "./pi-finding-normalize.mjs";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
 
@@ -96,7 +97,7 @@ const reviewState = {
 };
 // The tool schema the model sees is generated from the SAME vocabulary the normalizer validates
 // against, so the SDK boundary can no longer accept a value the normalizer rejects (or, as happened
-// with INDETERMINATE, reject one the orchestrator instructs the model to emit).
+// with INCONCLUSIVE, reject one the orchestrator instructs the model to emit).
 const presenceSchema = { type: "string", enum: PRESENCE_VALUES };
 const assessmentSchema = { type: "string", enum: ASSESSMENT_VALUES };
 const severitySchema = { type: "string", enum: SEVERITY_VALUES };
@@ -126,12 +127,42 @@ const searchSchema = {
         },
     },
 };
+// What the practice looks for, and the fact about THIS work that rules it out. REQUIRED when
+// presence=NOT_APPLICABLE: that value is a claim about the developer's work — "there was nothing here to
+// see" — and it is the only presence with no proof attached, which is exactly why uncertainty drains into
+// it. Naming the ground is what separates it from an abstention. If you cannot name one, say INCONCLUSIVE.
+const inapplicabilitySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["consulted", "subject", "ruledOutBy"],
+    properties: {
+        consulted: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string", minLength: 1 },
+            description: "Evidence source kinds you read to reach this conclusion, e.g. scm.pull-request.diff.",
+        },
+        subject: {
+            type: "string",
+            minLength: 1,
+            description: "What this practice looks for, e.g. error handling around outbound network calls.",
+        },
+        ruledOutBy: {
+            type: "string",
+            minLength: 1,
+            description:
+                "The fact about THIS work that means the subject cannot occur in it, e.g. the change touches " +
+                "only Markdown documentation and makes no network calls.",
+        },
+    },
+};
 const evidenceSchema = {
     type: "object",
     additionalProperties: false,
     required: ["citations"],
     properties: {
         search: searchSchema,
+        inapplicability: inapplicabilitySchema,
         citations: {
             type: "array",
             minItems: 1,
@@ -219,7 +250,7 @@ function isValidFinding(f) {
     if (typeof f.title !== "string" || !f.title.trim()) return false;
     if (typeof f.presence !== "string") return false;
     // assessment is required only for a presence that carries valence; NOT_APPLICABLE and
-    // INDETERMINATE are both silence and must NOT carry one (mirrors Presence.carriesValence()).
+    // INCONCLUSIVE are both silence and must NOT carry one (mirrors Presence.carriesValence()).
     if (carriesValence(f.presence) && typeof f.assessment !== "string") return false;
     // Number(null) === 0 — reject nullish before isNaN check.
     if (f.confidence == null || f.confidence === "") return false;
@@ -313,6 +344,7 @@ function normalizeAndValidateFinding(rawFinding) {
         practiceExhaustiveSources.get(finding.practiceSlug) ?? new Set(),
         availableSourceKinds,
     );
+    validateInapplicabilityScope(finding, availableSourceKinds);
     for (const citation of finding.evidence.citations) {
         const content = readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
         if (!citationMatchesArtifact(citation, content)) {
@@ -530,7 +562,7 @@ function loadPracticeSlugs() {
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
     `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +
-    `For an INDETERMINATE finding, guidance states in one sentence what would have decided it. ` +
+    `For an INCONCLUSIVE finding, guidance states in one sentence what would have decided it. ` +
     `Only keep GOOD findings that add real review value. ` +
     `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
     `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
@@ -749,9 +781,9 @@ async function main() {
                     `Coverage check. You have NOT yet reported a finding for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
                     `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
-                    `— set presence (${PRESENCE_VALUES.join("/")}) and, unless it is NOT_APPLICABLE or INDETERMINATE, ` +
+                    `— set presence (${PRESENCE_VALUES.join("/")}) and, unless it is NOT_APPLICABLE or INCONCLUSIVE, ` +
                     `assessment (GOOD/BAD). If you read the evidence and it does not settle the question, say ` +
-                    `INDETERMINATE — do NOT reach for NOT_APPLICABLE, which claims there was nothing here to see.`;
+                    `INCONCLUSIVE — do NOT reach for NOT_APPLICABLE, which claims there was nothing here to see.`;
                 try {
                     await session.prompt(gatePrompt);
                 } catch (err) {

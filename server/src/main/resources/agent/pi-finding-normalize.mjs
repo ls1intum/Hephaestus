@@ -1,9 +1,9 @@
 // ── Vocabularies shared with Java ────────────────────────────────────────────
 // Each list mirrors an enum on the server. They are hand-maintained on both sides, so
 // PresenceVocabularyParityTest parses these literals and asserts equality with the Java enum's
-// values(); it exists because presence drifted once and silently laundered INDETERMINATE into
+// values(); it exists because presence drifted once and silently laundered INCONCLUSIVE into
 // NOT_APPLICABLE. Add a value here and to the Java enum in the same change, or the test fails.
-export const PRESENCE_VALUES = ["PRESENT", "ABSENT", "NOT_APPLICABLE", "INDETERMINATE"];
+export const PRESENCE_VALUES = ["PRESENT", "ABSENT", "NOT_APPLICABLE", "INCONCLUSIVE"];
 export const ASSESSMENT_VALUES = ["GOOD", "BAD"];
 export const SEVERITY_VALUES = ["CRITICAL", "MAJOR", "MINOR", "INFO"];
 
@@ -11,7 +11,7 @@ export const SEVERITY_VALUES = ["CRITICAL", "MAJOR", "MINOR", "INFO"];
  * Whether an observation with this presence carries a good/bad direction — the exact twin of
  * Presence.carriesValence() in Java and of the DB CHECK chk_observation_presence_assessment.
  * Asked rather than open-coding `!== "NOT_APPLICABLE"`, which silently demands an assessment on
- * INDETERMINATE and rejects the honest answer.
+ * INCONCLUSIVE and rejects the honest answer.
  */
 export function carriesValence(presence) {
     return presence === "PRESENT" || presence === "ABSENT";
@@ -50,6 +50,40 @@ export function normalizeSearch(search) {
     return { consulted: [...new Set(consulted)].sort(), lookedFor, boundary };
 }
 
+/**
+ * The positive claim behind a NOT_APPLICABLE observation: what this practice looks for, and the fact about
+ * this work that means it cannot be here.
+ *
+ * NOT_APPLICABLE is the one presence that costs nothing to say. A PRESENT observation is warranted by the
+ * citation that shows the thing; an ABSENT one has to record the search that came up empty. NOT_APPLICABLE
+ * needs a citation too, but any citation will do — quoting a line proves nothing about a practice having no
+ * subject — so it is the cheapest answer available and it is where uncertainty drains to. Every form on
+ * earth uses N/A for "no answer", and a model reaches for it the same way.
+ *
+ * That matters because NOT_APPLICABLE is not a shrug: it is a claim about the developer's work, entering a
+ * long-running record of how a person works as "there was nothing here to see". The honest answer when you
+ * cannot tell is INCONCLUSIVE. Naming the ground makes the difference visible to the model while it is
+ * choosing, which is the only moment the choice can be made well.
+ */
+export function normalizeInapplicability(inapplicability) {
+    if (!inapplicability || typeof inapplicability !== "object")
+        throw new Error("inapplicability is required");
+    const consulted = Array.isArray(inapplicability.consulted)
+        ? inapplicability.consulted.map((kind) => String(kind ?? "").trim()).filter(Boolean)
+        : [];
+    const subject = String(inapplicability.subject ?? "").trim();
+    const ruledOutBy = String(inapplicability.ruledOutBy ?? "").trim();
+    if (consulted.length === 0)
+        throw new Error("inapplicability.consulted must name at least one source you read to conclude this");
+    if (!subject) throw new Error("inapplicability.subject is required: name what this practice looks for");
+    if (!ruledOutBy)
+        throw new Error(
+            "inapplicability.ruledOutBy is required: state the fact about THIS work that means the subject " +
+                "cannot occur in it. If you are merely unsure, the answer is INCONCLUSIVE, not NOT_APPLICABLE",
+        );
+    return { consulted: [...new Set(consulted)].sort(), subject, ruledOutBy };
+}
+
 export function normalizeEvidence(evidence, presence) {
     if (!Array.isArray(evidence?.citations) || evidence.citations.length === 0)
         throw new Error("evidence citations are required");
@@ -86,6 +120,18 @@ export function normalizeEvidence(evidence, presence) {
         }
         return { citations, search: normalizeSearch(evidence.search) };
     }
+    // The same shape one presence over: a claim that the practice has no subject here must say what the
+    // subject is and what rules it out, or it is an abstention wearing a measurement's clothes.
+    if (presence === "NOT_APPLICABLE") {
+        if (evidence.inapplicability == null) {
+            throw new Error(
+                "a NOT_APPLICABLE observation must say why the practice does not apply: " +
+                    "evidence.inapplicability with consulted, subject and ruledOutBy. If you looked and could " +
+                    "not tell, say INCONCLUSIVE instead",
+            );
+        }
+        return { citations, inapplicability: normalizeInapplicability(evidence.inapplicability) };
+    }
     return evidence.search == null ? { citations } : { citations, search: normalizeSearch(evidence.search) };
 }
 
@@ -99,7 +145,7 @@ export function normalizeFinding(finding) {
     const presence = String(finding.presence ?? "")
         .trim()
         .toUpperCase();
-    // NOT_APPLICABLE and INDETERMINATE are both silence and carry no direction; the Java parser
+    // NOT_APPLICABLE and INCONCLUSIVE are both silence and carry no direction; the Java parser
     // nulls any assessment attached to either, so drop it here rather than demanding one.
     const hasValence = carriesValence(presence);
     const assessment = hasValence
@@ -177,7 +223,7 @@ export function validateEvidenceSources(finding, availableSourceKinds, artifactS
  * <p>`EXHAUSTIVE` is the practice saying "this claim asserts something is NOT in this source", which
  * is the only stance under which absence is assertable at all. So the sources held that way ARE the
  * domain: an ABSENT observation that did not consult one of them is asserting a universal over a
- * corpus it never opened, and the honest answer is INDETERMINATE instead.
+ * corpus it never opened, and the honest answer is INCONCLUSIVE instead.
  *
  * <p>Consulting something this run never staged is the same error the citation check already rejects —
  * the bytes were not there, so they cannot have been searched.
@@ -196,8 +242,26 @@ export function validateSearchScope(finding, exhaustiveSourceKinds, availableSou
     if (unsearched.length > 0) {
         throw new Error(
             `cannot conclude ABSENT for '${finding.practiceSlug}' without searching ${unsearched.join(", ")} — ` +
-                `say INDETERMINATE instead, or record the search`,
+                `say INCONCLUSIVE instead, or record the search`,
         );
+    }
+}
+
+/**
+ * Holds a NOT_APPLICABLE claim to sources this run actually staged.
+ *
+ * The same boundary the citations and the recorded search answer to: bytes that were never there cannot
+ * have been read, so claiming to have read them is the inapplicability-shaped version of citing evidence
+ * we never had.
+ */
+export function validateInapplicabilityScope(finding, availableSourceKinds) {
+    if (finding.presence !== "NOT_APPLICABLE") return;
+    const inapplicability = finding.evidence.inapplicability;
+    if (!inapplicability) throw new Error("a NOT_APPLICABLE observation must say why the practice does not apply");
+    for (const sourceKind of inapplicability.consulted) {
+        if (!availableSourceKinds.has(sourceKind)) {
+            throw new Error(`consulted source '${sourceKind}' was not available to this invocation`);
+        }
     }
 }
 

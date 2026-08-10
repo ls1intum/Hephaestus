@@ -299,6 +299,7 @@ public class PracticeDetectionDeliveryService {
             }
         });
         enforceRecordedSearch(finding, exhaustive, boundary, job);
+        enforceStatedInapplicability(finding, boundary, job);
         for (JsonNode citation : citations) {
             JsonNode sourceKind = citation.path("sourceKind");
             JsonNode artifactPath = citation.path("artifactPath");
@@ -461,6 +462,87 @@ public class PracticeDetectionDeliveryService {
      * delivery without it having run; a guard that can be skipped by the party it constrains is
      * advice, not a boundary. This is the same reason the citation check below is duplicated here.
      */
+    /**
+     * Holds a {@code NOT_APPLICABLE} observation to the claim it is making.
+     *
+     * <p>Of the four presences this is the only one that costs nothing to say. {@code PRESENT} is warranted
+     * by the citation showing the thing. {@code ABSENT} has to record the search that came up empty. But a
+     * citation attached to {@code NOT_APPLICABLE} proves nothing — quoting any line of the change is
+     * consistent with the practice applying perfectly well — so it is the cheapest answer on the menu, and
+     * uncertainty drains into it. Every form anybody has ever filled in uses N/A for "no answer".
+     *
+     * <p>That is not a tidiness problem. {@code NOT_APPLICABLE} is a claim about the developer's work — this
+     * practice has no subject here — and it enters a long-running record of how a person works as "there was
+     * nothing to see" on a change where there may well have been something to see. The honest answer when a
+     * detector cannot tell is {@code INCONCLUSIVE}. Requiring the ground to be named is what makes the two
+     * cost the same to say, which is the only thing that makes choosing between them a real choice.
+     *
+     * <p>Enforced here as well as in the sandbox for the same reason the recorded search is: the in-sandbox
+     * normalizer runs inside the thing it is checking, and a crashed runner, an older image or a rescued
+     * text payload all reach delivery without it having run. A guard the constrained party can skip is
+     * advice, not a boundary.
+     */
+    private void enforceStatedInapplicability(ValidatedFinding finding, EvidenceBoundary boundary, AgentJob job) {
+        if (finding.presence() != Presence.NOT_APPLICABLE) {
+            return;
+        }
+        JsonNode inapplicability = finding.evidence() == null ? null : finding.evidence().get("inapplicability");
+        JsonNode consulted = inapplicability == null ? null : inapplicability.get("consulted");
+        if (
+            inapplicability == null ||
+            consulted == null ||
+            !consulted.isArray() ||
+            consulted.isEmpty() ||
+            !inapplicability.path("subject").isTextual() ||
+            inapplicability.path("subject").asString().isBlank() ||
+            !inapplicability.path("ruledOutBy").isTextual() ||
+            inapplicability.path("ruledOutBy").asString().isBlank()
+        ) {
+            throw new JobDeliveryException(
+                "A NOT_APPLICABLE observation must name what the practice looks for and what rules it out " +
+                    "here; if it could not be told either way the answer is INCONCLUSIVE: slug=" +
+                    finding.practiceSlug() +
+                    ", jobId=" +
+                    job.getId()
+            );
+        }
+        for (JsonNode kind : consulted) {
+            if (!kind.isTextual()) {
+                throw new JobDeliveryException(
+                    "Stated inapplicability names a non-textual source: slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+            SourceKind sourceKind;
+            try {
+                sourceKind = new SourceKind(kind.asString());
+            } catch (IllegalArgumentException e) {
+                throw new JobDeliveryException(
+                    "Stated inapplicability names an invalid source: slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId(),
+                    e
+                );
+            }
+            // The same boundary the citations and the recorded search answer to: a source this run never
+            // staged cannot have been read, so claiming it was is the inapplicability-shaped version of
+            // citing evidence we never had.
+            if (!boundary.allowedSources().contains(sourceKind)) {
+                throw new JobDeliveryException(
+                    "Stated inapplicability claims a source this run did not stage " +
+                        sourceKind +
+                        ": slug=" +
+                        finding.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+        }
+    }
+
     private void enforceRecordedSearch(
         ValidatedFinding finding,
         Set<SourceKind> exhaustive,

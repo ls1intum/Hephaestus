@@ -318,7 +318,7 @@ public class PracticeDetectionResultParser {
         Presence presence = parseEnum(entry, "presence", Presence.class);
 
         // Required only for a presence that carries valence: assessment. The detector decides GOOD/BAD per
-        // observation by reading the criteria + what_good_looks_like. NOT_APPLICABLE and INDETERMINATE have no
+        // observation by reading the criteria + what_good_looks_like. NOT_APPLICABLE and INCONCLUSIVE have no
         // valence (forced null); any other presence with a missing/blank assessment is genuinely malformed and
         // the entry is discarded.
         Assessment assessment = parseAssessment(entry, presence);
@@ -393,7 +393,7 @@ public class PracticeDetectionResultParser {
      * Parses the {@code assessment} valence. NULL exactly when the presence does not
      * {@link Presence#carriesValence() carry valence} — an inapplicable practice and an undecided one both
      * have a direction of nothing, and any assessment supplied there is ignored rather than honoured. That
-     * silent drop is deliberate for INDETERMINATE in particular: a model that could not settle the question
+     * silent drop is deliberate for INCONCLUSIVE in particular: a model that could not settle the question
      * and still attached a GOOD would otherwise smuggle an unearned strength into the series.
      *
      * <p>For a present/absent finding the detector must supply a recognised {@code GOOD}/{@code BAD}; a

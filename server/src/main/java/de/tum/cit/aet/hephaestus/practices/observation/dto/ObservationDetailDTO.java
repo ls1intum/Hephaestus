@@ -28,10 +28,10 @@ public record ObservationDetailDTO(
     @NonNull @Schema(description = "Artifact type (e.g. PULL_REQUEST)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Artifact entity ID") Long artifactId,
     @NonNull @Schema(description = "Observation title") String title,
-    @NonNull @Schema(description = "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE") Presence presence,
+    @NonNull @Schema(description = "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE") Presence presence,
     @Nullable
     @Schema(
-        description = "Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INDETERMINATE)"
+        description = "Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INCONCLUSIVE)"
     )
     Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,

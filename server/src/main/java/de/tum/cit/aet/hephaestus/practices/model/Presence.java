@@ -37,14 +37,14 @@ public enum Presence {
      * {@code exhaustive} stance whose corpus turned out incomplete: such a practice may warrant ABSENT
      * only when the corpus it searched was whole.
      */
-    INDETERMINATE;
+    INCONCLUSIVE;
 
     /**
      * Whether an observation with this presence carries a good/bad direction — i.e. whether
      * {@link Assessment} is required rather than forbidden.
      *
      * <p>The same predicate as the DB CHECK {@code chk_observation_presence_assessment}. Asked here
-     * rather than by an open-coded {@code != NOT_APPLICABLE}, which silently accepts an INDETERMINATE
+     * rather than by an open-coded {@code != NOT_APPLICABLE}, which silently accepts an INCONCLUSIVE
      * row with an assessment attached.
      */
     public boolean carriesValence() {

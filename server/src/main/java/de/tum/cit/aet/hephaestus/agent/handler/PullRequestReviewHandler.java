@@ -326,8 +326,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // A run that decided nothing at all over a non-empty diff is the stale-diff signature. Both
         // valence-free presences count here: a model handed an empty diff abstains as NOT_APPLICABLE, and a
-        // model handed a truncated one says INDETERMINATE — the harness fault is identical either way, and
-        // treating INDETERMINATE as a real verdict would let the newer value walk straight through the guard.
+        // model handed a truncated one says INCONCLUSIVE — the harness fault is identical either way, and
+        // treating INCONCLUSIVE as a real verdict would let the newer value walk straight through the guard.
         boolean nothingDecided = parsed
             .validFindings()
             .stream()
@@ -336,7 +336,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             boolean hasDiffContent = !diffFiles.isEmpty();
             if (hasDiffContent) {
                 throw new JobDeliveryException(
-                    "No finding decided anything (all NOT_APPLICABLE/INDETERMINATE) but the diff contains " +
+                    "No finding decided anything (all NOT_APPLICABLE/INCONCLUSIVE) but the diff contains " +
                         diffFiles.size() +
                         " files — likely a stale/empty diff was provided to the agent. " +
                         "Refusing to deliver. jobId=" +
@@ -476,7 +476,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
-                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), ArtifactKinds.PULL_REQUEST);
+                : practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
         // unifiedDiff (computed once at the top of deliver()) is the substrate for BOTH the M1 grounding
         // guard (drop a hallucinated inline anchor before it lands on a student) and the downstream
         // line-position validator below.

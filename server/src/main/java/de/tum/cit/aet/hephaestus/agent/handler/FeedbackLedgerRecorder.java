@@ -259,7 +259,7 @@ public class FeedbackLedgerRecorder {
         excludedIds.addAll(alreadySuppressed);
 
         // Bind every DELIVERED finding: BAD (the problems surfaced) lead as PRIMARY, GOOD
-        // strengths as SUPPORTING; abstentions (NOT_APPLICABLE), undecided measurements (INDETERMINATE)
+        // strengths as SUPPORTING; abstentions (NOT_APPLICABLE), undecided measurements (INCONCLUSIVE)
         // and withheld findings are excluded — feedback is an intervention, and neither of those two
         // says anything to intervene about.
         // Severity is null for a GOOD strength (ADR 0022) — sort it after any problem (least severe).
