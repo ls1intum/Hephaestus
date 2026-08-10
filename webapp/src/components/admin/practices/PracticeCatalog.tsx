@@ -48,20 +48,24 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
+import {
+	REVIEW_TIER_DESCRIPTIONS,
+	REVIEW_TIER_LABELS,
+	REVIEW_TIER_ORDER,
+} from "@/lib/review-tiers";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
-/** Ascending loudness. Every tier above "Off" runs the review; they differ only in who is told. */
-const REVIEW_TIERS = [
-	{ value: "OFF", label: "Off", hint: "Not reviewed at all." },
-	{ value: "MEASURE", label: "Measure", hint: "Reviewed and recorded. Nobody is told anything." },
-	{ value: "COACH", label: "Coach", hint: "Also raised in the developer's mentor chat." },
-	{ value: "ENGAGE", label: "Engage", hint: "Also posted on the pull request or issue." },
-] as const satisfies readonly { value: Practice["reviewTier"]; label: string; hint: string }[];
-
-function reviewTierLabel(tier: Practice["reviewTier"]): string {
-	return REVIEW_TIERS.find((entry) => entry.value === tier)?.label ?? tier;
-}
+/**
+ * Built from the shared vocabulary rather than spelled here: this screen and the artifact trace both
+ * name the tier a developer reads back, and each keeping its own list is how one shipped "Measure"
+ * while the other shipped "Measure only".
+ */
+const REVIEW_TIERS = REVIEW_TIER_ORDER.map((value) => ({
+	value,
+	label: REVIEW_TIER_LABELS[value],
+	hint: REVIEW_TIER_DESCRIPTIONS[value],
+}));
 
 export type FocusFilter = "ALL" | KnownArtifactKind;
 
@@ -625,7 +629,7 @@ function PracticeRowDetails({
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
 				{practice.reviewTier !== "ENGAGE" && (
-					<Badge variant="outline">{reviewTierLabel(practice.reviewTier)}</Badge>
+					<Badge variant="outline">{REVIEW_TIER_LABELS[practice.reviewTier]}</Badge>
 				)}
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
