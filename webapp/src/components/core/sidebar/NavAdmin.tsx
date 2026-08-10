@@ -5,6 +5,7 @@ import {
 	ChevronRight,
 	CircleDollarSign,
 	ClipboardCheck,
+	Gauge,
 	History,
 	LayoutGridIcon,
 	ListChecks,
@@ -67,11 +68,14 @@ export function NavAdmin({
 	const onReviews = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/reviews", fuzzy: true }),
 	);
+	const onAutonomy = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/practices/autonomy", fuzzy: true }),
+	);
 	const onBackfill = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/backfill", fuzzy: true }),
 	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
-	const onCatalog = onSection && !onReviewSettings && !onReviews && !onBackfill;
+	const onCatalog = onSection && !onReviewSettings && !onReviews && !onBackfill && !onAutonomy;
 
 	const onIntegrationsScm = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/scm", fuzzy: true }),
@@ -197,6 +201,21 @@ export function NavAdmin({
 						>
 							<ListChecks />
 							<span>Practice setup</span>
+						</SidebarMenuSubButton>
+					</SidebarMenuSubItem>
+					<SidebarMenuSubItem>
+						<SidebarMenuSubButton
+							isActive={onAutonomy}
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/practices/autonomy"
+									params={{ workspaceSlug }}
+									search={{}}
+								/>
+							}
+						>
+							<Gauge />
+							<span>Review autonomy</span>
 						</SidebarMenuSubButton>
 					</SidebarMenuSubItem>
 					<SidebarMenuSubItem>

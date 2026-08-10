@@ -67,6 +67,7 @@ import { Route as AuthenticatedWWorkspaceSlugAdminPracticesRunsRouteImport } fro
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesNewRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/new'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesBackfillRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/backfill'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/autonomy'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsSlackRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations/slack'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsScmRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations/scm'
@@ -412,6 +413,12 @@ const AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute =
     path: '/backfill',
     getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesRoute,
   } as any)
+const AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRouteImport.update({
+    id: '/autonomy',
+    path: '/autonomy',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesRoute,
+  } as any)
 const AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute =
   AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRouteImport.update({
     id: '/$practiceSlug',
@@ -558,6 +565,7 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin/integrations/scm': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsScmRoute
   '/w/$workspaceSlug/admin/integrations/slack': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsSlackRoute
   '/w/$workspaceSlug/admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute
+  '/w/$workspaceSlug/admin/practices/autonomy': typeof AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute
   '/w/$workspaceSlug/admin/practices/backfill': typeof AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute
   '/w/$workspaceSlug/admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminPracticesNewRoute
   '/w/$workspaceSlug/admin/practices/reviews': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren
@@ -625,6 +633,7 @@ export interface FileRoutesByTo {
   '/w/$workspaceSlug/admin/integrations/scm': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsScmRoute
   '/w/$workspaceSlug/admin/integrations/slack': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsSlackRoute
   '/w/$workspaceSlug/admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute
+  '/w/$workspaceSlug/admin/practices/autonomy': typeof AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute
   '/w/$workspaceSlug/admin/practices/backfill': typeof AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute
   '/w/$workspaceSlug/admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminPracticesNewRoute
   '/w/$workspaceSlug/admin/practices/runs': typeof AuthenticatedWWorkspaceSlugAdminPracticesRunsRoute
@@ -696,6 +705,7 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin/integrations/scm': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsScmRoute
   '/_authenticated/w/$workspaceSlug/admin/integrations/slack': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsSlackRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/autonomy': typeof AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/backfill': typeof AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminPracticesNewRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/reviews': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren
@@ -770,6 +780,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/integrations/scm'
     | '/w/$workspaceSlug/admin/integrations/slack'
     | '/w/$workspaceSlug/admin/practices/$practiceSlug'
+    | '/w/$workspaceSlug/admin/practices/autonomy'
     | '/w/$workspaceSlug/admin/practices/backfill'
     | '/w/$workspaceSlug/admin/practices/new'
     | '/w/$workspaceSlug/admin/practices/reviews'
@@ -837,6 +848,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/integrations/scm'
     | '/w/$workspaceSlug/admin/integrations/slack'
     | '/w/$workspaceSlug/admin/practices/$practiceSlug'
+    | '/w/$workspaceSlug/admin/practices/autonomy'
     | '/w/$workspaceSlug/admin/practices/backfill'
     | '/w/$workspaceSlug/admin/practices/new'
     | '/w/$workspaceSlug/admin/practices/runs'
@@ -907,6 +919,7 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin/integrations/scm'
     | '/_authenticated/w/$workspaceSlug/admin/integrations/slack'
     | '/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/autonomy'
     | '/_authenticated/w/$workspaceSlug/admin/practices/backfill'
     | '/_authenticated/w/$workspaceSlug/admin/practices/new'
     | '/_authenticated/w/$workspaceSlug/admin/practices/reviews'
@@ -1349,6 +1362,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesBackfillRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesRoute
     }
+    '/_authenticated/w/$workspaceSlug/admin/practices/autonomy': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/autonomy'
+      path: '/autonomy'
+      fullPath: '/w/$workspaceSlug/admin/practices/autonomy'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesRoute
+    }
     '/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug': {
       id: '/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug'
       path: '/$practiceSlug'
@@ -1585,6 +1605,7 @@ const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren =
 
 interface AuthenticatedWWorkspaceSlugAdminPracticesRouteChildren {
   AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute
+  AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute
   AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute
   AuthenticatedWWorkspaceSlugAdminPracticesNewRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesNewRoute
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren
@@ -1597,6 +1618,8 @@ const AuthenticatedWWorkspaceSlugAdminPracticesRouteChildren: AuthenticatedWWork
   {
     AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute:
       AuthenticatedWWorkspaceSlugAdminPracticesPracticeSlugRoute,
+    AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesAutonomyRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute:
       AuthenticatedWWorkspaceSlugAdminPracticesBackfillRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesNewRoute:

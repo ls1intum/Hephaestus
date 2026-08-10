@@ -1,16 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
-import { toast } from "sonner";
 import {
 	getPracticeReviewSettingsOptions,
-	getPracticeReviewSettingsQueryKey,
 	getWorkspaceOptions,
 	listAgentsOptions,
-	updatePracticeReviewSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
+import type { UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
 import {
 	type PracticeReviewField,
 	PracticeReviewSettings as PracticeReviewSettingsForm,
@@ -20,9 +17,9 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Spinner } from "@/components/ui/spinner";
+import { usePracticeReviewSettingsMutation } from "@/hooks/use-practice-review-settings";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
-import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/settings")({
 	head: workspaceAdminHead("Practice review settings"),
@@ -30,7 +27,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 });
 
 function ReviewSettingsContainer() {
-	const queryClient = useQueryClient();
 	const { workspaceSlug } = Route.useParams();
 
 	const reviewSettingsQuery = useQuery({
@@ -45,49 +41,9 @@ function ReviewSettingsContainer() {
 		...getWorkspaceOptions({ path: { workspaceSlug } }),
 	});
 
-	const reviewSettingsQueryKey = getPracticeReviewSettingsQueryKey({
-		path: { workspaceSlug },
-	});
-	const reviewSettingsMutationKey = [
-		"workspace",
-		workspaceSlug,
-		"practice-review-settings",
-	] as const;
-
-	const updatePracticeReviewSettings = useMutation({
-		...updatePracticeReviewSettingsMutation(),
-		mutationKey: reviewSettingsMutationKey,
-		scope: { id: `workspace:${workspaceSlug}:practice-review-settings` },
-		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: reviewSettingsQueryKey });
-			const previous = queryClient.getQueryData<PracticeReviewSettings>(reviewSettingsQueryKey);
-			if (previous && !variables.body.reset?.length) {
-				queryClient.setQueryData(
-					reviewSettingsQueryKey,
-					patchReviewSettings(previous, variables.body),
-				);
-			}
-			return { previous };
-		},
-		onSuccess: (updated) => {
-			queryClient.setQueryData(reviewSettingsQueryKey, updated);
-			toast.success("Review settings updated");
-		},
-		onError: (error, _variables, context) => {
-			if (context?.previous) {
-				queryClient.setQueryData(reviewSettingsQueryKey, context.previous);
-			}
-			toast.error("Failed to update review settings", {
-				description: problemDetailOf(error),
-			});
-		},
-		onSettled: () => {
-			if (queryClient.isMutating({ mutationKey: reviewSettingsMutationKey }) === 1) {
-				void queryClient.invalidateQueries({
-					queryKey: reviewSettingsQueryKey,
-				});
-			}
-		},
+	const updatePracticeReviewSettings = usePracticeReviewSettingsMutation(workspaceSlug, {
+		success: "Review settings updated",
+		error: "Failed to update review settings",
 	});
 
 	const updateFeatures = useUpdateWorkspaceFeatures(workspaceSlug, {
@@ -165,34 +121,4 @@ function ReviewSettingsContainer() {
 			<div className="max-w-3xl">{content}</div>
 		</PageLayout>
 	);
-}
-
-function patchReviewSettings(
-	settings: PracticeReviewSettings,
-	patch: UpdatePracticeReviewSettingsRequest,
-): PracticeReviewSettings {
-	return {
-		...settings,
-		...(patch.deliverToMerged === undefined
-			? {}
-			: {
-					deliverToMerged: patch.deliverToMerged,
-					deliverToMergedOverride: patch.deliverToMerged,
-				}),
-		...(patch.runForAllUsers === undefined
-			? {}
-			: {
-					runForAllUsers: patch.runForAllUsers,
-					runForAllUsersOverride: patch.runForAllUsers,
-				}),
-		...(patch.cooldownMinutes === undefined
-			? {}
-			: {
-					cooldownMinutes: patch.cooldownMinutes,
-					cooldownMinutesOverride: patch.cooldownMinutes,
-				}),
-		// The scope has no separate "override" key: it replaces wholesale and an empty scope already
-		// means "unrestricted", so the effective value is the only value there is.
-		...(patch.reviewScope === undefined ? {} : { reviewScope: patch.reviewScope }),
-	};
 }

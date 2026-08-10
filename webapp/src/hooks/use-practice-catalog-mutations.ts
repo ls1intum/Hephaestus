@@ -10,6 +10,7 @@ import {
 	listPracticesQueryKey,
 	placePracticeMutation,
 	reorderAreasMutation,
+	reviewTierRollupQueryKey,
 	setReviewTierMutation,
 	updateAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -62,14 +63,25 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		}
 	};
 
+	// The per-tier rollup is a server-resolved projection of this catalogue: every tier written here,
+	// and every practice created, deleted or moved between areas, changes a count in it. Nothing on
+	// this screen renders it, which is exactly why it has to be invalidated from here — the autonomy
+	// screen shares the cache and would otherwise open on the numbers from before the last edit.
+	const invalidateReviewTierRollup = () => {
+		void queryClient.invalidateQueries({
+			queryKey: reviewTierRollupQueryKey({ path: { workspaceSlug } }),
+		});
+	};
 	const invalidateAreasAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: areaMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: areasQueryKey });
+			invalidateReviewTierRollup();
 		}
 	};
 	const invalidatePracticesAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: practiceMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: practicesQueryKey });
+			invalidateReviewTierRollup();
 		}
 	};
 
