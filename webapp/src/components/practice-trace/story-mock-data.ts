@@ -88,7 +88,7 @@ export const tracedSignals = [
 	},
 	{
 		id: "sig-review-requested",
-		signal: "scm.pull_request.review_requested",
+		signal: "scm.pull_request.manual_review",
 		displayName: "Review requested",
 		revision: "9ab3c410",
 		occurredAt: "2026-08-07T08:30:00Z",
@@ -163,8 +163,8 @@ export const practiceTraceEntries = [
 		outcome: "PENDING",
 		explanation:
 			"Queued behind the reviews already running for this workspace. It will start on its own; nothing is needed from you.",
-		watches: ["scm.pull_request.ready", "scm.pull_request.review_requested"],
-		occasionedBy: "scm.pull_request.review_requested",
+		watches: ["scm.pull_request.ready", "scm.pull_request.manual_review"],
+		occasionedBy: "scm.pull_request.manual_review",
 		occasionedById: "sig-review-requested",
 		observationCount: 0,
 		deliveredCount: 0,
@@ -205,7 +205,7 @@ export const practiceTraceEntries = [
 		practiceSlug: "descriptive-pull-requests",
 		practiceName: "Descriptive pull requests",
 		reviewTier: "OFF",
-		outcome: "SILENCED",
+		outcome: "TURNED_OFF",
 		explanation:
 			"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
 		watches: ["scm.pull_request.ready"],
@@ -305,7 +305,7 @@ export const untouchedArtifactTrace = {
 			practiceSlug: "issue-hygiene",
 			practiceName: "Issue hygiene",
 			reviewTier: "OFF",
-			outcome: "SILENCED",
+			outcome: "TURNED_OFF",
 			explanation:
 				"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
 			watches: ["scm.issue.opened"],

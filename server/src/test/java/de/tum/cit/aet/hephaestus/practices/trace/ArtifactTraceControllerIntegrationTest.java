@@ -178,7 +178,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
                 .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].observationCount")
                 .isEqualTo(1)
                 .jsonPath("$.practices[?(@.practiceSlug=='silenced')].outcome")
-                .isEqualTo("SILENCED")
+                .isEqualTo("TURNED_OFF")
                 .jsonPath("$.practices[?(@.practiceSlug=='not-admitted')].outcome")
                 .isEqualTo("SKIPPED")
                 .jsonPath("$.practices[?(@.practiceSlug=='dormant')].outcome")

@@ -53,7 +53,7 @@ final class PracticeTraceDeriver {
         6,
         PracticeTraceOutcome.DORMANT,
         7,
-        PracticeTraceOutcome.SILENCED,
+        PracticeTraceOutcome.TURNED_OFF,
         8,
         PracticeTraceOutcome.NOT_OCCASIONED,
         9
@@ -156,7 +156,7 @@ final class PracticeTraceDeriver {
         if (practice.reviewTier() == PracticeReviewTier.OFF) {
             return entry(
                 practice,
-                PracticeTraceOutcome.SILENCED,
+                PracticeTraceOutcome.TURNED_OFF,
                 "This workspace turned the practice off, so it is not measured here.",
                 latest,
                 null,

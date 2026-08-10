@@ -33,8 +33,14 @@ public enum PracticeTraceOutcome {
      */
     NOT_ASSESSABLE,
 
-    /** The workspace turned this practice down to {@code OFF}; it is not measured at all. */
-    SILENCED,
+    /**
+     * The workspace turned this practice down to {@code OFF}; it is not measured at all.
+     *
+     * <p>Not "silenced": that describes the {@code MEASURE} tier — measured and kept quiet — which
+     * {@code FeedbackSuppressionReason.PRACTICE_TIER_QUIET} already covers. This is the tier above
+     * nothing at all, and every reader of it, the webapp included, has to render it as "Turned off".
+     */
+    TURNED_OFF,
 
     /** Nothing this practice watches has happened to this artifact. The ordinary quiet answer. */
     NOT_OCCASIONED,

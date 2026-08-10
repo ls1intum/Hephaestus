@@ -26,7 +26,7 @@ const OUTCOME_BADGE = {
 	PENDING: { variant: "secondary", Icon: ClockIcon },
 	SKIPPED: { variant: "outline", Icon: CircleSlashIcon },
 	NOT_ASSESSABLE: { variant: "warning", Icon: CircleHelpIcon },
-	SILENCED: { variant: "outline", Icon: BellOffIcon },
+	TURNED_OFF: { variant: "outline", Icon: BellOffIcon },
 	NOT_OCCASIONED: { variant: "outline", Icon: CircleDashedIcon },
 	DORMANT: { variant: "warning", Icon: UnplugIcon },
 	LAPSED: { variant: "outline", Icon: HourglassIcon },

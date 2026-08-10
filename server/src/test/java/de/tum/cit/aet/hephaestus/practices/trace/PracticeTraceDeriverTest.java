@@ -289,7 +289,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                 Map.of()
             );
 
-            assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.SILENCED);
+            assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.TURNED_OFF);
         }
 
         @Test
