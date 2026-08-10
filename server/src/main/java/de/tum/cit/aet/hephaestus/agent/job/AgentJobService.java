@@ -227,7 +227,7 @@ public class AgentJobService {
             .orElse(null);
         if (binding == null) {
             log.debug("No practice-review binding to run: workspaceId={}", workspaceId);
-            return refuse(signalKey, SignalStateReason.BINDING_DISABLED);
+            return refuse(signalKey, SignalStateReason.REVIEW_MODEL_UNBOUND);
         }
 
         // THE choke point for all sandboxed LLM work, scoped to whoever pays for THIS binding — which is
@@ -307,7 +307,7 @@ public class AgentJobService {
                 .orElse(null);
             if (binding == null) {
                 // Unbound or disabled since discovery.
-                return refuseInTransaction(signalKey, SignalStateReason.BINDING_DISABLED);
+                return refuseInTransaction(signalKey, SignalStateReason.REVIEW_MODEL_UNBOUND);
             }
 
             // A keyed submission was already deduplicated by the ledger's unique constraint, which

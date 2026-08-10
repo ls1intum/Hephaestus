@@ -54,8 +54,16 @@ public enum SignalStateReason {
 
     NO_ACTIVE_PRACTICE(SignalState.PENDING),
 
-    /** No enabled practice-review binding, or it lost its enablement between discovery and submission. */
-    BINDING_DISABLED(SignalState.PENDING),
+    /**
+     * The workspace has no enabled AI model bound to practice review, or it lost that binding between
+     * discovery and submission.
+     *
+     * <p>Named for the model rather than the practice because that is what an operator has to go and
+     * fix: this is Administration &rarr; AI models, not the practice catalogue. It was once called
+     * {@code BINDING_DISABLED}, which read as a fact about a practice binding and sent every reader to
+     * the wrong screen.
+     */
+    REVIEW_MODEL_UNBOUND(SignalState.PENDING),
 
     /**
      * A practice is bound to this signal and every one that is sits at loudness tier {@code OFF}.
@@ -125,7 +133,7 @@ public enum SignalStateReason {
             case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";
             case PRACTICES_DISABLED -> "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
             case NO_ACTIVE_PRACTICE -> "No practice was bound to this occurrence when it was recorded.";
-            case BINDING_DISABLED -> "No enabled binding covered this occurrence when it was recorded.";
+            case REVIEW_MODEL_UNBOUND -> "No AI model is bound to practice review for this workspace; binding one in Administration re-offers it.";
             case PRACTICE_TIER_OFF -> "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
             case BUDGET_EXHAUSTED -> "The budget funding this review was exhausted; it is re-offered when the budget refills.";
             case SUBJECT_UNLINKED -> "Nobody this could be attributed to has linked their account; linking one re-offers it.";

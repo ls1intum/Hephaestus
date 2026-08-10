@@ -25,7 +25,7 @@ export const OUTCOME_LABELS: Record<TraceOutcome, string> = {
 	PENDING: "Waiting",
 	SKIPPED: "Skipped",
 	NOT_ASSESSABLE: "Couldn't assess",
-	SILENCED: "Turned off",
+	TURNED_OFF: "Turned off",
 	NOT_OCCASIONED: "Not triggered",
 	DORMANT: "Waiting on a connection",
 	LAPSED: "Expired",
@@ -42,11 +42,17 @@ export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
 	ENGAGE: "Engage",
 };
 
+/**
+ * What each tier reaches, in the server's terms: `COACH` is the mentor conversation and nothing else,
+ * and `ENGAGE` adds the artifact on top of it. Saying it the other way round — the conversation as
+ * `ENGAGE`'s addition — tells a workspace admin that turning a practice down to `COACH` will stop the
+ * mentor chat, which is the opposite of what happens.
+ */
 export const REVIEW_TIER_DESCRIPTIONS: Record<ReviewTier, string> = {
 	OFF: "Not run at all on this workspace.",
 	MEASURE: "Measured for reporting, never spoken about.",
-	COACH: "Measured, and notable results are raised with you.",
-	ENGAGE: "Measured, raised with you, and followed up in conversation.",
+	COACH: "Measured, and raised in the developer's mentor chat.",
+	ENGAGE: "Measured, raised in the mentor chat, and posted on the pull request or issue.",
 };
 
 export const SIGNAL_STATE_LABELS: Record<SignalState, string> = {
@@ -67,7 +73,7 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	WORKSPACE_INACTIVE: "The workspace was not active",
 	PRACTICES_DISABLED: "Practice reviews are switched off for this workspace",
 	NO_ACTIVE_PRACTICE: "No practice was active for this kind of work",
-	BINDING_DISABLED: "Every practice that watches this is switched off",
+	REVIEW_MODEL_UNBOUND: "No AI model is set up to run reviews for this workspace",
 	PRACTICE_TIER_OFF: "The practices that watch this are set to off",
 	BUDGET_EXHAUSTED: "The workspace's AI budget was used up",
 	SUBJECT_UNLINKED: "The author is not linked to a Hephaestus account",

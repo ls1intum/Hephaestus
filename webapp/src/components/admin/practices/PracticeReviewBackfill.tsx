@@ -62,7 +62,7 @@ const WINDOWS = [
 const PAUSE_EXPLANATIONS: Record<NonNullable<ReviewBackfillRun["pauseReason"]>, string> = {
 	BUDGET_EXHAUSTED:
 		"The monthly AI budget funding these reviews is used up. Nothing has been skipped — the backfill continues from where it stopped once the budget resets or the cap is raised.",
-	BINDING_DISABLED:
+	REVIEW_MODEL_UNBOUND:
 		"There is no enabled review model for this workspace. Nothing has been skipped — the backfill continues once a model is bound.",
 	WORKSPACE_UNAVAILABLE:
 		"Practice reviews are off for this workspace, or the workspace is not active. Nothing has been skipped — the backfill continues once they are back on.",

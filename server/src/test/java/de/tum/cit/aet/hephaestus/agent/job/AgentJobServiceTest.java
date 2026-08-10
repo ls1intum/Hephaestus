@@ -662,7 +662,7 @@ class AgentJobServiceTest extends BaseUnitTest {
                 null
             );
 
-            assertThat(result).isEqualTo("No job created. " + SignalStateReason.BINDING_DISABLED.describe());
+            assertThat(result).isEqualTo("No job created. " + SignalStateReason.REVIEW_MODEL_UNBOUND.describe());
         }
 
         @Test

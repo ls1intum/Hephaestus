@@ -134,7 +134,7 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
         driver().advance(run);
 
         assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.PAUSED);
-        assertThat(run.getPauseReason()).isEqualTo(ReviewBackfillPauseReason.BINDING_DISABLED);
+        assertThat(run.getPauseReason()).isEqualTo(ReviewBackfillPauseReason.REVIEW_MODEL_UNBOUND);
     }
 
     /** No re-confirmation: the estimate the admin approved covered the whole scope, and pausing did not change it. */

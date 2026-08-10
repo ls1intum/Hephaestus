@@ -196,7 +196,7 @@ public class ReviewBackfillDriver {
             .filter(WorkspaceAgentBinding::isEnabled)
             .orElse(null);
         if (binding == null) {
-            return ReviewBackfillPauseReason.BINDING_DISABLED;
+            return ReviewBackfillPauseReason.REVIEW_MODEL_UNBOUND;
         }
         if (llmBudgetService.blockSubmission(workspace, "REVIEW_BACKFILL", binding.getFundingSource())) {
             return ReviewBackfillPauseReason.BUDGET_EXHAUSTED;

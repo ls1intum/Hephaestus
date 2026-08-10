@@ -10,8 +10,8 @@ public enum ReviewBackfillPauseReason {
     /** The purse funding this workspace's practice-review binding has reached its monthly cap. */
     BUDGET_EXHAUSTED,
 
-    /** The workspace has no enabled practice-review binding, so there is nothing to submit to. */
-    BINDING_DISABLED,
+    /** The workspace has no enabled AI model bound to practice review, so there is nothing to submit to. */
+    REVIEW_MODEL_UNBOUND,
 
     /** The workspace is no longer ACTIVE, or has turned practice review off. */
     WORKSPACE_UNAVAILABLE,
