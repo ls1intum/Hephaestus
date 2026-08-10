@@ -6,6 +6,7 @@ const WORK_ARTIFACT_HINTS: Record<string, string> = {
 	[ARTIFACT_KIND.pullRequest]: "Reviews work submitted in a pull or merge request",
 	[ARTIFACT_KIND.issue]: "Reviews work described or discussed in an issue",
 	[ARTIFACT_KIND.conversationThread]: "Reviews messages in a conversation thread",
+	[ARTIFACT_KIND.document]: "Reviews the writing in a published document",
 };
 
 /** Undefined for a kind this build has never heard of, which is still offered under its own name. */
@@ -20,6 +21,7 @@ export const WORK_ARTIFACT_FILTER_OPTIONS = [
 		value: ARTIFACT_KIND.conversationThread,
 		label: artifactKindPluralLabel(ARTIFACT_KIND.conversationThread),
 	},
+	{ value: ARTIFACT_KIND.document, label: artifactKindPluralLabel(ARTIFACT_KIND.document) },
 ] as const;
 
 export function generateSlug(name: string): string {

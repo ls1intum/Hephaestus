@@ -1,3 +1,11 @@
+import {
+	CircleDotIcon,
+	FileTextIcon,
+	GitPullRequestIcon,
+	type LucideIcon,
+	MessagesSquareIcon,
+} from "lucide-react";
+
 /**
  * Artifact kinds are an open vocabulary — a `<domain>.<kind>` string named by the owning server
  * module, so the generated client types one as `string`. These are the kinds the UI can label;
@@ -7,6 +15,7 @@ export const ARTIFACT_KIND = {
 	pullRequest: "scm.pull_request",
 	issue: "scm.issue",
 	conversationThread: "chat.conversation_thread",
+	document: "docs.document",
 } as const;
 
 export type KnownArtifactKind = (typeof ARTIFACT_KIND)[keyof typeof ARTIFACT_KIND];
@@ -23,12 +32,14 @@ const ARTIFACT_KIND_LABELS: Record<KnownArtifactKind, string> = {
 	[ARTIFACT_KIND.pullRequest]: "Pull or merge request",
 	[ARTIFACT_KIND.issue]: "Issue",
 	[ARTIFACT_KIND.conversationThread]: "Conversation",
+	[ARTIFACT_KIND.document]: "Document",
 };
 
 const ARTIFACT_KIND_PLURAL_LABELS: Record<KnownArtifactKind, string> = {
 	[ARTIFACT_KIND.pullRequest]: "Pull or merge requests",
 	[ARTIFACT_KIND.issue]: "Issues",
 	[ARTIFACT_KIND.conversationThread]: "Conversations",
+	[ARTIFACT_KIND.document]: "Documents",
 };
 
 export function isKnownArtifactKind(kind: string | null | undefined): kind is KnownArtifactKind {
@@ -43,4 +54,21 @@ export function artifactKindLabel(kind: string | undefined): string {
 export function artifactKindPluralLabel(kind: string | undefined): string {
 	if (!kind) return "Reviewed work";
 	return isKnownArtifactKind(kind) ? ARTIFACT_KIND_PLURAL_LABELS[kind] : kind;
+}
+
+const ARTIFACT_KIND_ICONS: Record<KnownArtifactKind, LucideIcon> = {
+	[ARTIFACT_KIND.pullRequest]: GitPullRequestIcon,
+	[ARTIFACT_KIND.issue]: CircleDotIcon,
+	[ARTIFACT_KIND.conversationThread]: MessagesSquareIcon,
+	[ARTIFACT_KIND.document]: FileTextIcon,
+};
+
+/**
+ * One map, so a kind cannot show as a pull request on one screen and a chat bubble on another.
+ *
+ * <p>A kind this build has never heard of gets the neutral page icon rather than a hole — and, just
+ * as importantly, never borrows the icon of a kind it is not.
+ */
+export function artifactKindIcon(kind: string | undefined): LucideIcon {
+	return kind && isKnownArtifactKind(kind) ? ARTIFACT_KIND_ICONS[kind] : FileTextIcon;
 }

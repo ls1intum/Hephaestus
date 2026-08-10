@@ -1,13 +1,9 @@
-import {
-	CircleDotIcon,
-	ExternalLinkIcon,
-	GitPullRequestIcon,
-	MessagesSquareIcon,
-} from "lucide-react";
+import { ExternalLinkIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ReviewArtifact as ReviewArtifactData, ReviewRunTarget } from "@/api/types.gen";
 import {
 	ARTIFACT_KIND,
+	artifactKindIcon,
 	artifactKindLabel,
 	isKnownArtifactKind,
 	type KnownArtifactKind,
@@ -23,6 +19,7 @@ const ARTIFACT_KIND_SLUGS = {
 	[ARTIFACT_KIND.pullRequest]: "pull-request",
 	[ARTIFACT_KIND.issue]: "issue",
 	[ARTIFACT_KIND.conversationThread]: "conversation",
+	[ARTIFACT_KIND.document]: "document",
 } as const satisfies Record<KnownArtifactKind, string>;
 
 export type ReviewArtifactTypeSlug = (typeof ARTIFACT_KIND_SLUGS)[keyof typeof ARTIFACT_KIND_SLUGS];
@@ -55,6 +52,8 @@ export function reviewArtifactLabel(artifact: ReviewArtifactDisplay): string {
 			return artifact.number == null ? "Issue" : `Issue #${artifact.number}`;
 		case ARTIFACT_KIND.conversationThread:
 			return artifact.channelName ? `#${artifact.channelName}` : "Conversation";
+		case ARTIFACT_KIND.document:
+			return "Document";
 		default:
 			// A kind this build has no copy for still names itself rather than rendering blank.
 			return artifactKindLabel(artifact.type);
@@ -73,6 +72,7 @@ export function reviewArtifactScopeLabel(
 		[ARTIFACT_KIND.pullRequest]: ["pull or merge request", "pull or merge requests"],
 		[ARTIFACT_KIND.issue]: ["issue", "issues"],
 		[ARTIFACT_KIND.conversationThread]: ["conversation", "conversations"],
+		[ARTIFACT_KIND.document]: ["document", "documents"],
 	};
 	const scope = isKnownArtifactKind(kind)
 		? labels[kind][id == null ? 1 : 0]
@@ -81,9 +81,10 @@ export function reviewArtifactScopeLabel(
 }
 
 function ArtifactIcon({ type }: { type: ReviewArtifactDisplay["type"] }) {
-	if (type === ARTIFACT_KIND.pullRequest) return <GitPullRequestIcon aria-hidden />;
-	if (type === ARTIFACT_KIND.issue) return <CircleDotIcon aria-hidden />;
-	return <MessagesSquareIcon aria-hidden />;
+	// Shared with the artifact trace, so one kind cannot be a document on one screen and a chat thread
+	// on another. The old fallback here handed every unrecognised kind the conversation icon.
+	const Icon = artifactKindIcon(type);
+	return <Icon aria-hidden />;
 }
 
 export function ReviewArtifact({
