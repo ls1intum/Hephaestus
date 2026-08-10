@@ -416,7 +416,7 @@ export function PracticeAreaDetailPage({
 					</span>
 					{weight !== undefined && (
 						<span
-							className="absolute -top-1 right-full mr-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted-foreground/80 px-1 text-[9px] font-semibold text-background"
+							className="absolute -top-1 right-full mr-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted px-1 text-[9px] font-semibold text-foreground ring-1 ring-border"
 							title={`Weight: counts ×${weight} toward the area`}
 						>
 							{`×${weight}`}
@@ -997,9 +997,9 @@ export function PracticeAreaDetailPage({
 															<>
 																{detail.detail.guidance && (
 																	<div className="flex flex-col gap-1">
-																		<h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+																		<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 																			What to do
-																		</h4>
+																		</p>
 																		<p className="max-w-prose text-pretty text-sm">
 																			{detail.detail.guidance}
 																		</p>
@@ -1007,9 +1007,9 @@ export function PracticeAreaDetailPage({
 																)}
 																{detail.detail.reasoning && (
 																	<div className="flex flex-col gap-1">
-																		<h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+																		<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 																			Why this finding was raised
-																		</h4>
+																		</p>
 																		<p className="max-w-prose text-pretty text-sm text-muted-foreground">
 																			{detail.detail.reasoning}
 																		</p>
@@ -1017,9 +1017,9 @@ export function PracticeAreaDetailPage({
 																)}
 																{evidenceLocations(detail.detail).length > 0 && (
 																	<div className="flex flex-col gap-1">
-																		<h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+																		<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 																			Evidence
-																		</h4>
+																		</p>
 																		<ul className="flex flex-wrap gap-1.5">
 																			{evidenceLocations(detail.detail).map((location) => (
 																				<li key={`${location.path}-${location.line}`}>
