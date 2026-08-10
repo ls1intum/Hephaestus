@@ -3,6 +3,8 @@
 This glossary is the canonical language for AI-supported practice mentoring and the versioned evidence contract.
 Use product terms in human-facing copy and the corresponding machine terms in contracts; do not invent synonyms.
 The broader [practice feedback language](./practice-feedback-language.md) remains canonical for observations and feedback.
+For how the words fit together at runtime — the four stages, and the refusal vocabulary each one owns — see the
+[practice review pipeline](./practice-review-pipeline.mdx).
 
 ## Product terms
 
@@ -63,6 +65,35 @@ A future human-review feature needs its own consent, provenance, retention, acce
 model. It must record who reviewed and in what relationship to the author. Human reviews
 may use different rubrics and evidence, and disagreement remains multiple provenance-bearing reviews rather
 than one ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an automated review.
+
+## How a review was occasioned
+
+Three separate words describe the start of a review, and they are not synonyms. The **door** is what a
+person or a provider did. `DiscoveredVia` is how we came to know about the occurrence, recorded on every
+signal. `ObservationOrigin` is the population any resulting observation belongs to, derived from
+`DiscoveredVia` once and never re-decided.
+
+| Door | Recorded as (`DiscoveredVia`) | UI label | Observation origin | Starts a review |
+| --- | --- | --- | --- | --- |
+| A provider event on connected work | `EVENT` | Live event | `LIVE` | yes |
+| Reconciling with the provider | `SYNC` | Noticed during a sync | `LIVE` | **no**, for pull requests and issues |
+| `/hephaestus review` in a merge request comment | `MANUAL` | Requested by hand | `MANUAL` | yes |
+| The *Review this now* button | `MANUAL` | Requested by hand | `MANUAL` | yes |
+| A confirmed campaign over past work | `BACKFILL` | Backfill of past work | `BACKFILL` | yes |
+| A recurring sweep schedule | `SWEEP` | Found by a recurring check | `LIVE` | yes |
+
+Two consequences follow from the table rather than from any enum, so state them rather than letting a
+reader infer them:
+
+- **The comment command and the button are indistinguishable afterwards.** Both record `MANUAL`; nothing
+  downstream can tell them apart. (A third path, the dev trigger, records `MANUAL` too.)
+- **`SYNC` is a dead end for connected project work** — the SCM listeners return before submitting, leaving
+  the row `RECORDED`. The exception is the Slack thread sweep, which records `SYNC` and does submit. Never
+  write "reconciliation never starts a review" without saying which artifact kind you mean.
+
+`MANUAL` and `BACKFILL` are self-selected samples and `LIVE` is not, which is why they are held apart in
+every behavioural read. A `BACKFILL` observation is additionally entitled only to `PROFILE`, a channel with
+no producer, so it is measured and never delivered.
 
 ## Loudness tiers
 
@@ -149,8 +180,12 @@ without the artifact changing.
 | Reason a person is needed | `insufficiencyReason` | `PracticeEvidenceLimitation` | inside `automated_review_policy` |
 | Known limitations | `knownLimitations` | `PracticeEvidenceLimitation` | inside `automated_review_policy` |
 | Automated review validation | `automatedReviewValidation` | `PracticeAutomatedReviewValidation` | derived API value |
-| Automated review readiness | `automatedReviewReadiness` | `AutomatedReviewReadinessReport` | inside `agent_job.evidence_snapshot` |
-| Source readiness checks | `sourceChecks` | `SourceReadinessCheck` | internal readiness report |
+| Automated review readiness | not on the HTTP API | `AutomatedReviewReadinessReport` | `agent_job.review_readiness` — its own column, not inside `evidence_snapshot` |
+| Source readiness checks | not on the HTTP API | `SourceReadinessCheck` | inside `agent_job.review_readiness` |
+| Source absence reason | inside `manifest.json` | `SourceAbsenceReason` | inside `agent_job.evidence_snapshot` |
+| Discovery provenance | `discoveredVia` | `DiscoveredVia` | `artifact_signal.discovered_via` |
+| Observation origin | `origin` | `ObservationOrigin` | `observation.origin` |
+| Occurrence state | — | `SignalState` | `artifact_signal.state` |
 | Source-use purpose | `purpose` | `SourceUsePurpose` | source-use decisions |
 | Source absence state | `supportedAbsenceStates` | `SourceAbsenceState` | source catalog |
 | Materialization | `artifacts` | `SourceArtifact` | manifest and content-addressed storage metadata |

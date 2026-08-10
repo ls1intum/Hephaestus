@@ -121,10 +121,11 @@ The constraints with direct authoring consequences are:
   subject, so it cannot answer "is all of it here?" — which is exactly what an author asserting an absence is
   asking. Outline documents and linked work items are both retrieved by heuristics that cannot establish they
   found everything, and neither reports `COMPLETE`.
-- Pull-request and issue core records cannot be logically empty. Other `1.0.0` sources may be validly empty.
-- An available pull-request diff is pinned and never partial. It may be captured empty, but its
-  `requiredQuality` is `COMPLETE_AND_NON_EMPTY`, so a practice that reads it is refused rather than left to
-  grade the title and description instead.
+- Three `1.0.0` sources cannot be logically empty — the pull-request, issue, and document core records.
+  Every other source may be validly empty.
+- Two cannot be partial: the pull-request diff and the document core record. An available diff is
+  additionally pinned. It may be captured empty, but its `requiredQuality` is `COMPLETE_AND_NON_EMPTY`, so
+  a practice that reads it is refused rather than left to grade the title and description instead.
 
 `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized product
 scope. It is not controller or DPO approval and cannot cover an expanded source, purpose, audience, processor,
@@ -166,7 +167,8 @@ Only `AVAILABLE` has:
 
 - logical content: `EMPTY` or `NON_EMPTY`;
 - completeness: `COMPLETE`, `PARTIAL`, or `UNKNOWN`;
-- capture facts: `observedAt`, an optional `sourceEffectiveAt` watermark, and an optional pinned identity;
+- capture facts: `capturedAt` — the only required one — plus an optional `observedAt`, an optional
+  `sourceEffectiveAt` watermark, and an optional pinned identity;
 - artifacts.
 
 Capture facts hold only what could not be known before the capture ran. Everything derivable from the
@@ -341,9 +343,13 @@ practice taking an `EXHAUSTIVE` stance is refused by a partial one.
 
 ## Runtime behavior
 
-The runtime resolves exact practice revisions before capture and collects the union of the governed sources
-their bindings name. Readiness is evaluated per practice. A `CONTEXTUAL` failure does not skip an otherwise
-eligible practice; a `REQUIRED` or `EXHAUSTIVE` failure does. If no practice is eligible, no model request is made.
+The runtime resolves exact practice revisions before capture and then stages **every governed source the
+catalog declares for the artifact kind under review** — all of them, on every review. There is no per-run
+source selection: practice bindings decide which practices may run, never which sources are captured, so a
+source listed as anything other than `AVAILABLE` always says why in a typed reason code and never because
+no practice asked for it. Bindings enter afterwards, in the readiness check. Readiness is evaluated per
+practice. A `CONTEXTUAL` failure does not skip an otherwise eligible practice; a `REQUIRED` or `EXHAUSTIVE`
+failure does. If no practice is eligible, no model request is made.
 
 One invocation may contain the governed union needed by several practices. The model can technically read that
 union; this runtime uses an attribution boundary rather than process isolation. The practice index lists each
@@ -355,8 +361,13 @@ location is persisted. Delivery fails atomically on any mismatch.
 This proves traceable grounding, not model causality; evaluations requiring non-interference must still run
 practices in isolated evidence views.
 
-The internal readiness report records whether each practice is ready or skipped. Model-visible input exposes only the evidence
-needed for the review; governance metadata and protected reason codes remain internal.
+The internal readiness report records whether each practice is ready or skipped, and it is the one document
+that stays server-side: it is persisted to `agent_job.review_readiness` and never staged. The **manifest is
+not internal** — the same bytes persisted to `agent_job.evidence_snapshot` are staged into the sandbox at
+`inputs/manifest.json`, carrying every absence reason code including `GOVERNANCE_NOT_EFFECTIVE`,
+`CONSENT_NOT_ACTIVE`, and `PRIVACY_POLICY`. There is no redacted model-facing variant. Treat a reason code
+you add to a capture state as model-visible, and put anything that must not be as a readiness decision
+instead.
 
 ## Change and staleness
 

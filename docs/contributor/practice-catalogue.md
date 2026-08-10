@@ -170,25 +170,13 @@ covers name, description, icon, and color; position is excluded.
 
 ## Turning a practice down
 
-Loudness is a workspace decision, not a catalog one, and it is deliberately not a switch. Each practice
-carries a `reviewTier` of `OFF`, `MEASURE`, `COACH`, or `ENGAGE`; only `OFF` stops the review. `MEASURE`
-and `COACH` run it and record every observation exactly as `ENGAGE` does, and differ only in how far the
-result travels — `MEASURE` says nothing anywhere, `COACH` raises it in the recipient's mentor
-conversation, `ENGAGE` also places it on the artifact. This exists because the previous answer to "this
-practice is too noisy" was to stop using it, which also stopped the measurement and put a hole in the
-behaviour series.
+Loudness is a workspace decision, not a catalog one: a practice's `reviewTier` and the workspace's review
+scope both live outside the curated catalogue, and a curator never sets either. The
+[practice review glossary](./practice-review-glossary.mdx) defines both in full — the four tiers, what each
+one reaches, and the refusal reasons an out-of-scope or tier-`OFF` artifact records.
 
-`COACH` reaches the mentor conversation and nothing else. The channel vocabulary also declares
-`PROFILE`, but nothing in the application writes one, so do not describe `COACH` as reaching a profile
-or reflection surface. A finding a tier withholds is recorded as suppressed with reason
-`PRACTICE_TIER_QUIET` rather than dropped, so a deliberate quiet stays distinguishable from a miss.
-
-Alongside it, a workspace review scope decides which work is reviewed at all: two exact-match lists,
-`targetBranches` and `repositories`, ANDed onto every binding, with an empty list meaning no
-restriction on that axis. There is no path scope and there are no glob patterns, and a branch scope
-cannot narrow issue review because an issue has no target branch. The
-[practice review glossary](./practice-review-glossary.mdx) documents both, including the refusal
-reasons an out-of-scope or tier-`OFF` artifact records.
+What matters for curation is only this: turning a noisy practice down does **not** stop measuring it, so
+"this practice is too noisy" is never a reason to remove it from the catalogue.
 
 ## Selecting a practice
 

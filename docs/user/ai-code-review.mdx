@@ -45,9 +45,17 @@ For feedback tied to a changed line, an inline comment can explain:
 
 Some comments include a suggested code change. Check it before applying it.
 
-### Run the review again
+### Ask for a review
 
-On a **GitLab merge request**, after you push new commits, start a comment with:
+There are two ways to ask, and both are limited to the work's author or assignees and to workspace
+admins. Each person also has an hourly allowance, so a burst of requests is refused rather than queued.
+
+**From the app.** Open **Review activity** in the workspace sidebar, open the piece of work, and use
+**Review this now**. If the request is not accepted you stay on the page and it tells you why, in a
+sentence — the work was reviewed too recently, no AI model is set up, the practices that watch it are
+turned off, and so on.
+
+**From a GitLab merge request.** After you push new commits, start a comment with:
 
 ```text
 /hephaestus review
@@ -57,8 +65,22 @@ The command is case-insensitive. Text before the command prevents it from being 
 ignored once the merge request is closed or merged, and whether it is accepted at all depends on the
 workspace settings.
 
-There is no equivalent command on GitHub pull requests; reviews there start from the events the
-workspace's practices are bound to.
+There is no equivalent command on GitHub pull requests. Use **Review this now** instead.
+
+### See what was reviewed, and what was not
+
+**Review activity** in the workspace sidebar lists every piece of work Hephaestus recorded, and opening
+one shows what each practice made of it — including the practices that stayed quiet, and why. This is
+the place to look when you expected feedback and got none.
+
+Two answers there surprise people:
+
+- **Turned off** means your workspace switched that practice off; it is not measured at all.
+- **Reviewed**, with nothing delivered, is a normal and deliberate outcome. A practice can be set to a
+  quieter level, where it still runs and still records what it found but does not post a comment. Your
+  workspace admins can see the result even when you were told nothing.
+
+A review of past work is quieter still: those never produce comments at all, by design.
 
 ### What code is reviewed
 

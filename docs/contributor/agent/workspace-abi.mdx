@@ -12,12 +12,12 @@ a separate workspace contract.
 
 The workspace is partitioned by **lifecycle, expressed as location** (ADR 0020): read-only
 vs writable is decided by *where* a file lives, not by convention. Three top-level regions —
-`inputs/` (read-only; the path-guard whitelists exactly this subtree), `work/` (agent +
-precompute scratch; never collected), and `out/` (the only directory collected back into SQL).
+`inputs/` (read-only), `work/` (agent + precompute scratch; never collected), and `out/`
+(the only directory collected back into SQL).
 
 ```text
 /workspace/
-├── inputs/                          # READ-ONLY. The path-guard whitelists exactly this subtree.
+├── inputs/                          # READ-ONLY (enforced by directory ownership, not a path guard).
 │   ├── manifest.json                #   Versioned source, capture-state, and artifact index.
 │   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020).
 │   │   └── scm/repo/                #   Pinned, read-only SCM tree without Git metadata or history.
@@ -35,14 +35,17 @@ precompute scratch; never collected), and `out/` (the only directory collected b
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
 │   ├── precompute/                  #   Per-practice precompute scripts injected by the server.
 │   ├── precompute-out/              #   Precompute runtime output (logs, structured hints).
-│   └── analysis/                    #   Per-practice analysis output (.gitkeep markers).
+│   └── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,
 │                                    #   usage.json, runner-debug.json, watchdog-killed.json
 ├── task.json                        # TaskEnvelope<…> — runtime contract between handler and runner.
 ├── .pi/                             # Pi SDK agent dir — $PI_CODING_AGENT_DIR resolves here.
 │   ├── AGENTS.md                    #   Orchestrator instructions
-│   ├── settings.json                #   Pi SDK config (provider, model, compaction)
-│   └── extensions/                  #   Custom provider extensions (auto-discovered)
+│   └── settings.json                #   Pi SDK config (provider, model, compaction)
+├── pi-provider.json                 # Provider/model routing for the runner.
+├── pi-provider.mjs                  # Provider helper module loaded by the runner.
+├── pi-finding-normalize.mjs         # Finding normaliser the runner imports before writing out/.
+├── node_modules -> /opt/pi-sdk/…    # Symlink created at container start, not staged.
 └── .run-pi.mjs                      # Runner script entry point.
 ```
 
@@ -51,8 +54,12 @@ covered by this ABI.
 
 ## Path conventions
 
-- **`inputs/`** — the entire read-only region. The sandbox path-guard whitelists exactly this
-  subtree; an agent write attempt anywhere under `inputs/` is rejected.
+- **`inputs/`** — the entire read-only region. Read-only-ness is a **filesystem** property, not a path
+  guard: the server pre-creates only the `work/` ancestors as the sandbox uid and lets the container
+  runtime auto-create the `inputs/` directories as root, so the unprivileged agent cannot write there.
+  There is no runtime allowlist of `inputs/`. The one allowlist that does exist is server-side and narrower
+  — it validates the paths an *adapter* may inject before the container exists, and covers
+  `inputs/context/` and the mentor's `.sessions/` only.
 - **`inputs/context/`** — system-written, AI-readable source materializations of the artifact under
   review. A source with nothing to report still writes its file, holding an empty list: "the record was
   read and held nothing" is a fact a review may reason from, and "the file is not there" is not.
@@ -81,10 +88,14 @@ covered by this ABI.
 
 | Code | Meaning |
 |------|---------|
-| 0    | Success |
-| 1    | Agent runtime failure (Pi SDK or runner error) |
-| 3    | Watchdog hard-kill (budget + grace exceeded) |
+| 0    | Success — `out/result.json` is complete, whether from the first attempt, the recovery retry, or reconstruction from persisted tool state |
+| 1    | No complete review output after the initial attempt *and* the recovery retry |
+| 2    | Fatal runner error — an unhandled rejection or uncaught exception. Debug and usage files are persisted first |
+| 3    | Watchdog hard-kill (budget + grace exceeded); writes `out/watchdog-killed.json` first |
 | 42   | Envelope mismatch (unsupported `schemaVersion` or unknown `kind`) — image/server drift |
+
+`137` is a container SIGKILL from the runtime, not a runner code. The server treats `0` as success and
+`42` as drift; every other non-zero code is a generic failure.
 
 ## Versioning policy
 
