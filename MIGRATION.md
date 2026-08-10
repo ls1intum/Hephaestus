@@ -65,6 +65,51 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 `GIT_STORAGE_PATH` is now `HEPHAESTUS_FABRIC_ROOT`
+
+**Affected**: deployments that set `GIT_STORAGE_PATH` to anything other than `/data/git-repos`. Check
+with `grep GIT_STORAGE_PATH` over your deployment configuration before you upgrade. Deployments that
+use the shipped Compose files unchanged are **not** affected: those files already pinned this path to
+`/data/git-repos` and now pass the new name for the same directory, mounted from the same volume.
+
+**Before**: `GIT_STORAGE_PATH` (`hephaestus.git.storage-path`) named the directory holding repository
+working copies, and the rest of the on-disk cache — content-addressed evidence blobs and per-job
+manifests — fell back to it whenever `HEPHAESTUS_FABRIC_ROOT` was unset.
+
+**After**: `HEPHAESTUS_FABRIC_ROOT` is the only name for that directory. `GIT_STORAGE_PATH` is read
+nowhere and has no alias.
+
+**Nothing warns you.** Everything under this root is a rebuildable cache, so an instance that keeps
+only the old variable starts, passes its health check and reviews normally — it simply writes to
+`/data/git-repos` instead of the path you chose. If that path is not a mounted volume on your
+deployment, it is the container's own writable layer: it grows with every clone, is discarded on
+every restart, and presents as repeated full re-clones and a container disk filling up. The tree at
+your old path is left where it is, no longer read and no longer swept.
+
+**Migration**: before starting the new version, set `HEPHAESTUS_FABRIC_ROOT` to the value
+`GIT_STORAGE_PATH` had, then remove `GIT_STORAGE_PATH`. The directory layout beneath the root is
+unchanged, so the existing contents are picked up as they are and nothing has to be re-fetched.
+
+#### 🔴 The evidence-cache retention window must be at least one day
+
+**Affected**: deployments that set `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS`
+(`hephaestus.fabric.gc-retention-days`). The shipped default is `30` and is valid; if you have not
+set this, there is nothing to do.
+
+This is the number of days a review's cached evidence and job manifest are kept before the daily
+sweep removes them. `0` was previously accepted, and did the opposite of what it looks like: instead
+of switching the sweep off it made every cached job directory eligible for deletion on the next run.
+A value below `1` is now rejected.
+
+**Migration**: if you set it to `0` or a negative number, set a real window before upgrading.
+Otherwise the server role does not start and reports:
+
+```
+hephaestus.fabric.gc-retention-days must be positive
+```
+
+No value switches the sweep off; set a long window instead.
+
 #### 🔴 Practice-review API uses one vocabulary
 
 **Affected**: API clients that configure practices, read findings, or manage AI bindings.
