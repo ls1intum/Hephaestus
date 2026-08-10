@@ -507,14 +507,15 @@ function PracticeActions({
 					    fails — and the sentences now have a screen of their own on Review autonomy. */}
 					<DropdownMenuGroup>
 						<DropdownMenuLabel>How far Hephaestus may go</DropdownMenuLabel>
-						{REVIEW_TIERS.map((tier) => (
+						{/* Only the rungs that can be moved to. A menu is a list of things you can do, and
+						    Propose is not one of them anywhere yet — the row's picker still renders it,
+						    because that one has to be able to show a tier already in force. Keeping it here
+						    as well made the menu tall enough to become a scrollable region no keyboard can
+						    reach, which the a11y gate fails. */}
+						{REVIEW_TIERS.filter((tier) => tier.selectable).map((tier) => (
 							<DropdownMenuItem
 								key={tier.value}
-								disabled={
-									tierChangeDisabled ||
-									!tier.selectable ||
-									practice.reviewTier.effective === tier.value
-								}
+								disabled={tierChangeDisabled || practice.reviewTier.effective === tier.value}
 								onClick={() => onSetReviewTier(practice.slug, tier.value)}
 							>
 								{tier.label}
