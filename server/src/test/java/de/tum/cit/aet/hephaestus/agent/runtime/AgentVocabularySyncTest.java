@@ -25,9 +25,9 @@ import org.junit.jupiter.api.Test;
  * as a Java enum the server persists, once as a JavaScript literal the in-sandbox runner validates
  * against — and nothing but this test holds the two spellings together.
  *
- * <p>Written because they drifted. {@code INDETERMINATE} was added to {@link Presence}, to the DB CHECK,
+ * <p>Written because they drifted. {@code INCONCLUSIVE} was added to {@link Presence}, to the DB CHECK,
  * to the DTOs and to the web UI, while the runner's list stayed at three values. The orchestrator prompt
- * asked for {@code INDETERMINATE} in seventeen places; the tool call was rejected back to the model,
+ * asked for {@code INCONCLUSIVE} in seventeen places; the tool call was rejected back to the model,
  * which refiled the same observation as {@code NOT_APPLICABLE} — turning "I read the evidence and could
  * not call it" into "there was nothing here to see" in a permanent record of how a person works. That is
  * the precise laundering the value was introduced to prevent, and the whole suite stayed green through it,

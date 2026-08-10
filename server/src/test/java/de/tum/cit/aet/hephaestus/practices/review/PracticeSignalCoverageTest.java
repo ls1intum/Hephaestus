@@ -35,6 +35,12 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     private final PracticeRepository practices = mock(PracticeRepository.class);
     private final PracticeSignalOptions options = PracticeSignalOptionsFixture.real();
 
+    /**
+     * Only reached by {@code dormantBindings}, which these tests do not exercise: the vocabulary check
+     * asks nothing of any workspace, so the tier chain has no bottom to resolve here.
+     */
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults = mock(WorkspaceReviewDefaultsProvider.class);
+
     @Test
     @DisplayName("a vocabulary whose every ingested signal is covered is accepted")
     void aFullyCoveredVocabularyIsAccepted() {
@@ -76,7 +82,7 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     }
 
     private PracticeSignalCoverage coverage(Set<SignalName> covered) {
-        return new PracticeSignalCoverage(fixedCoverage(covered), options, practices);
+        return new PracticeSignalCoverage(fixedCoverage(covered), options, practices, workspaceDefaults);
     }
 
     /** Every signal an author can bind to that some ingested event is declared to raise. */

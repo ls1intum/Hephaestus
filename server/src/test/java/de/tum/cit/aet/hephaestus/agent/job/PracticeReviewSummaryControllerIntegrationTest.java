@@ -256,7 +256,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         result.setName("Review quality");
         result.setCriteria("Review the change");
         result.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        result.setReviewTier(PracticeReviewTier.ENGAGE);
+        result.setReviewTier(PracticeReviewTier.DELIVER);
         return practiceRepository.save(result);
     }
 

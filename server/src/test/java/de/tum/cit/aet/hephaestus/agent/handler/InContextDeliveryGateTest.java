@@ -3,8 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -22,6 +25,8 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -51,13 +56,18 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
 
     private InContextDeliveryGate gate() {
-        return new InContextDeliveryGate(practiceRepository, observationRepository, feedbackLedgerRecorder);
+        return new InContextDeliveryGate(
+            practiceRepository,
+            observationRepository,
+            feedbackLedgerRecorder,
+            workspaceDefaults()
+        );
     }
 
     @Test
-    void engagedPracticesReachTheArtifact() {
+    void deliveringPracticesReachTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("loud", PracticeReviewTier.ENGAGE))
+            List.of(practice("loud", PracticeReviewTier.DELIVER))
         );
         ValidatedFinding finding = finding("loud", "occ-1");
 
@@ -65,24 +75,25 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         verifyNoInteractions(feedbackLedgerRecorder);
     }
 
+    /** Every tier below {@code DELIVER} withholds: {@code OBSERVE} says nothing, {@code PROPOSE} waits. */
     @Test
-    void measuringAndCoachingPracticesAreWithheldFromTheArtifact() {
+    void observingAndProposingPracticesAreWithheldFromTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(
-                practice("measured", PracticeReviewTier.MEASURE),
-                practice("coached", PracticeReviewTier.COACH),
-                practice("loud", PracticeReviewTier.ENGAGE)
+                practice("measured", PracticeReviewTier.OBSERVE),
+                practice("proposed", PracticeReviewTier.PROPOSE),
+                practice("loud", PracticeReviewTier.DELIVER)
             )
         );
         ValidatedFinding measured = finding("measured", "occ-1");
-        ValidatedFinding coached = finding("coached", "occ-2");
+        ValidatedFinding proposed = finding("proposed", "occ-2");
         ValidatedFinding loud = finding("loud", "occ-3");
         // Built BEFORE the stubbing call: mocking inside a when(...) argument leaves Mockito's stubbing
         // half-finished and fails the next interaction instead of this line.
         List<Observation> persisted = List.of(observation("occ-1"), observation("occ-2"), observation("occ-3"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
 
-        List<ValidatedFinding> admitted = gate().admitInContext(job(), List.of(measured, coached, loud));
+        List<ValidatedFinding> admitted = gate().admitInContext(job(), List.of(measured, proposed, loud));
 
         assertThat(admitted).containsExactly(loud);
         // Written down, not dropped: a later evaluation must be able to tell a deliberate quiet from a miss.
@@ -96,7 +107,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void anUnknownPracticeSlugIsKept() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("known", PracticeReviewTier.MEASURE))
+            List.of(practice("known", PracticeReviewTier.OBSERVE))
         );
         ValidatedFinding stranger = finding("not-in-the-catalogue", "occ-9");
 
@@ -107,7 +118,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aWithheldFindingThatWasNeverPersistedGetsNoLedgerRow() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.MEASURE))
+            List.of(practice("measured", PracticeReviewTier.OBSERVE))
         );
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(List.of());
 
@@ -119,7 +130,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aLedgerFailureDoesNotStopTheFindingsThatSurvived() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.MEASURE), practice("loud", PracticeReviewTier.ENGAGE))
+            List.of(practice("measured", PracticeReviewTier.OBSERVE), practice("loud", PracticeReviewTier.DELIVER))
         );
         List<Observation> persisted = List.of(observation("occ-1"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
@@ -157,9 +168,9 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aTierWithheldFindingIsRecordedUnderTheTierNotTheProvenance() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.MEASURE))
+            List.of(practice("measured", PracticeReviewTier.OBSERVE))
         );
-        // Built BEFORE the stubbing call: see measuringAndCoachingPracticesAreWithheldFromTheArtifact.
+        // Built BEFORE the stubbing call: see observingAndProposingPracticesAreWithheldFromTheArtifact.
         List<Observation> persisted = List.of(observation("occ-1"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
 
@@ -229,5 +240,16 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         Observation observation = org.mockito.Mockito.mock(Observation.class);
         org.mockito.Mockito.lenient().when(observation.getOccurrenceKey()).thenReturn(occurrenceKey);
         return observation;
+    }
+
+    /**
+     * Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work — which is what
+     * a workspace that has never configured anything gets, and therefore what these fixtures meant before
+     * the chain existed.
+     */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
+        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return provider;
     }
 }

@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * when it was written.
  *
  * <p>A test that enumerates the values by hand silently stops covering the enum the moment one is
- * added: the new value is simply not checked, and an {@code INDETERMINATE} row carrying a GOOD
+ * added: the new value is simply not checked, and an {@code INCONCLUSIVE} row carrying a GOOD
  * assessment — the precise failure that value exists to prevent — slips through with the suite green.
  */
 class ObservationCoherenceTest extends BaseUnitTest {
@@ -65,7 +65,7 @@ class ObservationCoherenceTest extends BaseUnitTest {
     }
 
     /**
-     * INDETERMINATE is a measurement about the world; a source that could not be read is not, and is
+     * INCONCLUSIVE is a measurement about the world; a source that could not be read is not, and is
      * refused before any observation is written. If a {@link Presence} ever appears that means "we could
      * not look", this test is the one that should stop it.
      */

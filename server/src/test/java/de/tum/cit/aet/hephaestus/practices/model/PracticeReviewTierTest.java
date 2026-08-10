@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
@@ -11,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-@DisplayName("Loudness tiers")
+@DisplayName("Autonomy tiers")
 class PracticeReviewTierTest extends BaseUnitTest {
 
     @Nested
@@ -21,63 +20,91 @@ class PracticeReviewTierTest extends BaseUnitTest {
         @Test
         void offIsTheOnlyTierThatStopsAReview() {
             assertThat(PracticeReviewTier.OFF.admitsReview()).isFalse();
-            assertThat(PracticeReviewTier.MEASURE.admitsReview()).isTrue();
-            assertThat(PracticeReviewTier.COACH.admitsReview()).isTrue();
-            assertThat(PracticeReviewTier.ENGAGE.admitsReview()).isTrue();
+            assertThat(PracticeReviewTier.OBSERVE.admitsReview()).isTrue();
+            assertThat(PracticeReviewTier.PROPOSE.admitsReview()).isTrue();
+            assertThat(PracticeReviewTier.DELIVER.admitsReview()).isTrue();
         }
     }
 
     @Nested
-    @DisplayName("delivery")
-    class Delivery {
+    @DisplayName("autonomy")
+    class Autonomy {
 
+        /**
+         * The whole axis in one assertion: only the top tier may act without a person. The tier says how
+         * far the system may go on its own; it says nothing about <em>where</em>, which is
+         * {@code FeedbackReach}'s question and is asked separately.
+         */
         @Test
-        void onlyEngageReachesTheArtifact() {
-            assertThat(PracticeReviewTier.OFF.delivers(FeedbackChannel.IN_CONTEXT)).isFalse();
-            assertThat(PracticeReviewTier.MEASURE.delivers(FeedbackChannel.IN_CONTEXT)).isFalse();
-            assertThat(PracticeReviewTier.COACH.delivers(FeedbackChannel.IN_CONTEXT)).isFalse();
-            assertThat(PracticeReviewTier.ENGAGE.delivers(FeedbackChannel.IN_CONTEXT)).isTrue();
-        }
-
-        @Test
-        void coachAndEngageReachTheConversation() {
-            assertThat(PracticeReviewTier.OFF.delivers(FeedbackChannel.CONVERSATION)).isFalse();
-            assertThat(PracticeReviewTier.MEASURE.delivers(FeedbackChannel.CONVERSATION)).isFalse();
-            assertThat(PracticeReviewTier.COACH.delivers(FeedbackChannel.CONVERSATION)).isTrue();
-            assertThat(PracticeReviewTier.ENGAGE.delivers(FeedbackChannel.CONVERSATION)).isTrue();
+        void onlyDeliverActsWithoutAHuman() {
+            assertThat(PracticeReviewTier.OFF.deliversWithoutApproval()).isFalse();
+            assertThat(PracticeReviewTier.OBSERVE.deliversWithoutApproval()).isFalse();
+            assertThat(PracticeReviewTier.PROPOSE.deliversWithoutApproval()).isFalse();
+            assertThat(PracticeReviewTier.DELIVER.deliversWithoutApproval()).isTrue();
         }
 
         /**
-         * PROFILE is a declared channel with no producer anywhere in {@code src/main} — nothing ever writes
-         * a PROFILE feedback unit. COACH is therefore documented and implemented as conversation-only
-         * rather than as "the quiet channels", because claiming a delivery the code cannot perform is the
-         * failure mode this contract exists to prevent. This test is the guard: when a PROFILE producer is
-         * built, it fails, and whoever builds it decides deliberately which tiers reach it.
+         * PROPOSE answers no here and must keep answering no once the approval queue ships: delivering
+         * something a person approved is a different act, recorded differently, and not this one. If this
+         * test is ever changed to make PROPOSE deliver on its own, the tier has silently become DELIVER.
+         */
+        @Test
+        void proposeStillDoesNotDeliverOnItsOwnOnceApprovalExists() {
+            assertThat(PracticeReviewTier.PROPOSE.deliversWithoutApproval()).isFalse();
+        }
+
+        /** Autonomy is monotone: a higher tier does everything a lower one does, and never less. */
+        @Test
+        void eachTierDoesASupersetOfTheOneBelowIt() {
+            PracticeReviewTier[] ascending = {
+                PracticeReviewTier.OFF,
+                PracticeReviewTier.OBSERVE,
+                PracticeReviewTier.PROPOSE,
+                PracticeReviewTier.DELIVER,
+            };
+            for (int i = 1; i < ascending.length; i++) {
+                if (ascending[i - 1].admitsReview()) {
+                    assertThat(ascending[i].admitsReview())
+                        .as("%s must admit a review because %s does", ascending[i], ascending[i - 1])
+                        .isTrue();
+                }
+                if (ascending[i - 1].deliversWithoutApproval()) {
+                    assertThat(ascending[i].deliversWithoutApproval())
+                        .as("%s must deliver because %s does", ascending[i], ascending[i - 1])
+                        .isTrue();
+                }
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("selectability")
+    class Selectability {
+
+        /**
+         * PROPOSE is declared, admitted by the DB CHECK, and refused at every write boundary until an
+         * approval queue exists. A practice parked there would prepare feedback nobody can approve and
+         * swallow it — worse than the tier not being offered at all.
+         *
+         * <p>This test is the one line to delete when the queue ships.
+         */
+        @Test
+        void proposeIsTheOnlyTierAnAdministratorMayNotChooseYet() {
+            assertThat(PracticeReviewTier.PROPOSE.selectable()).isFalse();
+            assertThat(PracticeReviewTier.OFF.selectable()).isTrue();
+            assertThat(PracticeReviewTier.OBSERVE.selectable()).isTrue();
+            assertThat(PracticeReviewTier.DELIVER.selectable()).isTrue();
+        }
+
+        /**
+         * Declared but unselectable is a deliberate and temporary state, so it is pinned to exactly one
+         * constant. A second unselectable tier means somebody has started using this as a general escape
+         * hatch for shipping vocabulary ahead of behaviour.
          */
         @ParameterizedTest
         @EnumSource(PracticeReviewTier.class)
-        void noTierClaimsTheUnwrittenProfileChannel(PracticeReviewTier tier) {
-            assertThat(tier.delivers(FeedbackChannel.PROFILE)).isFalse();
-        }
-
-        /** Loudness is monotone: a louder tier delivers everywhere a quieter one does, and never less. */
-        @Test
-        void eachTierDeliversASupersetOfTheOneBelowIt() {
-            PracticeReviewTier[] ascending = {
-                PracticeReviewTier.OFF,
-                PracticeReviewTier.MEASURE,
-                PracticeReviewTier.COACH,
-                PracticeReviewTier.ENGAGE,
-            };
-            for (int i = 1; i < ascending.length; i++) {
-                for (FeedbackChannel channel : FeedbackChannel.values()) {
-                    if (ascending[i - 1].delivers(channel)) {
-                        assertThat(ascending[i].delivers(channel))
-                            .as("%s must deliver %s because %s does", ascending[i], channel, ascending[i - 1])
-                            .isTrue();
-                    }
-                }
-            }
+        void nothingElseIsShippedAheadOfItsBehaviour(PracticeReviewTier tier) {
+            assertThat(tier.selectable()).isEqualTo(tier != PracticeReviewTier.PROPOSE);
         }
     }
 
@@ -93,9 +120,15 @@ class PracticeReviewTierTest extends BaseUnitTest {
             );
         }
 
+        /**
+         * The bottom of the practice → area → workspace chain. It is the loudest tier on purpose: that is
+         * what every practice did before the chain existed, and a migration must not change how loud a
+         * running system is. Turning it down is now one decision instead of forty — but it is a decision
+         * somebody makes, not one an upgrade makes for them.
+         */
         @Test
-        void theDefaultIsTheLoudestTier() {
-            assertThat(PracticeReviewTier.DEFAULT).isEqualTo(PracticeReviewTier.ENGAGE);
+        void theFallbackIsWhatEveryPracticeAlreadyDid() {
+            assertThat(PracticeReviewTier.DEFAULT).isEqualTo(PracticeReviewTier.DELIVER);
         }
     }
 }

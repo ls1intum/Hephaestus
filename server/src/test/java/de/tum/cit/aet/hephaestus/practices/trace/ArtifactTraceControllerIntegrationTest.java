@@ -151,10 +151,10 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         @Test
         @WithMentorUser
         void reportsEveryPracticeIncludingTheQuietOnes() {
-            Practice reviewed = persistPractice("reviewed", "Reviewed practice", PracticeReviewTier.ENGAGE);
+            Practice reviewed = persistPractice("reviewed", "Reviewed practice", PracticeReviewTier.DELIVER);
             persistPractice("silenced", "Silenced practice", PracticeReviewTier.OFF);
-            persistPractice("not-admitted", "Not admitted practice", PracticeReviewTier.ENGAGE);
-            persistPractice("dormant", "Dormant practice", PracticeReviewTier.ENGAGE, ScmSignals.PULL_REQUEST_MERGED);
+            persistPractice("not-admitted", "Not admitted practice", PracticeReviewTier.DELIVER);
+            persistPractice("dormant", "Dormant practice", PracticeReviewTier.DELIVER, ScmSignals.PULL_REQUEST_MERGED);
             AgentJob job = persistJob();
             recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.TRIGGERED, null, job.getId());
             insertObservation(reviewed, job);
@@ -196,7 +196,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         @Test
         @WithMentorUser
         void explainsARefusedSignalWithTheActionThatWouldLiftIt() {
-            persistPractice("waiting", "Waiting practice", PracticeReviewTier.ENGAGE);
+            persistPractice("waiting", "Waiting practice", PracticeReviewTier.DELIVER);
             recordSignal(
                 workspace,
                 ScmSignals.PULL_REQUEST_READY,
@@ -220,7 +220,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         @Test
         @WithMentorUser
         void answersNothingForAnArtifactNobodyRecordedAnythingAbout() {
-            persistPractice("waiting", "Waiting practice", PracticeReviewTier.ENGAGE);
+            persistPractice("waiting", "Waiting practice", PracticeReviewTier.DELIVER);
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
                 .expectStatus()

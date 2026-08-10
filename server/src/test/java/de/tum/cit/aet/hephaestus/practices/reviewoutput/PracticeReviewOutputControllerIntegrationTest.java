@@ -124,7 +124,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         practice.setName(name);
         practice.setCriteria("Criteria for " + slug);
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setReviewTier(PracticeReviewTier.ENGAGE);
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         return practiceRepository.save(practice);
     }
 

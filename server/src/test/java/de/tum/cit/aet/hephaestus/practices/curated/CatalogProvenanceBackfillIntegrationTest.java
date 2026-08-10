@@ -194,7 +194,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                     workspace_id, practice_area_id, slug, name, applies_to, display_order, bindings,
                     criteria, automated_review_policy, why_it_matters, source_curated_slug,
                     source_curated_fingerprint, review_tier, created_at
-                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, 'ENGAGE', now())
+                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, 'DELIVER', now())
                 RETURNING id
                 """,
                 Long.class,

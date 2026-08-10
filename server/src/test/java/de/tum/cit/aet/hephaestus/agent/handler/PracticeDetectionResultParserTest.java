@@ -288,12 +288,12 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        void indeterminateIsAcceptedAndKeepsNoDirection() {
+        void inconclusiveIsAcceptedAndKeepsNoDirection() {
             // "We read the evidence and it does not settle this" is a measurement the series must be able
             // to hold. Any assessment the model attaches to it is dropped rather than honoured, so a model
             // that could not decide cannot back-door a strength or a defect into a developer's history.
             ObjectNode finding = validFindingNode();
-            finding.put("presence", "INDETERMINATE");
+            finding.put("presence", "INCONCLUSIVE");
             finding.put("assessment", "GOOD");
             finding.put("severity", "MAJOR");
 
@@ -301,7 +301,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validFindings()).hasSize(1);
             ValidatedFinding parsed = result.validFindings().get(0);
-            assertThat(parsed.presence()).isEqualTo(Presence.INDETERMINATE);
+            assertThat(parsed.presence()).isEqualTo(Presence.INCONCLUSIVE);
             assertThat(parsed.assessment()).isNull();
             assertThat(parsed.coerceCoherence(false, false).severity())
                 .as("severity is an impact band for a defect; an undecided finding has none")

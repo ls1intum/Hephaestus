@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -40,6 +41,8 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -91,7 +94,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         handler = new PullRequestReviewHandler(
             objectMapper,
             cas,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             workspaceContextBuilder,
             taskEnvelopeWriter,
             resultParser,
@@ -119,7 +122,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                workspaceDefaults()
             )
         );
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));
@@ -203,7 +207,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria(criteria);
-        p.setReviewTier(PracticeReviewTier.ENGAGE);
+        p.setReviewTier(PracticeReviewTier.DELIVER);
         p.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
         p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         var revision = new PracticeRevision();
@@ -233,13 +237,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             .when(workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any()))
             .thenAnswer(invocation -> readiness(invocation.getArgument(1)));
         lenient()
-            .when(
-                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    WORKSPACE_ID,
-                    PracticeReviewTier.OFF,
-                    ArtifactKinds.PULL_REQUEST
-                )
-            )
+            .when(practiceRepository.findByWorkspaceIdAndArtifactKind(WORKSPACE_ID, ArtifactKinds.PULL_REQUEST))
             .thenReturn(samplePractices());
     }
 
@@ -323,11 +321,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
             ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
             when(
-                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    WORKSPACE_ID,
-                    PracticeReviewTier.OFF,
-                    ArtifactKinds.PULL_REQUEST
-                )
+                practiceRepository.findByWorkspaceIdAndArtifactKind(WORKSPACE_ID, ArtifactKinds.PULL_REQUEST)
             ).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
@@ -373,11 +367,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void rejectsMalformedSlug() {
             when(
-                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    WORKSPACE_ID,
-                    PracticeReviewTier.OFF,
-                    ArtifactKinds.PULL_REQUEST
-                )
+                practiceRepository.findByWorkspaceIdAndArtifactKind(WORKSPACE_ID, ArtifactKinds.PULL_REQUEST)
             ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
 
             assertThatThrownBy(() -> handler.prepareInputs(jobWithMetadata(sampleJobMetadata())))
@@ -388,11 +378,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenNoActivePractices() {
             when(
-                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    WORKSPACE_ID,
-                    PracticeReviewTier.OFF,
-                    ArtifactKinds.PULL_REQUEST
-                )
+                practiceRepository.findByWorkspaceIdAndArtifactKind(WORKSPACE_ID, ArtifactKinds.PULL_REQUEST)
             ).thenReturn(List.of());
 
             assertThatThrownBy(() -> handler.prepareInputs(jobWithMetadata(sampleJobMetadata())))
@@ -421,11 +407,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
             ).thenAnswer(invocation -> readiness(invocation.getArgument(1)));
             when(
-                practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    WORKSPACE_ID,
-                    PracticeReviewTier.OFF,
-                    ArtifactKinds.PULL_REQUEST
-                )
+                practiceRepository.findByWorkspaceIdAndArtifactKind(WORKSPACE_ID, ArtifactKinds.PULL_REQUEST)
             ).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
@@ -477,7 +459,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             Assessment assessment = switch (presence) {
                 case PRESENT -> Assessment.GOOD;
                 case ABSENT -> Assessment.BAD;
-                case NOT_APPLICABLE, INDETERMINATE -> null;
+                case NOT_APPLICABLE, INCONCLUSIVE -> null;
             };
             return new PracticeDetectionResultParser.ValidatedFinding(
                 "fatal-error-crash",
@@ -787,5 +769,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(delivered.diffNotes()).hasSize(1);
             assertThat(delivered.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-error-handling");
         }
+    }
+
+    /**
+     * Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work — which is what
+     * a workspace that has never configured anything gets, and therefore what these fixtures meant before
+     * the chain existed.
+     */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
+        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return provider;
     }
 }

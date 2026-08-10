@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,6 +28,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -88,7 +91,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             new TaskEnvelopeWriter(objectMapper),
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             new PracticeDetectionResultParser(objectMapper),
             deliveryService,
             commentPoster,
@@ -110,7 +113,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                feedbackLedgerRecorder
+                feedbackLedgerRecorder,
+                workspaceDefaults()
             )
         );
         lenient()
@@ -476,5 +480,16 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
+    }
+
+    /**
+     * Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work — which is what
+     * a workspace that has never configured anything gets, and therefore what these fixtures meant before
+     * the chain existed.
+     */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
+        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return provider;
     }
 }

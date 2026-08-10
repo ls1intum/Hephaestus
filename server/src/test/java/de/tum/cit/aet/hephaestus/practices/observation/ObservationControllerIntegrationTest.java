@@ -100,7 +100,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         practice.setName(name);
         practice.setCriteria("Description for " + slug);
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setReviewTier(PracticeReviewTier.ENGAGE);
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         practice = practiceRepository.saveAndFlush(practice);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
@@ -508,7 +508,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Desc");
             otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-            otherPractice.setReviewTier(PracticeReviewTier.ENGAGE);
+            otherPractice.setReviewTier(PracticeReviewTier.DELIVER);
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();
@@ -1091,7 +1091,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             otherPractice.setName("WS2 Practice");
             otherPractice.setCriteria("Desc");
             otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-            otherPractice.setReviewTier(PracticeReviewTier.ENGAGE);
+            otherPractice.setReviewTier(PracticeReviewTier.DELIVER);
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();

@@ -319,7 +319,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         Assessment assessment = switch (v) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
-            case NOT_APPLICABLE, INDETERMINATE -> null;
+            case NOT_APPLICABLE, INCONCLUSIVE -> null;
         };
         return locusFull(job, key, v, assessment, sev, conf, slug, title);
     }

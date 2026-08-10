@@ -60,7 +60,7 @@ result is good or bad for the developer.
 | `PRESENT` | desired behaviour is present | undesirable behaviour is present |
 | `ABSENT` | undesirable behaviour is absent | desired behaviour is missing |
 
-The two valence-free presences, `NOT_APPLICABLE` and `INDETERMINATE`, carry a null assessment; the
+The two valence-free presences, `NOT_APPLICABLE` and `INCONCLUSIVE`, carry a null assessment; the
 database enforces that pairing. They are not interchangeable — see
 [when each is correct](./practice-review-glossary.mdx#outcome-states). Severity is present only for a
 bad assessment; validation and persistence paths enforce that invariant.
@@ -78,7 +78,7 @@ part we did not fetch". So an `ABSENT` observation carries an `evidence.search` 
 A practice declares the corpus its absences range over by holding a source `EXHAUSTIVE` (see
 [`EvidenceStance`](../../server/src/main/java/de/tum/cit/aet/hephaestus/practices/EvidenceStance.java)).
 Every such source must appear in `consulted`, or delivery rejects the observation — the correct answer
-for a search that could not cover them is `INDETERMINATE`. There is deliberately no second field
+for a search that could not cover them is `INCONCLUSIVE`. There is deliberately no second field
 declaring "may assert absence here": `EXHAUSTIVE` already carries that decision, and a parallel
 vocabulary would let the two contradict each other.
 

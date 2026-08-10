@@ -163,7 +163,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         practice.setName("Practice of " + ws.getWorkspaceSlug());
         practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setReviewTier(PracticeReviewTier.ENGAGE);
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         practice = practiceRepository.save(practice);
 
         AgentJob job = new AgentJob();

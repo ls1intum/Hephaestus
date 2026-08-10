@@ -165,7 +165,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         p.setName(name);
         p.setCriteria("Test " + slug);
         p.setBindings(PracticeTestEvidence.bindings(signals.toArray(SignalName[]::new)));
-        p.setReviewTier(active ? PracticeReviewTier.ENGAGE : PracticeReviewTier.OFF);
+        p.setReviewTier(active ? PracticeReviewTier.DELIVER : PracticeReviewTier.OFF);
         return practiceRepository.save(p);
     }
 

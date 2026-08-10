@@ -57,7 +57,7 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
         practice.setName("Review quality");
         practice.setCriteria("Review the change");
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setReviewTier(PracticeReviewTier.ENGAGE);
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         practice = practiceRepository.save(practice);
 
         AgentJob referenced = oldTerminalJob(workspace);

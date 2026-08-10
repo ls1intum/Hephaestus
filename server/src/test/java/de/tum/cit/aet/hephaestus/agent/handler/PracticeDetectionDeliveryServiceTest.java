@@ -212,7 +212,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         Assessment assessment = switch (presence) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
-            case NOT_APPLICABLE, INDETERMINATE -> null;
+            case NOT_APPLICABLE, INCONCLUSIVE -> null;
         };
         ObjectNode evidence = objectMapper.createObjectNode();
         evidence
@@ -231,6 +231,14 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             search.putArray("consulted").add("scm.pull-request.diff");
             search.put("lookedFor", "a described rationale for the change");
             search.put("boundary", "the diff of this pull request only");
+        }
+        // A NOT_APPLICABLE observation asserts something about the work too — that this practice has no
+        // subject in it — so delivery requires it to name what the practice looks for and what rules it out.
+        if (presence == Presence.NOT_APPLICABLE) {
+            ObjectNode inapplicability = evidence.putObject("inapplicability");
+            inapplicability.putArray("consulted").add("scm.pull-request.diff");
+            inapplicability.put("subject", "a described rationale for the change");
+            inapplicability.put("ruledOutBy", "the change is a generated lockfile update with no prose to judge");
         }
         return new ValidatedFinding(
             slug,
@@ -573,6 +581,72 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var result = service.deliver(testJob, List.of(finding));
 
             assertThat(result.inserted()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("a NOT_APPLICABLE observation with no stated ground is refused")
+        void rejectsAnUnjustifiedNotApplicable() {
+            // The server repeats the sandbox's rule because the sandbox normalizer runs inside the thing it
+            // is checking: a crashed runner, an older image or a rescued text payload all reach delivery
+            // without it having run.
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.NOT_APPLICABLE);
+            ((ObjectNode) finding.evidence()).remove("inapplicability");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("must name what the practice looks for")
+                // The refusal names the answer it is asking for. Without that it would just teach a model
+                // to invent a ground, which is the failure this rule exists to prevent.
+                .hasMessageContaining("INCONCLUSIVE");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("a stated inapplicability missing any of its three parts is refused")
+        void rejectsAnIncompleteInapplicability() {
+            for (String field : new String[] { "consulted", "subject", "ruledOutBy" }) {
+                ValidatedFinding finding = validFinding("pr-description-quality", Presence.NOT_APPLICABLE);
+                ((ObjectNode) finding.evidence().get("inapplicability")).remove(field);
+
+                assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                    .as("a NOT_APPLICABLE observation missing inapplicability.%s", field)
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("must name what the practice looks for");
+            }
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("a stated inapplicability claiming a source this run never staged is refused")
+        void rejectsAnInapplicabilityOutsideTheBoundary() {
+            ValidatedFinding finding = validFinding("pr-description-quality", Presence.NOT_APPLICABLE);
+            ObjectNode inapplicability = (ObjectNode) finding.evidence().get("inapplicability");
+            inapplicability.putArray("consulted").add("scm.repository.tree");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("claims a source this run did not stage");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("a ground is asked of NOT_APPLICABLE alone — INCONCLUSIVE claims nothing about the work")
+        void doesNotAskForAGroundOnOtherPresences() {
+            // INCONCLUSIVE is the answer this rule pushes work towards, so demanding a ground from it too
+            // would close the exit and send everything back to the unjustified NOT_APPLICABLE we started at.
+            for (Presence presence : Presence.values()) {
+                if (presence == Presence.NOT_APPLICABLE) {
+                    continue;
+                }
+                ValidatedFinding finding = validFinding("pr-description-quality", presence);
+                assertThat(finding.evidence().get("inapplicability"))
+                    .as("%s carries no stated inapplicability", presence)
+                    .isNull();
+
+                assertThatCode(() -> service.deliver(testJob, List.of(finding)))
+                    .as("%s is delivered without a stated inapplicability", presence)
+                    .doesNotThrowAnyException();
+            }
         }
 
         @Test

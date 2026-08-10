@@ -17,7 +17,7 @@ flowchart TB
     Occasion -->|yes| Capture{Capture: can we look?}
     Capture -->|no| Unready[agent_job.review_readiness]
     Capture -->|yes| Observe{Observation: what do we see?}
-    Observe -->|cannot tell| Indeterminate[observation.presence INDETERMINATE]
+    Observe -->|cannot tell| Inconclusive[observation.presence INCONCLUSIVE]
     Observe -->|a claim| Deliver{Delivery: do we say it?}
     Deliver -->|no| Quiet[feedback.suppression_reason]
     Deliver -->|yes| Said[A comment on the work, or a mentor turn]
@@ -42,7 +42,7 @@ interchangeable.**
 | --- | --- | --- | --- |
 | Occasion | `SignalStateReason` | `artifact_signal.state_reason` | We chose not to look, or not yet |
 | Capture | `SourceAbsenceReason` per source, `SourceReadinessReason` per practice check | `agent_job.evidence_snapshot` (the manifest), `agent_job.review_readiness` | We could not look |
-| Observation | `Presence.INDETERMINATE` | `observation.presence` | We looked and could not tell |
+| Observation | `Presence.INCONCLUSIVE` | `observation.presence` | We looked and could not tell |
 | Delivery | `FeedbackSuppressionReason` | `feedback.suppression_reason` | We know, and chose to stay quiet |
 
 The four are not ranked and do not substitute for one another. "We could not look" is deliberately not
@@ -103,7 +103,7 @@ artifact changing.
 | `PRACTICES_DISABLED` | An admin starts practice reviews |
 | `NO_ACTIVE_PRACTICE` | A practice covering this kind of work is installed |
 | `REVIEW_MODEL_UNBOUND` | An admin binds a model for practice review |
-| `PRACTICE_TIER_OFF` | An admin raises a watching practice above `OFF` |
+| `PRACTICE_TIER_OFF` | An admin raises a watching practice above `OFF` — at the practice, its area, or the workspace default |
 | `BUDGET_EXHAUSTED` | The cap is raised, or the month rolls over |
 | `SUBJECT_UNLINKED` | The author links a Hephaestus account |
 | `MODEL_UNAVAILABLE` | The bound model or its connection becomes usable |
@@ -169,14 +169,22 @@ carries one entry per staged file and a TOASTed `jsonb` has no partial read.
 ## Observation
 
 An observation is one practice's answer about one piece of work, written once and immutable. It carries a
-`Presence` — `PRESENT`, `ABSENT`, `NOT_APPLICABLE` or `INDETERMINATE` — and, only when the presence carries
-valence, an assessment. `PracticeDetectionResultParser` force-nulls the assessment on an `INDETERMINATE`
+`Presence` — `PRESENT`, `ABSENT`, `NOT_APPLICABLE` or `INCONCLUSIVE` — and, only when the presence carries
+valence, an assessment. `PracticeDetectionResultParser` force-nulls the assessment on an `INCONCLUSIVE`
 finding, so a detector that hedges and still attaches a strength cannot slip an unearned one into the
 series.
 
-`INDETERMINATE` means the evidence the practice needs *was* present and *was* read and does not settle the
+`INCONCLUSIVE` means the evidence the practice needs *was* present and *was* read and does not settle the
 question. It is not "we could not look" — a missing, errored or governance-blocked source produces a
 readiness decision and **no observation at all**.
+
+The two valence-free presences are held to different costs on purpose. `NOT_APPLICABLE` is a claim about the
+work, so it must carry `evidence.inapplicability`: the sources read, what the practice looks for, and the
+fact about *this* change that rules it out. Without that it was the cheapest answer available — its citation
+proves nothing, unlike `PRESENT`'s — and uncertainty drained into it, which writes "nothing to see" into a
+person's record on a change where there was something to see. The rule is enforced twice, in the in-sandbox
+normalizer and again at server-side delivery, for the same reason the citation and recorded-search rules are:
+the sandbox guard runs inside the thing it is checking.
 
 Identity is assigned at persistence, not by the detector: an occurrence key dedupes within a run
 (`insertIfAbsent`, `ON CONFLICT DO NOTHING`), and a recurrence key hashes the locus so the same finding is
@@ -196,11 +204,17 @@ Delivery turns admitted findings into a message and records what happened to it,
 sent. A withheld finding is written to the ledger as `SUPPRESSED` with a reason rather than dropped, so "we
 saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation.
 
-Two gates decide admission, and they are ANDed:
+Three gates decide admission, and they are ANDed. `FeedbackAdmission.delivers(origin, tier, reach, channel)`
+is the single place they meet, so a new channel, tier, reach or origin has one place to be reasoned about:
 
-- **`PracticeReviewTier`** — the workspace's per-practice loudness: `OFF`, `MEASURE`, `COACH`, `ENGAGE`.
-  `IN_CONTEXT` needs `ENGAGE`; `CONVERSATION` needs `COACH` or `ENGAGE`. Withheld here means
-  `PRACTICE_TIER_QUIET`.
+- **`PracticeReviewTier`** — how much autonomy the system has over this practice: `OFF`, `OBSERVE`,
+  `PROPOSE`, `DELIVER`. Only `DELIVER` delivers without a person approving it. The tier is the
+  **effective** one, resolved practice → area → workspace, because either of the first two levels may hold
+  no opinion. Withheld here means `PRACTICE_TIER_QUIET`.
+- **`FeedbackReach`** — where this workspace lets feedback go at all: `CONVERSATION`, or `ON_THE_WORK`
+  which adds the artifact. One setting per workspace, not per practice. Withheld here also means
+  `PRACTICE_TIER_QUIET` — from the recipient's side it is the same fact, that the workspace chose to stay
+  quiet here.
 - **`ObservationOrigin`** — `LIVE` and `MANUAL` deliver everywhere; `BACKFILL` is entitled only to
   `PROFILE`. Withheld here means `BACKFILL_QUIET`.
 
@@ -299,10 +313,10 @@ workspace:
   `DORMANT`, `LAPSED`, and so on.
 - **`observationCount`, `deliveredCount` and `withheldReasons` are about the intervention.**
 
-So a practice at `MEASURE` is `REVIEWED` with `deliveredCount = 0` and `PRACTICE_TIER_QUIET` in
+So a practice at `OBSERVE` is `REVIEWED` with `deliveredCount = 0` and `PRACTICE_TIER_QUIET` in
 `withheldReasons` — measured, and deliberately quiet. `TURNED_OFF` is the workspace's own choice and is
 checked *before* any mechanical reason, so it never masks one. It is not called `SILENCED`: silence is what
-`MEASURE` does, and `PRACTICE_TIER_QUIET` already covers it.
+`OBSERVE` does, and `PRACTICE_TIER_QUIET` already covers it.
 
 Operator-facing guidance for reading the same screen is on
 [Practice review](/admin/practice-review); the vocabulary both pages use is defined in the

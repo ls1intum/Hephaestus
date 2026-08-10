@@ -39,7 +39,9 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Source-use purpose** | Why Hephaestus processes evidence, such as automated review or feedback delivery. | audience, recipient |
 | **Audience / recipient** | Who may receive or inspect evidence. | purpose |
 | **Review readiness** | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks. | validation, activation |
-| **Loudness tier** | How far one practice's result is allowed to travel in one workspace: `OFF`, `MEASURE`, `COACH`, or `ENGAGE`. | used in new reviews, enabled, detectable |
+| **Autonomy tier** | How much the system may do on its own about one practice: `OFF`, `OBSERVE`, `PROPOSE`, or `DELIVER`. Nullable at the practice and area levels, where null means "inherit". | loudness tier, used in new reviews, enabled, detectable |
+| **Feedback reach** | Where a workspace lets feedback go at all: `CONVERSATION` or `ON_THE_WORK`. One decision per workspace, ANDed with every tier. | loudness, channel setting |
+| **Effective tier** | The tier in force after resolving practice → area → workspace. Always server-resolved, always reported with the level it came from. | tier |
 | **Review scope** | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories. | filter, path filter, include pattern |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
@@ -95,37 +97,94 @@ reader infer them:
 every behavioural read. A `BACKFILL` observation is additionally entitled only to `PROFILE`, a channel with
 no producer, so it is measured and never delivered.
 
-## Loudness tiers
+## Autonomy tiers
 
-`PracticeReviewTier` is the workspace's answer to "how loud may this practice be" — a question a boolean
-cannot answer, because measuring and intervening are separate decisions. Each tier adds to the one before it.
+`PracticeReviewTier` is the answer to "how much may the system do on its own about this practice" — a
+question a boolean cannot answer, because measuring and intervening are separate decisions. Each tier adds
+to the one before it.
 
-| Tier | Review runs | Observation recorded | Mentor conversation | On the artifact |
+| Tier | Review runs | Observation recorded | Feedback prepared | Feedback delivered |
 | --- | --- | --- | --- | --- |
 | `OFF` | no | no | no | no |
-| `MEASURE` | yes | yes | no | no |
-| `COACH` | yes | yes | yes | no |
-| `ENGAGE` | yes | yes | yes | yes |
+| `OBSERVE` | yes | yes | no | no |
+| `PROPOSE` | yes | yes | yes | only once a human approves |
+| `DELIVER` | yes | yes | yes | yes, without asking |
 
-Only `OFF` stops the review. `MEASURE` and `COACH` run it and record every observation exactly as `ENGAGE`
-does; they differ only in how far the result travels. That is the point of the tier: turning a noisy
-practice down does not put a hole in the behaviour series. `ENGAGE` is the default and the tier a workspace
-that never touches the setting stays at.
+Only `OFF` stops the review. `OBSERVE` runs it and records every observation exactly as `DELIVER` does; they
+differ only in what the system may do next. That is the point of the tier: turning a noisy practice down
+does not put a hole in the behaviour series. `DELIVER` is what a practice, area or workspace that has
+expressed no opinion resolves to.
 
-**`COACH` means the mentor conversation, and nothing else.** The channel vocabulary
-(`FeedbackChannel`) declares `IN_CONTEXT`, `CONVERSATION`, and `PROFILE`, but nothing in the application
-writes a `PROFILE` unit — there is no producer. Do not describe `COACH` as reaching a profile or
-reflection surface. Should a producer appear, `PROFILE` joins `COACH` alongside `CONVERSATION` without
-the tier's meaning changing.
+**The tier is autonomy, not reach.** It says how far the system may act alone. *Where* feedback may go is a
+separate, workspace-level decision — see [Feedback reach](#feedback-reach). The two were once one ladder,
+which did not order: a mentor chat is not obviously quieter or louder than one review comment, so the
+boundary between the two middle tiers was unpickable. Autonomy does order, and it is the adoption ladder a
+team actually walks.
+
+**`PROPOSE` is declared and not selectable.** It is in the enum and in the DB CHECK so the ladder reads
+whole and so the value is representable the day the approval queue ships, but every write boundary —
+practice, area and workspace — refuses it with a reason naming the missing queue. A practice parked there
+would prepare feedback nobody can approve and swallow it, which is worse than not offering the tier. Do not
+reuse `FeedbackDeliveryState.PREPARED` for that queue when it is built: that state is an auto-advancing
+mentor-conversation slot with a 14-day TTL, flipped to `DELIVERED` by the next chat turn that links the
+finding, so parking approvals there would deliver them without anybody approving anything.
 
 A finding withheld by a tier is written to the feedback ledger as `SUPPRESSED` with reason
 `PRACTICE_TIER_QUIET` rather than dropped, so "we saw it and chose to stay quiet" reads differently from
 "we missed it" in every later evaluation.
 
-Setting the tier is `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier` with body
-`{"reviewTier": "MEASURE"}`. The catalog list endpoint filters on `?reviewTier=<TIER>`. A practice whose
-automated-review policy cannot attempt a review — any mode/sufficiency pair other than `LANGUAGE_MODEL`
-with `SUFFICIENT_WHEN_REQUIREMENTS_MET` — is forced to `OFF` when it is created or edited.
+## Tier inheritance
+
+A tier is never read raw. `practice.review_tier` and `practice_area.review_tier` are both **nullable**, and
+null means "this level holds no opinion":
+
+```
+effective tier = practice.review_tier ?? area.review_tier ?? workspace default ?? DELIVER
+```
+
+`ReviewTierResolver` is the only implementation of that chain, and resolution is always server-side — a
+client that resolved it would be a second implementation, drifting on the first change. Nothing pushes the
+chain into SQL either, for the same reason.
+
+Null exists because a NOT NULL column cannot say "I have not decided", so every practice shipped holding an
+opinion nobody expressed and turning the system down meant editing every row. Every API that reports a tier
+therefore reports four things: the effective tier, the raw override (null = inheriting), the level that
+decided it (`ReviewTierSource`: `PRACTICE`, `AREA`, `WORKSPACE`), and an `inherited` flag.
+
+Setting a tier is `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier` or
+`PATCH /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier`, both with body
+`{"reviewTier": "OBSERVE"}` — or `{"reviewTier": null}` to clear the override back to inherit. Clearing has
+to be expressible or the chain is write-once. `GET /workspaces/{workspaceSlug}/practices/review-tiers`
+returns the per-area and per-workspace counts. The catalog list endpoint's `?reviewTier=<TIER>` filters on
+the **effective** tier, which is the only tier visible on the screen doing the filtering.
+
+A practice whose automated-review policy cannot attempt a review — any mode/sufficiency pair other than
+`LANGUAGE_MODEL` with `SUFFICIENT_WHEN_REQUIREMENTS_MET` — is written to `OFF` explicitly when it is created
+or edited, and cannot be set to (or left inheriting) any tier that resolves above `OFF`. That is a fact
+about the practice rather than a preference, which is why it is stored rather than inherited.
+
+## Feedback reach {#feedback-reach}
+
+`FeedbackReach` is the workspace's answer to "where may feedback go at all": `CONVERSATION` (the recipient's
+mentor conversation and nowhere else) or `ON_THE_WORK` (also pull-request summaries, inline notes and issue
+comments). Unset resolves to `ON_THE_WORK`.
+
+One decision per workspace, not per practice. Reach multiplied by tier per practice is two hundred decisions
+at a hundred practices, which is why nobody made any of them and the shipped default was the only setting
+that ever ran. Reach is a statement about how a team uses the system, and one statement is enough.
+
+Reach is **ANDed** with the resolved tier at every delivery site, so it can only ever silence a channel, never
+make a quiet practice speak. `FeedbackAdmission.delivers(origin, tier, reach, channel)` is the single
+conjunction point; both delivery paths ask it rather than comparing constants themselves.
+
+Nothing in the application writes a `PROFILE` unit — there is no producer — so `FeedbackReach.reaches(PROFILE)`
+is false at every reach, pinned by `ProfileChannelUnwrittenArchTest`. Do not describe any reach as touching a
+profile or reflection surface.
+
+Reach lives with the other per-workspace review policy: `GET`/`PATCH
+/workspaces/{workspaceSlug}/practices/review-settings`, alongside the workspace default tier. Both are
+reported as an effective value plus a raw override, and both are cleared by naming `FEEDBACK_REACH` or
+`DEFAULT_REVIEW_TIER` in the PATCH `reset` set.
 
 ## Review scope
 
@@ -189,7 +248,11 @@ without the artifact changing.
 | Source-use purpose | `purpose` | `SourceUsePurpose` | source-use decisions |
 | Source absence state | `supportedAbsenceStates` | `SourceAbsenceState` | source catalog |
 | Materialization | `artifacts` | `SourceArtifact` | manifest and content-addressed storage metadata |
-| Loudness tier | `reviewTier` | `Practice.reviewTier` | `review_tier` |
+| Autonomy tier | `reviewTier` | `PracticeReviewTier` | `practice.review_tier`, `practice_area.review_tier` (both nullable) |
+| Effective tier | `reviewTier.effective` | `EffectiveReviewTier` | resolved, never stored |
+| Tier source | `reviewTier.source` | `ReviewTierSource` | resolved, never stored |
+| Workspace default tier | `defaultReviewTier` | `PracticeReviewTier` | `workspace.practice_default_review_tier` |
+| Feedback reach | `feedbackReach` | `FeedbackReach` | `workspace.practice_feedback_reach` |
 | Review scope | `reviewScope` | `WorkspaceReviewScope` | `workspace.practice_review_scope` |
 | Feedback channel | `channel` | `FeedbackChannel` | `feedback.channel` |
 | Feedback suppression reason | `suppressionReason` | `FeedbackSuppressionReason` | `feedback.suppression_reason` |
@@ -219,28 +282,38 @@ Two distinctions carry the whole weight of reading the observation table as beha
 | Outcome | Meaning | Where it lands |
 | --- | --- | --- |
 | `Presence.NOT_APPLICABLE` | The practice has no subject in this work. | An observation. |
-| `Presence.INDETERMINATE` | The evidence was present and read, and it does not settle the question either way. | An observation. |
+| `Presence.INCONCLUSIVE` | The evidence was present and read, and it does not settle the question either way. | An observation. |
 | A readiness refusal | We could not look: a source was missing, incomplete, empty where content was required, or governance-blocked. | `AutomatedReviewReadinessDecision` on the review. **No observation at all.** |
 
-`INDETERMINATE` is what a detector must say when it cannot decide. Saying `NOT_APPLICABLE` instead
+`INCONCLUSIVE` is what a detector must say when it cannot decide. Saying `NOT_APPLICABLE` instead
 launders the detector's own uncertainty into a claim about the developer, which then enters the behaviour
 series as "nothing to see". A refusal is a fact about the instrument, is deliberately not representable as
 a `Presence` value, and is what lets the whole observation table be read as behaviour.
+
+**`NOT_APPLICABLE` must state its ground.** It is the only presence whose citation proves nothing — any
+quote from the change is equally consistent with the practice applying — so it was the cheapest answer
+available and uncertainty drained into it. A `NOT_APPLICABLE` observation therefore carries
+`evidence.inapplicability`: `consulted` (source kinds read, each of which this run must have staged),
+`subject` (what the practice looks for) and `ruledOutBy` (the fact about *this* work that means the subject
+cannot occur). Enforced at both boundaries the citation and recorded-search rules already use — the
+in-sandbox normalizer and the server-side delivery gate — because a guard the constrained party can skip is
+advice, not a boundary. A detector that cannot name a `ruledOutBy` has not found an inapplicable practice;
+it has found one it could not call, and the answer is `INCONCLUSIVE`.
 
 ## Lifecycle
 
 1. A practice author chooses **AI-supported mentoring**, **Human review needed**, or **Guidance only**.
 2. For AI-supported mentoring, recommended evidence is applied automatically per binding; an author customizes it only when that occasion needs different evidence or limitations.
-3. Only AI-supported mentoring can be reviewed. The other choices force the loudness tier to `OFF` and never start an automated review.
+3. Only AI-supported mentoring can be reviewed. The other choices force the autonomy tier to `OFF` and never start an automated review.
 4. An instance operator authorizes each source and product use through a reviewed governance decision.
 5. A workspace integration makes authorized sources available.
-6. A workspace administrator sets each practice's loudness tier and, optionally, the workspace review scope.
+6. A workspace administrator sets the workspace default tier and its feedback reach, then overrides per area or per practice only where the default is wrong. Optionally they also set the workspace review scope.
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
 10. Observations retain the exact practice revision, source contract, and evidence provenance.
 11. Practice or source-contract changes can mark earlier claims stale.
-12. Automated review validation remains separate from source authorization, loudness tier, and per-run readiness.
+12. Automated review validation remains separate from source authorization, autonomy tier, feedback reach, and per-run readiness.
 
 ## Writing rules
 
@@ -250,7 +323,7 @@ a `Presence` value, and is what lets the whole observation table be read as beha
 4. Put stable reason codes in machine fields and plain explanations in UI messages.
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
-7. Say what a tier reaches, never more: `COACH` reaches the mentor conversation, not a profile.
+7. Say what a tier does, never where it reaches: a tier is autonomy, reach is a separate workspace setting. Neither reaches a profile.
 8. Never write bare **binding**. Two unrelated things carry the word — a *practice binding* (an occasion
    a practice is reviewed on, `PracticeBinding`) and a *model binding* (a workspace's AI model for a
    purpose, `WorkspaceAgentBinding`) — and they send an operator to different screens. A reason code,

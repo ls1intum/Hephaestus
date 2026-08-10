@@ -26,6 +26,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.review.DormantBinding;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeSignalCoverage;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
@@ -118,7 +120,8 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         PracticeSignalCoverage practiceCoverage = new PracticeSignalCoverage(
             splitCoverage(),
             new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
-            repository
+            repository,
+            workspaceDefaults()
         );
 
         assertThat(practiceCoverage.dormantBindings(WORKSPACE_ID)).isEmpty();
@@ -207,8 +210,19 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         return new PracticeSignalCoverage(
             coverage(connected),
             new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
-            repository
+            repository,
+            workspaceDefaults()
         );
+    }
+
+    /**
+     * A workspace that has expressed no opinion, so the fixture practices inherit the vocabulary's default
+     * and stay admitted to review — the state in which dormancy is the only thing that can silence them.
+     */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider defaults = mock(WorkspaceReviewDefaultsProvider.class);
+        when(defaults.forWorkspace(WORKSPACE_ID)).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return defaults;
     }
 
     private static Practice practiceBoundTo(SignalName... signals) {

@@ -44,10 +44,12 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.Convert;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -125,15 +127,12 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.getFeatures().setPracticesEnabled(true);
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
+        // One pull-request practice that says nothing about its own tier, so it inherits the workspace's —
+        // and the workspace has expressed no opinion either, so the chain bottoms out at DELIVER, which
+        // admits a review. The tier is no longer filtered in SQL; the service resolves these rows itself.
         lenient()
-            .when(
-                practiceRepository.existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    anyLong(),
-                    eq(PracticeReviewTier.OFF),
-                    any()
-                )
-            )
-            .thenReturn(true);
+            .when(practiceRepository.findReviewTierRows(anyLong()))
+            .thenReturn(List.of(tierRow(null, ArtifactKinds.PULL_REQUEST)));
 
         enabledBinding = new WorkspaceAgentBinding();
         enabledBinding.setId(10L);
@@ -165,6 +164,37 @@ class AgentJobServiceTest extends BaseUnitTest {
         lenient()
             .when(llmModelResolver.connectionRef(any()))
             .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 99L, null, null));
+    }
+
+    /**
+     * One row of {@link PracticeRepository#findReviewTierRows} — a practice's raw tier column and its
+     * area's, ungrouped here so the chain runs practice → workspace.
+     */
+    private static PracticeRepository.PracticeTierRow tierRow(
+        @Nullable PracticeReviewTier practiceTier,
+        ArtifactKind artifactKind
+    ) {
+        return new PracticeRepository.PracticeTierRow() {
+            @Override
+            public PracticeReviewTier getPracticeTier() {
+                return practiceTier;
+            }
+
+            @Override
+            public PracticeReviewTier getAreaTier() {
+                return null;
+            }
+
+            @Override
+            public Long getAreaId() {
+                return null;
+            }
+
+            @Override
+            public ArtifactKind getArtifactKind() {
+                return artifactKind;
+            }
+        };
     }
 
     private JobSubmission createSubmission() {
@@ -266,13 +296,12 @@ class AgentJobServiceTest extends BaseUnitTest {
         @Test
         void shouldNotSubmitWithoutAnActivePracticeForTheReviewedWork() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(
-                practiceRepository.existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    1L,
-                    PracticeReviewTier.OFF,
-                    ArtifactKinds.CONVERSATION_THREAD
-                )
-            ).thenReturn(false);
+            // The workspace has a conversation practice, and it is switched OFF — the case that has to read
+            // differently from "nothing is bound to this work at all", and the reason the tier survives to
+            // the JVM instead of being filtered away in SQL.
+            when(practiceRepository.findReviewTierRows(1L)).thenReturn(
+                List.of(tierRow(PracticeReviewTier.OFF, ArtifactKinds.CONVERSATION_THREAD))
+            );
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.CONVERSATION_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());

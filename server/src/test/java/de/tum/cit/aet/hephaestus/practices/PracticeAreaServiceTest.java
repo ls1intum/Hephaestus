@@ -110,7 +110,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         assertThat(entry.workspaceId()).isEqualTo(1L);
         assertThat(entry.before()).isNull();
         assertThat(entry.after()).isEqualTo(
-            new PracticeAreaSnapshot("review-comms", "Review communication", null, true, null, null)
+            new PracticeAreaSnapshot("review-comms", "Review communication", null, true, null, null, null)
         );
     }
 
@@ -172,8 +172,8 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
         ConfigAuditEntry entry = capturedAuditEntry();
         assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_AREA);
-        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("guidance", "Old", null, true, null, null));
-        assertThat(entry.after()).isEqualTo(new PracticeAreaSnapshot("guidance", "New", null, false, null, null));
+        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("guidance", "Old", null, true, null, null, null));
+        assertThat(entry.after()).isEqualTo(new PracticeAreaSnapshot("guidance", "New", null, false, null, null, null));
     }
 
     @Test
@@ -301,7 +301,9 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
         ConfigAuditEntry entry = capturedAuditEntry();
         assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_AREA);
-        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("deleted", "Deleted", null, true, null, null));
+        assertThat(entry.before()).isEqualTo(
+            new PracticeAreaSnapshot("deleted", "Deleted", null, true, null, null, null)
+        );
         assertThat(entry.after()).isNull();
     }
 

@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +14,8 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Nested;
@@ -48,7 +52,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         return new PullRequestReviewHandler(
             objectMapper,
             cas,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             workspaceContextBuilder,
             envelopeWriter,
             parser,
@@ -59,7 +63,8 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                workspaceDefaults()
             )
         );
     }
@@ -71,7 +76,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             parser,
             deliveryService,
             commentPoster,
@@ -83,7 +88,8 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                workspaceDefaults()
             )
         );
     }
@@ -95,7 +101,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             parser,
             deliveryService,
             org.mockito.Mockito.mock(ApplicationEventPublisher.class),
@@ -110,7 +116,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             parser,
             deliveryService
         );
@@ -172,5 +178,16 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             var registry = fullRegistry();
             assertThatThrownBy(() -> registry.getHandler(null)).isInstanceOf(NullPointerException.class);
         }
+    }
+
+    /**
+     * Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work — which is what
+     * a workspace that has never configured anything gets, and therefore what these fixtures meant before
+     * the chain existed.
+     */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
+        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return provider;
     }
 }

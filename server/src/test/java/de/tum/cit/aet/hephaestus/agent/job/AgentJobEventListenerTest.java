@@ -878,7 +878,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Practice practice = new Practice();
             practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-            practice.setReviewTier(PracticeReviewTier.ENGAGE);
+            practice.setReviewTier(PracticeReviewTier.DELIVER);
             when(fixture.practiceRepository().findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
 
             setupCollaborationPR();
@@ -906,7 +906,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             // Practice only matches ReviewSubmitted, not PullRequestCreated
             Practice practice = new Practice();
             practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED));
-            practice.setReviewTier(PracticeReviewTier.ENGAGE);
+            practice.setReviewTier(PracticeReviewTier.DELIVER);
             when(fixture.practiceRepository().findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
 
             setupCollaborationPR();

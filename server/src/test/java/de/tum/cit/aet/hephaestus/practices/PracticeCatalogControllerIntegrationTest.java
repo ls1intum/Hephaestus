@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierSource;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -94,7 +95,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Detect prompt for " + slug);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        practice.setReviewTier(active ? PracticeReviewTier.ENGAGE : PracticeReviewTier.OFF);
+        practice.setReviewTier(active ? PracticeReviewTier.DELIVER : PracticeReviewTier.OFF);
         return practiceRepository.save(practice);
     }
 
@@ -281,7 +282,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?reviewTier=ENGAGE", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?reviewTier=DELIVER", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -340,7 +341,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("target-practice");
             assertThat(result.name()).isEqualTo("Target Practice");
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().inherited()).isFalse();
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for target-practice");
             assertThat(result.createdAt()).isNotNull();
@@ -432,7 +435,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.automatedReviewPolicy()).isEqualTo(
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
             );
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
+            // A new practice states no tier of its own; the tier in force is the workspace's, which is
+            // DELIVER until the workspace says otherwise — the same loudness the old stored default had.
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
+            assertThat(result.reviewTier().inherited()).isTrue();
             assertThat(result.id()).isNotNull();
             assertThat(result.createdAt()).isNotNull();
             assertThat(result.updatedAt()).isNotNull();
@@ -443,7 +451,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             );
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("Practice new-practice");
-            assertThat(persisted.get().getReviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
+            assertThat(persisted.get().getReviewTier()).isNull();
         }
 
         @Test
@@ -479,7 +487,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("minimal-practice");
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().override()).isNull();
             assertThat(result.automatedReviewPolicy()).isEqualTo(
                 evidenceDefaults.policyFor(ArtifactKinds.PULL_REQUEST)
             );
@@ -506,7 +515,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.OFF);
+            // Held on the practice, not inherited: a practice that cannot run a review must stay off
+            // whatever its area or its workspace later decides.
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
         }
 
         @Test
@@ -915,7 +927,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.name()).isEqualTo("Updated Name");
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
             assertThat(result.areaSlug()).isEqualTo("existing-area");
         }
 
@@ -976,7 +988,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
             // The occasion survives — it is where the practice's kind comes from — but a practice
             // nobody automates reads nothing, so the evidence goes with the automation that read it.
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
@@ -1543,7 +1556,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
 
             Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(
                 workspace.getId(),
@@ -1564,7 +1578,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "activate-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.ENGAGE))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1573,7 +1587,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
         }
 
         @Test
@@ -1589,7 +1603,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "no-automated-review")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.ENGAGE))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
                 .exchange()
                 .expectStatus()
                 .isBadRequest();
@@ -1607,7 +1621,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "already-active")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.ENGAGE))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1616,7 +1630,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier()).isEqualTo(PracticeReviewTier.ENGAGE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
         }
 
         @Test
@@ -1654,13 +1668,23 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isForbidden();
         }
 
+        /**
+         * A null tier is the only way back out of an override. Without it the chain would be write-once:
+         * an administrator who set one practice explicitly could never return it to its area's decision.
+         */
         @Test
         @WithAdminUser
-        void shouldReturn400ForNullUsageSetting() {
+        @DisplayName("a null tier clears the practice's own setting and it inherits again")
+        void shouldClearTheOverrideOnNullTier() {
             ensureAdminMembership(workspace);
-            persistPractice("null-active", "Name", true);
+            PracticeArea area = persistArea("area-with-a-tier");
+            area.setReviewTier(PracticeReviewTier.OBSERVE);
+            practiceAreaRepository.save(area);
+            Practice practice = persistPractice("null-active", "Name", true);
+            practice.setArea(area);
+            practiceRepository.save(practice);
 
-            webTestClient
+            PracticeDTO result = webTestClient
                 .patch()
                 .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "null-active")
                 .headers(TestAuthUtils.withCurrentUser())
@@ -1668,7 +1692,52 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .bodyValue("{\"reviewTier\": null}")
                 .exchange()
                 .expectStatus()
+                .isOk()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
+            assertThat(result.reviewTier().inherited()).isTrue();
+            assertThat(
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "null-active")
+                    .orElseThrow()
+                    .getReviewTier()
+            ).isNull();
+        }
+
+        /**
+         * PROPOSE is in the vocabulary and in the DB CHECK, but the approval queue that would let a human
+         * act on a prepared unit does not exist, so a practice parked there would prepare feedback nobody
+         * can approve and swallow it.
+         */
+        @Test
+        @WithAdminUser
+        @DisplayName("returns 400 for a tier that cannot be selected yet")
+        void shouldReturn400ForProposeTier() {
+            ensureAdminMembership(workspace);
+            persistPractice("not-selectable", "Name", true);
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "not-selectable")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
+                .exchange()
+                .expectStatus()
                 .isBadRequest();
+
+            assertThat(
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "not-selectable")
+                    .orElseThrow()
+                    .getReviewTier()
+            ).isEqualTo(PracticeReviewTier.DELIVER);
         }
 
         @Test

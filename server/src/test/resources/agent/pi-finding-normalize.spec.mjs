@@ -12,6 +12,7 @@ const {
     dedupeKeyForFinding,
     validateEvidenceSources,
     validateSearchScope,
+    validateInapplicabilityScope,
 } = await import(MOD);
 
 function baseFinding(overrides = {}) {
@@ -57,7 +58,7 @@ test("mixed-case enums up-case", () => {
 });
 
 test("NOT_APPLICABLE (lowercase) nulls assessment", () => {
-    const out = normalizeFinding(baseFinding({ presence: "not_applicable", assessment: "bad" }));
+    const out = normalizeFinding(notApplicableFinding(goodInapplicability, { presence: "not_applicable", assessment: "bad" }));
     assert.equal(out.presence, "NOT_APPLICABLE");
     assert.equal(out.assessment, undefined);
 });
@@ -149,20 +150,24 @@ test("removed-line citations use old-side coordinates", () => {
     assert.equal(citationMatchesArtifact({ ...citation, side: "NEW" }, diff), false);
 });
 
-// ── INDETERMINATE ────────────────────────────────────────────────────────────
+// ── INCONCLUSIVE ────────────────────────────────────────────────────────────
 // The orchestrator asks for this value in seventeen places. It used to be rejected here, so a model
 // that obeyed got an error back and refiled the observation as NOT_APPLICABLE — writing "nothing to
 // see here" into a person's record on a change where there was something to see.
 
-test("INDETERMINATE is accepted and carries no assessment", () => {
-    const out = normalizeFinding({ ...baseFinding(), presence: "INDETERMINATE", assessment: undefined });
-    assert.equal(out.presence, "INDETERMINATE");
+test("INCONCLUSIVE is accepted and carries no assessment", () => {
+    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined });
+    assert.equal(out.presence, "INCONCLUSIVE");
     assert.equal("assessment" in out, false);
 });
 
 test("an assessment attached to a valence-free presence is dropped, not rejected", () => {
-    for (const presence of ["NOT_APPLICABLE", "INDETERMINATE"]) {
-        const out = normalizeFinding({ ...baseFinding(), presence, assessment: "GOOD" });
+    const finding = (presence) =>
+        presence === "NOT_APPLICABLE"
+            ? notApplicableFinding(goodInapplicability, { assessment: "GOOD" })
+            : { ...baseFinding(), presence, assessment: "GOOD" };
+    for (const presence of ["NOT_APPLICABLE", "INCONCLUSIVE"]) {
+        const out = normalizeFinding(finding(presence));
         assert.equal("assessment" in out, false, `${presence} must not carry an assessment`);
     }
 });
@@ -171,7 +176,7 @@ test("carriesValence agrees with the presence/assessment coupling", () => {
     assert.equal(carriesValence("PRESENT"), true);
     assert.equal(carriesValence("ABSENT"), true);
     assert.equal(carriesValence("NOT_APPLICABLE"), false);
-    assert.equal(carriesValence("INDETERMINATE"), false);
+    assert.equal(carriesValence("INCONCLUSIVE"), false);
     // PRESENT and ABSENT still REQUIRE one.
     assert.throws(() => normalizeFinding({ ...baseFinding(), assessment: undefined }), /invalid assessment/);
 });
@@ -283,4 +288,77 @@ test("the history is never an exhaustive source, so it can never carry an absenc
 
     // Consulting it is fine — it is a place the review genuinely looked.
     assert.doesNotThrow(() => validateSearchScope(finding, new Set(["scm.review-threads"]), staged));
+});
+
+// ── Stated inapplicability ───────────────────────────────────────────────────
+// NOT_APPLICABLE was the one presence that cost nothing to say: PRESENT is warranted by its citation and
+// ABSENT has to record its search, but a citation attached to NOT_APPLICABLE proves nothing about a
+// practice having no subject. So it became where uncertainty drained to — 160 of them in live data against
+// zero of the value that means "I looked and could not tell", a fifth of them phrased in their own
+// reasoning as could-not-tell. Naming the ground is what makes the two answers cost the same.
+
+function notApplicableFinding(inapplicability, overrides = {}) {
+    const base = baseFinding();
+    return {
+        ...base,
+        presence: "NOT_APPLICABLE",
+        assessment: undefined,
+        evidence: {
+            ...base.evidence,
+            ...(inapplicability === undefined ? {} : { inapplicability }),
+        },
+        ...overrides,
+    };
+}
+
+const goodInapplicability = {
+    consulted: ["scm.pull-request.diff"],
+    subject: "error handling around outbound network calls",
+    ruledOutBy: "the change touches only Markdown documentation and makes no network calls",
+};
+
+test("a NOT_APPLICABLE observation must say what rules the practice out", () => {
+    assert.throws(() => normalizeFinding(notApplicableFinding(undefined)), /must say why the practice does not apply/);
+    assert.throws(
+        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, consulted: [] })),
+        /at least one source/,
+    );
+    assert.throws(
+        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, subject: " " })),
+        /subject is required/,
+    );
+    assert.throws(
+        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, ruledOutBy: "" })),
+        /ruledOutBy is required/,
+    );
+
+    const out = normalizeFinding(notApplicableFinding(goodInapplicability));
+    assert.deepEqual(out.evidence.inapplicability.consulted, ["scm.pull-request.diff"]);
+    assert.equal(out.evidence.inapplicability.subject, goodInapplicability.subject);
+});
+
+test("the refusal points at INCONCLUSIVE, because that is the answer it is asking for", () => {
+    // The whole point of the rule: a model that cannot name the ground has not found an inapplicable
+    // practice, it has found one it could not call. If the error did not say so it would just teach the
+    // model to invent a ruledOutBy.
+    assert.throws(() => normalizeFinding(notApplicableFinding(undefined)), /INCONCLUSIVE/);
+    assert.throws(
+        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, ruledOutBy: "" })),
+        /INCONCLUSIVE/,
+    );
+});
+
+test("INCONCLUSIVE needs no inapplicability block — it is not claiming anything about the work", () => {
+    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined });
+    assert.equal("inapplicability" in out.evidence, false);
+});
+
+test("a NOT_APPLICABLE claim may only rest on sources this run staged", () => {
+    const finding = normalizeFinding(notApplicableFinding(goodInapplicability));
+    assert.doesNotThrow(() => validateInapplicabilityScope(finding, new Set(["scm.pull-request.diff"])));
+    assert.throws(() => validateInapplicabilityScope(finding, new Set(["scm.review-threads"])), /was not available/);
+
+    // Every other presence is none of this validator's business.
+    const present = normalizeFinding(baseFinding());
+    assert.doesNotThrow(() => validateInapplicabilityScope(present, new Set()));
 });

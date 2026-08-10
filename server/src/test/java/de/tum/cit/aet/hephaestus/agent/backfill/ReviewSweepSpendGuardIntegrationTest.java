@@ -146,7 +146,7 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         practice.setName("Sweep guard practice");
         practice.setCriteria("Review the pull request");
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_READY));
-        practice.setReviewTier(PracticeReviewTier.ENGAGE);
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         practiceRepository.save(practice);
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("sweep-guard"));

@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
@@ -36,6 +37,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,6 +83,13 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private ObservationVisibilityPolicy visibilityPolicy;
 
+    /**
+     * Only consulted by {@code admit(...)}, which resolves the workspace's defaults before routing. These
+     * cases call {@link FeedbackChannelRouter#route} directly and hand it both values, so nothing stubs it.
+     */
+    @Mock
+    private WorkspaceReviewDefaultsProvider workspaceReviewDefaults;
+
     @BeforeEach
     void authorizeEvidenceDelivery() {
         Observation observation = problem(null, null);
@@ -99,7 +108,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     private FeedbackChannelRouter router() {
-        return new FeedbackChannelRouter(feedbackRepository, observationRepository);
+        return new FeedbackChannelRouter(feedbackRepository, observationRepository, workspaceReviewDefaults);
     }
 
     private ConversationalFeedbackPreparer preparer() {
@@ -191,7 +200,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             }
         };
 
-        assertThat(router().route(obs, PracticeReviewTier.ENGAGE, WS, ctx)).isEqualTo(expected);
+        assertThat(router().route(obs, PracticeReviewTier.DELIVER, FeedbackReach.ON_THE_WORK, WS, ctx)).isEqualTo(
+            expected
+        );
     }
 
     /**
@@ -204,9 +215,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         Observation obs = problem(null, null);
         lenient().when(obs.getOrigin()).thenReturn(ObservationOrigin.BACKFILL);
 
-        assertThat(router().route(obs, PracticeReviewTier.ENGAGE, WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.BACKFILL_QUIET
-        );
+        assertThat(
+            router().route(obs, PracticeReviewTier.DELIVER, FeedbackReach.ON_THE_WORK, WS, RoutingContext.author())
+        ).isEqualTo(ConversationRoutingDecision.BACKFILL_QUIET);
     }
 
     @Test
@@ -406,25 +417,47 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     /**
-     * The loudness tier's conversation half. MEASURE promises silence on every channel, so it must be
-     * refused here — and refused with a NAMED reason, because "the workspace turned this practice down" is
-     * a different answer to "why did nothing happen" than "there was nothing worth raising".
+     * The autonomy tier's conversation half. Only DELIVER may speak without being asked: OBSERVE promises
+     * silence on every channel and PROPOSE waits for an approval that has nowhere to come from yet, so both
+     * must be refused here — and refused with a NAMED reason, because "the workspace turned this practice
+     * down" is a different answer to "why did nothing happen" than "there was nothing worth raising".
      */
     @ParameterizedTest
     @MethodSource("tierRoutingCases")
-    void routerAppliesTheLoudnessTierBeforeAnythingElse(PracticeReviewTier tier, ConversationRoutingDecision expected) {
+    void routerAppliesTheAutonomyTierBeforeAnythingElse(PracticeReviewTier tier, ConversationRoutingDecision expected) {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, tier, WS, RoutingContext.author())).isEqualTo(expected);
+        assertThat(router().route(observation, tier, FeedbackReach.ON_THE_WORK, WS, RoutingContext.author())).isEqualTo(
+            expected
+        );
     }
 
     static Stream<Arguments> tierRoutingCases() {
         return Stream.of(
             arguments(PracticeReviewTier.OFF, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
-            arguments(PracticeReviewTier.MEASURE, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
-            arguments(PracticeReviewTier.COACH, ConversationRoutingDecision.ADMIT),
-            arguments(PracticeReviewTier.ENGAGE, ConversationRoutingDecision.ADMIT)
+            arguments(PracticeReviewTier.OBSERVE, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
+            arguments(PracticeReviewTier.PROPOSE, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
+            arguments(PracticeReviewTier.DELIVER, ConversationRoutingDecision.ADMIT)
         );
+    }
+
+    /**
+     * The reach axis is orthogonal to the tier: a workspace that keeps feedback out of the work still
+     * coaches in the mentor conversation, which is the whole point of narrowing reach rather than turning
+     * practices down. Both reaches therefore admit here.
+     */
+    @ParameterizedTest
+    @MethodSource("reachRoutingCases")
+    void everyReachStillOpensTheMentorConversation(FeedbackReach reach) {
+        Observation observation = problem(null, null);
+
+        assertThat(
+            router().route(observation, PracticeReviewTier.DELIVER, reach, WS, RoutingContext.author())
+        ).isEqualTo(ConversationRoutingDecision.ADMIT);
+    }
+
+    static Stream<Arguments> reachRoutingCases() {
+        return Stream.of(arguments(FeedbackReach.CONVERSATION), arguments(FeedbackReach.ON_THE_WORK));
     }
 
     /**
@@ -435,9 +468,15 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void tierIsAskedBeforeTheReviewerDeferral() {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, PracticeReviewTier.MEASURE, WS, RoutingContext.reviewer())).isEqualTo(
-            ConversationRoutingDecision.PRACTICE_TIER_QUIET
-        );
+        assertThat(
+            router().route(
+                observation,
+                PracticeReviewTier.OBSERVE,
+                FeedbackReach.ON_THE_WORK,
+                WS,
+                RoutingContext.reviewer()
+            )
+        ).isEqualTo(ConversationRoutingDecision.PRACTICE_TIER_QUIET);
     }
 
     /**
@@ -448,7 +487,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void anUnresolvedTierLeavesTheRemainingRulesInCharge() {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, null, WS, RoutingContext.author())).isEqualTo(
+        assertThat(router().route(observation, null, FeedbackReach.ON_THE_WORK, WS, RoutingContext.author())).isEqualTo(
             ConversationRoutingDecision.ADMIT
         );
     }

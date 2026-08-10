@@ -317,7 +317,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     criteria, automated_review_policy, review_tier, created_at
                 ) VALUES (
                     136103, 'missing-current-revision', 'Missing revision', 'scm.pull_request', 3,
-                    '[]'::jsonb, 'criteria', '{}'::jsonb, 'ENGAGE', now()
+                    '[]'::jsonb, 'criteria', '{}'::jsonb, 'DELIVER', now()
                 )
                 """
             )

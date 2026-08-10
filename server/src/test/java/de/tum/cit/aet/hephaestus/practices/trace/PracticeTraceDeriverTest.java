@@ -46,7 +46,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void reportsAPracticeThatProducedObservationsAsReviewed() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, completed()),
                 Map.of(1L, new PracticeOutput(2, 1, List.of(), RUN, AT))
@@ -79,7 +79,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void reportsAnAdmittedPracticeWithNoFindingsAsReviewedRatherThanSilent() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, completed(Map.of("slug", new PracticeReadinessOutcome(true, List.of())))),
                 Map.of()
@@ -91,14 +91,14 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         }
 
         /**
-         * Measured and deliberately quiet is the state loudness tiers exist to express, and it is only
+         * Measured and deliberately quiet is the state the autonomy tiers exist to express, and it is only
          * legible when the two axes stay apart: an outcome about the measurement, counts about the
          * intervention.
          */
         @Test
         void keepsMeasurementAndDeliveryOnSeparateAxes() {
             var entry = only(
-                practice(PracticeReviewTier.MEASURE, READY),
+                practice(PracticeReviewTier.OBSERVE, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, completed()),
                 Map.of(1L, new PracticeOutput(3, 0, List.of(FeedbackSuppressionReason.PRACTICE_TIER_QUIET), RUN, AT))
@@ -118,7 +118,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void rendersARefusedReadinessDecisionAsNotAssessableWithItsBlockers() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(
                     RUN,
@@ -142,7 +142,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void reportsARunRefusedForEvidenceAsNotAssessableEvenWithoutPerPracticeDetail() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, new ReviewOutcome(ReviewRunState.COMPLETED, true, AT, Map.of())),
                 Map.of()
@@ -159,7 +159,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void reportsAPracticeTheRunConsideredOthersInsteadOfAsSkipped() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, completed(Map.of("other", new PracticeReadinessOutcome(true, List.of())))),
                 Map.of()
@@ -173,7 +173,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void saysSoWhenTheRunRecordedNoReadinessAtAll() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, completed()),
                 Map.of()
@@ -191,7 +191,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void turnsARetryableRefusalIntoPendingWithTheActionThatLiftsIt() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(refused(READY, SignalState.PENDING, SignalStateReason.BUDGET_EXHAUSTED)),
                 Map.of(),
                 Map.of()
@@ -208,7 +208,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void turnsATerminalRefusalIntoSkippedWithItsReason() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(refused(READY, SignalState.SUPPRESSED, SignalStateReason.OUT_OF_REVIEW_SCOPE)),
                 Map.of(),
                 Map.of()
@@ -221,7 +221,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void reportsARetiredSignalAsLapsed() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(refused(READY, SignalState.LAPSED, SignalStateReason.PENDING_DEADLINE_EXCEEDED)),
                 Map.of(),
                 Map.of()
@@ -233,7 +233,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void reportsAnUndecidedSignalAsPending() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(new SignalOccurrence(OCCURRENCE, READY, AT, SignalState.RECORDED, null, null)),
                 Map.of(),
                 Map.of()
@@ -245,13 +245,13 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void reportsAnUnfinishedRunAsRunningAndAFailedOneAsFailed() {
             var running = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, new ReviewOutcome(ReviewRunState.IN_PROGRESS, false, null, Map.of())),
                 Map.of()
             );
             var failed = only(
-                practice(PracticeReviewTier.ENGAGE, READY),
+                practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, new ReviewOutcome(ReviewRunState.FAILED, false, AT, Map.of())),
                 Map.of()
@@ -265,7 +265,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void ignoresOccurrencesThePracticeDoesNotWatch() {
             var entry = only(
-                practice(PracticeReviewTier.ENGAGE, MERGED),
+                practice(PracticeReviewTier.DELIVER, MERGED),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, completed()),
                 Map.of()
@@ -298,7 +298,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                 1L,
                 "slug",
                 "A practice",
-                PracticeReviewTier.ENGAGE,
+                PracticeReviewTier.DELIVER,
                 List.of(READY),
                 "no connected integration raises [scm.pull_request.ready]; connect one of [GITHUB]"
             );
@@ -310,7 +310,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
 
         @Test
         void reportsAnUnoccasionedPracticeAsSuch() {
-            var entry = only(practice(PracticeReviewTier.ENGAGE, MERGED), List.of(), Map.of(), Map.of());
+            var entry = only(practice(PracticeReviewTier.DELIVER, MERGED), List.of(), Map.of(), Map.of());
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.NOT_OCCASIONED);
         }
@@ -319,8 +319,8 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
     /** A reader scanning the page must reach the practice that did something before the quiet ones. */
     @Test
     void ordersInformativeAnswersFirst() {
-        var reviewed = new TracedPractice(1L, "b-reviewed", "B", PracticeReviewTier.ENGAGE, List.of(READY), null);
-        var quiet = new TracedPractice(2L, "a-quiet", "A", PracticeReviewTier.ENGAGE, List.of(MERGED), null);
+        var reviewed = new TracedPractice(1L, "b-reviewed", "B", PracticeReviewTier.DELIVER, List.of(READY), null);
+        var quiet = new TracedPractice(2L, "a-quiet", "A", PracticeReviewTier.DELIVER, List.of(MERGED), null);
         var off = new TracedPractice(3L, "c-off", "C", PracticeReviewTier.OFF, List.of(READY), null);
 
         var entries = PracticeTraceDeriver.derive(

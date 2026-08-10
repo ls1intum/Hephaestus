@@ -144,7 +144,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     private Practice createPractice(SignalName... signals) {
         Practice practice = new Practice();
         practice.setBindings(PracticeTestEvidence.bindings(signals));
-        practice.setReviewTier(PracticeReviewTier.ENGAGE);
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         return practice;
     }
 
@@ -156,7 +156,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 new PracticeBinding(List.of(signals), PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST), true)
             )
         );
-        practice.setReviewTier(PracticeReviewTier.ENGAGE);
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         return practice;
     }
 
@@ -799,18 +799,18 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     /**
-     * The loudness tier's admission half. OFF is the only tier that stops a review; MEASURE and COACH are
-     * as reviewed as ENGAGE and differ only in how far the result is allowed to travel, so their signals
-     * must reach the agent exactly like ENGAGE's do.
+     * The autonomy tier's admission half. OFF is the only tier that stops a review; OBSERVE and PROPOSE are
+     * as reviewed as DELIVER and differ only in what may be said about the result, so their signals must
+     * reach the agent exactly like DELIVER's do.
      */
     @Nested
-    class LoudnessTierAdmissionTests {
+    class ReviewTierAdmissionTests {
 
         @Test
-        void detectsWhenTheOnlyBoundPracticeIsMeasuringSilently() {
+        void detectsWhenTheOnlyBoundPracticeIsObservingSilently() {
             PullRequest pr = createPullRequest();
             Practice measured = createPractice(SIGNAL);
-            measured.setReviewTier(PracticeReviewTier.MEASURE);
+            measured.setReviewTier(PracticeReviewTier.OBSERVE);
             Workspace workspace = setupThroughPracticeMatching(pr, measured);
             workspace.getReviewSettings().setRunForAllUsers(true);
 
@@ -821,11 +821,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        void detectsWhenTheOnlyBoundPracticeCoaches() {
+        @DisplayName("a practice waiting on an approver is still reviewed")
+        void detectsWhenTheOnlyBoundPracticeProposes() {
             PullRequest pr = createPullRequest();
-            Practice coached = createPractice(SIGNAL);
-            coached.setReviewTier(PracticeReviewTier.COACH);
-            Workspace workspace = setupThroughPracticeMatching(pr, coached);
+            Practice proposing = createPractice(SIGNAL);
+            proposing.setReviewTier(PracticeReviewTier.PROPOSE);
+            Workspace workspace = setupThroughPracticeMatching(pr, proposing);
             workspace.getReviewSettings().setRunForAllUsers(true);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
@@ -866,17 +867,17 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        void admitsOnlyTheLoudEnoughPracticesWhenTheSignalIsSharedWithAnOffOne() {
+        void admitsOnlyTheReviewablePracticesWhenTheSignalIsSharedWithAnOffOne() {
             PullRequest pr = createPullRequest();
             Practice silenced = createPractice(SIGNAL);
             silenced.setReviewTier(PracticeReviewTier.OFF);
-            Practice engaged = createPractice(SIGNAL);
-            Workspace workspace = setupThroughPracticeMatching(pr, silenced, engaged);
+            Practice delivering = createPractice(SIGNAL);
+            Workspace workspace = setupThroughPracticeMatching(pr, silenced, delivering);
             workspace.getReviewSettings().setRunForAllUsers(true);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
-            assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactly(engaged);
+            assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactly(delivering);
         }
     }
 

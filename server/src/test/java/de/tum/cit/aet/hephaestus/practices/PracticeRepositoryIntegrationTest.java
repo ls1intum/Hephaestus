@@ -2,9 +2,12 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -27,6 +30,9 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
+    private PracticeAreaRepository practiceAreaRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     private Workspace workspace;
@@ -46,6 +52,16 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         practice.setCriteria("Default criteria for " + slug);
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         return practice;
+    }
+
+    private PracticeArea persistArea(String slug, PracticeReviewTier reviewTier, int displayOrder) {
+        PracticeArea area = new PracticeArea();
+        area.setWorkspace(workspace);
+        area.setSlug(slug);
+        area.setName("Area " + slug);
+        area.setReviewTier(reviewTier);
+        area.setDisplayOrder(displayOrder);
+        return practiceAreaRepository.save(area);
     }
 
     @Nested
@@ -121,23 +137,115 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(result).extracting(Practice::getSlug).containsExactlyInAnyOrder("loud", "silent");
         }
 
+        /**
+         * The work-type finder narrows by kind of work and by nothing else.
+         *
+         * <p>Its predecessor pushed {@code review_tier <> 'OFF'} into SQL, which was only ever correct
+         * while the column could not be null: {@code NULL <> 'OFF'} is UNKNOWN, so the moment a practice
+         * was allowed to hold no tier and inherit one, every inheriting practice would have vanished from
+         * the reviewer's catalogue without a single row changing. The tier is resolved in the JVM instead,
+         * so this query has to hand back the silenced and the inheriting ones alike.
+         */
         @Test
-        void reviewTierFilteredQueryExcludesOnlyTheSilencedOnes() {
+        @DisplayName("findByWorkspaceIdAndArtifactKind returns every tier, including the inheriting NULL")
+        void workTypeQueryReturnsEveryTierIncludingTheInheritingOnes() {
             Practice loud = createPractice("loud", "Loud");
-            Practice measured = createPractice("measured", "Measured");
-            measured.setReviewTier(PracticeReviewTier.MEASURE);
+            loud.setReviewTier(PracticeReviewTier.DELIVER);
+            Practice observed = createPractice("observed", "Observed");
+            observed.setReviewTier(PracticeReviewTier.OBSERVE);
             Practice silent = createPractice("silent", "Silent");
             silent.setReviewTier(PracticeReviewTier.OFF);
-            practiceRepository.saveAll(List.of(loud, measured, silent));
+            // Holds no tier of its own: the row the deleted <> 'OFF' predicate silently dropped.
+            Practice inheriting = createPractice("inheriting", "Inheriting");
+            practiceRepository.saveAll(List.of(loud, observed, silent, inheriting));
 
-            List<Practice> result = practiceRepository.findByWorkspaceIdAndReviewTierNotAndArtifactKind(
+            List<Practice> result = practiceRepository.findByWorkspaceIdAndArtifactKind(
                 workspace.getId(),
-                PracticeReviewTier.OFF,
                 loud.getArtifactKind()
             );
 
-            // MEASURE is included: it still runs a review, and the agent needs its criteria to run one.
-            assertThat(result).extracting(Practice::getSlug).containsExactlyInAnyOrder("loud", "measured");
+            assertThat(result)
+                .extracting(Practice::getSlug)
+                .containsExactlyInAnyOrder("loud", "observed", "silent", "inheriting");
+        }
+
+        @Test
+        @DisplayName("findByWorkspaceIdAndArtifactKind keeps out the other kinds of work")
+        void workTypeQueryNarrowsToTheRequestedKind() {
+            Practice pullRequest = createPractice("on-pull-requests", "On pull requests");
+            Practice issue = createPractice("on-issues", "On issues");
+            issue.setBindings(PracticeTestEvidence.bindings(ScmSignals.ISSUE_OPENED));
+            issue.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE));
+            practiceRepository.saveAll(List.of(pullRequest, issue));
+
+            List<Practice> result = practiceRepository.findByWorkspaceIdAndArtifactKind(
+                workspace.getId(),
+                ArtifactKinds.PULL_REQUEST
+            );
+
+            assertThat(result).extracting(Practice::getSlug).containsExactly("on-pull-requests");
+        }
+
+        /**
+         * The tier rows are what the rollup and the "is anything switched on here" check read instead of
+         * hydrating the catalogue. They carry both levels of the chain raw — a null means "this level
+         * decided nothing", which the resolver needs in order to fall through to the next one, so a
+         * projection that turned it into a value would resolve the chain wrongly and silently.
+         */
+        @Test
+        @DisplayName("findReviewTierRows carries the practice's tier and its area's, nulls kept as nulls")
+        void reviewTierRowsCarryBothLevelsAndKeepTheirNulls() {
+            PracticeArea silencedArea = persistArea("silenced-area", PracticeReviewTier.OFF, 0);
+            PracticeArea undecidedArea = persistArea("undecided-area", null, 1);
+            Practice ownTier = createPractice("own-tier", "Own tier");
+            ownTier.setReviewTier(PracticeReviewTier.OBSERVE);
+            ownTier.setArea(silencedArea);
+            Practice fromArea = createPractice("from-area", "From area");
+            fromArea.setArea(silencedArea);
+            Practice fromWorkspace = createPractice("from-workspace", "From workspace");
+            fromWorkspace.setArea(undecidedArea);
+            Practice unfiled = createPractice("unfiled", "Unfiled");
+            practiceRepository.saveAll(List.of(ownTier, fromArea, fromWorkspace, unfiled));
+
+            List<PracticeRepository.PracticeTierRow> rows = practiceRepository.findReviewTierRows(workspace.getId());
+
+            assertThat(rows)
+                .extracting(
+                    PracticeRepository.PracticeTierRow::getPracticeTier,
+                    PracticeRepository.PracticeTierRow::getAreaTier,
+                    PracticeRepository.PracticeTierRow::getAreaId,
+                    PracticeRepository.PracticeTierRow::getArtifactKind
+                )
+                .containsExactlyInAnyOrder(
+                    tuple(
+                        PracticeReviewTier.OBSERVE,
+                        PracticeReviewTier.OFF,
+                        silencedArea.getId(),
+                        ArtifactKinds.PULL_REQUEST
+                    ),
+                    tuple(null, PracticeReviewTier.OFF, silencedArea.getId(), ArtifactKinds.PULL_REQUEST),
+                    tuple(null, null, undecidedArea.getId(), ArtifactKinds.PULL_REQUEST),
+                    // No area at all: the chain falls straight through to the workspace.
+                    tuple(null, null, null, ArtifactKinds.PULL_REQUEST)
+                );
+        }
+
+        @Test
+        @DisplayName("findAllForCatalog returns the whole workspace catalogue, areas first")
+        void catalogQueryReturnsEveryPracticeOrderedByArea() {
+            PracticeArea first = persistArea("first-area", null, 0);
+            PracticeArea second = persistArea("second-area", null, 1);
+            Practice inSecond = createPractice("in-second", "In second");
+            inSecond.setArea(second);
+            Practice inFirst = createPractice("in-first", "In first");
+            inFirst.setArea(first);
+            // Holds no tier: findByFilters' `p.reviewTier = :reviewTier` could never have matched it.
+            Practice unfiled = createPractice("unfiled", "Unfiled");
+            practiceRepository.saveAll(List.of(inSecond, inFirst, unfiled));
+
+            List<Practice> result = practiceRepository.findAllForCatalog(workspace.getId());
+
+            assertThat(result).extracting(Practice::getSlug).containsExactly("in-first", "in-second", "unfiled");
         }
 
         @Test
