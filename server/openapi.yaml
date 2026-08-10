@@ -10695,7 +10695,7 @@ components:
           - PENDING
           - SKIPPED
           - NOT_ASSESSABLE
-          - SILENCED
+          - TURNED_OFF
           - NOT_OCCASIONED
           - DORMANT
           - LAPSED
@@ -11622,7 +11622,7 @@ components:
           description: Set only while the run is PAUSED
           enum:
           - BUDGET_EXHAUSTED
-          - BINDING_DISABLED
+          - REVIEW_MODEL_UNBOUND
           - WORKSPACE_UNAVAILABLE
         requestedByAccountId:
           type: integer
@@ -12312,7 +12312,7 @@ components:
           - WORKSPACE_INACTIVE
           - PRACTICES_DISABLED
           - NO_ACTIVE_PRACTICE
-          - BINDING_DISABLED
+          - REVIEW_MODEL_UNBOUND
           - PRACTICE_TIER_OFF
           - BUDGET_EXHAUSTED
           - SUBJECT_UNLINKED
@@ -13048,7 +13048,7 @@ components:
           - WORKSPACE_INACTIVE
           - PRACTICES_DISABLED
           - NO_ACTIVE_PRACTICE
-          - BINDING_DISABLED
+          - REVIEW_MODEL_UNBOUND
           - PRACTICE_TIER_OFF
           - BUDGET_EXHAUSTED
           - SUBJECT_UNLINKED
