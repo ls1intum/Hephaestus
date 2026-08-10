@@ -45,7 +45,7 @@ These variables exist only in the reference deployment, so they live here:
 | Variable | Purpose |
 | --- | --- |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
-| `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host. |
+| `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `HEPHAESTUS_INTEGRATION_OAUTH_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host. |
 
 :::caution Not everything the container reads is settable from `docker/.env`
 `LEGAL_PROFILE` is forwarded by the shipped Compose files, so setting it in `docker/.env` works.
@@ -141,7 +141,7 @@ channels through this same bot token, so it needs no scopes beyond the set above
 ### Outline integration
 
 Outline is a documentation content source: a workspace admin connects one Outline instance from
-**Settings → Integrations** with the wiki's base URL and an API key, then registers the collections to
+**Administration → Integrations → Outline** with the wiki's base URL and an API key, then registers the collections to
 mirror. The key is encrypted at rest in the `connection` table.
 
 There is no default Outline operator. Before enabling the integration, record the exact origin's legal role,
@@ -195,7 +195,8 @@ the provider can also be added later under **Instance admin → Login providers*
 **API keys do not self-rotate.** Outline's `apiKeys.create` and `apiKeys.delete` accept only an
 interactive session, never a bearer token, so Hephaestus cannot roll its own key. The connection's
 admin card surfaces the key's expiry (via `apiKeys.list`, when the key may see itself) ahead of the
-lapse; renewing means creating a new key in Outline and re-entering it in **Settings → Integrations**.
+lapse; renewing means creating a new key in Outline and re-entering it in
+**Administration → Integrations → Outline**.
 A lapsed key reports `accepted=false` and the mirror stops refreshing until it is replaced.
 
 ### GitHub integration
@@ -227,51 +228,18 @@ The login provider is instance-agnostic: gitlab.com works out of the box, and an
 
 This env-seeds **one** default GitLab login provider (registration id `gitlab`). Additional GitLab instances are added at runtime by an instance admin under **Instance admin → Login providers** — no redeploy.
 
-### Practice review rollout bundle
+### Practice review
 
-Practice review is not enabled by a single flag. The following settings must be aligned:
+Practice review has its own page: **[Practice Review](./practice-review)** covers the deployment
+variables, the per-workspace setup in screen order, what each door costs, campaigns versus recurring
+sweeps, the agent queue-health metrics and retention, and the checklist for a workspace that went quiet.
 
-| Variable | Purpose |
-| --- | --- |
-| `PRACTICE_REVIEW_FOR_ALL` | Enables the feature flag and the detection gate for all users. Also sets the detection gate via `PRACTICE_REVIEW_RUN_FOR_ALL`. |
-| `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
-| `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
-| `AGENT_ENABLED` | Enables the PostgreSQL-backed agent job queue and executor |
-| `GIT_CHECKOUT_ENABLED` | Enables local repository checkout used to materialize declared evidence |
-| `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | Age after which replay directories and unreferenced evidence blobs become eligible for collection (default `30`). |
-| `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
-| `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
-
-Repository checkouts, replay metadata, and content-addressed evidence live under the fabric root, which the
-reference Compose stack pins to `/data/git-repos` on the `git-repos` volume. A custom split or multi-host
-deployment must mount the same durable read-write filesystem on every server and worker, with cross-process
-file locks, atomic rename, and appropriate access controls.
-
-Which sources a review may read, and for which purpose, is not a deployment setting: it is fixed by the
-reviewed source-use decisions shipped in the artifact-source contract, and a deployment cannot widen or
-narrow them. A source your workspace has not connected is simply never captured. See the
-[artifact-source contract](https://github.com/ls1intum/Hephaestus/blob/main/docs/contributor/artifact-source-contract.mdx)
-for what each purpose covers, and [Artifact-Source Governance](./dsms/artifact-source-governance) for the
-decision record behind them.
-
-The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by `AGENT_ENABLED`. Keep that capability and Docker access on the application server because interactive mentor sandboxes are request-affine and run there; a dedicated `application-worker` adds capacity for queued practice reviews. When `AGENT_ENABLED` is also true, any worker-capable replica may claim those PostgreSQL jobs. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
-
-### Agent queue health & retention
-
-The agent job queue (`agent_job`, polled by `AgentJobExecutor`) exposes its own health signals — wire an alert off these rather than guessing from application logs:
-
-- **`agent.queue.depth`** — QUEUED jobs currently eligible to run (`available_at <= now()`).
-- **`agent.queue.oldest_age_seconds`** — age of the oldest eligible QUEUED job; `0` when the queue is empty. This is the signal to alert on, not depth alone: a briefly busy queue and a stuck one can both show non-zero depth, but only a stuck queue shows a climbing age.
-- **`agent.queue.running`** — jobs currently RUNNING fleet-wide.
-- **`agent.queue.health.sampler.failures`** — failed queue-health samples; gauges keep their last-good values instead of reporting a false empty queue.
-- **`agent.job.claim.latency`** — time between a job becoming eligible and being claimed.
-- **`agent.job.execution.duration`** — tagged by `jobType` and outcome `status` (`COMPLETED`, `FAILED`, `TIMED_OUT`, `CANCELLED`, `REQUEUED`).
-- **`agent.job.delivery.recovered`** — stuck `PENDING` deliveries (executor crashed mid-delivery) successfully re-attempted by the recovery sweep.
-- **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — terminal rows whose heavy payload columns were nulled out, and rows deleted outright, by the retention sweep below.
-
-The queue-health gauges are sampled every 30s; timers and counters are recorded inline. None run on a request path.
-
-**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row and its durable evidence snapshot. Replay directories and unreferenced CAS blobs use `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` (default `30`, positive integer). Tighten these only against the deployment's approved retention policy. Treat the fabric root volume as sensitive storage: restrict host access, include it in erasure operations, and monitor successful garbage-collection sweeps.
+Two facts belong here because they are deployment topology rather than feature configuration. The Docker
+sandbox is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by
+`AGENT_ENABLED`: keep that capability and Docker access on the application server, because interactive
+mentor sandboxes are request-affine and run there, and add a dedicated `application-worker` for queued
+review capacity. And `NATS_ENABLED` gates webhook-driven sync consumption and must stay on for that; it is
+not part of the practice-review bundle.
 
 ### Rollout tiers
 
@@ -311,7 +279,7 @@ There are two monthly LLM budgets, and **they are never added together**:
 - **The instance budget** caps a workspace's spend on **shared** models — your money, on connections you registered. An instance admin sets it under **Instance admin → AI usage → Set budget** (per-workspace, per calendar month, UTC).
 - **The workspace's own budget** caps that workspace's spend on **its own connected provider** — their money, billed to their provider account. A workspace admin sets it on their own **AI usage** page.
 
-For either cap: clearing the field removes it (**No cap** — uncapped, the default); setting it to exactly `0` pauses that purse immediately, which is the supported way to hard-stop spending mid-month.
+For either cap: **Remove cap** clears it (uncapped is the default); setting it to exactly `0` pauses that purse immediately, which is the supported way to hard-stop spending mid-month.
 
 **Each cap pauses only the work it funds.** Exhausting the instance budget stops shared-model work and leaves the workspace's own-provider work running; exhausting the workspace's own budget does the reverse. This is deliberate — an instance budget that also paused work you are not billed for would be stopping spending you cannot see the price of. If you need to stop *all* AI work in a workspace, change the workspace's status or its feature switches; a budget is not that instrument.
 
@@ -336,45 +304,6 @@ reach an UNVERIFIABLE month in the first place.
 Reasoning tokens are retained as telemetry when the compatible endpoint reports them. They are not
 priced separately: OpenAI-compatible usage includes reasoning tokens in billable output tokens, so a
 second reasoning rate would double-count the same work.
-
-### A workspace stopped running practice reviews
-
-Nothing errors when practice review stops — the workspace simply goes quiet, so this is the one
-failure you have to go looking for. Work down the list; the first four are per-workspace and the last
-two are instance-wide, so if several workspaces went quiet at once, start at the bottom.
-
-1. **Is a detection model bound and enabled?** Workspace → Administration → **AI models**, the
-   "Detection runs on …" card. A workspace with no binding runs no reviews at all — this is the
-   expected state immediately after upgrading from named agent configurations, where everything is
-   carried over switched off (see `MIGRATION.md`). The card's readiness indicator also covers the
-   next case.
-2. **Is the bound model still usable?** A model is only usable if the model *and* its connection are
-   both enabled, the protocol is supported, and — for a shared instance model — the workspace still
-   has a grant. Revoking a grant or disabling a connection stops every workspace bound to it, and the
-   binding stays in place looking correct.
-3. **Is a budget exhausted?** Administration → **AI usage** names which purse paused the workspace
-   and who can lift it. Jobs already queued are *held*, not cancelled, and released automatically
-   when the cap is raised or the month rolls over — but a job still over cap seven days after it was
-   queued is cancelled rather than held forever. `agent.queue.held` counts jobs parked on a cap;
-   `agent.queue.depth` counts only what a worker could claim now, so alert on held rather than
-   reading depth.
-4. **Is the feature or the workspace switched off?** Practice review is a workspace feature flag, and
-   a paused workspace runs nothing regardless of its AI configuration.
-5. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates
-   submission, execution *and* orphan recovery independently of the worker role. Set on the worker
-   only, jobs are submitted by nobody; set on the server only, they queue and are never claimed.
-   Confirm by presence, not value: if the flag never reached a pod, `agent.queue.depth`,
-   `agent.queue.oldest_age_seconds` and `agent.queue.running` are absent from that pod's metrics
-   rather than reading zero.
-6. **Are jobs being claimed at all?** Watch `agent.queue.oldest_age_seconds`. It should rise and
-   fall. Climbing monotonically means the server is submitting and no worker is claiming — check
-   `AGENT_ENABLED` and the worker role on the worker pod. Reviews also need `GIT_CHECKOUT_ENABLED`;
-   it and `AGENT_ENABLED` must be true together.
-
-The per-workspace job list under Administration → **Practices → Runs** shows each run's status, the
-model it ran on, and its error message — the fastest way to tell "never submitted" from "submitted
-and failed". A held job says it is held, why, and when it
-is next due; **AI usage** names which purse is capped.
 
 ### Data sync and backfill
 

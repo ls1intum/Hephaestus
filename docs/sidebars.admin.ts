@@ -5,6 +5,7 @@ const sidebars: SidebarsConfig = {
     {type: 'doc', id: 'install', label: 'Install (Self-Hosted)'},
     {type: 'doc', id: 'github-integration', label: 'GitHub Integration'},
     {type: 'doc', id: 'ai-providers', label: 'Connect an AI Provider'},
+    {type: 'doc', id: 'practice-review', label: 'Practice Review'},
     {type: 'doc', id: 'backup-restore', label: 'Backup & Restore'},
     {type: 'doc', id: 'production-setup', label: 'Integrations & Reference Deployment'},
     {type: 'doc', id: 'compatibility-policy', label: 'Compatibility Policy'},
