@@ -35,7 +35,7 @@ definition or an existing workspace.
 | --- | --- | --- |
 | Practice author | Define the habit, guidance, and responsible mentoring support | Authorize collection or certify review accuracy |
 | Instance administrator | Curate the defaults offered to new workspaces | Rewrite existing workspace practices |
-| Workspace administrator | Adapt practices, set each one's loudness tier, and scope which work is reviewed | Authorize a new data source for the instance |
+| Workspace administrator | Adapt practices, set the workspace default tier and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance |
 | Instance operator | Approve source purposes, privacy, retention, and erasure coverage | Decide that connected evidence proves a practice |
 | Developer, peer, or mentor | Use findings and available human context in a review | Supply hidden context to Hephaestus implicitly |
 
@@ -72,7 +72,7 @@ settings:
   while a developer, peer, or mentor may still review it from context the system does not collect.
   It still names its occasions — that is where its artifact kind comes from, and saying what a
   practice is about was never the same claim as asking Hephaestus to act on it — but it cannot define
-  a static-analysis script and its loudness tier is forced to `OFF`.
+  a static-analysis script and its autonomy tier is forced to `OFF`.
 - **Guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
 
 Each binding starts with the recommended evidence for its work type. Most authors should keep it.

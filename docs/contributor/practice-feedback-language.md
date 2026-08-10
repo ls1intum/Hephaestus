@@ -5,7 +5,7 @@ Use these product terms in user-facing interfaces, documentation, and release no
 This page owns the vocabulary for **observations and the feedback built from them**. The
 [practice review glossary](./practice-review-glossary.mdx) owns the vocabulary for **the review
 operation, the evidence contract, and the exact API, Java, and persistence names**, including
-*practice review*, *binding*, *signal*, *evidence stance* and *loudness tier*. A term is defined in
+*practice review*, *binding*, *signal*, *evidence stance*, *autonomy tier* and *feedback reach*. A term is defined in
 one of the two and cited from the other; when the two disagree, that is a bug in one of them, not a
 choice for the writer.
 
@@ -22,7 +22,7 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 | **Practice feedback** | The collective guidance created from observations                               | AI feedback, feedback items        |
 | **Message**           | One countable unit of feedback                                                  | ledger unit                        |
 | **Delivery**          | A message's prepared, delivered, withheld, failed, or replaced outcome          | placement, surface                 |
-| **Channel**           | Where feedback is intended to appear; see [loudness tiers](./practice-review-glossary.mdx#loudness-tiers) for which destinations exist | destination, surface |
+| **Channel**           | Where feedback is intended to appear; see [feedback reach](./practice-review-glossary.mdx#feedback-reach) for which destinations exist | destination, surface |
 | **Reviewed work**     | A pull request, merge request, issue, or conversation being reviewed             | artifact, target                   |
 | **Developer**         | The person an observation is about                                              | learner                            |
 | **Contributor**       | A repository role relevant to review eligibility                                | user, when the role matters        |
@@ -46,12 +46,18 @@ side, where it means a note pinned to a place in a diff (`FindingAnchor`, `Inlin
 than a measurement. The read APIs and the reviews UI say *findings* because renaming a wire contract is its
 own change; that is a reason to leave them alone, not a licence to write *finding* in new copy.
 
-For how far a practice's result may travel in a workspace — including whether it is reviewed at all —
-use **loudness tier** and its values **Off**, **Measure**, **Coach**, **Engage**, as the
-[practice review glossary](./practice-review-glossary.mdx#product-terms) defines them. Do not write
+For how much a workspace lets the system do on its own about a practice — including whether it is
+reviewed at all — use **autonomy tier** and its values **Off**, **Observe**, **Propose**, **Deliver**, as
+the [practice review glossary](./practice-review-glossary.mdx#product-terms) defines them. Do not write
 *used in new reviews*: it is a boolean where the concept has four values, so it cannot express the tiers
-between silent measurement and full delivery. "Not reviewed at all" is the **Off** tier, not a
-separate concept.
+between silent measurement and unasked delivery. "Not reviewed at all" is the **Off** tier, not a separate
+concept. Do not write *loudness tier*: it named a ladder that mixed how much the system does with where it
+says it, and the second half is now **feedback reach**, a separate workspace setting.
+
+A tier is also rarely a fact about one practice alone. Most practices hold no tier and inherit their area's,
+and most areas inherit the workspace's, so write **effective tier** for the one in force and **override**
+for a tier set at the level being discussed. *Inherited* is about the level being described, not about
+which level answered.
 
 For whether an instance entry is copied into new workspaces, use **include / exclude** (see the table
 above). Do not use *shipped*, *offered*, *retired*, *ours*, *yours*, or *here* in catalog UI copy;
