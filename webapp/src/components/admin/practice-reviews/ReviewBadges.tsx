@@ -57,7 +57,7 @@ export function FindingResultBadge({ finding }: { finding: FindingResult }) {
 	}
 	// Distinct from "Not applicable": the practice did apply and the evidence was read, it just did
 	// not settle the question. Collapsing the two would claim nothing here was worth looking at.
-	if (finding.presence === "INDETERMINATE") {
+	if (finding.presence === "INCONCLUSIVE") {
 		return <Badge variant="outline">Could not be determined</Badge>;
 	}
 	if (!finding.assessment) {
@@ -163,7 +163,7 @@ export function FindingCountsSummary({ counts }: { counts: ReviewFindingCounts }
 			? `${counts.problems} ${counts.problems === 1 ? "improvement" : "improvements"}`
 			: undefined,
 		counts.notApplicable > 0 ? `${counts.notApplicable} not applicable` : undefined,
-		counts.indeterminate > 0 ? `${counts.indeterminate} undetermined` : undefined,
+		counts.inconclusive > 0 ? `${counts.inconclusive} undetermined` : undefined,
 	].filter(Boolean);
 	return (
 		<p className="text-sm text-muted-foreground">

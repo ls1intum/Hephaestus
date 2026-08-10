@@ -123,7 +123,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "thin-controllers",
 		practiceName: "Thin controllers",
-		reviewTier: "COACH",
+		reviewTier: "DELIVER",
 		outcome: "REVIEWED",
 		explanation:
 			"Reviewed on the commits pushed at 14:48. Three measurements were taken and one was raised with you; the rest repeated a point already made on this pull request.",
@@ -139,10 +139,10 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "product-language",
 		practiceName: "Product language",
-		reviewTier: "MEASURE",
+		reviewTier: "OBSERVE",
 		outcome: "REVIEWED",
 		explanation:
-			"Reviewed, and two measurements were recorded. This practice is set to measure only, so nothing was said to you; raise its tier to Coach to hear about results like these.",
+			"Reviewed, and two measurements were recorded. This practice is set to observe only, so nothing was said to you; raise its tier to Deliver to hear about results like these.",
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
@@ -155,7 +155,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "meaningful-commits",
 		practiceName: "Meaningful commit history",
-		reviewTier: "COACH",
+		reviewTier: "DELIVER",
 		outcome: "RUNNING",
 		explanation:
 			"A review started when the last commits landed and has not finished yet. Check back in a few minutes.",
@@ -170,7 +170,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "tests-accompany-behaviour",
 		practiceName: "Tests accompany behaviour changes",
-		reviewTier: "ENGAGE",
+		reviewTier: "DELIVER",
 		outcome: "PENDING",
 		explanation:
 			"Queued behind the reviews already running for this workspace. It will start on its own; nothing is needed from you.",
@@ -184,7 +184,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "small-changes",
 		practiceName: "Small, reviewable changes",
-		reviewTier: "COACH",
+		reviewTier: "DELIVER",
 		outcome: "SKIPPED",
 		explanation:
 			"Skipped because this pull request was reviewed 40 minutes ago and the workspace's cooldown is one hour. The next push after that window will be reviewed.",
@@ -199,7 +199,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "migration-safety",
 		practiceName: "Migration safety",
-		reviewTier: "COACH",
+		reviewTier: "DELIVER",
 		outcome: "NOT_ASSESSABLE",
 		explanation:
 			"The diff for these commits could not be read, so this practice could not be judged either way. Re-run once the provider serves the diff again.",
@@ -227,7 +227,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "timely-review-response",
 		practiceName: "Timely review response",
-		reviewTier: "COACH",
+		reviewTier: "DELIVER",
 		outcome: "NOT_OCCASIONED",
 		explanation:
 			"Nothing this practice watches for has happened on this pull request yet. It reacts when a review is submitted.",
@@ -239,7 +239,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "discussion-hygiene",
 		practiceName: "Discussion hygiene",
-		reviewTier: "ENGAGE",
+		reviewTier: "DELIVER",
 		outcome: "DORMANT",
 		explanation:
 			"This practice needs a chat integration, and this workspace has none connected. It will start answering once one is.",
@@ -251,7 +251,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "draft-not-left-open",
 		practiceName: "Drafts are not left open",
-		reviewTier: "COACH",
+		reviewTier: "DELIVER",
 		outcome: "LAPSED",
 		explanation:
 			"This one waited longer than the workspace allows before a reviewer was free, so the question expired unanswered. A new push will ask it again.",
@@ -266,7 +266,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "dependency-risk",
 		practiceName: "Dependency risk",
-		reviewTier: "COACH",
+		reviewTier: "DELIVER",
 		outcome: "FAILED",
 		explanation:
 			"The review of this practice failed with an error and produced nothing. It will be retried on the next push; tell a workspace admin if it keeps failing.",
@@ -352,7 +352,7 @@ export const documentArtifactTrace = {
 		{
 			practiceSlug: "written-for-a-newcomer",
 			practiceName: "Written for a newcomer",
-			reviewTier: "MEASURE",
+			reviewTier: "OBSERVE",
 			outcome: "REVIEWED",
 			explanation: "Assessed on this artifact.",
 			watches: ["docs.document.published"],

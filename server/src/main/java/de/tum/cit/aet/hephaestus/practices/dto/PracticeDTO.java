@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -36,15 +37,24 @@ public record PracticeDTO(
     @Nullable @Schema(description = "Developer-facing exemplar (learner layer)") String whatGoodLooksLike,
     @NonNull
     @Schema(
-        description = "How loud this practice is: OFF = not reviewed · MEASURE = reviewed and recorded, " +
-            "silent · COACH = also raised in the mentor conversation · ENGAGE = also placed on the artifact"
+        description = "How much autonomy the system has over this practice, whether that was set here or " +
+            "inherited from its area or workspace, and which level decided it"
     )
-    PracticeReviewTier reviewTier,
+    ReviewTierAssignmentDTO reviewTier,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the practice was last updated") Instant updatedAt,
     @Nullable CatalogOriginDTO catalogOrigin
 ) {
-    public static PracticeDTO from(Practice practice, @Nullable CatalogOriginDTO catalogOrigin) {
+    /**
+     * @param workspaceDefault the workspace's effective default tier, the bottom of the inheritance chain.
+     *     Passed in rather than looked up here so one response resolves it once, and so this stays a pure
+     *     mapping.
+     */
+    public static PracticeDTO from(
+        Practice practice,
+        @Nullable CatalogOriginDTO catalogOrigin,
+        PracticeReviewTier workspaceDefault
+    ) {
         return new PracticeDTO(
             practice.getId(),
             practice.getSlug(),
@@ -59,7 +69,10 @@ public record PracticeDTO(
             practice.getDisplayOrder(),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
-            practice.getReviewTier(),
+            ReviewTierAssignmentDTO.of(
+                ReviewTierResolver.resolvePractice(practice, workspaceDefault),
+                practice.getReviewTier()
+            ),
             practice.getCreatedAt(),
             practice.getUpdatedAt(),
             catalogOrigin

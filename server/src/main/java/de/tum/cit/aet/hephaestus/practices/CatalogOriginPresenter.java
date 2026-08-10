@@ -6,37 +6,59 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Turns practices and areas into their response shapes, adding the two things neither entity knows on its
+ * own: where it came from in the instance catalogue, and what tier is actually in force for it.
+ *
+ * <p>Every method takes the workspace id because the tier a practice reports is the <em>effective</em> one,
+ * and the bottom of that chain is a workspace decision. Resolved once per response rather than per row —
+ * the list endpoints are the ones that matter and they would otherwise ask the same question a hundred
+ * times.
+ */
 @Component
 @RequiredArgsConstructor
 public class CatalogOriginPresenter {
 
     private final CuratedCatalogService catalogService;
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
-    public PracticeDTO present(Practice practice) {
-        return PracticeDTO.from(practice, CatalogOrigin.of(practice, catalogService.catalog()));
+    public PracticeDTO present(Long workspaceId, Practice practice) {
+        return PracticeDTO.from(
+            practice,
+            CatalogOrigin.of(practice, catalogService.catalog()),
+            defaultTier(workspaceId)
+        );
     }
 
-    public PracticeAreaDTO present(PracticeArea area) {
-        return PracticeAreaDTO.from(area, CatalogOrigin.of(area, catalogService.catalog()));
+    public PracticeAreaDTO present(Long workspaceId, PracticeArea area) {
+        return PracticeAreaDTO.from(area, CatalogOrigin.of(area, catalogService.catalog()), defaultTier(workspaceId));
     }
 
-    public List<PracticeDTO> presentPractices(List<Practice> practices) {
+    public List<PracticeDTO> presentPractices(Long workspaceId, List<Practice> practices) {
         EffectiveCatalog catalog = catalogService.catalog();
+        PracticeReviewTier workspaceDefault = defaultTier(workspaceId);
         return practices
             .stream()
-            .map(practice -> PracticeDTO.from(practice, CatalogOrigin.of(practice, catalog)))
+            .map(practice -> PracticeDTO.from(practice, CatalogOrigin.of(practice, catalog), workspaceDefault))
             .toList();
     }
 
-    public List<PracticeAreaDTO> presentAreas(List<PracticeArea> areas) {
+    public List<PracticeAreaDTO> presentAreas(Long workspaceId, List<PracticeArea> areas) {
         EffectiveCatalog catalog = catalogService.catalog();
+        PracticeReviewTier workspaceDefault = defaultTier(workspaceId);
         return areas
             .stream()
-            .map(area -> PracticeAreaDTO.from(area, CatalogOrigin.of(area, catalog)))
+            .map(area -> PracticeAreaDTO.from(area, CatalogOrigin.of(area, catalog), workspaceDefault))
             .toList();
+    }
+
+    private PracticeReviewTier defaultTier(Long workspaceId) {
+        return workspaceDefaults.forWorkspace(workspaceId).defaultTier();
     }
 }

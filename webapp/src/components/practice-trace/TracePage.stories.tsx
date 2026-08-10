@@ -45,7 +45,7 @@ export const EveryOutcome: Story = {
 		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
 		// The tier is named exactly as the catalog names it, from one shared list. This screen used to
 		// say "Measure only" for the tier the catalog called "Measure".
-		await expect(canvas.getByText(REVIEW_TIER_LABELS.MEASURE)).toBeVisible();
+		await expect(canvas.getByText(REVIEW_TIER_LABELS.OBSERVE)).toBeVisible();
 	},
 };
 

@@ -1,28 +1,49 @@
 import type { Practice } from "@/api/types.gen";
 
 /**
- * How loud one practice is allowed to be in one workspace, in the words every surface has to use.
+ * How much autonomy the system has over one practice, in the words every surface has to use.
  *
  * <p>One module rather than a copy per screen. The catalog is where an admin sets the tier and the
  * artifact trace is where a developer reads it back, and the two shipped the same tier under two
  * names — "Measure" in one and "Measure only" in the other — which is how a screen and a support
  * answer stop agreeing about a setting nobody changed.
+ *
+ * <p>Derived from the `effective` field, not from `reviewTier` itself: the API reports a tier as an
+ * assignment — the tier in force, the raw override, the level that decided it, and whether it was
+ * inherited — because a screen has to render "inherited, de-emphasised, with a reset" differently from
+ * "set here". The vocabulary below is about the tier alone.
  */
-export type ReviewTier = Practice["reviewTier"];
+export type ReviewTier = Practice["reviewTier"]["effective"];
 
-/** Ascending loudness. Every tier above Off runs the review; they differ only in who is told. */
+/**
+ * Ascending autonomy. Every tier above Off runs the review; they differ in how far the system may act
+ * on its own. Where feedback goes is a separate, workspace-level setting.
+ */
 export const REVIEW_TIER_ORDER = [
 	"OFF",
-	"MEASURE",
-	"COACH",
-	"ENGAGE",
+	"OBSERVE",
+	"PROPOSE",
+	"DELIVER",
 ] as const satisfies readonly ReviewTier[];
+
+/**
+ * Propose is in the ladder but cannot be chosen yet: there is no queue for a human to approve the
+ * feedback it would prepare, so a practice parked there would prepare feedback nobody can approve and
+ * swallow it. The server refuses it at every write boundary; a surface that offers a tier picker has to
+ * disable this one rather than let the choice fail after the click.
+ */
+export const REVIEW_TIER_SELECTABLE: Record<ReviewTier, boolean> = {
+	OFF: true,
+	OBSERVE: true,
+	PROPOSE: false,
+	DELIVER: true,
+};
 
 export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
 	OFF: "Off",
-	MEASURE: "Measure",
-	COACH: "Coach",
-	ENGAGE: "Engage",
+	OBSERVE: "Observe",
+	PROPOSE: "Propose",
+	DELIVER: "Deliver",
 };
 
 /**
@@ -30,9 +51,9 @@ export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
  * with nothing to compare it against. A ladder that only reads top-down ("Also raised in…") says
  * nothing there.
  *
- * <p>`COACH` is the mentor conversation and nothing else, and `ENGAGE` adds the work itself on top of
- * it. Saying it the other way round tells an admin that turning a practice down to `COACH` will stop
- * the mentor conversation, which is the opposite of what happens.
+ * <p>None of them says *where* feedback goes. That is the workspace's reach setting, and folding it in
+ * here would tell an admin that turning a practice down changes where the system speaks, when it
+ * changes whether it speaks at all.
  *
  * <p>Kept to one short line each. The catalog prints these beside the tier name inside a menu that is
  * already tall; a sentence long enough to wrap turns that menu into a scrollable region a keyboard
@@ -40,7 +61,7 @@ export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
  */
 export const REVIEW_TIER_DESCRIPTIONS: Record<ReviewTier, string> = {
 	OFF: "Not reviewed at all.",
-	MEASURE: "Reviewed and recorded. Nobody is told.",
-	COACH: "Reviewed, and raised in the mentor conversation.",
-	ENGAGE: "Reviewed, raised in the conversation, and on the work.",
+	OBSERVE: "Reviewed and recorded. Nobody is told.",
+	PROPOSE: "Feedback prepared for a person to approve. Not available yet.",
+	DELIVER: "Reviewed, and feedback delivered without asking.",
 };

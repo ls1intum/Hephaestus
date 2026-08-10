@@ -4,6 +4,8 @@ import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
+	chosenTier,
+	inheritedTier,
 	mockAreas,
 	mockPracticeLongText,
 	mockPractices,
@@ -363,22 +365,37 @@ export const LoudnessTiers: Story = {
 	args: {
 		areas: mockAreas,
 		practices: [
-			{ ...mockPractices[0], slug: "loud", name: "Engage", reviewTier: "ENGAGE" as const },
-			{ ...mockPractices[0], slug: "coached", name: "Coach", reviewTier: "COACH" as const },
-			{ ...mockPractices[0], slug: "measured", name: "Measure", reviewTier: "MEASURE" as const },
-			{ ...mockPractices[0], slug: "silent", name: "Off", reviewTier: "OFF" as const },
+			{ ...mockPractices[0], slug: "loud", name: "Deliver", reviewTier: inheritedTier("DELIVER") },
+			{ ...mockPractices[0], slug: "quiet", name: "Observe", reviewTier: chosenTier("OBSERVE") },
+			{ ...mockPractices[0], slug: "silent", name: "Off", reviewTier: chosenTier("OFF") },
 		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
 	},
-	play: async ({ canvas }) => {
-		for (const tier of ["Engage", "Coach", "Measure", "Off"]) {
+	play: async ({ canvas, userEvent }) => {
+		for (const tier of ["Deliver", "Observe", "Off"]) {
 			await expect(canvas.getByLabelText(`How loud ${tier} is`)).toHaveTextContent(tier);
 		}
-		// Engage is the default and carries no badge; the quieter tiers each announce themselves,
-		// because those are the rows where a developer will see less than the practice's name suggests.
-		const badges = canvas.getAllByText(/^(Off|Measure|Coach)$/, {
+		// Deliver is what a practice nobody has configured inherits, so it carries no badge; the quieter
+		// tiers each announce themselves, because those are the rows where a developer will see less
+		// than the practice's name suggests.
+		const badges = canvas.getAllByText(/^(Off|Observe)$/, {
 			selector: '[data-slot="badge"]',
 		});
-		await expect(badges).toHaveLength(3);
+		await expect(badges).toHaveLength(2);
 		await expectNoPageOverflow();
+
+		// Propose is a rung with nothing behind it yet — no queue for a human to approve what it would
+		// prepare — and the server refuses it at every write boundary. It is offered and disabled rather
+		// than omitted: dropping it leaves a gap between "records it" and "says it unasked" that the
+		// ladder has no word for, and offering it plainly would fail after the click.
+		await userEvent.click(canvas.getByLabelText("How loud Deliver is"));
+		const options = within(await screen.findByRole("listbox"));
+		await expect(options.getByRole("option", { name: "Propose" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(options.getByRole("option", { name: "Observe" })).not.toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
 	},
 };

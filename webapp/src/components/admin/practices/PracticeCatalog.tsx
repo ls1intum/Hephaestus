@@ -52,6 +52,8 @@ import {
 	REVIEW_TIER_DESCRIPTIONS,
 	REVIEW_TIER_LABELS,
 	REVIEW_TIER_ORDER,
+	REVIEW_TIER_SELECTABLE,
+	type ReviewTier,
 } from "@/lib/review-tiers";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
@@ -65,6 +67,9 @@ const REVIEW_TIERS = REVIEW_TIER_ORDER.map((value) => ({
 	value,
 	label: REVIEW_TIER_LABELS[value],
 	hint: REVIEW_TIER_DESCRIPTIONS[value],
+	// Shown but not choosable where the server would refuse it. Dropping the rung instead would leave
+	// the ladder with a gap and no word for what sits between "records it" and "says it unasked".
+	selectable: REVIEW_TIER_SELECTABLE[value],
 }));
 
 export type FocusFilter = "ALL" | KnownArtifactKind;
@@ -92,7 +97,7 @@ export interface PracticeCatalogProps {
 	onDeleteArea: (slug: string) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
-	onSetPracticeReviewTier: (slug: string, reviewTier: Practice["reviewTier"]) => void;
+	onSetPracticeReviewTier: (slug: string, reviewTier: ReviewTier) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
 }
@@ -434,22 +439,20 @@ function PracticeActions({
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
 	pending: boolean;
-	onSetReviewTier: (slug: string, reviewTier: Practice["reviewTier"]) => void;
+	onSetReviewTier: (slug: string, reviewTier: ReviewTier) => void;
 	onDelete: (practice: Practice) => void;
 }) {
 	const canReview = canAttemptAutomatedReview(practice.automatedReviewPolicy, supportedModes);
 	// A practice whose policy cannot run an automated review has nowhere to go from Off, so the
 	// control is locked there rather than offering tiers the server would refuse. One already above
 	// Off keeps its control: turning a practice down must never need a policy edit.
-	const tierChangeDisabled = pending || (practice.reviewTier === "OFF" && !canReview);
+	const tierChangeDisabled = pending || (practice.reviewTier.effective === "OFF" && !canReview);
 	return (
 		<>
 			<Select
 				items={REVIEW_TIERS}
-				value={practice.reviewTier}
-				onValueChange={(value) =>
-					value && onSetReviewTier(practice.slug, value as Practice["reviewTier"])
-				}
+				value={practice.reviewTier.effective}
+				onValueChange={(value) => value && onSetReviewTier(practice.slug, value as ReviewTier)}
 				disabled={tierChangeDisabled}
 			>
 				<SelectTrigger
@@ -460,7 +463,7 @@ function PracticeActions({
 				</SelectTrigger>
 				<SelectContent>
 					{REVIEW_TIERS.map((tier) => (
-						<SelectItem key={tier.value} value={tier.value}>
+						<SelectItem key={tier.value} value={tier.value} disabled={!tier.selectable}>
 							{tier.label}
 						</SelectItem>
 					))}
@@ -496,7 +499,11 @@ function PracticeActions({
 						{REVIEW_TIERS.map((tier) => (
 							<DropdownMenuItem
 								key={tier.value}
-								disabled={tierChangeDisabled || practice.reviewTier === tier.value}
+								disabled={
+									tierChangeDisabled ||
+									!tier.selectable ||
+									practice.reviewTier.effective === tier.value
+								}
 								onClick={() => onSetReviewTier(practice.slug, tier.value)}
 							>
 								{tier.label}
@@ -628,8 +635,8 @@ function PracticeRowDetails({
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
-				{practice.reviewTier !== "ENGAGE" && (
-					<Badge variant="outline">{REVIEW_TIER_LABELS[practice.reviewTier]}</Badge>
+				{practice.reviewTier.effective !== "DELIVER" && (
+					<Badge variant="outline">{REVIEW_TIER_LABELS[practice.reviewTier.effective]}</Badge>
 				)}
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />

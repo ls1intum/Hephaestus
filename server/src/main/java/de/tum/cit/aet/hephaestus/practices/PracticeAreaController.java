@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -68,6 +69,7 @@ public class PracticeAreaController {
         ) Boolean visibleInPracticeDashboardsOnly
     ) {
         List<PracticeAreaDTO> areas = presenter.presentAreas(
+            workspaceContext.id(),
             areaService.listAreas(workspaceContext, visibleInPracticeDashboardsOnly)
         );
         return ResponseEntity.ok(areas);
@@ -87,7 +89,9 @@ public class PracticeAreaController {
     )
     @SecurityRequirements
     public ResponseEntity<PracticeAreaDTO> getArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
-        return ResponseEntity.ok(presenter.present(areaService.getArea(workspaceContext, areaSlug)));
+        return ResponseEntity.ok(
+            presenter.present(workspaceContext.id(), areaService.getArea(workspaceContext, areaSlug))
+        );
     }
 
     @PostMapping
@@ -123,7 +127,7 @@ public class PracticeAreaController {
             .path("/{slug}")
             .buildAndExpand(area.getSlug())
             .toUri();
-        return ResponseEntity.created(location).body(presenter.present(area));
+        return ResponseEntity.created(location).body(presenter.present(workspaceContext.id(), area));
     }
 
     @PatchMapping("/{areaSlug}")
@@ -157,7 +161,41 @@ public class PracticeAreaController {
             ),
             request.visibleInPracticeDashboards()
         );
-        return ResponseEntity.ok(presenter.present(area));
+        return ResponseEntity.ok(presenter.present(workspaceContext.id(), area));
+    }
+
+    @PatchMapping("/{areaSlug}/review-tier")
+    @Operation(
+        summary = "Set how much autonomy the system has over one area",
+        description = "Applies to every practice in the area that holds no tier of its own; practices that " +
+            "set their own are left alone. OFF stops their reviews entirely. OBSERVE runs them and records " +
+            "every observation without telling anyone. DELIVER sends feedback without asking. Send a null " +
+            "tier to clear the area's own setting so it follows the workspace default."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Tier updated; the response carries the tier now in force and where it came from",
+        content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "PROPOSE cannot be selected yet: there is no approval queue for the feedback it would prepare",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Area not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
+    public ResponseEntity<PracticeAreaDTO> setAreaReviewTier(
+        WorkspaceContext workspaceContext,
+        @PathVariable String areaSlug,
+        @Valid @RequestBody UpdatePracticeReviewTierRequestDTO request
+    ) {
+        PracticeArea area = areaService.setReviewTier(workspaceContext, areaSlug, request.reviewTier());
+        return ResponseEntity.ok(presenter.present(workspaceContext.id(), area));
     }
 
     @PatchMapping("/reorder")
@@ -187,7 +225,10 @@ public class PracticeAreaController {
         @Valid @RequestBody ReorderPracticeAreasRequestDTO request
     ) {
         areaService.reorder(workspaceContext, request.orderedSlugs());
-        List<PracticeAreaDTO> areas = presenter.presentAreas(areaService.listAreas(workspaceContext, null));
+        List<PracticeAreaDTO> areas = presenter.presentAreas(
+            workspaceContext.id(),
+            areaService.listAreas(workspaceContext, null)
+        );
         return ResponseEntity.ok(areas);
     }
 

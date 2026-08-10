@@ -980,13 +980,13 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
- * Request to set how loud a practice is allowed to be in this workspace
+ * Set how much autonomy the system has here, or clear it back to inherit
  */
 export type UpdatePracticeReviewTierRequest = {
     /**
-     * OFF = not reviewed · MEASURE = reviewed and recorded, silent · COACH = also raised in the mentor conversation · ENGAGE = also placed on the artifact
+     * OFF = not reviewed at all · OBSERVE = the review runs and every observation is recorded, and nobody is told · DELIVER = feedback is delivered without asking. Send null (or omit the field) to hold no tier here and inherit — a practice inherits its area's, an area inherits the workspace default. PROPOSE is declared but not selectable yet: it would prepare feedback with no way for anyone to approve it.
      */
-    reviewTier: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
+    reviewTier?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
 };
 
 /**
@@ -998,13 +998,21 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     cooldownMinutes?: number;
     /**
+     * How much autonomy the system has over practices and areas that hold no tier of their own. The one decision that changes how loud a whole workspace is. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet.
+     */
+    defaultReviewTier?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    /**
      * Deliver feedback to already-merged PRs/MRs
      */
     deliverToMerged?: boolean;
     /**
-     * Fields to reset to the inherited fleet default
+     * Where feedback may go at all: CONVERSATION for the mentor conversation only, ON_THE_WORK to also place it on the work. Null leaves it unchanged; name FEEDBACK_REACH in 'reset' to clear it.
      */
-    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE'>;
+    feedbackReach?: 'CONVERSATION' | 'ON_THE_WORK';
+    /**
+     * Fields to reset back to inherit
+     */
+    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_REVIEW_TIER' | 'FEEDBACK_REACH'>;
     /**
      * Replaces the review scope wholesale (the lists ARE the setting, so a merge could only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted.
      */
@@ -1856,6 +1864,80 @@ export type RevokeSessionsResult = {
 };
 
 /**
+ * Practice counts per autonomy tier, for the workspace and for each of its areas
+ */
+export type ReviewTierRollup = {
+    /**
+     * The same counts per area, in catalogue order
+     */
+    areas: Array<AreaReviewTierRollup>;
+    /**
+     * Practice count per effective tier across the whole workspace; every tier is a key
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * Where feedback may go in this workspace at all, ANDed with every tier
+     */
+    feedbackReach: 'CONVERSATION' | 'ON_THE_WORK';
+    /**
+     * The workspace-level decision every area and practice falls back to
+     */
+    workspaceDefault: ReviewTierAssignment;
+};
+
+/**
+ * The autonomy tier in force here, whether it was set here or inherited, and the level that decided it
+ */
+export type ReviewTierAssignment = {
+    /**
+     * The tier actually in force. OFF = not reviewed · OBSERVE = reviewed and recorded, nobody is told · PROPOSE = feedback prepared for a human to approve (not selectable yet) · DELIVER = feedback delivered without asking
+     */
+    effective: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    /**
+     * True when this practice or area holds no tier of its own and follows a level above
+     */
+    inherited: boolean;
+    /**
+     * The tier set on this practice or area itself, or null when it holds none and inherits. Send null to the tier endpoint to clear it back to this state.
+     */
+    override?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    /**
+     * Which level decided the effective tier: PRACTICE, AREA or WORKSPACE
+     */
+    source: 'PRACTICE' | 'AREA' | 'WORKSPACE';
+};
+
+/**
+ * One area's practice counts per effective tier, and the area's own tier
+ */
+export type AreaReviewTierRollup = {
+    /**
+     * Area name; null for the no-area group
+     */
+    areaName?: string;
+    /**
+     * Area slug; null groups the practices that belong to no area
+     */
+    areaSlug?: string;
+    /**
+     * Practice count per effective tier in this area; every tier is a key
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * How many of this area's practices set their own tier rather than inheriting
+     */
+    overriddenCount: number;
+    /**
+     * The tier in force for this area, and where it came from
+     */
+    reviewTier: ReviewTierAssignment;
+};
+
+/**
  * A standing instruction to review recent work on a cadence, as an admin sees it.
  */
 export type ReviewSweepSchedule = {
@@ -1934,7 +2016,7 @@ export type ReviewFindingCounts = {
     /**
      * Practices that looked at the evidence and could not settle the question either way; reported apart from notApplicable because one says there was nothing here to judge and the other says we could not tell
      */
-    indeterminate: number;
+    inconclusive: number;
     /**
      * Practices whose subject did not occur in this work
      */
@@ -2060,7 +2142,7 @@ export type ReviewFindingDetail = {
      */
     practiceRevisionId?: number;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     reasoning?: string;
     /**
      * Cross-run locus key; null when continuity is unavailable
@@ -2185,7 +2267,7 @@ export type ReviewFinding = {
     origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
     practiceName: string;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * Cross-run locus key; null when continuity is unavailable
      */
@@ -2306,7 +2388,7 @@ export type ReviewBoundFinding = {
     ordinal: number;
     practiceName: string;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * Whether the finding leads the message or reinforces it
      */
@@ -3045,7 +3127,7 @@ export type PracticeTraceEntry = {
     /**
      * How loudly the workspace currently runs this practice
      */
-    reviewTier: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
+    reviewTier: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
     /**
      * The signals this practice watches
      */
@@ -3069,6 +3151,14 @@ export type PracticeReviewSettings = {
      */
     cooldownMinutesOverride?: number;
     /**
+     * Effective: how much autonomy the system has over practices and areas that hold no tier of their own — the bottom of the practice → area → workspace chain
+     */
+    defaultReviewTier: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    /**
+     * Raw override; null = this workspace has never chosen, so DELIVER applies
+     */
+    defaultReviewTierOverride?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    /**
      * Effective: deliver feedback to merged PRs/MRs
      */
     deliverToMerged: boolean;
@@ -3076,6 +3166,14 @@ export type PracticeReviewSettings = {
      * Raw override; null = inheriting the fleet default
      */
     deliverToMergedOverride?: boolean;
+    /**
+     * Effective: where feedback may go at all. CONVERSATION = the recipient's mentor conversation and nowhere else · ON_THE_WORK = also on the work itself, as pull-request summaries, inline notes and issue comments. ANDed with every practice's tier, so this cannot make a quiet practice speak — only stop a loud one from speaking in a given place.
+     */
+    feedbackReach: 'CONVERSATION' | 'ON_THE_WORK';
+    /**
+     * Raw override; null = this workspace has never chosen, so ON_THE_WORK applies
+     */
+    feedbackReachOverride?: 'CONVERSATION' | 'ON_THE_WORK';
     /**
      * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
      */
@@ -3209,6 +3307,10 @@ export type PracticeArea = {
      */
     name: string;
     /**
+     * How much autonomy the system has over every practice in this area that holds no tier of its own, whether that was set here or inherited from the workspace, and which level decided it
+     */
+    reviewTier: ReviewTierAssignment;
+    /**
      * URL-safe identifier unique within the workspace
      */
     slug: string;
@@ -3281,9 +3383,9 @@ export type Practice = {
      */
     precomputeScript?: string;
     /**
-     * How loud this practice is: OFF = not reviewed · MEASURE = reviewed and recorded, silent · COACH = also raised in the mentor conversation · ENGAGE = also placed on the artifact
+     * How much autonomy the system has over this practice, whether that was set here or inherited from its area or workspace, and which level decided it
      */
-    reviewTier: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
+    reviewTier: ReviewTierAssignment;
     /**
      * URL-safe identifier unique within workspace
      */
@@ -3393,7 +3495,7 @@ export type ObservationList = {
      */
     artifactKind: string;
     /**
-     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INDETERMINATE)
+     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INCONCLUSIVE)
      */
     assessment?: 'GOOD' | 'BAD';
     /**
@@ -3425,9 +3527,9 @@ export type ObservationList = {
      */
     practiceSlug: string;
     /**
-     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE
+     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE
      */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * Severity level (null unless assessment is BAD)
      */
@@ -3807,7 +3909,7 @@ export type ObservationDetail = {
      */
     artifactKind: string;
     /**
-     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INDETERMINATE)
+     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INCONCLUSIVE)
      */
     assessment?: 'GOOD' | 'BAD';
     /**
@@ -3844,9 +3946,9 @@ export type ObservationDetail = {
      */
     practiceSlug: string;
     /**
-     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE
+     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE
      */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * AI reasoning behind the observation
      */
@@ -8915,6 +9017,39 @@ export type UpdateAreaResponses = {
 
 export type UpdateAreaResponse = UpdateAreaResponses[keyof UpdateAreaResponses];
 
+export type SetAreaReviewTierData = {
+    body: UpdatePracticeReviewTierRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        areaSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier';
+};
+
+export type SetAreaReviewTierErrors = {
+    /**
+     * PROPOSE cannot be selected yet: there is no approval queue for the feedback it would prepare
+     */
+    400: unknown;
+    /**
+     * Area not found
+     */
+    404: unknown;
+};
+
+export type SetAreaReviewTierResponses = {
+    /**
+     * Tier updated; the response carries the tier now in force and where it came from
+     */
+    200: PracticeArea;
+};
+
+export type SetAreaReviewTierResponse = SetAreaReviewTierResponses[keyof SetAreaReviewTierResponses];
+
 export type GetCuratedPracticeCatalogEntryData = {
     body?: never;
     path: {
@@ -8947,9 +9082,9 @@ export type ListPracticesData = {
     };
     query?: {
         /**
-         * Filter to practices at exactly this loudness tier
+         * Keep only the practices whose tier IN FORCE is exactly this one, inherited or not
          */
-        reviewTier?: 'OFF' | 'MEASURE' | 'COACH' | 'ENGAGE';
+        reviewTier?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
     };
     url: '/workspaces/{workspaceSlug}/practices';
 };
@@ -9263,7 +9398,7 @@ export type ListObservationsData = {
         /**
          * Filter by presence
          */
-        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE';
+        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
         page?: number;
         size?: number;
     };
@@ -9482,6 +9617,27 @@ export type UpdatePracticeReviewSettingsResponses = {
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
+export type ReviewTierRollupData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-tiers';
+};
+
+export type ReviewTierRollupResponses = {
+    /**
+     * Rollup returned
+     */
+    200: ReviewTierRollup;
+};
+
+export type ReviewTierRollupResponse = ReviewTierRollupResponses[keyof ReviewTierRollupResponses];
+
 export type ListPracticeReviewsData = {
     body?: never;
     path: {
@@ -9639,7 +9795,7 @@ export type ListPracticeReviewFindingsData = {
         sort?: 'NEWEST' | 'ACTIONABILITY';
         practiceSlug?: Array<string>;
         areaSlug?: Array<string>;
-        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INDETERMINATE'>;
+        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE'>;
         assessment?: Array<'GOOD' | 'BAD'>;
         severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         agentJobId?: string;
@@ -10083,6 +10239,10 @@ export type SetReviewTierData = {
 
 export type SetReviewTierErrors = {
     /**
+     * The tier cannot be selected: PROPOSE has no approval queue yet, or this practice's review settings cannot run an automated review at any tier above OFF
+     */
+    400: ProblemDetail;
+    /**
      * Practice not found
      */
     404: ProblemDetail;
@@ -10092,7 +10252,7 @@ export type SetReviewTierError = SetReviewTierErrors[keyof SetReviewTierErrors];
 
 export type SetReviewTierResponses = {
     /**
-     * Loudness tier updated
+     * Tier updated; the response carries the tier now in force and where it came from
      */
     200: Practice;
 };

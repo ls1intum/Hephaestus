@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,5 +27,17 @@ public record UpdatePracticeReviewSettingsRequestDTO(
             "only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted."
     )
     WorkspaceReviewScope reviewScope,
-    @Schema(description = "Fields to reset to the inherited fleet default") Set<PracticeReviewField> reset
+    @Schema(
+        description = "How much autonomy the system has over practices and areas that hold no tier of " +
+            "their own. The one decision that changes how loud a whole workspace is. Null leaves it " +
+            "unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet."
+    )
+    PracticeReviewTier defaultReviewTier,
+    @Schema(
+        description = "Where feedback may go at all: CONVERSATION for the mentor conversation only, " +
+            "ON_THE_WORK to also place it on the work. Null leaves it unchanged; name FEEDBACK_REACH in " +
+            "'reset' to clear it."
+    )
+    FeedbackReach feedbackReach,
+    @Schema(description = "Fields to reset back to inherit") Set<PracticeReviewField> reset
 ) {}

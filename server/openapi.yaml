@@ -4185,6 +4185,49 @@ paths:
       summary: Update a practice area
       tags:
       - Practice Areas
+  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier:
+    patch:
+      description: Applies to every practice in the area that holds no tier of its
+        own; practices that set their own are left alone. OFF stops their reviews
+        entirely. OBSERVE runs them and records every observation without telling
+        anyone. DELIVER sends feedback without asking. Send a null tier to clear the
+        area's own setting so it follows the workspace default.
+      operationId: setAreaReviewTier
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: areaSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeReviewTierRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeArea"
+          description: Tier updated; the response carries the tier now in force and
+            where it came from
+        "400":
+          description: "PROPOSE cannot be selected yet: there is no approval queue\
+            \ for the feedback it would prepare"
+        "404":
+          description: Area not found
+      summary: Set how much autonomy the system has over one area
+      tags:
+      - Practice Areas
   /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
     get:
       description: The current instance-catalog definition for comparison with a workspace
@@ -4215,8 +4258,10 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices:
     get:
-      description: "Returns workspace practice definitions, optionally filtered by\
-        \ loudness tier"
+      description: "Returns this workspace's practices, each with the autonomy tier\
+        \ in force for it, whether that tier was set on the practice or inherited\
+        \ from its area or the workspace, and which level decided it. Optionally narrowed\
+        \ to one tier."
       operationId: listPractices
       parameters:
       - description: Workspace slug
@@ -4226,7 +4271,8 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Filter to practices at exactly this loudness tier
+      - description: "Keep only the practices whose tier IN FORCE is exactly this\
+          \ one, inherited or not"
         in: query
         name: reviewTier
         required: false
@@ -4234,9 +4280,9 @@ paths:
           type: string
           enum:
           - "OFF"
-          - MEASURE
-          - COACH
-          - ENGAGE
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
       responses:
         "200":
           content:
@@ -4599,7 +4645,7 @@ paths:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-          - INDETERMINATE
+          - INCONCLUSIVE
       - in: query
         name: page
         required: false
@@ -4875,6 +4921,31 @@ paths:
       summary: Update the workspace's practice-review policy
       tags:
       - Practice Review Settings
+  /workspaces/{workspaceSlug}/practices/review-tiers:
+    get:
+      description: "How many practices sit at each autonomy tier, for the whole workspace\
+        \ and for each area, plus the workspace default and where feedback may go.\
+        \ The summary a hundred-practice catalogue is read through — answered here\
+        \ so a client never has to fetch every practice to count them."
+      operationId: reviewTierRollup
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTierRollup"
+          description: Rollup returned
+      summary: "Summarise how loud this workspace is, by area"
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/reviews:
     get:
       description: Results are ordered newest first.
@@ -5190,7 +5261,7 @@ paths:
             - PRESENT
             - ABSENT
             - NOT_APPLICABLE
-            - INDETERMINATE
+            - INCONCLUSIVE
       - in: query
         name: assessment
         required: false
@@ -5733,8 +5804,10 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier:
     patch:
-      description: OFF stops the review entirely; MEASURE keeps measuring in silence;
-        COACH adds the mentor conversation; ENGAGE also places feedback on the artifact
+      description: "OFF stops the review entirely. OBSERVE runs it and records every\
+        \ observation without telling anyone. DELIVER sends feedback without asking,\
+        \ as far as this workspace's reach allows. Send a null tier to clear the practice's\
+        \ own setting so it follows its area, and through the area the workspace default."
       operationId: setReviewTier
       parameters:
       - description: Workspace slug
@@ -5761,14 +5834,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Practice"
-          description: Loudness tier updated
+          description: Tier updated; the response carries the tier now in force and
+            where it came from
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The tier cannot be selected: PROPOSE has no approval queue\
+            \ yet, or this practice's review settings cannot run an automated review\
+            \ at any tier above OFF"
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Practice not found
-      summary: Set how loud a practice is
+      summary: Set how much autonomy the system has over one practice
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
@@ -7286,6 +7368,36 @@ components:
       - reviewOutcome
       - status
       - target
+    AreaReviewTierRollup:
+      type: object
+      description: "One area's practice counts per effective tier, and the area's\
+        \ own tier"
+      properties:
+        areaName:
+          type: string
+          description: Area name; null for the no-area group
+        areaSlug:
+          type: string
+          description: Area slug; null groups the practices that belong to no area
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Practice count per effective tier in this area; every tier
+            is a key
+        overriddenCount:
+          type: integer
+          format: int32
+          description: How many of this area's practices set their own tier rather
+            than inheriting
+        reviewTier:
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: "The tier in force for this area, and where it came from"
+      required:
+      - counts
+      - overriddenCount
+      - reviewTier
     ArtifactTrace:
       type: object
       description: "Every practice's answer for one artifact, and the occurrences\
@@ -9680,7 +9792,7 @@ components:
         assessment:
           type: string
           description: "Assessment: GOOD or BAD; null when the presence carries no\
-            \ direction (NOT_APPLICABLE, INDETERMINATE)"
+            \ direction (NOT_APPLICABLE, INCONCLUSIVE)"
           enum:
           - GOOD
           - BAD
@@ -9725,12 +9837,12 @@ components:
           description: Practice slug
         presence:
           type: string
-          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE"
+          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE"
           enum:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-          - INDETERMINATE
+          - INCONCLUSIVE
         reasoning:
           type: string
           description: AI reasoning behind the observation
@@ -9783,7 +9895,7 @@ components:
         assessment:
           type: string
           description: "Assessment: GOOD or BAD; null when the presence carries no\
-            \ direction (NOT_APPLICABLE, INDETERMINATE)"
+            \ direction (NOT_APPLICABLE, INCONCLUSIVE)"
           enum:
           - GOOD
           - BAD
@@ -9822,12 +9934,12 @@ components:
           description: Practice slug
         presence:
           type: string
-          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INDETERMINATE"
+          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE"
           enum:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-          - INDETERMINATE
+          - INCONCLUSIVE
         severity:
           type: string
           description: Severity level (null unless assessment is BAD)
@@ -10271,15 +10383,10 @@ components:
           description: TypeScript/Bun precompute script for static analysis before
             AI review
         reviewTier:
-          type: string
-          description: "How loud this practice is: OFF = not reviewed · MEASURE =\
-            \ reviewed and recorded, silent · COACH = also raised in the mentor conversation\
-            \ · ENGAGE = also placed on the artifact"
-          enum:
-          - "OFF"
-          - MEASURE
-          - COACH
-          - ENGAGE
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: "How much autonomy the system has over this practice, whether\
+            \ that was set here or inherited from its area or workspace, and which\
+            \ level decided it"
         slug:
           type: string
           description: URL-safe identifier unique within workspace
@@ -10336,6 +10443,11 @@ components:
         name:
           type: string
           description: Human-readable name
+        reviewTier:
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: "How much autonomy the system has over every practice in this\
+            \ area that holds no tier of its own, whether that was set here or inherited\
+            \ from the workspace, and which level decided it"
         slug:
           type: string
           description: URL-safe identifier unique within the workspace
@@ -10351,6 +10463,7 @@ components:
       - displayOrder
       - id
       - name
+      - reviewTier
       - slug
       - visibleInPracticeDashboards
     PracticeAutomatedReview:
@@ -10619,12 +10732,48 @@ components:
           type: integer
           format: int32
           description: Raw override; null = inheriting the fleet default
+        defaultReviewTier:
+          type: string
+          description: "Effective: how much autonomy the system has over practices\
+            \ and areas that hold no tier of their own — the bottom of the practice\
+            \ → area → workspace chain"
+          enum:
+          - "OFF"
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
+        defaultReviewTierOverride:
+          type: string
+          description: "Raw override; null = this workspace has never chosen, so DELIVER\
+            \ applies"
+          enum:
+          - "OFF"
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
         deliverToMerged:
           type: boolean
           description: "Effective: deliver feedback to merged PRs/MRs"
         deliverToMergedOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
+        feedbackReach:
+          type: string
+          description: "Effective: where feedback may go at all. CONVERSATION = the\
+            \ recipient's mentor conversation and nowhere else · ON_THE_WORK = also\
+            \ on the work itself, as pull-request summaries, inline notes and issue\
+            \ comments. ANDed with every practice's tier, so this cannot make a quiet\
+            \ practice speak — only stop a loud one from speaking in a given place."
+          enum:
+          - CONVERSATION
+          - ON_THE_WORK
+        feedbackReachOverride:
+          type: string
+          description: "Raw override; null = this workspace has never chosen, so ON_THE_WORK\
+            \ applies"
+          enum:
+          - CONVERSATION
+          - ON_THE_WORK
         reviewScope:
           $ref: "#/components/schemas/WorkspaceReviewScope"
           description: "Which work is reviewed at all, ANDed onto every practice binding.\
@@ -10639,7 +10788,9 @@ components:
           description: Raw override; null = inheriting the fleet default
       required:
       - cooldownMinutes
+      - defaultReviewTier
       - deliverToMerged
+      - feedbackReach
       - reviewScope
       - runForAllUsers
     PracticeSignalOption:
@@ -10713,9 +10864,9 @@ components:
           description: How loudly the workspace currently runs this practice
           enum:
           - "OFF"
-          - MEASURE
-          - COACH
-          - ENGAGE
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
         watches:
           type: array
           description: The signals this practice watches
@@ -11771,7 +11922,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-          - INDETERMINATE
+          - INCONCLUSIVE
         role:
           type: string
           description: Whether the finding leads the message or reinforces it
@@ -12080,7 +12231,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-          - INDETERMINATE
+          - INCONCLUSIVE
         recurrenceKey:
           type: string
           description: Cross-run locus key; null when continuity is unavailable
@@ -12115,7 +12266,7 @@ components:
       type: object
       description: Counts of findings by assessment
       properties:
-        indeterminate:
+        inconclusive:
           type: integer
           format: int64
           description: Practices that looked at the evidence and could not settle
@@ -12132,7 +12283,7 @@ components:
           type: integer
           format: int64
       required:
-      - indeterminate
+      - inconclusive
       - notApplicable
       - problems
       - strengths
@@ -12194,7 +12345,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-          - INDETERMINATE
+          - INCONCLUSIVE
         reasoning:
           type: string
         recurrenceKey:
@@ -12464,6 +12615,81 @@ components:
       - id
       - lookbackDays
       - nextRunAt
+    ReviewTierAssignment:
+      type: object
+      description: "The autonomy tier in force here, whether it was set here or inherited,\
+        \ and the level that decided it"
+      properties:
+        effective:
+          type: string
+          description: "The tier actually in force. OFF = not reviewed · OBSERVE =\
+            \ reviewed and recorded, nobody is told · PROPOSE = feedback prepared\
+            \ for a human to approve (not selectable yet) · DELIVER = feedback delivered\
+            \ without asking"
+          enum:
+          - "OFF"
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
+        inherited:
+          type: boolean
+          description: True when this practice or area holds no tier of its own and
+            follows a level above
+        override:
+          type: string
+          description: "The tier set on this practice or area itself, or null when\
+            \ it holds none and inherits. Send null to the tier endpoint to clear\
+            \ it back to this state."
+          enum:
+          - "OFF"
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
+        source:
+          type: string
+          description: "Which level decided the effective tier: PRACTICE, AREA or\
+            \ WORKSPACE"
+          enum:
+          - PRACTICE
+          - AREA
+          - WORKSPACE
+      required:
+      - effective
+      - inherited
+      - source
+    ReviewTierRollup:
+      type: object
+      description: "Practice counts per autonomy tier, for the workspace and for each\
+        \ of its areas"
+      properties:
+        areas:
+          type: array
+          description: "The same counts per area, in catalogue order"
+          items:
+            $ref: "#/components/schemas/AreaReviewTierRollup"
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Practice count per effective tier across the whole workspace;
+            every tier is a key
+        feedbackReach:
+          type: string
+          description: "Where feedback may go in this workspace at all, ANDed with\
+            \ every tier"
+          enum:
+          - CONVERSATION
+          - ON_THE_WORK
+        workspaceDefault:
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: The workspace-level decision every area and practice falls
+            back to
+      required:
+      - areas
+      - counts
+      - feedbackReach
+      - workspaceDefault
     RevokeSessionsResult:
       type: object
       properties:
@@ -13403,12 +13629,31 @@ components:
             the cooldown
           maximum: 1440
           minimum: 0
+        defaultReviewTier:
+          type: string
+          description: How much autonomy the system has over practices and areas that
+            hold no tier of their own. The one decision that changes how loud a whole
+            workspace is. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset'
+            to clear it. PROPOSE is not selectable yet.
+          enum:
+          - "OFF"
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
         deliverToMerged:
           type: boolean
           description: Deliver feedback to already-merged PRs/MRs
+        feedbackReach:
+          type: string
+          description: "Where feedback may go at all: CONVERSATION for the mentor\
+            \ conversation only, ON_THE_WORK to also place it on the work. Null leaves\
+            \ it unchanged; name FEEDBACK_REACH in 'reset' to clear it."
+          enum:
+          - CONVERSATION
+          - ON_THE_WORK
         reset:
           type: array
-          description: Fields to reset to the inherited fleet default
+          description: Fields to reset back to inherit
           items:
             type: string
             enum:
@@ -13417,6 +13662,8 @@ components:
             - DELIVER_TO_MERGED
             - COOLDOWN_MINUTES
             - REVIEW_SCOPE
+            - DEFAULT_REVIEW_TIER
+            - FEEDBACK_REACH
           uniqueItems: true
         reviewScope:
           $ref: "#/components/schemas/WorkspaceReviewScope"
@@ -13429,20 +13676,22 @@ components:
             role)
     UpdatePracticeReviewTierRequest:
       type: object
-      description: Request to set how loud a practice is allowed to be in this workspace
+      description: "Set how much autonomy the system has here, or clear it back to\
+        \ inherit"
       properties:
         reviewTier:
           type: string
-          description: "OFF = not reviewed · MEASURE = reviewed and recorded, silent\
-            \ · COACH = also raised in the mentor conversation · ENGAGE = also placed\
-            \ on the artifact"
+          description: "OFF = not reviewed at all · OBSERVE = the review runs and\
+            \ every observation is recorded, and nobody is told · DELIVER = feedback\
+            \ is delivered without asking. Send null (or omit the field) to hold no\
+            \ tier here and inherit — a practice inherits its area's, an area inherits\
+            \ the workspace default. PROPOSE is declared but not selectable yet: it\
+            \ would prepare feedback with no way for anyone to approve it."
           enum:
           - "OFF"
-          - MEASURE
-          - COACH
-          - ENGAGE
-      required:
-      - reviewTier
+          - OBSERVE
+          - PROPOSE
+          - DELIVER
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in

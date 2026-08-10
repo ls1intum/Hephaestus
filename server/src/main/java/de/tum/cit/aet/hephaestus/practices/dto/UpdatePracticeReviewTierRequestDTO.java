@@ -2,14 +2,24 @@ package de.tum.cit.aet.hephaestus.practices.dto;
 
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.Nullable;
 
-@Schema(description = "Request to set how loud a practice is allowed to be in this workspace")
+/**
+ * Sets — or clears — the autonomy tier held by one practice or one area.
+ *
+ * <p>The field is deliberately nullable. Without a way to say "hold nothing", the inheritance chain would
+ * be write-once: an administrator who set one practice explicitly could never put it back under its area's
+ * decision, and the setting would silently accumulate the same per-row opinions it exists to remove.
+ */
+@Schema(description = "Set how much autonomy the system has here, or clear it back to inherit")
 public record UpdatePracticeReviewTierRequestDTO(
-    @NotNull(message = "Review tier is required")
+    @Nullable
     @Schema(
-        description = "OFF = not reviewed · MEASURE = reviewed and recorded, silent · " +
-            "COACH = also raised in the mentor conversation · ENGAGE = also placed on the artifact"
+        description = "OFF = not reviewed at all · OBSERVE = the review runs and every observation is " +
+            "recorded, and nobody is told · DELIVER = feedback is delivered without asking. Send null (or " +
+            "omit the field) to hold no tier here and inherit — a practice inherits its area's, an area " +
+            "inherits the workspace default. PROPOSE is declared but not selectable yet: it would prepare " +
+            "feedback with no way for anyone to approve it."
     )
     PracticeReviewTier reviewTier
 ) {}

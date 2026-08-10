@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Practice } from "@/api/types.gen";
-import { mockPractices } from "@/components/admin/practices/story-mock-data";
+import {
+	chosenTier,
+	inheritedTier,
+	mockPractices,
+} from "@/components/admin/practices/story-mock-data";
 import {
 	applyDisplayOrder,
 	applyPracticePlacements,
@@ -92,18 +96,18 @@ describe("practice catalog cache updates", () => {
 
 	it("supports empty destinations and structural-only rollback", () => {
 		const practices = [
-			{ ...practice("moving", "quality", 0), reviewTier: "ENGAGE" as const },
+			{ ...practice("moving", "quality", 0), reviewTier: inheritedTier("DELIVER") },
 			practice("remaining", "quality", 1),
 		];
 		const snapshot = practicePlacementSnapshot(practices, "moving", null);
 		const moved = placePractice(practices, "moving", null, 0).map((item) =>
-			item.slug === "moving" ? { ...item, reviewTier: "OFF" as const } : item,
+			item.slug === "moving" ? { ...item, reviewTier: chosenTier("OFF") } : item,
 		);
 
 		const restored = applyPracticePlacements(moved, snapshot);
 
 		expect(restored.find(({ slug }) => slug === "moving")).toMatchObject({
-			reviewTier: "OFF",
+			reviewTier: chosenTier("OFF"),
 			areaSlug: "quality",
 			displayOrder: 0,
 		});
@@ -113,7 +117,7 @@ describe("practice catalog cache updates", () => {
 	it("reconciles only fields owned by the edit request", () => {
 		const updated = {
 			...practice("edited", "delivery", 4),
-			reviewTier: "OFF" as const,
+			reviewTier: chosenTier("OFF"),
 			name: "Updated",
 		};
 

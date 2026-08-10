@@ -280,11 +280,23 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			const previousValue = queryClient
 				.getQueryData<Practice[]>(practicesQueryKey)
 				?.find((practice) => practice.slug === variables.path.practiceSlug)?.reviewTier;
-			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-				patchPractice(practices, variables.path.practiceSlug, {
-					reviewTier: variables.body.reviewTier,
-				}),
-			);
+			// A tier chosen here is held here, so the optimistic row can say so. Clearing it back to
+			// inherit (an omitted field) resolves against the area and the workspace, which only the
+			// server can do — guessing would flash a tier that is not the one about to arrive, so that
+			// case waits for the response instead.
+			const chosen = variables.body.reviewTier;
+			if (chosen) {
+				queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
+					patchPractice(practices, variables.path.practiceSlug, {
+						reviewTier: {
+							effective: chosen,
+							override: chosen,
+							source: "PRACTICE",
+							inherited: false,
+						},
+					}),
+				);
+			}
 			return { previousValue };
 		},
 		onError: (_error, variables, context) => {

@@ -1,10 +1,25 @@
-import type { Practice } from "@/api/types.gen";
+import type { Practice, PracticeArea, ReviewTierAssignment } from "@/api/types.gen";
+import type { ReviewTier } from "@/lib/review-tiers";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockMergeBinding,
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+
+/**
+ * The ordinary state of a practice nobody has configured: it holds no tier of its own and follows the
+ * workspace default. Most fixtures want this, because a catalog full of overrides is not what an admin
+ * opens the screen to.
+ */
+export function inheritedTier(effective: ReviewTier = "DELIVER"): ReviewTierAssignment {
+	return { effective, source: "WORKSPACE", inherited: true };
+}
+
+/** A tier somebody chose on this practice itself — the case a story is showing on purpose. */
+export function chosenTier(effective: ReviewTier): ReviewTierAssignment {
+	return { effective, override: effective, source: "PRACTICE", inherited: false };
+}
 
 export const mockPractices: Practice[] = [
 	{
@@ -22,7 +37,7 @@ export const mockPractices: Practice[] = [
 		automatedReviewPolicy: mockPullRequestPolicy,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
-		reviewTier: "ENGAGE",
+		reviewTier: inheritedTier(),
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-15"),
 	},
@@ -42,7 +57,7 @@ export const mockPractices: Practice[] = [
 		automatedReviewPolicy: mockPullRequestPolicy,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
-		reviewTier: "ENGAGE",
+		reviewTier: inheritedTier(),
 		createdAt: new Date("2025-06-02"),
 		updatedAt: new Date("2025-06-14"),
 	},
@@ -62,7 +77,7 @@ export const mockPractices: Practice[] = [
 		automatedReviewPolicy: mockPullRequestPolicy,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
-		reviewTier: "OFF",
+		reviewTier: chosenTier("OFF"),
 		createdAt: new Date("2025-06-03"),
 		updatedAt: new Date("2025-06-10"),
 	},
@@ -81,7 +96,7 @@ export const mockUnassignedPractice: Practice = {
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
-	reviewTier: "ENGAGE",
+	reviewTier: inheritedTier(),
 	createdAt: new Date("2025-06-05"),
 	updatedAt: new Date("2025-06-17"),
 };
@@ -97,7 +112,7 @@ export const mockPracticeLongText: Practice = {
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
-	reviewTier: "ENGAGE",
+	reviewTier: inheritedTier(),
 	createdAt: new Date("2025-06-06"),
 	updatedAt: new Date("2025-06-18"),
 };
@@ -129,12 +144,12 @@ export const mockPracticeWithAllTriggers: Practice = {
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
-	reviewTier: "ENGAGE",
+	reviewTier: inheritedTier(),
 	createdAt: new Date("2025-06-04"),
 	updatedAt: new Date("2025-06-16"),
 };
 
-export const mockAreas: import("@/api/types.gen").PracticeArea[] = [
+export const mockAreas: PracticeArea[] = [
 	{
 		id: 1,
 		slug: "review-ready-work",
@@ -142,6 +157,7 @@ export const mockAreas: import("@/api/types.gen").PracticeArea[] = [
 		description: "Make each change easy and fast to review.",
 		visibleInPracticeDashboards: true,
 		displayOrder: 1,
+		reviewTier: inheritedTier(),
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-01"),
 	},
@@ -152,6 +168,7 @@ export const mockAreas: import("@/api/types.gen").PracticeArea[] = [
 		description: "Give a maintainer enough to start work.",
 		visibleInPracticeDashboards: true,
 		displayOrder: 3,
+		reviewTier: inheritedTier(),
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-01"),
 	},

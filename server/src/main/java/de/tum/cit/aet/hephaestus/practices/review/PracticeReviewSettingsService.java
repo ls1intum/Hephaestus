@@ -4,11 +4,14 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +44,9 @@ public class PracticeReviewSettingsService {
         settings.reset(req.reset());
         settings.applyPatch(req.runForAllUsers(), req.deliverToMerged(), req.cooldownMinutes());
         settings.applyScope(req.reviewScope());
+        requireSelectable(req.defaultReviewTier());
+        settings.applyDefaultReviewTier(req.defaultReviewTier() == null ? null : req.defaultReviewTier().name());
+        settings.applyFeedbackReach(req.feedbackReach() == null ? null : req.feedbackReach().name());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
@@ -51,6 +57,22 @@ public class PracticeReviewSettingsService {
             )
         );
         return toView(workspaceRepository.save(workspace));
+    }
+
+    /**
+     * Refuses a tier an administrator may not select yet.
+     *
+     * <p>Enforced at all three levels — practice, area and here — because a workspace default that could be
+     * PROPOSE would silently park every inheriting practice on it, which is the largest-blast-radius version
+     * of preparing feedback nobody can approve.
+     */
+    private static void requireSelectable(@Nullable PracticeReviewTier tier) {
+        if (tier != null && !tier.selectable()) {
+            throw new IllegalArgumentException(
+                "Propose is not available yet: feedback would be prepared with no way for anyone to approve " +
+                    "it. Use Observe to keep measuring in silence, or Deliver to send feedback without approval."
+            );
+        }
     }
 
     private Workspace requireWorkspace(WorkspaceContext workspaceContext) {
@@ -71,6 +93,7 @@ public class PracticeReviewSettingsService {
 
     private PracticeReviewSettingsDTO toView(Workspace workspace) {
         PracticeReviewSettings s = workspace.getReviewSettings();
+        WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(s);
         return new PracticeReviewSettingsDTO(
             s.resolveRunForAllUsers(reviewProperties.runForAllUsers()),
             s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
@@ -78,7 +101,11 @@ public class PracticeReviewSettingsService {
             s.getRunForAllUsers(),
             s.getDeliverToMerged(),
             s.getCooldownMinutes(),
-            s.resolveReviewScope()
+            s.resolveReviewScope(),
+            defaults.defaultTier(),
+            s.getDefaultReviewTier() == null ? null : PracticeReviewTier.valueOf(s.getDefaultReviewTier()),
+            defaults.reach(),
+            s.getFeedbackReach() == null ? null : FeedbackReach.valueOf(s.getFeedbackReach())
         );
     }
 }

@@ -37,6 +37,12 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	cooldownMinutesOverride: 30,
 	deliverToMergedOverride: undefined,
 	runForAllUsersOverride: undefined,
+	// Never chosen here, so both fall back to what a fresh workspace gets: the bottom of the
+	// practice → area → workspace chain speaks, and it may speak on the work itself.
+	defaultReviewTier: "DELIVER",
+	defaultReviewTierOverride: undefined,
+	feedbackReach: "ON_THE_WORK",
+	feedbackReachOverride: undefined,
 };
 
 /**

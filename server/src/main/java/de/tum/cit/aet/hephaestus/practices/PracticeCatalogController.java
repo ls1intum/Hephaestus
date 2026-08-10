@@ -10,10 +10,12 @@ import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReviewTierRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierRollupService;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -53,6 +55,7 @@ public class PracticeCatalogController {
 
     private final PracticeService practiceService;
     private final CatalogOriginPresenter presenter;
+    private final ReviewTierRollupService rollupService;
     private final PracticeAreaService areaService;
     private final PracticeDefinitionOptionsService definitionOptionsService;
 
@@ -70,7 +73,9 @@ public class PracticeCatalogController {
     @GetMapping
     @Operation(
         summary = "List practice definitions",
-        description = "Returns workspace practice definitions, optionally filtered by loudness tier"
+        description = "Returns this workspace's practices, each with the autonomy tier in force for it, " +
+            "whether that tier was set on the practice or inherited from its area or the workspace, and " +
+            "which level decided it. Optionally narrowed to one tier."
     )
     @ApiResponse(
         responseCode = "200",
@@ -81,10 +86,11 @@ public class PracticeCatalogController {
     public ResponseEntity<List<PracticeDTO>> listPractices(
         WorkspaceContext workspaceContext,
         @RequestParam(name = "reviewTier", required = false) @Parameter(
-            description = "Filter to practices at exactly this loudness tier"
+            description = "Keep only the practices whose tier IN FORCE is exactly this one, inherited or not"
         ) PracticeReviewTier reviewTier
     ) {
         List<PracticeDTO> practices = presenter.presentPractices(
+            workspaceContext.id(),
             practiceService.listPractices(workspaceContext, reviewTier)
         );
         return ResponseEntity.ok(practices);
@@ -132,7 +138,7 @@ public class PracticeCatalogController {
         @PathVariable String practiceSlug
     ) {
         Practice practice = practiceService.getPractice(workspaceContext, practiceSlug);
-        return ResponseEntity.ok(presenter.present(practice));
+        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
     }
 
     @PostMapping
@@ -169,7 +175,7 @@ public class PracticeCatalogController {
             .path("/{slug}")
             .buildAndExpand(practice.getSlug())
             .toUri();
-        return ResponseEntity.created(location).body(presenter.present(practice));
+        return ResponseEntity.created(location).body(presenter.present(workspaceContext.id(), practice));
     }
 
     @PatchMapping("/reorder")
@@ -197,7 +203,10 @@ public class PracticeCatalogController {
         @Valid @RequestBody ReorderPracticesRequestDTO request
     ) {
         practiceService.reorderPractices(workspaceContext, request.areaSlug(), request.orderedSlugs());
-        List<PracticeDTO> practices = presenter.presentPractices(practiceService.listPractices(workspaceContext, null));
+        List<PracticeDTO> practices = presenter.presentPractices(
+            workspaceContext.id(),
+            practiceService.listPractices(workspaceContext, null)
+        );
         return ResponseEntity.ok(practices);
     }
 
@@ -224,19 +233,30 @@ public class PracticeCatalogController {
         @Valid @RequestBody UpdatePracticeRequestDTO request
     ) {
         Practice practice = practiceService.updatePractice(workspaceContext, practiceSlug, request);
-        return ResponseEntity.ok(presenter.present(practice));
+        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
     }
 
     @PatchMapping("/{practiceSlug}/review-tier")
     @Operation(
-        summary = "Set how loud a practice is",
-        description = "OFF stops the review entirely; MEASURE keeps measuring in silence; COACH adds the " +
-            "mentor conversation; ENGAGE also places feedback on the artifact"
+        summary = "Set how much autonomy the system has over one practice",
+        description = "OFF stops the review entirely. OBSERVE runs it and records every observation without " +
+            "telling anyone. DELIVER sends feedback without asking, as far as this workspace's reach " +
+            "allows. Send a null tier to clear the practice's own setting so it follows its area, and " +
+            "through the area the workspace default."
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Loudness tier updated",
+        description = "Tier updated; the response carries the tier now in force and where it came from",
         content = @Content(schema = @Schema(implementation = PracticeDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "The tier cannot be selected: PROPOSE has no approval queue yet, or this practice's " +
+            "review settings cannot run an automated review at any tier above OFF",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)
+        )
     )
     @ApiResponse(
         responseCode = "404",
@@ -254,7 +274,7 @@ public class PracticeCatalogController {
         @Valid @RequestBody UpdatePracticeReviewTierRequestDTO request
     ) {
         Practice practice = practiceService.setReviewTier(workspaceContext, practiceSlug, request.reviewTier());
-        return ResponseEntity.ok(presenter.present(practice));
+        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
     }
 
     @PutMapping("/{practiceSlug}/area")
@@ -283,7 +303,7 @@ public class PracticeCatalogController {
         @Valid @RequestBody BindPracticeAreaRequestDTO request
     ) {
         Practice practice = areaService.bindPractice(workspaceContext, practiceSlug, request.areaSlug());
-        return ResponseEntity.ok(presenter.present(practice));
+        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
     }
 
     @PutMapping("/{practiceSlug}/placement")
@@ -320,6 +340,7 @@ public class PracticeCatalogController {
         @Valid @RequestBody PlacePracticeRequestDTO request
     ) {
         List<PracticeDTO> practices = presenter.presentPractices(
+            workspaceContext.id(),
             practiceService.placePractice(workspaceContext, practiceSlug, request.areaSlug(), request.position())
         );
         return ResponseEntity.ok(practices);
@@ -341,5 +362,23 @@ public class PracticeCatalogController {
     public ResponseEntity<Void> deletePractice(WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
         practiceService.deletePractice(workspaceContext, practiceSlug);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/review-tiers")
+    @Operation(
+        summary = "Summarise how loud this workspace is, by area",
+        description = "How many practices sit at each autonomy tier, for the whole workspace and for each " +
+            "area, plus the workspace default and where feedback may go. The summary a hundred-practice " +
+            "catalogue is read through — answered here so a client never has to fetch every practice to " +
+            "count them."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Rollup returned",
+        content = @Content(schema = @Schema(implementation = ReviewTierRollupDTO.class))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<ReviewTierRollupDTO> reviewTierRollup(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(rollupService.rollup(workspaceContext.id()));
     }
 }

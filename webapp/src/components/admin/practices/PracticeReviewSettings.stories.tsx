@@ -12,6 +12,9 @@ const settings: PracticeReviewSettingsData = {
 	deliverToMerged: false,
 	cooldownMinutes: 30,
 	reviewScope: { targetBranches: [], repositories: [] },
+	// Neither has been chosen here, so both show what a fresh workspace gets.
+	defaultReviewTier: "DELIVER",
+	feedbackReach: "ON_THE_WORK",
 };
 
 const readyBinding: AgentBinding = {

@@ -15,14 +15,18 @@ record PracticeReviewSnapshot(
     @Nullable Boolean runForAllUsers,
     @Nullable Boolean deliverToMerged,
     @Nullable Integer cooldownMinutes,
-    @Nullable WorkspaceReviewScope reviewScope
+    @Nullable WorkspaceReviewScope reviewScope,
+    @Nullable String defaultReviewTier,
+    @Nullable String feedbackReach
 ) implements ConfigAuditSnapshot {
     static PracticeReviewSnapshot of(PracticeReviewSettings s) {
         return new PracticeReviewSnapshot(
             s.getRunForAllUsers(),
             s.getDeliverToMerged(),
             s.getCooldownMinutes(),
-            s.getReviewScope()
+            s.getReviewScope(),
+            s.getDefaultReviewTier(),
+            s.getFeedbackReach()
         );
     }
 }
