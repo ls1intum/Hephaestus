@@ -142,25 +142,19 @@ function countByTier(practices: readonly Practice[]): Record<string, number> {
  *
  * <p>`overriddenCount` is per area and counts practices only, so an admin who set three area tiers and
  * nothing else would read "0 set their own" and conclude the screen was broken.
+ *
+ * <p>Taken from the rollup rather than from the grouped rows: the rollup already counts every practice
+ * in the workspace, while the groups carry only the ones a filter left standing — and asking the
+ * groups would mean grouping a hundred practices a second time on every render just to add up two
+ * numbers the server already sent.
  */
-export function countOverrides(groups: readonly AutonomyGroup[]): {
+export function countOverrides(rollup: ReviewTierRollup): {
 	practices: number;
 	areas: number;
 } {
 	return {
-		practices: groups.reduce((total, group) => total + group.overriddenCount, 0),
-		areas: groups.filter((group) => group.areaSlug !== null && isOverridden(group.reviewTier))
+		practices: rollup.areas.reduce((total, area) => total + area.overriddenCount, 0),
+		areas: rollup.areas.filter((area) => area.areaSlug != null && isOverridden(area.reviewTier))
 			.length,
 	};
-}
-
-/** Sums the per-area maps rather than the workspace map, so a filtered view can report what it shows. */
-export function sumCounts(groups: readonly AutonomyGroup[]): Record<string, number> {
-	const total: Record<string, number> = {};
-	for (const group of groups) {
-		for (const [tier, count] of Object.entries(group.counts)) {
-			total[tier] = (total[tier] ?? 0) + count;
-		}
-	}
-	return total;
 }

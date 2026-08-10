@@ -106,9 +106,16 @@ describe("isOverridden", () => {
 
 describe("countOverrides", () => {
 	it("counts both levels, because an admin who only set area tiers has still decided something", () => {
-		const groups = groupPracticesByArea(fixture.rollup, fixture.practices);
+		expect(countOverrides(fixture.rollup)).toEqual({ practices: 1, areas: 1 });
+	});
 
-		expect(countOverrides(groups)).toEqual({ practices: 1, areas: 1 });
+	it("still answers for the whole workspace while the list is filtered down to a handful", () => {
+		const filtered = groupPracticesByArea(fixture.rollup, fixture.practices, {
+			overridesOnly: true,
+		});
+
+		expect(filtered.flatMap((group) => group.practices)).toHaveLength(1);
+		expect(countOverrides(fixture.rollup).practices).toBe(1);
 	});
 });
 

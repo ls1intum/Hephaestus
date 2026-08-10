@@ -1,6 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import type { Practice, PracticeReviewSettings, ReviewTierAssignment } from "@/api/types.gen";
+import type {
+	Practice,
+	PracticeReviewSettings,
+	ReviewTierAssignment,
+	ReviewTierRollup,
+} from "@/api/types.gen";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	Accordion,
@@ -65,7 +70,7 @@ export interface ReviewAutonomyPageProps {
 	workspaceSlug: string;
 	settings: PracticeReviewSettings;
 	/** Server-resolved counts for the whole workspace and every area, in catalogue order. */
-	rollup: Parameters<typeof groupPracticesByArea>[0];
+	rollup: ReviewTierRollup;
 	practices: Practice[];
 	pending: ReviewAutonomyPendingState;
 	overridesOnly: boolean;
@@ -112,7 +117,7 @@ export function ReviewAutonomyPage({
 	const [openAreas, setOpenAreas] = useState<string[]>([]);
 
 	const groups = groupPracticesByArea(rollup, practices, { overridesOnly });
-	const overrides = countOverrides(groupPracticesByArea(rollup, practices));
+	const overrides = countOverrides(rollup);
 	// Filtering is a reading mode, not a navigation one: a narrowed list whose groups are all shut
 	// hides the very rows it was opened to show.
 	const openValue = overridesOnly ? groups.map((group) => group.key) : openAreas;

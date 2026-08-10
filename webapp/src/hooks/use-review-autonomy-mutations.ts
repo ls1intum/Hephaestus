@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	listAreasQueryKey,
@@ -30,6 +30,9 @@ export interface BulkProgress {
 export function useReviewAutonomyMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
 	const [bulk, setBulk] = useState<BulkProgress | null>(null);
+	// A ref rather than the state above, because the mutation's own callbacks close over the render
+	// that created them and would keep reading `null` for the whole run.
+	const bulkRunning = useRef(false);
 	const areaMutationKey = ["review-autonomy", workspaceSlug, "areas"] as const;
 
 	const invalidateResolved = () => {
@@ -69,7 +72,13 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 		...setReviewTierMutation(),
 		onError: (error) =>
 			toast.error("Couldn't change the practice", { description: problemDetailOf(error) }),
-		onSettled: invalidateResolved,
+		// One write, one refetch — except inside a bulk run, which settles once at the end. Otherwise
+		// setting a hundred practices marks the practice list and the rollup stale a hundred times over
+		// and refetches both after every single PATCH, so the screen spends the whole run redrawing rows
+		// that are about to change again.
+		onSettled: () => {
+			if (!bulkRunning.current) invalidateResolved();
+		},
 	});
 
 	/**
@@ -87,6 +96,7 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 	) => {
 		if (practiceSlugs.length === 0) return;
 		let failed = 0;
+		bulkRunning.current = true;
 		setBulk({ done: 0, total: practiceSlugs.length });
 		try {
 			for (const [index, practiceSlug] of practiceSlugs.entries()) {
@@ -103,6 +113,7 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 				setBulk({ done: index + 1, total: practiceSlugs.length });
 			}
 		} finally {
+			bulkRunning.current = false;
 			setBulk(null);
 			invalidateResolved();
 		}
