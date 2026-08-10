@@ -176,7 +176,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
      * reach of the only artifact they apply to.
      */
     /**
-     * A review somebody asked for by hand. No bundled practice binds {@code scm.pull_request.review_requested}
+     * A review somebody asked for by hand. No bundled practice binds {@code scm.pull_request.manual_review}
      * — nothing in {@code default-catalog.json} mentions it — so matching a request by signal would refuse
      * every one of them with "no matching practices", which reads to a developer as a broken workspace. The
      * request instead admits every practice on the kind.
@@ -184,7 +184,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     @Nested
     class ManualRequestTests {
 
-        private static final SignalName REQUEST = ScmSignals.PULL_REQUEST_REVIEW_REQUESTED;
+        private static final SignalName REQUEST = ScmSignals.PULL_REQUEST_MANUAL_REVIEW;
 
         @BeforeEach
         void treatTheRequestSignalAsARequest() {

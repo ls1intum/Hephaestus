@@ -376,7 +376,7 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         row.setWorkspace(workspace);
         row.setArtifactKind(ArtifactKinds.PULL_REQUEST.value());
         row.setArtifactId(artifactId);
-        row.setSignalName(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED.value());
+        row.setSignalName(ScmSignals.PULL_REQUEST_MANUAL_REVIEW.value());
         row.setRevision("run~" + UUID.randomUUID());
         row.setOccurredAt(occurredAt);
         row.setDiscoveredVia(DiscoveredVia.MANUAL);

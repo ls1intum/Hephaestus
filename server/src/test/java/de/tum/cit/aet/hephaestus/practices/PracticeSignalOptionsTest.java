@@ -35,7 +35,7 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
                 ScmSignals.PULL_REQUEST_REVIEWED,
                 ScmSignals.PULL_REQUEST_MERGED,
                 ScmSignals.PULL_REQUEST_CLOSED,
-                ScmSignals.PULL_REQUEST_REVIEW_REQUESTED
+                ScmSignals.PULL_REQUEST_MANUAL_REVIEW
             );
         assertThat(options.optionsFor(ArtifactKinds.ISSUE))
             .extracting(SignalOption::signal)
@@ -43,7 +43,7 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
                 ScmSignals.ISSUE_OPENED,
                 ScmSignals.ISSUE_LABELED,
                 ScmSignals.ISSUE_CLOSED,
-                ScmSignals.ISSUE_REVIEW_REQUESTED
+                ScmSignals.ISSUE_MANUAL_REVIEW
             );
     }
 
@@ -91,7 +91,7 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
         // Both of these are real occasions with no ingested event behind them: somebody asked for a
         // review, or a scheduler decided a discussion had finished. Coverage must not read that as a
         // vendor failing to deliver.
-        assertThat(options.producedByIngestion(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED)).isFalse();
+        assertThat(options.producedByIngestion(ScmSignals.PULL_REQUEST_MANUAL_REVIEW)).isFalse();
         assertThat(options.producedByIngestion(ChatSignals.CONVERSATION_THREAD_SETTLED)).isFalse();
         assertThat(options.producedByIngestion(ScmSignals.PULL_REQUEST_MERGED)).isTrue();
     }

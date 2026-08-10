@@ -62,7 +62,7 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
         Set<SignalName> covered = everyIngestedSignal();
         assertThat(covered).doesNotContain(
             ChatSignals.CONVERSATION_THREAD_SETTLED,
-            ScmSignals.PULL_REQUEST_REVIEW_REQUESTED
+            ScmSignals.PULL_REQUEST_MANUAL_REVIEW
         );
 
         assertThatCode(coverage(covered)::validateAuthoringVocabulary).doesNotThrowAnyException();

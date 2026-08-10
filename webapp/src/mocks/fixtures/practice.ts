@@ -117,7 +117,7 @@ export const mockPracticeDefinitionOptions = {
 					recommended: false,
 				},
 				{
-					signal: "scm.pull_request.review_requested",
+					signal: "scm.pull_request.manual_review",
 					displayName: "Review requested by hand",
 					recommended: false,
 				},
@@ -175,7 +175,7 @@ export const mockPracticeDefinitionOptions = {
 				{ signal: "scm.issue.labeled", displayName: "Labeled", recommended: true },
 				{ signal: "scm.issue.closed", displayName: "Closed", recommended: false },
 				{
-					signal: "scm.issue.review_requested",
+					signal: "scm.issue.manual_review",
 					displayName: "Review requested by hand",
 					recommended: false,
 				},

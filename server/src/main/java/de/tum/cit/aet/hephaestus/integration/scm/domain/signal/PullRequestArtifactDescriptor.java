@@ -61,7 +61,7 @@ public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
         ),
         // No ingested event raises this one: it is somebody asking for a review by hand. Declaring the
         // empty provenance is what stops a vendor from claiming it can raise it.
-        declareManualRequest(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED, "Review requested by hand")
+        declareManualRequest(ScmSignals.PULL_REQUEST_MANUAL_REVIEW, "Review requested by hand")
     );
 
     @Override

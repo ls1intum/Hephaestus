@@ -46,7 +46,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <h2>The occasion is the request, and it is recorded as one</h2>
  * <p>The gate is asked about the kind's declared manual-request signal — {@code
- * scm.pull_request.review_requested} and its issue counterpart — not about some lifecycle event that
+ * scm.pull_request.manual_review} and its issue counterpart — not about some lifecycle event that
  * did not happen. The artifact trace renders the signal as the reason a review ran, so naming an event
  * nobody observed puts an untruth in the one place a developer goes to find out why.
  *

@@ -194,11 +194,11 @@ class ScmSignalsTest extends BaseUnitTest {
             ScmSignals.PULL_REQUEST_REVIEWED,
             ScmSignals.PULL_REQUEST_MERGED,
             ScmSignals.PULL_REQUEST_CLOSED,
-            ScmSignals.PULL_REQUEST_REVIEW_REQUESTED,
+            ScmSignals.PULL_REQUEST_MANUAL_REVIEW,
             ScmSignals.ISSUE_OPENED,
             ScmSignals.ISSUE_LABELED,
             ScmSignals.ISSUE_CLOSED,
-            ScmSignals.ISSUE_REVIEW_REQUESTED,
+            ScmSignals.ISSUE_MANUAL_REVIEW,
         }) {
             assertThat(ScmSignals.revisionScheme(signal)).as(signal.value()).isNotNull();
         }

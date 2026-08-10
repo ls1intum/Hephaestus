@@ -236,7 +236,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
     @Nested
     class RequestSignalsMustBeRecordable {
 
-        private static final SignalName REQUESTED = SignalName.of("fixture.widget.review_requested");
+        private static final SignalName REQUESTED = SignalName.of("fixture.widget.manual_review");
 
         private static ArtifactDescriptor withRequestSignal(Signal request) {
             return FixtureIntegration.descriptor(

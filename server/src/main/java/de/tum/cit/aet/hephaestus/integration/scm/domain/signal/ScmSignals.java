@@ -38,12 +38,21 @@ public final class ScmSignals {
     public static final SignalName PULL_REQUEST_REVIEWED = SignalName.of("scm.pull_request.reviewed");
     public static final SignalName PULL_REQUEST_MERGED = SignalName.of("scm.pull_request.merged");
     public static final SignalName PULL_REQUEST_CLOSED = SignalName.of("scm.pull_request.closed");
-    public static final SignalName PULL_REQUEST_REVIEW_REQUESTED = SignalName.of("scm.pull_request.review_requested");
+    /**
+     * Somebody asked Hephaestus for a review of this pull request by hand.
+     *
+     * <p>Deliberately not {@code review_requested}: GitHub's {@code pull_request} webhook already uses
+     * that action for something else — a human reviewer being assigned — and {@link
+     * #PULL_REQUEST_REVIEWED} above already occupies that world. A name that reads as an ingested
+     * lifecycle event would also invite a vendor to claim it can raise this one; nothing can, which is
+     * why its descriptor declares an empty provenance.
+     */
+    public static final SignalName PULL_REQUEST_MANUAL_REVIEW = SignalName.of("scm.pull_request.manual_review");
 
     public static final SignalName ISSUE_OPENED = SignalName.of("scm.issue.opened");
     public static final SignalName ISSUE_LABELED = SignalName.of("scm.issue.labeled");
     public static final SignalName ISSUE_CLOSED = SignalName.of("scm.issue.closed");
-    public static final SignalName ISSUE_REVIEW_REQUESTED = SignalName.of("scm.issue.review_requested");
+    public static final SignalName ISSUE_MANUAL_REVIEW = SignalName.of("scm.issue.manual_review");
 
     private static final Map<String, SignalName> BY_TRIGGER_EVENT = Map.of(
         TriggerEventNames.PULL_REQUEST_CREATED,
@@ -77,11 +86,11 @@ public final class ScmSignals {
         Map.entry(PULL_REQUEST_REVIEWED, RevisionScheme.HEAD_COMMIT),
         Map.entry(PULL_REQUEST_MERGED, RevisionScheme.TERMINAL_STATE),
         Map.entry(PULL_REQUEST_CLOSED, RevisionScheme.TERMINAL_STATE),
-        Map.entry(PULL_REQUEST_REVIEW_REQUESTED, RevisionScheme.RUN_ID),
+        Map.entry(PULL_REQUEST_MANUAL_REVIEW, RevisionScheme.RUN_ID),
         Map.entry(ISSUE_OPENED, RevisionScheme.CONTENT_DIGEST),
         Map.entry(ISSUE_LABELED, RevisionScheme.CONTENT_DIGEST),
         Map.entry(ISSUE_CLOSED, RevisionScheme.TERMINAL_STATE),
-        Map.entry(ISSUE_REVIEW_REQUESTED, RevisionScheme.RUN_ID)
+        Map.entry(ISSUE_MANUAL_REVIEW, RevisionScheme.RUN_ID)
     );
 
     private ScmSignals() {}

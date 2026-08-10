@@ -2335,4 +2335,123 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-readiness" id="1785743133884-42">
+        <preConditions onFail="MARK_RAN" onFailMessage="signal state reasons already name the model binding">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_name = 'artifact_signal' AND column_name = 'state_reason'
+            </sqlCheck>
+        </preConditions>
+        <comment>Say the review model is unbound, not that a practice binding is off: they send an operator to different screens.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            UPDATE artifact_signal SET state_reason = 'REVIEW_MODEL_UNBOUND'
+                WHERE state_reason = 'BINDING_DISABLED';
+
+            UPDATE review_backfill_run SET pause_reason = 'REVIEW_MODEL_UNBOUND'
+                WHERE pause_reason = 'BINDING_DISABLED';
+
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_pause_reason;
+            ALTER TABLE review_backfill_run ADD CONSTRAINT ck_review_backfill_run_pause_reason
+                CHECK (pause_reason IS NULL OR pause_reason IN
+                    ('BUDGET_EXHAUSTED','REVIEW_MODEL_UNBOUND','WORKSPACE_UNAVAILABLE'));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            UPDATE artifact_signal SET state_reason = 'BINDING_DISABLED'
+                WHERE state_reason = 'REVIEW_MODEL_UNBOUND';
+
+            UPDATE review_backfill_run SET pause_reason = 'BINDING_DISABLED'
+                WHERE pause_reason = 'REVIEW_MODEL_UNBOUND';
+
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_pause_reason;
+            ALTER TABLE review_backfill_run ADD CONSTRAINT ck_review_backfill_run_pause_reason
+                CHECK (pause_reason IS NULL OR pause_reason IN
+                    ('BUDGET_EXHAUSTED','BINDING_DISABLED','WORKSPACE_UNAVAILABLE'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-43">
+        <preConditions onFail="MARK_RAN" onFailMessage="the signal ledger is not present">
+            <tableExists tableName="artifact_signal"/>
+        </preConditions>
+        <comment>Re-file reviews somebody asked for by hand under a name GitHub does not already use for assigning a reviewer.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            /* The dedup key is (workspace, kind, artifact, signal_name, revision), and a manual request
+               takes a fresh run id as its revision, so no row can already hold the new name for the same
+               revision. The NOT EXISTS guard is there so that if one somehow does, the migration leaves
+               it where it is instead of failing the deploy or deleting somebody's history. */
+            UPDATE artifact_signal old
+               SET signal_name = replace(old.signal_name, 'review_requested', 'manual_review')
+             WHERE old.signal_name IN ('scm.pull_request.review_requested', 'scm.issue.review_requested')
+               AND NOT EXISTS (
+                   SELECT 1 FROM artifact_signal fresh
+                    WHERE fresh.workspace_id = old.workspace_id
+                      AND fresh.artifact_kind = old.artifact_kind
+                      AND fresh.artifact_id = old.artifact_id
+                      AND fresh.revision = old.revision
+                      AND fresh.signal_name = replace(old.signal_name, 'review_requested', 'manual_review')
+               );
+
+            /* A workspace may have authored a practice bound to the old name: the signal picker offers
+               every signal a kind declares, the manual one included. The name is a quoted string inside
+               the bindings array, and no other value in that document contains it — a source kind spells
+               the same domain with hyphens — so a text substitution is exact here. */
+            UPDATE practice SET bindings = replace(bindings::text,
+                    'review_requested"', 'manual_review"')::jsonb
+                WHERE bindings::text LIKE '%.review_requested"%';
+
+            UPDATE curated_practice_override SET bindings = replace(bindings::text,
+                    'review_requested"', 'manual_review"')::jsonb
+                WHERE bindings::text LIKE '%.review_requested"%';
+
+            /* A revision is immutable by trigger, and the practice's current revision must project the
+               practice exactly. Renaming one side and not the other would leave the projection broken,
+               so the revision moves with it under the same suspension the earlier bindings migration
+               used, and both land inside this changeset's transaction before the deferred projection
+               check runs. */
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+            UPDATE practice_revision SET bindings = replace(bindings::text,
+                    'review_requested"', 'manual_review"')::jsonb
+                WHERE bindings::text LIKE '%.review_requested"%';
+            /* The signal name feeds the review-rule fingerprint, so any revision that moved now carries
+               one describing a rule set spelled a way that no longer exists. Cleared for
+               CatalogProvenanceBackfill to recompute on the next boot, as changesets -21, -22 and -25 do. */
+            UPDATE practice_revision SET review_rule_fingerprint = NULL
+                WHERE bindings::text LIKE '%.manual_review"%';
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            UPDATE artifact_signal old
+               SET signal_name = replace(old.signal_name, 'manual_review', 'review_requested')
+             WHERE old.signal_name IN ('scm.pull_request.manual_review', 'scm.issue.manual_review')
+               AND NOT EXISTS (
+                   SELECT 1 FROM artifact_signal stale
+                    WHERE stale.workspace_id = old.workspace_id
+                      AND stale.artifact_kind = old.artifact_kind
+                      AND stale.artifact_id = old.artifact_id
+                      AND stale.revision = old.revision
+                      AND stale.signal_name = replace(old.signal_name, 'manual_review', 'review_requested')
+               );
+
+            UPDATE practice SET bindings = replace(bindings::text,
+                    'manual_review"', 'review_requested"')::jsonb
+                WHERE bindings::text LIKE '%.manual_review"%';
+
+            UPDATE curated_practice_override SET bindings = replace(bindings::text,
+                    'manual_review"', 'review_requested"')::jsonb
+                WHERE bindings::text LIKE '%.manual_review"%';
+
+            ALTER TABLE practice_revision DISABLE TRIGGER practice_revision_immutable_update;
+            UPDATE practice_revision SET bindings = replace(bindings::text,
+                    'manual_review"', 'review_requested"')::jsonb
+                WHERE bindings::text LIKE '%.manual_review"%';
+            UPDATE practice_revision SET review_rule_fingerprint = NULL
+                WHERE bindings::text LIKE '%.review_requested"%';
+            ALTER TABLE practice_revision ENABLE TRIGGER practice_revision_immutable_update;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

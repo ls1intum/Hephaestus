@@ -81,7 +81,7 @@ public class PracticeSignalOptions {
      * loads. A hand-requested review has to be admitted by <em>both</em> — admitting it at the gate alone
      * buys a job that then fails to prepare, having found no practice bound to a signal no practice binds to.
      *
-     * <p>Derived from the descriptor rather than from the signal's spelling. Matching a {@code review_requested}
+     * <p>Derived from the descriptor rather than from the signal's spelling. Matching a {@code manual_review}
      * suffix here would encode one domain's naming habit as a core rule and quietly fail for a kind that
      * spells its request differently.
      */

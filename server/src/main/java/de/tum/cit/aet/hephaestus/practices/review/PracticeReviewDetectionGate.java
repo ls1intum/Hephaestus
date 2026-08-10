@@ -410,7 +410,7 @@ public class PracticeReviewDetectionGate {
      * The practices a signal occasions.
      *
      * <p>A review somebody asked for by hand is matched differently, and deliberately so. No bundled practice
-     * binds a {@code *.review_requested} signal, and none should have to: a person asking "review this now"
+     * binds a {@code *.manual_review} signal, and none should have to: a person asking "review this now"
      * is asking for the practices this workspace measures on this kind of work, not for a separate catalog
      * somebody has to remember to maintain in parallel. Matching by signal would refuse every such request
      * with "no matching practices", which reads as a broken workspace.

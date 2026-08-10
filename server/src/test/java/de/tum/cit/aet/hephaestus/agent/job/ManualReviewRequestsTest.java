@@ -107,7 +107,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         lenient().when(rateLimits.refusalFor(any(), any(), anyLong(), any())).thenReturn(Optional.empty());
         lenient()
             .when(signalOptions.manualRequestSignalFor(ScmSignals.PULL_REQUEST))
-            .thenReturn(Optional.of(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED));
+            .thenReturn(Optional.of(ScmSignals.PULL_REQUEST_MANUAL_REVIEW));
     }
 
     @Test
@@ -132,7 +132,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
 
         requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
-        verify(gate).evaluate(any(), eq(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED), eq(TriggerMode.MANUAL));
+        verify(gate).evaluate(any(), eq(ScmSignals.PULL_REQUEST_MANUAL_REVIEW), eq(TriggerMode.MANUAL));
         verify(gate, never()).evaluate(any(), eq(ScmSignals.PULL_REQUEST_OPENED), any());
     }
 
@@ -171,7 +171,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         SignalKey key = captor.getValue();
         assertThat(key.workspaceId()).isEqualTo(WORKSPACE_ID);
         assertThat(key.artifactId()).isEqualTo(PR_ID);
-        assertThat(key.signalName()).isEqualTo(ScmSignals.PULL_REQUEST_REVIEW_REQUESTED);
+        assertThat(key.signalName()).isEqualTo(ScmSignals.PULL_REQUEST_MANUAL_REVIEW);
         assertThat(key.revision().scheme()).contains(RevisionScheme.RUN_ID);
     }
 

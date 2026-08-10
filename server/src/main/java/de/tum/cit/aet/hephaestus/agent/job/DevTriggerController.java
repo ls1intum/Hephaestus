@@ -187,7 +187,7 @@ public class DevTriggerController {
             : Prepared.review(
                   request,
                   triggerSignal == null
-                      ? recordManualRequest(workspaceId, pr.getId(), ScmSignals.PULL_REQUEST_REVIEW_REQUESTED)
+                      ? recordManualRequest(workspaceId, pr.getId(), ScmSignals.PULL_REQUEST_MANUAL_REVIEW)
                       : null
               );
     }
@@ -221,7 +221,7 @@ public class DevTriggerController {
             : Prepared.issue(
                   request,
                   triggerSignal == null
-                      ? recordManualRequest(workspaceId, issue.getId(), ScmSignals.ISSUE_REVIEW_REQUESTED)
+                      ? recordManualRequest(workspaceId, issue.getId(), ScmSignals.ISSUE_MANUAL_REVIEW)
                       : null
               );
     }

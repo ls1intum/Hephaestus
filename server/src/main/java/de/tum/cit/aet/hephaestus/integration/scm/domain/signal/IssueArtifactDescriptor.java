@@ -34,7 +34,7 @@ public class IssueArtifactDescriptor implements ArtifactDescriptor {
         // one per newly added label off the update event, so the provenance is real.
         declareRecommended(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
         declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
-        declareManualRequest(ScmSignals.ISSUE_REVIEW_REQUESTED, "Review requested by hand")
+        declareManualRequest(ScmSignals.ISSUE_MANUAL_REVIEW, "Review requested by hand")
     );
 
     @Override
