@@ -123,6 +123,9 @@ export function PracticeReviewSweepSchedule({
 						<AlertCircle />
 						<AlertTitle>Recurring checks couldn't be loaded</AlertTitle>
 						<AlertDescription>
+							{/* Says what did not happen, not what broke: any check already scheduled is still
+							    running, and an admin reading only the title would set a second one up. */}
+							<p>Whatever is scheduled is still running — this is only about showing it here.</p>
 							<Button variant="outline" size="sm" onClick={onRetry}>
 								Try again
 							</Button>
@@ -142,7 +145,8 @@ export function PracticeReviewSweepSchedule({
 							</EmptyMedia>
 							<EmptyTitle>Nothing is checked on a schedule</EmptyTitle>
 							<EmptyDescription>
-								Work that never raised a notification is never reviewed, and nothing says so.
+								Work that never raised a notification is never reviewed, and nothing says so. Add a
+								check below and Hephaestus looks over the last few days again.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
@@ -184,29 +188,34 @@ function ScheduleRow({
 	onReplace: (scheduleId: string, request: UpdateReviewSweepScheduleRequest) => void;
 	onDelete: (scheduleId: string) => void;
 }) {
+	const kind = artifactKindPluralLabel(schedule.artifactKind);
 	const nextRun = formatMoment(schedule.nextRunAt);
 	const lastRun = formatMoment(schedule.lastRunAt);
+
+	// Joined rather than concatenated: an enabled schedule with no next run printed a double space, and
+	// a paused one that had never run promised a first run "within the hour" while nothing was running.
+	const description = [
+		`${describeCadence(schedule)}.`,
+		schedule.enabled
+			? nextRun
+				? `Next check ${nextRun}.`
+				: "The first check happens within the hour."
+			: "Paused, so nothing is being checked.",
+		lastRun ? `Last checked ${lastRun}.` : "It has not checked anything yet.",
+	].join(" ");
 
 	return (
 		<Item variant="outline">
 			<ItemContent>
-				<ItemTitle>{artifactKindPluralLabel(schedule.artifactKind)}</ItemTitle>
-				<ItemDescription>
-					{describeCadence(schedule)}.{" "}
-					{schedule.enabled
-						? nextRun
-							? `Next check ${nextRun}.`
-							: ""
-						: "Paused — nothing is being checked."}{" "}
-					{lastRun
-						? `Last checked ${lastRun}.`
-						: "It has not checked anything yet; the first run happens within the hour."}
-				</ItemDescription>
+				<ItemTitle>{kind}</ItemTitle>
+				<ItemDescription>{description}</ItemDescription>
 			</ItemContent>
 			<ItemActions>
 				<Badge variant={schedule.enabled ? "secondary" : "outline"}>
 					{schedule.enabled ? "On" : "Paused"}
 				</Badge>
+				{/* One row per kind, so every row would otherwise answer to the same three words. The visible
+				    word still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
 				<Button
 					variant="outline"
 					size="sm"
@@ -220,9 +229,11 @@ function ScheduleRow({
 					}
 				>
 					{schedule.enabled ? "Pause" : "Resume"}
+					<span className="sr-only"> checking {kind.toLowerCase()}</span>
 				</Button>
 				<Button variant="ghost" size="sm" disabled={isSaving} onClick={() => onDelete(schedule.id)}>
 					Remove
+					<span className="sr-only"> the recurring check on {kind.toLowerCase()}</span>
 				</Button>
 			</ItemActions>
 		</Item>
@@ -254,9 +265,18 @@ function AddScheduleForm({
 
 	const kindItems = availableKinds;
 	const windowItems = lookbackItems(cadence);
+	const chosenKind = (
+		availableKinds.find((kind) => kind.value === artifactKind)?.label ??
+		artifactKindPluralLabel(artifactKind)
+	).toLowerCase();
 
 	return (
-		<div className="space-y-4 border-t pt-4">
+		// A named group rather than three loose controls after a list: without it a screen-reader user
+		// arrives at a second "Kind of work" with nothing saying they have left the schedules behind.
+		<section className="space-y-4 border-t pt-4" aria-labelledby="sweep-add-heading">
+			<h3 id="sweep-add-heading" className="font-medium text-sm">
+				Add a recurring check
+			</h3>
 			<Field orientation="horizontal">
 				<FieldContent>
 					<FieldLabel htmlFor="sweep-kind">Kind of work</FieldLabel>
@@ -283,7 +303,7 @@ function AddScheduleForm({
 			<Field orientation="horizontal">
 				<FieldContent>
 					<FieldLabel htmlFor="sweep-cadence">How often</FieldLabel>
-					<FieldDescription>Checked in the background; nothing to run by hand.</FieldDescription>
+					<FieldDescription>Runs on its own; there is nothing to start by hand.</FieldDescription>
 				</FieldContent>
 				<Select
 					items={CADENCES}
@@ -330,6 +350,8 @@ function AddScheduleForm({
 			</Field>
 
 			<div className="flex flex-wrap items-center gap-3">
+				{/* The button names the work it commits to, not just the verb: this is the one control on
+				    the page that authorises spending again and again without being asked. */}
 				<Button
 					disabled={isSaving || isLoading}
 					onClick={() =>
@@ -341,12 +363,13 @@ function AddScheduleForm({
 					}
 				>
 					{isSaving ? <Spinner /> : null}
-					Start checking
+					Start checking {chosenKind}
 				</Button>
 				<p className="text-muted-foreground text-sm">
-					This authorises the AI spend for every future check, not just the first.
+					Every check can start reviews, so this authorises the AI spend for all of them — not just
+					the first.
 				</p>
 			</div>
-		</div>
+		</section>
 	);
 }

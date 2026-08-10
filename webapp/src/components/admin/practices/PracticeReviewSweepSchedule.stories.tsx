@@ -71,6 +71,12 @@ export const NothingScheduled: Story = {
 		await expect(canvas.getByRole("combobox", { name: /How often/ })).toHaveTextContent(
 			"Every day",
 		);
+		// The one control that authorises spending again and again names the work it commits to, and
+		// the sentence beside it says the commitment outlives the first check.
+		await expect(
+			canvas.getByRole("button", { name: "Start checking pull or merge requests" }),
+		).toBeInTheDocument();
+		await expect(canvas.getByText(/not just the first/i)).toBeInTheDocument();
 		await expectNoPageOverflow();
 	},
 };
@@ -102,7 +108,15 @@ export const Running: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/every day, covering the last 2 days/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+		// The row's own kind is inside the accessible name: with a schedule per kind, three buttons
+		// reading "Pause" would leave a voice-control or screen-reader user guessing which row they
+		// stopped (WCAG 2.2 SC 2.5.3, SC 2.4.6).
+		await expect(
+			canvas.getByRole("button", { name: "Pause checking pull or merge requests" }),
+		).toBeInTheDocument();
+		await expect(
+			canvas.getByRole("button", { name: "Remove the recurring check on pull or merge requests" }),
+		).toBeInTheDocument();
 		await expectNoPageOverflow();
 	},
 };
@@ -125,7 +139,22 @@ export const Paused: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/nothing is being checked/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Resume" })).toBeInTheDocument();
+		await expect(
+			canvas.getByRole("button", { name: "Resume checking pull or merge requests" }),
+		).toBeInTheDocument();
+	},
+};
+
+/**
+ * Paused before it ever ran — the one combination whose copy used to contradict itself, promising a
+ * first check "within the hour" on a schedule that was doing nothing at all.
+ */
+export const PausedBeforeItEverRan: Story = {
+	args: { schedules: [schedule({ enabled: false, lastRunAt: undefined })] },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/paused, so nothing is being checked/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/within the hour/i)).not.toBeInTheDocument();
 	},
 };
 
@@ -153,5 +182,9 @@ export const CouldNotLoad: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/recurring checks couldn't be loaded/i)).toBeInTheDocument();
+		// The failure is about this screen, not about the workspace: without saying so, an admin reads
+		// "couldn't be loaded" as "stopped" and schedules a second check over the same work.
+		await expect(canvas.getByText(/still running/i)).toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: "Try again" })).toBeInTheDocument();
 	},
 };
