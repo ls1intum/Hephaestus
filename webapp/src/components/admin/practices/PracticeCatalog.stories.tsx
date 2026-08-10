@@ -70,6 +70,7 @@ const meta = {
 		onReorderAreas: fn(),
 		onSetAreaVisual: fn(),
 		onSetPracticeReviewTier: fn(),
+		onClearPracticeReviewTier: fn(),
 		onDeletePractice: fn(),
 		onPlacePractice: fn(),
 	},
@@ -361,7 +362,7 @@ export const BlockedDestinationDrag: Story = {
 	},
 };
 
-export const LoudnessTiers: Story = {
+export const AutonomyTiers: Story = {
 	args: {
 		areas: mockAreas,
 		practices: [
@@ -372,7 +373,9 @@ export const LoudnessTiers: Story = {
 	},
 	play: async ({ canvas, userEvent }) => {
 		for (const tier of ["Deliver", "Observe", "Off"]) {
-			await expect(canvas.getByLabelText(`How loud ${tier} is`)).toHaveTextContent(tier);
+			await expect(canvas.getByLabelText(`How far Hephaestus may go on ${tier}`)).toHaveTextContent(
+				tier,
+			);
 		}
 		// Deliver is what a practice nobody has configured inherits, so it carries no badge; the quieter
 		// tiers each announce themselves, because those are the rows where a developer will see less
@@ -387,7 +390,7 @@ export const LoudnessTiers: Story = {
 		// prepare — and the server refuses it at every write boundary. It is offered and disabled rather
 		// than omitted: dropping it leaves a gap between "records it" and "says it unasked" that the
 		// ladder has no word for, and offering it plainly would fail after the click.
-		await userEvent.click(canvas.getByLabelText("How loud Deliver is"));
+		await userEvent.click(canvas.getByLabelText("How far Hephaestus may go on Deliver"));
 		const options = within(await screen.findByRole("listbox"));
 		await expect(options.getByRole("option", { name: "Propose" })).toHaveAttribute(
 			"aria-disabled",
@@ -397,5 +400,37 @@ export const LoudnessTiers: Story = {
 			"aria-disabled",
 			"true",
 		);
+	},
+};
+
+/**
+ * A tier chosen on the practice itself can be handed back to the area or the workspace. Without this
+ * the chain is write-once from the catalogue: the first pick pins a tier and nothing takes it off.
+ */
+export const ClearingAnOverride: Story = {
+	args: {
+		areas: mockAreas,
+		practices: [
+			{ ...mockPractices[0], slug: "held", name: "Set here", reviewTier: chosenTier("OBSERVE") },
+			{
+				...mockPractices[0],
+				slug: "free",
+				name: "Inheriting",
+				reviewTier: inheritedTier("DELIVER"),
+			},
+		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "More actions for Inheriting" }));
+		await expect(await screen.findByRole("menuitem", { name: "Use the default" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await userEvent.keyboard("{Escape}");
+
+		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Use the default" }));
+		await expect(args.onClearPracticeReviewTier).toHaveBeenCalledWith("held");
 	},
 };

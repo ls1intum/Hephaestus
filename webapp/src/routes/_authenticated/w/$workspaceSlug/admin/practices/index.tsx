@@ -141,6 +141,11 @@ function PracticeCatalogRoute() {
 							body: { reviewTier },
 						})
 					}
+					// An omitted field, not a null one: the generated request types the tier as optional and
+					// the server reads its absence as "hold no tier here, inherit the area or workspace".
+					onClearPracticeReviewTier={(practiceSlug) =>
+						catalog.setReviewTier.mutate({ path: { workspaceSlug, practiceSlug }, body: {} })
+					}
 					onDeletePractice={setDeletingPractice}
 					onPlacePractice={(practiceSlug, areaSlug, position) =>
 						catalog.placePractice.mutate({

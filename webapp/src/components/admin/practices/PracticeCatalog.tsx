@@ -49,7 +49,6 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import {
-	REVIEW_TIER_DESCRIPTIONS,
 	REVIEW_TIER_LABELS,
 	REVIEW_TIER_ORDER,
 	REVIEW_TIER_SELECTABLE,
@@ -66,7 +65,6 @@ import { CatalogOriginBadge } from "./CatalogOriginBadge";
 const REVIEW_TIERS = REVIEW_TIER_ORDER.map((value) => ({
 	value,
 	label: REVIEW_TIER_LABELS[value],
-	hint: REVIEW_TIER_DESCRIPTIONS[value],
 	// Shown but not choosable where the server would refuse it. Dropping the rung instead would leave
 	// the ladder with a gap and no word for what sits between "records it" and "says it unasked".
 	selectable: REVIEW_TIER_SELECTABLE[value],
@@ -98,6 +96,8 @@ export interface PracticeCatalogProps {
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onSetPracticeReviewTier: (slug: string, reviewTier: ReviewTier) => void;
+	/** Hands the decision back to the area or the workspace, which is the only way off an override. */
+	onClearPracticeReviewTier: (slug: string) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
 }
@@ -122,6 +122,7 @@ export function PracticeCatalog({
 	onReorderAreas,
 	onSetAreaVisual,
 	onSetPracticeReviewTier,
+	onClearPracticeReviewTier,
 	onDeletePractice,
 	onPlacePractice,
 }: PracticeCatalogProps) {
@@ -224,6 +225,7 @@ export function PracticeCatalog({
 						move={move}
 						pending={pending.practiceSlugs.has(practice.slug)}
 						onSetReviewTier={onSetPracticeReviewTier}
+						onClearReviewTier={onClearPracticeReviewTier}
 						onDelete={onDeletePractice}
 					/>
 				)}
@@ -431,6 +433,7 @@ function PracticeActions({
 	move,
 	pending,
 	onSetReviewTier,
+	onClearReviewTier,
 	onDelete,
 }: {
 	practice: Practice;
@@ -440,6 +443,7 @@ function PracticeActions({
 	move: CatalogEntryMoveActions;
 	pending: boolean;
 	onSetReviewTier: (slug: string, reviewTier: ReviewTier) => void;
+	onClearReviewTier: (slug: string) => void;
 	onDelete: (practice: Practice) => void;
 }) {
 	const canReview = canAttemptAutomatedReview(practice.automatedReviewPolicy, supportedModes);
@@ -455,9 +459,13 @@ function PracticeActions({
 				onValueChange={(value) => value && onSetReviewTier(practice.slug, value as ReviewTier)}
 				disabled={tierChangeDisabled}
 			>
+				{/* The tier stopped being a volume knob when it stopped encoding where feedback goes: it is
+				    now how far the system may act alone, and reach is one workspace-level setting. Naming
+				    it "how loud" here told an admin that turning a practice down moved the feedback
+				    somewhere quieter, when it stops the feedback. */}
 				<SelectTrigger
 					className="hidden w-32 sm:inline-flex"
-					aria-label={`How loud ${practice.name} is`}
+					aria-label={`How far Hephaestus may go on ${practice.name}`}
 				>
 					<SelectValue />
 				</SelectTrigger>
@@ -494,8 +502,11 @@ function PracticeActions({
 						Edit practice
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
+					{/* Labels only. The one-line hints that used to sit beside each tier made this menu tall
+					    enough to become a scrollable region no keyboard could reach, which the a11y gate
+					    fails — and the sentences now have a screen of their own on Review autonomy. */}
 					<DropdownMenuGroup>
-						<DropdownMenuLabel>How loud</DropdownMenuLabel>
+						<DropdownMenuLabel>How far Hephaestus may go</DropdownMenuLabel>
 						{REVIEW_TIERS.map((tier) => (
 							<DropdownMenuItem
 								key={tier.value}
@@ -507,9 +518,18 @@ function PracticeActions({
 								onClick={() => onSetReviewTier(practice.slug, tier.value)}
 							>
 								{tier.label}
-								<span className="ml-auto pl-4 text-xs text-muted-foreground">{tier.hint}</span>
 							</DropdownMenuItem>
 						))}
+						{/* Without this the chain is write-once from here: picking any tier pins one to the
+						    practice, and nothing in this menu could ever hand the decision back to the area
+						    or the workspace. Disabled rather than hidden while the practice is already
+						    inheriting, so the row does not change shape as an admin moves down the list. */}
+						<DropdownMenuItem
+							disabled={tierChangeDisabled || practice.reviewTier.inherited}
+							onClick={() => onClearReviewTier(practice.slug)}
+						>
+							Use the default
+						</DropdownMenuItem>
 					</DropdownMenuGroup>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
