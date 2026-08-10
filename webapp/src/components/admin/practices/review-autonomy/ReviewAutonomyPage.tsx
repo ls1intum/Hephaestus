@@ -300,7 +300,8 @@ function WorkspaceDecisionCard({
 				<Field>
 					<FieldTitle>Where feedback may go</FieldTitle>
 					<FieldDescription>
-						Narrows where feedback can land. It never makes a quiet practice speak.
+						Narrows where feedback can land. It never gives a practice more autonomy than its own
+						tier allows.
 					</FieldDescription>
 					<RadioGroup
 						aria-label="Where feedback may go"

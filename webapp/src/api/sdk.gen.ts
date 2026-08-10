@@ -1667,7 +1667,7 @@ export const submitReaction = <ThrowOnError extends boolean = false>(options: Op
 /**
  * List reviewed practices, learner-facing
  *
- * Returns the learner-facing name, area, rationale, and example for every practice the workspace reviews (any loudness tier above OFF)
+ * Returns the learner-facing name, area, rationale, and example for every practice the workspace reviews (any autonomy tier above OFF)
  */
 export const listLearnerPractices = <ThrowOnError extends boolean = false>(options: Options<ListLearnerPracticesData, ThrowOnError>) => (options.client ?? client).get<ListLearnerPracticesResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/learner', ...options });
 
@@ -1757,7 +1757,7 @@ export const updatePracticeReviewSettings = <ThrowOnError extends boolean = fals
 });
 
 /**
- * Summarise how loud this workspace is, by area
+ * Summarise how much autonomy this workspace grants, by area
  *
  * How many practices sit at each autonomy tier, for the whole workspace and for each area, plus the workspace default and where feedback may go. The summary a hundred-practice catalogue is read through — answered here so a client never has to fetch every practice to count them.
  */

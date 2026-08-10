@@ -4593,7 +4593,7 @@ paths:
   /workspaces/{workspaceSlug}/practices/learner:
     get:
       description: "Returns the learner-facing name, area, rationale, and example\
-        \ for every practice the workspace reviews (any loudness tier above OFF)"
+        \ for every practice the workspace reviews (any autonomy tier above OFF)"
       operationId: listLearnerPractices
       parameters:
       - description: Workspace slug
@@ -4943,7 +4943,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReviewTierRollup"
           description: Rollup returned
-      summary: "Summarise how loud this workspace is, by area"
+      summary: "Summarise how much autonomy this workspace grants, by area"
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/reviews:
@@ -7418,7 +7418,8 @@ components:
         practices:
           type: array
           description: "Every practice this workspace runs against this kind of work,\
-            \ answered ones first, then the quiet ones"
+            \ the ones with something to report first, then the rest; ties broken\
+            \ by practice name"
           items:
             $ref: "#/components/schemas/PracticeTraceEntry"
         signals:
@@ -10762,8 +10763,9 @@ components:
           description: "Effective: where feedback may go at all. CONVERSATION = the\
             \ recipient's mentor conversation and nowhere else · ON_THE_WORK = also\
             \ on the work itself, as pull-request summaries, inline notes and issue\
-            \ comments. ANDed with every practice's tier, so this cannot make a quiet\
-            \ practice speak — only stop a loud one from speaking in a given place."
+            \ comments. ANDed with every practice's tier, so this cannot give a practice\
+            \ more autonomy than its own tier allows — it can only narrow where a\
+            \ practice that already delivers is allowed to deliver."
           enum:
           - CONVERSATION
           - ON_THE_WORK
@@ -10861,7 +10863,8 @@ components:
           description: "The review this answer came from, when one ran"
         reviewTier:
           type: string
-          description: How loudly the workspace currently runs this practice
+          description: "How much autonomy the workspace currently gives this practice,\
+            \ after inheritance"
           enum:
           - "OFF"
           - OBSERVE
@@ -13632,8 +13635,8 @@ components:
         defaultReviewTier:
           type: string
           description: How much autonomy the system has over practices and areas that
-            hold no tier of their own. The one decision that changes how loud a whole
-            workspace is. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset'
+            hold no tier of their own. The one decision that moves a whole workspace
+            at once. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset'
             to clear it. PROPOSE is not selectable yet.
           enum:
           - "OFF"

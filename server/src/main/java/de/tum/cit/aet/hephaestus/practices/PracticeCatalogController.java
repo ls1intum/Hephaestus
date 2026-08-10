@@ -100,7 +100,7 @@ public class PracticeCatalogController {
     @Operation(
         summary = "List reviewed practices, learner-facing",
         description = "Returns the learner-facing name, area, rationale, and example for every practice the " +
-            "workspace reviews (any loudness tier above OFF)"
+            "workspace reviews (any autonomy tier above OFF)"
     )
     @ApiResponse(
         responseCode = "200",
@@ -366,7 +366,7 @@ public class PracticeCatalogController {
 
     @GetMapping("/review-tiers")
     @Operation(
-        summary = "Summarise how loud this workspace is, by area",
+        summary = "Summarise how much autonomy this workspace grants, by area",
         description = "How many practices sit at each autonomy tier, for the whole workspace and for each " +
             "area, plus the workspace default and where feedback may go. The summary a hundred-practice " +
             "catalogue is read through — answered here so a client never has to fetch every practice to " +

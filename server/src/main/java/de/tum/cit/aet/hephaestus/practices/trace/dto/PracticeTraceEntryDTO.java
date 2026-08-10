@@ -15,15 +15,15 @@ import org.jspecify.annotations.NonNull;
  *
  * <p>{@code outcome} is about the <em>measurement</em>: did this practice get assessed, and if not,
  * why. The counts and {@code withheldReasons} are about the <em>intervention</em>: did anything reach
- * a person. A practice at {@code MEASURE} is {@code REVIEWED} with nothing delivered, and reporting
- * that as one number would hide the exact distinction loudness tiers exist to make.
+ * a person. A practice at {@code OBSERVE} is {@code REVIEWED} with nothing delivered, and reporting
+ * that as one number would hide the exact distinction autonomy tiers exist to make.
  */
 @Schema(description = "What became of one practice on this artifact, and whether anyone heard about it")
 public record PracticeTraceEntryDTO(
     @NonNull String practiceSlug,
     @NonNull String practiceName,
     @NonNull
-    @Schema(description = "How loudly the workspace currently runs this practice")
+    @Schema(description = "How much autonomy the workspace currently gives this practice, after inheritance")
     PracticeReviewTier reviewTier,
     @NonNull PracticeTraceOutcome outcome,
     @NonNull @Schema(description = "The outcome in a sentence, phrased as what would change it") String explanation,

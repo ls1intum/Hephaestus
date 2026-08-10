@@ -26,8 +26,8 @@ public record ArtifactTraceDTO(
     List<TracedSignalDTO> signals,
     @NonNull
     @Schema(
-        description = "Every practice this workspace runs against this kind of work, answered ones first, " +
-            "then the quiet ones"
+        description = "Every practice this workspace runs against this kind of work, the ones with " +
+            "something to report first, then the rest; ties broken by practice name"
     )
     List<PracticeTraceEntryDTO> practices
 ) {}

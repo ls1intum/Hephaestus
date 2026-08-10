@@ -42,7 +42,8 @@ public record PracticeReviewSettingsDTO(
         description = "Effective: where feedback may go at all. CONVERSATION = the recipient's mentor " +
             "conversation and nowhere else · ON_THE_WORK = also on the work itself, as pull-request " +
             "summaries, inline notes and issue comments. ANDed with every practice's tier, so this cannot " +
-            "make a quiet practice speak — only stop a loud one from speaking in a given place."
+            "give a practice more autonomy than its own tier allows — it can only narrow where a practice " +
+            "that already delivers is allowed to deliver."
     )
     FeedbackReach feedbackReach,
     @Schema(description = "Raw override; null = this workspace has never chosen, so ON_THE_WORK applies")

@@ -3113,7 +3113,7 @@ export const listLearnerPracticesQueryKey = (options: Options<ListLearnerPractic
 /**
  * List reviewed practices, learner-facing
  *
- * Returns the learner-facing name, area, rationale, and example for every practice the workspace reviews (any loudness tier above OFF)
+ * Returns the learner-facing name, area, rationale, and example for every practice the workspace reviews (any autonomy tier above OFF)
  */
 export const listLearnerPracticesOptions = (options: Options<ListLearnerPracticesData>) => queryOptions<ListLearnerPracticesResponse, DefaultError, ListLearnerPracticesResponse, ReturnType<typeof listLearnerPracticesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -3331,7 +3331,7 @@ export const updatePracticeReviewSettingsMutation = (options?: Partial<Options<U
 export const reviewTierRollupQueryKey = (options: Options<ReviewTierRollupData>) => createQueryKey('reviewTierRollup', options, false, ['Practice Catalog']);
 
 /**
- * Summarise how loud this workspace is, by area
+ * Summarise how much autonomy this workspace grants, by area
  *
  * How many practices sit at each autonomy tier, for the whole workspace and for each area, plus the workspace default and where feedback may go. The summary a hundred-practice catalogue is read through — answered here so a client never has to fetch every practice to count them.
  */

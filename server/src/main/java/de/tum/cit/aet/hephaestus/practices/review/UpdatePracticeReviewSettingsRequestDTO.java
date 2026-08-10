@@ -29,7 +29,7 @@ public record UpdatePracticeReviewSettingsRequestDTO(
     WorkspaceReviewScope reviewScope,
     @Schema(
         description = "How much autonomy the system has over practices and areas that hold no tier of " +
-            "their own. The one decision that changes how loud a whole workspace is. Null leaves it " +
+            "their own. The one decision that moves a whole workspace at once. Null leaves it " +
             "unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet."
     )
     PracticeReviewTier defaultReviewTier,

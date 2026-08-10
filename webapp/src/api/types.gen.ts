@@ -998,7 +998,7 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     cooldownMinutes?: number;
     /**
-     * How much autonomy the system has over practices and areas that hold no tier of their own. The one decision that changes how loud a whole workspace is. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet.
+     * How much autonomy the system has over practices and areas that hold no tier of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet.
      */
     defaultReviewTier?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
     /**
@@ -3125,7 +3125,7 @@ export type PracticeTraceEntry = {
      */
     reviewId?: string;
     /**
-     * How loudly the workspace currently runs this practice
+     * How much autonomy the workspace currently gives this practice, after inheritance
      */
     reviewTier: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
     /**
@@ -3167,7 +3167,7 @@ export type PracticeReviewSettings = {
      */
     deliverToMergedOverride?: boolean;
     /**
-     * Effective: where feedback may go at all. CONVERSATION = the recipient's mentor conversation and nowhere else · ON_THE_WORK = also on the work itself, as pull-request summaries, inline notes and issue comments. ANDed with every practice's tier, so this cannot make a quiet practice speak — only stop a loud one from speaking in a given place.
+     * Effective: where feedback may go at all. CONVERSATION = the recipient's mentor conversation and nowhere else · ON_THE_WORK = also on the work itself, as pull-request summaries, inline notes and issue comments. ANDed with every practice's tier, so this cannot give a practice more autonomy than its own tier allows — it can only narrow where a practice that already delivers is allowed to deliver.
      */
     feedbackReach: 'CONVERSATION' | 'ON_THE_WORK';
     /**
@@ -5392,7 +5392,7 @@ export type ArtifactTrace = {
      */
     number?: number;
     /**
-     * Every practice this workspace runs against this kind of work, answered ones first, then the quiet ones
+     * Every practice this workspace runs against this kind of work, the ones with something to report first, then the rest; ties broken by practice name
      */
     practices: Array<PracticeTraceEntry>;
     /**

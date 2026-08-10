@@ -173,8 +173,8 @@ One decision per workspace, not per practice. Reach multiplied by tier per pract
 at a hundred practices, which is why nobody made any of them and the shipped default was the only setting
 that ever ran. Reach is a statement about how a team uses the system, and one statement is enough.
 
-Reach is **ANDed** with the resolved tier at every delivery site, so it can only ever silence a channel, never
-make a quiet practice speak. `FeedbackAdmission.delivers(origin, tier, reach, channel)` is the single
+Reach is **ANDed** with the resolved tier at every delivery site, so it can only ever close a channel, never
+give a practice more autonomy than its own tier allows. `FeedbackAdmission.delivers(origin, tier, reach, channel)` is the single
 conjunction point; both delivery paths ask it rather than comparing constants themselves.
 
 Nothing in the application writes a `PROFILE` unit — there is no producer — so `FeedbackReach.reaches(PROFILE)`
