@@ -17,7 +17,8 @@ The broader [practice feedback language](./practice-feedback-language.md) remain
 | **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
 | **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
 | **Automated-review policy** | The frame a review runs in for one practice: the source-contract version, the review mode, the refusal behaviour, and the known limits. Sources belong to the bindings, not here. | evidence requirements |
-| **Binding** | One occasion a practice is reviewed on, and the evidence a review occasioned that way reads. A practice declares a list of them. | trigger, review event, schedule |
+| **Practice binding** | One occasion a practice is reviewed on, and the evidence a review occasioned that way reads. A practice declares a list of them. | trigger, review event, schedule, bare "binding" |
+| **Model binding** | Which AI model, with which execution limits, a workspace runs a given purpose on. Lives in Administration &rarr; AI models, not in the practice catalogue. | bare "binding", practice binding, agent config |
 | **Signal** | The name of an ingested event a binding can be occasioned by, such as `scm.pull_request.merged`. Its prefix is the artifact kind, which is why a practice never states its artifact kind separately. | trigger event, webhook, hook |
 | **Evidence requirement** | One source a binding reads, and the stance the practice takes towards it. | required evidence, evidence declaration, detector configuration |
 | **Evidence stance** | How a practice relates to one source: `REQUIRED`, `EXHAUSTIVE`, or `CONTEXTUAL`. | required/optional lists, source role |
@@ -131,7 +132,8 @@ without the artifact changing.
 | --- | --- | --- | --- |
 | Practice-review AI purpose | `PRACTICE_REVIEW` | `AgentPurpose.PRACTICE_REVIEW` | `PRACTICE_REVIEW` |
 | Automated-review policy | `automatedReviewPolicy` | `PracticeAutomatedReviewPolicy` | `automated_review_policy` |
-| Binding | `on` | `PracticeBinding` | `bindings` |
+| Practice binding | `on` | `PracticeBinding` | `bindings` |
+| Model binding | `AgentBinding` | `WorkspaceAgentBinding` | `workspace_agent_binding` |
 | Signal | `signals[]` | `SignalName` | inside `bindings` |
 | Draft occasion | `onDrafts` | `PracticeBinding.onDrafts` | inside `bindings` |
 | Evidence requirement | `needs[]` | `PracticeEvidenceRequirement` | inside `bindings` |
@@ -214,3 +216,9 @@ a `Presence` value, and is what lets the whole observation table be read as beha
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
 7. Say what a tier reaches, never more: `COACH` reaches the mentor conversation, not a profile.
+8. Never write bare **binding**. Two unrelated things carry the word — a *practice binding* (an occasion
+   a practice is reviewed on, `PracticeBinding`) and a *model binding* (a workspace's AI model for a
+   purpose, `WorkspaceAgentBinding`) — and they send an operator to different screens. A reason code,
+   label, or javadoc that says only "binding" has already lost that distinction; `REVIEW_MODEL_UNBOUND`
+   exists because `BINDING_DISABLED` did exactly that and sent readers to the practice catalogue to fix
+   a missing AI model.
