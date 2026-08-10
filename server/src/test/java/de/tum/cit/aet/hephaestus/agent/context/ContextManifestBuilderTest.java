@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReview;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewMode;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
@@ -391,6 +393,96 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).containsExactly(
             SourceReadinessReason.SOURCE_INCOMPLETE
         );
+    }
+
+    @Test
+    @DisplayName(
+        "a repository tree the bounds truncated is PARTIAL, names what it dropped, and refuses an absence claim"
+    )
+    void shouldRefuseAnAbsenceClaimOnATruncatedRepositoryTree() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        String path = "inputs/sources/scm/repo/src/App.java";
+        files.put(path, "class App {}".getBytes(StandardCharsets.UTF_8));
+        ArtifactSourceManifest manifest = builder.augment(
+            files,
+            Map.of(path, REPOSITORY_TREE),
+            "job-truncated-tree",
+            plan(),
+            new ContextManifestBuilder.CaptureMetadata(
+                Map.of(REPOSITORY_TREE, SourceCompleteness.PARTIAL),
+                Map.of(REPOSITORY_TREE, SourceContentState.NON_EMPTY),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(REPOSITORY_TREE, List.of(GitRepositoryManager.TREE_LIMITATION_FILE_COUNT)),
+                Set.of(REPOSITORY_TREE)
+            )
+        );
+
+        // The manifest the model reads has to say which bound stopped the walk, not merely that
+        // something is missing: "we stopped at 20,000 files" and "we skipped one 400 MB binary" send a
+        // reader to different conclusions about what the tree could still have contained.
+        SourceCaptureState.Available tree = (SourceCaptureState.Available) manifest
+            .sources()
+            .stream()
+            .filter(source -> source.kind().equals(REPOSITORY_TREE))
+            .findFirst()
+            .orElseThrow()
+            .state();
+        assertThat(tree.completeness()).isEqualTo(SourceCompleteness.PARTIAL);
+        assertThat(tree.limitations()).containsExactly(GitRepositoryManager.TREE_LIMITATION_FILE_COUNT);
+
+        // A practice that only reads what is in front of it still runs on a fragment.
+        assertThat(
+            builder
+                .checkAutomatedReviewReadinessAsOfNow(
+                    manifest,
+                    List.of(practiceRequiring(REPOSITORY_TREE, "reads-the-tree"))
+                )
+                .readyPractices()
+        ).hasSize(1);
+
+        // The one that matters: a practice whose verdict rests on something being absent from the
+        // repository must not be answered from a tree we only partly walked.
+        AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadinessAsOfNow(
+            manifest,
+            List.of(practiceRequiring(REPOSITORY_TREE, "asserts-nothing-in-the-repo", EvidenceStance.EXHAUSTIVE))
+        );
+
+        assertThat(refused.readyPractices()).isEmpty();
+        assertThat(refused.decisions().getFirst().sourceChecks().getFirst().reasonCodes()).containsExactly(
+            SourceReadinessReason.SOURCE_INCOMPLETE
+        );
+    }
+
+    @Test
+    @DisplayName("refuses to publish a capture that calls itself complete and still names an omission")
+    void shouldRejectACompleteCaptureThatNamesAnOmission() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        String path = "inputs/sources/scm/repo/src/App.java";
+        files.put(path, "class App {}".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() ->
+            builder.augment(
+                files,
+                Map.of(path, REPOSITORY_TREE),
+                "job-contradictory-tree",
+                plan(),
+                new ContextManifestBuilder.CaptureMetadata(
+                    Map.of(REPOSITORY_TREE, SourceCompleteness.COMPLETE),
+                    Map.of(REPOSITORY_TREE, SourceContentState.NON_EMPTY),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(REPOSITORY_TREE, List.of(GitRepositoryManager.TREE_LIMITATION_TOTAL_SIZE)),
+                    Set.of(REPOSITORY_TREE)
+                )
+            )
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("reported COMPLETE while naming what it omitted");
     }
 
     @Test

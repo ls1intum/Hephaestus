@@ -314,6 +314,15 @@
 								},
 								"facts": {
 									"$ref": "#/$defs/facts"
+								},
+								"limitations": {
+									"type": "array",
+									"description": "What this capture could not include. Non-empty only when completeness is PARTIAL; see the source's own limitation codes.",
+									"items": {
+										"type": "string",
+										"minLength": 1
+									},
+									"uniqueItems": true
 								}
 							}
 						},

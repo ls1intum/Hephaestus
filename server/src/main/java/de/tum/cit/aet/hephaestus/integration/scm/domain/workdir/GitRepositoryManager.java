@@ -53,6 +53,31 @@ public class GitRepositoryManager {
 
     private static final String SCM_CONNECTOR = "scm";
 
+    /**
+     * What a tree snapshot could not stage. Every one of these makes the capture {@code PARTIAL}, and
+     * each names the omission rather than the count, because the reader's question is "what could this
+     * evidence not have shown me", not "how much of it is there".
+     */
+    public static final String TREE_LIMITATION_SYMLINK = "SYMLINK_EXCLUDED";
+
+    /** A submodule's gitlink; its contents live in another repository this snapshot does not read. */
+    public static final String TREE_LIMITATION_SUBMODULE = "SUBMODULE_EXCLUDED";
+
+    /** A tree entry whose git mode is neither a regular nor an executable file. */
+    public static final String TREE_LIMITATION_UNSUPPORTED_MODE = "UNSUPPORTED_GIT_MODE_EXCLUDED";
+
+    /** A path that would escape the staging root; excluded rather than resolved. */
+    public static final String TREE_LIMITATION_UNSAFE_PATH = "UNSAFE_PATH_EXCLUDED";
+
+    /** One blob over {@code hephaestus.git.tree-max-file-size} was skipped; the walk continued. */
+    public static final String TREE_LIMITATION_FILE_TOO_LARGE = "FILE_TOO_LARGE_EXCLUDED";
+
+    /** The walk stopped at {@code hephaestus.git.tree-max-files}; the rest of the tree was never read. */
+    public static final String TREE_LIMITATION_FILE_COUNT = "FILE_COUNT_LIMIT_REACHED";
+
+    /** The walk stopped at {@code hephaestus.git.tree-max-total-size}; the rest was never read. */
+    public static final String TREE_LIMITATION_TOTAL_SIZE = "TOTAL_SIZE_LIMIT_REACHED";
+
     private final GitRepositoryProperties properties;
     private final GitRepositoryLockManager lockManager;
     private final FabricLayout fabricLayout;
@@ -708,6 +733,16 @@ public class GitRepositoryManager {
      * one buffer regardless of repository size. The caller owns the result and must
      * {@link GitTreeSnapshot#close() close} it to delete the directory.
      *
+     * <p>Peak memory being bounded is not the same as the capture being bounded: a repository can be
+     * arbitrarily large, and a review that reads all of it costs an unbounded number of tokens. So the
+     * walk stops at {@code hephaestus.git.tree-max-files} and {@code tree-max-total-size}, and skips any
+     * single blob over {@code tree-max-file-size}. Each of those adds its own limitation, which makes
+     * {@link GitTreeSnapshot#complete()} false — the point being not that the tree is smaller, but that
+     * nothing downstream may then claim something is absent from a repository it only partly saw.
+     *
+     * <p>A blob's size is read from the object database before it is written, so an oversized file is
+     * never staged and then deleted; the bound protects the disk as well as the context window.
+     *
      * <p>The git handles are opened and closed entirely within this call. Returning lazy readers instead
      * would be cheaper still, but would leave an {@code ObjectReader} and the repository read lock alive
      * across the staging boundary, where a slow consumer would hold both open indefinitely.
@@ -746,6 +781,10 @@ public class GitRepositoryManager {
                     resolvedCommitSha = commit.getId().getName();
                     treeSha = commit.getTree().getId().getName();
 
+                    long maxTotalBytes = properties.treeMaxTotalSize().toBytes();
+                    long maxFileBytes = properties.treeMaxFileSize().toBytes();
+                    int maxFiles = properties.treeMaxFiles();
+
                     try (TreeWalk treeWalk = new TreeWalk(reader)) {
                         treeWalk.addTree(commit.getTree());
                         treeWalk.setRecursive(true);
@@ -755,22 +794,54 @@ public class GitRepositoryManager {
                             String sourcePath = treeWalk.getPathString();
                             FileMode mode = treeWalk.getFileMode(0);
                             if (FileMode.SYMLINK.equals(mode)) {
-                                limitations.add("SYMLINK_EXCLUDED");
+                                limitations.add(TREE_LIMITATION_SYMLINK);
                                 continue;
                             }
                             if (FileMode.GITLINK.equals(mode)) {
-                                limitations.add("SUBMODULE_EXCLUDED");
+                                limitations.add(TREE_LIMITATION_SUBMODULE);
                                 continue;
                             }
                             if (!FileMode.REGULAR_FILE.equals(mode) && !FileMode.EXECUTABLE_FILE.equals(mode)) {
-                                limitations.add("UNSUPPORTED_GIT_MODE_EXCLUDED");
+                                limitations.add(TREE_LIMITATION_UNSUPPORTED_MODE);
                                 continue;
                             }
                             if (unsafeWorkspacePath(sourcePath)) {
-                                limitations.add("UNSAFE_PATH_EXCLUDED");
+                                limitations.add(TREE_LIMITATION_UNSAFE_PATH);
                                 continue;
                             }
+                            // The count bound stops the walk rather than skipping a file: past it we no
+                            // longer know what we are not reading, and "we read the first 20,000 paths in
+                            // tree order" is a claim we can state, where "we read some of them" is not.
+                            if (result.size() >= maxFiles) {
+                                limitations.add(TREE_LIMITATION_FILE_COUNT);
+                                log.warn(
+                                    "Repository tree hit the file-count bound; snapshot is partial: repoId={}, commit={}, maxFiles={}",
+                                    repositoryId,
+                                    commitSha,
+                                    maxFiles
+                                );
+                                break;
+                            }
                             ObjectId blobId = treeWalk.getObjectId(0);
+                            long blobSize = reader.getObjectSize(blobId, Constants.OBJ_BLOB);
+                            if (blobSize > maxFileBytes) {
+                                // One outsized blob does not end the walk: it is almost always a binary
+                                // asset, and dropping the rest of the tree with it would cost the review
+                                // the source files it came for.
+                                limitations.add(TREE_LIMITATION_FILE_TOO_LARGE);
+                                log.debug("Skipping oversized file: path={}, size={}", sourcePath, blobSize);
+                                continue;
+                            }
+                            if (totalBytes + blobSize > maxTotalBytes) {
+                                limitations.add(TREE_LIMITATION_TOTAL_SIZE);
+                                log.warn(
+                                    "Repository tree hit the total-size bound; snapshot is partial: repoId={}, commit={}, maxTotalBytes={}",
+                                    repositoryId,
+                                    commitSha,
+                                    maxTotalBytes
+                                );
+                                break;
+                            }
                             Path target = stagingDir.resolve(sourcePath);
                             Files.createDirectories(target.getParent());
                             try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(target))) {

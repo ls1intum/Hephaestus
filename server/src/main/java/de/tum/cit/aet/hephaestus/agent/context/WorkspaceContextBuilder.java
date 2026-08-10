@@ -165,6 +165,7 @@ public class WorkspaceContextBuilder {
         Map<SourceKind, Instant> observedAt = new HashMap<>();
         Map<SourceKind, Instant> sourceEffectiveAt = new HashMap<>();
         Map<SourceKind, SourceCaptureState> stateOverrides = new HashMap<>();
+        Map<SourceKind, List<String>> captureLimitations = new HashMap<>();
         Set<SourceKind> attemptedKinds = new HashSet<>();
         Map<String, java.nio.file.Path> filesOnDisk = new LinkedHashMap<>();
         List<AutoCloseable> cleanups = new ArrayList<>();
@@ -199,6 +200,7 @@ public class WorkspaceContextBuilder {
                     observedAt,
                     sourceEffectiveAt,
                     stateOverrides,
+                    captureLimitations,
                     attemptedKinds,
                     filesOnDisk,
                     cleanups
@@ -285,6 +287,7 @@ public class WorkspaceContextBuilder {
                         observedAt,
                         sourceEffectiveAt,
                         stateOverrides,
+                        captureLimitations,
                         attemptedKinds
                     )
                 );
@@ -311,6 +314,7 @@ public class WorkspaceContextBuilder {
         Map<SourceKind, Instant> observedAt,
         Map<SourceKind, Instant> sourceEffectiveAt,
         Map<SourceKind, SourceCaptureState> stateOverrides,
+        Map<SourceKind, List<String>> captureLimitations,
         Set<SourceKind> attemptedKinds,
         Map<String, java.nio.file.Path> filesOnDisk,
         List<AutoCloseable> cleanups
@@ -378,6 +382,7 @@ public class WorkspaceContextBuilder {
             immutableIdentities.putAll(contribution.immutableIdentities());
             observedAt.putAll(contribution.observedAt());
             sourceEffectiveAt.putAll(contribution.sourceEffectiveAt());
+            captureLimitations.putAll(contribution.captureLimitations());
         }
         return files;
     }
@@ -392,6 +397,7 @@ public class WorkspaceContextBuilder {
         reportedKinds.addAll(contribution.immutableIdentities().keySet());
         reportedKinds.addAll(contribution.observedAt().keySet());
         reportedKinds.addAll(contribution.sourceEffectiveAt().keySet());
+        reportedKinds.addAll(contribution.captureLimitations().keySet());
         reportedKinds.removeAll(allowedKinds);
         if (!reportedKinds.isEmpty()) {
             throw new IllegalStateException(

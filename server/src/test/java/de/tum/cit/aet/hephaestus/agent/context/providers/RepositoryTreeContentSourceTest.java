@@ -68,6 +68,44 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
     }
 
     @Test
+    @org.junit.jupiter.api.DisplayName("reports a bounded tree as PARTIAL and names the bound that stopped it")
+    void shouldReportATruncatedTreeAsPartialWithItsLimitation() {
+        AgentJob job = job(17L, "0123456789012345678901234567890123456789");
+        when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
+        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789")).thenReturn(
+            new GitRepositoryManager.GitTreeSnapshot(
+                stagingDir,
+                "0123456789012345678901234567890123456789",
+                "1123456789012345678901234567890123456789",
+                Map.of("src/App.java", stagingDir.resolve("src/App.java")),
+                12,
+                40_000,
+                false,
+                Set.of(
+                    GitRepositoryManager.TREE_LIMITATION_FILE_COUNT,
+                    GitRepositoryManager.TREE_LIMITATION_FILE_TOO_LARGE
+                )
+            )
+        );
+
+        var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
+
+        // COMPLETE here would license a practice to say "this does not exist anywhere in the
+        // repository" about a tree whose walk we cut short.
+        assertThat(contribution.completeness()).containsEntry(
+            new SourceKind("scm.repository.tree"),
+            de.tum.cit.aet.hephaestus.evidence.SourceCompleteness.PARTIAL
+        );
+        assertThat(
+            contribution.captureLimitations().get(new SourceKind("scm.repository.tree"))
+        ).containsExactlyInAnyOrder(
+            GitRepositoryManager.TREE_LIMITATION_FILE_COUNT,
+            GitRepositoryManager.TREE_LIMITATION_FILE_TOO_LARGE
+        );
+    }
+
+    @Test
     void shouldRejectUnpinnedTree() {
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);

@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +75,10 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         GitRepositoryManager.GitTreeSnapshot snapshot = snapshot(request);
         Map<String, java.nio.file.Path> onDisk = new java.util.LinkedHashMap<>();
         snapshot.files().forEach((path, file) -> onDisk.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, file));
+        // A tree the walk stopped short of, or excluded anything from, is PARTIAL — and says which
+        // bound or exclusion did it. Reporting COMPLETE for a truncated tree is the failure this
+        // guards: a practice that asserts something is absent from the repository would then be
+        // answered from a fragment that merely does not happen to contain it.
         SourceCompleteness completeness = snapshot.complete()
             ? SourceCompleteness.COMPLETE
             : SourceCompleteness.PARTIAL;
@@ -86,7 +91,8 @@ public class RepositoryTreeContentSource implements EvidenceSource {
             Map.of(),
             Map.of(),
             onDisk,
-            snapshot
+            snapshot,
+            snapshot.limitations().isEmpty() ? Map.of() : Map.of(KIND, List.copyOf(snapshot.limitations()))
         );
     }
 

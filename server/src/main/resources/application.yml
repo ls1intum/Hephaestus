@@ -337,6 +337,12 @@ hephaestus:
 
     git:
         enabled: ${GIT_CHECKOUT_ENABLED:false}
+        # Bounds on one repository-tree capture. The defaults are the numbers the shipped
+        # scm.repository.tree source contract promises; a tree that exceeds them is staged up to the
+        # bound and reported PARTIAL, never COMPLETE.
+        tree-max-files: ${GIT_TREE_MAX_FILES:20000}
+        tree-max-total-size: ${GIT_TREE_MAX_TOTAL_SIZE:32MB}
+        tree-max-file-size: ${GIT_TREE_MAX_FILE_SIZE:10MB}
 
     webapp:
         url: ${HEPHAESTUS_WEBAPP_URL:${APPLICATION_HOST_URL:http://localhost:4200}}

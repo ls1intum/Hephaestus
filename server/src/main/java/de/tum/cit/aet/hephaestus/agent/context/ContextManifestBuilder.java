@@ -70,6 +70,8 @@ public class ContextManifestBuilder {
         Map<SourceKind, Instant> observedAt,
         Map<SourceKind, Instant> sourceEffectiveAt,
         Map<SourceKind, SourceCaptureState> stateOverrides,
+        /** Per source, what its capture could not include; empty for a source that captured it all. */
+        Map<SourceKind, List<String>> captureLimitations,
         Set<SourceKind> attemptedKinds
     ) {
         public CaptureMetadata(
@@ -87,6 +89,28 @@ public class ContextManifestBuilder {
                 observedAt,
                 sourceEffectiveAt,
                 stateOverrides,
+                Map.of(),
+                attemptedKinds
+            );
+        }
+
+        public CaptureMetadata(
+            Map<SourceKind, SourceCompleteness> reportedCompleteness,
+            Map<SourceKind, SourceContentState> reportedContentStates,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt,
+            Map<SourceKind, SourceCaptureState> stateOverrides,
+            Set<SourceKind> attemptedKinds
+        ) {
+            this(
+                reportedCompleteness,
+                reportedContentStates,
+                immutableIdentities,
+                observedAt,
+                sourceEffectiveAt,
+                stateOverrides,
+                Map.of(),
                 attemptedKinds
             );
         }
@@ -156,6 +180,7 @@ public class ContextManifestBuilder {
         reported.addAll(metadata.immutableIdentities().keySet());
         reported.addAll(metadata.observedAt().keySet());
         reported.addAll(metadata.sourceEffectiveAt().keySet());
+        reported.addAll(metadata.captureLimitations().keySet());
         reported.removeAll(applicableSources);
         if (!reported.isEmpty()) {
             throw new IllegalArgumentException(
@@ -179,6 +204,7 @@ public class ContextManifestBuilder {
                     metadata.observedAt(),
                     metadata.sourceEffectiveAt(),
                     metadata.stateOverrides(),
+                    metadata.captureLimitations(),
                     metadata.attemptedKinds()
                 )
             )
@@ -402,6 +428,7 @@ public class ContextManifestBuilder {
         Map<SourceKind, Instant> observedAt,
         Map<SourceKind, Instant> sourceEffectiveAt,
         Map<SourceKind, SourceCaptureState> stateOverrides,
+        Map<SourceKind, List<String>> captureLimitations,
         Set<SourceKind> attemptedKinds
     ) {
         ArtifactSourceContract contract = catalogs.requireSource(plan.contractVersion(), kind);
@@ -447,7 +474,17 @@ public class ContextManifestBuilder {
             observedAt.get(kind),
             immutableIdentities.get(kind)
         );
-        return new SourceCapture(kind, new SourceCaptureState.Available(content, completeness, facts), artifacts);
+        List<String> limitations = captureLimitations.getOrDefault(kind, List.of());
+        // A collector that named an omission and still reported COMPLETE is contradicting itself; the
+        // completeness is the claim a practice acts on, so the omission is what has to win.
+        if (!limitations.isEmpty() && completeness == SourceCompleteness.COMPLETE) {
+            throw new IllegalStateException(kind + " reported COMPLETE while naming what it omitted: " + limitations);
+        }
+        return new SourceCapture(
+            kind,
+            new SourceCaptureState.Available(content, completeness, facts, limitations),
+            artifacts
+        );
     }
 
     private static SourceCapture missingCapture(ArtifactSourceContract contract, SourceCaptureState state) {

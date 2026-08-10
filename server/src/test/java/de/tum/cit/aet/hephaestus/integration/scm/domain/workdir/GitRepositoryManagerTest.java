@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.util.unit.DataSize;
 
 class GitRepositoryManagerTest extends BaseUnitTest {
 
@@ -58,8 +59,27 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     private GitRepositoryManager createManager(boolean enabled) {
-        GitRepositoryProperties properties = new GitRepositoryProperties(enabled);
+        return createManager(enabled, 20_000, DataSize.ofMegabytes(32), DataSize.ofMegabytes(10));
+    }
+
+    private GitRepositoryManager createManager(
+        boolean enabled,
+        int maxFiles,
+        DataSize maxTotalSize,
+        DataSize maxFileSize
+    ) {
+        GitRepositoryProperties properties = new GitRepositoryProperties(enabled, maxFiles, maxTotalSize, maxFileSize);
         return new GitRepositoryManager(properties, lockManager, new FabricLayout(storagePath.toString()));
+    }
+
+    private String commit(Git git, String message) throws GitAPIException {
+        return git
+            .commit()
+            .setMessage(message)
+            .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+            .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+            .call()
+            .getName();
     }
 
     private Git createSourceRepo() throws GitAPIException, IOException {
@@ -602,7 +622,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         @Test
         @DisplayName("stages a blob larger than the heap budget of the process reading it")
         void shouldStageAFileLargerThanAnInMemoryReadCouldHold() throws Exception {
-            manager = createManager(true);
+            // Bounds raised past the blob on purpose: what is under test is that a large file is
+            // streamed rather than read into heap, not what the default ceiling happens to be.
+            manager = createManager(true, 20_000, DataSize.ofMegabytes(128), DataSize.ofMegabytes(128));
             try (Git sourceGit = createSourceRepo()) {
                 // 64 MB in one blob. Streaming to disk means peak memory here is one buffer, not one
                 // repository, so the file size must not decide whether the snapshot is complete.
@@ -647,6 +669,90 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                     assertThat(stagingDir).exists();
                 }
                 assertThat(stagingDir).doesNotExist();
+            }
+        }
+
+        @Test
+        @DisplayName("skips one oversized blob, keeps the rest of the tree, and says which bound it hit")
+        void shouldSkipABlobOverThePerFileBoundWithoutLosingTheTree() throws Exception {
+            manager = createManager(true, 20_000, DataSize.ofMegabytes(32), DataSize.ofKilobytes(4));
+            try (Git sourceGit = createSourceRepo()) {
+                Files.write(sourceRepoPath.resolve("asset.bin"), new byte[16 * 1024]);
+                Files.writeString(sourceRepoPath.resolve("src.java"), "class A {}\n");
+                sourceGit.add().addFilepattern(".").call();
+                String sha = commit(sourceGit, "Add an oversized asset beside a source file");
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                try (var snapshot = manager.readTreeSnapshot(1L, sha)) {
+                    assertThat(snapshot.files()).doesNotContainKey("asset.bin");
+                    assertThat(snapshot.files()).containsKeys("src.java", "README.md");
+                    assertThat(snapshot.limitations()).contains(GitRepositoryManager.TREE_LIMITATION_FILE_TOO_LARGE);
+                    assertThat(snapshot.complete()).isFalse();
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("stops at the file-count bound and reports itself incomplete")
+        void shouldStopAtTheFileCountBound() throws Exception {
+            manager = createManager(true, 3, DataSize.ofMegabytes(32), DataSize.ofMegabytes(10));
+            try (Git sourceGit = createSourceRepo()) {
+                for (int i = 0; i < 10; i++) {
+                    Files.writeString(sourceRepoPath.resolve("file" + i + ".txt"), "content " + i + "\n");
+                }
+                sourceGit.add().addFilepattern(".").call();
+                String sha = commit(sourceGit, "Add more files than the bound admits");
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                try (var snapshot = manager.readTreeSnapshot(1L, sha)) {
+                    assertThat(snapshot.files()).hasSize(3);
+                    assertThat(snapshot.limitations()).contains(GitRepositoryManager.TREE_LIMITATION_FILE_COUNT);
+                    assertThat(snapshot.complete()).isFalse();
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("stops at the total-size bound and reports itself incomplete")
+        void shouldStopAtTheTotalSizeBound() throws Exception {
+            manager = createManager(true, 20_000, DataSize.ofKilobytes(6), DataSize.ofKilobytes(4));
+            try (Git sourceGit = createSourceRepo()) {
+                for (int i = 0; i < 8; i++) {
+                    Files.write(sourceRepoPath.resolve("file" + i + ".bin"), new byte[2 * 1024]);
+                }
+                sourceGit.add().addFilepattern(".").call();
+                String sha = commit(sourceGit, "Add more bytes than the bound admits");
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                try (var snapshot = manager.readTreeSnapshot(1L, sha)) {
+                    assertThat(snapshot.totalBytes()).isLessThanOrEqualTo(6 * 1024);
+                    assertThat(snapshot.files()).hasSizeLessThan(9);
+                    assertThat(snapshot.limitations()).contains(GitRepositoryManager.TREE_LIMITATION_TOTAL_SIZE);
+                    assertThat(snapshot.complete()).isFalse();
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("never writes a blob it is going to reject")
+        void shouldNotStageAnOversizedBlobBeforeRejectingIt() throws Exception {
+            manager = createManager(true, 20_000, DataSize.ofMegabytes(32), DataSize.ofKilobytes(4));
+            try (Git sourceGit = createSourceRepo()) {
+                Files.write(sourceRepoPath.resolve("asset.bin"), new byte[64 * 1024]);
+                sourceGit.add().addFilepattern(".").call();
+                String sha = commit(sourceGit, "Add an oversized asset");
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                try (var snapshot = manager.readTreeSnapshot(1L, sha)) {
+                    // The bound has to protect the disk too: measuring the blob after writing it would
+                    // let a repository full of huge files fill the staging volume before being rejected.
+                    assertThat(snapshot.stagingDir().resolve("asset.bin")).doesNotExist();
+                    assertThat(snapshot.totalBytes()).isLessThan(64 * 1024);
+                }
             }
         }
 
