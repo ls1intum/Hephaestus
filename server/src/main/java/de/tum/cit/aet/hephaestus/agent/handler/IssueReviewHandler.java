@@ -259,7 +259,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
-                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), ArtifactKinds.ISSUE);
+                : practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.ISSUE);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             loudEnough,
             ArtifactKinds.ISSUE,

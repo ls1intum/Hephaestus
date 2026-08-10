@@ -120,7 +120,7 @@ public class CatalogProvenanceBackfill {
 
     private int stampPractices(Long workspaceId, BundledPracticeCatalog catalog) {
         int stamped = 0;
-        for (Practice practice : practiceRepository.findByFilters(workspaceId, null)) {
+        for (Practice practice : practiceRepository.findAllForCatalog(workspaceId)) {
             if (practice.getSourceCuratedSlug() != null || practice.getCurrentRevision() == null) {
                 continue;
             }

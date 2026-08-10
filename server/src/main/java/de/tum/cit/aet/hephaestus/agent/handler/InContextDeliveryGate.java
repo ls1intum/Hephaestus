@@ -11,6 +11,9 @@ import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,15 +55,18 @@ class InContextDeliveryGate {
     private final PracticeRepository practiceRepository;
     private final ObservationRepository observationRepository;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     InContextDeliveryGate(
         PracticeRepository practiceRepository,
         ObservationRepository observationRepository,
-        FeedbackLedgerRecorder feedbackLedgerRecorder
+        FeedbackLedgerRecorder feedbackLedgerRecorder,
+        WorkspaceReviewDefaultsProvider workspaceDefaults
     ) {
         this.practiceRepository = practiceRepository;
         this.observationRepository = observationRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
+        this.workspaceDefaults = workspaceDefaults;
     }
 
     /**
@@ -88,16 +94,30 @@ class InContextDeliveryGate {
             return List.of();
         }
 
+        // Effective tiers, resolved through practice -> area -> workspace. The raw column is not the
+        // answer: a practice that holds no opinion of its own inherits one, and treating its NULL as an
+        // unresolved lookup would admit it whatever its area or its workspace had decided.
+        //
+        // Resolved from the workspace ID rather than off job.getWorkspace(). The job reaches this gate
+        // detached on some paths, so reading a lazy association here would make the delivery rule's
+        // correctness depend on whether the caller happens to hold a session — which is exactly the trap
+        // the conversational router's tier projection was written to avoid.
+        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
         Map<String, PracticeReviewTier> tierBySlug = new HashMap<>();
         for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
-            tierBySlug.put(practice.getSlug(), practice.getReviewTier());
+            tierBySlug.put(practice.getSlug(), ReviewTierResolver.effectiveTierOf(practice, defaults.defaultTier()));
         }
 
         List<ValidatedFinding> admitted = new ArrayList<>(findings.size());
         List<ValidatedFinding> withheld = new ArrayList<>();
         for (ValidatedFinding finding : findings) {
             if (
-                FeedbackAdmission.delivers(origin, tierBySlug.get(finding.practiceSlug()), FeedbackChannel.IN_CONTEXT)
+                FeedbackAdmission.delivers(
+                    origin,
+                    tierBySlug.get(finding.practiceSlug()),
+                    defaults.reach(),
+                    FeedbackChannel.IN_CONTEXT
+                )
             ) {
                 admitted.add(finding);
             } else {

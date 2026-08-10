@@ -12,6 +12,8 @@ import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -44,25 +46,61 @@ public class PracticeService {
     private final WorkspaceRepository workspaceRepository;
     private final PracticeDefinitionValidator definitionValidator;
     private final PracticeEvidenceDefaults evidenceDefaults;
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
-    @Transactional(readOnly = true)
-    public List<Practice> listPractices(WorkspaceContext ctx, @Nullable PracticeReviewTier reviewTier) {
-        log.debug("Listing practices for workspace {} (reviewTier={})", ctx.slug(), reviewTier);
-        return practiceRepository.findByFilters(ctx.id(), reviewTier);
+    /**
+     * Refuses a tier an administrator may not select yet.
+     *
+     * <p>{@code PROPOSE} is in the vocabulary and in the DB CHECK so the ladder reads whole and so the value
+     * is already representable, but the approval queue that would let a human act on a prepared unit does
+     * not exist. A practice parked there would prepare feedback nobody can approve and swallow it, which is
+     * strictly worse than the tier not being offered — so the refusal names the missing thing rather than
+     * calling the value invalid.
+     */
+    private static void requireSelectable(@Nullable PracticeReviewTier tier) {
+        if (tier != null && !tier.selectable()) {
+            throw new IllegalArgumentException(
+                "Propose is not available yet: feedback would be prepared with no way for anyone to approve " +
+                    "it. Use Observe to keep measuring in silence, or Deliver to send feedback without approval."
+            );
+        }
     }
 
     /**
-     * Every practice this workspace actually reviews, at any tier above {@code OFF}.
+     * The workspace catalogue, optionally narrowed to one tier.
      *
-     * <p>Includes {@code MEASURE}: that tier promises the developer no <em>feedback</em>, not concealment,
+     * <p>The filter is on the <em>effective</em> tier, which is the only tier an administrator can see on
+     * the screen they are filtering. Filtering the stored column instead would answer "which practices
+     * happen to hold this value", and would return nothing at all for the tier most practices are actually
+     * at — the inherited one.
+     */
+    @Transactional(readOnly = true)
+    public List<Practice> listPractices(WorkspaceContext ctx, @Nullable PracticeReviewTier reviewTier) {
+        log.debug("Listing practices for workspace {} (reviewTier={})", ctx.slug(), reviewTier);
+        List<Practice> all = practiceRepository.findAllForCatalog(ctx.id());
+        if (reviewTier == null) {
+            return all;
+        }
+        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultTier();
+        return all
+            .stream()
+            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault) == reviewTier)
+            .toList();
+    }
+
+    /**
+     * Every practice this workspace actually reviews, at any effective tier above {@code OFF}.
+     *
+     * <p>Includes {@code OBSERVE}: that tier promises the developer no <em>feedback</em>, not concealment,
      * so the learner-facing catalogue lists what is observed while the tier governs what is said.
      */
     @Transactional(readOnly = true)
     public List<Practice> listReviewedPractices(WorkspaceContext ctx) {
+        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultTier();
         return practiceRepository
-            .findByFilters(ctx.id(), null)
+            .findAllForCatalog(ctx.id())
             .stream()
-            .filter(p -> p.getReviewTier().admitsReview())
+            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
             .toList();
     }
 
@@ -73,7 +111,7 @@ public class PracticeService {
         }
         lockWorkspace(ctx);
         List<Practice> bucket = practiceRepository
-            .findByFilters(ctx.id(), null)
+            .findAllForCatalog(ctx.id())
             .stream()
             .filter(p -> Objects.equals(areaSlug, p.getArea() == null ? null : p.getArea().getSlug()))
             .toList();
@@ -117,7 +155,7 @@ public class PracticeService {
 
         Long sourceAreaId = practice.getArea() == null ? null : practice.getArea().getId();
         Long destinationAreaId = destination == null ? null : destination.getId();
-        List<Practice> allPractices = practiceRepository.findByFilters(ctx.id(), null);
+        List<Practice> allPractices = practiceRepository.findAllForCatalog(ctx.id());
         List<Practice> source = practicesInArea(allPractices, sourceAreaId, practice);
         List<Practice> target = Objects.equals(sourceAreaId, destinationAreaId)
             ? source
@@ -208,11 +246,15 @@ public class PracticeService {
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
-        // A practice whose policy cannot attempt an automated review starts silent rather than at the
-        // default tier: there is nothing for a louder tier to deliver.
+        // A new practice holds NO opinion of its own and inherits its area's, and through it the
+        // workspace's. It used to be stamped with the default tier at creation, which is how forty
+        // practices came to carry an opinion nobody had expressed and why turning the system down meant
+        // editing every one of them. The exception is a practice whose policy cannot attempt an automated
+        // review: that is not a preference to be inherited over, it is a fact about the practice, so it is
+        // written explicitly.
         practice.setReviewTier(
             definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
-                ? PracticeReviewTier.DEFAULT
+                ? null
                 : PracticeReviewTier.OFF
         );
         definitionValidator.validate(definition);
@@ -341,8 +383,15 @@ public class PracticeService {
         return practice;
     }
 
+    /**
+     * Sets one practice's own tier, or clears it back to inherit.
+     *
+     * @param reviewTier the tier to hold, or {@code null} to hold none and inherit the area's — and through
+     *     it the workspace's. Clearing has to be expressible or the chain is write-once: an administrator
+     *     who set one practice explicitly could never put it back under the area's decision.
+     */
     @Transactional
-    public Practice setReviewTier(WorkspaceContext ctx, String slug, PracticeReviewTier reviewTier) {
+    public Practice setReviewTier(WorkspaceContext ctx, String slug, @Nullable PracticeReviewTier reviewTier) {
         lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
@@ -352,9 +401,17 @@ public class PracticeService {
         if (before == reviewTier) {
             return practice;
         }
+        requireSelectable(reviewTier);
         // Every tier above OFF starts a review, so every tier above OFF needs a policy that can run one.
+        // Asked of the tier that would be IN FORCE, not of the one being written: "inherit" is a request
+        // for whatever the area says, and if that admits a review the practice still cannot run it.
+        PracticeReviewTier effective = ReviewTierResolver.resolvePractice(
+            reviewTier,
+            practice.getArea() == null ? null : practice.getArea().getReviewTier(),
+            workspaceDefaults.forWorkspace(ctx.id()).defaultTier()
+        ).tier();
         if (
-            reviewTier.admitsReview() &&
+            effective.admitsReview() &&
             !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
         ) {
             throw new IllegalArgumentException(

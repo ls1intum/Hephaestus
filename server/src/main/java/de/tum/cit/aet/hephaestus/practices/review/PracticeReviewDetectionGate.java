@@ -11,6 +11,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -368,7 +370,7 @@ public class PracticeReviewDetectionGate {
         // 4. Practice matching. The binding answers the draft question, not a fleet-wide veto ahead of
         //    this one, which would make every draft-specific criterion in the catalog unreachable. OFF is
         //    then the only tier that stops the review; MEASURE and COACH still record their observations.
-        SignalMatch match = findMatchingPractices(workspace.getId(), signal, draft);
+        SignalMatch match = findMatchingPractices(workspace, signal, draft);
         if (match.admitted().isEmpty()) {
             // Two reasons, not one: "bound and turned all the way down" is a deliberate act and must stay
             // answerable apart from "nothing bound".
@@ -421,10 +423,10 @@ public class PracticeReviewDetectionGate {
      * asks the descriptor which signal that is, so a new domain's manual request works with no edit here.
      * The tier is still honoured below: Off means off, however the review was occasioned.
      */
-    private SignalMatch findMatchingPractices(Long workspaceId, SignalName signal, boolean draft) {
+    private SignalMatch findMatchingPractices(Workspace workspace, SignalName signal, boolean draft) {
         boolean requestedByHand = signalOptions.isManualRequest(signal);
         List<Practice> bound = practiceRepository
-            .findByWorkspaceId(workspaceId)
+            .findByWorkspaceId(workspace.getId())
             .stream()
             .filter(p ->
                 p
@@ -435,9 +437,12 @@ public class PracticeReviewDetectionGate {
                     )
             )
             .toList();
+        // The effective tier, resolved through practice -> area -> workspace. Reading the column raw here
+        // would ask a practice that holds no opinion for one.
+        PracticeReviewTier workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultTier();
         List<Practice> admitted = bound
             .stream()
-            .filter(p -> p.getReviewTier().admitsReview())
+            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
             .toList();
         return new SignalMatch(admitted, admitted.isEmpty() && !bound.isEmpty());
     }

@@ -2454,4 +2454,172 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-readiness" id="1785743133884-44">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice review tiers already name autonomy">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_practice_review_tier'
+                  AND conrelid = 'practice'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%DELIVER%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Let a practice hold no opinion, and name the tiers after autonomy rather than reach.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- The column could not say "I have not decided". Every practice therefore shipped holding an
+            -- opinion nobody expressed -- the loudest one -- and turning the system down meant editing every
+            -- row by hand. At forty practices that is tedious, at a hundred across twenty-five areas nobody
+            -- does it, so the shipped default was the only configuration that ever ran. NULL is the fix: it
+            -- is the difference between a decision and the absence of one, and it lets one decision at the
+            -- area or the workspace cover everything below it that has not disagreed.
+            ALTER TABLE practice DROP CONSTRAINT IF EXISTS chk_practice_review_tier;
+            ALTER TABLE practice ALTER COLUMN review_tier DROP DEFAULT;
+            ALTER TABLE practice ALTER COLUMN review_tier DROP NOT NULL;
+
+            -- OFF and MEASURE carry over exactly: not reviewed, and reviewed-but-silent, are unchanged acts.
+            -- ENGAGE carries over exactly as DELIVER: feedback sent without anyone approving it.
+            --
+            -- COACH is the one that cannot be preserved, and it goes to the QUIETER side. It meant "reviewed,
+            -- and raised in the mentor conversation but never on the work" -- one claim about autonomy and one
+            -- about reach. Reach is now a single workspace setting, so a per-practice COACH has nowhere to be
+            -- stored. Sending it to DELIVER would preserve its reach only by granting it autonomy it never
+            -- had, and on a workspace reaching the work it would start commenting on people's changes because
+            -- of a migration. OBSERVE keeps every observation COACH was recording and says nothing until a
+            -- person decides otherwise. A system that comments on somebody's work gets louder by an explicit
+            -- decision, never by an upgrade.
+            UPDATE practice SET review_tier = CASE review_tier
+                WHEN 'MEASURE' THEN 'OBSERVE'
+                WHEN 'COACH'   THEN 'OBSERVE'
+                WHEN 'ENGAGE'  THEN 'DELIVER'
+                ELSE review_tier
+            END;
+
+            -- PROPOSE is admitted here and refused at every write boundary until an approval queue exists.
+            -- Admitting it now costs nothing and means the value is already representable when it ships;
+            -- a column that had to be widened later would be a migration on the day of the feature.
+            ALTER TABLE practice ADD CONSTRAINT chk_practice_review_tier
+                CHECK (review_tier IS NULL OR review_tier IN ('OFF', 'OBSERVE', 'PROPOSE', 'DELIVER'));
+
+            -- The workspace default is left unset by this migration, and an unset default resolves to
+            -- DELIVER -- exactly what every one of these rows already did. So a practice sitting at the
+            -- migrated default is a practice with no opinion, and saying so changes no behaviour at all
+            -- while turning forty edits into one. A practice at OFF or OBSERVE disagreed on purpose and
+            -- keeps its explicit value.
+            UPDATE practice SET review_tier = NULL WHERE review_tier = 'DELIVER';
+        ]]></sql>
+        <rollback><![CDATA[
+            -- Rolling back has to re-fill the NULLs, because the old column was NOT NULL. They become
+            -- ENGAGE: that is what an unset tier resolved to going forward, so the schema before and after
+            -- this rollback describe the same behaviour.
+            ALTER TABLE practice DROP CONSTRAINT IF EXISTS chk_practice_review_tier;
+            UPDATE practice SET review_tier = 'ENGAGE' WHERE review_tier IS NULL;
+            UPDATE practice SET review_tier = CASE review_tier
+                WHEN 'OBSERVE' THEN 'MEASURE'
+                WHEN 'DELIVER' THEN 'ENGAGE'
+                WHEN 'PROPOSE' THEN 'MEASURE'
+                ELSE review_tier
+            END;
+            ALTER TABLE practice ALTER COLUMN review_tier SET NOT NULL;
+            ALTER TABLE practice ALTER COLUMN review_tier SET DEFAULT 'ENGAGE';
+            ALTER TABLE practice ADD CONSTRAINT chk_practice_review_tier
+                CHECK (review_tier IN ('OFF', 'MEASURE', 'COACH', 'ENGAGE'));
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-45">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_area.review_tier already present">
+            <not><columnExists tableName="practice_area" columnName="review_tier"/></not>
+        </preConditions>
+        <comment>Let an area decide for the practices under it that have not decided for themselves.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- The middle level, and the one that makes the chain worth having: an area is the grain a team
+            -- actually reasons in ("we are not ready for this to comment on our testing practices"), so one
+            -- write here is the decision that a dozen per-practice writes used to be. Nullable with no
+            -- default and no backfill, because an area that has never been configured has not decided
+            -- anything and a default would record an opinion it does not hold.
+            ALTER TABLE practice_area ADD COLUMN review_tier VARCHAR(16);
+            ALTER TABLE practice_area ADD CONSTRAINT chk_practice_area_review_tier
+                CHECK (review_tier IS NULL OR review_tier IN ('OFF', 'OBSERVE', 'PROPOSE', 'DELIVER'));
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE practice_area DROP CONSTRAINT IF EXISTS chk_practice_area_review_tier;
+            ALTER TABLE practice_area DROP COLUMN IF EXISTS review_tier;
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-46">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace practice defaults already present">
+            <not><columnExists tableName="workspace" columnName="practice_default_review_tier"/></not>
+        </preConditions>
+        <comment>Give a workspace one decision about how loud it is, and one about where feedback may go.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- The bottom of the practice -> area -> workspace chain, and the one decision an administrator
+            -- makes to start. Nullable with no default: null means this workspace has never chosen, which
+            -- resolves to DELIVER -- what every practice did before the chain existed. Deliberately NOT
+            -- backfilled to 'DELIVER'. Writing the value everybody currently behaves as would turn "never
+            -- configured" into "configured", and the two are the distinction this whole change is about.
+            ALTER TABLE workspace ADD COLUMN practice_default_review_tier VARCHAR(16);
+            ALTER TABLE workspace ADD CONSTRAINT chk_workspace_default_review_tier
+                CHECK (practice_default_review_tier IS NULL
+                    OR practice_default_review_tier IN ('OFF', 'OBSERVE', 'PROPOSE', 'DELIVER'));
+
+            -- Reach: may the system speak on the work, or only in the mentor conversation. This is what the
+            -- retired COACH tier was really expressing, asked once per workspace instead of once per
+            -- practice -- per-practice reach multiplied by per-practice tier is the two-hundred-decision
+            -- explosion that left everyone on the defaults.
+            ALTER TABLE workspace ADD COLUMN practice_feedback_reach VARCHAR(16);
+            ALTER TABLE workspace ADD CONSTRAINT chk_workspace_feedback_reach
+                CHECK (practice_feedback_reach IS NULL
+                    OR practice_feedback_reach IN ('CONVERSATION', 'ON_THE_WORK'));
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE workspace DROP CONSTRAINT IF EXISTS chk_workspace_feedback_reach;
+            ALTER TABLE workspace DROP CONSTRAINT IF EXISTS chk_workspace_default_review_tier;
+            ALTER TABLE workspace DROP COLUMN IF EXISTS practice_feedback_reach;
+            ALTER TABLE workspace DROP COLUMN IF EXISTS practice_default_review_tier;
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-47">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation presence already says INCONCLUSIVE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_observation_presence'
+                  AND conrelid = 'observation'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%INCONCLUSIVE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Say INCONCLUSIVE, the word a detector reaches for when it looked and could not tell.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- Same value, ordinary English. The evidence is that the old name was never reached: the
+            -- orchestrator asks for it in twenty places and live data holds none of it, while a large share
+            -- of the NOT_APPLICABLE rows are phrased as could-not-tell in their own reasoning -- a detector
+            -- saying the right thing under the wrong label, which enters a person's record as "nothing to
+            -- see here" on a change where there was something to see. A word a model reaches for is not a
+            -- cosmetic concern when the whole value exists to be reached for.
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence_assessment;
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence;
+
+            UPDATE observation SET presence = 'INCONCLUSIVE' WHERE presence = 'INDETERMINATE';
+
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence
+                CHECK (presence IN ('PRESENT', 'ABSENT', 'NOT_APPLICABLE', 'INCONCLUSIVE'));
+            -- The coupling is unchanged: assessment is present exactly when the presence carries a
+            -- direction. INCONCLUSIVE stays on the null side with NOT_APPLICABLE, which is the whole point
+            -- of the value -- a run that could not settle the question must not smuggle a verdict out with it.
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence_assessment
+                CHECK ((presence IN ('NOT_APPLICABLE', 'INCONCLUSIVE') AND assessment IS NULL)
+                    OR (presence IN ('PRESENT', 'ABSENT') AND assessment IS NOT NULL));
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence_assessment;
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_presence;
+            UPDATE observation SET presence = 'INDETERMINATE' WHERE presence = 'INCONCLUSIVE';
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence
+                CHECK (presence IN ('PRESENT', 'ABSENT', 'NOT_APPLICABLE', 'INDETERMINATE'));
+            ALTER TABLE observation ADD CONSTRAINT chk_observation_presence_assessment
+                CHECK ((presence IN ('NOT_APPLICABLE', 'INDETERMINATE') AND assessment IS NULL)
+                    OR (presence IN ('PRESENT', 'ABSENT') AND assessment IS NOT NULL));
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

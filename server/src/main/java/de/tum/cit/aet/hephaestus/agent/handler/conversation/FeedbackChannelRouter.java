@@ -1,12 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,20 +37,28 @@ public class FeedbackChannelRouter {
 
     private final FeedbackRepository feedbackRepository;
     private final ObservationRepository observationRepository;
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
-    public FeedbackChannelRouter(FeedbackRepository feedbackRepository, ObservationRepository observationRepository) {
+    public FeedbackChannelRouter(
+        FeedbackRepository feedbackRepository,
+        ObservationRepository observationRepository,
+        WorkspaceReviewDefaultsProvider workspaceDefaults
+    ) {
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
+        this.workspaceDefaults = workspaceDefaults;
     }
 
     /** The observations from {@code observations} that are eligible for conversational delivery, order preserved. */
     public List<Observation> admit(List<Observation> observations, long workspaceId, RoutingContext context) {
-        Map<UUID, PracticeReviewTier> tiers = tiersFor(observations);
+        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
+        Map<UUID, PracticeReviewTier> tiers = tiersFor(observations, defaults.defaultTier());
         List<Observation> admitted = new ArrayList<>();
         for (Observation observation : observations) {
             ConversationRoutingDecision decision = route(
                 observation,
                 tiers.get(observation.getId()),
+                defaults.reach(),
                 workspaceId,
                 context
             );
@@ -59,29 +72,30 @@ public class FeedbackChannelRouter {
     /**
      * Route a single observation. See the class javadoc for the admission predicate.
      *
-     * @param tier the loudness tier of the observation's practice, or {@code null} when it could not be
-     *     resolved. Passed in rather than read off {@code observation.getPractice()} on purpose: that
-     *     association is lazy, so reading it here would make the routing rule depend on whether the
-     *     caller happens to hold a session — correct inside the delivery listener's transaction and
-     *     broken for every other caller. A null tier lets the remaining rules decide, because refusing
-     *     on a failed lookup would silently withhold coaching the developer was owed.
+     * @param tier the <em>effective</em> tier of the observation's practice, already resolved through the
+     *     practice → area → workspace chain, or {@code null} when it could not be resolved. Passed in rather
+     *     than read off {@code observation.getPractice()} on purpose: that association is lazy, so reading
+     *     it here would make the routing rule depend on whether the caller happens to hold a session —
+     *     correct inside the delivery listener's transaction and broken for every other caller. A null tier
+     *     lets the remaining rules decide, because refusing on a failed lookup would silently withhold
+     *     coaching the developer was owed.
+     * @param reach where this workspace lets feedback go at all
      */
     public ConversationRoutingDecision route(
         Observation observation,
         @Nullable PracticeReviewTier tier,
+        FeedbackReach reach,
         long workspaceId,
         RoutingContext context
     ) {
-        // How the measurement was taken, asked first: it needs no lookup at all, and no per-practice dial
-        // can make a months-old finding worth raising as though the developer could still act on it.
-        if (!observation.getOrigin().delivers(FeedbackChannel.CONVERSATION)) {
-            return ConversationRoutingDecision.BACKFILL_QUIET;
-        }
-        // The workspace's standing loudness policy for this practice, asked next: it is the cheapest
-        // remaining test and the most decisive one, because a practice at MEASURE has nothing to say on
-        // ANY channel.
-        if (tier != null && !tier.delivers(FeedbackChannel.CONVERSATION)) {
-            return ConversationRoutingDecision.PRACTICE_TIER_QUIET;
+        // Provenance, tier and reach in one predicate, so this path and the in-context one cannot drift on
+        // what "may we say this here" means. Asked first because none of the three needs anything but the
+        // observation in hand, and each is decisive: an OBSERVE practice has nothing to say on ANY channel,
+        // and a workspace whose reach stops at the work never opens a conversation at all.
+        if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, reach, FeedbackChannel.CONVERSATION)) {
+            return observation.getOrigin().delivers(FeedbackChannel.CONVERSATION)
+                ? ConversationRoutingDecision.PRACTICE_TIER_QUIET
+                : ConversationRoutingDecision.BACKFILL_QUIET;
         }
         // Reviewer-targeted delivery: deferred (ADR 0021).
         if (context.recipientRole() != RecipientRole.AUTHOR) {
@@ -115,14 +129,20 @@ public class FeedbackChannelRouter {
      * One projection query for the whole cycle's tiers. An observation with no id yet is simply absent
      * from the map, which the null-tier rule above already covers.
      */
-    private Map<UUID, PracticeReviewTier> tiersFor(List<Observation> observations) {
+    private Map<UUID, PracticeReviewTier> tiersFor(
+        List<Observation> observations,
+        PracticeReviewTier workspaceDefault
+    ) {
         List<UUID> ids = observations.stream().map(Observation::getId).filter(Objects::nonNull).toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         Map<UUID, PracticeReviewTier> tiers = new HashMap<>();
         for (var row : observationRepository.practiceReviewTiersFor(ids)) {
-            tiers.put(row.getObservationId(), row.getReviewTier());
+            tiers.put(
+                row.getObservationId(),
+                ReviewTierResolver.resolvePractice(row.getPracticeTier(), row.getAreaTier(), workspaceDefault).tier()
+            );
         }
         return tiers;
     }

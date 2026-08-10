@@ -827,7 +827,7 @@ erDiagram
         VARCHAR(64) source_curated_slug
         VARCHAR(96) source_curated_fingerprint
         JSONB automated_review_policy "NOT NULL"
-        VARCHAR(16) review_tier "NOT NULL"
+        VARCHAR(16) review_tier
     }
 
     PracticeArea {
@@ -844,6 +844,7 @@ erDiagram
         VARCHAR(32) color
         VARCHAR(64) source_curated_slug
         VARCHAR(64) source_curated_fingerprint
+        VARCHAR(16) review_tier
     }
 
     PracticeCatalogInstallation {
@@ -1322,6 +1323,8 @@ erDiagram
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
         JSONB practice_review_scope
+        VARCHAR(16) practice_default_review_tier
+        VARCHAR(16) practice_feedback_reach
     }
 
     WorkspaceAgentBinding {

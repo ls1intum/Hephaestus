@@ -6,7 +6,11 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -86,13 +90,23 @@ public class PracticeCatalogContentSource implements ContentSource {
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // Only the practices whose loudness tier admits the conversation channel. A MEASURE practice is
+        // Only the practices this workspace may actually raise in a conversation. An OBSERVE practice is
         // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
-        // subject it is not allowed to raise; an OFF practice is not reviewed at all.
+        // subject it is not allowed to raise; an OFF practice is not reviewed at all; and a workspace whose
+        // reach excludes the conversation has no conversational catalogue at all. Tier is the effective one,
+        // resolved through the practice -> area -> workspace chain.
+        WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
         List<Practice> practices = practiceRepository
             .findByWorkspaceId(workspaceId)
             .stream()
-            .filter(p -> p.getReviewTier().delivers(FeedbackChannel.CONVERSATION))
+            .filter(p ->
+                FeedbackAdmission.delivers(
+                    ObservationOrigin.LIVE,
+                    ReviewTierResolver.effectiveTierOf(p, defaults.defaultTier()),
+                    defaults.reach(),
+                    FeedbackChannel.CONVERSATION
+                )
+            )
             .toList();
 
         ObjectNode root = objectMapper.createObjectNode();

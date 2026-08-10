@@ -13,9 +13,11 @@ import org.jspecify.annotations.Nullable;
  * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on
  * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
  *
- * <p>Every field is <strong>nullable</strong> on purpose: {@code null} means "inherit the fleet
- * default" ({@code hephaestus.practice-review.*}). Read via the {@code resolveX(fallback)}
- * accessors, passing the property default as the fallback.
+ * <p>Every field is <strong>nullable</strong> on purpose: {@code null} means "this workspace has not
+ * decided". For the scalars that resolves to the fleet default ({@code hephaestus.practice-review.*}) — read
+ * them via the {@code resolveX(fallback)} accessors, passing the property default as the fallback. For
+ * {@link #reviewScope}, {@link #defaultReviewTier} and {@link #feedbackReach} there is no fleet default to
+ * inherit and null resolves to a constant instead; each says so at the field.
  *
  * <p>PATCH {@code null} means "no change"; to reset a previously-set field back to inherit, name it
  * in the PATCH {@code reset} set (see {@link #reset(java.util.Set)}).
@@ -65,6 +67,38 @@ public class PracticeReviewSettings {
     @Nullable
     private WorkspaceReviewScope reviewScope;
 
+    /**
+     * How much autonomy the system has over every practice in this workspace that holds no opinion, and
+     * whose area holds none either — the one decision an administrator makes to start. A
+     * {@code PracticeReviewTier} name, or {@code null} to mean that tier's own default.
+     *
+     * <p><b>Why a String and not the enum.</b> {@code PracticeReviewTier} belongs to the practices module,
+     * which already depends on this one; naming it here would close a module cycle that
+     * {@code ModulithVerificationTest} rejects. The column is the storage, the practices module owns the
+     * vocabulary, and the two are held together from three sides: the DB CHECK
+     * {@code chk_workspace_default_review_tier}, the converter that is the only thing which reads this
+     * field, and a test that pins every constant round-tripping through it.
+     *
+     * <p>Like {@link #reviewScope} it has no fleet default to inherit: how a team wants to be spoken to is a
+     * fact about that team, so there is nothing useful for an instance-wide setting to say.
+     */
+    @Column(name = "practice_default_review_tier", length = 16)
+    @Nullable
+    private String defaultReviewTier;
+
+    /**
+     * Where this workspace's practice feedback may go at all: the mentor conversation only, or also on the
+     * work itself. A {@code FeedbackReach} name, or {@code null} for that enum's default.
+     *
+     * <p>One decision per workspace rather than per practice, because reach is a statement about how this
+     * team uses the system and almost nobody wants a different answer for practice 71 than for practice 12.
+     * ANDed with the resolved tier at every delivery site. Stored as a name for the same module-boundary
+     * reason as {@link #defaultReviewTier}, and constrained by {@code chk_workspace_feedback_reach}.
+     */
+    @Column(name = "practice_feedback_reach", length = 16)
+    @Nullable
+    private String feedbackReach;
+
     public boolean resolveRunForAllUsers(boolean fallback) {
         return runForAllUsers != null ? runForAllUsers : fallback;
     }
@@ -102,6 +136,25 @@ public class PracticeReviewSettings {
         }
     }
 
+    /**
+     * PATCH semantics, same as the scalars: null leaves the current value alone. Clearing the workspace
+     * default back to the tier vocabulary's own default is a
+     * {@link PracticeReviewField#DEFAULT_REVIEW_TIER} reset, not a null here — otherwise a client that
+     * simply did not send the field would silently reset it.
+     */
+    public void applyDefaultReviewTier(@Nullable String tierName) {
+        if (tierName != null) {
+            this.defaultReviewTier = tierName;
+        }
+    }
+
+    /** PATCH semantics, same as above; clear via {@link PracticeReviewField#FEEDBACK_REACH}. */
+    public void applyFeedbackReach(@Nullable String reachName) {
+        if (reachName != null) {
+            this.feedbackReach = reachName;
+        }
+    }
+
     /** Clear the named fields back to {@code null} (inherit the fleet default). */
     public void reset(@Nullable Set<PracticeReviewField> fields) {
         if (fields == null) {
@@ -132,6 +185,14 @@ public class PracticeReviewSettings {
                 }
                 case REVIEW_SCOPE -> {
                     this.reviewScope = null;
+                    yield true;
+                }
+                case DEFAULT_REVIEW_TIER -> {
+                    this.defaultReviewTier = null;
+                    yield true;
+                }
+                case FEEDBACK_REACH -> {
+                    this.feedbackReach = null;
                     yield true;
                 }
             };

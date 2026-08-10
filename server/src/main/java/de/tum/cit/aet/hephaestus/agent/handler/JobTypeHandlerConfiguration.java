@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -90,8 +91,11 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    PracticeCatalogInjector practiceCatalogInjector(PracticeRepository practiceRepository) {
-        return new PracticeCatalogInjector(objectMapper, practiceRepository);
+    PracticeCatalogInjector practiceCatalogInjector(
+        PracticeRepository practiceRepository,
+        WorkspaceReviewDefaultsProvider workspaceDefaults
+    ) {
+        return new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults);
     }
 
     @Bean

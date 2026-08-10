@@ -28,6 +28,8 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -286,13 +288,10 @@ public class AgentJobService {
                 );
                 return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
             }
-            if (
-                !practiceRepository.existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
-                    workspace.getId(),
-                    PracticeReviewTier.OFF,
-                    artifactKindFor(jobType)
-                )
-            ) {
+            // Resolved, not filtered in SQL: a practice that inherits its tier stores NULL, and
+            // `review_tier <> 'OFF'` answers UNKNOWN for it — which would refuse the review of every
+            // workspace that had left its practices to inherit, i.e. all of them after this release.
+            if (!hasReviewablePractice(currentWorkspace, artifactKindFor(jobType))) {
                 log.debug(
                     "Skipping practice review with no active practice for its work type: workspaceId={}, jobType={}",
                     workspace.getId(),
@@ -430,6 +429,20 @@ public class AgentJobService {
      * The artifact a job of this type is about. The single mapping for both the job row and the
      * observations filed against it — a second one drifts, and the same artifact ends up with two names.
      */
+    /** Whether any practice of this work type resolves to a tier that admits a review. */
+    private boolean hasReviewablePractice(Workspace workspace, ArtifactKind artifactKind) {
+        PracticeReviewTier workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultTier();
+        return practiceRepository
+            .findReviewTierRows(workspace.getId())
+            .stream()
+            .filter(row -> artifactKind.equals(row.getArtifactKind()))
+            .anyMatch(row ->
+                ReviewTierResolver.resolvePractice(row.getPracticeTier(), row.getAreaTier(), workspaceDefault)
+                    .tier()
+                    .admitsReview()
+            );
+    }
+
     public static ArtifactKind artifactKindFor(AgentJobType jobType) {
         return switch (jobType) {
             case PULL_REQUEST_REVIEW -> ArtifactKinds.PULL_REQUEST;

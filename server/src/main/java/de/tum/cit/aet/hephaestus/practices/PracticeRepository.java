@@ -32,19 +32,53 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceId(Long workspaceId);
 
-    /** Practices that a new review may include for one work type, i.e. everything above {@code OFF}. */
+    /**
+     * Every practice of the workspace for one work type, at any tier — including the ones resolving to
+     * {@code OFF}.
+     *
+     * <p>Deliberately unfiltered by tier. The two derived {@code ...ReviewTierNot...} finders this replaces
+     * pushed {@code review_tier <> 'OFF'} into SQL, which was correct only while the column could not be
+     * null: {@code NULL <> 'OFF'} is UNKNOWN, so every practice that inherits its tier would silently
+     * vanish from the catalog the reviewer is given and from the "is anything switched on here" check —
+     * turning the whole inheritance chain into an outage. Tier is resolved in the JVM by
+     * {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}, which is the only
+     * implementation of the chain there is.
+     */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndReviewTierNotAndArtifactKind(
-        Long workspaceId,
-        PracticeReviewTier excludedTier,
-        ArtifactKind artifactKind
-    );
+    List<Practice> findByWorkspaceIdAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
-    boolean existsByWorkspaceIdAndReviewTierNotAndArtifactKind(
-        Long workspaceId,
-        PracticeReviewTier excludedTier,
-        ArtifactKind artifactKind
-    );
+    /**
+     * The raw tier columns of every practice in a workspace, with its area's, and nothing else.
+     *
+     * <p>For the callers that only need to count or test tiers — the rollup the admin screen reads and the
+     * "does this workspace have anything switched on" check on the review path. Both would otherwise
+     * hydrate the whole catalogue, and both resolve the pairs through the same resolver as everyone else,
+     * so no second expression of the chain exists in SQL to drift from it.
+     */
+    @Query(
+        """
+        SELECT p.reviewTier AS practiceTier, a.reviewTier AS areaTier,
+               a.id AS areaId, p.artifactKind AS artifactKind
+        FROM Practice p
+        LEFT JOIN p.area a
+        WHERE p.workspace.id = :workspaceId
+        """
+    )
+    List<PracticeTierRow> findReviewTierRows(@Param("workspaceId") Long workspaceId);
+
+    /** One practice's tier and its area's, without hydrating either entity. */
+    interface PracticeTierRow {
+        @Nullable
+        PracticeReviewTier getPracticeTier();
+
+        @Nullable
+        PracticeReviewTier getAreaTier();
+
+        @Nullable
+        Long getAreaId();
+
+        ArtifactKind getArtifactKind();
+    }
 
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
@@ -86,8 +120,13 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findSourceAlignedV1Practices();
 
     /**
-     * Lists practices for a workspace with an optional loudness-tier filter.
-     * A null filter is ignored (match every tier).
+     * Every practice of a workspace in the order the admin catalogue shows them, areas first.
+     *
+     * <p>No tier predicate: filtering to a tier means filtering to an <em>effective</em> tier, and the
+     * effective tier of a practice that holds no opinion is not in this row. The caller resolves and then
+     * filters. The old {@code p.reviewTier = :reviewTier} could not have been kept anyway — it never
+     * matches a null column, so asking for the workspace's own default tier would have returned every
+     * practice except the ones actually at it.
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     @Query(
@@ -95,14 +134,10 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         SELECT p FROM Practice p
         LEFT JOIN FETCH p.area a
         WHERE p.workspace.id = :workspaceId
-        AND (:reviewTier IS NULL OR p.reviewTier = :reviewTier)
         ORDER BY a.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
         """
     )
-    List<Practice> findByFilters(
-        @Param("workspaceId") Long workspaceId,
-        @Param("reviewTier") @Nullable PracticeReviewTier reviewTier
-    );
+    List<Practice> findAllForCatalog(@Param("workspaceId") Long workspaceId);
 
     /** Deletes all practices for the workspace. Cascades to observation via ON DELETE CASCADE. */
     @Modifying

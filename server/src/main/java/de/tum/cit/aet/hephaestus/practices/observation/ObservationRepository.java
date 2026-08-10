@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -53,7 +54,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                COUNT(*) FILTER (WHERE o.assessment = 'GOOD') AS "strengths",
                COUNT(*) FILTER (WHERE o.assessment = 'BAD') AS "problems",
                COUNT(*) FILTER (WHERE o.presence = 'NOT_APPLICABLE') AS "notApplicable",
-               COUNT(*) FILTER (WHERE o.presence = 'INDETERMINATE') AS "indeterminate"
+               COUNT(*) FILTER (WHERE o.presence = 'INCONCLUSIVE') AS "inconclusive"
         FROM observation o
         JOIN practice p ON p.id = o.practice_id
         WHERE p.workspace_id = :workspaceId
@@ -77,7 +78,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
          * {@link #getNotApplicable()}: both are silence on the artifact, but an operator reading a review
          * summary needs "nothing here to judge" told apart from "we could not tell".
          */
-        Long getIndeterminate();
+        Long getInconclusive();
     }
 
     /**
@@ -411,7 +412,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      *
      * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed. {@code NOT_APPLICABLE}
      * dominates the list ("no change needed / awaiting review" rows) and would bury the actionable {@code BAD}
-     * problems and {@code GOOD} strengths within the page budget; {@code INDETERMINATE} is excluded because
+     * problems and {@code GOOD} strengths within the page budget; {@code INCONCLUSIVE} is excluded because
      * coaching on it would invite the mentor to invent a direction the measurement declined to take. Both
      * totals still reach the mentor via the presence-count summary; this is the drill-down list only, and
      * stays recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
@@ -791,26 +792,39 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     }
 
     /**
-     * The loudness tier of each observation's practice, resolved in ONE query rather than by walking the
-     * lazy {@code Observation.practice} association.
+     * The raw tier columns of each observation's practice <em>and of that practice's area</em>, resolved in
+     * ONE query rather than by walking the lazy {@code Observation.practice} association.
      *
      * <p>The association is deliberately not used: the conversational router receives observations that
      * may already be detached, so traversing a lazy proxy there would make the tier rule's correctness
      * depend on whether the caller happens to hold a session. A projection is session-independent.
+     *
+     * <p>Both levels are projected because either may be null, and null does not mean the same thing to the
+     * router as it does here: an unresolved lookup is admitted, while a practice that merely inherits its
+     * tier must be held to the tier it inherits. Projecting only the practice column would have made every
+     * inheriting practice look unresolved, and admitted it to the conversation whatever its area or its
+     * workspace had decided.
      */
     @Query(
         """
-        SELECT o.id AS observationId, o.practice.reviewTier AS reviewTier
+        SELECT o.id AS observationId, p.reviewTier AS practiceTier, a.reviewTier AS areaTier
         FROM Observation o
+        JOIN o.practice p
+        LEFT JOIN p.area a
         WHERE o.id IN :observationIds
         """
     )
     List<ObservationPracticeTier> practiceReviewTiersFor(@Param("observationIds") Collection<UUID> observationIds);
 
-    /** One observation's practice tier, without loading either entity. */
+    /** One observation's practice tier and its area's, without loading any of the three entities. */
     interface ObservationPracticeTier {
         UUID getObservationId();
-        PracticeReviewTier getReviewTier();
+
+        @Nullable
+        PracticeReviewTier getPracticeTier();
+
+        @Nullable
+        PracticeReviewTier getAreaTier();
     }
 
     /**

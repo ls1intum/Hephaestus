@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraint
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -156,6 +157,43 @@ public class PracticeAreaService {
         area.setSourceCuratedSlug(slug);
         area.setSourceCuratedFingerprint(definition.provenanceFingerprint(slug));
         return practiceAreaRepository.save(area);
+    }
+
+    /**
+     * Sets — or clears — the tier this area imposes on the practices under it that hold no tier of their own.
+     *
+     * <p>The level that makes the chain worth having. An area is the grain a team reasons in, so one write
+     * here is the decision that forty per-practice writes used to be. Practices that set their own tier are
+     * untouched: they disagreed on purpose, and an area-wide setting is not a reason to overrule them.
+     *
+     * @param reviewTier the tier to impose, or {@code null} to hold none and follow the workspace default
+     */
+    @Transactional
+    public PracticeArea setReviewTier(WorkspaceContext ctx, String slug, @Nullable PracticeReviewTier reviewTier) {
+        lockWorkspace(ctx);
+        PracticeArea area = getArea(ctx, slug);
+        if (area.getReviewTier() == reviewTier) {
+            return area;
+        }
+        if (reviewTier != null && !reviewTier.selectable()) {
+            throw new IllegalArgumentException(
+                "Propose is not available yet: feedback would be prepared with no way for anyone to approve " +
+                    "it. Use Observe to keep measuring in silence, or Deliver to send feedback without approval."
+            );
+        }
+        PracticeAreaSnapshot before = PracticeAreaSnapshot.of(area);
+        area.setReviewTier(reviewTier);
+        area = practiceAreaRepository.save(area);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_AREA,
+                area.getId(),
+                ctx.id(),
+                before,
+                PracticeAreaSnapshot.of(area)
+            )
+        );
+        return area;
     }
 
     @Transactional

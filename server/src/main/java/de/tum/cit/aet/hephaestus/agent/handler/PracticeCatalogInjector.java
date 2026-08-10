@@ -12,6 +12,9 @@ import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -46,10 +49,16 @@ class PracticeCatalogInjector {
 
     private final JsonMapper objectMapper;
     private final PracticeRepository practiceRepository;
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
-    PracticeCatalogInjector(JsonMapper objectMapper, PracticeRepository practiceRepository) {
+    PracticeCatalogInjector(
+        JsonMapper objectMapper,
+        PracticeRepository practiceRepository,
+        WorkspaceReviewDefaultsProvider workspaceDefaults
+    ) {
         this.objectMapper = objectMapper;
         this.practiceRepository = practiceRepository;
+        this.workspaceDefaults = workspaceDefaults;
     }
 
     /**
@@ -58,9 +67,8 @@ class PracticeCatalogInjector {
      * workspace — only {@code getCriteria()} reaches the agent — so the principle stays server-controlled and
      * cannot be fabricated or drift in model prose. Practices with a blank principle are omitted.
      */
-    Map<String, String> whyBySlug(Long workspaceId, ArtifactKind focus) {
-        return practiceRepository
-            .findByWorkspaceIdAndReviewTierNotAndArtifactKind(workspaceId, PracticeReviewTier.OFF, focus)
+    Map<String, String> whyBySlug(Workspace workspace, ArtifactKind focus) {
+        return reviewedPractices(workspace, focus)
             .stream()
             .filter(p -> p.getWhyItMatters() != null && !p.getWhyItMatters().isBlank())
             .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
@@ -112,13 +120,30 @@ class PracticeCatalogInjector {
         inject(files, job, focus, resolveEligiblePractices(job, focus));
     }
 
+    /**
+     * The practices of one workspace and work type whose <em>effective</em> tier admits a review.
+     *
+     * <p>Resolved in the JVM rather than filtered in SQL. A practice that holds no tier of its own inherits
+     * one, and a {@code review_tier <> 'OFF'} predicate answers UNKNOWN for it — so the SQL form silently
+     * dropped exactly the practices the inheritance chain exists to serve.
+     */
+    private List<Practice> reviewedPractices(Workspace workspace, ArtifactKind focus) {
+        // By ID, not off the entity: the job's workspace association is lazy and the job is detached on
+        // some paths, so reading the settings here would make the catalogue depend on whether the caller
+        // holds a session.
+        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(workspace.getId()).defaultTier();
+        return practiceRepository
+            .findByWorkspaceIdAndArtifactKind(workspace.getId(), focus)
+            .stream()
+            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
+            .toList();
+    }
+
     List<Practice> resolveEligiblePractices(AgentJob job, ArtifactKind focus) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
-        Long workspaceId = job.getWorkspace().getId();
-        List<Practice> practices = practiceRepository
-            .findByWorkspaceIdAndReviewTierNotAndArtifactKind(workspaceId, PracticeReviewTier.OFF, focus)
+        List<Practice> practices = reviewedPractices(job.getWorkspace(), focus)
             .stream()
             .sorted(Comparator.comparing(Practice::getSlug))
             .toList();
@@ -136,7 +161,12 @@ class PracticeCatalogInjector {
         }
         if (practices.isEmpty()) {
             throw new JobPreparationException(
-                "No active " + focus + " practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
+                "No active " +
+                    focus +
+                    " practices for workspace: workspaceId=" +
+                    job.getWorkspace().getId() +
+                    ", jobId=" +
+                    job.getId()
             );
         }
         for (Practice p : practices) {

@@ -33,6 +33,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -172,16 +173,22 @@ public class Practice {
     private PracticeAutomatedReviewPolicy automatedReviewPolicy;
 
     /**
-     * How loud this practice is allowed to be in this workspace: whether it is reviewed at all, and how
-     * far the result may travel. A tier rather than a boolean, so silencing a noisy practice does not
-     * also cost its measurement.
+     * This practice's own answer to how much autonomy the system has over it, or {@code null} to inherit its
+     * area's — and through it the workspace's. A tier rather than a boolean, so silencing a noisy practice
+     * does not also cost its measurement.
+     *
+     * <p><b>Nullable on purpose, and never read raw for a decision.</b> {@code null} is "this practice holds
+     * no opinion", which is a different fact from every concrete tier and the one a NOT NULL column could
+     * not state. Resolve it with
+     * {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}; a caller that reads this
+     * field and compares it to a constant is deciding on behalf of a practice that never decided.
      *
      * @see PracticeReviewTier
      */
-    @Column(name = "review_tier", nullable = false, length = PracticeReviewTier.MAX_LENGTH)
+    @Column(name = "review_tier", length = PracticeReviewTier.MAX_LENGTH)
     @Enumerated(EnumType.STRING)
-    @ColumnDefault("'ENGAGE'")
-    private PracticeReviewTier reviewTier = PracticeReviewTier.DEFAULT;
+    @Nullable
+    private PracticeReviewTier reviewTier;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
