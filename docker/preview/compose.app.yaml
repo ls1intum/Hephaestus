@@ -183,6 +183,10 @@ services:
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES}
       # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
+      # GitHub delivers webhooks to the app's single configured URL, so a preview never receives the
+      # events that would trigger a practice review — a full-stack change cannot be exercised here
+      # without an out-of-band trigger. Opt-in per deploy, off unless the variable is set.
+      HEPHAESTUS_DEV_TRIGGER_ENABLED: ${HEPHAESTUS_DEV_TRIGGER_ENABLED:-false}
       # The SPA's origin, not this server's: it feeds hephaestus.cors.allowed-origins,
       # hephaestus.webapp.url and the links the app hands to users.
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
