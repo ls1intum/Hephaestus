@@ -4,8 +4,8 @@
 
 Written documents are now a kind of work a practice can be about, and practices about them run.
 Publishing, editing or archiving a page in a connected Outline wiki is recorded against that page and
-starts a review of it, the practice editor offers **Document** alongside pull requests, issues and
-conversations, and a bundled practice asks whether a published decision record says what else the
+starts a review of it, the practice editor lists documents as a kind of work to review alongside pull
+requests, issues and conversations, and a bundled practice asks whether a published decision record says what else the
 team considered and why those options lost — so decision records get read for the first time.
 
 A document review reads only the document: its title, collection, authorship and body. The results

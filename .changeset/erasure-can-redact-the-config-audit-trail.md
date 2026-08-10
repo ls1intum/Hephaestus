@@ -1,10 +1,8 @@
 ---
-"hephaestus": patch
 ---
 
-Erasing an account now reliably removes that person from the configuration audit trail on instances
-whose database login is not a superuser. The audit trail is deliberately append-only, and the one
-change it has always been meant to accept is an erasure blanking the two columns that name a person.
-A database-level restriction shipped alongside that rule was broader than the rule itself and would
-have rejected the erasure outright, leaving the erased account still named in the trail. The
-append-only guarantee is unchanged — the trail still refuses ordinary edits, deletes, and truncation.
+No user-facing or operator-facing effect. Erasing an account has to blank the two columns that name a
+person in the configuration audit trail, and the database-level rule protecting that trail was broader
+than the append-only guarantee it enforces, so it would have rejected the erasure. Both the trail and
+the rule are new in this same release: there is no version an operator can be upgrading from where an
+erased account stayed named in it.

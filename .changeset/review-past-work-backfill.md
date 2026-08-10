@@ -13,11 +13,19 @@ will cost, based on what this workspace's own reviews have actually cost. Nothin
 you confirm that estimate, and the confirmation is recorded on the audit log against the admin who
 gave it.
 
-While it runs you can watch it and stop it. If the monthly AI budget runs out part-way, the backfill
-**pauses and resumes** where it stopped — it never quietly skips the work it could not afford, so
-you never end up with a baseline where "not reviewed" and "reviewed, nothing found" look the same.
+While it runs you can watch it and stop it. If the monthly AI budget runs out part-way, the campaign
+**pauses and resumes** where it stopped — it never quietly skips the work it could not afford. When
+it finishes it says plainly whether the baseline is whole: the items it could not review are counted
+and reported separately from the ones it deliberately walked past, so a campaign that hit errors
+cannot announce itself complete over a baseline with gaps in it.
 
-Two things a backfill deliberately does *not* do:
+The findings reach the developers they are about. They flow through the same reads as live feedback —
+the reflective read model, the mentor's history of what it can refer to, and the earlier observations
+a later review is given — each carrying what occasioned it, so a surface can say an item came from a
+review of past work rather than passing it off as something that just happened. The admin findings
+list can filter on the same thing: live, requested by hand, or from a campaign.
+
+Two things a campaign deliberately does *not* do:
 
 - **It says nothing on the work itself.** Commenting on pull requests that were merged months ago
   would notify everyone still subscribed to them about work nobody can act on. Backfilled findings
