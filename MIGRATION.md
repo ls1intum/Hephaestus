@@ -179,7 +179,7 @@ webhook roles and restart all three. Disconnect connections for removed origins;
 **Affected**: deployments where the instance Silent Mode setting has never been explicitly changed.
 
 The upgrade engages the instance-wide outbound brake before any new GitHub, GitLab, or Slack delivery
-can leave the application. Detection, persistence, synchronization, webhooks, OAuth, and administration
+can leave the application. Practice review, persistence, synchronization, webhooks, OAuth, and administration
 continue normally; suppressed feedback is recorded and is never replayed.
 
 On production, verify each workspace's practice delivery settings and provider targets, then open
@@ -232,14 +232,14 @@ version first and keep its startup log to hand.
    concurrent-run limit and internet setting — into that workspace's AI models page, named after the
    old configuration. "In use" means one a workspace explicitly pointed at **or** any configuration
    that was simply switched on: an unset pointer never meant unused, it meant *fall back*, and the
-   mentor fell back to the workspace's oldest enabled configuration while practice detection ran on
+   mentor fell back to the workspace's oldest enabled configuration while practice review ran on
    every enabled one. Configurations created from `AGENT_DEFAULT_CONFIG_*` are exactly that shape.
-   No key you were using has to be re-issued. Everything arrives **disabled**, so practice detection
+   No key you were using has to be re-issued. Everything arrives **disabled**, so practice review
    and the mentor stay stopped until an administrator opens the page and switches them on. That is
    deliberate: in the default PROXY credential mode the endpoint a configuration actually called came
    from an instance-wide environment variable rather than from the configuration row, so re-enabling
    automatically could silently re-point a workspace's traffic — and its key — at a different host.
-   Until someone does, that workspace's practice detection and mentor are simply idle: nothing errors,
+   Until someone does, that workspace's practice review and mentor are simply idle: nothing errors,
    so there is nothing to notice. A workspace is done when its AI models page shows an enabled
    connection and a model bound to each purpose it uses.
 4. **Fix what the upgrade could not determine.** These cases need a value typed in before they will
@@ -255,10 +255,12 @@ version first and keep its startup log to hand.
      `model-not-migrated`, which keeps the configuration's timeout, concurrency and internet limits
      attached to a real binding. Replace it with the model id you want. Such a configuration could
      not run before the upgrade either.
-5. **Check any workspace where detection ran on several configurations at once.** A workspace with no
-   explicit practice-detection pointer ran detection on *every* enabled configuration. The new model
-   binds one model per purpose, so detection is bound to the oldest of them and the deploy log names
-   the workspace (`practice detection ran on SEVERAL configurations at once in these workspaces: …`).
+5. **Check any workspace where review ran on several configurations at once.** A workspace with no
+   explicit practice-review pointer ran reviews on *every* enabled configuration. The new model binds
+   one model per purpose, so practice review is bound to the oldest of them and the deploy log names
+   the workspace. That log line is written by the migration itself and still uses this release's old
+   word for the purpose: `practice detection ran on SEVERAL configurations at once in these
+   workspaces: …`.
    Nothing is lost — the other configurations are all there as connections and models — but pick the
    one you want, or delete the rest.
 6. **Revoke the keys of configurations that are dropped.** A configuration that was both switched off
