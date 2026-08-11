@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { CatalogEntryStatus, CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
@@ -212,13 +212,17 @@ export const UnavailableMoveDestinationIsNamed: Story = {
 	},
 };
 
-function FilterTransition() {
+/**
+ * Owns the search term the story drives, so that filtering is a state transition rather than two
+ * separate renders. Everything else still arrives as args, so the Controls panel stays live.
+ */
+function FilterTransition(props: ComponentProps<typeof CuratedCatalog>) {
 	const [search, setSearch] = useState<CuratedCatalogSearch>({});
-	return <CuratedCatalog {...meta.args} search={search} onSearchChange={setSearch} />;
+	return <CuratedCatalog {...props} search={search} onSearchChange={setSearch} />;
 }
 
 export const FilteringOpensMatchingAreas: Story = {
-	render: () => <FilterTransition />,
+	render: (args) => <FilterTransition {...args} />,
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);

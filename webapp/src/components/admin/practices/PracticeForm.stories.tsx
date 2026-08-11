@@ -18,22 +18,20 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	decorators: [withStandardPage],
-} satisfies Meta;
+	args: {
+		mode: "create",
+		workspaceSlug: "demo",
+		areas: mockAreas,
+		definitionOptions: mockPracticeDefinitionOptions,
+		onSubmit: createSubmit,
+		isPending: false,
+	},
+} satisfies Meta<typeof PracticeForm>;
 
 export default meta;
-type Story = StoryObj;
+type Story = StoryObj<typeof meta>;
 
 export const Create: Story = {
-	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			definitionOptions={mockPracticeDefinitionOptions}
-			onSubmit={createSubmit}
-			isPending={false}
-		/>
-	),
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
@@ -44,51 +42,26 @@ export const Create: Story = {
 };
 
 export const EditWithAdvanced: Story = {
-	render: () => (
-		<PracticeForm
-			mode="edit"
-			workspaceSlug="demo"
-			initialData={mockPracticeWithAllTriggers}
-			areas={mockAreas}
-			definitionOptions={mockPracticeDefinitionOptions}
-			onSubmit={fn()}
-			isPending={false}
-		/>
-	),
+	args: { mode: "edit", initialData: mockPracticeWithAllTriggers, onSubmit: fn() },
 };
 
 export const Submitting: Story = {
-	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			definitionOptions={mockPracticeDefinitionOptions}
-			onSubmit={fn()}
-			isPending
-		/>
-	),
+	args: { isPending: true, onSubmit: fn() },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };
 
 export const EditClearsOptionalGuidance: Story = {
-	render: () => (
-		<PracticeForm
-			mode="edit"
-			workspaceSlug="demo"
-			initialData={{
-				...mockPracticeWithAllTriggers,
-				whyItMatters: "Small commits make review safer.",
-				whatGoodLooksLike: "Each commit explains one coherent change.",
-			}}
-			areas={mockAreas}
-			definitionOptions={mockPracticeDefinitionOptions}
-			onSubmit={editSubmit}
-			isPending={false}
-		/>
-	),
+	args: {
+		mode: "edit",
+		initialData: {
+			...mockPracticeWithAllTriggers,
+			whyItMatters: "Small commits make review safer.",
+			whatGoodLooksLike: "Each commit explains one coherent change.",
+		},
+		onSubmit: editSubmit,
+	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
 		editSubmit.mockClear();
@@ -107,16 +80,6 @@ export const EditClearsOptionalGuidance: Story = {
 };
 
 export const ValidationErrors: Story = {
-	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			definitionOptions={mockPracticeDefinitionOptions}
-			onSubmit={createSubmit}
-			isPending={false}
-		/>
-	),
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
@@ -165,16 +128,6 @@ export const ValidationAndSubmit: Story = {
 };
 
 export const ConversationPractice: Story = {
-	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			definitionOptions={mockPracticeDefinitionOptions}
-			onSubmit={createSubmit}
-			isPending={false}
-		/>
-	),
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
 		createSubmit.mockClear();
