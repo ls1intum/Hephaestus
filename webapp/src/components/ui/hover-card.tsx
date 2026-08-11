@@ -21,16 +21,7 @@ function HoverCardContent({
 	Pick<PreviewCardPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
 	return (
 		<PreviewCardPrimitive.Portal data-slot="hover-card-portal">
-			{/*
-			 * `positionMethod="fixed"`, not Base UI's default `absolute`. An absolutely positioned
-			 * positioner is laid out in the document at `left: 0` and then moved by a transform, so its
-			 * own box is as wide as its containing block and the transform pushes the *document* that much
-			 * wider: an open card measured 320px viewport, 320px card, and a `documentElement.scrollWidth`
-			 * of 325 — the whole page could be dragged sideways while the card was open (WCAG 2.2 SC
-			 * 1.4.10). A fixed positioner is out of flow relative to the viewport and adds nothing to the
-			 * document's scroll width. The popup is portalled to `body`, so there is no transformed
-			 * ancestor for `fixed` to be captured by.
-			 */}
+			{/* Viewport-relative, not `absolute` — see `overlay-reflow.stories.tsx`. */}
 			<PreviewCardPrimitive.Positioner
 				align={align}
 				alignOffset={alignOffset}

@@ -1,4 +1,4 @@
-import { expect } from "storybook/test";
+import { expect, waitFor } from "storybook/test";
 
 const LAYOUT_SLACK_PX = 1;
 const MIN_TARGET_PX = 24;
@@ -7,6 +7,46 @@ export async function expectNoPageOverflow() {
 	await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
 		document.documentElement.clientWidth + LAYOUT_SLACK_PX,
 	);
+}
+
+/**
+ * Overlay popups are positioned against the viewport rather than the document, so that an open one
+ * cannot widen the page (SC 1.4.10). The price is that nothing moves them for free: this asserts the
+ * popup still holds its offset from the trigger after `scroll` has moved the trigger.
+ */
+export async function expectOverlayFollowsTrigger(
+	trigger: HTMLElement,
+	popup: HTMLElement,
+	scroll: () => void,
+) {
+	const offsetOf = () => {
+		const triggerRect = trigger.getBoundingClientRect();
+		const popupRect = popup.getBoundingClientRect();
+		return { x: popupRect.left - triggerRect.left, y: popupRect.top - triggerRect.top };
+	};
+
+	const before = offsetOf();
+	const triggerTopBefore = trigger.getBoundingClientRect().top;
+	scroll();
+	await waitFor(() => {
+		expect(
+			Math.abs(trigger.getBoundingClientRect().top - triggerTopBefore),
+			"The scroll callback did not move the trigger, so the assertion below would prove nothing.",
+		).toBeGreaterThan(LAYOUT_SLACK_PX);
+	});
+
+	// Base UI repositions on the next frame, not synchronously with the scroll event.
+	await waitFor(() => {
+		const after = offsetOf();
+		expect(
+			Math.abs(after.x - before.x),
+			"The popup drifted horizontally off its trigger.",
+		).toBeLessThanOrEqual(LAYOUT_SLACK_PX);
+		expect(
+			Math.abs(after.y - before.y),
+			"The popup drifted vertically off its trigger.",
+		).toBeLessThanOrEqual(LAYOUT_SLACK_PX);
+	});
 }
 
 export function horizontalScrollParentOf(element: HTMLElement): HTMLElement {
