@@ -393,6 +393,12 @@ export const Loading: Story = {
 };
 ```
 
+`satisfies Meta<typeof Button>` is **enforced**, not just conventional: `.biome/typed-story-meta.grit`
+fails `check:webapp` on a meta that names a `component` but is typed as a bare `Meta`, because that
+type parameter is what checks `args` against the component's real props. A gallery meta that names no
+component — several components documented on one page — is the one case bare `Meta` is correct, and
+the rule leaves it alone.
+
 ### Titles and the sidebar
 
 Two conventions live side by side, and which one applies is a property of the component, not a taste:
