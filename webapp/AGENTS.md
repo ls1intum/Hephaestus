@@ -76,7 +76,29 @@ Two cases, and which one a file gets is decided by what it exports:
 Colocation does not change the rule: a helper next to the component that uses it is named the same
 way as one in `src/lib/`.
 
-Biome enforces this (`style/useFilenamingConvention`) over `src/components/**`, `src/lib/**`,
+### Which admin console a component belongs to
+
+`src/components/admin/**` holds two different consoles, and **the directory name does not tell you
+which**: `admin/llm/` is the instance-wide LLM console, `admin/ai/` is the per-workspace one. The
+**component name** is what carries the scope, and it is the only thing that does:
+
+- `Admin*` or `Instance*` — instance-wide. Configures the Hephaestus deployment for every workspace
+  (`AdminLlmConnectionsTable`, `InstanceLlmSettingsCard`).
+- `Workspace*` — scoped to one workspace (`WorkspaceLlmModelsTable`, `WorkspaceLlmProviderPanel`).
+- **Unprefixed — shared by both, so it must not assume a scope.** `LlmConnectionFields`,
+  `LlmModelFields` and `PriceModeEditor` are each imported by an `Admin*` dialog *and* a `Workspace*`
+  one. Adding a scope-specific field, permission check or copy string to one of these breaks the
+  other console silently, because nothing in the file says it has two callers.
+
+Name a new component for its scope, and check the caller list before editing an unprefixed one.
+
+Splitting these into `admin/instance/` and `admin/workspace/` directories has been considered and
+rejected: the shared components in the third bullet have no scope to be filed under, so a split
+would need a `shared/` directory anyway and the path still would not answer the question — while
+moving ~290 files. The prefix answers it, and it also shows up in imports and in the Storybook
+sidebar, which a directory name does not.
+
+Biome enforces filename casing (`style/useFilenamingConvention`) over `src/components/**`, `src/lib/**`,
 `src/hooks/**` and `src/integrations/**` — every directory whose files this repo writes by hand.
 `src/routes/**` is exempt: TanStack Router derives URL segments from the filenames there, so the
 router owns that naming (`$workspaceSlug.tsx`, `-route.test.ts`), not this rule. `src/api/**` and
@@ -452,12 +474,18 @@ Use play functions for interaction testing.
 Dialogs, popovers, selects and toasts render into a portal, so they are on `document` and not in the
 story canvas — query them with `screen`, not `within(canvasElement)`.
 
-Do not reach for `toBeVisible()` on an overlay you have just opened. Base UI mounts the panel with
-`data-starting-style` and clears it a frame later, so for that one frame the panel computes to
+Do not reach for a bare `toBeVisible()` on an overlay you have just opened. Base UI mounts the panel
+with `data-starting-style` and clears it a frame later, so for that one frame the panel computes to
 `opacity: 0` and a mounted element reads as invisible. This is not an animation *duration* problem —
 the Playwright context already requests `reducedMotion: "reduce"`, the media query matches, and
-forcing every duration to 1ms does not fix it. Either let the query stand on its own or wait for the
-panel to settle first.
+forcing every duration to 1ms does not fix it.
+
+Use `expectSettledVisible` from `@/test/overlay`, which waits for the starting-style frame to pass
+and for the enter transition to finish before asserting. It takes the element you actually care
+about, not the panel: the assertion target is usually a `<dt>` or a `<p>` well inside the popup, and
+it is the *ancestor* that is transparent, so the helper looks upward for both signals. Reach for
+`settledPopup()` from the same module when you need the panel itself — the measuring assertions do,
+because a mid-flight `scale(.95)` would let a too-wide popup pass.
 
 ## Accessibility
 
