@@ -4,7 +4,7 @@ import { FeedbackResults } from "./FeedbackResults";
 import { reviewFeedback } from "./story-mock-data";
 
 const meta = {
-	title: "Admin/Practice reviews/Building blocks/Delivery results",
+	title: "Workspace admin/Practice reviews/Building blocks/Delivery results",
 	component: FeedbackResults,
 	parameters: {
 		layout: "padded",

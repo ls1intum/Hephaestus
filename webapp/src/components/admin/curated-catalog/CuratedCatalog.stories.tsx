@@ -112,7 +112,7 @@ const practices: CuratedPracticeSummary[] = [
 ];
 
 const meta = {
-	title: "Instance admin/Practice catalog",
+	title: "Instance admin/Practice catalog/Overview",
 	component: CuratedCatalog,
 	parameters: { layout: "fullscreen", chromatic: { viewports: [1440] } },
 	decorators: [withStandardPage],

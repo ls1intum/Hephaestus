@@ -7,7 +7,7 @@ import { FindingsListPage } from "./FindingsListPage";
 import { reviewFindings } from "./story-mock-data";
 
 const meta = {
-	title: "Admin/Practice reviews/Findings",
+	title: "Workspace admin/Practice reviews/Findings",
 	component: FindingsListPage,
 	parameters: {
 		layout: "fullscreen",

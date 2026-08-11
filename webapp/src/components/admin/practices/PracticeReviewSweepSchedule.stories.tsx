@@ -5,7 +5,7 @@ import { PracticeReviewSweepSchedule } from "./PracticeReviewSweepSchedule";
 import { sweepSchedule as schedule } from "./story-mock-data";
 
 const meta = {
-	title: "Workspace admin/Practices/Keep checking new work",
+	title: "Workspace admin/Practices/Review/Keep checking new work",
 	component: PracticeReviewSweepSchedule,
 	parameters: {
 		layout: "padded",

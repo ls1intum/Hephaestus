@@ -176,7 +176,7 @@ function CatalogTreeHarness({
  * stories vary.
  */
 const meta = {
-	title: "Workspace admin/Practices/Catalog tree",
+	title: "Shared/Practice catalog/Catalog tree",
 	component: CatalogTreeHarness,
 	parameters: { layout: "padded" },
 	args: { onPlaceEntry: fn(), onReorderAreas: fn() },

@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { EmptyState } from "./EmptyState";
 
 const meta: Meta<typeof EmptyState> = {
-	title: "Shared/EmptyState",
+	title: "Shared/Empty state",
 	component: EmptyState,
 	parameters: {
 		layout: "centered",

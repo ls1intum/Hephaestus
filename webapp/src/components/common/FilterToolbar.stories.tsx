@@ -3,7 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { FilterToolbar } from "./FilterToolbar";
 
 const meta = {
-	title: "Common/FilterToolbar",
+	title: "Common/Filter toolbar",
 	component: FilterToolbar,
 	parameters: { layout: "padded" },
 	args: {

@@ -4,7 +4,7 @@ import { ReviewArtifact, ReviewArtifactLink } from "./ReviewArtifact";
 import { reviewArtifact } from "./story-mock-data";
 
 const meta = {
-	title: "Admin/Practice reviews/Building blocks/Reviewed work",
+	title: "Workspace admin/Practice reviews/Building blocks/Reviewed work",
 	component: ReviewArtifact,
 	parameters: {
 		layout: "padded",

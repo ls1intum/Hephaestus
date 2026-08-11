@@ -25,7 +25,7 @@ const longContentFinding = {
 } satisfies ReviewFinding;
 
 const meta = {
-	title: "Admin/Practice reviews/Building blocks/Finding results",
+	title: "Workspace admin/Practice reviews/Building blocks/Finding results",
 	component: FindingResults,
 	parameters: {
 		layout: "padded",

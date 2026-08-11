@@ -120,14 +120,14 @@ const preview: Preview = {
 		options: {
 			storySort: {
 				// Product surfaces first, roughly outside-in by who opens them, then the shared kit, then
-				// the auto-titled `components/*` tree, then cross-cutting regression suites. Every
-				// top-level segment any story declares has to appear here — an unnamed one sorts
-				// alphabetically after all of these, which is how `Workspace admin` ended up below
-				// `Shared`. `Core` was in this list and is not a namespace any story uses.
+				// the auto-titled path trees, then cross-cutting regression suites. Every top-level
+				// segment any story declares has to appear here — an unnamed one sorts alphabetically
+				// after all of these, which is how `Workspace admin` ended up below `Shared`. That
+				// applies to derived titles too: `integrations` is the auto-title of the two
+				// feature-flag stories, and was missing.
 				order: [
 					"Workspace admin",
 					"Instance admin",
-					"Admin",
 					"Practice trace",
 					"Workspace",
 					"Surveys",
@@ -136,6 +136,7 @@ const preview: Preview = {
 					"Provider",
 					"Icons",
 					"components",
+					"integrations",
 					"Tests",
 				],
 			},

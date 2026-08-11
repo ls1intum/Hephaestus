@@ -27,7 +27,7 @@ const deliveredFeedbackDetail = {
 } satisfies ReviewFeedbackDetail;
 
 const meta = {
-	title: "Admin/Practice reviews/Message details",
+	title: "Workspace admin/Practice reviews/Message details",
 	component: FeedbackDetailPage,
 	parameters: {
 		layout: "padded",

@@ -129,7 +129,7 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 };
 
 const meta = {
-	title: "Surveys/SurveyContainer",
+	title: "Surveys/Survey container",
 	component: SurveyContainer,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],

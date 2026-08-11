@@ -13,7 +13,7 @@ if (!evidence) {
 const [citation] = evidence.citations;
 
 const meta = {
-	title: "Admin/Practice reviews/Finding evidence",
+	title: "Workspace admin/Practice reviews/Finding evidence",
 	component: FindingEvidence,
 	args: { evidence },
 	parameters: { layout: "padded" },

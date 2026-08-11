@@ -3,7 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { ReferenceFilterPill } from "./ReferenceFilterPill";
 
 const meta = {
-	title: "Common/ReferenceFilterPill",
+	title: "Common/Reference filter pill",
 	component: ReferenceFilterPill,
 	parameters: { layout: "padded" },
 	args: { label: "Actor", id: 7, onClear: fn() },

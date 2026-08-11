@@ -9,7 +9,7 @@ import {
 import { PracticeEvidenceSummary } from "./PracticeEvidenceSummary";
 
 const meta = {
-	title: "Workspace admin/Practices/Evidence summary",
+	title: "Shared/Practice catalog/Evidence summary",
 	component: PracticeEvidenceSummary,
 	args: {
 		policy: mockPullRequestPolicy,

@@ -10,7 +10,7 @@ const withContainer: Decorator = (StoryComponent) => (
 );
 
 const meta = {
-	title: "Surveys/SurveyQuestion",
+	title: "Surveys/Survey question",
 	component: SurveyQuestion,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],

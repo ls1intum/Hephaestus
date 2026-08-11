@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { ComingSoon } from "./ComingSoon";
 
 const meta: Meta<typeof ComingSoon> = {
-	title: "Shared/ComingSoon",
+	title: "Shared/Coming soon",
 	component: ComingSoon,
 	parameters: {
 		layout: "fullscreen",

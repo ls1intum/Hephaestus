@@ -4,7 +4,7 @@ import { mockJobFailedDelivery, mockJobRunning } from "@/components/admin/ai/sto
 import { ReviewRunActions } from "./ReviewRunActions";
 
 const meta = {
-	title: "Admin/Practice reviews/Building blocks/Review actions",
+	title: "Workspace admin/Practice reviews/Building blocks/Review actions",
 	component: ReviewRunActions,
 	parameters: {
 		layout: "centered",

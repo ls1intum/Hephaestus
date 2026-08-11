@@ -7,7 +7,7 @@ import { FeedbackListPage } from "./FeedbackListPage";
 import { reviewFeedback } from "./story-mock-data";
 
 const meta = {
-	title: "Admin/Practice reviews/Delivery",
+	title: "Workspace admin/Practice reviews/Delivery",
 	component: FeedbackListPage,
 	parameters: {
 		layout: "fullscreen",

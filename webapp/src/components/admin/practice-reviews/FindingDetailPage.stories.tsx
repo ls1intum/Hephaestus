@@ -6,7 +6,7 @@ import { FindingDetailPage } from "./FindingDetailPage";
 import { reviewFindingDetail } from "./story-mock-data";
 
 const meta = {
-	title: "Admin/Practice reviews/Finding details",
+	title: "Workspace admin/Practice reviews/Finding details",
 	component: FindingDetailPage,
 	parameters: {
 		layout: "padded",

@@ -8,7 +8,7 @@ import { SurveyContainer } from "./survey-container";
 import { SURVEY_LAYOUT_ID, SurveyNotificationButton } from "./survey-notification-button";
 
 const meta = {
-	title: "Surveys/SurveyNotificationButton",
+	title: "Surveys/Survey notification button",
 	component: SurveyNotificationButton,
 	parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof SurveyNotificationButton>;

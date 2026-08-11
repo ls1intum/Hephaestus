@@ -4,7 +4,7 @@ import { withStandardPage } from "@/stories/decorators";
 import { PracticeReviewsHeader } from "./PracticeReviewsLayout";
 
 const meta = {
-	title: "Admin/Practice reviews/Navigation",
+	title: "Workspace admin/Practice reviews/Navigation",
 	component: PracticeReviewsHeader,
 	parameters: {
 		layout: "fullscreen",

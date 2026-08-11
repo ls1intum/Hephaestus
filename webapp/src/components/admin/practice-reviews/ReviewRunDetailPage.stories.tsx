@@ -41,7 +41,7 @@ const handlers = (
 ];
 
 const meta = {
-	title: "Admin/Practice reviews/Review details",
+	title: "Workspace admin/Practice reviews/Review details",
 	component: ReviewRunDetailPage,
 	parameters: {
 		layout: "padded",

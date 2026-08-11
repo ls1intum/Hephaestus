@@ -3,7 +3,7 @@ import { expect } from "storybook/test";
 import { ClaimCurrentnessAlert } from "./ReviewBadges";
 
 const meta = {
-	title: "Admin/Practice reviews/Claim currentness alert",
+	title: "Workspace admin/Practice reviews/Claim currentness alert",
 	component: ClaimCurrentnessAlert,
 	args: { currentness: "STALE" },
 	parameters: { layout: "padded" },

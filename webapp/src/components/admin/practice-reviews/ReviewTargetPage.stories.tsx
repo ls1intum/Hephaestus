@@ -20,7 +20,7 @@ const handlers = (feedback: unknown[] = reviewFeedback, findings: unknown[] = re
 ];
 
 const meta = {
-	title: "Admin/Practice reviews/Reviewed work",
+	title: "Workspace admin/Practice reviews/Reviewed work",
 	component: ReviewTargetPage,
 	parameters: {
 		layout: "padded",

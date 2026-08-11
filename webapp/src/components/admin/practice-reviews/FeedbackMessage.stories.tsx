@@ -6,7 +6,7 @@ const body =
 	"## What worked\n\nThe controller stays focused on HTTP concerns.\n\n[Read the guide](https://example.com/guide).";
 
 const meta = {
-	title: "Admin/Practice reviews/Building blocks/Message preview",
+	title: "Workspace admin/Practice reviews/Building blocks/Message preview",
 	component: FeedbackMessage,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 768] } },
 	tags: ["autodocs"],

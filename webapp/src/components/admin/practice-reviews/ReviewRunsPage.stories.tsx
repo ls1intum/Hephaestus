@@ -42,7 +42,7 @@ const reviewsHandler = (content: ReviewRunSummary[] = reviews) =>
 	);
 
 const meta = {
-	title: "Admin/Practice reviews/Reviews",
+	title: "Workspace admin/Practice reviews/Reviews",
 	component: ReviewRunsPage,
 	parameters: {
 		layout: "fullscreen",
