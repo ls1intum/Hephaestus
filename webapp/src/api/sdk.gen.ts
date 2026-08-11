@@ -2,6 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
+import { addLabelToTeamResponseTransformer, adminCreateCuratedPracticeResponseTransformer, adminCreateLlmConnectionResponseTransformer, adminCreateLlmModelResponseTransformer, adminCreateLoginProviderResponseTransformer, adminDeleteCuratedPracticeOverrideResponseTransformer, adminGetCuratedPracticeResponseTransformer, adminGetInstanceSettingsResponseTransformer, adminGetLlmConnectionResponseTransformer, adminGetLlmModelResponseTransformer, adminGetLlmUsageReportResponseTransformer, adminKeepCuratedPracticeResponseTransformer, adminListAuthEventsResponseTransformer, adminListConfigAuditEventsResponseTransformer, adminListLlmConnectionsResponseTransformer, adminListLlmModelsResponseTransformer, adminListLoginProvidersResponseTransformer, adminListWorkspacesResponseTransformer, adminUpdateCuratedPracticeResponseTransformer, adminUpdateCuratedPracticeStatusResponseTransformer, adminUpdateLlmConnectionResponseTransformer, adminUpdateLlmModelPriceResponseTransformer, adminUpdateLlmModelResponseTransformer, adminUpdateLlmModelSharingResponseTransformer, adminUpdateLoginProviderResponseTransformer, adminUpdateSilentModeResponseTransformer, assignRoleResponseTransformer, auditResponseTransformer, bindAreaResponseTransformer, cancelAgentJobResponseTransformer, createAreaResponseTransformer, createPracticeResponseTransformer, createSweepScheduleResponseTransformer, createWorkspaceResponseTransformer, getActivityMonitorResponseTransformer, getAgentJobResponseTransformer, getAllAchievementDefinitionsResponseTransformer, getAllTeamsResponseTransformer, getAreaResponseTransformer, getArtifactTraceResponseTransformer, getBackfillRunResponseTransformer, getConnectionSyncStatusResponseTransformer, getCuratedPracticeCatalogEntryResponseTransformer, getCurrentUserMembershipResponseTransformer, getDataExportStatusResponseTransformer, getLabelFiltersResponseTransformer, getLatestReactionResponseTransformer, getLeaderboardResponseTransformer, getLlmUsageReportResponseTransformer, getMemberResponseTransformer, getObservationResponseTransformer, getObservationsForPullRequestResponseTransformer, getOutlineCollectionResponseTransformer, getOutlineTokenStatusResponseTransformer, getPracticeResponseTransformer, getPracticeReviewFeedbackResponseTransformer, getPracticeReviewFindingResponseTransformer, getSummaryResponseTransformer, getThreadResponseTransformer, getUserAchievementsResponseTransformer, getUserProfileResponseTransformer, getWorkspaceResponseTransformer, listAgentJobsResponseTransformer, listAreasResponseTransformer, listBackfillRunsResponseTransformer, listConnectionSyncJobsResponseTransformer, listConnectionSyncResourcesResponseTransformer, listLinkedIdentitiesResponseTransformer, listMembersResponseTransformer, listObservationsResponseTransformer, listOutlineCollectionsResponseTransformer, listPracticeReviewFeedbackResponseTransformer, listPracticeReviewFindingsResponseTransformer, listPracticeReviewsResponseTransformer, listPracticesResponseTransformer, listResponseTransformer, listSessionsResponseTransformer, listSlackChannelConsentEventsResponseTransformer, listSlackChannelsResponseTransformer, listSweepSchedulesResponseTransformer, listThreadsResponseTransformer, listTracedArtifactsResponseTransformer, listWorkspaceConfigAuditEventsResponseTransformer, listWorkspacesResponseTransformer, placePracticeResponseTransformer, preflightBackfillRunResponseTransformer, readResponseTransformer, registerOutlineCollectionResponseTransformer, registerSlackChannelResponseTransformer, removeLabelFromTeamResponseTransformer, renameSlugResponseTransformer, reorderAreasResponseTransformer, reorderPracticesResponseTransformer, replaceSweepScheduleResponseTransformer, retryAgentJobDeliveryResponseTransformer, setAreaReviewTierResponseTransformer, setReviewTierResponseTransformer, submitReactionResponseTransformer, triggerSyncJobResponseTransformer, updateAreaResponseTransformer, updateBackfillRunStatusResponseTransformer, updateConnectionStatusResponseTransformer, updateConnectionSyncJobResponseTransformer, updateFeaturesResponseTransformer, updateLeaderboardDigestResponseTransformer, updateMemberVisibilityResponseTransformer, updateNotificationsResponseTransformer, updateOutlineCollectionStateResponseTransformer, updatePracticeResponseTransformer, updatePublicVisibilityResponseTransformer, updateScheduleResponseTransformer, updateSlackChannelConsentResponseTransformer, updateStatusResponseTransformer, updateTokenResponseTransformer, voteResponseTransformer, workspaceCreateLlmConnectionResponseTransformer, workspaceCreateLlmModelResponseTransformer, workspaceGetLlmConnectionResponseTransformer, workspaceGetLlmModelResponseTransformer, workspaceListLlmConnectionsResponseTransformer, workspaceListLlmModelsResponseTransformer, workspaceUpdateLlmConnectionResponseTransformer, workspaceUpdateLlmModelResponseTransformer } from './transformers.gen';
 import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateCuratedAreaData, AdminCreateCuratedAreaErrors, AdminCreateCuratedAreaResponses, AdminCreateCuratedPracticeData, AdminCreateCuratedPracticeErrors, AdminCreateCuratedPracticeResponses, AdminCreateLlmConnectionData, AdminCreateLlmConnectionErrors, AdminCreateLlmConnectionResponses, AdminCreateLlmModelData, AdminCreateLlmModelErrors, AdminCreateLlmModelResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteCuratedAreaOverrideData, AdminDeleteCuratedAreaOverrideErrors, AdminDeleteCuratedAreaOverrideResponses, AdminDeleteCuratedPracticeOverrideData, AdminDeleteCuratedPracticeOverrideErrors, AdminDeleteCuratedPracticeOverrideResponses, AdminDeleteLlmConnectionData, AdminDeleteLlmConnectionErrors, AdminDeleteLlmConnectionResponses, AdminDeleteLlmModelData, AdminDeleteLlmModelErrors, AdminDeleteLlmModelResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminGetCuratedAreaData, AdminGetCuratedAreaResponses, AdminGetCuratedCatalogData, AdminGetCuratedCatalogResponses, AdminGetCuratedPracticeData, AdminGetCuratedPracticeResponses, AdminGetInstanceSettingsData, AdminGetInstanceSettingsResponses, AdminGetLlmConnectionData, AdminGetLlmConnectionErrors, AdminGetLlmConnectionResponses, AdminGetLlmModelData, AdminGetLlmModelErrors, AdminGetLlmModelResponses, AdminGetLlmSettingsData, AdminGetLlmSettingsResponses, AdminGetLlmUsageReportData, AdminGetLlmUsageReportResponses, AdminGetPracticeDefinitionOptionsData, AdminGetPracticeDefinitionOptionsResponses, AdminKeepCuratedAreaData, AdminKeepCuratedAreaErrors, AdminKeepCuratedAreaResponses, AdminKeepCuratedPracticeData, AdminKeepCuratedPracticeErrors, AdminKeepCuratedPracticeResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListConfigAuditEventsData, AdminListConfigAuditEventsResponses, AdminListLlmConnectionsData, AdminListLlmConnectionsResponses, AdminListLlmModelsData, AdminListLlmModelsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminPlaceCuratedPracticeData, AdminPlaceCuratedPracticeResponses, AdminProbeLlmConnectionData, AdminProbeLlmConnectionDraftData, AdminProbeLlmConnectionDraftResponses, AdminProbeLlmConnectionResponses, AdminReorderCuratedAreasData, AdminReorderCuratedAreasResponses, AdminReorderCuratedPracticesData, AdminReorderCuratedPracticesResponses, AdminResetCuratedCatalogOrderData, AdminResetCuratedCatalogOrderResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateCuratedAreaData, AdminUpdateCuratedAreaErrors, AdminUpdateCuratedAreaResponses, AdminUpdateCuratedAreaStatusData, AdminUpdateCuratedAreaStatusErrors, AdminUpdateCuratedAreaStatusResponses, AdminUpdateCuratedPracticeData, AdminUpdateCuratedPracticeErrors, AdminUpdateCuratedPracticeResponses, AdminUpdateCuratedPracticeStatusData, AdminUpdateCuratedPracticeStatusErrors, AdminUpdateCuratedPracticeStatusResponses, AdminUpdateLlmConnectionData, AdminUpdateLlmConnectionErrors, AdminUpdateLlmConnectionResponses, AdminUpdateLlmModelData, AdminUpdateLlmModelErrors, AdminUpdateLlmModelPriceData, AdminUpdateLlmModelPriceErrors, AdminUpdateLlmModelPriceResponses, AdminUpdateLlmModelResponses, AdminUpdateLlmModelSharingData, AdminUpdateLlmModelSharingErrors, AdminUpdateLlmModelSharingResponses, AdminUpdateLlmSettingsData, AdminUpdateLlmSettingsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateSilentModeData, AdminUpdateSilentModeErrors, AdminUpdateSilentModeResponses, AdminUpdateUserData, AdminUpdateUserResponses, AdminUpdateWorkspaceLlmBudgetData, AdminUpdateWorkspaceLlmBudgetResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelAgentJobData, CancelAgentJobErrors, CancelAgentJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, ConfigureAgentData, ConfigureAgentErrors, ConfigureAgentResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateSweepScheduleData, CreateSweepScheduleErrors, CreateSweepScheduleResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeleteOutlineCollectionData, DeleteOutlineCollectionErrors, DeleteOutlineCollectionResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteSweepScheduleData, DeleteSweepScheduleErrors, DeleteSweepScheduleResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAgentJobData, GetAgentJobErrors, GetAgentJobResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetArtifactTraceData, GetArtifactTraceErrors, GetArtifactTraceResponses, GetBackfillRunData, GetBackfillRunErrors, GetBackfillRunResponses, GetConnectionSyncStatusData, GetConnectionSyncStatusResponses, GetCuratedPracticeCatalogEntryData, GetCuratedPracticeCatalogEntryResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetIntegrationCatalogData, GetIntegrationCatalogResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetLlmUsageReportData, GetLlmUsageReportResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetOutlineCollectionData, GetOutlineCollectionErrors, GetOutlineCollectionResponses, GetOutlineTokenStatusData, GetOutlineTokenStatusErrors, GetOutlineTokenStatusResponses, GetPracticeData, GetPracticeDefinitionOptionsData, GetPracticeDefinitionOptionsResponses, GetPracticeErrors, GetPracticeResponses, GetPracticeReviewFeedbackData, GetPracticeReviewFeedbackErrors, GetPracticeReviewFeedbackResponses, GetPracticeReviewFindingData, GetPracticeReviewFindingErrors, GetPracticeReviewFindingResponses, GetPracticeReviewSettingsData, GetPracticeReviewSettingsResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSlackUserPreferencesData, GetSlackUserPreferencesResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, InitiateData, InitiateResponses, ListAgentJobsData, ListAgentJobsResponses, ListAgentsData, ListAgentsResponses, ListAreasData, ListAreasResponses, ListBackfillRunsData, ListBackfillRunsResponses, ListConnectionSyncJobsData, ListConnectionSyncJobsResponses, ListConnectionSyncResourcesData, ListConnectionSyncResourcesResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesErrors, ListOutlineCollectionCandidatesResponses, ListOutlineCollectionsData, ListOutlineCollectionsErrors, ListOutlineCollectionsResponses, ListPracticeEvidenceOutcomesData, ListPracticeEvidenceOutcomesResponses, ListPracticeReviewFeedbackData, ListPracticeReviewFeedbackErrors, ListPracticeReviewFeedbackResponses, ListPracticeReviewFindingsData, ListPracticeReviewFindingsErrors, ListPracticeReviewFindingsResponses, ListPracticeReviewsData, ListPracticeReviewsErrors, ListPracticeReviewsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponses, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponses, ListSlackChannelsData, ListSlackChannelsResponses, ListSweepSchedulesData, ListSweepSchedulesResponses, ListThreadsData, ListThreadsResponses, ListTracedArtifactsData, ListTracedArtifactsErrors, ListTracedArtifactsResponses, ListWorkspaceConfigAuditEventsData, ListWorkspaceConfigAuditEventsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PlacePracticeData, PlacePracticeErrors, PlacePracticeResponses, PreflightBackfillRunData, PreflightBackfillRunErrors, PreflightBackfillRunResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, RegisterOutlineCollectionData, RegisterOutlineCollectionErrors, RegisterOutlineCollectionResponses, RegisterSlackChannelData, RegisterSlackChannelResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, ReplaceSweepScheduleData, ReplaceSweepScheduleErrors, ReplaceSweepScheduleResponses, RequestDataExportData, RequestDataExportResponses, RequestPracticeReviewData, RequestPracticeReviewErrors, RequestPracticeReviewResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryAgentJobDeliveryData, RetryAgentJobDeliveryErrors, RetryAgentJobDeliveryResponses, ReviewTierRollupData, ReviewTierRollupResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendSlackTestMessageData, SendSlackTestMessageResponses, SetAreaReviewTierData, SetAreaReviewTierErrors, SetAreaReviewTierResponses, SetReviewTierData, SetReviewTierErrors, SetReviewTierResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, TriggerSyncJobData, TriggerSyncJobErrors, TriggerSyncJobResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateBackfillRunStatusData, UpdateBackfillRunStatusErrors, UpdateBackfillRunStatusResponses, UpdateConnectionStatusData, UpdateConnectionStatusResponses, UpdateConnectionSyncJobData, UpdateConnectionSyncJobErrors, UpdateConnectionSyncJobResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateErrors, UpdateOutlineCollectionStateResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponses, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, UpdateWorkspaceLlmBudgetData, UpdateWorkspaceLlmBudgetResponses, VoteData, VoteErrors, VoteResponses, WorkspaceCreateLlmConnectionData, WorkspaceCreateLlmConnectionErrors, WorkspaceCreateLlmConnectionResponses, WorkspaceCreateLlmModelData, WorkspaceCreateLlmModelErrors, WorkspaceCreateLlmModelResponses, WorkspaceDeleteLlmConnectionData, WorkspaceDeleteLlmConnectionErrors, WorkspaceDeleteLlmConnectionResponses, WorkspaceDeleteLlmModelData, WorkspaceDeleteLlmModelErrors, WorkspaceDeleteLlmModelResponses, WorkspaceGetLlmConnectionData, WorkspaceGetLlmConnectionErrors, WorkspaceGetLlmConnectionResponses, WorkspaceGetLlmModelData, WorkspaceGetLlmModelErrors, WorkspaceGetLlmModelResponses, WorkspaceGetLlmSettingsData, WorkspaceGetLlmSettingsResponses, WorkspaceListAvailableLlmModelsData, WorkspaceListAvailableLlmModelsResponses, WorkspaceListLlmConnectionsData, WorkspaceListLlmConnectionsResponses, WorkspaceListLlmModelsData, WorkspaceListLlmModelsResponses, WorkspaceProbeLlmConnectionData, WorkspaceProbeLlmConnectionResponses, WorkspaceUpdateLlmConnectionData, WorkspaceUpdateLlmConnectionErrors, WorkspaceUpdateLlmConnectionResponses, WorkspaceUpdateLlmModelData, WorkspaceUpdateLlmModelErrors, WorkspaceUpdateLlmModelResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
@@ -31,6 +32,7 @@ export const getJwks = <ThrowOnError extends boolean = false>(options?: Options<
  * List auth audit events (paged, newest first)
  */
 export const adminListAuthEvents = <ThrowOnError extends boolean = false>(options?: Options<AdminListAuthEventsData, ThrowOnError>) => (options?.client ?? client).get<AdminListAuthEventsResponses, unknown, ThrowOnError>({
+    responseTransformer: adminListAuthEventsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/audit',
     ...options
@@ -49,6 +51,7 @@ export const adminExportAuthEvents = <ThrowOnError extends boolean = false>(opti
  * List admin configuration changes across workspaces (paged, newest first)
  */
 export const adminListConfigAuditEvents = <ThrowOnError extends boolean = false>(options?: Options<AdminListConfigAuditEventsData, ThrowOnError>) => (options?.client ?? client).get<AdminListConfigAuditEventsResponses, unknown, ThrowOnError>({
+    responseTransformer: adminListConfigAuditEventsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/config-audit',
     ...options
@@ -58,6 +61,7 @@ export const adminListConfigAuditEvents = <ThrowOnError extends boolean = false>
  * List LLM connections
  */
 export const adminListLlmConnections = <ThrowOnError extends boolean = false>(options?: Options<AdminListLlmConnectionsData, ThrowOnError>) => (options?.client ?? client).get<AdminListLlmConnectionsResponses, unknown, ThrowOnError>({
+    responseTransformer: adminListLlmConnectionsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/connections',
     ...options
@@ -67,6 +71,7 @@ export const adminListLlmConnections = <ThrowOnError extends boolean = false>(op
  * Create an LLM connection
  */
 export const adminCreateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminCreateLlmConnectionData, ThrowOnError>) => (options.client ?? client).post<AdminCreateLlmConnectionResponses, AdminCreateLlmConnectionErrors, ThrowOnError>({
+    responseTransformer: adminCreateLlmConnectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/connections',
     ...options,
@@ -93,6 +98,7 @@ export const adminProbeLlmConnectionDraft = <ThrowOnError extends boolean = fals
  * Create a model on an LLM connection
  */
 export const adminCreateLlmModel = <ThrowOnError extends boolean = false>(options: Options<AdminCreateLlmModelData, ThrowOnError>) => (options.client ?? client).post<AdminCreateLlmModelResponses, AdminCreateLlmModelErrors, ThrowOnError>({
+    responseTransformer: adminCreateLlmModelResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/connections/{connectionId}/models',
     ...options,
@@ -115,6 +121,7 @@ export const adminDeleteLlmConnection = <ThrowOnError extends boolean = false>(o
  * Get an LLM connection
  */
 export const adminGetLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminGetLlmConnectionData, ThrowOnError>) => (options.client ?? client).get<AdminGetLlmConnectionResponses, AdminGetLlmConnectionErrors, ThrowOnError>({
+    responseTransformer: adminGetLlmConnectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/connections/{id}',
     ...options
@@ -124,6 +131,7 @@ export const adminGetLlmConnection = <ThrowOnError extends boolean = false>(opti
  * Update an LLM connection
  */
 export const adminUpdateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmConnectionData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateLlmConnectionResponses, AdminUpdateLlmConnectionErrors, ThrowOnError>({
+    responseTransformer: adminUpdateLlmConnectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/connections/{id}',
     ...options,
@@ -146,6 +154,7 @@ export const adminProbeLlmConnection = <ThrowOnError extends boolean = false>(op
  * List LLM catalog models
  */
 export const adminListLlmModels = <ThrowOnError extends boolean = false>(options?: Options<AdminListLlmModelsData, ThrowOnError>) => (options?.client ?? client).get<AdminListLlmModelsResponses, unknown, ThrowOnError>({
+    responseTransformer: adminListLlmModelsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/models',
     ...options
@@ -164,6 +173,7 @@ export const adminDeleteLlmModel = <ThrowOnError extends boolean = false>(option
  * Get an LLM catalog model
  */
 export const adminGetLlmModel = <ThrowOnError extends boolean = false>(options: Options<AdminGetLlmModelData, ThrowOnError>) => (options.client ?? client).get<AdminGetLlmModelResponses, AdminGetLlmModelErrors, ThrowOnError>({
+    responseTransformer: adminGetLlmModelResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/models/{id}',
     ...options
@@ -173,6 +183,7 @@ export const adminGetLlmModel = <ThrowOnError extends boolean = false>(options: 
  * Update a model's metadata
  */
 export const adminUpdateLlmModel = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmModelData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateLlmModelResponses, AdminUpdateLlmModelErrors, ThrowOnError>({
+    responseTransformer: adminUpdateLlmModelResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/models/{id}',
     ...options,
@@ -186,6 +197,7 @@ export const adminUpdateLlmModel = <ThrowOnError extends boolean = false>(option
  * Reprice a model
  */
 export const adminUpdateLlmModelPrice = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmModelPriceData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateLlmModelPriceResponses, AdminUpdateLlmModelPriceErrors, ThrowOnError>({
+    responseTransformer: adminUpdateLlmModelPriceResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/models/{id}/price',
     ...options,
@@ -199,6 +211,7 @@ export const adminUpdateLlmModelPrice = <ThrowOnError extends boolean = false>(o
  * Share a model with all or selected workspaces
  */
 export const adminUpdateLlmModelSharing = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmModelSharingData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateLlmModelSharingResponses, AdminUpdateLlmModelSharingErrors, ThrowOnError>({
+    responseTransformer: adminUpdateLlmModelSharingResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/models/{id}/sharing',
     ...options,
@@ -234,6 +247,7 @@ export const adminUpdateLlmSettings = <ThrowOnError extends boolean = false>(opt
  * Per-workspace LLM spend rollup for one month (all workspaces)
  */
 export const adminGetLlmUsageReport = <ThrowOnError extends boolean = false>(options?: Options<AdminGetLlmUsageReportData, ThrowOnError>) => (options?.client ?? client).get<AdminGetLlmUsageReportResponses, unknown, ThrowOnError>({
+    responseTransformer: adminGetLlmUsageReportResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/llm/usage',
     ...options
@@ -243,6 +257,7 @@ export const adminGetLlmUsageReport = <ThrowOnError extends boolean = false>(opt
  * List login providers
  */
 export const adminListLoginProviders = <ThrowOnError extends boolean = false>(options?: Options<AdminListLoginProvidersData, ThrowOnError>) => (options?.client ?? client).get<AdminListLoginProvidersResponses, unknown, ThrowOnError>({
+    responseTransformer: adminListLoginProvidersResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/login-providers',
     ...options
@@ -252,6 +267,7 @@ export const adminListLoginProviders = <ThrowOnError extends boolean = false>(op
  * Create a login provider
  */
 export const adminCreateLoginProvider = <ThrowOnError extends boolean = false>(options: Options<AdminCreateLoginProviderData, ThrowOnError>) => (options.client ?? client).post<AdminCreateLoginProviderResponses, unknown, ThrowOnError>({
+    responseTransformer: adminCreateLoginProviderResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/login-providers',
     ...options,
@@ -274,6 +290,7 @@ export const adminDeleteLoginProvider = <ThrowOnError extends boolean = false>(o
  * Update a login provider
  */
 export const adminUpdateLoginProvider = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLoginProviderData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateLoginProviderResponses, unknown, ThrowOnError>({
+    responseTransformer: adminUpdateLoginProviderResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/login-providers/{registrationId}',
     ...options,
@@ -399,6 +416,7 @@ export const adminResetCuratedCatalogOrder = <ThrowOnError extends boolean = fal
  * Add a practice to the catalog
  */
 export const adminCreateCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminCreateCuratedPracticeData, ThrowOnError>) => (options.client ?? client).post<AdminCreateCuratedPracticeResponses, AdminCreateCuratedPracticeErrors, ThrowOnError>({
+    responseTransformer: adminCreateCuratedPracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/practice-catalog/practices',
     ...options,
@@ -425,6 +443,7 @@ export const adminReorderCuratedPractices = <ThrowOnError extends boolean = fals
  * Read a catalog practice
  */
 export const adminGetCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminGetCuratedPracticeData, ThrowOnError>) => (options.client ?? client).get<AdminGetCuratedPracticeResponses, unknown, ThrowOnError>({
+    responseTransformer: adminGetCuratedPracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/practice-catalog/practices/{slug}',
     ...options
@@ -434,6 +453,7 @@ export const adminGetCuratedPractice = <ThrowOnError extends boolean = false>(op
  * Replace a practice definition
  */
 export const adminUpdateCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCuratedPracticeData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateCuratedPracticeResponses, AdminUpdateCuratedPracticeErrors, ThrowOnError>({
+    responseTransformer: adminUpdateCuratedPracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/practice-catalog/practices/{slug}',
     ...options,
@@ -449,6 +469,7 @@ export const adminUpdateCuratedPractice = <ThrowOnError extends boolean = false>
  * Discards the customization, so the practice follows the Hephaestus default again.
  */
 export const adminDeleteCuratedPracticeOverride = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteCuratedPracticeOverrideData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteCuratedPracticeOverrideResponses, AdminDeleteCuratedPracticeOverrideErrors, ThrowOnError>({
+    responseTransformer: adminDeleteCuratedPracticeOverrideResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/practice-catalog/practices/{slug}/override',
     ...options
@@ -460,6 +481,7 @@ export const adminDeleteCuratedPracticeOverride = <ThrowOnError extends boolean 
  * Records that the Hephaestus update was reviewed and keeps the saved definition.
  */
 export const adminKeepCuratedPractice = <ThrowOnError extends boolean = false>(options: Options<AdminKeepCuratedPracticeData, ThrowOnError>) => (options.client ?? client).put<AdminKeepCuratedPracticeResponses, AdminKeepCuratedPracticeErrors, ThrowOnError>({
+    responseTransformer: adminKeepCuratedPracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/practice-catalog/practices/{slug}/override/acknowledgement',
     ...options
@@ -482,6 +504,7 @@ export const adminPlaceCuratedPractice = <ThrowOnError extends boolean = false>(
  * Exclude a practice from new workspaces, or include it again
  */
 export const adminUpdateCuratedPracticeStatus = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCuratedPracticeStatusData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateCuratedPracticeStatusResponses, AdminUpdateCuratedPracticeStatusErrors, ThrowOnError>({
+    responseTransformer: adminUpdateCuratedPracticeStatusResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/practice-catalog/practices/{slug}/status',
     ...options,
@@ -495,6 +518,7 @@ export const adminUpdateCuratedPracticeStatus = <ThrowOnError extends boolean = 
  * Get instance settings
  */
 export const adminGetInstanceSettings = <ThrowOnError extends boolean = false>(options?: Options<AdminGetInstanceSettingsData, ThrowOnError>) => (options?.client ?? client).get<AdminGetInstanceSettingsResponses, unknown, ThrowOnError>({
+    responseTransformer: adminGetInstanceSettingsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/settings',
     ...options
@@ -504,6 +528,7 @@ export const adminGetInstanceSettings = <ThrowOnError extends boolean = false>(o
  * Engage or release the instance-wide silent mode
  */
 export const adminUpdateSilentMode = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateSilentModeData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateSilentModeResponses, AdminUpdateSilentModeErrors, ThrowOnError>({
+    responseTransformer: adminUpdateSilentModeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/settings/silent-mode',
     ...options,
@@ -548,6 +573,7 @@ export const adminRevokeUserSessions = <ThrowOnError extends boolean = false>(op
  * List all workspaces (metadata only)
  */
 export const adminListWorkspaces = <ThrowOnError extends boolean = false>(options?: Options<AdminListWorkspacesData, ThrowOnError>) => (options?.client ?? client).get<AdminListWorkspacesResponses, unknown, ThrowOnError>({
+    responseTransformer: adminListWorkspacesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/workspaces',
     ...options
@@ -667,6 +693,7 @@ export const requestDataExport = <ThrowOnError extends boolean = false>(options?
  * Get data-export status
  */
 export const getDataExportStatus = <ThrowOnError extends boolean = false>(options: Options<GetDataExportStatusData, ThrowOnError>) => (options.client ?? client).get<GetDataExportStatusResponses, unknown, ThrowOnError>({
+    responseTransformer: getDataExportStatusResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/user/exports/{id}',
     ...options
@@ -696,6 +723,7 @@ export const getUserFeatures = <ThrowOnError extends boolean = false>(options?: 
  * List linked identity providers
  */
 export const listLinkedIdentities = <ThrowOnError extends boolean = false>(options?: Options<ListLinkedIdentitiesData, ThrowOnError>) => (options?.client ?? client).get<ListLinkedIdentitiesResponses, unknown, ThrowOnError>({
+    responseTransformer: listLinkedIdentitiesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/user/identities',
     ...options
@@ -723,6 +751,7 @@ export const revokeOtherSessions = <ThrowOnError extends boolean = false>(option
  * List active sessions for the current user
  */
 export const listSessions = <ThrowOnError extends boolean = false>(options?: Options<ListSessionsData, ThrowOnError>) => (options?.client ?? client).get<ListSessionsResponses, unknown, ThrowOnError>({
+    responseTransformer: listSessionsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/user/sessions',
     ...options
@@ -772,6 +801,7 @@ export const getSlackUserPreferences = <ThrowOnError extends boolean = false>(op
  * List all workspaces
  */
 export const listWorkspaces = <ThrowOnError extends boolean = false>(options?: Options<ListWorkspacesData, ThrowOnError>) => (options?.client ?? client).get<ListWorkspacesResponses, unknown, ThrowOnError>({
+    responseTransformer: listWorkspacesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces',
     ...options
@@ -781,6 +811,7 @@ export const listWorkspaces = <ThrowOnError extends boolean = false>(options?: O
  * Create a new workspace
  */
 export const createWorkspace = <ThrowOnError extends boolean = false>(options: Options<CreateWorkspaceData, ThrowOnError>) => (options.client ?? client).post<CreateWorkspaceResponses, unknown, ThrowOnError>({
+    responseTransformer: createWorkspaceResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces',
     ...options,
@@ -835,7 +866,11 @@ export const purgeWorkspace = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Fetch a workspace by slug
  */
-export const getWorkspace = <ThrowOnError extends boolean = false>(options: Options<GetWorkspaceData, ThrowOnError>) => (options.client ?? client).get<GetWorkspaceResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}', ...options });
+export const getWorkspace = <ThrowOnError extends boolean = false>(options: Options<GetWorkspaceData, ThrowOnError>) => (options.client ?? client).get<GetWorkspaceResponses, unknown, ThrowOnError>({
+    responseTransformer: getWorkspaceResponseTransformer,
+    url: '/workspaces/{workspaceSlug}',
+    ...options
+});
 
 /**
  * List the workspace's agents and how each is configured
@@ -850,6 +885,7 @@ export const listAgents = <ThrowOnError extends boolean = false>(options: Option
  * List agent jobs for a workspace
  */
 export const listAgentJobs = <ThrowOnError extends boolean = false>(options: Options<ListAgentJobsData, ThrowOnError>) => (options.client ?? client).get<ListAgentJobsResponses, unknown, ThrowOnError>({
+    responseTransformer: listAgentJobsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/agents/jobs',
     ...options
@@ -859,6 +895,7 @@ export const listAgentJobs = <ThrowOnError extends boolean = false>(options: Opt
  * Get agent job details
  */
 export const getAgentJob = <ThrowOnError extends boolean = false>(options: Options<GetAgentJobData, ThrowOnError>) => (options.client ?? client).get<GetAgentJobResponses, GetAgentJobErrors, ThrowOnError>({
+    responseTransformer: getAgentJobResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}',
     ...options
@@ -868,6 +905,7 @@ export const getAgentJob = <ThrowOnError extends boolean = false>(options: Optio
  * Cancel an agent job
  */
 export const cancelAgentJob = <ThrowOnError extends boolean = false>(options: Options<CancelAgentJobData, ThrowOnError>) => (options.client ?? client).post<CancelAgentJobResponses, CancelAgentJobErrors, ThrowOnError>({
+    responseTransformer: cancelAgentJobResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/cancel',
     ...options
@@ -877,6 +915,7 @@ export const cancelAgentJob = <ThrowOnError extends boolean = false>(options: Op
  * Retry delivery for a completed agent job
  */
 export const retryAgentJobDelivery = <ThrowOnError extends boolean = false>(options: Options<RetryAgentJobDeliveryData, ThrowOnError>) => (options.client ?? client).post<RetryAgentJobDeliveryResponses, RetryAgentJobDeliveryErrors, ThrowOnError>({
+    responseTransformer: retryAgentJobDeliveryResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/delivery/retry',
     ...options
@@ -908,12 +947,14 @@ export const configureAgent = <ThrowOnError extends boolean = false>(options: Op
  * List this workspace's admin configuration changes (paged, newest first)
  */
 export const listWorkspaceConfigAuditEvents = <ThrowOnError extends boolean = false>(options: Options<ListWorkspaceConfigAuditEventsData, ThrowOnError>) => (options.client ?? client).get<ListWorkspaceConfigAuditEventsResponses, unknown, ThrowOnError>({
+    responseTransformer: listWorkspaceConfigAuditEventsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/config-audit',
     ...options
 });
 
 export const list = <ThrowOnError extends boolean = false>(options: Options<ListData, ThrowOnError>) => (options.client ?? client).get<ListResponses, unknown, ThrowOnError>({
+    responseTransformer: listResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections',
     ...options
@@ -944,6 +985,7 @@ export const getIntegrationCatalog = <ThrowOnError extends boolean = false>(opti
  * Probes Outline directly. Reports whether the token is still accepted and, when the token may list its own key, its name, expiry and last use. Outline cannot rotate a key from a key, so an expiring token is renewed in Outline and re-entered here.
  */
 export const getOutlineTokenStatus = <ThrowOnError extends boolean = false>(options: Options<GetOutlineTokenStatusData, ThrowOnError>) => (options.client ?? client).get<GetOutlineTokenStatusResponses, GetOutlineTokenStatusErrors, ThrowOnError>({
+    responseTransformer: getOutlineTokenStatusResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/outline/token',
     ...options
@@ -972,6 +1014,7 @@ export const sendSlackTestMessage = <ThrowOnError extends boolean = false>(optio
  * Unified sync status for one connection
  */
 export const getConnectionSyncStatus = <ThrowOnError extends boolean = false>(options: Options<GetConnectionSyncStatusData, ThrowOnError>) => (options.client ?? client).get<GetConnectionSyncStatusResponses, unknown, ThrowOnError>({
+    responseTransformer: getConnectionSyncStatusResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync',
     ...options
@@ -981,6 +1024,7 @@ export const getConnectionSyncStatus = <ThrowOnError extends boolean = false>(op
  * Paginated sync job history for one connection
  */
 export const listConnectionSyncJobs = <ThrowOnError extends boolean = false>(options: Options<ListConnectionSyncJobsData, ThrowOnError>) => (options.client ?? client).get<ListConnectionSyncJobsResponses, unknown, ThrowOnError>({
+    responseTransformer: listConnectionSyncJobsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs',
     ...options
@@ -993,6 +1037,7 @@ export const listConnectionSyncJobs = <ThrowOnError extends boolean = false>(opt
  * 200 with that job rather than erroring, so a double-click "Sync now" is harmless.
  */
 export const triggerSyncJob = <ThrowOnError extends boolean = false>(options: Options<TriggerSyncJobData, ThrowOnError>) => (options.client ?? client).post<TriggerSyncJobResponses, TriggerSyncJobErrors, ThrowOnError>({
+    responseTransformer: triggerSyncJobResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs',
     ...options,
@@ -1006,6 +1051,7 @@ export const triggerSyncJob = <ThrowOnError extends boolean = false>(options: Op
  * Update a running sync job
  */
 export const updateConnectionSyncJob = <ThrowOnError extends boolean = false>(options: Options<UpdateConnectionSyncJobData, ThrowOnError>) => (options.client ?? client).patch<UpdateConnectionSyncJobResponses, UpdateConnectionSyncJobErrors, ThrowOnError>({
+    responseTransformer: updateConnectionSyncJobResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs/{jobId}',
     ...options,
@@ -1019,18 +1065,21 @@ export const updateConnectionSyncJob = <ThrowOnError extends boolean = false>(op
  * Per-resource sync state (repos / channels / collections) for one connection
  */
 export const listConnectionSyncResources = <ThrowOnError extends boolean = false>(options: Options<ListConnectionSyncResourcesData, ThrowOnError>) => (options.client ?? client).get<ListConnectionSyncResourcesResponses, unknown, ThrowOnError>({
+    responseTransformer: listConnectionSyncResourcesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/resources',
     ...options
 });
 
 export const read = <ThrowOnError extends boolean = false>(options: Options<ReadData, ThrowOnError>) => (options.client ?? client).get<ReadResponses, unknown, ThrowOnError>({
+    responseTransformer: readResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{id}',
     ...options
 });
 
 export const audit = <ThrowOnError extends boolean = false>(options: Options<AuditData, ThrowOnError>) => (options.client ?? client).get<AuditResponses, unknown, ThrowOnError>({
+    responseTransformer: auditResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{id}/audit',
     ...options
@@ -1046,6 +1095,7 @@ export const audit = <ThrowOnError extends boolean = false>(options: Options<Aud
  * transitions surface as 400 via the state machine.
  */
 export const updateConnectionStatus = <ThrowOnError extends boolean = false>(options: Options<UpdateConnectionStatusData, ThrowOnError>) => (options.client ?? client).patch<UpdateConnectionStatusResponses, unknown, ThrowOnError>({
+    responseTransformer: updateConnectionStatusResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{id}/status',
     ...options,
@@ -1059,6 +1109,7 @@ export const updateConnectionStatus = <ThrowOnError extends boolean = false>(opt
  * Update workspace feature flags
  */
 export const updateFeatures = <ThrowOnError extends boolean = false>(options: Options<UpdateFeaturesData, ThrowOnError>) => (options.client ?? client).patch<UpdateFeaturesResponses, unknown, ThrowOnError>({
+    responseTransformer: updateFeaturesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/features',
     ...options,
@@ -1073,12 +1124,17 @@ export const updateFeatures = <ThrowOnError extends boolean = false>(options: Op
  *
  * Creates a ranked contributor list for the specified time range
  */
-export const getLeaderboard = <ThrowOnError extends boolean = false>(options: Options<GetLeaderboardData, ThrowOnError>) => (options.client ?? client).get<GetLeaderboardResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/leaderboard', ...options });
+export const getLeaderboard = <ThrowOnError extends boolean = false>(options: Options<GetLeaderboardData, ThrowOnError>) => (options.client ?? client).get<GetLeaderboardResponses, unknown, ThrowOnError>({
+    responseTransformer: getLeaderboardResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/leaderboard',
+    ...options
+});
 
 /**
  * Update the whole weekly leaderboard digest config (schedule + notifications) atomically
  */
 export const updateLeaderboardDigest = <ThrowOnError extends boolean = false>(options: Options<UpdateLeaderboardDigestData, ThrowOnError>) => (options.client ?? client).patch<UpdateLeaderboardDigestResponses, unknown, ThrowOnError>({
+    responseTransformer: updateLeaderboardDigestResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/leaderboard-digest',
     ...options,
@@ -1130,6 +1186,7 @@ export const updateWorkspaceLlmBudget = <ThrowOnError extends boolean = false>(o
  * List your AI provider connections
  */
 export const workspaceListLlmConnections = <ThrowOnError extends boolean = false>(options: Options<WorkspaceListLlmConnectionsData, ThrowOnError>) => (options.client ?? client).get<WorkspaceListLlmConnectionsResponses, unknown, ThrowOnError>({
+    responseTransformer: workspaceListLlmConnectionsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/connections',
     ...options
@@ -1139,6 +1196,7 @@ export const workspaceListLlmConnections = <ThrowOnError extends boolean = false
  * Connect your own AI provider
  */
 export const workspaceCreateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceCreateLlmConnectionData, ThrowOnError>) => (options.client ?? client).post<WorkspaceCreateLlmConnectionResponses, WorkspaceCreateLlmConnectionErrors, ThrowOnError>({
+    responseTransformer: workspaceCreateLlmConnectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/connections',
     ...options,
@@ -1152,6 +1210,7 @@ export const workspaceCreateLlmConnection = <ThrowOnError extends boolean = fals
  * Create a model on your AI provider
  */
 export const workspaceCreateLlmModel = <ThrowOnError extends boolean = false>(options: Options<WorkspaceCreateLlmModelData, ThrowOnError>) => (options.client ?? client).post<WorkspaceCreateLlmModelResponses, WorkspaceCreateLlmModelErrors, ThrowOnError>({
+    responseTransformer: workspaceCreateLlmModelResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/connections/{connectionId}/models',
     ...options,
@@ -1174,6 +1233,7 @@ export const workspaceDeleteLlmConnection = <ThrowOnError extends boolean = fals
  * Get one of your AI provider connections
  */
 export const workspaceGetLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceGetLlmConnectionData, ThrowOnError>) => (options.client ?? client).get<WorkspaceGetLlmConnectionResponses, WorkspaceGetLlmConnectionErrors, ThrowOnError>({
+    responseTransformer: workspaceGetLlmConnectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/connections/{id}',
     ...options
@@ -1183,6 +1243,7 @@ export const workspaceGetLlmConnection = <ThrowOnError extends boolean = false>(
  * Update your AI provider connection
  */
 export const workspaceUpdateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceUpdateLlmConnectionData, ThrowOnError>) => (options.client ?? client).patch<WorkspaceUpdateLlmConnectionResponses, WorkspaceUpdateLlmConnectionErrors, ThrowOnError>({
+    responseTransformer: workspaceUpdateLlmConnectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/connections/{id}',
     ...options,
@@ -1205,6 +1266,7 @@ export const workspaceProbeLlmConnection = <ThrowOnError extends boolean = false
  * List models on your AI provider
  */
 export const workspaceListLlmModels = <ThrowOnError extends boolean = false>(options: Options<WorkspaceListLlmModelsData, ThrowOnError>) => (options.client ?? client).get<WorkspaceListLlmModelsResponses, unknown, ThrowOnError>({
+    responseTransformer: workspaceListLlmModelsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/models',
     ...options
@@ -1223,6 +1285,7 @@ export const workspaceDeleteLlmModel = <ThrowOnError extends boolean = false>(op
  * Get a model on your AI provider
  */
 export const workspaceGetLlmModel = <ThrowOnError extends boolean = false>(options: Options<WorkspaceGetLlmModelData, ThrowOnError>) => (options.client ?? client).get<WorkspaceGetLlmModelResponses, WorkspaceGetLlmModelErrors, ThrowOnError>({
+    responseTransformer: workspaceGetLlmModelResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/models/{id}',
     ...options
@@ -1232,6 +1295,7 @@ export const workspaceGetLlmModel = <ThrowOnError extends boolean = false>(optio
  * Update a model on your AI provider
  */
 export const workspaceUpdateLlmModel = <ThrowOnError extends boolean = false>(options: Options<WorkspaceUpdateLlmModelData, ThrowOnError>) => (options.client ?? client).patch<WorkspaceUpdateLlmModelResponses, WorkspaceUpdateLlmModelErrors, ThrowOnError>({
+    responseTransformer: workspaceUpdateLlmModelResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/models/{id}',
     ...options,
@@ -1254,6 +1318,7 @@ export const workspaceGetLlmSettings = <ThrowOnError extends boolean = false>(op
  * Get the workspace's LLM usage report for one month
  */
 export const getLlmUsageReport = <ThrowOnError extends boolean = false>(options: Options<GetLlmUsageReportData, ThrowOnError>) => (options.client ?? client).get<GetLlmUsageReportResponses, unknown, ThrowOnError>({
+    responseTransformer: getLlmUsageReportResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/llm/usage',
     ...options
@@ -1265,7 +1330,11 @@ export const getLlmUsageReport = <ThrowOnError extends boolean = false>(options:
  * List all members of the workspace with pagination.
  * Accessible to all workspace members (MEMBER role and above).
  */
-export const listMembers = <ThrowOnError extends boolean = false>(options: Options<ListMembersData, ThrowOnError>) => (options.client ?? client).get<ListMembersResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/members', ...options });
+export const listMembers = <ThrowOnError extends boolean = false>(options: Options<ListMembersData, ThrowOnError>) => (options.client ?? client).get<ListMembersResponses, unknown, ThrowOnError>({
+    responseTransformer: listMembersResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/members',
+    ...options
+});
 
 /**
  * Assign or update a role for a workspace member.
@@ -1274,6 +1343,7 @@ export const listMembers = <ThrowOnError extends boolean = false>(options: Optio
  * OWNER can assign any role. ADMIN can assign ADMIN or MEMBER roles.
  */
 export const assignRole = <ThrowOnError extends boolean = false>(options: Options<AssignRoleData, ThrowOnError>) => (options.client ?? client).post<AssignRoleResponses, unknown, ThrowOnError>({
+    responseTransformer: assignRoleResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/members/assign',
     ...options,
@@ -1291,7 +1361,11 @@ export const assignRole = <ThrowOnError extends boolean = false>(options: Option
  * if their database role is lower, matching the runtime authorization behaviour in
  * {@link WorkspaceAccessService WorkspaceAccessService}.
  */
-export const getCurrentUserMembership = <ThrowOnError extends boolean = false>(options: Options<GetCurrentUserMembershipData, ThrowOnError>) => (options.client ?? client).get<GetCurrentUserMembershipResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/members/me', ...options });
+export const getCurrentUserMembership = <ThrowOnError extends boolean = false>(options: Options<GetCurrentUserMembershipData, ThrowOnError>) => (options.client ?? client).get<GetCurrentUserMembershipResponses, unknown, ThrowOnError>({
+    responseTransformer: getCurrentUserMembershipResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/members/me',
+    ...options
+});
 
 /**
  * Revoke a user's membership (remove them from workspace).
@@ -1312,7 +1386,11 @@ export const removeMember = <ThrowOnError extends boolean = false>(options: Opti
  * Get a specific member's details.
  * Accessible to all workspace members.
  */
-export const getMember = <ThrowOnError extends boolean = false>(options: Options<GetMemberData, ThrowOnError>) => (options.client ?? client).get<GetMemberResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/members/{userId}', ...options });
+export const getMember = <ThrowOnError extends boolean = false>(options: Options<GetMemberData, ThrowOnError>) => (options.client ?? client).get<GetMemberResponses, unknown, ThrowOnError>({
+    responseTransformer: getMemberResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/members/{userId}',
+    ...options
+});
 
 /**
  * Toggle the hidden flag for a workspace member.
@@ -1321,6 +1399,7 @@ export const getMember = <ThrowOnError extends boolean = false>(options: Options
  * Hidden members are excluded from the leaderboard.
  */
 export const updateMemberVisibility = <ThrowOnError extends boolean = false>(options: Options<UpdateMemberVisibilityData, ThrowOnError>) => (options.client ?? client).patch<UpdateMemberVisibilityResponses, unknown, ThrowOnError>({
+    responseTransformer: updateMemberVisibilityResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/members/{userId}/hidden',
     ...options
@@ -1330,6 +1409,7 @@ export const updateMemberVisibility = <ThrowOnError extends boolean = false>(opt
  * List the current user's mentor threads in this workspace
  */
 export const listThreads = <ThrowOnError extends boolean = false>(options: Options<ListThreadsData, ThrowOnError>) => (options.client ?? client).get<ListThreadsResponses, unknown, ThrowOnError>({
+    responseTransformer: listThreadsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/mentor/threads',
     ...options
@@ -1348,6 +1428,7 @@ export const deleteThread = <ThrowOnError extends boolean = false>(options: Opti
  * Get a mentor thread with its full message history
  */
 export const getThread = <ThrowOnError extends boolean = false>(options: Options<GetThreadData, ThrowOnError>) => (options.client ?? client).get<GetThreadResponses, GetThreadErrors, ThrowOnError>({
+    responseTransformer: getThreadResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/mentor/threads/{threadId}',
     ...options
@@ -1366,6 +1447,7 @@ export const removeVote = <ThrowOnError extends boolean = false>(options: Option
  * Upsert a vote on an assistant message
  */
 export const vote = <ThrowOnError extends boolean = false>(options: Options<VoteData, ThrowOnError>) => (options.client ?? client).post<VoteResponses, VoteErrors, ThrowOnError>({
+    responseTransformer: voteResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/mentor/threads/{threadId}/messages/{messageId}/vote',
     ...options,
@@ -1379,6 +1461,7 @@ export const vote = <ThrowOnError extends boolean = false>(options: Options<Vote
  * Update leaderboard notification preferences
  */
 export const updateNotifications = <ThrowOnError extends boolean = false>(options: Options<UpdateNotificationsData, ThrowOnError>) => (options.client ?? client).patch<UpdateNotificationsResponses, unknown, ThrowOnError>({
+    responseTransformer: updateNotificationsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/notifications',
     ...options,
@@ -1392,6 +1475,7 @@ export const updateNotifications = <ThrowOnError extends boolean = false>(option
  * List the workspace's mirrored Outline collections with their sync state
  */
 export const listOutlineCollections = <ThrowOnError extends boolean = false>(options: Options<ListOutlineCollectionsData, ThrowOnError>) => (options.client ?? client).get<ListOutlineCollectionsResponses, ListOutlineCollectionsErrors, ThrowOnError>({
+    responseTransformer: listOutlineCollectionsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/outline/collections',
     ...options
@@ -1401,6 +1485,7 @@ export const listOutlineCollections = <ThrowOnError extends boolean = false>(opt
  * Register an Outline collection for mirroring (lands ENABLED + PENDING; idempotent on the id)
  */
 export const registerOutlineCollection = <ThrowOnError extends boolean = false>(options: Options<RegisterOutlineCollectionData, ThrowOnError>) => (options.client ?? client).post<RegisterOutlineCollectionResponses, RegisterOutlineCollectionErrors, ThrowOnError>({
+    responseTransformer: registerOutlineCollectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/outline/collections',
     ...options,
@@ -1434,6 +1519,7 @@ export const deleteOutlineCollection = <ThrowOnError extends boolean = false>(op
  * One mirrored Outline collection with its sync state and live document count
  */
 export const getOutlineCollection = <ThrowOnError extends boolean = false>(options: Options<GetOutlineCollectionData, ThrowOnError>) => (options.client ?? client).get<GetOutlineCollectionResponses, GetOutlineCollectionErrors, ThrowOnError>({
+    responseTransformer: getOutlineCollectionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}',
     ...options
@@ -1445,6 +1531,7 @@ export const getOutlineCollection = <ThrowOnError extends boolean = false>(optio
  * Resuming (PAUSED → ENABLED) resets the sync status to PENDING and kicks a targeted sync; requesting the current state is an idempotent no-op.
  */
 export const updateOutlineCollectionState = <ThrowOnError extends boolean = false>(options: Options<UpdateOutlineCollectionStateData, ThrowOnError>) => (options.client ?? client).patch<UpdateOutlineCollectionStateResponses, UpdateOutlineCollectionStateErrors, ThrowOnError>({
+    responseTransformer: updateOutlineCollectionStateResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}',
     ...options,
@@ -1459,12 +1546,17 @@ export const updateOutlineCollectionState = <ThrowOnError extends boolean = fals
  *
  * Returns the workspace's practice areas
  */
-export const listAreas = <ThrowOnError extends boolean = false>(options: Options<ListAreasData, ThrowOnError>) => (options.client ?? client).get<ListAreasResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practice-areas', ...options });
+export const listAreas = <ThrowOnError extends boolean = false>(options: Options<ListAreasData, ThrowOnError>) => (options.client ?? client).get<ListAreasResponses, unknown, ThrowOnError>({
+    responseTransformer: listAreasResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/practice-areas',
+    ...options
+});
 
 /**
  * Create a new practice area
  */
 export const createArea = <ThrowOnError extends boolean = false>(options: Options<CreateAreaData, ThrowOnError>) => (options.client ?? client).post<CreateAreaResponses, CreateAreaErrors, ThrowOnError>({
+    responseTransformer: createAreaResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practice-areas',
     ...options,
@@ -1480,6 +1572,7 @@ export const createArea = <ThrowOnError extends boolean = false>(options: Option
  * Sets each area's display order to its index in the provided slug list (one atomic write)
  */
 export const reorderAreas = <ThrowOnError extends boolean = false>(options: Options<ReorderAreasData, ThrowOnError>) => (options.client ?? client).patch<ReorderAreasResponses, ReorderAreasErrors, ThrowOnError>({
+    responseTransformer: reorderAreasResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practice-areas/reorder',
     ...options,
@@ -1503,12 +1596,17 @@ export const deleteArea = <ThrowOnError extends boolean = false>(options: Option
 /**
  * Get a practice area
  */
-export const getArea = <ThrowOnError extends boolean = false>(options: Options<GetAreaData, ThrowOnError>) => (options.client ?? client).get<GetAreaResponses, GetAreaErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}', ...options });
+export const getArea = <ThrowOnError extends boolean = false>(options: Options<GetAreaData, ThrowOnError>) => (options.client ?? client).get<GetAreaResponses, GetAreaErrors, ThrowOnError>({
+    responseTransformer: getAreaResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}',
+    ...options
+});
 
 /**
  * Update a practice area
  */
 export const updateArea = <ThrowOnError extends boolean = false>(options: Options<UpdateAreaData, ThrowOnError>) => (options.client ?? client).patch<UpdateAreaResponses, UpdateAreaErrors, ThrowOnError>({
+    responseTransformer: updateAreaResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}',
     ...options,
@@ -1524,6 +1622,7 @@ export const updateArea = <ThrowOnError extends boolean = false>(options: Option
  * Applies to every practice in the area that holds no tier of its own; practices that set their own are left alone. OFF stops their reviews entirely. PROPOSE runs them and records every observation, and sends nothing. DELIVER sends feedback without asking. Send a null tier to clear the area's own setting so it follows the workspace default.
  */
 export const setAreaReviewTier = <ThrowOnError extends boolean = false>(options: Options<SetAreaReviewTierData, ThrowOnError>) => (options.client ?? client).patch<SetAreaReviewTierResponses, SetAreaReviewTierErrors, ThrowOnError>({
+    responseTransformer: setAreaReviewTierResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier',
     ...options,
@@ -1539,6 +1638,7 @@ export const setAreaReviewTier = <ThrowOnError extends boolean = false>(options:
  * The current instance-catalog definition for comparison with a workspace copy.
  */
 export const getCuratedPracticeCatalogEntry = <ThrowOnError extends boolean = false>(options: Options<GetCuratedPracticeCatalogEntryData, ThrowOnError>) => (options.client ?? client).get<GetCuratedPracticeCatalogEntryResponses, unknown, ThrowOnError>({
+    responseTransformer: getCuratedPracticeCatalogEntryResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practice-catalog/practices/{slug}',
     ...options
@@ -1550,6 +1650,7 @@ export const getCuratedPracticeCatalogEntry = <ThrowOnError extends boolean = fa
  * Returns this workspace's practices, each with the autonomy tier in force for it, whether that tier was set on the practice or inherited from its area or the workspace, and which level decided it. Optionally narrowed to one tier.
  */
 export const listPractices = <ThrowOnError extends boolean = false>(options: Options<ListPracticesData, ThrowOnError>) => (options.client ?? client).get<ListPracticesResponses, unknown, ThrowOnError>({
+    responseTransformer: listPracticesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices',
     ...options
@@ -1559,6 +1660,7 @@ export const listPractices = <ThrowOnError extends boolean = false>(options: Opt
  * Create a new practice definition
  */
 export const createPractice = <ThrowOnError extends boolean = false>(options: Options<CreatePracticeData, ThrowOnError>) => (options.client ?? client).post<CreatePracticeResponses, CreatePracticeErrors, ThrowOnError>({
+    responseTransformer: createPracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices',
     ...options,
@@ -1572,6 +1674,7 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
  * List this workspace's recent backfill campaigns
  */
 export const listBackfillRuns = <ThrowOnError extends boolean = false>(options: Options<ListBackfillRunsData, ThrowOnError>) => (options.client ?? client).get<ListBackfillRunsResponses, unknown, ThrowOnError>({
+    responseTransformer: listBackfillRunsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/backfill-runs',
     ...options
@@ -1583,6 +1686,7 @@ export const listBackfillRuns = <ThrowOnError extends boolean = false>(options: 
  * Creates a run awaiting confirmation. Submits nothing and spends nothing.
  */
 export const preflightBackfillRun = <ThrowOnError extends boolean = false>(options: Options<PreflightBackfillRunData, ThrowOnError>) => (options.client ?? client).post<PreflightBackfillRunResponses, PreflightBackfillRunErrors, ThrowOnError>({
+    responseTransformer: preflightBackfillRunResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/backfill-runs',
     ...options,
@@ -1596,6 +1700,7 @@ export const preflightBackfillRun = <ThrowOnError extends boolean = false>(optio
  * Get one backfill campaign, including its live progress
  */
 export const getBackfillRun = <ThrowOnError extends boolean = false>(options: Options<GetBackfillRunData, ThrowOnError>) => (options.client ?? client).get<GetBackfillRunResponses, GetBackfillRunErrors, ThrowOnError>({
+    responseTransformer: getBackfillRunResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}',
     ...options
@@ -1607,6 +1712,7 @@ export const getBackfillRun = <ThrowOnError extends boolean = false>(options: Op
  * RUNNING authorises the estimated spend and starts the campaign; CANCELLED stops it for good.
  */
 export const updateBackfillRunStatus = <ThrowOnError extends boolean = false>(options: Options<UpdateBackfillRunStatusData, ThrowOnError>) => (options.client ?? client).patch<UpdateBackfillRunStatusResponses, UpdateBackfillRunStatusErrors, ThrowOnError>({
+    responseTransformer: updateBackfillRunStatusResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}/status',
     ...options,
@@ -1644,6 +1750,7 @@ export const getEngagement = <ThrowOnError extends boolean = false>(options: Opt
  * Returns the current user's most recent reaction to the specified feedback unit, or 204 if none exists.
  */
 export const getLatestReaction = <ThrowOnError extends boolean = false>(options: Options<GetLatestReactionData, ThrowOnError>) => (options.client ?? client).get<GetLatestReactionResponses, GetLatestReactionErrors, ThrowOnError>({
+    responseTransformer: getLatestReactionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions',
     ...options
@@ -1655,6 +1762,7 @@ export const getLatestReaction = <ThrowOnError extends boolean = false>(options:
  * Records the recipient's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE) to a delivered feedback unit. Append-only: submitting again creates a new record, preserving temporal history.
  */
 export const submitReaction = <ThrowOnError extends boolean = false>(options: Options<SubmitReactionData, ThrowOnError>) => (options.client ?? client).post<SubmitReactionResponses, SubmitReactionErrors, ThrowOnError>({
+    responseTransformer: submitReactionResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions',
     ...options,
@@ -1676,14 +1784,22 @@ export const listLearnerPractices = <ThrowOnError extends boolean = false>(optio
  *
  * Paginated observations for the authenticated developer with optional filters
  */
-export const listObservations = <ThrowOnError extends boolean = false>(options: Options<ListObservationsData, ThrowOnError>) => (options.client ?? client).get<ListObservationsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations', ...options });
+export const listObservations = <ThrowOnError extends boolean = false>(options: Options<ListObservationsData, ThrowOnError>) => (options.client ?? client).get<ListObservationsResponses, unknown, ThrowOnError>({
+    responseTransformer: listObservationsResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/practices/observations',
+    ...options
+});
 
 /**
  * List observations for a pull request
  *
  * All observations for a specific pull request within the workspace
  */
-export const getObservationsForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetObservationsForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetObservationsForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/pull-request/{prId}', ...options });
+export const getObservationsForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetObservationsForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetObservationsForPullRequestResponses, unknown, ThrowOnError>({
+    responseTransformer: getObservationsForPullRequestResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/practices/observations/pull-request/{prId}',
+    ...options
+});
 
 /**
  * Reflective dashboard feedback for the current developer
@@ -1697,12 +1813,20 @@ export const getReflection = <ThrowOnError extends boolean = false>(options: Opt
  *
  * Aggregated observation counts per practice for dashboard cards
  */
-export const getSummary = <ThrowOnError extends boolean = false>(options: Options<GetSummaryData, ThrowOnError>) => (options.client ?? client).get<GetSummaryResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/summary', ...options });
+export const getSummary = <ThrowOnError extends boolean = false>(options: Options<GetSummaryData, ThrowOnError>) => (options.client ?? client).get<GetSummaryResponses, unknown, ThrowOnError>({
+    responseTransformer: getSummaryResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/practices/observations/summary',
+    ...options
+});
 
 /**
  * Get observation detail
  */
-export const getObservation = <ThrowOnError extends boolean = false>(options: Options<GetObservationData, ThrowOnError>) => (options.client ?? client).get<GetObservationResponses, GetObservationErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/{observationId}', ...options });
+export const getObservation = <ThrowOnError extends boolean = false>(options: Options<GetObservationData, ThrowOnError>) => (options.client ?? client).get<GetObservationResponses, GetObservationErrors, ThrowOnError>({
+    responseTransformer: getObservationResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/practices/observations/{observationId}',
+    ...options
+});
 
 /**
  * Reorder the practices within an area
@@ -1710,6 +1834,7 @@ export const getObservation = <ThrowOnError extends boolean = false>(options: Op
  * Sets each practice's display order to its index in the provided slug list (one atomic write)
  */
 export const reorderPractices = <ThrowOnError extends boolean = false>(options: Options<ReorderPracticesData, ThrowOnError>) => (options.client ?? client).patch<ReorderPracticesResponses, ReorderPracticesErrors, ThrowOnError>({
+    responseTransformer: reorderPracticesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reorder',
     ...options,
@@ -1773,6 +1898,7 @@ export const reviewTierRollup = <ThrowOnError extends boolean = false>(options: 
  * Results are ordered newest first.
  */
 export const listPracticeReviews = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReviewsData, ThrowOnError>) => (options.client ?? client).get<ListPracticeReviewsResponses, ListPracticeReviewsErrors, ThrowOnError>({
+    responseTransformer: listPracticeReviewsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reviews',
     ...options
@@ -1795,6 +1921,7 @@ export const listPracticeEvidenceOutcomes = <ThrowOnError extends boolean = fals
  * Results are ordered newest first and include every delivery state.
  */
 export const listPracticeReviewFeedback = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReviewFeedbackData, ThrowOnError>) => (options.client ?? client).get<ListPracticeReviewFeedbackResponses, ListPracticeReviewFeedbackErrors, ThrowOnError>({
+    responseTransformer: listPracticeReviewFeedbackResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reviews/feedback',
     ...options
@@ -1804,6 +1931,7 @@ export const listPracticeReviewFeedback = <ThrowOnError extends boolean = false>
  * Get feedback with its stored body, findings and placements
  */
 export const getPracticeReviewFeedback = <ThrowOnError extends boolean = false>(options: Options<GetPracticeReviewFeedbackData, ThrowOnError>) => (options.client ?? client).get<GetPracticeReviewFeedbackResponses, GetPracticeReviewFeedbackErrors, ThrowOnError>({
+    responseTransformer: getPracticeReviewFeedbackResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}',
     ...options
@@ -1815,6 +1943,7 @@ export const getPracticeReviewFeedback = <ThrowOnError extends boolean = false>(
  * Results include linked feedback outcomes and are ordered newest first by default.
  */
 export const listPracticeReviewFindings = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReviewFindingsData, ThrowOnError>) => (options.client ?? client).get<ListPracticeReviewFindingsResponses, ListPracticeReviewFindingsErrors, ThrowOnError>({
+    responseTransformer: listPracticeReviewFindingsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reviews/findings',
     ...options
@@ -1824,6 +1953,7 @@ export const listPracticeReviewFindings = <ThrowOnError extends boolean = false>
  * Get a finding with its evidence and linked feedback
  */
 export const getPracticeReviewFinding = <ThrowOnError extends boolean = false>(options: Options<GetPracticeReviewFindingData, ThrowOnError>) => (options.client ?? client).get<GetPracticeReviewFindingResponses, GetPracticeReviewFindingErrors, ThrowOnError>({
+    responseTransformer: getPracticeReviewFindingResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}',
     ...options
@@ -1833,6 +1963,7 @@ export const getPracticeReviewFinding = <ThrowOnError extends boolean = false>(o
  * List this workspace's sweep schedules
  */
 export const listSweepSchedules = <ThrowOnError extends boolean = false>(options: Options<ListSweepSchedulesData, ThrowOnError>) => (options.client ?? client).get<ListSweepSchedulesResponses, unknown, ThrowOnError>({
+    responseTransformer: listSweepSchedulesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/sweep-schedules',
     ...options
@@ -1844,6 +1975,7 @@ export const listSweepSchedules = <ThrowOnError extends boolean = false>(options
  * Authorises the recurring spend. The first sweep runs within the hour.
  */
 export const createSweepSchedule = <ThrowOnError extends boolean = false>(options: Options<CreateSweepScheduleData, ThrowOnError>) => (options.client ?? client).post<CreateSweepScheduleResponses, CreateSweepScheduleErrors, ThrowOnError>({
+    responseTransformer: createSweepScheduleResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/sweep-schedules',
     ...options,
@@ -1870,6 +2002,7 @@ export const deleteSweepSchedule = <ThrowOnError extends boolean = false>(option
  * Changes the cadence, the window, or whether the sweep runs at all.
  */
 export const replaceSweepSchedule = <ThrowOnError extends boolean = false>(options: Options<ReplaceSweepScheduleData, ThrowOnError>) => (options.client ?? client).put<ReplaceSweepScheduleResponses, ReplaceSweepScheduleErrors, ThrowOnError>({
+    responseTransformer: replaceSweepScheduleResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}',
     ...options,
@@ -1885,6 +2018,7 @@ export const replaceSweepSchedule = <ThrowOnError extends boolean = false>(optio
  * Built from the signal ledger, so it includes work that was never reviewed — which is exactly what a listing derived from review runs cannot show. Most recently signalled first.
  */
 export const listTracedArtifacts = <ThrowOnError extends boolean = false>(options: Options<ListTracedArtifactsData, ThrowOnError>) => (options.client ?? client).get<ListTracedArtifactsResponses, ListTracedArtifactsErrors, ThrowOnError>({
+    responseTransformer: listTracedArtifactsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/trace',
     ...options
@@ -1896,6 +2030,7 @@ export const listTracedArtifacts = <ThrowOnError extends boolean = false>(option
  * Every practice the workspace runs against this kind of work appears, including the ones that did nothing, each with the recorded reason. 404 means nothing about this artifact was ever recorded here — not that the trace is unavailable.
  */
 export const getArtifactTrace = <ThrowOnError extends boolean = false>(options: Options<GetArtifactTraceData, ThrowOnError>) => (options.client ?? client).get<GetArtifactTraceResponses, GetArtifactTraceErrors, ThrowOnError>({
+    responseTransformer: getArtifactTraceResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}',
     ...options
@@ -1914,6 +2049,7 @@ export const deletePractice = <ThrowOnError extends boolean = false>(options: Op
  * Get a practice definition
  */
 export const getPractice = <ThrowOnError extends boolean = false>(options: Options<GetPracticeData, ThrowOnError>) => (options.client ?? client).get<GetPracticeResponses, GetPracticeErrors, ThrowOnError>({
+    responseTransformer: getPracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}',
     ...options
@@ -1923,6 +2059,7 @@ export const getPractice = <ThrowOnError extends boolean = false>(options: Optio
  * Update a practice
  */
 export const updatePractice = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeData, ThrowOnError>) => (options.client ?? client).patch<UpdatePracticeResponses, UpdatePracticeErrors, ThrowOnError>({
+    responseTransformer: updatePracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}',
     ...options,
@@ -1938,6 +2075,7 @@ export const updatePractice = <ThrowOnError extends boolean = false>(options: Op
  * Moves the practice to the requested area, or to Unassigned when areaSlug is null
  */
 export const bindArea = <ThrowOnError extends boolean = false>(options: Options<BindAreaData, ThrowOnError>) => (options.client ?? client).put<BindAreaResponses, BindAreaErrors, ThrowOnError>({
+    responseTransformer: bindAreaResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/area',
     ...options,
@@ -1953,6 +2091,7 @@ export const bindArea = <ThrowOnError extends boolean = false>(options: Options<
  * Moves the practice and sets its exact position in one atomic write; omit areaSlug for Unassigned
  */
 export const placePractice = <ThrowOnError extends boolean = false>(options: Options<PlacePracticeData, ThrowOnError>) => (options.client ?? client).put<PlacePracticeResponses, PlacePracticeErrors, ThrowOnError>({
+    responseTransformer: placePracticeResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/placement',
     ...options,
@@ -1968,6 +2107,7 @@ export const placePractice = <ThrowOnError extends boolean = false>(options: Opt
  * OFF stops the review entirely. PROPOSE runs it and records every observation and sends nothing. DELIVER sends feedback without asking, as far as this workspace's reach allows. Send a null tier to clear the practice's own setting so it follows its area, and through the area the workspace default.
  */
 export const setReviewTier = <ThrowOnError extends boolean = false>(options: Options<SetReviewTierData, ThrowOnError>) => (options.client ?? client).patch<SetReviewTierResponses, SetReviewTierErrors, ThrowOnError>({
+    responseTransformer: setReviewTierResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier',
     ...options,
@@ -1982,19 +2122,28 @@ export const setReviewTier = <ThrowOnError extends boolean = false>(options: Opt
  *
  * Returns user profile with workspace-scoped activity data including open PRs, review activity, and league points
  */
-export const getUserProfile = <ThrowOnError extends boolean = false>(options: Options<GetUserProfileData, ThrowOnError>) => (options.client ?? client).get<GetUserProfileResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/profile/{login}', ...options });
+export const getUserProfile = <ThrowOnError extends boolean = false>(options: Options<GetUserProfileData, ThrowOnError>) => (options.client ?? client).get<GetUserProfileResponses, unknown, ThrowOnError>({
+    responseTransformer: getUserProfileResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/profile/{login}',
+    ...options
+});
 
 /**
  * Get contributor activity monitor
  *
  * Returns workspace-scoped activity monitor data for a contributor with optional repository and limit filters
  */
-export const getActivityMonitor = <ThrowOnError extends boolean = false>(options: Options<GetActivityMonitorData, ThrowOnError>) => (options.client ?? client).get<GetActivityMonitorResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/profile/{login}/activity-monitor', ...options });
+export const getActivityMonitor = <ThrowOnError extends boolean = false>(options: Options<GetActivityMonitorData, ThrowOnError>) => (options.client ?? client).get<GetActivityMonitorResponses, unknown, ThrowOnError>({
+    responseTransformer: getActivityMonitorResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/profile/{login}/activity-monitor',
+    ...options
+});
 
 /**
  * Toggle public visibility for a workspace
  */
 export const updatePublicVisibility = <ThrowOnError extends boolean = false>(options: Options<UpdatePublicVisibilityData, ThrowOnError>) => (options.client ?? client).patch<UpdatePublicVisibilityResponses, unknown, ThrowOnError>({
+    responseTransformer: updatePublicVisibilityResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/public-visibility',
     ...options,
@@ -2031,6 +2180,7 @@ export const addRepositoryToMonitor = <ThrowOnError extends boolean = false>(opt
  * Update leaderboard schedule configuration
  */
 export const updateSchedule = <ThrowOnError extends boolean = false>(options: Options<UpdateScheduleData, ThrowOnError>) => (options.client ?? client).patch<UpdateScheduleResponses, unknown, ThrowOnError>({
+    responseTransformer: updateScheduleResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/schedule',
     ...options,
@@ -2044,6 +2194,7 @@ export const updateSchedule = <ThrowOnError extends boolean = false>(options: Op
  * List the workspace's allow-listed Slack channels with their consent state
  */
 export const listSlackChannels = <ThrowOnError extends boolean = false>(options: Options<ListSlackChannelsData, ThrowOnError>) => (options.client ?? client).get<ListSlackChannelsResponses, unknown, ThrowOnError>({
+    responseTransformer: listSlackChannelsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/slack/channels',
     ...options
@@ -2053,6 +2204,7 @@ export const listSlackChannels = <ThrowOnError extends boolean = false>(options:
  * Allow-list a Slack channel (lands in PENDING; idempotent on the natural key)
  */
 export const registerSlackChannel = <ThrowOnError extends boolean = false>(options: Options<RegisterSlackChannelData, ThrowOnError>) => (options.client ?? client).post<RegisterSlackChannelResponses, unknown, ThrowOnError>({
+    responseTransformer: registerSlackChannelResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/slack/channels',
     ...options,
@@ -2075,6 +2227,7 @@ export const listSlackChannelCandidates = <ThrowOnError extends boolean = false>
  * Transition a Slack channel to a target consent state (activate / pause / resume / revoke)
  */
 export const updateSlackChannelConsent = <ThrowOnError extends boolean = false>(options: Options<UpdateSlackChannelConsentData, ThrowOnError>) => (options.client ?? client).patch<UpdateSlackChannelConsentResponses, unknown, ThrowOnError>({
+    responseTransformer: updateSlackChannelConsentResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}',
     ...options,
@@ -2088,6 +2241,7 @@ export const updateSlackChannelConsent = <ThrowOnError extends boolean = false>(
  * The immutable consent-transition audit trail of one Slack channel
  */
 export const listSlackChannelConsentEvents = <ThrowOnError extends boolean = false>(options: Options<ListSlackChannelConsentEventsData, ThrowOnError>) => (options.client ?? client).get<ListSlackChannelConsentEventsResponses, unknown, ThrowOnError>({
+    responseTransformer: listSlackChannelConsentEventsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}/consent-events',
     ...options
@@ -2110,6 +2264,7 @@ export const updateSlackUserPreferences = <ThrowOnError extends boolean = false>
  * Rename workspace slug and create redirect
  */
 export const renameSlug = <ThrowOnError extends boolean = false>(options: Options<RenameSlugData, ThrowOnError>) => (options.client ?? client).patch<RenameSlugResponses, unknown, ThrowOnError>({
+    responseTransformer: renameSlugResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/slug',
     ...options,
@@ -2123,6 +2278,7 @@ export const renameSlug = <ThrowOnError extends boolean = false>(options: Option
  * Update workspace lifecycle status
  */
 export const updateStatus = <ThrowOnError extends boolean = false>(options: Options<UpdateStatusData, ThrowOnError>) => (options.client ?? client).patch<UpdateStatusResponses, unknown, ThrowOnError>({
+    responseTransformer: updateStatusResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/status',
     ...options,
@@ -2137,7 +2293,11 @@ export const updateStatus = <ThrowOnError extends boolean = false>(options: Opti
  *
  * Returns all teams in the workspace organization
  */
-export const getAllTeams = <ThrowOnError extends boolean = false>(options: Options<GetAllTeamsData, ThrowOnError>) => (options.client ?? client).get<GetAllTeamsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/team', ...options });
+export const getAllTeams = <ThrowOnError extends boolean = false>(options: Options<GetAllTeamsData, ThrowOnError>) => (options.client ?? client).get<GetAllTeamsResponses, unknown, ThrowOnError>({
+    responseTransformer: getAllTeamsResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/team',
+    ...options
+});
 
 /**
  * Update team visibility
@@ -2168,6 +2328,7 @@ export const updateRepositoryVisibility = <ThrowOnError extends boolean = false>
  * Remove a repository label from a team
  */
 export const removeLabelFromTeam = <ThrowOnError extends boolean = false>(options: Options<RemoveLabelFromTeamData, ThrowOnError>) => (options.client ?? client).delete<RemoveLabelFromTeamResponses, unknown, ThrowOnError>({
+    responseTransformer: removeLabelFromTeamResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}',
     ...options
@@ -2177,6 +2338,7 @@ export const removeLabelFromTeam = <ThrowOnError extends boolean = false>(option
  * Add a repository label to a team
  */
 export const addLabelToTeam = <ThrowOnError extends boolean = false>(options: Options<AddLabelToTeamData, ThrowOnError>) => (options.client ?? client).post<AddLabelToTeamResponses, unknown, ThrowOnError>({
+    responseTransformer: addLabelToTeamResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{repositoryId}/{label}',
     ...options
@@ -2209,7 +2371,11 @@ export const updateTeamSettings = <ThrowOnError extends boolean = false>(options
  *
  * Returns all labels configured as filters for a team in the workspace
  */
-export const getLabelFilters = <ThrowOnError extends boolean = false>(options: Options<GetLabelFiltersData, ThrowOnError>) => (options.client ?? client).get<GetLabelFiltersResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/teams/{teamId}/settings/label-filters', ...options });
+export const getLabelFilters = <ThrowOnError extends boolean = false>(options: Options<GetLabelFiltersData, ThrowOnError>) => (options.client ?? client).get<GetLabelFiltersResponses, unknown, ThrowOnError>({
+    responseTransformer: getLabelFiltersResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/teams/{teamId}/settings/label-filters',
+    ...options
+});
 
 /**
  * Remove label filter
@@ -2259,6 +2425,7 @@ export const updateRepositorySettings = <ThrowOnError extends boolean = false>(o
  * Update workspace Personal Access Token
  */
 export const updateToken = <ThrowOnError extends boolean = false>(options: Options<UpdateTokenData, ThrowOnError>) => (options.client ?? client).patch<UpdateTokenResponses, unknown, ThrowOnError>({
+    responseTransformer: updateTokenResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/token',
     ...options,
@@ -2278,14 +2445,22 @@ export const getUsersWithTeams = <ThrowOnError extends boolean = false>(options:
  *
  * Returns all achievements with progress information for the specified user
  */
-export const getUserAchievements = <ThrowOnError extends boolean = false>(options: Options<GetUserAchievementsData, ThrowOnError>) => (options.client ?? client).get<GetUserAchievementsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/users/{login}/achievements', ...options });
+export const getUserAchievements = <ThrowOnError extends boolean = false>(options: Options<GetUserAchievementsData, ThrowOnError>) => (options.client ?? client).get<GetUserAchievementsResponses, unknown, ThrowOnError>({
+    responseTransformer: getUserAchievementsResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements',
+    ...options
+});
 
 /**
  * Get all achievement definitions
  *
  * Returns the master list of all available achievements. Restricted to non-prod environments.
  */
-export const getAllAchievementDefinitions = <ThrowOnError extends boolean = false>(options: Options<GetAllAchievementDefinitionsData, ThrowOnError>) => (options.client ?? client).get<GetAllAchievementDefinitionsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/users/{login}/achievements/definitions', ...options });
+export const getAllAchievementDefinitions = <ThrowOnError extends boolean = false>(options: Options<GetAllAchievementDefinitionsData, ThrowOnError>) => (options.client ?? client).get<GetAllAchievementDefinitionsResponses, unknown, ThrowOnError>({
+    responseTransformer: getAllAchievementDefinitionsResponseTransformer,
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/definitions',
+    ...options
+});
 
 /**
  * Recalculate user achievements

@@ -505,6 +505,28 @@ because a mid-flight `scale(.95)` would let a too-wide popup pass.
 | `src/api/**/*` | `pnpm run generate:api:application-server` |
 | `src/routeTree.gen.ts` | TanStack Router plugin (automatic) |
 
+Regenerating **empties** `src/api/`, so nothing hand-written survives there — not even a test about
+the generated client. `src/test/response-transformers.test.ts` lives outside that directory for
+exactly this reason.
+
+### Dates from the API
+
+A `format: date-time` field is a real `Date` by the time a component sees it: `openapi-ts.config.ts`
+sets `transformer: true` on the `@hey-api/sdk` plugin, which wires the generated response
+transformers into every SDK call. Two consequences worth knowing:
+
+- **Fixtures passed straight to a prop use `new Date(…)`** — that is the shape production sends.
+  Fixtures served through **MSW** are JSON and use ISO strings; type those with `Wire<T>` from
+  `@/lib/dates`, which turns every nested `Date` in a generated view into a `string`.
+- **`asDate()`** (also `@/lib/dates`) is for values that did *not* come through the generated SDK —
+  the Mentor SSE stream is hand-parsed in `use-mentor-chat.ts` because its operation is excluded
+  from generation — and for optional fields, since it returns `undefined` instead of an Invalid Date.
+
+The `transformer: true` setting is load-bearing and invisible to `tsc`: without it the types still
+say `Date` while the client hands back strings, which is how `.toLocaleDateString()` once shipped a
+crash. `src/test/response-transformers.test.ts` is the guard; it calls the real SDK, so it fails
+whenever that wiring is lost.
+
 ## Available Skills
 
 | Skill | When to Use |

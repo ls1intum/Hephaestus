@@ -149,7 +149,7 @@ export const WithHistory: Story = {
 				submittedCount: 118,
 				passedCount: 10,
 				confirmedByAccountId: 7,
-				finishedAt: "2026-08-06T12:00:00Z",
+				finishedAt: new Date("2026-08-06T12:00:00Z"),
 			}),
 			run({
 				id: "33333333-3333-3333-3333-333333333333",
@@ -159,7 +159,7 @@ export const WithHistory: Story = {
 				submittedCount: 12,
 				passedCount: 3,
 				confirmedByAccountId: 7,
-				finishedAt: "2026-08-05T12:00:00Z",
+				finishedAt: new Date("2026-08-05T12:00:00Z"),
 			}),
 		],
 	},

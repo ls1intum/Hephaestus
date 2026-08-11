@@ -6,7 +6,6 @@ import type {
 	ReviewSweepSchedule,
 	ReviewTierAssignment,
 } from "@/api/types.gen";
-import { asWire, type Wire } from "@/lib/dates";
 import type { ReviewTier } from "@/lib/review-tiers";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -34,35 +33,32 @@ export function mockReviewSettings(
 }
 
 /**
- * A recurring check as it reaches the component: ISO strings, because no response transformer revives
- * them. A fixture built from `new Date(…)` would let a screen that calls `.toLocaleString()` on a
- * string pass in a story and break in the browser — hence the cast, which is the one place the lie
- * the generated types tell about these two fields is written down.
+ * A recurring check as the component receives it. These go straight to a prop rather than through
+ * MSW, so the dates are real `Date`s: that is what the generated client's response transformer hands
+ * a screen at runtime, and a fixture is only worth trusting if it is the shape production sends.
  */
-export function sweepSchedule(
-	overrides: Partial<Wire<ReviewSweepSchedule>> = {},
-): ReviewSweepSchedule {
-	return asWire<ReviewSweepSchedule>({
+export function sweepSchedule(overrides: Partial<ReviewSweepSchedule> = {}): ReviewSweepSchedule {
+	return {
 		id: "22222222-2222-2222-2222-222222222222",
 		artifactKind: "scm.pull_request",
 		cadence: "DAILY",
 		lookbackDays: 2,
 		enabled: true,
-		nextRunAt: "2026-08-10T02:17:00Z",
-		lastRunAt: "2026-08-09T02:17:00Z",
+		nextRunAt: new Date("2026-08-10T02:17:00Z"),
+		lastRunAt: new Date("2026-08-09T02:17:00Z"),
 		createdByAccountId: 7,
-		createdAt: "2026-08-01T09:00:00Z",
+		createdAt: new Date("2026-08-01T09:00:00Z"),
 		...overrides,
-	});
+	};
 }
 
-/** A past-work campaign, on the same terms as {@link sweepSchedule}: dates arrive as ISO strings. */
-export function backfillRun(overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRun {
-	return asWire<ReviewBackfillRun>({
+/** A past-work campaign, on the same terms as {@link sweepSchedule}. */
+export function backfillRun(overrides: Partial<ReviewBackfillRun> = {}): ReviewBackfillRun {
+	return {
 		id: "11111111-1111-1111-1111-111111111111",
 		artifactKind: "scm.pull_request",
-		fromAt: "2026-07-08T00:00:00Z",
-		toAt: "2026-08-07T00:00:00Z",
+		fromAt: new Date("2026-07-08T00:00:00Z"),
+		toAt: new Date("2026-08-07T00:00:00Z"),
 		status: "AWAITING_CONFIRMATION",
 		// A campaign an admin scoped by hand. The other value, SWEEP, belongs to a run a recurring
 		// check opened, and those are shown by the schedule card rather than here.
@@ -73,9 +69,9 @@ export function backfillRun(overrides: Partial<Wire<ReviewBackfillRun>> = {}): R
 		passedCount: 0,
 		failedCount: 0,
 		requestedByAccountId: 7,
-		createdAt: "2026-08-07T09:00:00Z",
+		createdAt: new Date("2026-08-07T09:00:00Z"),
 		...overrides,
-	});
+	};
 }
 
 /**

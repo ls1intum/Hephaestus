@@ -1,6 +1,15 @@
 /**
- * The generated client *types* date fields as `Date` but its response transformers are not wired
- * into `sdk.gen.ts`, so at runtime they arrive as ISO strings. Every read goes through this.
+ * Normalises a date field to a `Date`, or to `undefined` when there is nothing usable to show.
+ *
+ * The generated client revives every `format: date-time` field in a *response* into a real `Date`
+ * (`openapi-ts.config.ts` sets `transformer: true` on the SDK plugin), so callers on a generated
+ * query hook already hold a `Date`. This exists for the two cases that stay outside that guarantee:
+ * a field the server may omit, and a payload that never went through the generated SDK — the Mentor
+ * SSE stream is parsed by hand in `use-mentor-chat.ts` because its operation is excluded from
+ * generation, so its timestamps arrive as raw strings.
+ *
+ * Returning `undefined` rather than an Invalid Date keeps a bad value from rendering as the string
+ * "Invalid Date"; callers pick their own fallback.
  */
 export function asDate(value: Date | string | undefined | null): Date | undefined {
 	if (value == null) return undefined;
@@ -9,24 +18,16 @@ export function asDate(value: Date | string | undefined | null): Date | undefine
 }
 
 /**
- * Hands a wire-shaped fixture to a prop typed with the generated view.
+ * A generated view as it looks *on the wire*: every `Date` in it, however deeply nested, is a string.
  *
- * A fixture that reaches the component through MSW needs none of this — it is serialised on the way
- * and the generated type is the only one in play. One passed straight to a prop has to cross the gap
- * `Wire` describes, and the two types do not overlap, so something has to assert it. Doing it here
- * keeps the literal checked against `Wire<T>` by the parameter type, and keeps `as unknown as` out of
- * the fixture files, where it would read as a fixture nobody type-checked.
- */
-export function asWire<T>(value: Wire<T>): T {
-	return value as unknown as T;
-}
-
-/**
- * A generated view as it actually arrives: every `Date` in it, however deeply nested, is a string.
+ * Use this to type a fixture that a test or story serves through MSW, because that is literally what
+ * such a fixture is — JSON, which has no date type. Typing it as the generated view instead would
+ * force `new Date(…)` into a payload that is about to be `JSON.stringify`d anyway, and would let a
+ * misspelled or missing field pass unchecked.
  *
- * Type fixtures with this rather than with the generated view: a fixture built from `new Date(…)`
- * type-checks and then tests a shape production never produces, so `value.toLocaleDateString()`
- * stays green in the story and throws on the first real response.
+ * A fixture passed *straight to a prop* needs the opposite: real `Date`s, because that is what the
+ * transformer hands the component at runtime. There is deliberately no cast helper for that
+ * direction — needing one would mean a component is being shown a shape production never sends.
  */
 export type Wire<T> = T extends Date
 	? string

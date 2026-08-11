@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { asDate, asWire, type Wire } from "./dates";
+import { asDate, type Wire } from "./dates";
 
 describe("asDate", () => {
 	// The instant, not merely the type: `toBeInstanceOf(Date)` is satisfied by `new Date(0)`.
-	it("parses the ISO string the SDK actually returns for a date field", () => {
+	it("parses an ISO string, which is how a hand-parsed payload still arrives", () => {
 		expect(asDate("2026-07-24T10:30:00.000Z")?.toISOString()).toBe("2026-07-24T10:30:00.000Z");
 	});
 
-	it("passes a real Date through untouched", () => {
+	it("passes a real Date through untouched, which is what the SDK now returns", () => {
 		const date = new Date("2026-07-24T10:30:00.000Z");
 		expect(asDate(date)).toBe(date);
 	});
@@ -25,34 +25,34 @@ describe("asDate", () => {
 
 /**
  * `Wire` earns its keep only if it *rejects* the shape it exists to prevent, so the assertions here
- * are the `@ts-expect-error`s: each one fails the typecheck the moment `Wire` stops catching a
- * `Date`, which is the regression that would let a fixture type-check and then hand a component a
- * value production never sends. The runtime `expect`s only keep the file honest as a test.
+ * are the `@ts-expect-error`s: each one fails the typecheck the moment `Wire` stops turning a `Date`
+ * into a string. That is the regression that would let an MSW fixture carry a `Date` into a payload
+ * that is about to be serialised, hiding a field whose real wire spelling nobody ever checked.
  */
 describe("Wire", () => {
 	type View = { id: string; createdAt: Date; nested: { at: Date }[] };
 
-	it("accepts the wire shape, typed as the generated view", () => {
-		const view = asWire<View>({
+	it("accepts the wire shape, checked against the generated view", () => {
+		const view: Wire<View> = {
 			id: "a",
 			createdAt: "2026-07-24T10:30:00.000Z",
 			nested: [{ at: "2026-07-24T10:30:00.000Z" }],
-		});
+		};
 
 		// Not `toBeInstanceOf(Date)`: the value really is a string, which is the point.
 		expect(asDate(view.createdAt)?.toISOString()).toBe("2026-07-24T10:30:00.000Z");
 	});
 
 	it("rejects a Date at the top level", () => {
-		// @ts-expect-error a real Date is exactly what `Wire` exists to keep out of a fixture
-		const view = asWire<View>({ id: "a", createdAt: new Date(0), nested: [] });
+		// @ts-expect-error a real Date is exactly what `Wire` exists to keep out of an MSW fixture
+		const view: Wire<View> = { id: "a", createdAt: new Date(0), nested: [] };
 
 		expect(view.id).toBe("a");
 	});
 
 	it("rejects a Date nested inside an array, where the recursion could quietly stop", () => {
 		// @ts-expect-error `Wire` must recurse through arrays, not just top-level members
-		const view = asWire<View>({ id: "a", createdAt: "x", nested: [{ at: new Date(0) }] });
+		const view: Wire<View> = { id: "a", createdAt: "x", nested: [{ at: new Date(0) }] };
 
 		expect(view.id).toBe("a");
 	});
