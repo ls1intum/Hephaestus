@@ -60,6 +60,7 @@ import { expectNoPageOverflow, expectOverlayFollowsTrigger } from "@/test/reflow
  */
 const meta = {
 	title: "Tests/Overlay reflow",
+	tags: ["autodocs"],
 	parameters: {
 		layout: "fullscreen",
 		viewport: { defaultViewport: "reflow" },
@@ -114,7 +115,6 @@ async function settledPopup(): Promise<HTMLElement> {
 	return popup;
 }
 
-/** One shape for all six: render the widest realistic overlay, open it, assert the page holds. */
 function reflowStory(render: () => ReactElement, open: () => Promise<unknown>): Story {
 	return {
 		render,

@@ -338,7 +338,6 @@ export const RefusalOffersTheFixToAnAdmin: Story = {
 	},
 };
 
-/** The same refusal for a member: the server's sentence, and no door they cannot open. */
 export const RefusalWithheldFixFromAMember: Story = {
 	args: { canAdminister: false },
 	parameters: {

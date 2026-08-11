@@ -89,7 +89,6 @@ export const Invalid: Story = {
 		error: "Explain at least one limitation that requires additional context.",
 	},
 	play: async ({ canvas }) => {
-		// Both errors are on screen: the missing reason, on its own field, and the section's own.
 		await expect(
 			canvas.getByText("Explain at least one limitation that requires additional context."),
 		).toBeVisible();

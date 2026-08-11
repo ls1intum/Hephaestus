@@ -6,6 +6,7 @@ import { SetOwnProviderBudgetDialog } from "./SetOwnProviderBudgetDialog";
 
 const capDialog = async () => within(await screen.findByRole("dialog"));
 
+/** The workspace's cap on spend through its own provider — their money, so theirs to change. */
 const meta = {
 	component: SetOwnProviderBudgetDialog,
 	parameters: { layout: "centered" },

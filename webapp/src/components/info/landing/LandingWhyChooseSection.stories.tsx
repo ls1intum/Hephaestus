@@ -1,10 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { LandingWhyChooseSection } from "./LandingWhyChooseSection";
 
-/**
- * Why Choose section component that explains the unique value proposition of Hephaestus
- * through a combination of visual elements and feature highlights.
- */
 const meta = {
 	component: LandingWhyChooseSection,
 	parameters: {

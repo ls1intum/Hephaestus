@@ -51,7 +51,6 @@ interface HarnessProps {
 	/** Areas whose own rows may not be reordered. Kept apart from {@link blockedDestinations} so a
 	 * story can tell which of the tree's two independent guards it exercised. */
 	blockedOrderBuckets?: readonly string[];
-	/** Areas no row may be moved into. */
 	blockedDestinations?: readonly string[];
 	/** When set, only these rows are listed — the shape a search box produces. */
 	visible?: readonly string[];

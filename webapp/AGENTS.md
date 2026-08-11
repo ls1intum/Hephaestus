@@ -383,7 +383,15 @@ Two conventions live side by side, and which one applies is a property of the co
   earns an explicit title: `Workspace admin/Practices/Review/How much`. Do not rename an existing
   explicit tree into auto-titles — the path would file it under `components/`.
 - **Sentence case throughout**, for both segments and story names: `Practice trace/Outcome badge`,
-  not `PracticeTrace/OutcomeBadge`.
+  not `PracticeTrace/OutcomeBadge`. A leaf named after its component is still sentence case —
+  `Common/Filter toolbar`, not `Common/FilterToolbar`. Product terms and acronyms keep their capitals
+  (`AI mentoring`, `Hephaestus default panel`).
+- **There are exactly two admin consoles, so there are exactly two admin namespaces.**
+  `Workspace admin/…` for anything reached under `w/$workspaceSlug/admin/**`, `Instance admin/…` for
+  anything under the `isAppAdmin` routes in `_authenticated/admin.*`. Never a bare `Admin/…`: the
+  reader cannot tell which console it is, and every file that used to sit there was a workspace
+  surface. A presentational component **both** consoles render belongs to neither — file it under
+  `Shared/…`, as `Shared/Practice catalog/Area visual picker` already does.
 - **A leaf and a folder must not share a name.** If `Foo` gains children, the leaf becomes
   `Foo/Overview`.
 - **Every top-level segment must appear in `storySort.order` in `.storybook/preview.ts`.** One that
@@ -405,13 +413,28 @@ Two conventions live side by side, and which one applies is a property of the co
   the URL it should have produced, makes a wrong component and a wrong test agree. Write the expected
   values out; if the literal table risks drifting, assert that its *keys* match the source's.
 - **Use the `canvas` play argument** rather than re-deriving `within(canvasElement)` in every story.
+- **`getBy*` is already the assertion.** It throws when it finds nothing, so
+  `expect(canvas.getByRole("button")).toBeInTheDocument()` — or `.toBeTruthy()` — adds a matcher that
+  can only ever run against an element that exists. Write the query on its own line. This is enforced:
+  `.biome/no-redundant-in-the-document.grit` is a Biome plugin that fails `pnpm run check`, so CI
+  catches a reintroduction. Absence still needs `expect(queryBy(…)).not.toBeInTheDocument()`, and
+  `await findBy*` is its own assertion — the rule leaves both alone.
 
 ### JSDoc on stories
 
 Storybook renders these blocks as Markdown (`markdown-to-jsx`). Separate paragraphs with a blank
-comment line — a Java-style `<p>` emits a stray empty paragraph before each one. A comment that only
-restates the story's name is noise; keep the ones that record a decision, a fixture choice, or the
-bug the story exists to prevent.
+comment line — a Java-style `<p>` emits a stray empty paragraph before each one.
+
+A block above `meta` or above an exported story is **published prose**, not a code comment: with
+`autodocs` it is the Docs page. So it earns its place only if it records a rejected alternative, a
+real trap, or a why the reader cannot derive — and it is addressed to somebody reading the component,
+not to somebody reading the test. Restating the story's name is the common failure (`/** Moving an
+area's worth in one action */` above `BulkSet`); notes about how the assertion reaches the DOM are
+the other, and those belong in a `//` inside the play function.
+
+If the file has no `autodocs`, none of it renders. Either say why in the meta block — see
+`SortableCatalogTree.stories.tsx`, which opts out because the stories render a harness — or turn
+`autodocs` on, so the thing worth writing down is actually published.
 
 ### Story Requirements
 
@@ -427,9 +450,14 @@ Use play functions for interaction testing.
 ### Play functions: portals and transitions
 
 Dialogs, popovers, selects and toasts render into a portal, so they are on `document` and not in the
-story canvas — query them with `screen`, not `within(canvasElement)`. Assert `toBeInTheDocument()`
-rather than `toBeVisible()`: the popup's enter transition can still be animating opacity when the
-assertion runs.
+story canvas — query them with `screen`, not `within(canvasElement)`.
+
+Do not reach for `toBeVisible()` on an overlay you have just opened. Base UI mounts the panel with
+`data-starting-style` and clears it a frame later, so for that one frame the panel computes to
+`opacity: 0` and a mounted element reads as invisible. This is not an animation *duration* problem —
+the Playwright context already requests `reducedMotion: "reduce"`, the media query matches, and
+forcing every duration to 1ms does not fix it. Either let the query stand on its own or wait for the
+panel to settle first.
 
 ## Accessibility
 

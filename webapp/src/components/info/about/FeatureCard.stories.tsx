@@ -2,10 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { Code, MessageSquare, Sparkles, Trophy } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 
-/**
- * FeatureCard component for displaying feature information with icons and badges.
- * Used to highlight key platform capabilities with consistent visual styling.
- */
 const meta = {
 	component: FeatureCard,
 	parameters: { layout: "padded" },

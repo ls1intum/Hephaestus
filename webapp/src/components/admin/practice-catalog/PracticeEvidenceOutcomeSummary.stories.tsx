@@ -64,8 +64,6 @@ export const ReasonsCanOutnumberTheSkips: Story = {
 		}),
 	},
 	play: async ({ canvas }) => {
-		// One skipped review, two rows under it — the assertion the story is named for, and the reason
-		// the sentence counts reviews while the list counts reasons.
 		await expect(
 			canvas.getByText(/skipped this practice in 1 of the last 5 reviews/),
 		).toBeVisible();

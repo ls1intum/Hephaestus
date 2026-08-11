@@ -133,7 +133,6 @@ export const WhereEachFixLives: Story = {
 	},
 };
 
-/** A member sees the same sixteen sentences and not one door they cannot open. */
 export const AMemberSeesNoLinks: Story = {
 	args: { canAdminister: false },
 	render: (args) => <RefusalCatalogue {...args} />,

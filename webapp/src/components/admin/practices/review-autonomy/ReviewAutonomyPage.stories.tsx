@@ -162,7 +162,6 @@ export const WorkspaceDefaultUnset: Story = {
 	},
 };
 
-/** The one decision that replaces a hundred, made — and reversible from the same place. */
 export const WorkspaceDefaultSet: Story = {
 	args: from(chosenByTheWorkspace),
 	play: async ({ args, canvas, userEvent }) => {
@@ -206,7 +205,6 @@ export const AreaOverride: Story = {
 	},
 };
 
-/** One practice set by hand, and the way back to inheriting from the same row. */
 export const PracticeOverrideWithReset: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
@@ -341,7 +339,6 @@ export const OverridesOnlyEmpty: Story = {
 	},
 };
 
-/** Moving an area's worth in one action, which is the task the screen exists for. */
 export const BulkSet: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {

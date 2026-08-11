@@ -6,7 +6,7 @@ import type {
 	ReviewSweepSchedule,
 	ReviewTierAssignment,
 } from "@/api/types.gen";
-import type { Wire } from "@/lib/dates";
+import { asWire, type Wire } from "@/lib/dates";
 import type { ReviewTier } from "@/lib/review-tiers";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -42,7 +42,7 @@ export function mockReviewSettings(
 export function sweepSchedule(
 	overrides: Partial<Wire<ReviewSweepSchedule>> = {},
 ): ReviewSweepSchedule {
-	return {
+	return asWire<ReviewSweepSchedule>({
 		id: "22222222-2222-2222-2222-222222222222",
 		artifactKind: "scm.pull_request",
 		cadence: "DAILY",
@@ -53,12 +53,12 @@ export function sweepSchedule(
 		createdByAccountId: 7,
 		createdAt: "2026-08-01T09:00:00Z",
 		...overrides,
-	} satisfies Wire<ReviewSweepSchedule> as unknown as ReviewSweepSchedule;
+	});
 }
 
 /** A past-work campaign, on the same terms as {@link sweepSchedule}: dates arrive as ISO strings. */
 export function backfillRun(overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRun {
-	return {
+	return asWire<ReviewBackfillRun>({
 		id: "11111111-1111-1111-1111-111111111111",
 		artifactKind: "scm.pull_request",
 		fromAt: "2026-07-08T00:00:00Z",
@@ -75,7 +75,7 @@ export function backfillRun(overrides: Partial<Wire<ReviewBackfillRun>> = {}): R
 		requestedByAccountId: 7,
 		createdAt: "2026-08-07T09:00:00Z",
 		...overrides,
-	} satisfies Wire<ReviewBackfillRun> as unknown as ReviewBackfillRun;
+	});
 }
 
 /**

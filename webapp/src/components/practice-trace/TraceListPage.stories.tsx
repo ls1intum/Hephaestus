@@ -98,10 +98,12 @@ export const FilteredToOneKind: Story = {
 };
 
 /**
- * "Everything" needs a value of its own (Base UI reads "" as no selection), and that value must not
- * escape into the URL — a `kind=__all` link filters for a kind nothing ever has.
+ * Clearing the filter must leave no trace in the URL: a `kind=__all` link filters for a kind nothing
+ * ever has, and would hand somebody an empty list they cannot explain.
  */
 export const ClearingTheFilterFromThePicker: Story = {
+	// "Everything" carries a sentinel value because Base UI reads "" as no selection at all; the
+	// sentinel is what must not escape into the search params.
 	args: { search: { kind: "scm.issue", page: 3 }, onSearchChange: fn() },
 	play: async ({ args, canvas }) => {
 		await userEvent.click(await canvas.findByRole("combobox", { name: "Show" }));

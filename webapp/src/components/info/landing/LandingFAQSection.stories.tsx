@@ -2,10 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { LandingFAQSection } from "./LandingFAQSection";
 
-/**
- * FAQ section component that displays frequently asked questions and answers
- * through an accordion interface, along with a community link.
- */
 const meta = {
 	component: LandingFAQSection,
 	parameters: {

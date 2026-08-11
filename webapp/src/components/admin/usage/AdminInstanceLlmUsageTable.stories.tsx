@@ -130,6 +130,10 @@ const detailReport: WorkspaceLlmUsageReport = {
 	],
 };
 
+/**
+ * Every workspace's AI spend for one month, against both caps: the shared-model budget the host
+ * grants — editable here — and the workspace's own provider cap, read-only because it is their money.
+ */
 const meta = {
 	component: AdminInstanceLlmUsageTable,
 	parameters: { layout: "padded" },

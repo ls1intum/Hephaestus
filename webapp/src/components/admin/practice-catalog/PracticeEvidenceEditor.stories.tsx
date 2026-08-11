@@ -131,7 +131,8 @@ export const SubmittingRevealsTheSources: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Submit the form" }));
 		await expect(canvas.getByRole("radiogroup", { name: /Use Code changes/ })).toBeVisible();
 
-		// Closed again by the author, and it stays closed while the error stands.
+		// Closed again by the author, and it stays closed while the error stands — the panel opens on
+		// the transition into invalid, so re-opening it is the author's to undo.
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Type something else" }));
 		await expect(canvas.queryByRole("radiogroup", { name: /Use Code changes/ })).toBeNull();
