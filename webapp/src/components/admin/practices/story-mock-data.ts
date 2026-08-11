@@ -16,6 +16,17 @@ export function inheritedTier(effective: ReviewTier = "DELIVER"): ReviewTierAssi
 	return { effective, source: "WORKSPACE", inherited: true };
 }
 
+/**
+ * A tier this practice inherits from its area, because the area holds one of its own.
+ *
+ * <p>Distinct from {@link inheritedTier} in the one field that decides what a row is allowed to say:
+ * a practice under an area that holds no tier reports `WORKSPACE` and must be told about the
+ * workspace, and only this shape may name the area.
+ */
+export function areaTier(effective: ReviewTier): ReviewTierAssignment {
+	return { effective, source: "AREA", inherited: true };
+}
+
 /** A tier somebody chose on this practice itself — the case a story is showing on purpose. */
 export function chosenTier(effective: ReviewTier): ReviewTierAssignment {
 	return { effective, override: effective, source: "PRACTICE", inherited: false };

@@ -11,7 +11,6 @@ import {
 	placePracticeMutation,
 	reorderAreasMutation,
 	reviewTierRollupQueryKey,
-	setReviewTierMutation,
 	updateAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
@@ -19,7 +18,6 @@ import {
 	applyDisplayOrder,
 	applyPracticePlacements,
 	patchArea,
-	patchPractice,
 	placePractice,
 	practiceCatalogStructureScope,
 	practicePlacementSnapshot,
@@ -285,55 +283,11 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
-	const setReviewTier = useMutation({
-		...filedUnder(practiceMutationKey, setReviewTierMutation()),
-		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: practicesQueryKey });
-			const previousValue = queryClient
-				.getQueryData<Practice[]>(practicesQueryKey)
-				?.find((practice) => practice.slug === variables.path.practiceSlug)?.reviewTier;
-			// A tier chosen here is held here, so the optimistic row can say so. Clearing it back to
-			// inherit (an omitted field) resolves against the area and the workspace, which only the
-			// server can do — guessing would flash a tier that is not the one about to arrive, so that
-			// case waits for the response instead.
-			const chosen = variables.body.reviewTier;
-			if (chosen) {
-				queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-					patchPractice(practices, variables.path.practiceSlug, {
-						reviewTier: {
-							effective: chosen,
-							override: chosen,
-							source: "PRACTICE",
-							inherited: false,
-						},
-					}),
-				);
-			}
-			return { previousValue };
-		},
-		onError: (_error, variables, context) => {
-			if (context?.previousValue !== undefined) {
-				queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-					patchPractice(practices, variables.path.practiceSlug, {
-						reviewTier: context.previousValue,
-					}),
-				);
-			}
-			toast.error("Couldn't update the practice");
-		},
-		onSuccess: (updated) => {
-			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-				patchPractice(practices, updated.slug, { reviewTier: updated.reviewTier }),
-			);
-			queryClient.setQueryData<Practice>(
-				getPracticeQueryKey({
-					path: { workspaceSlug, practiceSlug: updated.slug },
-				}),
-				(practice) => (practice ? { ...practice, reviewTier: updated.reviewTier } : practice),
-			);
-		},
-		onSettled: invalidatePracticesAfterLastWrite,
-	});
+	// No tier mutation here. The catalogue reads the tier out and links to Review autonomy, which is
+	// the one writer of the field — two editors over one endpoint is how an admin undid the workspace
+	// answer they had just set. This hook also held the only client-side construction of a
+	// `ReviewTierAssignment` anywhere in the app, which could only ever guess at a chain the server
+	// resolves.
 
 	// Subscribed rather than read with `getQueryData`, which is a snapshot with no subscription behind
 	// it: a catalogue that changes while a move or a delete is in flight would leave these buckets —
@@ -390,7 +344,6 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		blockedMoveDestinationSlugs,
 		blockedPracticeOrderBuckets,
 		reorderAreas,
-		setReviewTier,
 		updateArea,
 	};
 }

@@ -4,6 +4,7 @@ import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
+	areaTier,
 	chosenTier,
 	inheritedTier,
 	mockAreas,
@@ -69,8 +70,6 @@ const meta = {
 		onDeleteArea: fn(),
 		onReorderAreas: fn(),
 		onSetAreaVisual: fn(),
-		onSetPracticeReviewTier: fn(),
-		onClearPracticeReviewTier: fn(),
 		onDeletePractice: fn(),
 		onPlacePractice: fn(),
 	},
@@ -362,96 +361,87 @@ export const BlockedDestinationDrag: Story = {
 	},
 };
 
+/**
+ * The tier, and the level that decided it, on rows that differ only in where the answer came from.
+ *
+ * <p>All three read the same tier out. What separates them is the sentence beside it: an admin who
+ * sees "Off" needs to know whether this practice was singled out or whether every practice in the
+ * workspace is off, because those have different fixes and only one of them is on this row.
+ */
 export const AutonomyTiers: Story = {
 	args: {
 		areas: mockAreas,
 		practices: [
-			{ ...mockPractices[0], slug: "loud", name: "Deliver", reviewTier: inheritedTier("DELIVER") },
-			{ ...mockPractices[0], slug: "quiet", name: "Propose", reviewTier: chosenTier("PROPOSE") },
-			{ ...mockPractices[0], slug: "silent", name: "Off", reviewTier: chosenTier("OFF") },
+			{
+				...mockPractices[0],
+				slug: "from-workspace",
+				name: "Nobody has touched this one",
+				reviewTier: inheritedTier("DELIVER"),
+			},
+			{
+				...mockPractices[0],
+				slug: "from-area",
+				name: "Its area decided",
+				reviewTier: areaTier("PROPOSE"),
+			},
+			{
+				...mockPractices[0],
+				slug: "held",
+				name: "Singled out",
+				reviewTier: chosenTier("OFF"),
+			},
 		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
 	},
-	play: async ({ canvas, userEvent }) => {
-		for (const tier of ["Deliver", "Propose", "Off"]) {
-			await expect(canvas.getByLabelText(`How far Hephaestus may go on ${tier}`)).toHaveTextContent(
-				tier,
-			);
-		}
-		// Deliver is what a practice nobody has configured inherits, so it carries no badge; the quieter
-		// tiers each announce themselves, because those are the rows where a developer will see less
-		// than the practice's name suggests.
-		const badges = canvas.getAllByText(/^(Off|Propose)$/, {
+	play: async ({ canvas }) => {
+		// Every tier is read out, Deliver included. The badge used to hide there, which was defensible
+		// while a picker beside it always said the tier; as the only read-out, a hidden one would leave
+		// the rows an admin is least likely to question saying nothing about how far the system may go.
+		const badges = canvas.getAllByText(/^(Off|Propose|Deliver)$/, {
 			selector: '[data-slot="badge"]',
 		});
-		await expect(badges).toHaveLength(2);
+		await expect(badges).toHaveLength(3);
+
+		// An area that holds no tier of its own is not the level that decided anything, so a practice
+		// under it is told about the workspace — the level it would actually have to go and change.
+		await expect(canvas.getByText(`Follows ${mockAreas[0].name}`)).toBeVisible();
+		await expect(canvas.getByText("Follows the workspace default")).toBeVisible();
+		await expect(canvas.getByText("Set for this practice")).toBeVisible();
 		await expectNoPageOverflow();
-
-		// The row picker offers the whole ladder and disables none of it. Propose was once offered and
-		// disabled, back when the server refused it; a picker that renders a choice it will reject is a
-		// failure after the click, and one that quietly drops the middle rung leaves an on/off switch.
-		await userEvent.click(canvas.getByLabelText("How far Hephaestus may go on Deliver"));
-		const options = within(await screen.findByRole("listbox"));
-		for (const name of ["Off", "Propose", "Deliver"]) {
-			await expect(options.getByRole("option", { name })).not.toHaveAttribute(
-				"aria-disabled",
-				"true",
-			);
-		}
 	},
 };
 
 /**
- * A tier chosen on the practice itself can be handed back to the area or the workspace. Without this
- * the chain is write-once from the catalogue: the first pick pins a tier and nothing takes it off.
- */
-const overrideArgs = {
-	areas: mockAreas,
-	practices: [
-		{ ...mockPractices[0], slug: "held", name: "Set here", reviewTier: chosenTier("PROPOSE") },
-		{
-			...mockPractices[0],
-			slug: "free",
-			name: "Inheriting",
-			reviewTier: inheritedTier("DELIVER"),
-		},
-	].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
-};
-
-/**
- * A tier chosen on the practice itself can be handed back to the area or the workspace. Without this
- * the chain is write-once from the catalogue: the first pick pins a tier and nothing takes it off.
- */
-export const ClearingAnOverride: Story = {
-	args: overrideArgs,
-	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ args, canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
-		await userEvent.click(await screen.findByRole("menuitem", { name: "Use the default" }));
-		await expect(args.onClearPracticeReviewTier).toHaveBeenCalledWith("held");
-	},
-};
-
-/**
- * Offered but disabled where there is nothing to clear, so the row keeps its shape down the list.
+ * The tier is not editable here, and the row says where it is.
  *
- * <p>Shown on a desktop viewport, alone among the catalogue's stories. This is the one story that
- * leaves the actions menu standing when the a11y check runs, and that menu is longer than 568px of
- * screen: Base UI caps it at the available height, which makes it a scrollable region the check
- * rejects. That is a pre-existing property of the menu — it holds four groups and every area in the
- * workspace — not of the item this story is about, and hiding it behind a taller viewport is honest
- * only because it is recorded here.
+ * <p>This screen used to write the tier through a hook of its own. The control bound the *effective*
+ * value with nothing beside it naming the source, so picking a tier pinned a practice-level override
+ * and silently undid the workspace answer an admin had just set — without the word "inherited" ever
+ * appearing. One field, one writer.
  */
-export const NothingToClear: Story = {
-	args: { ...overrideArgs, practices: [...overrideArgs.practices].reverse() },
+export const TierIsReadOnlyHere: Story = {
+	args: {
+		areas: mockAreas,
+		practices: [
+			{ ...mockPractices[0], slug: "held", name: "Set here", reviewTier: chosenTier("PROPOSE") },
+		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
+	},
 	parameters: {
 		chromatic: { disableSnapshot: true },
+		// The actions menu is taller than 568px — it holds every area in the workspace — so Base UI caps
+		// it at the available height and the a11y check rejects the scrollable region that makes. That
+		// is a property of the menu, not of the link this story is about.
 		viewport: { defaultViewport: "desktop" },
 	},
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "More actions for Inheriting" }));
-		await expect(await screen.findByRole("menuitem", { name: "Use the default" })).toHaveAttribute(
-			"aria-disabled",
-			"true",
+		await expect(canvas.queryByLabelText(/^How far Hephaestus may go on/)).not.toBeInTheDocument();
+
+		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
+		const menu = within(await screen.findByRole("menu"));
+		await expect(menu.getByRole("menuitem", { name: "Change on Review autonomy" })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/practices/autonomy",
 		);
+		// The way off an override left with the picker, so nothing here may still offer it.
+		await expect(menu.queryByRole("menuitem", { name: "Use the default" })).not.toBeInTheDocument();
 	},
 };

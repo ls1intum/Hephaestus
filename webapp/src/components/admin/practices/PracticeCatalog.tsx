@@ -4,10 +4,7 @@ import { type ReactNode, useState } from "react";
 import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { WORK_ARTIFACT_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
-import {
-	automatedReviewUnavailableLabel,
-	canAttemptAutomatedReview,
-} from "@/components/admin/practice-catalog/evidence-presentation";
+import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
@@ -48,19 +45,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import { REVIEW_TIER_LABELS, REVIEW_TIER_ORDER, type ReviewTier } from "@/lib/review-tiers";
+import {
+	inheritedTierSourceSentence,
+	REVIEW_TIER_LABELS,
+	WORKSPACE_DEFAULT_SOURCE,
+} from "@/lib/review-tiers";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
-
-/**
- * Built from the shared vocabulary rather than spelled here: this screen and the artifact trace both
- * name the tier a developer reads back, and each keeping its own list is how one shipped "Measure"
- * while the other shipped "Measure only".
- */
-const REVIEW_TIERS = REVIEW_TIER_ORDER.map((value) => ({
-	value,
-	label: REVIEW_TIER_LABELS[value],
-}));
 
 export type FocusFilter = "ALL" | KnownArtifactKind;
 
@@ -87,9 +78,6 @@ export interface PracticeCatalogProps {
 	onDeleteArea: (slug: string) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
-	onSetPracticeReviewTier: (slug: string, reviewTier: ReviewTier) => void;
-	/** Hands the decision back to the area or the workspace, which is the only way off an override. */
-	onClearPracticeReviewTier: (slug: string) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
 }
@@ -113,8 +101,6 @@ export function PracticeCatalog({
 	onDeleteArea,
 	onReorderAreas,
 	onSetAreaVisual,
-	onSetPracticeReviewTier,
-	onClearPracticeReviewTier,
 	onDeletePractice,
 	onPlacePractice,
 }: PracticeCatalogProps) {
@@ -136,6 +122,12 @@ export function PracticeCatalog({
 	const supportedModesFor = (practice: Practice) =>
 		definitionOptions.workTypes.find((option) => option.artifactKind === practice.artifactKind)
 			?.supportedAutomatedReviewModes ?? [];
+	// Named from the area list this screen already renders, so a row can say "Follows Testing" rather
+	// than the slug the assignment carries. A practice in no area has nothing between it and the
+	// workspace, and one whose area the list does not know yet is in the same position for now.
+	const areaNames = new Map(areas.map((area) => [area.slug, area.name]));
+	const inheritedFromFor = (practice: Practice) =>
+		(practice.areaSlug && areaNames.get(practice.areaSlug)) || WORKSPACE_DEFAULT_SOURCE;
 
 	return (
 		<div className="space-y-4">
@@ -197,6 +189,7 @@ export function PracticeCatalog({
 					<PracticeRowDetails
 						practice={practice}
 						supportedModes={supportedModesFor(practice)}
+						inheritedFrom={inheritedFromFor(practice)}
 						title={
 							<Link
 								to="/w/$workspaceSlug/admin/practices/$practiceSlug"
@@ -211,18 +204,19 @@ export function PracticeCatalog({
 				renderEntryActions={(practice, move) => (
 					<PracticeActions
 						practice={practice}
-						supportedModes={supportedModesFor(practice)}
 						workspaceSlug={workspaceSlug}
 						areas={areas}
 						move={move}
 						pending={pending.practiceSlugs.has(practice.slug)}
-						onSetReviewTier={onSetPracticeReviewTier}
-						onClearReviewTier={onClearPracticeReviewTier}
 						onDelete={onDeletePractice}
 					/>
 				)}
 				renderEntryPreview={(practice) => (
-					<PracticeDragPreview practice={practice} supportedModes={supportedModesFor(practice)} />
+					<PracticeDragPreview
+						practice={practice}
+						supportedModes={supportedModesFor(practice)}
+						inheritedFrom={inheritedFromFor(practice)}
+					/>
 				)}
 				getEmptyLabel={(areaSlug, total) => {
 					if (total > 0) return "No matching practices.";
@@ -419,158 +413,110 @@ function AreaActions({
 
 function PracticeActions({
 	practice,
-	supportedModes,
 	workspaceSlug,
 	areas,
 	move,
 	pending,
-	onSetReviewTier,
-	onClearReviewTier,
 	onDelete,
 }: {
 	practice: Practice;
-	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
 	pending: boolean;
-	onSetReviewTier: (slug: string, reviewTier: ReviewTier) => void;
-	onClearReviewTier: (slug: string) => void;
 	onDelete: (practice: Practice) => void;
 }) {
-	const canReview = canAttemptAutomatedReview(practice.automatedReviewPolicy, supportedModes);
-	// A practice whose policy cannot run an automated review has nowhere to go from Off, so the
-	// control is locked there rather than offering tiers the server would refuse. One already above
-	// Off keeps its control: turning a practice down must never need a policy edit.
-	const tierChangeDisabled = pending || (practice.reviewTier.effective === "OFF" && !canReview);
 	return (
-		<>
-			<Select
-				items={REVIEW_TIERS}
-				value={practice.reviewTier.effective}
-				onValueChange={(value) => value && onSetReviewTier(practice.slug, value as ReviewTier)}
-				disabled={tierChangeDisabled}
-			>
-				{/* The tier stopped being a volume knob when it stopped encoding where feedback goes: it is
-				    now how far the system may act alone, and reach is one workspace-level setting. Naming
-				    it "how loud" here told an admin that turning a practice down moved the feedback
-				    somewhere quieter, when it stops the feedback. */}
-				<SelectTrigger
-					className="hidden w-32 sm:inline-flex"
-					aria-label={`How far Hephaestus may go on ${practice.name}`}
-				>
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					{REVIEW_TIERS.map((tier) => (
-						<SelectItem key={tier.value} value={tier.value}>
-							{tier.label}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-			<DropdownMenu>
-				<DropdownMenuTrigger
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						ref={move.actionTriggerRef}
+						variant="ghost"
+						size="icon-sm"
+						aria-label={`More actions for ${practice.name}`}
+					>
+						<MoreHorizontal className="size-4" />
+					</Button>
+				}
+			/>
+			<DropdownMenuContent align="end">
+				<DropdownMenuItem
 					render={
-						<Button
-							ref={move.actionTriggerRef}
-							variant="ghost"
-							size="icon-sm"
-							aria-label={`More actions for ${practice.name}`}
-						>
-							<MoreHorizontal className="size-4" />
-						</Button>
+						<Link
+							to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+							params={{ workspaceSlug, practiceSlug: practice.slug }}
+						/>
 					}
-				/>
-				<DropdownMenuContent align="end">
-					<DropdownMenuItem
-						render={
-							<Link
-								to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-								params={{ workspaceSlug, practiceSlug: practice.slug }}
-							/>
+				>
+					Edit practice
+				</DropdownMenuItem>
+				<DropdownMenuSeparator />
+				{/* A link out, not a picker. This screen used to write the tier through a second hook of
+					    its own, and because the control bound the *effective* value with nothing saying where
+					    that value came from, choosing a tier here pinned a practice-level override — undoing
+					    the workspace answer an admin had just set, without the word "inherited" ever
+					    appearing. One field, one writer; the row still reads the tier out beside the
+					    practice's name. */}
+				<DropdownMenuItem
+					render={
+						<Link
+							to="/w/$workspaceSlug/admin/practices/autonomy"
+							params={{ workspaceSlug }}
+							search={{ overrides: undefined }}
+						/>
+					}
+				>
+					Change on Review autonomy
+				</DropdownMenuItem>
+				<DropdownMenuSeparator />
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Order</DropdownMenuLabel>
+					<DropdownMenuItem disabled={!move.canMoveUp} onClick={move.moveUp}>
+						Move up
+					</DropdownMenuItem>
+					<DropdownMenuItem disabled={!move.canMoveDown} onClick={move.moveDown}>
+						Move down
+					</DropdownMenuItem>
+				</DropdownMenuGroup>
+				<DropdownMenuSeparator />
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Move to</DropdownMenuLabel>
+					<DropdownMenuRadioGroup
+						value={practice.areaSlug ?? UNASSIGNED_CATALOG_BUCKET}
+						onValueChange={(value) =>
+							move.moveTo(value === UNASSIGNED_CATALOG_BUCKET ? null : value)
 						}
 					>
-						Edit practice
-					</DropdownMenuItem>
-					<DropdownMenuSeparator />
-					{/* Labels only. The one-line hints that used to sit beside each tier made this menu tall
-					    enough to become a scrollable region no keyboard could reach, which the a11y gate
-					    fails — and the sentences now have a screen of their own on Review autonomy. */}
-					<DropdownMenuGroup>
-						<DropdownMenuLabel>How far Hephaestus may go</DropdownMenuLabel>
-						{/* Every rung, because every rung can now be moved to. This list is three items and
-						    label-only on purpose: the one-line hints, or a fourth tier, made the menu tall
-						    enough to become a scrollable region no keyboard can reach. */}
-						{REVIEW_TIERS.map((tier) => (
-							<DropdownMenuItem
-								key={tier.value}
-								disabled={tierChangeDisabled || practice.reviewTier.effective === tier.value}
-								onClick={() => onSetReviewTier(practice.slug, tier.value)}
-							>
-								{tier.label}
-							</DropdownMenuItem>
-						))}
-						{/* Without this the chain is write-once from here: picking any tier pins one to the
-						    practice, and nothing in this menu could ever hand the decision back to the area
-						    or the workspace. Disabled rather than hidden while the practice is already
-						    inheriting, so the row does not change shape as an admin moves down the list. */}
-						<DropdownMenuItem
-							disabled={tierChangeDisabled || practice.reviewTier.inherited}
-							onClick={() => onClearReviewTier(practice.slug)}
+						<DropdownMenuRadioItem
+							value={UNASSIGNED_CATALOG_BUCKET}
+							disabled={move.currentAreaSlug !== null && !move.canMoveTo(null)}
+							closeOnClick
 						>
-							Use the default
-						</DropdownMenuItem>
-					</DropdownMenuGroup>
-					<DropdownMenuSeparator />
-					<DropdownMenuGroup>
-						<DropdownMenuLabel>Order</DropdownMenuLabel>
-						<DropdownMenuItem disabled={!move.canMoveUp} onClick={move.moveUp}>
-							Move up
-						</DropdownMenuItem>
-						<DropdownMenuItem disabled={!move.canMoveDown} onClick={move.moveDown}>
-							Move down
-						</DropdownMenuItem>
-					</DropdownMenuGroup>
-					<DropdownMenuSeparator />
-					<DropdownMenuGroup>
-						<DropdownMenuLabel>Move to</DropdownMenuLabel>
-						<DropdownMenuRadioGroup
-							value={practice.areaSlug ?? UNASSIGNED_CATALOG_BUCKET}
-							onValueChange={(value) =>
-								move.moveTo(value === UNASSIGNED_CATALOG_BUCKET ? null : value)
-							}
-						>
+							Unassigned
+						</DropdownMenuRadioItem>
+						{areas.map((area) => (
 							<DropdownMenuRadioItem
-								value={UNASSIGNED_CATALOG_BUCKET}
-								disabled={move.currentAreaSlug !== null && !move.canMoveTo(null)}
+								key={area.slug}
+								value={area.slug}
+								disabled={move.currentAreaSlug !== area.slug && !move.canMoveTo(area.slug)}
 								closeOnClick
 							>
-								Unassigned
+								{area.name}
 							</DropdownMenuRadioItem>
-							{areas.map((area) => (
-								<DropdownMenuRadioItem
-									key={area.slug}
-									value={area.slug}
-									disabled={move.currentAreaSlug !== area.slug && !move.canMoveTo(area.slug)}
-									closeOnClick
-								>
-									{area.name}
-								</DropdownMenuRadioItem>
-							))}
-						</DropdownMenuRadioGroup>
-					</DropdownMenuGroup>
-					<DropdownMenuSeparator />
-					<DropdownMenuItem
-						variant="destructive"
-						disabled={pending}
-						onClick={() => onDelete(practice)}
-					>
-						Delete practice
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
-		</>
+						))}
+					</DropdownMenuRadioGroup>
+				</DropdownMenuGroup>
+				<DropdownMenuSeparator />
+				<DropdownMenuItem
+					variant="destructive"
+					disabled={pending}
+					onClick={() => onDelete(practice)}
+				>
+					Delete practice
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
@@ -632,23 +578,39 @@ function PracticeRowDetails({
 	practice,
 	title,
 	supportedModes,
+	inheritedFrom,
 }: {
 	practice: Practice;
 	title: ReactNode;
 	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
+	/** The level one step up, named — the practice's area, or the workspace when it has none. */
+	inheritedFrom: string;
 }) {
 	const unavailableLabel = automatedReviewUnavailableLabel(
 		practice.automatedReviewPolicy,
 		supportedModes,
 	);
+	const follows = inheritedTierSourceSentence(practice.reviewTier, inheritedFrom);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
-				{practice.reviewTier.effective !== "DELIVER" && (
-					<Badge variant="outline">{REVIEW_TIER_LABELS[practice.reviewTier.effective]}</Badge>
-				)}
+				{/* Every tier, including Deliver. The badge used to hide there, which was defensible while a
+				    picker beside it always said the tier out loud; now that this is the only read-out, a
+				    hidden one would leave the rows an admin is least likely to question saying nothing at
+				    all about how far the system may go on them. */}
+				<Badge variant="outline">
+					{/* Two badges and a bare sentence in a row read as a list of unrelated words. The prefix
+					    is absolutely positioned, which blockifies it — every engine inserts the space, so it
+					    is announced as a sentence rather than welded to the tier name. */}
+					<span className="sr-only">How far Hephaestus may go: </span>
+					{REVIEW_TIER_LABELS[practice.reviewTier.effective]}
+				</Badge>
+				{/* Where the tier came from, because the value alone cannot be acted on: an admin who reads
+				    "Off" here needs to know whether this practice was singled out or whether the whole
+				    workspace is off, and those have different fixes. */}
+				<span>{follows ?? "Set for this practice"}</span>
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</ItemDescription>
@@ -659,9 +621,11 @@ function PracticeRowDetails({
 function PracticeDragPreview({
 	practice,
 	supportedModes,
+	inheritedFrom,
 }: {
 	practice: Practice;
 	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
+	inheritedFrom: string;
 }) {
 	return (
 		<Item
@@ -676,6 +640,7 @@ function PracticeDragPreview({
 			<PracticeRowDetails
 				practice={practice}
 				supportedModes={supportedModes}
+				inheritedFrom={inheritedFrom}
 				title={<span className="break-words">{practice.name}</span>}
 			/>
 		</Item>

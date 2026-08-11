@@ -1,4 +1,4 @@
-import type { Practice, PracticeReviewSettings } from "@/api/types.gen";
+import type { Practice, PracticeReviewSettings, ReviewTierAssignment } from "@/api/types.gen";
 
 /**
  * How much autonomy the system has over one practice, in the words every surface has to use.
@@ -67,6 +67,30 @@ export const REVIEW_TIER_ADDS: Record<ReviewTier, string> = {
 	PROPOSE: "Adds the review. Every observation is recorded, and nothing is sent.",
 	DELIVER: "Adds sending. Feedback goes out without waiting to be approved.",
 };
+
+/** How the workspace level is named to a reader, wherever a sentence has to point at it. */
+export const WORKSPACE_DEFAULT_SOURCE = "the workspace default";
+
+/**
+ * Which level decided the tier in force, as the one sentence every screen prints.
+ *
+ * <p>Null when the tier was set on the thing itself, because the two screens honestly say different
+ * things there: the one that can change it offers the way back, and the one that only reads it says
+ * where to go instead. Only the shared half — the wording of "inherited, and from where" — lives here,
+ * which is the half that drifts when it is written twice.
+ *
+ * <p>`inheritedFrom` is what the caller believes sits one level up, and it is deliberately not trusted
+ * on its own: a practice in an area that holds no tier inherits the workspace default directly, and
+ * naming the area there would send an admin to a level that decided nothing.
+ */
+export function inheritedTierSourceSentence(
+	assignment: ReviewTierAssignment,
+	inheritedFrom: string,
+): string | null {
+	if (!assignment.inherited) return null;
+	const decidedBy = assignment.source === "WORKSPACE" ? WORKSPACE_DEFAULT_SOURCE : inheritedFrom;
+	return `Follows ${decidedBy}`;
+}
 
 /** Where a workspace lets feedback go at all. ANDed with every tier, so it can only ever silence. */
 export type FeedbackReach = PracticeReviewSettings["feedbackReach"];

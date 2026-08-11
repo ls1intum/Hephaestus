@@ -41,6 +41,7 @@ import {
 	FEEDBACK_REACH_LABELS,
 	FEEDBACK_REACH_ORDER,
 	type FeedbackReach,
+	inheritedTierSourceSentence,
 	REVIEW_TIER_LABELS,
 	REVIEW_TIER_ORDER,
 	type ReviewTier,
@@ -681,15 +682,9 @@ function InheritanceNote({
 	disabled: boolean;
 	onClear: () => void;
 }) {
-	if (!isOverridden(assignment)) {
-		return (
-			<p className="text-muted-foreground text-xs">
-				Follows{" "}
-				{assignment.source === "WORKSPACE" && inheritedFrom !== "the workspace default"
-					? "the workspace default"
-					: inheritedFrom}
-			</p>
-		);
+	const follows = inheritedTierSourceSentence(assignment, inheritedFrom);
+	if (follows) {
+		return <p className="text-muted-foreground text-xs">{follows}</p>;
 	}
 
 	return (
