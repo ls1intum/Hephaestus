@@ -27,7 +27,7 @@ type Story = StoryObj<typeof meta>;
 export const Quoted: Story = {
 	play: async ({ canvasElement, canvas }) => {
 		await expect(canvasElement.querySelector("pre")).toHaveTextContent("const routeName =");
-		await expect(canvas.getByText(/scm\.pull-request\.diff · inputs\/context\/diff\.patch/));
+		canvas.getByText(/scm\.pull-request\.diff · inputs\/context\/diff\.patch/);
 	},
 };
 
