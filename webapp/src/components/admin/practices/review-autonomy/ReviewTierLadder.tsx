@@ -4,7 +4,6 @@ import {
 	REVIEW_TIER_ADDS,
 	REVIEW_TIER_LABELS,
 	REVIEW_TIER_ORDER,
-	REVIEW_TIER_SELECTABLE,
 	type ReviewTier,
 } from "@/lib/review-tiers";
 import { cn } from "@/lib/utils";
@@ -12,7 +11,7 @@ import { cn } from "@/lib/utils";
 export interface ReviewTierLadderProps {
 	/**
 	 * Names the group for a screen reader. A `role="radiogroup"` takes no name from a surrounding
-	 * legend or table cell, and at twenty-five areas on one screen "Off, Observe, Deliver" repeated
+	 * legend or table cell, and at twenty-five areas on one screen "Off, Propose, Deliver" repeated
 	 * with no owner is the difference between a usable list and an unnavigable one.
 	 */
 	label: string;
@@ -32,21 +31,20 @@ export interface ReviewTierLadderProps {
 /**
  * The autonomy tier as the ordered axis it is.
  *
- * <p>A dropdown presents four unrelated options and hides three of them until you open it; this is one
+ * <p>A dropdown presents unrelated options and hides all but one until you open it; this is one
  * axis where every stop contains the one before it, and the whole point of the screen is that an admin
  * can see where their workspace sits on it. So: a segmented control, laid out left to right in
  * {@link REVIEW_TIER_ORDER}.
  *
  * <p>Real radio semantics rather than a toggle group. The rungs are mutually exclusive states of one
  * setting, which is what `role="radiogroup"` means; a toggle group's items are `aria-pressed` buttons,
- * which says "three of these are off" rather than "this one is chosen". It also buys arrow-key movement
+ * which says "the others are off" rather than "this one is chosen". It also buys arrow-key movement
  * along the axis for free, which is the interaction the shape is promising.
  *
- * <p>Propose is rendered and cannot be moved to. It stays on the ladder because removing it leaves a gap
- * between "records it" and "says it unasked" that the remaining words cannot describe, and because a
- * workspace whose data already holds it — the enum and the DB CHECK both admit it — must be able to see
- * that rather than have the control silently show something else. It is disabled *except* when it is the
- * current value, so a keyboard can still land on the rung that is in force.
+ * <p>Every rung can be moved to. Propose was once rendered disabled, which left the control offering one
+ * reachable choice either side of a rung nobody could take; with the ladder down to three that would be
+ * an on/off switch drawn as an axis. Nothing here filters the order — what the vocabulary lists, the
+ * control offers.
  */
 export function ReviewTierLadder({
 	label,
@@ -68,9 +66,8 @@ export function ReviewTierLadder({
 				disabled={disabled}
 				onValueChange={(next) => {
 					const tier = next as ReviewTier;
-					// Re-selecting the rung already in force is the only way to "choose" Propose, and the
-					// server treats it as a no-op. Dropping it here keeps a stray click from spending a
-					// request, and keeps a disabled-but-checked rung from looking like a refusal.
+					// Re-selecting the rung already in force is a no-op the server would accept and record
+					// as a change to nothing; dropping it here keeps a stray click from spending a request.
 					if (tier && tier !== value) onChange(tier);
 				}}
 				className={cn(
@@ -81,7 +78,7 @@ export function ReviewTierLadder({
 			>
 				{REVIEW_TIER_ORDER.map((tier, index) => {
 					const selected = tier === value;
-					const locked = disabled || (!REVIEW_TIER_SELECTABLE[tier] && !selected);
+					const locked = disabled;
 					return (
 						// Base UI's Radio renders a span plus a hidden input beside it, so the rung is a label
 						// wrapping the control rather than one pointed at it by `htmlFor`: the id it would have
@@ -102,7 +99,7 @@ export function ReviewTierLadder({
 							)}
 						>
 							<span className="flex min-w-0 items-center gap-2">
-								{/* The name is the visible word, exactly — a voice-control user says "Observe" and
+								{/* The name is the visible word, exactly — a voice-control user says "Propose" and
 								    means this rung (WCAG 2.2 SC 2.5.3). */}
 								<RadioGroupItem
 									value={tier}

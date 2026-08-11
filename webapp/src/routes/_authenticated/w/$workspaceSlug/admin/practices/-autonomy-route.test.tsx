@@ -9,7 +9,7 @@ import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 vi.setConfig({ testTimeout: 20_000 });
 
 const fixture = buildAutonomyFixture({
-	workspaceDefault: "OBSERVE",
+	workspaceDefault: "PROPOSE",
 	areas: [
 		{
 			slug: "hygiene",
@@ -47,7 +47,7 @@ describe("review autonomy route", () => {
 		// The counts are the server's; nothing here adds up practice rows, and the areas are shut.
 		// Twice over, on purpose: once for the workspace in the strip that stays on screen, once for the
 		// only area, which happens to hold every practice.
-		expect(screen.getAllByText("2 practices: 1 off and 1 observe.")).toHaveLength(2);
+		expect(screen.getAllByText("2 practices: 1 off and 1 propose.")).toHaveLength(2);
 		expect(screen.queryByText("States the motivation")).toBeNull();
 	});
 
@@ -65,7 +65,7 @@ describe("review autonomy route", () => {
 					bodies.push((await request.json()) as Record<string, unknown>);
 					return HttpResponse.json({
 						...fixture.practices[1],
-						reviewTier: { effective: "OBSERVE", source: "AREA", inherited: true },
+						reviewTier: { effective: "PROPOSE", source: "AREA", inherited: true },
 					});
 				},
 			),

@@ -15,7 +15,7 @@ import {
 /**
  * Fixtures that resolve the inheritance chain the way the server does.
  *
- * <p>Hand-written rows drift: a story showing a practice at Observe under an area at Off, with a
+ * <p>Hand-written rows drift: a story showing a practice at Propose under an area at Off, with a
  * rollup counting it as Deliver, would look plausible and would be testing a state the API cannot
  * produce. Everything here is derived from the overrides a story declares, so a fixture is either a
  * state the server can reach or a compile error.
@@ -207,7 +207,7 @@ const SCALE_PRACTICE_NAMES = [
  */
 export function scaleFixture(): AutonomyFixture {
 	return buildAutonomyFixture({
-		workspaceDefault: "OBSERVE",
+		workspaceDefault: "PROPOSE",
 		areas: SCALE_AREA_NAMES.map((name, index) => ({
 			slug: slugify(name),
 			name,

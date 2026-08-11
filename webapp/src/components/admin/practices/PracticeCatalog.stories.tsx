@@ -367,12 +367,12 @@ export const AutonomyTiers: Story = {
 		areas: mockAreas,
 		practices: [
 			{ ...mockPractices[0], slug: "loud", name: "Deliver", reviewTier: inheritedTier("DELIVER") },
-			{ ...mockPractices[0], slug: "quiet", name: "Observe", reviewTier: chosenTier("OBSERVE") },
+			{ ...mockPractices[0], slug: "quiet", name: "Propose", reviewTier: chosenTier("PROPOSE") },
 			{ ...mockPractices[0], slug: "silent", name: "Off", reviewTier: chosenTier("OFF") },
 		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
 	},
 	play: async ({ canvas, userEvent }) => {
-		for (const tier of ["Deliver", "Observe", "Off"]) {
+		for (const tier of ["Deliver", "Propose", "Off"]) {
 			await expect(canvas.getByLabelText(`How far Hephaestus may go on ${tier}`)).toHaveTextContent(
 				tier,
 			);
@@ -380,26 +380,23 @@ export const AutonomyTiers: Story = {
 		// Deliver is what a practice nobody has configured inherits, so it carries no badge; the quieter
 		// tiers each announce themselves, because those are the rows where a developer will see less
 		// than the practice's name suggests.
-		const badges = canvas.getAllByText(/^(Off|Observe)$/, {
+		const badges = canvas.getAllByText(/^(Off|Propose)$/, {
 			selector: '[data-slot="badge"]',
 		});
 		await expect(badges).toHaveLength(2);
 		await expectNoPageOverflow();
 
-		// Propose is a rung with nothing behind it yet — no queue for a human to approve what it would
-		// prepare — and the server refuses it at every write boundary. It is offered and disabled rather
-		// than omitted: dropping it leaves a gap between "records it" and "says it unasked" that the
-		// ladder has no word for, and offering it plainly would fail after the click.
+		// The row picker offers the whole ladder and disables none of it. Propose was once offered and
+		// disabled, back when the server refused it; a picker that renders a choice it will reject is a
+		// failure after the click, and one that quietly drops the middle rung leaves an on/off switch.
 		await userEvent.click(canvas.getByLabelText("How far Hephaestus may go on Deliver"));
 		const options = within(await screen.findByRole("listbox"));
-		await expect(options.getByRole("option", { name: "Propose" })).toHaveAttribute(
-			"aria-disabled",
-			"true",
-		);
-		await expect(options.getByRole("option", { name: "Observe" })).not.toHaveAttribute(
-			"aria-disabled",
-			"true",
-		);
+		for (const name of ["Off", "Propose", "Deliver"]) {
+			await expect(options.getByRole("option", { name })).not.toHaveAttribute(
+				"aria-disabled",
+				"true",
+			);
+		}
 	},
 };
 
@@ -410,7 +407,7 @@ export const AutonomyTiers: Story = {
 const overrideArgs = {
 	areas: mockAreas,
 	practices: [
-		{ ...mockPractices[0], slug: "held", name: "Set here", reviewTier: chosenTier("OBSERVE") },
+		{ ...mockPractices[0], slug: "held", name: "Set here", reviewTier: chosenTier("PROPOSE") },
 		{
 			...mockPractices[0],
 			slug: "free",

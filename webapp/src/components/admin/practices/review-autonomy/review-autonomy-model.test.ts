@@ -10,7 +10,7 @@ import {
 import { buildAutonomyFixture, scaleFixture } from "./story-mock-data";
 
 const fixture = buildAutonomyFixture({
-	workspaceDefault: "OBSERVE",
+	workspaceDefault: "PROPOSE",
 	areas: [
 		{
 			slug: "hygiene",
@@ -131,18 +131,23 @@ describe("reviewableByHephaestus", () => {
 });
 
 describe("the workspace summary", () => {
-	it("drops the empty tiers the rollup always sends, including the one nobody can select", () => {
-		expect(fixture.rollup.counts.PROPOSE).toBe(0);
+	it("drops the tiers the rollup sends at zero, and keeps ladder order", () => {
+		// The rollup sends every tier as a key even at zero, so a caller never has to gap-fill. A
+		// workspace with nothing at Propose should still not spend its summary line saying "0 propose".
+		expect(tierDistribution({ OFF: 3, PROPOSE: 0, DELIVER: 1 }).map(({ tier }) => tier)).toEqual([
+			"OFF",
+			"DELIVER",
+		]);
 		expect(tierDistribution(fixture.rollup.counts).map(({ tier }) => tier)).toEqual([
 			"OFF",
-			"OBSERVE",
+			"PROPOSE",
 			"DELIVER",
 		]);
 	});
 
 	it("reads as a sentence for the live region, not as middot-separated fragments", () => {
 		expect(tierDistributionSentence(fixture.rollup.counts)).toBe(
-			"4 practices: 1 off, 2 observe and 1 deliver.",
+			"4 practices: 1 off, 2 propose and 1 deliver.",
 		);
 	});
 
@@ -157,7 +162,7 @@ describe("the workspace summary", () => {
 		expect(tierTotal(scale.rollup.counts)).toBe(100);
 		expect(scale.rollup.areas).toHaveLength(25);
 		expect(tierDistributionSentence(scale.rollup.counts)).toBe(
-			"100 practices: 6 off, 89 observe and 5 deliver.",
+			"100 practices: 6 off, 89 propose and 5 deliver.",
 		);
 	});
 });

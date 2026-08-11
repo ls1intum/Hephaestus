@@ -21,27 +21,12 @@ export type ReviewTier = Practice["reviewTier"]["effective"];
  */
 export const REVIEW_TIER_ORDER = [
 	"OFF",
-	"OBSERVE",
 	"PROPOSE",
 	"DELIVER",
 ] as const satisfies readonly ReviewTier[];
 
-/**
- * Propose is in the ladder but cannot be chosen yet: there is no queue for a human to approve the
- * feedback it would prepare, so a practice parked there would prepare feedback nobody can approve and
- * swallow it. The server refuses it at every write boundary; a surface that offers a tier picker has to
- * disable this one rather than let the choice fail after the click.
- */
-export const REVIEW_TIER_SELECTABLE: Record<ReviewTier, boolean> = {
-	OFF: true,
-	OBSERVE: true,
-	PROPOSE: false,
-	DELIVER: true,
-};
-
 export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
 	OFF: "Off",
-	OBSERVE: "Observe",
 	PROPOSE: "Propose",
 	DELIVER: "Deliver",
 };
@@ -61,26 +46,25 @@ export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
  */
 export const REVIEW_TIER_DESCRIPTIONS: Record<ReviewTier, string> = {
 	OFF: "Not reviewed at all.",
-	OBSERVE: "Reviewed and recorded. Nobody is told.",
-	PROPOSE: "Feedback prepared for a person to approve. Not available yet.",
+	PROPOSE: "Reviewed and recorded. Nothing is sent.",
 	DELIVER: "Reviewed, and feedback delivered without asking.",
 };
 
 /**
- * The same four tiers said as a ladder: what each rung *adds* to the one below it.
+ * The same three tiers said as a ladder: what each rung *adds* to the one below it.
  *
  * <p>A second set rather than a rewrite of {@link REVIEW_TIER_DESCRIPTIONS}, because the two answer
  * different questions. The descriptions above answer "what is this practice doing" for a reader who
  * sees one tier alone; these answer "what changes if I move one step right" for a reader looking at
- * all four at once. Folding them together would leave the standalone tooltip saying "Adds…" with
+ * all three at once. Folding them together would leave the standalone tooltip saying "Adds…" with
  * nothing to add to.
  *
- * <p>Off is the floor and adds nothing, so it says what it removes instead.
+ * <p>Off is the floor and adds nothing, so it says what it removes instead. Propose does not promise a
+ * draft to read: nothing is composed at that tier, so the sentence stops at what is recorded.
  */
 export const REVIEW_TIER_ADDS: Record<ReviewTier, string> = {
 	OFF: "Nothing runs. No review, no record, nothing said.",
-	OBSERVE: "Adds the review. Every observation is recorded, and nobody is told.",
-	PROPOSE: "Adds prepared feedback, held back until a person approves it.",
+	PROPOSE: "Adds the review. Every observation is recorded, and nothing is sent.",
 	DELIVER: "Adds sending. Feedback goes out without waiting to be approved.",
 };
 
@@ -119,9 +103,9 @@ export interface ReviewTierCount {
  * A tier count map as an ordered list, with the empty tiers dropped.
  *
  * <p>The rollup carries every tier as a key even at zero, which is what lets a caller render a
- * distribution without gap-filling — but printing "0 propose" on every workspace would spend the
- * summary line on the one tier nobody can select. Ladder order, not count order: an admin reading
- * "12 off · 84 observe" twice in a row should see the same shape both times.
+ * distribution without gap-filling — but printing "0 propose" on a workspace with none of them spends
+ * the summary line on a number nobody asked about. Ladder order, not count order: an admin reading
+ * "12 off · 84 propose" twice in a row should see the same shape both times.
  */
 export function tierDistribution(counts: Record<string, number>): ReviewTierCount[] {
 	return REVIEW_TIER_ORDER.map((tier) => ({ tier, count: counts[tier] ?? 0 })).filter(

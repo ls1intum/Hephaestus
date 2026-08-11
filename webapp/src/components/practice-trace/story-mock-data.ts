@@ -139,10 +139,10 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "product-language",
 		practiceName: "Product language",
-		reviewTier: "OBSERVE",
+		reviewTier: "PROPOSE",
 		outcome: "REVIEWED",
 		explanation:
-			"Reviewed, and two measurements were recorded. This practice is set to observe only, so nothing was said to you; raise its tier to Deliver to hear about results like these.",
+			"Reviewed, and two measurements were recorded. This practice is set to Propose, so nothing was said to you; raise its tier to Deliver to hear about results like these.",
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
@@ -352,7 +352,7 @@ export const documentArtifactTrace = {
 		{
 			practiceSlug: "written-for-a-newcomer",
 			practiceName: "Written for a newcomer",
-			reviewTier: "OBSERVE",
+			reviewTier: "PROPOSE",
 			outcome: "REVIEWED",
 			explanation: "Assessed on this artifact.",
 			watches: ["docs.document.published"],

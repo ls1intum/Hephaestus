@@ -11,7 +11,7 @@ const small = buildAutonomyFixture({
 			name: "Pull request hygiene",
 			practices: [
 				{ name: "States the motivation" },
-				{ name: "Links the issue it closes", override: "OBSERVE" },
+				{ name: "Links the issue it closes", override: "PROPOSE" },
 			],
 		},
 		{
@@ -93,7 +93,7 @@ export const WorkspaceDefaultUnset: Story = {
 export const WorkspaceDefaultSet: Story = {
 	args: (() => {
 		const fixture = buildAutonomyFixture({
-			workspaceDefault: "OBSERVE",
+			workspaceDefault: "PROPOSE",
 			feedbackReach: "CONVERSATION",
 			areas: [
 				{
@@ -109,7 +109,7 @@ export const WorkspaceDefaultSet: Story = {
 		await expect(
 			within(
 				canvas.getByRole("radiogroup", { name: "How far Hephaestus may go without you" }),
-			).getByRole("radio", { name: "Observe" }),
+			).getByRole("radio", { name: "Propose" }),
 		).toBeChecked();
 		await expect(
 			within(canvas.getByRole("radiogroup", { name: "Where feedback may go" })).getByRole("radio", {
@@ -224,13 +224,13 @@ export const BulkSet: Story = {
 
 		await userEvent.click(canvas.getByRole("button", { name: "Change the selected" }));
 		const menu = within(await screen.findByRole("menu"));
-		await userEvent.click(await menu.findByRole("menuitem", { name: "Observe" }));
+		await userEvent.click(await menu.findByRole("menuitem", { name: "Propose" }));
 		await expect(args.onBulkSetTier).toHaveBeenCalledWith(
 			[
 				"pull-request-hygiene-states-the-motivation",
 				"pull-request-hygiene-links-the-issue-it-closes",
 			],
-			"OBSERVE",
+			"PROPOSE",
 		);
 	},
 };
@@ -276,7 +276,7 @@ export const AtScale: Story = {
 		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
 	})(),
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("100 practices: 6 off, 89 observe and 5 deliver.")).toBeVisible();
+		await expect(canvas.getByText("100 practices: 6 off, 89 propose and 5 deliver.")).toBeVisible();
 		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(27);
 		await expect(canvas.queryByRole("checkbox", { name: /^Select / })).not.toBeInTheDocument();
 		await expectNoPageOverflow();

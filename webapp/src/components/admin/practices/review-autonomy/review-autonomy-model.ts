@@ -28,7 +28,7 @@ export interface AutonomyGroup {
  * Mirrors the server's `canAttemptAutomatedReview`.
  *
  * <p>Duplicated rather than inferred from the tier, because the two say different things: a practice
- * the system cannot review is written to Off and refused above it, and a control that offered Observe
+ * the system cannot review is written to Off and refused above it, and a control that offered Propose
  * there would fail after the click with a message about a policy the admin is not looking at. The
  * server owns the rule; this only decides whether to offer the choice.
  */

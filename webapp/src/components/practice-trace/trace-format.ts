@@ -14,7 +14,7 @@ export type DiscoveredVia = TracedSignal["discoveredVia"];
 /**
  * Was the practice *measured*, and nothing more: whether anyone heard about it is the separate
  * `observationCount`/`deliveredCount`/`withheldReasons` axis. "Reviewed" having delivered nothing
- * is the OBSERVE tier working as configured.
+ * is the PROPOSE tier working as configured.
  */
 export const OUTCOME_LABELS: Record<TraceOutcome, string> = {
 	REVIEWED: "Reviewed",

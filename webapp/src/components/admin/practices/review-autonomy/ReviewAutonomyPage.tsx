@@ -43,7 +43,6 @@ import {
 	type FeedbackReach,
 	REVIEW_TIER_LABELS,
 	REVIEW_TIER_ORDER,
-	REVIEW_TIER_SELECTABLE,
 	type ReviewTier,
 	tierDistribution,
 	tierDistributionSentence,
@@ -456,7 +455,7 @@ function BulkActionBar({
 					    needs a `Menu.Group` above it and takes the whole popup down without one. */}
 					<DropdownMenuGroup>
 						<DropdownMenuLabel>Set every selected practice to</DropdownMenuLabel>
-						{REVIEW_TIER_ORDER.filter((tier) => REVIEW_TIER_SELECTABLE[tier]).map((tier) => (
+						{REVIEW_TIER_ORDER.map((tier) => (
 							<DropdownMenuItem key={tier} onClick={() => onSet(tier)}>
 								{REVIEW_TIER_LABELS[tier]}
 							</DropdownMenuItem>

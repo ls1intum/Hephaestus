@@ -28,9 +28,9 @@ type Story = StoryObj<typeof meta>;
 export const Full: Story = {
 	args: { variant: "full" },
 	play: async ({ canvas }) => {
-		// Radios, not pressed buttons: the rungs are four states of one setting, and a screen reader
-		// should say "Deliver, selected, 4 of 4" rather than "Off, not pressed" three times over.
-		await expect(canvas.getAllByRole("radio")).toHaveLength(4);
+		// Radios, not pressed buttons: the rungs are three states of one setting, and a screen reader
+		// should say "Deliver, selected, 3 of 3" rather than "Off, not pressed" twice over.
+		await expect(canvas.getAllByRole("radio")).toHaveLength(3);
 		await expect(canvas.getByRole("radio", { name: "Deliver" })).toBeChecked();
 		await expect(canvas.getByRole("radiogroup")).toHaveAccessibleName(
 			"How far Hephaestus may go without you",
@@ -47,58 +47,53 @@ export const Off: Story = {
 };
 
 export const Compact: Story = {
-	args: { variant: "compact", value: "OBSERVE" },
+	args: { variant: "compact", value: "PROPOSE" },
 };
 
 /** The state an inherited row is drawn in: shown, readable, and visibly somebody else's decision. */
 export const Inherited: Story = {
-	args: { variant: "compact", value: "OBSERVE", muted: true },
+	args: { variant: "compact", value: "PROPOSE", muted: true },
 };
 
 export const Choosing: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	args: { variant: "full", value: "DELIVER" },
 	play: async ({ args, canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("radio", { name: "Observe" }));
-		await expect(args.onChange).toHaveBeenCalledWith("OBSERVE");
+		await userEvent.click(canvas.getByRole("radio", { name: "Propose" }));
+		await expect(args.onChange).toHaveBeenCalledWith("PROPOSE");
 	},
 };
 
 /**
- * Propose has no approval queue behind it, so the server refuses it at every write boundary. The rung
- * stays on the ladder — without it there is no word for what sits between "records it" and "says it
- * unasked" — and cannot be moved to.
+ * Every rung is reachable, Propose included. It was once rendered disabled, on the grounds that the
+ * server would refuse it; with the ladder down to three that left one reachable choice either side of a
+ * dead rung, which is an on/off switch drawn as an axis. Pinned here because a picker that silently
+ * stops offering the middle is the exact regression this ladder exists to prevent.
  */
-export const ProposeIsNotSelectable: Story = {
-	args: { variant: "full", value: "OBSERVE" },
-	play: async ({ args, canvas, userEvent }) => {
-		const propose = canvas.getByRole("radio", { name: "Propose" });
-		await expect(propose).toHaveAttribute("aria-disabled", "true");
-		// Clicking the rung's label is the reachable route to a disabled radio — a pointer never lands
-		// on the control itself — so that is what has to write nothing.
-		const rung = propose.closest("label");
-		if (!(rung instanceof HTMLElement)) throw new Error("A rung with no label cannot be clicked");
-		await userEvent.click(rung);
-		await expect(args.onChange).not.toHaveBeenCalled();
-		await expect(canvas.getByRole("radio", { name: "Observe" })).toBeChecked();
+export const EveryRungIsReachable: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	args: { variant: "full", value: "DELIVER" },
+	play: async ({ canvas }) => {
+		for (const name of ["Off", "Propose", "Deliver"]) {
+			await expect(canvas.getByRole("radio", { name })).not.toHaveAttribute(
+				"aria-disabled",
+				"true",
+			);
+		}
 	},
 };
 
-/**
- * A workspace whose rows already hold Propose — the enum and the database CHECK both admit it — must
- * see the tier that is actually in force, and must still be able to reach that rung with a keyboard.
- */
-export const ProposeAlreadyInForce: Story = {
+/** Re-selecting the rung already in force writes nothing; only moving off it does. */
+export const ReSelectingTheRungInForceWritesNothing: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
 	args: { variant: "full", value: "PROPOSE" },
 	play: async ({ args, canvas, userEvent }) => {
 		const propose = canvas.getByRole("radio", { name: "Propose" });
 		await expect(propose).toBeChecked();
-		await expect(propose).not.toHaveAttribute("aria-disabled", "true");
-		// Re-selecting the rung in force writes nothing; only moving off it does.
 		await userEvent.click(propose);
 		await expect(args.onChange).not.toHaveBeenCalled();
-		await userEvent.click(canvas.getByRole("radio", { name: "Observe" }));
-		await expect(args.onChange).toHaveBeenCalledWith("OBSERVE");
+		await userEvent.click(canvas.getByRole("radio", { name: "Deliver" }));
+		await expect(args.onChange).toHaveBeenCalledWith("DELIVER");
 	},
 };
 

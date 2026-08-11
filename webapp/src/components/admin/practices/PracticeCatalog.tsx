@@ -48,12 +48,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import {
-	REVIEW_TIER_LABELS,
-	REVIEW_TIER_ORDER,
-	REVIEW_TIER_SELECTABLE,
-	type ReviewTier,
-} from "@/lib/review-tiers";
+import { REVIEW_TIER_LABELS, REVIEW_TIER_ORDER, type ReviewTier } from "@/lib/review-tiers";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
@@ -65,9 +60,6 @@ import { CatalogOriginBadge } from "./CatalogOriginBadge";
 const REVIEW_TIERS = REVIEW_TIER_ORDER.map((value) => ({
 	value,
 	label: REVIEW_TIER_LABELS[value],
-	// Shown but not choosable where the server would refuse it. Dropping the rung instead would leave
-	// the ladder with a gap and no word for what sits between "records it" and "says it unasked".
-	selectable: REVIEW_TIER_SELECTABLE[value],
 }));
 
 export type FocusFilter = "ALL" | KnownArtifactKind;
@@ -471,7 +463,7 @@ function PracticeActions({
 				</SelectTrigger>
 				<SelectContent>
 					{REVIEW_TIERS.map((tier) => (
-						<SelectItem key={tier.value} value={tier.value} disabled={!tier.selectable}>
+						<SelectItem key={tier.value} value={tier.value}>
 							{tier.label}
 						</SelectItem>
 					))}
@@ -507,12 +499,10 @@ function PracticeActions({
 					    fails — and the sentences now have a screen of their own on Review autonomy. */}
 					<DropdownMenuGroup>
 						<DropdownMenuLabel>How far Hephaestus may go</DropdownMenuLabel>
-						{/* Only the rungs that can be moved to. A menu is a list of things you can do, and
-						    Propose is not one of them anywhere yet — the row's picker still renders it,
-						    because that one has to be able to show a tier already in force. Keeping it here
-						    as well made the menu tall enough to become a scrollable region no keyboard can
-						    reach, which the a11y gate fails. */}
-						{REVIEW_TIERS.filter((tier) => tier.selectable).map((tier) => (
+						{/* Every rung, because every rung can now be moved to. This list is three items and
+						    label-only on purpose: the one-line hints, or a fourth tier, made the menu tall
+						    enough to become a scrollable region no keyboard can reach. */}
+						{REVIEW_TIERS.map((tier) => (
 							<DropdownMenuItem
 								key={tier.value}
 								disabled={tierChangeDisabled || practice.reviewTier.effective === tier.value}
