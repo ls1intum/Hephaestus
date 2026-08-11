@@ -371,6 +371,48 @@ export const Loading: Story = {
 };
 ```
 
+### Titles and the sidebar
+
+Two conventions live side by side, and which one applies is a property of the component, not a taste:
+
+- **Omit `title` by default.** `.storybook/main.ts` sets no `titlePrefix`, so a story with no title is
+  filed by its path under `src` — `components/admin/ai/ModelPicker`. Most stories should be here: the
+  file tree *is* the grouping, and it cannot go stale.
+- **Declare a `title` when the file layout cannot express where a reader looks for the thing.** A
+  product surface assembled from several directories, or one an admin knows by the screen it is on,
+  earns an explicit title: `Workspace admin/Practices/Review/How much`. Do not rename an existing
+  explicit tree into auto-titles — the path would file it under `components/`.
+- **Sentence case throughout**, for both segments and story names: `Practice trace/Outcome badge`,
+  not `PracticeTrace/OutcomeBadge`.
+- **A leaf and a folder must not share a name.** If `Foo` gains children, the leaf becomes
+  `Foo/Overview`.
+- **Every top-level segment must appear in `storySort.order` in `.storybook/preview.ts`.** One that
+  is missing sorts alphabetically after every named one, which silently buries it.
+- **A cross-cutting regression suite is not a component.** A file with no `component`, covering
+  several primitives at once, belongs under `Tests/` — see `src/components/ui/overlay-reflow.stories.tsx`.
+
+### Args, Controls and play functions
+
+- **A `render` that ignores `args` disables the Controls panel**, which is most of a story's
+  documentation value. Prefer `args` alone; when a story needs a wrapper, spread:
+  `render: (args) => <Harness {...args} />`. Keep at least one story per file driven by meta args
+  (`export const Default: Story = {};`).
+- **`autodocs` publishes the `component`'s props.** If the stories render a test harness rather than
+  the component, either point `component` at the real component or drop `autodocs` — do not publish
+  the harness's props as if they were the API.
+- **An expectation must not be recomputed from what it is checking.** Writing
+  `expect(rows).toHaveLength(FIXTURE.length)`, or rebuilding the component's own branching to derive
+  the URL it should have produced, makes a wrong component and a wrong test agree. Write the expected
+  values out; if the literal table risks drifting, assert that its *keys* match the source's.
+- **Use the `canvas` play argument** rather than re-deriving `within(canvasElement)` in every story.
+
+### JSDoc on stories
+
+Storybook renders these blocks as Markdown (`markdown-to-jsx`). Separate paragraphs with a blank
+comment line — a Java-style `<p>` emits a stray empty paragraph before each one. A comment that only
+restates the story's name is noise; keep the ones that record a decision, a fixture choice, or the
+bug the story exists to prevent.
+
 ### Story Requirements
 
 Cover for each component:

@@ -119,7 +119,25 @@ const preview: Preview = {
 		},
 		options: {
 			storySort: {
-				order: ["Admin", "Core", "Shared"],
+				// Product surfaces first, roughly outside-in by who opens them, then the shared kit, then
+				// the auto-titled `components/*` tree, then cross-cutting regression suites. Every
+				// top-level segment any story declares has to appear here — an unnamed one sorts
+				// alphabetically after all of these, which is how `Workspace admin` ended up below
+				// `Shared`. `Core` was in this list and is not a namespace any story uses.
+				order: [
+					"Workspace admin",
+					"Instance admin",
+					"Admin",
+					"Practice trace",
+					"Workspace",
+					"Surveys",
+					"Common",
+					"Shared",
+					"Provider",
+					"Icons",
+					"components",
+					"Tests",
+				],
 			},
 		},
 		docs: {
