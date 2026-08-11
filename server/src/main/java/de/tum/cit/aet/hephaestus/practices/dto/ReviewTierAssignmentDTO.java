@@ -22,9 +22,8 @@ import org.jspecify.annotations.Nullable;
 public record ReviewTierAssignmentDTO(
     @NonNull
     @Schema(
-        description = "The tier actually in force. OFF = not reviewed · OBSERVE = reviewed and recorded, " +
-            "nobody is told · PROPOSE = feedback prepared for a human to approve (not selectable yet) · " +
-            "DELIVER = feedback delivered without asking"
+        description = "The tier actually in force. OFF = not reviewed · PROPOSE = reviewed and recorded, " +
+            "feedback held back and nothing sent · DELIVER = feedback delivered without asking"
     )
     PracticeReviewTier effective,
     @Nullable

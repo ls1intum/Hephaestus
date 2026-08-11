@@ -2622,4 +2622,68 @@
         ]]></rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-readiness" id="1785743133884-48">
+        <preConditions onFail="MARK_RAN" onFailMessage="review tiers already reduced to OFF/PROPOSE/DELIVER">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_practice_review_tier'
+                  AND conrelid = 'practice'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%OBSERVE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Reduce the autonomy ladder to three modes: OFF, PROPOSE, DELIVER.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            -- The axis is how much the system does without you, and OBSERVE and PROPOSE both sat at "runs,
+            -- records, sends nothing". They were meant to differ over whether feedback had been prepared for
+            -- someone to approve, but nothing on the delivery path ever prepared it: findings are dropped
+            -- before a body is composed, and the withheld ledger row carries no body. So the boundary was
+            -- invisible on every screen that showed it, which is the same fault that made COACH and ENGAGE
+            -- unpickable. One middle rung carries the whole of "reviewed, recorded, silent".
+            --
+            -- PROPOSE is the survivor rather than OBSERVE because the rung has to stay selectable once the
+            -- approval queue exists, and a column that had to be re-mapped on the day of that feature would
+            -- be a migration nobody wants to run then. Behaviour is identical either way: neither tier
+            -- delivers, so no workspace gets louder or quieter here.
+            UPDATE practice SET review_tier = 'PROPOSE' WHERE review_tier = 'OBSERVE';
+            ALTER TABLE practice DROP CONSTRAINT IF EXISTS chk_practice_review_tier;
+            ALTER TABLE practice ADD CONSTRAINT chk_practice_review_tier
+                CHECK (review_tier IS NULL OR review_tier IN ('OFF', 'PROPOSE', 'DELIVER'));
+
+            UPDATE practice_area SET review_tier = 'PROPOSE' WHERE review_tier = 'OBSERVE';
+            ALTER TABLE practice_area DROP CONSTRAINT IF EXISTS chk_practice_area_review_tier;
+            ALTER TABLE practice_area ADD CONSTRAINT chk_practice_area_review_tier
+                CHECK (review_tier IS NULL OR review_tier IN ('OFF', 'PROPOSE', 'DELIVER'));
+
+            -- NULL still means "this workspace has never chosen", and still resolves to DELIVER. Only the
+            -- admitted vocabulary narrows.
+            UPDATE workspace SET practice_default_review_tier = 'PROPOSE'
+                WHERE practice_default_review_tier = 'OBSERVE';
+            ALTER TABLE workspace DROP CONSTRAINT IF EXISTS chk_workspace_default_review_tier;
+            ALTER TABLE workspace ADD CONSTRAINT chk_workspace_default_review_tier
+                CHECK (practice_default_review_tier IS NULL
+                    OR practice_default_review_tier IN ('OFF', 'PROPOSE', 'DELIVER'));
+        ]]></sql>
+        <rollback><![CDATA[
+            -- PROPOSE maps back to OBSERVE without ambiguity. Until this changeset, PROPOSE was refused at
+            -- every write boundary and no code path could store it, so every PROPOSE row in a database this
+            -- rollback can reach was written by the UPDATE above.
+            ALTER TABLE practice DROP CONSTRAINT IF EXISTS chk_practice_review_tier;
+            ALTER TABLE practice_area DROP CONSTRAINT IF EXISTS chk_practice_area_review_tier;
+            ALTER TABLE workspace DROP CONSTRAINT IF EXISTS chk_workspace_default_review_tier;
+
+            UPDATE practice SET review_tier = 'OBSERVE' WHERE review_tier = 'PROPOSE';
+            UPDATE practice_area SET review_tier = 'OBSERVE' WHERE review_tier = 'PROPOSE';
+            UPDATE workspace SET practice_default_review_tier = 'OBSERVE'
+                WHERE practice_default_review_tier = 'PROPOSE';
+
+            ALTER TABLE practice ADD CONSTRAINT chk_practice_review_tier
+                CHECK (review_tier IS NULL OR review_tier IN ('OFF', 'OBSERVE', 'PROPOSE', 'DELIVER'));
+            ALTER TABLE practice_area ADD CONSTRAINT chk_practice_area_review_tier
+                CHECK (review_tier IS NULL OR review_tier IN ('OFF', 'OBSERVE', 'PROPOSE', 'DELIVER'));
+            ALTER TABLE workspace ADD CONSTRAINT chk_workspace_default_review_tier
+                CHECK (practice_default_review_tier IS NULL
+                    OR practice_default_review_tier IN ('OFF', 'OBSERVE', 'PROPOSE', 'DELIVER'));
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

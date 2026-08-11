@@ -175,12 +175,6 @@ public class PracticeAreaService {
         if (area.getReviewTier() == reviewTier) {
             return area;
         }
-        if (reviewTier != null && !reviewTier.selectable()) {
-            throw new IllegalArgumentException(
-                "Propose is not available yet: feedback would be prepared with no way for anyone to approve " +
-                    "it. Use Observe to keep measuring in silence, or Deliver to send feedback without approval."
-            );
-        }
         PracticeAreaSnapshot before = PracticeAreaSnapshot.of(area);
         area.setReviewTier(reviewTier);
         area = practiceAreaRepository.save(area);

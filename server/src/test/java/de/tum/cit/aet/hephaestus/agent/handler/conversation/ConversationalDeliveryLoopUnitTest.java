@@ -417,10 +417,10 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     /**
-     * The autonomy tier's conversation half. Only DELIVER may speak without being asked: OBSERVE promises
-     * silence on every channel and PROPOSE waits for an approval that has nowhere to come from yet, so both
-     * must be refused here — and refused with a NAMED reason, because "the workspace turned this practice
-     * down" is a different answer to "why did nothing happen" than "there was nothing worth raising".
+     * The autonomy tier's conversation half. Only DELIVER may speak without being asked; PROPOSE promises
+     * silence on every channel and must be refused here — and refused with a NAMED reason, because "the
+     * workspace turned this practice down" is a different answer to "why did nothing happen" than "there
+     * was nothing worth raising".
      */
     @ParameterizedTest
     @MethodSource("tierRoutingCases")
@@ -435,7 +435,6 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     static Stream<Arguments> tierRoutingCases() {
         return Stream.of(
             arguments(PracticeReviewTier.OFF, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
-            arguments(PracticeReviewTier.OBSERVE, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
             arguments(PracticeReviewTier.PROPOSE, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
             arguments(PracticeReviewTier.DELIVER, ConversationRoutingDecision.ADMIT)
         );
@@ -471,7 +470,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         assertThat(
             router().route(
                 observation,
-                PracticeReviewTier.OBSERVE,
+                PracticeReviewTier.PROPOSE,
                 FeedbackReach.ON_THE_WORK,
                 WS,
                 RoutingContext.reviewer()

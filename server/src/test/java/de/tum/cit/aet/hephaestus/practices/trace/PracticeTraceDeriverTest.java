@@ -98,7 +98,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         @Test
         void keepsMeasurementAndDeliveryOnSeparateAxes() {
             var entry = only(
-                practice(PracticeReviewTier.OBSERVE, READY),
+                practice(PracticeReviewTier.PROPOSE, READY),
                 List.of(triggered(READY, RUN)),
                 Map.of(RUN, completed()),
                 Map.of(1L, new PracticeOutput(3, 0, List.of(FeedbackSuppressionReason.PRACTICE_TIER_QUIET), RUN, AT))

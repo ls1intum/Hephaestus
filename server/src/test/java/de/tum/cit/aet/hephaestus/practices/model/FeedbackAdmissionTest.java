@@ -82,7 +82,7 @@ class FeedbackAdmissionTest extends BaseUnitTest {
             assertThat(
                 FeedbackAdmission.delivers(
                     ObservationOrigin.LIVE,
-                    PracticeReviewTier.OBSERVE,
+                    PracticeReviewTier.PROPOSE,
                     FeedbackReach.ON_THE_WORK,
                     FeedbackChannel.IN_CONTEXT
                 )
@@ -118,7 +118,7 @@ class FeedbackAdmissionTest extends BaseUnitTest {
             assertThat(
                 FeedbackAdmission.delivers(
                     ObservationOrigin.LIVE,
-                    PracticeReviewTier.OBSERVE,
+                    PracticeReviewTier.PROPOSE,
                     FeedbackReach.ON_THE_WORK,
                     FeedbackChannel.CONVERSATION
                 )

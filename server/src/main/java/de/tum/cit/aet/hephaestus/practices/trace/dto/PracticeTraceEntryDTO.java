@@ -15,7 +15,7 @@ import org.jspecify.annotations.NonNull;
  *
  * <p>{@code outcome} is about the <em>measurement</em>: did this practice get assessed, and if not,
  * why. The counts and {@code withheldReasons} are about the <em>intervention</em>: did anything reach
- * a person. A practice at {@code OBSERVE} is {@code REVIEWED} with nothing delivered, and reporting
+ * a person. A practice at {@code PROPOSE} is {@code REVIEWED} with nothing delivered, and reporting
  * that as one number would hide the exact distinction autonomy tiers exist to make.
  */
 @Schema(description = "What became of one practice on this artifact, and whether anyone heard about it")

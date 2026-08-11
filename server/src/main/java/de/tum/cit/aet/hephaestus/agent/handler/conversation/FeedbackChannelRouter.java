@@ -25,7 +25,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Decides which of a cycle's observations are eligible for conversational delivery. An observation is
  * {@link ConversationRoutingDecision#ADMIT admitted} to the CONVERSATION channel iff ALL of: its provenance admits the
- * conversation channel, its practice's loudness tier admits the conversation channel, author-targeted, a
+ * conversation channel, its practice's autonomy tier admits the conversation channel, author-targeted, a
  * {@link Assessment#BAD} problem, has no natural inline anchor, and does not share a {@code recurrence_key} with a
  * DELIVERED IN_CONTEXT unit for the same recipient. Every other case is a named, testable non-admission reason.
  *
@@ -90,7 +90,7 @@ public class FeedbackChannelRouter {
     ) {
         // Provenance, tier and reach in one predicate, so this path and the in-context one cannot drift on
         // what "may we say this here" means. Asked first because none of the three needs anything but the
-        // observation in hand, and each is decisive: an OBSERVE practice has nothing to say on ANY channel,
+        // observation in hand, and each is decisive: a PROPOSE practice has nothing to say on ANY channel,
         // and a workspace whose reach stops at the work never opens a conversation at all.
         if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, reach, FeedbackChannel.CONVERSATION)) {
             return observation.getOrigin().delivers(FeedbackChannel.CONVERSATION)

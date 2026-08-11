@@ -25,11 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Decides which findings reach the artifact itself, by applying {@link FeedbackAdmission} to the
- * {@link FeedbackChannel#IN_CONTEXT} channel: a finding is posted only if its practice's loudness tier
+ * {@link FeedbackChannel#IN_CONTEXT} channel: a finding is posted only if its practice's autonomy tier
  * admits the channel <em>and</em> the run's provenance does.
  *
  * <p>Runs strictly AFTER the findings are persisted and stamped with their observation keys, which is
- * the whole point of both rules — {@code MEASURE}, {@code COACH} and a backfill are measured and
+ * the whole point of both rules — a {@code PROPOSE} practice and a backfill are measured and
  * recorded exactly like an engaged live run, and differ only in how far the result travels. Nothing here
  * can affect the behaviour time series; it only decides what is said.
  *
@@ -128,7 +128,7 @@ class InContextDeliveryGate {
             return findings;
         }
         log.info(
-            "Loudness tier withheld {} of {} finding(s) from the artifact: jobId={}",
+            "Autonomy tier withheld {} of {} finding(s) from the artifact: jobId={}",
             withheld.size(),
             findings.size(),
             job.getId()

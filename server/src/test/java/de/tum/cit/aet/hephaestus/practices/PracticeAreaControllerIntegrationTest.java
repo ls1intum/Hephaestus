@@ -588,7 +588,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "decides")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OBSERVE))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -597,36 +597,46 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
             assertThat(result.reviewTier().inherited()).isFalse();
-            assertThat(storedTierOf("decides")).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(storedTierOf("decides")).isEqualTo(PracticeReviewTier.PROPOSE);
         }
 
         /**
-         * PROPOSE is in the vocabulary and admitted by the DB CHECK, but the queue that would let a human
-         * act on a prepared unit does not exist. An area parked there would prepare feedback for every
-         * practice under it that nobody can approve, and swallow all of it.
+         * PROPOSE is the middle rung and an administrator may move an area onto it. It was once refused
+         * here, on the grounds that it would prepare feedback nobody could approve; the ladder it sat in
+         * also carried OBSERVE, so refusing it still left two usable rungs. With OBSERVE gone, a refused
+         * PROPOSE would leave OFF and DELIVER — an on/off switch, which is the defect the tier chain was
+         * built to remove. So the refusal is gone, and this pins that it stays gone: nothing is swallowed,
+         * because a withheld finding is still recorded and still shows on the artifact's trace.
          */
         @Test
         @WithAdminUser
-        @DisplayName("refuses PROPOSE with 400 and leaves the area's tier untouched")
-        void shouldRefuseProposeTier() {
+        @DisplayName("accepts PROPOSE, the middle rung, and stores it as the area's own tier")
+        void shouldAcceptProposeTier() {
             ensureAdminMembership(workspace);
-            persistAreaAt("not-selectable", PracticeReviewTier.OFF);
+            persistAreaAt("middle-rung", PracticeReviewTier.OFF);
 
-            webTestClient
+            PracticeAreaDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "not-selectable")
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "middle-rung")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
                 .exchange()
                 .expectStatus()
-                .isBadRequest();
+                .isOk()
+                .expectBody(PracticeAreaDTO.class)
+                .returnResult()
+                .getResponseBody();
 
-            assertThat(storedTierOf("not-selectable")).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
+            assertThat(storedTierOf("middle-rung")).isEqualTo(PracticeReviewTier.PROPOSE);
         }
 
         @Test
@@ -634,7 +644,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         @DisplayName("an explicit null clears the area's tier back to inheriting the workspace's")
         void shouldClearToInheritOnExplicitNull() {
             ensureAdminMembership(workspace);
-            workspaceDefaultsTo(PracticeReviewTier.OBSERVE);
+            workspaceDefaultsTo(PracticeReviewTier.PROPOSE);
             persistAreaAt("clear-me", PracticeReviewTier.OFF);
 
             PracticeAreaDTO result = webTestClient
@@ -652,7 +662,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
             assertThat(result).isNotNull();
             assertThat(result.reviewTier().override()).isNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
             assertThat(result.reviewTier().inherited()).isTrue();
             assertThat(storedTierOf("clear-me")).isNull();
@@ -701,7 +711,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         @DisplayName("re-sending the tier already in force records nothing in the audit ledger")
         void shouldBeIdempotentAndNotAudited() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistAreaAt("unchanged", PracticeReviewTier.OBSERVE);
+            PracticeArea area = persistAreaAt("unchanged", PracticeReviewTier.PROPOSE);
             long auditedBefore = auditedChangesTo(area);
 
             PracticeAreaDTO result = webTestClient
@@ -709,7 +719,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "unchanged")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OBSERVE))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -718,9 +728,9 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OBSERVE);
-            assertThat(storedTierOf("unchanged")).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(storedTierOf("unchanged")).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(auditedChangesTo(area)).isEqualTo(auditedBefore);
         }
 
@@ -730,7 +740,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         @DisplayName("a real change IS recorded in the audit ledger")
         void shouldAuditARealChange() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistAreaAt("changes", PracticeReviewTier.OBSERVE);
+            PracticeArea area = persistAreaAt("changes", PracticeReviewTier.PROPOSE);
             long auditedBefore = auditedChangesTo(area);
 
             webTestClient

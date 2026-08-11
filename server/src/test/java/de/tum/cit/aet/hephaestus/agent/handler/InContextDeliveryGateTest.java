@@ -75,12 +75,12 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         verifyNoInteractions(feedbackLedgerRecorder);
     }
 
-    /** Every tier below {@code DELIVER} withholds: {@code OBSERVE} says nothing, {@code PROPOSE} waits. */
+    /** Every tier below {@code DELIVER} withholds; {@code PROPOSE} is measured and says nothing. */
     @Test
-    void observingAndProposingPracticesAreWithheldFromTheArtifact() {
+    void proposingPracticesAreWithheldFromTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(
-                practice("measured", PracticeReviewTier.OBSERVE),
+                practice("measured", PracticeReviewTier.PROPOSE),
                 practice("proposed", PracticeReviewTier.PROPOSE),
                 practice("loud", PracticeReviewTier.DELIVER)
             )
@@ -107,7 +107,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void anUnknownPracticeSlugIsKept() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("known", PracticeReviewTier.OBSERVE))
+            List.of(practice("known", PracticeReviewTier.PROPOSE))
         );
         ValidatedFinding stranger = finding("not-in-the-catalogue", "occ-9");
 
@@ -118,7 +118,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aWithheldFindingThatWasNeverPersistedGetsNoLedgerRow() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.OBSERVE))
+            List.of(practice("measured", PracticeReviewTier.PROPOSE))
         );
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(List.of());
 
@@ -130,7 +130,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aLedgerFailureDoesNotStopTheFindingsThatSurvived() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.OBSERVE), practice("loud", PracticeReviewTier.DELIVER))
+            List.of(practice("measured", PracticeReviewTier.PROPOSE), practice("loud", PracticeReviewTier.DELIVER))
         );
         List<Observation> persisted = List.of(observation("occ-1"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
@@ -168,7 +168,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aTierWithheldFindingIsRecordedUnderTheTierNotTheProvenance() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.OBSERVE))
+            List.of(practice("measured", PracticeReviewTier.PROPOSE))
         );
         // Built BEFORE the stubbing call: see observingAndProposingPracticesAreWithheldFromTheArtifact.
         List<Observation> persisted = List.of(observation("occ-1"));

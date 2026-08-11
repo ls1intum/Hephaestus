@@ -7,8 +7,6 @@ import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 @DisplayName("Autonomy tiers")
 class PracticeReviewTierTest extends BaseUnitTest {
@@ -20,7 +18,6 @@ class PracticeReviewTierTest extends BaseUnitTest {
         @Test
         void offIsTheOnlyTierThatStopsAReview() {
             assertThat(PracticeReviewTier.OFF.admitsReview()).isFalse();
-            assertThat(PracticeReviewTier.OBSERVE.admitsReview()).isTrue();
             assertThat(PracticeReviewTier.PROPOSE.admitsReview()).isTrue();
             assertThat(PracticeReviewTier.DELIVER.admitsReview()).isTrue();
         }
@@ -38,7 +35,6 @@ class PracticeReviewTierTest extends BaseUnitTest {
         @Test
         void onlyDeliverActsWithoutAHuman() {
             assertThat(PracticeReviewTier.OFF.deliversWithoutApproval()).isFalse();
-            assertThat(PracticeReviewTier.OBSERVE.deliversWithoutApproval()).isFalse();
             assertThat(PracticeReviewTier.PROPOSE.deliversWithoutApproval()).isFalse();
             assertThat(PracticeReviewTier.DELIVER.deliversWithoutApproval()).isTrue();
         }
@@ -58,7 +54,6 @@ class PracticeReviewTierTest extends BaseUnitTest {
         void eachTierDoesASupersetOfTheOneBelowIt() {
             PracticeReviewTier[] ascending = {
                 PracticeReviewTier.OFF,
-                PracticeReviewTier.OBSERVE,
                 PracticeReviewTier.PROPOSE,
                 PracticeReviewTier.DELIVER,
             };
@@ -78,33 +73,26 @@ class PracticeReviewTierTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("selectability")
-    class Selectability {
+    @DisplayName("the shape of the ladder")
+    class LadderShape {
 
         /**
-         * PROPOSE is declared, admitted by the DB CHECK, and refused at every write boundary until an
-         * approval queue exists. A practice parked there would prepare feedback nobody can approve and
-         * swallow it — worse than the tier not being offered at all.
+         * Three modes, and an administrator may choose any of them. The ladder previously carried a fourth,
+         * OBSERVE, which sat beside PROPOSE at "runs, records, sends nothing"; the two were told apart only
+         * by whether feedback had been prepared, which nothing on the delivery path ever did. A rung nobody
+         * can tell from its neighbour is not a rung, and a rung nobody can select is not a ladder — with
+         * PROPOSE refused, OFF and DELIVER were an on/off switch wearing a ladder's clothes.
          *
-         * <p>This test is the one line to delete when the queue ships.
+         * <p>Pinned by exact value and order, so adding a rung or reordering one is a deliberate edit here
+         * rather than a silent change to what every screen renders.
          */
         @Test
-        void proposeIsTheOnlyTierAnAdministratorMayNotChooseYet() {
-            assertThat(PracticeReviewTier.PROPOSE.selectable()).isFalse();
-            assertThat(PracticeReviewTier.OFF.selectable()).isTrue();
-            assertThat(PracticeReviewTier.OBSERVE.selectable()).isTrue();
-            assertThat(PracticeReviewTier.DELIVER.selectable()).isTrue();
-        }
-
-        /**
-         * Declared but unselectable is a deliberate and temporary state, so it is pinned to exactly one
-         * constant. A second unselectable tier means somebody has started using this as a general escape
-         * hatch for shipping vocabulary ahead of behaviour.
-         */
-        @ParameterizedTest
-        @EnumSource(PracticeReviewTier.class)
-        void nothingElseIsShippedAheadOfItsBehaviour(PracticeReviewTier tier) {
-            assertThat(tier.selectable()).isEqualTo(tier != PracticeReviewTier.PROPOSE);
+        void theLadderIsExactlyOffProposeDeliver() {
+            assertThat(PracticeReviewTier.values()).containsExactly(
+                PracticeReviewTier.OFF,
+                PracticeReviewTier.PROPOSE,
+                PracticeReviewTier.DELIVER
+            );
         }
     }
 

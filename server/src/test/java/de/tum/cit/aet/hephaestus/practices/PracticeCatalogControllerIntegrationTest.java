@@ -1678,7 +1678,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldClearTheOverrideOnNullTier() {
             ensureAdminMembership(workspace);
             PracticeArea area = persistArea("area-with-a-tier");
-            area.setReviewTier(PracticeReviewTier.OBSERVE);
+            area.setReviewTier(PracticeReviewTier.PROPOSE);
             practiceAreaRepository.save(area);
             Practice practice = persistPractice("null-active", "Name", true);
             practice.setArea(area);
@@ -1699,7 +1699,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.reviewTier().override()).isNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
             assertThat(result.reviewTier().inherited()).isTrue();
             assertThat(
@@ -1711,33 +1711,39 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         /**
-         * PROPOSE is in the vocabulary and in the DB CHECK, but the approval queue that would let a human
-         * act on a prepared unit does not exist, so a practice parked there would prepare feedback nobody
-         * can approve and swallow it.
+         * The middle rung is settable on a practice too. PROPOSE was refused at this boundary while the
+         * ladder still carried OBSERVE; with OBSERVE retired it is the only way to turn one practice down
+         * without turning its measurement off, so refusing it would make the tier a boolean again.
          */
         @Test
         @WithAdminUser
-        @DisplayName("returns 400 for a tier that cannot be selected yet")
-        void shouldReturn400ForProposeTier() {
+        @DisplayName("accepts PROPOSE and stores it as the practice's own tier")
+        void shouldAcceptProposeTier() {
             ensureAdminMembership(workspace);
-            persistPractice("not-selectable", "Name", true);
+            persistPractice("middle-rung", "Name", true);
 
-            webTestClient
+            PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "not-selectable")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "middle-rung")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
                 .exchange()
                 .expectStatus()
-                .isBadRequest();
+                .isOk()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
 
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.PRACTICE);
             assertThat(
                 practiceRepository
-                    .findByWorkspaceIdAndSlug(workspace.getId(), "not-selectable")
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "middle-rung")
                     .orElseThrow()
                     .getReviewTier()
-            ).isEqualTo(PracticeReviewTier.DELIVER);
+            ).isEqualTo(PracticeReviewTier.PROPOSE);
         }
 
         @Test

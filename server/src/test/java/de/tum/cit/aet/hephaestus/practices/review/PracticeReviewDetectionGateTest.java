@@ -799,18 +799,18 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     /**
-     * The autonomy tier's admission half. OFF is the only tier that stops a review; OBSERVE and PROPOSE are
-     * as reviewed as DELIVER and differ only in what may be said about the result, so their signals must
-     * reach the agent exactly like DELIVER's do.
+     * The autonomy tier's admission half. OFF is the only tier that stops a review; PROPOSE is as reviewed
+     * as DELIVER and differs only in what may be said about the result, so its signals must reach the agent
+     * exactly like DELIVER's do.
      */
     @Nested
     class ReviewTierAdmissionTests {
 
         @Test
-        void detectsWhenTheOnlyBoundPracticeIsObservingSilently() {
+        void detectsWhenTheOnlyBoundPracticeIsProposingSilently() {
             PullRequest pr = createPullRequest();
             Practice measured = createPractice(SIGNAL);
-            measured.setReviewTier(PracticeReviewTier.OBSERVE);
+            measured.setReviewTier(PracticeReviewTier.PROPOSE);
             Workspace workspace = setupThroughPracticeMatching(pr, measured);
             workspace.getReviewSettings().setRunForAllUsers(true);
 
@@ -818,20 +818,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             assertThat(((GateDecision.Detect) decision).matchedPractices()).containsExactly(measured);
-        }
-
-        @Test
-        @DisplayName("a practice waiting on an approver is still reviewed")
-        void detectsWhenTheOnlyBoundPracticeProposes() {
-            PullRequest pr = createPullRequest();
-            Practice proposing = createPractice(SIGNAL);
-            proposing.setReviewTier(PracticeReviewTier.PROPOSE);
-            Workspace workspace = setupThroughPracticeMatching(pr, proposing);
-            workspace.getReviewSettings().setRunForAllUsers(true);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
         }
 
         @Test

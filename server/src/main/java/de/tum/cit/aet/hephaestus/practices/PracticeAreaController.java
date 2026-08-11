@@ -168,8 +168,8 @@ public class PracticeAreaController {
     @Operation(
         summary = "Set how much autonomy the system has over one area",
         description = "Applies to every practice in the area that holds no tier of its own; practices that " +
-            "set their own are left alone. OFF stops their reviews entirely. OBSERVE runs them and records " +
-            "every observation without telling anyone. DELIVER sends feedback without asking. Send a null " +
+            "set their own are left alone. OFF stops their reviews entirely. PROPOSE runs them and records " +
+            "every observation, and sends nothing. DELIVER sends feedback without asking. Send a null " +
             "tier to clear the area's own setting so it follows the workspace default."
     )
     @ApiResponse(

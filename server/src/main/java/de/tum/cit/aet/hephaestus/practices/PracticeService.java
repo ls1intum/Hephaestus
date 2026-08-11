@@ -49,24 +49,6 @@ public class PracticeService {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     /**
-     * Refuses a tier an administrator may not select yet.
-     *
-     * <p>{@code PROPOSE} is in the vocabulary and in the DB CHECK so the ladder reads whole and so the value
-     * is already representable, but the approval queue that would let a human act on a prepared unit does
-     * not exist. A practice parked there would prepare feedback nobody can approve and swallow it, which is
-     * strictly worse than the tier not being offered — so the refusal names the missing thing rather than
-     * calling the value invalid.
-     */
-    private static void requireSelectable(@Nullable PracticeReviewTier tier) {
-        if (tier != null && !tier.selectable()) {
-            throw new IllegalArgumentException(
-                "Propose is not available yet: feedback would be prepared with no way for anyone to approve " +
-                    "it. Use Observe to keep measuring in silence, or Deliver to send feedback without approval."
-            );
-        }
-    }
-
-    /**
      * The workspace catalogue, optionally narrowed to one tier.
      *
      * <p>The filter is on the <em>effective</em> tier, which is the only tier an administrator can see on
@@ -91,7 +73,7 @@ public class PracticeService {
     /**
      * Every practice this workspace actually reviews, at any effective tier above {@code OFF}.
      *
-     * <p>Includes {@code OBSERVE}: that tier promises the developer no <em>feedback</em>, not concealment,
+     * <p>Includes {@code PROPOSE}: that tier promises the developer no <em>feedback</em>, not concealment,
      * so the learner-facing catalogue lists what is observed while the tier governs what is said.
      */
     @Transactional(readOnly = true)
@@ -401,7 +383,6 @@ public class PracticeService {
         if (before == reviewTier) {
             return practice;
         }
-        requireSelectable(reviewTier);
         // Every tier above OFF starts a review, so every tier above OFF needs a policy that can run one.
         // Asked of the tier that would be IN FORCE, not of the one being written: "inherit" is a request
         // for whatever the area says, and if that admits a review the practice still cannot run it.

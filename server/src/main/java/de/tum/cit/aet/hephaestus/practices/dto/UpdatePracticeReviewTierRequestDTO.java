@@ -15,11 +15,10 @@ import org.jspecify.annotations.Nullable;
 public record UpdatePracticeReviewTierRequestDTO(
     @Nullable
     @Schema(
-        description = "OFF = not reviewed at all · OBSERVE = the review runs and every observation is " +
-            "recorded, and nobody is told · DELIVER = feedback is delivered without asking. Send null (or " +
+        description = "OFF = not reviewed at all · PROPOSE = the review runs and every observation is " +
+            "recorded, and nothing is sent · DELIVER = feedback is delivered without asking. Send null (or " +
             "omit the field) to hold no tier here and inherit — a practice inherits its area's, an area " +
-            "inherits the workspace default. PROPOSE is declared but not selectable yet: it would prepare " +
-            "feedback with no way for anyone to approve it."
+            "inherits the workspace default."
     )
     PracticeReviewTier reviewTier
 ) {}

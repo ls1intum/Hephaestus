@@ -10,7 +10,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * the system — may it speak on the work, or only in the mentor conversation — and one statement is enough.
  *
  * <p>Reach is ANDed with {@link de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier}, which answers
- * the orthogonal question of how much autonomy the system has. A practice at {@code OBSERVE} says nothing
+ * the orthogonal question of how much autonomy the system has. A practice at {@code PROPOSE} says nothing
  * anywhere no matter how wide the reach; a workspace at {@link #CONVERSATION} never comments on the work no
  * matter how many practices sit at {@code DELIVER}.
  *

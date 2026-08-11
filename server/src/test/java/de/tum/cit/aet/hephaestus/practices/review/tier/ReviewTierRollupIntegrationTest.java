@@ -137,7 +137,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @BeforeEach
         void seedCatalogue() {
             ensureAdminMembership(workspace);
-            workspaceDefaultsTo(PracticeReviewTier.OBSERVE, FeedbackReach.CONVERSATION);
+            workspaceDefaultsTo(PracticeReviewTier.PROPOSE, FeedbackReach.CONVERSATION);
 
             PracticeArea alpha = persistArea("alpha", 0, PracticeReviewTier.OFF);
             persistPractice("alpha-inherits", alpha, null);
@@ -155,8 +155,9 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         /**
          * The client renders a fixed set of chips. If a tier vanished from the map whenever nothing sat at
-         * it, the row's columns would move as practices are reconfigured — and {@code PROPOSE}, which
-         * nothing can be set to today, would never appear at all.
+         * it, the row's columns would move as practices are reconfigured. The map's keys are the ladder
+         * itself, so a tier added or retired shows up here rather than as a chip that quietly stops being
+         * rendered.
          */
         @Test
         @WithAdminUser
@@ -165,7 +166,9 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             ReviewTierRollupDTO rollup = fetchRollup();
 
             assertThat(rollup.counts()).containsOnlyKeys(PracticeReviewTier.values());
-            assertThat(rollup.counts()).containsEntry(PracticeReviewTier.PROPOSE, 0);
+            // The retired OBSERVE key must not survive anywhere in the payload the client gap-fills from.
+            assertThat(rollup.counts().keySet().stream().map(Enum::name)).doesNotContain("OBSERVE");
+            assertThat(rollup.counts()).containsEntry(PracticeReviewTier.OFF, 1);
             assertThat(rollup.areas())
                 .isNotEmpty()
                 .allSatisfy(area -> assertThat(area.counts()).containsOnlyKeys(PracticeReviewTier.values()));
@@ -191,8 +194,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             assertThat(rollup.counts()).containsOnly(
                 entry(PracticeReviewTier.OFF, 1), // alpha-inherits, from its area
-                entry(PracticeReviewTier.OBSERVE, 2), // beta-inherits and unfiled, from the workspace
-                entry(PracticeReviewTier.PROPOSE, 0),
+                entry(PracticeReviewTier.PROPOSE, 2), // beta-inherits and unfiled, from the workspace
                 entry(PracticeReviewTier.DELIVER, 1) // alpha-decides, from itself
             );
             assertThat(rollup.counts().values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(4);
@@ -207,11 +209,10 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             assertThat(areaNamed(rollup, "alpha").counts()).containsOnly(
                 entry(PracticeReviewTier.OFF, 1),
-                entry(PracticeReviewTier.OBSERVE, 0),
                 entry(PracticeReviewTier.PROPOSE, 0),
                 entry(PracticeReviewTier.DELIVER, 1)
             );
-            assertThat(areaNamed(rollup, "beta").counts()).containsEntry(PracticeReviewTier.OBSERVE, 1);
+            assertThat(areaNamed(rollup, "beta").counts()).containsEntry(PracticeReviewTier.PROPOSE, 1);
         }
 
         /**
@@ -241,7 +242,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             AreaReviewTierRollupDTO gamma = areaNamed(rollup, "gamma");
             assertThat(gamma.counts().values()).containsOnly(0);
-            assertThat(gamma.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(gamma.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(gamma.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
         }
 
@@ -269,8 +270,8 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(ungrouped.reviewTier().override()).isNull();
             assertThat(ungrouped.reviewTier().inherited()).isTrue();
             assertThat(ungrouped.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
-            assertThat(ungrouped.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
-            assertThat(ungrouped.counts()).containsEntry(PracticeReviewTier.OBSERVE, 1);
+            assertThat(ungrouped.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(ungrouped.counts()).containsEntry(PracticeReviewTier.PROPOSE, 1);
         }
 
         /** An area that decided reports itself as the decider; one that did not points at the workspace. */
@@ -287,7 +288,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(alpha.reviewTier().inherited()).isFalse();
 
             AreaReviewTierRollupDTO beta = areaNamed(rollup, "beta");
-            assertThat(beta.reviewTier().effective()).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(beta.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(beta.reviewTier().override()).isNull();
             assertThat(beta.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
             assertThat(beta.reviewTier().inherited()).isTrue();

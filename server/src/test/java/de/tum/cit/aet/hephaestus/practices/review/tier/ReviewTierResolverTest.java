@@ -40,17 +40,17 @@ class ReviewTierResolverTest extends BaseUnitTest {
         void aPracticeThatDecidedNothingTakesItsAreasAnswer() {
             EffectiveReviewTier resolved = ReviewTierResolver.resolvePractice(
                 null,
-                PracticeReviewTier.OBSERVE,
+                PracticeReviewTier.PROPOSE,
                 PracticeReviewTier.DELIVER
             );
-            assertThat(resolved.tier()).isEqualTo(PracticeReviewTier.OBSERVE);
+            assertThat(resolved.tier()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(resolved.source()).isEqualTo(ReviewTierSource.AREA);
         }
 
         @Test
         void whenNeitherDecidedTheWorkspaceAnswers() {
-            EffectiveReviewTier resolved = ReviewTierResolver.resolvePractice(null, null, PracticeReviewTier.OBSERVE);
-            assertThat(resolved.tier()).isEqualTo(PracticeReviewTier.OBSERVE);
+            EffectiveReviewTier resolved = ReviewTierResolver.resolvePractice(null, null, PracticeReviewTier.PROPOSE);
+            assertThat(resolved.tier()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(resolved.source()).isEqualTo(ReviewTierSource.WORKSPACE);
         }
 
@@ -100,8 +100,8 @@ class ReviewTierResolverTest extends BaseUnitTest {
 
         @Test
         void aWorkspaceThatChoseGetsWhatItChose() {
-            assertThat(ReviewTierResolver.workspaceDefault(PracticeReviewTier.OBSERVE)).isEqualTo(
-                PracticeReviewTier.OBSERVE
+            assertThat(ReviewTierResolver.workspaceDefault(PracticeReviewTier.PROPOSE)).isEqualTo(
+                PracticeReviewTier.PROPOSE
             );
         }
 
@@ -147,8 +147,8 @@ class ReviewTierResolverTest extends BaseUnitTest {
             PracticeArea area = new PracticeArea();
             area.setReviewTier(null);
 
-            EffectiveReviewTier resolved = ReviewTierResolver.resolveArea(area, PracticeReviewTier.OBSERVE);
-            assertThat(resolved.tier()).isEqualTo(PracticeReviewTier.OBSERVE);
+            EffectiveReviewTier resolved = ReviewTierResolver.resolveArea(area, PracticeReviewTier.PROPOSE);
+            assertThat(resolved.tier()).isEqualTo(PracticeReviewTier.PROPOSE);
             assertThat(resolved.source()).isEqualTo(ReviewTierSource.WORKSPACE);
         }
 
@@ -160,16 +160,16 @@ class ReviewTierResolverTest extends BaseUnitTest {
         @Test
         void resolvingThroughTheEntityAgreesWithResolvingTheColumns() {
             PracticeArea area = new PracticeArea();
-            area.setReviewTier(PracticeReviewTier.OBSERVE);
+            area.setReviewTier(PracticeReviewTier.PROPOSE);
             Practice practice = new Practice();
             practice.setReviewTier(null);
             practice.setArea(area);
 
             assertThat(ReviewTierResolver.resolvePractice(practice, PracticeReviewTier.DELIVER)).isEqualTo(
-                ReviewTierResolver.resolvePractice(null, PracticeReviewTier.OBSERVE, PracticeReviewTier.DELIVER)
+                ReviewTierResolver.resolvePractice(null, PracticeReviewTier.PROPOSE, PracticeReviewTier.DELIVER)
             );
             assertThat(ReviewTierResolver.effectiveTierOf(practice, PracticeReviewTier.DELIVER)).isEqualTo(
-                PracticeReviewTier.OBSERVE
+                PracticeReviewTier.PROPOSE
             );
         }
     }

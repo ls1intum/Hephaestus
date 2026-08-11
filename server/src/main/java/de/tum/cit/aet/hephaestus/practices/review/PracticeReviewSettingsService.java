@@ -44,7 +44,6 @@ public class PracticeReviewSettingsService {
         settings.reset(req.reset());
         settings.applyPatch(req.runForAllUsers(), req.deliverToMerged(), req.cooldownMinutes());
         settings.applyScope(req.reviewScope());
-        requireSelectable(req.defaultReviewTier());
         settings.applyDefaultReviewTier(req.defaultReviewTier() == null ? null : req.defaultReviewTier().name());
         settings.applyFeedbackReach(req.feedbackReach() == null ? null : req.feedbackReach().name());
         configAudit.record(
@@ -57,22 +56,6 @@ public class PracticeReviewSettingsService {
             )
         );
         return toView(workspaceRepository.save(workspace));
-    }
-
-    /**
-     * Refuses a tier an administrator may not select yet.
-     *
-     * <p>Enforced at all three levels — practice, area and here — because a workspace default that could be
-     * PROPOSE would silently park every inheriting practice on it, which is the largest-blast-radius version
-     * of preparing feedback nobody can approve.
-     */
-    private static void requireSelectable(@Nullable PracticeReviewTier tier) {
-        if (tier != null && !tier.selectable()) {
-            throw new IllegalArgumentException(
-                "Propose is not available yet: feedback would be prepared with no way for anyone to approve " +
-                    "it. Use Observe to keep measuring in silence, or Deliver to send feedback without approval."
-            );
-        }
     }
 
     private Workspace requireWorkspace(WorkspaceContext workspaceContext) {

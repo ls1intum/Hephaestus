@@ -90,7 +90,7 @@ public class PracticeCatalogContentSource implements ContentSource {
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // Only the practices this workspace may actually raise in a conversation. An OBSERVE practice is
+        // Only the practices this workspace may actually raise in a conversation. A PROPOSE practice is
         // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
         // subject it is not allowed to raise; an OFF practice is not reviewed at all; and a workspace whose
         // reach excludes the conversation has no conversational catalogue at all. Tier is the effective one,

@@ -8,21 +8,27 @@ package de.tum.cit.aet.hephaestus.practices.model;
  *
  * <table>
  *   <caption>Autonomy tiers</caption>
- *   <tr><th>Tier</th><th>Review runs</th><th>Observation recorded</th><th>Feedback prepared</th><th>Feedback delivered</th></tr>
- *   <tr><td>{@link #OFF}</td>     <td>no</td>  <td>no</td>  <td>no</td>  <td>no</td></tr>
- *   <tr><td>{@link #OBSERVE}</td> <td>yes</td> <td>yes</td> <td>no</td>  <td>no</td></tr>
- *   <tr><td>{@link #PROPOSE}</td> <td>yes</td> <td>yes</td> <td>yes</td> <td>only once a human approves</td></tr>
- *   <tr><td>{@link #DELIVER}</td> <td>yes</td> <td>yes</td> <td>yes</td> <td>yes, without asking</td></tr>
+ *   <tr><th>Tier</th><th>Review runs</th><th>Observation recorded</th><th>Feedback delivered</th></tr>
+ *   <tr><td>{@link #OFF}</td>     <td>no</td>  <td>no</td>  <td>no</td></tr>
+ *   <tr><td>{@link #PROPOSE}</td> <td>yes</td> <td>yes</td> <td>no — held back</td></tr>
+ *   <tr><td>{@link #DELIVER}</td> <td>yes</td> <td>yes</td> <td>yes, without asking</td></tr>
  * </table>
+ *
+ * <p><b>Three modes, not four.</b> The axis is how much Hephaestus does without you, and a rung an
+ * administrator cannot tell apart from its neighbour is not a rung. An earlier ladder split the middle into
+ * <em>observe</em> (runs, records, prepares nothing) and <em>propose</em> (runs, records, prepares feedback
+ * for approval); both sent nothing, and the difference between them was invisible on every screen that
+ * showed them. That is the same fault that made the ladder before it — <em>coach</em> against
+ * <em>engage</em> — unpickable. One middle rung, {@link #PROPOSE}, carries the whole of "runs, records,
+ * says nothing".
  *
  * <p><b>Autonomy, not reach.</b> This axis says how far the system may act on its own. <em>Where</em> the
  * feedback may go — the mentor conversation only, or also on the work itself — is a separate, workspace-level
  * decision carried by {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach}. The two were once
- * one ladder, which did not order: a mentor chat is not obviously quieter or louder than one review comment,
- * so the boundary between the two middle tiers was unpickable. Autonomy does order, and it is the adoption
- * ladder a team actually walks.
+ * one ladder, which did not order: a mentor chat is not obviously quieter or louder than one review comment.
+ * Autonomy does order, and it is the adoption ladder a team actually walks.
  *
- * <p>{@link #OBSERVE} is the tier that separates measurement from intervention: the review runs and every
+ * <p>{@link #PROPOSE} is the tier that separates measurement from intervention: the review runs and every
  * observation is recorded, so the behaviour series stays unbroken, and nobody is told anything. Silencing a
  * practice by dropping it from new reviews instead puts a hole in that series. Semgrep (<em>Monitor /
  * Comment / Block</em>), Kyverno (<em>Audit / Enforce</em>) and ESLint (<em>off / warn / error</em>) all draw
@@ -37,20 +43,20 @@ public enum PracticeReviewTier {
     OFF,
 
     /**
-     * Reviewed, recorded, silent — the only way to turn a practice down without turning its measurement
-     * off. No feedback unit is delivered on any channel.
-     */
-    OBSERVE,
-
-    /**
-     * Reviewed, recorded, and feedback prepared for a human to approve before anything is said.
+     * Reviewed and recorded, and nothing is sent — the only way to turn a practice down without turning its
+     * measurement off. No feedback unit is delivered on any channel.
      *
-     * <p><b>Declared and not yet selectable.</b> The approval queue that would let a human act on a prepared
-     * unit does not exist yet, so a practice parked here would prepare feedback nobody can approve and
-     * swallow it — strictly worse than not offering the tier. The constant is declared, admitted by the DB
-     * CHECK, and refused at every write boundary by {@link #selectable()} until the queue ships. It is
-     * declared now so the ladder a workspace reads is the whole ladder, and so the value it will hold is
-     * already representable when the queue lands.
+     * <p>What is withheld here is not lost. Every finding a review produces at this tier is persisted as an
+     * observation and gets a {@code SUPPRESSED} feedback row stamped
+     * {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason#PRACTICE_TIER_QUIET}, so
+     * the artifact's trace shows the practice as reviewed with measurements taken, nothing delivered, and
+     * the tier named as the reason. "Held, waiting for a person to decide" is a recorded outcome; vanished
+     * is not.
+     *
+     * <p>The name looks forward to an approval queue that does not exist yet. Until it does, a held unit is
+     * released by raising the practice — nobody approves an individual finding, and no surface claims
+     * otherwise. Delivery after approval will be a different act, recorded differently; see
+     * {@link #deliversWithoutApproval()}.
      */
     PROPOSE,
 
@@ -86,15 +92,5 @@ public enum PracticeReviewTier {
      */
     public boolean deliversWithoutApproval() {
         return this == DELIVER;
-    }
-
-    /**
-     * Whether an administrator may set a practice, area or workspace to this tier today.
-     *
-     * <p>Asked at every write boundary rather than by an open-coded {@code != PROPOSE}, so the day the
-     * approval queue ships there is exactly one line to delete.
-     */
-    public boolean selectable() {
-        return this != PROPOSE;
     }
 }

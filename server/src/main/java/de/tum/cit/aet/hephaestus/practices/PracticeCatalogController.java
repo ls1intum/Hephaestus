@@ -239,8 +239,8 @@ public class PracticeCatalogController {
     @PatchMapping("/{practiceSlug}/review-tier")
     @Operation(
         summary = "Set how much autonomy the system has over one practice",
-        description = "OFF stops the review entirely. OBSERVE runs it and records every observation without " +
-            "telling anyone. DELIVER sends feedback without asking, as far as this workspace's reach " +
+        description = "OFF stops the review entirely. PROPOSE runs it and records every observation and " +
+            "sends nothing. DELIVER sends feedback without asking, as far as this workspace's reach " +
             "allows. Send a null tier to clear the practice's own setting so it follows its area, and " +
             "through the area the workspace default."
     )

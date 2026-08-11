@@ -36,7 +36,7 @@ public enum FeedbackSuppressionReason {
     /** The instance-wide silent-mode brake was engaged, so nothing was posted anywhere. */
     INSTANCE_SILENCED,
     /**
-     * The practice's loudness tier does not admit this channel, so the finding was measured and recorded
+     * The practice's autonomy tier does not admit this channel, so the finding was measured and recorded
      * but never said out loud. Written rather than dropped so "we saw it and chose to stay quiet" reads
      * differently from "we missed it" in every downstream evaluation.
      */

@@ -152,7 +152,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             Practice loud = createPractice("loud", "Loud");
             loud.setReviewTier(PracticeReviewTier.DELIVER);
             Practice observed = createPractice("observed", "Observed");
-            observed.setReviewTier(PracticeReviewTier.OBSERVE);
+            observed.setReviewTier(PracticeReviewTier.PROPOSE);
             Practice silent = createPractice("silent", "Silent");
             silent.setReviewTier(PracticeReviewTier.OFF);
             // Holds no tier of its own: the row the deleted <> 'OFF' predicate silently dropped.
@@ -198,7 +198,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             PracticeArea silencedArea = persistArea("silenced-area", PracticeReviewTier.OFF, 0);
             PracticeArea undecidedArea = persistArea("undecided-area", null, 1);
             Practice ownTier = createPractice("own-tier", "Own tier");
-            ownTier.setReviewTier(PracticeReviewTier.OBSERVE);
+            ownTier.setReviewTier(PracticeReviewTier.PROPOSE);
             ownTier.setArea(silencedArea);
             Practice fromArea = createPractice("from-area", "From area");
             fromArea.setArea(silencedArea);
@@ -218,7 +218,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
                 )
                 .containsExactlyInAnyOrder(
                     tuple(
-                        PracticeReviewTier.OBSERVE,
+                        PracticeReviewTier.PROPOSE,
                         PracticeReviewTier.OFF,
                         silencedArea.getId(),
                         ArtifactKinds.PULL_REQUEST
