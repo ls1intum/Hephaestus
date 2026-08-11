@@ -89,7 +89,13 @@ export function ReviewTierLadder({
 								"flex min-w-0 flex-1 cursor-pointer items-start gap-2 border border-input bg-background p-2 font-normal transition-colors",
 								"first:rounded-t-md last:rounded-b-md sm:first:rounded-l-md sm:first:rounded-r-none sm:last:rounded-r-md sm:last:rounded-l-none",
 								"not-first:-mt-px sm:not-first:mt-0 sm:not-first:-ml-px",
-								full ? "sm:rounded-md sm:not-first:ml-0 sm:flex-col sm:gap-1.5" : "items-center",
+								// `flex-col` at every width, not from `sm` up. Scoped to `sm:` it left the rung a
+								// row below 640px, where the description — untruncatable, and the longer of the
+								// two — took the space and squeezed the label's `truncate` down to a single
+								// glyph: at 320px the three rungs of the primary control on this screen read
+								// "O…", "P…", "D…". The `aria-label` carried the real word, so every test and
+								// the axe gate passed while the visible control was unreadable.
+								full ? "flex-col gap-1.5 sm:rounded-md sm:not-first:ml-0" : "items-center",
 								selected && "z-10 border-primary bg-primary/5",
 								// Everything at or below the chosen rung is included in it. Tinting the run rather
 								// than only the endpoint is what makes "each adds to the previous" visible without a
@@ -114,7 +120,10 @@ export function ReviewTierLadder({
 								</span>
 							</span>
 							{full && (
-								<span className="text-muted-foreground text-xs" aria-hidden="true">
+								// Indented to the label's left edge, not the rung's: the radio is `size-4` and the
+								// gap is `2`, so the word above starts 1.5rem in. Without this the sentence hangs
+								// a quarter-inch left of the term it explains.
+								<span className="ps-6 text-muted-foreground text-xs" aria-hidden="true">
 									{REVIEW_TIER_ADDS[tier]}
 								</span>
 							)}
@@ -138,9 +147,12 @@ export function ReviewTierLadder({
 function CumulativeRail({ selectedIndex }: { selectedIndex: number }) {
 	const filled = selectedIndex <= 0 ? 0 : (selectedIndex / (REVIEW_TIER_ORDER.length - 1)) * 100;
 	return (
-		<div aria-hidden="true" className="mt-2 hidden h-1 rounded-full bg-muted sm:block">
+		// Thin and tinted rather than 4px of solid `primary`. At Deliver the fill is 100%, so the rail
+		// became a full-width near-black slab under the widest control on the screen — the loudest thing
+		// on the page, for the one element here that carries no information the rungs do not already.
+		<div aria-hidden="true" className="mt-2 hidden h-0.5 rounded-full bg-muted sm:block">
 			<div
-				className="h-full rounded-full bg-primary transition-all"
+				className="h-full rounded-full bg-primary/60 transition-all"
 				style={{ width: `${filled}%` }}
 			/>
 		</div>
