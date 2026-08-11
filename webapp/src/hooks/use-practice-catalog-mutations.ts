@@ -283,7 +283,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
-	// No tier mutation here. The catalogue reads the tier out and links to Review autonomy, which is
+	// No tier mutation here. The catalogue reads the tier out and links to Review → How much, which is
 	// the one writer of the field — two editors over one endpoint is how an admin undid the workspace
 	// answer they had just set. This hook also held the only client-side construction of a
 	// `ReviewTierAssignment` anywhere in the app, which could only ever guess at a chain the server

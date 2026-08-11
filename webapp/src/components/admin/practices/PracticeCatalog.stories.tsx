@@ -410,14 +410,6 @@ export const AutonomyTiers: Story = {
 	},
 };
 
-/**
- * The tier is not editable here, and the row says where it is.
- *
- * <p>This screen used to write the tier through a hook of its own. The control bound the *effective*
- * value with nothing beside it naming the source, so picking a tier pinned a practice-level override
- * and silently undid the workspace answer an admin had just set — without the word "inherited" ever
- * appearing. One field, one writer.
- */
 export const TierIsReadOnlyHere: Story = {
 	args: {
 		areas: mockAreas,

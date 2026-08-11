@@ -69,16 +69,26 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 
 /**
  * The same vocabulary answers "why did this occurrence go nowhere" and "why was my request refused",
- * so one fix table serves both. The alias is checked rather than assumed: the two unions are
- * generated separately, and a reason added to only one of them should fail the typecheck here rather
- * than silently lose its link on one of the two surfaces.
+ * so one fix table serves both.
+ *
+ * <p>The two unions are generated separately, and their agreement is asserted rather than assumed —
+ * a reason added to only one of them fails the typecheck on the two lines below, naming the pair
+ * that diverged, instead of quietly losing its link on one of the two surfaces.
  */
-export type RefusalReason =
-	NonNullable<ReviewRequestOutcome["reason"]> extends SignalStateReason
-		? SignalStateReason extends NonNullable<ReviewRequestOutcome["reason"]>
-			? SignalStateReason
-			: never
-		: never;
+type RequestRefusalReason = NonNullable<ReviewRequestOutcome["reason"]>;
+
+/** Resolves to `true` only while the two unions are mutually assignable. */
+type Agree<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/**
+ * The assertion itself. `false` does not satisfy `extends true`, so divergence is a compile error on
+ * this line rather than a silent collapse somewhere downstream.
+ */
+export type ReasonVocabulariesAgree<
+	T extends true = Agree<RequestRefusalReason, SignalStateReason>,
+> = T;
+
+export type RefusalReason = SignalStateReason;
 
 /**
  * Names the destination on its own. A link is read out of its sentence — by a screen reader listing
@@ -116,17 +126,24 @@ export type RefusalFix = RefusalFixLabel &
  * settings page that cannot affect what they just read is worse than sending them nowhere, because
  * they will change something to make it stop.
  *
- * <p>`SUBJECT_UNLINKED` is the near miss: it is fixable, but only by the author, on their own account
- * page — and the reader of a trace is usually not the author, so there is no one destination to
- * offer. `COOLDOWN_ACTIVE` is the other: the interval is configurable, but an active cooldown is the
- * setting working, not a fault, and a link there invites an admin to widen a limit to fix a non-fault.
+ * <p>Three near misses, each with a destination that looks right and is not:
+ *
+ * <p>`SUBJECT_UNLINKED` is fixable, but only by the author, on their own account page — and the
+ * reader of a trace is usually not the author, so there is no one destination to offer.
+ *
+ * <p>`COOLDOWN_ACTIVE` has a configurable interval, but an active cooldown is the setting working
+ * rather than a fault, and a link there invites an admin to widen a limit to fix a non-fault.
+ *
+ * <p>`WORKSPACE_INACTIVE` is lifted by reactivating the workspace, which the webapp has no control
+ * for at all: nothing outside the generated client calls the status endpoint, and the workspace
+ * settings page offers feature toggles and a delete button. Linking there would land an admin on a
+ * screen whose only lifecycle action is destroying the thing they came to restore.
  */
 export const REFUSAL_FIXES: Partial<Record<SignalStateReason, RefusalFix>> = {
 	GATE_SKIPPED: { section: "when-and-where", label: "Open Review: When and where" },
 	OUT_OF_REVIEW_SCOPE: { section: "when-and-where", label: "Open Review: When and where" },
 	PRACTICES_DISABLED: { section: "when-and-where", label: "Open Review: When and where" },
 	PRACTICE_TIER_OFF: { section: "how-much", label: "Open Review: How much" },
-	WORKSPACE_INACTIVE: { to: "/w/$workspaceSlug/admin/settings", label: "Open workspace settings" },
 	NO_ACTIVE_PRACTICE: { to: "/w/$workspaceSlug/admin/practices", label: "Open Practice setup" },
 	REVIEW_MODEL_UNBOUND: { to: "/w/$workspaceSlug/admin/models", label: "Set up a review model" },
 	MODEL_UNAVAILABLE: { to: "/w/$workspaceSlug/admin/models", label: "Open AI models" },

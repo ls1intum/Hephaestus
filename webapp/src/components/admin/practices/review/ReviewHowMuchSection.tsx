@@ -27,8 +27,11 @@ export interface ReviewHowMuchSectionProps {
  *
  * <p>Owns its own queries rather than taking them from the route. The three sections of this page are
  * tab panels, and an inactive panel is not rendered, so a section that fetches for itself is a
- * section whose four requests do not fire until somebody opens it. On a workspace with a hundred
- * practices that is the difference between one screen's cost and three.
+ * section whose requests do not fire until somebody opens it. On a workspace with a hundred practices
+ * that is the difference between one screen's cost and three.
+ *
+ * <p>Three of the four here are its own; the model binding is already in flight for the header, which
+ * needs it to say whether this workspace reviews anything, so asking again shares that cache entry.
  */
 export function ReviewHowMuchSection({
 	workspaceSlug,

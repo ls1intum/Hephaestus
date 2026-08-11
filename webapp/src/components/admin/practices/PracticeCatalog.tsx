@@ -45,11 +45,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import {
-	inheritedTierSourceSentence,
-	REVIEW_TIER_LABELS,
-	WORKSPACE_DEFAULT_SOURCE,
-} from "@/lib/review-tiers";
+import { inheritedTierSourceSentence, REVIEW_TIER_LABELS } from "@/lib/review-tiers";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
@@ -123,11 +119,14 @@ export function PracticeCatalog({
 		definitionOptions.workTypes.find((option) => option.artifactKind === practice.artifactKind)
 			?.supportedAutomatedReviewModes ?? [];
 	// Named from the area list this screen already renders, so a row can say "Follows Testing" rather
-	// than the slug the assignment carries. A practice in no area has nothing between it and the
-	// workspace, and one whose area the list does not know yet is in the same position for now.
+	// than the slug the assignment carries. Null when there is no name to give, which the sentence
+	// handles rather than this map: it reads the level off the assignment's own `source`, so a
+	// missing name degrades to "its area" instead of claiming the workspace decided. (The tree below
+	// buckets only by the areas it was given, so a practice in an area this list has not loaded is
+	// not rendered at all — the fallback is a property of the shared sentence, not of this screen.)
 	const areaNames = new Map(areas.map((area) => [area.slug, area.name]));
 	const inheritedFromFor = (practice: Practice) =>
-		(practice.areaSlug && areaNames.get(practice.areaSlug)) || WORKSPACE_DEFAULT_SOURCE;
+		(practice.areaSlug ? areaNames.get(practice.areaSlug) : null) ?? null;
 
 	return (
 		<div className="space-y-4">
@@ -583,8 +582,8 @@ function PracticeRowDetails({
 	practice: Practice;
 	title: ReactNode;
 	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
-	/** The level one step up, named — the practice's area, or the workspace when it has none. */
-	inheritedFrom: string;
+	/** The practice's area by name, or null when this list cannot name it. */
+	inheritedFrom: string | null;
 }) {
 	const unavailableLabel = automatedReviewUnavailableLabel(
 		practice.automatedReviewPolicy,
@@ -625,7 +624,7 @@ function PracticeDragPreview({
 }: {
 	practice: Practice;
 	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
-	inheritedFrom: string;
+	inheritedFrom: string | null;
 }) {
 	return (
 		<Item

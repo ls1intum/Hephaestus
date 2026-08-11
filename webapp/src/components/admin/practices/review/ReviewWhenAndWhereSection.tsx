@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
 	createSweepScheduleMutation,
@@ -93,15 +94,15 @@ export function ReviewWhenAndWhereSection({ workspaceSlug }: ReviewWhenAndWhereS
 	const isLoading = reviewSettingsQuery.isPending || workspaceQuery.isPending;
 	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
+	let settingsForm: ReactNode;
 	if (isLoading) {
-		return (
+		settingsForm = (
 			<div className="flex h-40 items-center justify-center">
 				<Spinner className="size-6" />
 			</div>
 		);
-	}
-	if (error || !reviewSettingsQuery.data || !workspaceQuery.data) {
-		return (
+	} else if (error || !reviewSettingsQuery.data || !workspaceQuery.data) {
+		settingsForm = (
 			<QueryErrorAlert
 				error={error}
 				title="Couldn't load the review settings"
@@ -111,10 +112,8 @@ export function ReviewWhenAndWhereSection({ workspaceSlug }: ReviewWhenAndWhereS
 				}}
 			/>
 		);
-	}
-
-	return (
-		<div className="max-w-3xl space-y-6">
+	} else {
+		settingsForm = (
 			<PracticeReviewSettingsForm
 				workspaceSlug={workspaceSlug}
 				model={{
@@ -143,6 +142,16 @@ export function ReviewWhenAndWhereSection({ workspaceSlug }: ReviewWhenAndWhereS
 						}),
 				}}
 			/>
+		);
+	}
+
+	return (
+		<div className="max-w-3xl space-y-6">
+			{settingsForm}
+			{/* Outside the gate above, and deliberately. The recurring check is a separate resource with
+			    its own request and its own error handling, and it is a standing authorisation to spend —
+			    so a failed review-settings load must not be what stops an admin pausing a runaway one.
+			    It rendered unconditionally on the page it came from; the move must not cost it that. */}
 			<PracticeReviewSweepSchedule
 				schedules={schedulesQuery.data ?? []}
 				isLoading={schedulesQuery.isLoading}

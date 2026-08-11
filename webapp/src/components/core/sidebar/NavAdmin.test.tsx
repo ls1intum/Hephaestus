@@ -61,8 +61,8 @@ describe("NavAdmin", () => {
 		["/w/acme/admin/practices/new", "Practice setup"],
 		["/w/acme/admin/practices/clean-code", "Practice setup"],
 		["/w/acme/admin/practices/review", "Review"],
-		// `review` is a prefix of `reviews`, so a fuzzy match on the shorter path lights both entries
-		// up at once. Both directions are checked, because only one of them is the confusable one.
+		// Both directions, because the two paths differ by one trailing character and a matcher that
+		// compared strings rather than whole segments would light both entries up on either.
 		["/w/acme/admin/practices/reviews", "Practice reviews"],
 		["/w/acme/admin/integrations/scm", "GitHub"],
 	])("marks only the destination for %s as current", async (path, currentLabel) => {

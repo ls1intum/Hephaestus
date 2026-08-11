@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { expect, fn, within } from "storybook/test";
 import { buildAutonomyFixture } from "@/components/admin/practices/review-autonomy/story-mock-data";
 import { expectNoPageOverflow } from "@/test/reflow";

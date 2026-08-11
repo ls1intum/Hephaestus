@@ -14,7 +14,7 @@ practice that stops being reviewed leaves a gap in its own history that later re
 team's behaviour. Nothing a quiet practice held back is lost either — the work's review activity shows
 it as reviewed, with what it saw, nothing delivered, and the setting named as the reason.
 
-A new **Review autonomy** page under Administration → Practices summarises how many practices sit at
+The **How much** section of Review, under Administration → Practices, summarises how many practices sit at
 each setting, per area and overall, so you can see what a workspace is actually doing without opening
 a hundred rows — and change a whole area, or a filtered selection, in one action.
 

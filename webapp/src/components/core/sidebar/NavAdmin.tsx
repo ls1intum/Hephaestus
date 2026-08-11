@@ -67,8 +67,9 @@ export function NavAdmin({
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/reviews", fuzzy: true }),
 	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
-	// `review` is a prefix of `reviews`, and a fuzzy match on the shorter one would light both
-	// entries up on every run page. The catalogue is what is left when neither claimed the route.
+	// The catalogue is what is left when neither of the other two claimed the route, so it needs no
+	// match of its own. `review` and `reviews` do not collide — the router matches whole segments —
+	// but the section landing link is a prefix of all three, so it cannot be the test for any of them.
 	const onCatalog = onSection && !onReview && !onReviews;
 
 	const onIntegrationsScm = Boolean(

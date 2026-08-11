@@ -81,15 +81,21 @@ export const WORKSPACE_DEFAULT_SOURCE = "the workspace default";
  *
  * <p>`inheritedFrom` is what the caller believes sits one level up, and it is deliberately not trusted
  * on its own: a practice in an area that holds no tier inherits the workspace default directly, and
- * naming the area there would send an admin to a level that decided nothing.
+ * naming the area there would send an admin to a level that decided nothing. The assignment's own
+ * `source` decides which level is named; `inheritedFrom` only supplies the name.
+ *
+ * <p>Null `inheritedFrom` means the caller cannot name that level — a practice whose area the
+ * caller's list does not carry, which the two queries behind a catalogue can be for one render after
+ * a write. It degrades to "its area" rather than to the workspace, because "Follows the workspace
+ * default" on a row the server says an *area* decided is not a vaguer answer, it is a wrong one.
  */
 export function inheritedTierSourceSentence(
 	assignment: ReviewTierAssignment,
-	inheritedFrom: string,
+	inheritedFrom: string | null,
 ): string | null {
 	if (!assignment.inherited) return null;
-	const decidedBy = assignment.source === "WORKSPACE" ? WORKSPACE_DEFAULT_SOURCE : inheritedFrom;
-	return `Follows ${decidedBy}`;
+	if (assignment.source === "WORKSPACE") return `Follows ${WORKSPACE_DEFAULT_SOURCE}`;
+	return `Follows ${inheritedFrom ?? "its area"}`;
 }
 
 /** Where a workspace lets feedback go at all. ANDed with every tier, so it can only ever silence. */
