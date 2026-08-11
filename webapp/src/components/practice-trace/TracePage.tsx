@@ -20,12 +20,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ARTIFACT_KIND, artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { REVIEW_TIER_DESCRIPTIONS, REVIEW_TIER_LABELS } from "@/lib/review-tiers";
+import { RefusalFixLink } from "./RefusalFixLink";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import {
 	DISCOVERED_VIA_DESCRIPTIONS,
 	DISCOVERED_VIA_LABELS,
 	deliveryLabel,
 	occurrenceDomId,
+	type RefusalReason,
 	SIGNAL_STATE_LABELS,
 	SIGNAL_STATE_REASON_LABELS,
 	WITHHELD_REASON_LABELS,
@@ -35,6 +37,12 @@ export interface TracePageProps {
 	workspaceSlug: string;
 	artifactKind: string;
 	artifactId: number;
+	/**
+	 * Whether this reader may open workspace administration, which decides whether a refusal is
+	 * allowed to offer its fix. Resolved by the route from the membership the guard already fetched,
+	 * so this page stays a pure render of what it is given.
+	 */
+	canAdminister: boolean;
 }
 
 /**
@@ -51,14 +59,24 @@ const REVIEWABLE_ON_DEMAND: readonly string[] = [ARTIFACT_KIND.pullRequest, ARTI
  * One piece of work and every practice's answer, the quiet ones included. Nothing collapses behind
  * a "show more": a practice that did nothing is precisely what the reader came to find.
  */
-export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePageProps) {
+export function TracePage({
+	workspaceSlug,
+	artifactKind,
+	artifactId,
+	canAdminister,
+}: TracePageProps) {
 	const queryClient = useQueryClient();
 	const query = useQuery({
 		...getArtifactTraceOptions({ path: { workspaceSlug, artifactKind, artifactId } }),
 	});
 	// Kept on the page rather than raised as a toast: a refusal is the answer to the question this
 	// whole page exists to answer, and a toast is gone before the reader has finished reading it.
-	const [refusal, setRefusal] = useState<string | null>(null);
+	// The coded reason rides along with the sentence, because it is what the fix link is keyed on —
+	// the sentence is prose the server owns and must not be matched against.
+	const [refusal, setRefusal] = useState<{
+		description: string;
+		reason?: RefusalReason;
+	} | null>(null);
 	const requestReview = useMutation({
 		...requestPracticeReviewMutation(),
 		onMutate: () => setRefusal(null),
@@ -73,7 +91,10 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 			// Printed exactly as the server phrased it. The sentence lives next to the reason it explains
 			// so that a screen, a bot comment and a support answer cannot come to say different things
 			// about the same refusal; re-wording it here is how that guarantee is lost.
-			setRefusal(outcome.reasonDescription ?? "No review was started.");
+			setRefusal({
+				description: outcome.reasonDescription ?? "No review was started.",
+				reason: outcome.reason,
+			});
 		},
 		onError: (error) =>
 			toast.error("Couldn't ask for a review", {
@@ -179,7 +200,19 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 				{refusal && (
 					<Alert variant="warning">
 						<AlertTitle>No review was started</AlertTitle>
-						<AlertDescription>{refusal}</AlertDescription>
+						<AlertDescription>
+							{/* The server's sentence, unchanged, and then the way out of it. Somebody who has
+							    just pressed a button and been told no is the reader with the most immediate
+							    use for the fix, and until now this alert was the one place that named none. */}
+							<span>{refusal.description}</span>
+							{refusal.reason && (
+								<RefusalFixLink
+									workspaceSlug={workspaceSlug}
+									reason={refusal.reason}
+									canAdminister={canAdminister}
+								/>
+							)}
+						</AlertDescription>
 					</Alert>
 				)}
 			</header>
@@ -233,8 +266,14 @@ export function TracePage({ workspaceSlug, artifactKind, artifactId }: TracePage
 									<span>{SIGNAL_STATE_LABELS[signal.state]}</span>
 								</p>
 								{signal.stateReason && (
-									<p className="mt-1 break-words text-xs text-muted-foreground">
-										{SIGNAL_STATE_REASON_LABELS[signal.stateReason]}.
+									<p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 break-words text-xs text-muted-foreground">
+										<span>{SIGNAL_STATE_REASON_LABELS[signal.stateReason]}.</span>
+										<RefusalFixLink
+											workspaceSlug={workspaceSlug}
+											reason={signal.stateReason}
+											canAdminister={canAdminister}
+											className="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+										/>
 									</p>
 								)}
 							</li>

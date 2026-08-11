@@ -1,4 +1,4 @@
-import type { PracticeTraceEntry, TracedSignal } from "@/api/types.gen";
+import type { PracticeTraceEntry, ReviewRequestOutcome, TracedSignal } from "@/api/types.gen";
 import { SUPPRESSION_REASON_LABELS } from "@/components/admin/practice-reviews/review-format";
 
 /**
@@ -54,13 +54,80 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	WORKSPACE_INACTIVE: "The workspace was not active",
 	PRACTICES_DISABLED: "Practice reviews are switched off for this workspace",
 	NO_ACTIVE_PRACTICE: "No practice was watching for this when it happened",
-	REVIEW_MODEL_UNBOUND: "No AI model is set up to run reviews; choose one under AI models",
+	// States the fact and stops. It used to end "; choose one under AI models", which named a page
+	// while linking to nothing and told every member of the workspace to go and do something only an
+	// admin can. The instruction now travels with the link, to the readers who can act on it.
+	REVIEW_MODEL_UNBOUND: "No AI model is set up to run reviews",
 	PRACTICE_TIER_OFF: "Every practice watching this is turned off; raising one lets it run",
 	BUDGET_EXHAUSTED: "The workspace's AI budget was used up; it refills",
 	SUBJECT_UNLINKED: "The author has not linked their account to Hephaestus",
 	MODEL_UNAVAILABLE: "The AI model set for reviews is no longer available",
 	PENDING_DEADLINE_EXCEEDED: "It waited too long to be picked up",
 	ARTIFACT_GONE: "The work no longer exists",
+};
+
+/**
+ * The same vocabulary answers "why did this occurrence go nowhere" and "why was my request refused",
+ * so one fix table serves both. The alias is checked rather than assumed: the two unions are
+ * generated separately, and a reason added to only one of them should fail the typecheck here rather
+ * than silently lose its link on one of the two surfaces.
+ */
+export type RefusalReason =
+	NonNullable<ReviewRequestOutcome["reason"]> extends SignalStateReason
+		? SignalStateReason extends NonNullable<ReviewRequestOutcome["reason"]>
+			? SignalStateReason
+			: never
+		: never;
+
+export interface RefusalFix {
+	/** A workspace-admin route, taking `workspaceSlug` and nothing else. */
+	to:
+		| "/w/$workspaceSlug/admin/models"
+		| "/w/$workspaceSlug/admin/practices"
+		| "/w/$workspaceSlug/admin/practices/autonomy"
+		| "/w/$workspaceSlug/admin/practices/settings"
+		| "/w/$workspaceSlug/admin/settings"
+		| "/w/$workspaceSlug/admin/usage";
+	/**
+	 * Names the destination on its own. A link is read out of its sentence — by a screen reader
+	 * listing the page's links, and by anyone scanning — so "here" identifies nothing (WCAG 2.4.4).
+	 */
+	label: string;
+}
+
+/**
+ * Where each refusal is undone, for the readers who can undo it.
+ *
+ * <p>Deliberately partial, and the gaps are the point. A reason earns an entry only when a workspace
+ * admin can go somewhere and change the answer; the rest are either self-healing (a cooldown that
+ * expires, an allowance that refills), already-running duplicates, or terminal. Sending someone to a
+ * settings page that cannot affect what they just read is worse than sending them nowhere, because
+ * they will change something to make it stop.
+ *
+ * <p>`SUBJECT_UNLINKED` is the near miss: it is fixable, but only by the author, on their own account
+ * page — and the reader of a trace is usually not the author, so there is no one destination to
+ * offer. `COOLDOWN_ACTIVE` is the other: the interval is configurable, but an active cooldown is the
+ * setting working, not a fault, and a link there invites an admin to widen a limit to fix a non-fault.
+ */
+export const REFUSAL_FIXES: Partial<Record<SignalStateReason, RefusalFix>> = {
+	GATE_SKIPPED: { to: "/w/$workspaceSlug/admin/practices/settings", label: "Open review settings" },
+	OUT_OF_REVIEW_SCOPE: {
+		to: "/w/$workspaceSlug/admin/practices/settings",
+		label: "Open review scope",
+	},
+	PRACTICES_DISABLED: {
+		to: "/w/$workspaceSlug/admin/practices/settings",
+		label: "Open review settings",
+	},
+	WORKSPACE_INACTIVE: { to: "/w/$workspaceSlug/admin/settings", label: "Open workspace settings" },
+	NO_ACTIVE_PRACTICE: { to: "/w/$workspaceSlug/admin/practices", label: "Open Practice setup" },
+	REVIEW_MODEL_UNBOUND: { to: "/w/$workspaceSlug/admin/models", label: "Set up a review model" },
+	MODEL_UNAVAILABLE: { to: "/w/$workspaceSlug/admin/models", label: "Open AI models" },
+	PRACTICE_TIER_OFF: {
+		to: "/w/$workspaceSlug/admin/practices/autonomy",
+		label: "Open Review autonomy",
+	},
+	BUDGET_EXHAUSTED: { to: "/w/$workspaceSlug/admin/usage", label: "Open AI usage" },
 };
 
 /** How we came to know about an occurrence, which sets how precise `occurredAt` can be. */

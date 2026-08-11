@@ -24,6 +24,7 @@ const meta = {
 		workspaceSlug: "demo",
 		artifactKind: "scm.pull_request",
 		artifactId: 1423,
+		canAdminister: true,
 	},
 } satisfies Meta<typeof TracePage>;
 
@@ -95,6 +96,48 @@ export const SignalsExplainThemselves: Story = {
 			),
 		).toBeVisible();
 		await expect(timeline.getByText("It waited too long to be picked up.")).toBeVisible();
+	},
+};
+
+/**
+ * A refusal that can be undone offers the way to undo it, and one that cannot says nothing extra.
+ *
+ * <p>This is the whole thesis of the page in one line of markup. "The workspace's review settings
+ * turned it away" names a screen an admin has to go and find; a link is that screen. The two quiet
+ * reasons beside it are the control: a cooldown expires on its own and a missed deadline is already
+ * past, so a settings link there would only invite somebody to widen a limit to fix a non-fault.
+ */
+export const RefusalsLinkToTheirFix: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
+
+		// The accessible name names the destination. "Open review settings" survives being read out of
+		// its sentence, in a screen reader's list of the page's links, which "here" does not.
+		await expect(timeline.getByRole("link", { name: "Open review settings" })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/practices/settings",
+		);
+		await expect(timeline.getAllByRole("link", { name: /^Open |^Set up / })).toHaveLength(1);
+	},
+};
+
+/**
+ * The same page for somebody who cannot open administration: the reasons stay, the links go.
+ *
+ * <p>Every member of a workspace can read a trace, and most of them are not admins. A link into
+ * `/admin` would bounce them off the route guard and back to the workspace home — losing the page
+ * they were reading, to be told nothing. The sentence already says everything they can act on.
+ */
+export const MembersAreOfferedNoAdminLinks: Story = {
+	args: { canAdminister: false },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
+		await expect(
+			timeline.getByText("This workspace's review settings turned it away."),
+		).toBeVisible();
+		await expect(timeline.queryByRole("link", { name: /^Open |^Set up / })).not.toBeInTheDocument();
 	},
 };
 
@@ -260,11 +303,79 @@ export const RefusesTheAskInTheServersWords: Story = {
 		const canvas = within(canvasElement);
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
 		await expect(await canvas.findByText("No review was started")).toBeVisible();
+		const alert = within(await canvas.findByRole("alert"));
 		await expect(
-			canvas.getByText(
+			alert.getByText(
 				"You have asked for as many reviews as an hour allows; the allowance refills.",
 			),
 		).toBeVisible();
+		// An allowance that refills is not something an admin can go and change, so the alert offers
+		// nowhere to go. Every refusal getting a link would make the links worth nothing.
+		await expect(alert.queryByRole("link")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Somebody pressed a button and was told no. That is the reader with the most immediate use for the
+ * fix, and until now this alert was the one refusal surface that named none.
+ *
+ * <p>The server's sentence is still printed exactly as it phrased it — the link is added beside it,
+ * keyed on the coded reason, never on the prose.
+ */
+export const RefusalOffersTheFixToAnAdmin: Story = {
+	parameters: {
+		msw: {
+			handlers: [
+				traceHandler,
+				http.post(REQUEST_URL, () =>
+					HttpResponse.json({
+						status: "REFUSED",
+						reason: "REVIEW_MODEL_UNBOUND",
+						reasonDescription: "No AI model is set up to run reviews in this workspace.",
+					}),
+				),
+			],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
+		const alert = within(await canvas.findByRole("alert"));
+		await expect(
+			alert.getByText("No AI model is set up to run reviews in this workspace."),
+		).toBeVisible();
+		await expect(alert.getByRole("link", { name: "Set up a review model" })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/models",
+		);
+	},
+};
+
+/** The same refusal for a member: the server's sentence, and no door they cannot open. */
+export const RefusalWithheldFixFromAMember: Story = {
+	args: { canAdminister: false },
+	parameters: {
+		msw: {
+			handlers: [
+				traceHandler,
+				http.post(REQUEST_URL, () =>
+					HttpResponse.json({
+						status: "REFUSED",
+						reason: "REVIEW_MODEL_UNBOUND",
+						reasonDescription: "No AI model is set up to run reviews in this workspace.",
+					}),
+				),
+			],
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
+		const alert = within(await canvas.findByRole("alert"));
+		await expect(
+			alert.getByText("No AI model is set up to run reviews in this workspace."),
+		).toBeVisible();
+		await expect(alert.queryByRole("link")).not.toBeInTheDocument();
 	},
 };
 
