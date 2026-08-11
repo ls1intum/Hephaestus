@@ -43,7 +43,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("heading", { name: /^privacy$/i })).toBeInTheDocument();
+		canvas.getByRole("heading", { name: /^privacy$/i });
 		// The banner is hidden while a decision is stored.
 		await expect(screen.queryByRole("region", { name: /your privacy/i })).not.toBeInTheDocument();
 

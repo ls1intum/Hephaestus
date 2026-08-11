@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { fn, screen, userEvent, within } from "storybook/test";
 import type { LlmModel } from "@/api/types.gen";
 import { AdminLlmModelsSection } from "./AdminLlmModelsSection";
 
@@ -94,6 +94,6 @@ export const DeleteConfirm: Story = {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("button", { name: /delete gpt-5/i }));
 		const dialog = await screen.findByRole("alertdialog");
-		await expect(within(dialog).getByText(/can't be deleted/i)).toBeInTheDocument();
+		within(dialog).getByText(/can't be deleted/i);
 	},
 };

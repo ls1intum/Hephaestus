@@ -51,7 +51,7 @@ export const Invalid: Story = {
 	args: { value: "not-a-channel", invalid: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/paste a slack channel url, mention, or/i)).toBeInTheDocument();
+		canvas.getByText(/paste a slack channel url, mention, or/i);
 		await expect(canvas.getByLabelText(/paste a channel link or id/i)).toHaveAttribute(
 			"aria-invalid",
 			"true",

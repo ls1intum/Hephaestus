@@ -48,7 +48,7 @@ export const TypeToConfirm: Story = {
 		await expect(args.onConfirm).not.toHaveBeenCalled();
 		await waitFor(() => expect(gate).toHaveAttribute("aria-invalid", "true"));
 		await expect(gate).toHaveAccessibleDescription(/does not match/i);
-		await expect(dialog.getByText(/that does not match/i)).toBeInTheDocument();
+		dialog.getByText(/that does not match/i);
 
 		await userEvent.clear(gate);
 		await userEvent.type(gate, "acme-corp");

@@ -318,16 +318,16 @@ export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		for (const name of ["Issues", "PRs", "Reviews", "Comments", "Commits"]) {
-			await expect(canvas.getByRole("columnheader", { name })).toBeInTheDocument();
+			canvas.getByRole("columnheader", { name });
 		}
-		await expect(canvas.getByRole("columnheader", { name: "Last synced" })).toBeInTheDocument();
+		canvas.getByRole("columnheader", { name: "Last synced" });
 		await expect(canvas.queryByRole("columnheader", { name: "Items" })).toBeNull();
 		await expect(canvas.queryByRole("columnheader", { name: "State" })).toBeNull();
 		await expect(canvas.queryByRole("columnheader", { name: /synced through/i })).toBeNull();
 
-		await expect(canvas.getByText("ls1intum/Artemis")).toBeInTheDocument();
+		canvas.getByText("ls1intum/Artemis");
 
-		await expect(canvas.getByRole("row", { name: /legacy-mirror/ })).toBeInTheDocument();
+		canvas.getByRole("row", { name: /legacy-mirror/ });
 	},
 };
 
@@ -335,7 +335,7 @@ export const WatermarkDivergence: Story = {
 	args: { resources: divergent },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByLabelText(/further behind/)).toBeInTheDocument();
+		canvas.getByLabelText(/further behind/);
 
 		await userEvent.hover(canvas.getByText(/ago$/));
 		await expect(await screen.findByText("Pull requests")).toBeInTheDocument();
@@ -366,11 +366,11 @@ export const SeventyOneRepositories: Story = {
 			await expect(container.scrollHeight).toBeGreaterThan(container.clientHeight);
 		}
 
-		await expect(canvas.getByRole("row", { name: /legacy-mirror/ })).toBeInTheDocument();
+		canvas.getByRole("row", { name: /legacy-mirror/ });
 
 		const search = canvas.getByRole("searchbox");
 		await userEvent.type(search, "legacy");
-		await expect(canvas.getByText(/1 of 71 repositories/i)).toBeInTheDocument();
+		canvas.getByText(/1 of 71 repositories/i);
 	},
 };
 
@@ -389,9 +389,9 @@ export const NeverSynced: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("0 Issues")).toBeInTheDocument();
+		canvas.getByText("0 Issues");
 
-		await expect(canvas.getByText("Never")).toBeInTheDocument();
+		canvas.getByText("Never");
 		await userEvent.hover(canvas.getByText("Never"));
 		await expect(await screen.findByText(/has not synced yet/i)).toBeInTheDocument();
 	},
@@ -401,10 +401,8 @@ export const Backfilling: Story = {
 	args: { resources },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/backfilling · 62%/i)).toBeInTheDocument();
-		await expect(
-			canvas.getByRole("progressbar", { name: /backfill progress for ls1intum\/aeolus/i }),
-		).toBeInTheDocument();
+		canvas.getByText(/backfilling · 62%/i);
+		canvas.getByRole("progressbar", { name: /backfill progress for ls1intum\/aeolus/i });
 	},
 };
 
@@ -427,14 +425,14 @@ export const SlackChannels: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Messages" })).toBeInTheDocument();
+		canvas.getByRole("columnheader", { name: "Messages" });
 		await expect(canvas.queryByRole("columnheader", { name: "Issues" })).toBeNull();
-		await expect(canvas.getByText("#engineering")).toBeInTheDocument();
-		await expect(canvas.getByText("C0123ABCD")).toBeInTheDocument();
-		await expect(canvas.getByText("All channels")).toBeInTheDocument();
+		canvas.getByText("#engineering");
+		canvas.getByText("C0123ABCD");
+		canvas.getByText("All channels");
 
 		const firstRow = canvas.getByRole("row", { name: /#design/ });
-		await expect(within(firstRow).getByRole("button", { name: /very stale/i })).toBeInTheDocument();
+		within(firstRow).getByRole("button", { name: /very stale/i });
 	},
 };
 
@@ -447,12 +445,12 @@ export const OutlineCollections: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Documents" })).toBeInTheDocument();
-		await expect(canvas.getByText("Engineering Handbook")).toBeInTheDocument();
-		await expect(canvas.getByText("col_handbook")).toBeInTheDocument();
+		canvas.getByRole("columnheader", { name: "Documents" });
+		canvas.getByText("Engineering Handbook");
+		canvas.getByText("col_handbook");
 
 		const firstRow = canvas.getByRole("row", { name: /Archived Notes/ });
-		await expect(within(firstRow).getByRole("button", { name: /very stale/i })).toBeInTheDocument();
+		within(firstRow).getByRole("button", { name: /very stale/i });
 
 		await userEvent.hover(canvas.getByText("Engineering Handbook"));
 		await expect(await screen.findByText("350 items")).toBeInTheDocument();
@@ -475,10 +473,10 @@ export const FilteredEmpty: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.type(canvas.getByRole("searchbox"), "zzz-no-such-repo");
-		await expect(canvas.getByText(/no repositories match/i)).toBeInTheDocument();
+		canvas.getByText(/no repositories match/i);
 
 		await userEvent.click(canvas.getByRole("button", { name: /clear filter/i }));
-		await expect(canvas.getByText("ls1intum/Artemis")).toBeInTheDocument();
+		canvas.getByText("ls1intum/Artemis");
 	},
 };
 
@@ -486,15 +484,15 @@ export const AttentionFilter: Story = {
 	args: { resources: facetMix },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
-		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+		canvas.getByText("acme/fresh-service");
+		canvas.getByText("acme/stale-service");
 
 		await userEvent.click(canvas.getByRole("button", { name: /attention \(1\)/i }));
-		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+		canvas.getByText("acme/stale-service");
 		await expect(canvas.queryByText("acme/fresh-service")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /fresh \(1\)/i }));
-		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
+		canvas.getByText("acme/fresh-service");
 		await expect(canvas.queryByText("acme/stale-service")).not.toBeInTheDocument();
 	},
 };
@@ -506,7 +504,7 @@ export const AttentionFacetFallsBackWhenCleared: Story = {
 		const canvas = within(canvasElement);
 
 		await userEvent.click(canvas.getByRole("button", { name: /attention \(1\)/i }));
-		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+		canvas.getByText("acme/stale-service");
 		await expect(canvas.queryByText("acme/fresh-service")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /heal the stale row/i }));
@@ -515,7 +513,7 @@ export const AttentionFacetFallsBackWhenCleared: Story = {
 		await expect(
 			canvas.queryByText(/no repositories match the current filter/i),
 		).not.toBeInTheDocument();
-		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
+		canvas.getByText("acme/fresh-service");
 	},
 };
 

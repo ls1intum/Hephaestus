@@ -27,9 +27,7 @@ export const CancelRunningReview: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Cancel review" }));
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(
-			dialog.getByText("The running review stops and cannot be resumed."),
-		).toBeInTheDocument();
+		dialog.getByText("The running review stops and cannot be resumed.");
 		await userEvent.click(dialog.getByRole("button", { name: "Cancel review" }));
 		await expect(args.onCancel).toHaveBeenCalledOnce();
 	},
@@ -40,9 +38,7 @@ export const RetryFailedDelivery: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Retry feedback comment" }));
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(
-			dialog.getByText("Hephaestus will try to post the failed comment again."),
-		).toBeInTheDocument();
+		dialog.getByText("Hephaestus will try to post the failed comment again.");
 		await userEvent.click(dialog.getByRole("button", { name: "Retry feedback comment" }));
 		await expect(args.onRetry).toHaveBeenCalledOnce();
 	},

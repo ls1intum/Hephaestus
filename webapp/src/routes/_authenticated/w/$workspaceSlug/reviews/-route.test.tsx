@@ -61,7 +61,7 @@ describe("review activity routes", () => {
 
 		// A dormant practice is asserted, not a delivering one: showing the quiet ones is the point.
 		await screen.findByText("Discussion hygiene", undefined, ROUTE_RENDER_WAIT);
-		expect(screen.getByText("Waiting on a connection")).toBeTruthy();
+		screen.getByText("Waiting on a connection");
 	});
 
 	it("refuses an artifact id that is not a positive integer", async () => {

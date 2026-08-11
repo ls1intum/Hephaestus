@@ -70,7 +70,7 @@ describe("MoneyCell", () => {
 		);
 
 		// The pad is `aria-hidden`: announcing "$0.00" would be a different amount of money.
-		expect(screen.getByRole("row", { name: "$0" })).toBeTruthy();
+		screen.getByRole("row", { name: "$0" });
 	});
 
 	it("leaves a figure that already prints its cents exactly as it is", () => {

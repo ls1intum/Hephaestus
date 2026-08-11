@@ -88,7 +88,7 @@ export const ProbeFailed: Story = {
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
 		await expect(await within(dialog).findByText(/outline did not respond/i)).toBeInTheDocument();
-		await expect(within(dialog).getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+		within(dialog).getByRole("button", { name: /^retry$/i });
 	},
 };
 
@@ -99,7 +99,7 @@ export const NoVisibleCollections: Story = {
 		await expect(
 			await within(dialog).findByText(/this token cannot see any collections/i),
 		).toBeInTheDocument();
-		await expect(within(dialog).getByText(/add the bot user/i)).toBeInTheDocument();
+		within(dialog).getByText(/add the bot user/i);
 	},
 };
 
@@ -110,10 +110,10 @@ export const PopulatedSearchable: Story = {
 
 		const mirrored = await within(dialog).findByRole("option", { name: /engineering/i });
 		await expect(mirrored).toHaveAttribute("data-disabled");
-		await expect(within(dialog).getByText(/already mirrored/i)).toBeInTheDocument();
+		within(dialog).getByText(/already mirrored/i);
 
 		await userEvent.type(within(dialog).getByRole("combobox"), "design");
-		await expect(within(dialog).getByText("Design System")).toBeInTheDocument();
+		within(dialog).getByText("Design System");
 		await expect(within(dialog).queryByText("Research Notes")).not.toBeInTheDocument();
 
 		await userEvent.click(within(dialog).getByRole("option", { name: /design system/i }));

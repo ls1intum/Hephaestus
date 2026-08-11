@@ -36,9 +36,9 @@ type Story = StoryObj<typeof meta>;
 export const Open: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
-		await expect(dialog.getByText(/post a visible announcement/i)).toBeInTheDocument();
-		await expect(dialog.getByText(/begin reading new messages/i)).toBeInTheDocument();
-		await expect(dialog.getByText(/opt out/i)).toBeInTheDocument();
+		dialog.getByText(/post a visible announcement/i);
+		dialog.getByText(/begin reading new messages/i);
+		dialog.getByText(/opt out/i);
 
 		await userEvent.click(dialog.getByRole("button", { name: /activate monitoring/i }));
 		await expect(args.onConfirm).toHaveBeenCalledWith(channel);

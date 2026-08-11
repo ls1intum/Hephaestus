@@ -73,7 +73,7 @@ export const WorkspaceAdminUser: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Administration")).toBeInTheDocument();
+		canvas.getByText("Administration");
 		await expect(canvas.queryByText("Instance admin")).not.toBeInTheDocument();
 	},
 };
@@ -89,7 +89,7 @@ export const AdminUser: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Administration")).toBeInTheDocument();
+		canvas.getByText("Administration");
 	},
 };
 
@@ -102,7 +102,7 @@ export const AdminContext: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Practice catalog")).toBeInTheDocument();
+		canvas.getByText("Practice catalog");
 		const content = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-content"]');
 		if (!content) throw new Error("sidebar content not found");
 		await expect(content.scrollWidth).toBeLessThanOrEqual(content.clientWidth);
@@ -119,8 +119,8 @@ export const AdminContextNoWorkspace: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Instance administration")).toBeInTheDocument();
-		await expect(canvas.getByText("Back to app")).toBeInTheDocument();
+		canvas.getByText("Instance administration");
+		canvas.getByText("Back to app");
 		await expect(canvas.queryByText(/no workspace/i)).not.toBeInTheDocument();
 	},
 };

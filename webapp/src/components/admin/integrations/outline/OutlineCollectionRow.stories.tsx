@@ -55,9 +55,9 @@ export const Mirroring: Story = {
 	args: { collection: base },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Mirroring")).toBeInTheDocument();
-		await expect(canvas.getByText(/up to date/i)).toBeInTheDocument();
-		await expect(canvas.getByText("engineering-4nZ3x")).toBeInTheDocument();
+		canvas.getByText("Mirroring");
+		canvas.getByText(/up to date/i);
+		canvas.getByText("engineering-4nZ3x");
 		// Freshness and document count live in the sync ledger, not this row — assert their absence.
 		await expect(canvas.queryByRole("button", { name: /ago$/i })).not.toBeInTheDocument();
 		await expect(canvas.queryByText("87")).not.toBeInTheDocument();
@@ -74,7 +74,7 @@ export const Paused: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Paused")).toBeInTheDocument();
+		canvas.getByText("Paused");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for handbook/i }));
 		await expect(await screen.findByRole("menuitem", { name: /resume/i })).toBeInTheDocument();
@@ -99,7 +99,7 @@ export const Syncing: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/syncing…/i)).toBeInTheDocument();
+		canvas.getByText(/syncing…/i);
 		// No urlId ⇒ no subtitle; the raw UUID is never shown.
 		await expect(canvas.queryByText(/col-decisions/)).not.toBeInTheDocument();
 		// "Never synced" is the sync ledger's reading, not this row's.

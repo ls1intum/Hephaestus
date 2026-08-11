@@ -1,5 +1,6 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+	"plugins": ["./.biome/no-redundant-in-the-document.grit"],
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",

@@ -70,8 +70,8 @@ export const Searching: Story = {
 
 		await userEvent.type(search, "team");
 		await expect(await screen.findByRole("option", { name: /#team-standup/i })).toBeInTheDocument();
-		await expect(screen.getByRole("option", { name: /#team-listed/i })).toBeInTheDocument();
-		await expect(screen.getByRole("option", { name: /#team-archive/i })).toBeInTheDocument();
+		screen.getByRole("option", { name: /#team-listed/i });
+		screen.getByRole("option", { name: /#team-archive/i });
 		await expect(screen.queryByRole("option", { name: /#general/i })).not.toBeInTheDocument();
 
 		await userEvent.clear(search);

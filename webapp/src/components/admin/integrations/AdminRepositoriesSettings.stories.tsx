@@ -70,16 +70,10 @@ export const RemoveConfirm: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /remove octocat\/Hello-World/i }));
 
 		const dialog = await screen.findByRole("alertdialog");
-		await expect(
-			within(dialog).getByText(/stop monitoring octocat\/Hello-World/i),
-		).toBeInTheDocument();
-		await expect(
-			within(dialog).getByText(/permanently erases everything Hephaestus has mirrored/i),
-		).toBeInTheDocument();
-		await expect(
-			within(dialog).getByText(/repository on GitHub itself is not affected/i),
-		).toBeInTheDocument();
-		await expect(within(dialog).getByText(/monitoring it again later/i)).toBeInTheDocument();
+		within(dialog).getByText(/stop monitoring octocat\/Hello-World/i);
+		within(dialog).getByText(/permanently erases everything Hephaestus has mirrored/i);
+		within(dialog).getByText(/repository on GitHub itself is not affected/i);
+		within(dialog).getByText(/monitoring it again later/i);
 		await expect(within(dialog).getByRole("button", { name: /stop monitoring/i })).toBeEnabled();
 	},
 };
@@ -125,7 +119,7 @@ export const Empty: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no repositories monitored yet/i)).toBeInTheDocument();
+		canvas.getByText(/no repositories monitored yet/i);
 	},
 };
 
@@ -141,8 +135,8 @@ export const LoadError: Story = {
 	},
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/couldn't load the monitored repositories/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/repositories service is unavailable/i)).toBeInTheDocument();
+		canvas.getByText(/couldn't load the monitored repositories/i);
+		canvas.getByText(/repositories service is unavailable/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalledTimes(1);
 	},
@@ -157,9 +151,7 @@ export const AddValidationError: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByText(/was not found, or the token cannot see it/i),
-		).toBeInTheDocument();
+		canvas.getByText(/was not found, or the token cannot see it/i);
 		await expect(
 			canvas.queryByText(/an error occurred while adding the repository/i),
 		).not.toBeInTheDocument();

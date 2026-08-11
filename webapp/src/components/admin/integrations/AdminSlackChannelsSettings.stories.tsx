@@ -89,7 +89,7 @@ export const Empty: Story = {
 	args: { channels: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no channels monitored yet/i)).toBeInTheDocument();
+		canvas.getByText(/no channels monitored yet/i);
 		// Both the header button and the empty-state CTA are labelled "Add channel", so an empty
 		// list must offer two of them — the CTA is not a relabelled header button.
 		await expect(canvas.getAllByRole("button", { name: /add channel/i }).length).toBeGreaterThan(1);
@@ -102,9 +102,9 @@ export const AllStates: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getAllByText("Not started").length).toBeGreaterThan(0);
-		await expect(canvas.getByText("Monitoring")).toBeInTheDocument();
-		await expect(canvas.getByText("Paused")).toBeInTheDocument();
-		await expect(canvas.getByText("Revoked")).toBeInTheDocument();
+		canvas.getByText("Monitoring");
+		canvas.getByText("Paused");
+		canvas.getByText("Revoked");
 	},
 };
 
@@ -119,9 +119,9 @@ export const WithOptOuts: Story = {
 			.getByRole("button", { name: "Actions for team-standup" })
 			.closest("tr");
 		const pendingRow = canvas.getByRole("button", { name: "Actions for team-intro" }).closest("tr");
-		await expect(within(activeRow as HTMLElement).getByText("2")).toBeInTheDocument();
+		within(activeRow as HTMLElement).getByText("2");
 		// 0 is rendered as a trust signal rather than blanked out.
-		await expect(within(pendingRow as HTMLElement).getByText("0")).toBeInTheDocument();
+		within(pendingRow as HTMLElement).getByText("0");
 	},
 };
 
@@ -156,7 +156,7 @@ export const NotConnected: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByRole("button", { name: /add channel/i })).not.toBeInTheDocument();
-		await expect(canvas.getByText(/connect slack to monitor channels/i)).toBeInTheDocument();
+		canvas.getByText(/connect slack to monitor channels/i);
 		// The passed-in channel must not render while disconnected: the inert section shows only the
 		// discovery copy, never a monitored-channel row the admin cannot act on.
 		await expect(canvas.queryByText("team-intro")).not.toBeInTheDocument();
@@ -171,7 +171,7 @@ export const ActivateConfirm: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: /activate monitoring/i }));
 		const dialog = await screen.findByRole("dialog");
-		await expect(within(dialog).getByText(/post a visible announcement/i)).toBeInTheDocument();
+		within(dialog).getByText(/post a visible announcement/i);
 
 		// Opening the dialog must not itself transition the channel — the gate is the confirm.
 		await expect(args.onUpdateConsent).not.toHaveBeenCalled();
@@ -197,7 +197,7 @@ export const RevokeTypeToConfirm: Story = {
 		const confirm = within(dialog).getByRole("button", { name: /remove & erase/i });
 		await expect(confirm).toBeEnabled();
 		await userEvent.click(confirm);
-		await expect(within(dialog).getByText(/that does not match/i)).toBeInTheDocument();
+		within(dialog).getByText(/that does not match/i);
 		await expect(args.onRemoveChannel).not.toHaveBeenCalled();
 
 		await userEvent.type(within(dialog).getByLabelText(/to confirm/i), active.slackChannelId);
@@ -217,7 +217,7 @@ export const Loading: Story = {
 	args: { isLoading: true, channels: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/monitored channels have their/i)).toBeInTheDocument();
+		canvas.getByText(/monitored channels have their/i);
 	},
 };
 
@@ -245,7 +245,7 @@ export const RemovePendingNothingCollected: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
 		const dialog = await screen.findByRole("alertdialog");
-		await expect(within(dialog).getByText(/nothing has been collected/i)).toBeInTheDocument();
+		within(dialog).getByText(/nothing has been collected/i);
 		await expect(within(dialog).queryByLabelText(/to confirm/i)).not.toBeInTheDocument();
 
 		// No gate to clear: Remove goes straight through, with no reason recorded.
@@ -295,14 +295,14 @@ export const AddChannelPicker: Story = {
 			"aria-disabled",
 			"true",
 		);
-		await expect(screen.getByText(/^archived$/i)).toBeInTheDocument();
+		screen.getByText(/^archived$/i);
 
 		// Searching narrows the option list instead of scrolling a flat button list.
 		await userEvent.type(
 			screen.getByRole("combobox", { name: /search available slack channels/i }),
 			"general",
 		);
-		await expect(screen.getByRole("option", { name: /#general/i })).toBeInTheDocument();
+		screen.getByRole("option", { name: /#general/i });
 		await expect(screen.queryByRole("option", { name: /#team-standup/i })).not.toBeInTheDocument();
 
 		// Picking an option and submitting registers the channel — the admin never handles a raw id.

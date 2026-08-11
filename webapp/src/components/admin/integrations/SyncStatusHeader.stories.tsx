@@ -86,7 +86,7 @@ export const NextRunDue: Story = {
 	args: { status: { ...baseStatus, nextScheduledSyncAt: minutesAgo(2) } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/next run due/i)).toBeInTheDocument();
+		canvas.getByText(/next run due/i);
 	},
 };
 
@@ -103,7 +103,7 @@ export const UnknownCadence: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByRole("button", { name: /stale/i })).not.toBeInTheDocument();
-		await expect(canvas.getByText(/ago$/)).toBeInTheDocument();
+		canvas.getByText(/ago$/);
 	},
 };
 
@@ -113,7 +113,7 @@ export const NeverSynced: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Never synced")).toBeInTheDocument();
+		canvas.getByText("Never synced");
 	},
 };
 
@@ -132,7 +132,7 @@ export const NothingToSyncYet: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no resources to sync yet/i)).toBeInTheDocument();
+		canvas.getByText(/no resources to sync yet/i);
 		await expect(canvas.queryByText(/never synced/i)).not.toBeInTheDocument();
 	},
 };
@@ -141,7 +141,7 @@ export const WebhookNotRegistered: Story = {
 	args: { status: { ...baseStatus, webhookRegistered: false } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/not registered/i)).toBeInTheDocument();
+		canvas.getByText(/not registered/i);
 	},
 };
 
@@ -149,7 +149,7 @@ export const NoWebhookEventsYet: Story = {
 	args: { status: { ...baseStatus, lastEventProcessedAt: undefined } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no events yet/i)).toBeInTheDocument();
+		canvas.getByText(/no events yet/i);
 	},
 };
 
@@ -167,7 +167,7 @@ export const WebhookNotTracked: Story = {
 		await expect(canvas.queryByText(/^webhook$/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/no events yet/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/not registered/i)).not.toBeInTheDocument();
-		await expect(canvas.getByText(/rate limit/i)).toBeInTheDocument();
+		canvas.getByText(/rate limit/i);
 	},
 };
 
@@ -242,7 +242,7 @@ export const RateLimitCeilingOnly: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/limit 5,000/i)).toBeInTheDocument();
+		canvas.getByText(/limit 5,000/i);
 		await expect(canvas.queryByText(/^\/\s*[\d,]+$/)).not.toBeInTheDocument();
 	},
 };
@@ -265,7 +265,7 @@ export const ScheduledBackfill: Story = {
 	args: { status: { ...baseStatus, backfill: { state: "IN_PROGRESS", percent: 40 } } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("In Progress")).toBeInTheDocument();
+		canvas.getByText("In Progress");
 		await expect(canvas.queryByText(/IN_PROGRESS/)).not.toBeInTheDocument();
 	},
 };
@@ -339,7 +339,7 @@ export const Slack: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByText(/rate limit/i)).not.toBeInTheDocument();
-		await expect(canvas.getByText(/^webhook$/i)).toBeInTheDocument();
+		canvas.getByText(/^webhook$/i);
 		await expect(canvas.queryByText(/not registered/i)).not.toBeInTheDocument();
 	},
 };
@@ -384,7 +384,7 @@ export const LoadError: Story = {
 	args: { status: undefined, error: new Error("503 Service Unavailable") },
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/couldn't load the github connection/i)).toBeInTheDocument();
+		canvas.getByText(/couldn't load the github connection/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalledTimes(1);
 	},

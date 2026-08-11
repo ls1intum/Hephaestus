@@ -39,13 +39,13 @@ type Story = StoryObj<typeof meta>;
 export const TypeToConfirm: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(dialog.getByText(/all messages collected/i)).toBeInTheDocument();
+		dialog.getByText(/all messages collected/i);
 
 		const confirm = dialog.getByRole("button", { name: /remove & erase/i });
 		await userEvent.click(confirm);
 
 		await expect(args.onConfirm).not.toHaveBeenCalled();
-		await expect(dialog.getByText(/that does not match/i)).toBeInTheDocument();
+		dialog.getByText(/that does not match/i);
 
 		await userEvent.type(dialog.getByLabelText(/to confirm/i), active.slackChannelId);
 		await userEvent.type(dialog.getByLabelText(/reason/i), "Course finished");
@@ -67,7 +67,7 @@ export const ConfirmMismatch: Story = {
 		await userEvent.click(dialog.getByRole("button", { name: /remove & erase/i }));
 
 		await expect(input).toHaveAttribute("aria-invalid", "true");
-		await expect(dialog.getByText(/that does not match/i)).toBeInTheDocument();
+		dialog.getByText(/that does not match/i);
 		await expect(args.onConfirm).not.toHaveBeenCalled();
 
 		// Correcting the value clears the invalid state — the error is not sticky.
@@ -83,7 +83,7 @@ export const NothingCollected: Story = {
 	args: { channel: { ...active, consentState: "PENDING", consentAnnouncedAt: undefined } },
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(dialog.getByText(/nothing has been collected/i)).toBeInTheDocument();
+		dialog.getByText(/nothing has been collected/i);
 		await expect(dialog.queryByLabelText(/to confirm/i)).not.toBeInTheDocument();
 
 		await userEvent.click(dialog.getByRole("button", { name: /^remove$/i }));

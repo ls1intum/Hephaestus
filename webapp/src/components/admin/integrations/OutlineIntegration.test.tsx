@@ -400,7 +400,7 @@ describe("Outline integration — token lifecycle", () => {
 		renderContainer();
 
 		expect(await screen.findByText(/we couldn't verify the outline token/i)).toBeTruthy();
-		expect(screen.getByRole("button", { name: /retry/i })).toBeTruthy();
+		screen.getByRole("button", { name: /retry/i });
 	});
 
 	it("surfaces a rejected token as a destructive alert instead of a healthy-looking card", async () => {
@@ -425,8 +425,8 @@ describe("Outline integration — token lifecycle", () => {
 		renderContainer();
 
 		expect(await screen.findByText(/outline accepts this token/i)).toBeTruthy();
-		expect(screen.getByText(/Hephaestus mirror/)).toBeTruthy();
-		expect(screen.getByText(/…9f2c/)).toBeTruthy();
+		screen.getByText(/Hephaestus mirror/);
+		screen.getByText(/…9f2c/);
 	});
 });
 
@@ -463,7 +463,7 @@ describe("Outline integration — with live push down, polling keeps a running s
 		await act(async () => {
 			await vi.advanceTimersByTimeAsync(50);
 		});
-		expect(screen.getByText(/reconciliation running/i)).toBeTruthy();
+		screen.getByText(/reconciliation running/i);
 
 		// No user interaction, no invalidation — only the 5s refetchInterval can clear this.
 		await act(async () => {
@@ -505,7 +505,7 @@ describe("Outline integration — Outline not enabled on this instance", () => {
 
 		// The raw ProblemDetail is still shown; the hint is derived from it and added below.
 		expect(await screen.findByText(/outline may not be enabled on this instance/i)).toBeTruthy();
-		expect(screen.getByText(/no connectionstrategy registered for kind=outline/i)).toBeTruthy();
+		screen.getByText(/no connectionstrategy registered for kind=outline/i);
 	});
 });
 
@@ -544,9 +544,9 @@ describe("Outline integration — per-collection sync ledger", () => {
 		expect(await screen.findByRole("columnheader", { name: "Documents" })).toBeTruthy();
 		expect(screen.queryByRole("columnheader", { name: "Issues" })).toBeNull();
 		expect(await screen.findByText("Engineering")).toBeTruthy();
-		expect(screen.getByText("12")).toBeTruthy();
+		screen.getByText("12");
 		// The freshness column exists here and nowhere else on the page.
-		expect(screen.getByRole("columnheader", { name: "Last synced" })).toBeTruthy();
+		screen.getByRole("columnheader", { name: "Last synced" });
 	});
 });
 

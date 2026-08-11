@@ -66,7 +66,7 @@ export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		// The table's own rendering of `result`, not `args.events` read back.
-		await expect(canvas.getByText("Failure")).toBeInTheDocument();
+		canvas.getByText("Failure");
 	},
 };
 
@@ -85,7 +85,7 @@ export const DeletedAccountFallback: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("#1234")).toBeInTheDocument();
+		canvas.getByText("#1234");
 	},
 };
 
@@ -95,7 +95,7 @@ export const RowDetail: Story = {
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
 		await expect(await screen.findByText("User agent")).toBeInTheDocument();
-		await expect(screen.getByText("Workspace")).toBeInTheDocument();
+		screen.getByText("Workspace");
 	},
 };
 
@@ -103,8 +103,8 @@ export const EmptyInitial: Story = {
 	args: { events: [], hasFilter: false },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No events yet")).toBeInTheDocument();
-		await expect(canvas.getByText(/Sign-ins, impersonation, role changes/i)).toBeInTheDocument();
+		canvas.getByText("No events yet");
+		canvas.getByText(/Sign-ins, impersonation, role changes/i);
 	},
 };
 
@@ -112,7 +112,7 @@ export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No events match your filters")).toBeInTheDocument();
+		canvas.getByText("No events match your filters");
 	},
 };
 
@@ -120,7 +120,7 @@ export const ErrorState: Story = {
 	args: { events: [], isError: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Couldn’t load the audit log/i)).toBeInTheDocument();
+		canvas.getByText(/Couldn’t load the audit log/i);
 	},
 };
 
@@ -128,7 +128,7 @@ export const Loading: Story = {
 	args: { events: [], isLoading: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
+		canvas.getByRole("columnheader", { name: "Event" });
 	},
 };
 

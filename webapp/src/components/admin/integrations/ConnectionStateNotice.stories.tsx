@@ -24,7 +24,7 @@ export const Pending: Story = {
 	args: { connectionState: "PENDING" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/finishing setup/i)).toBeInTheDocument();
+		canvas.getByText(/finishing setup/i);
 		await expect(canvas.queryByText(/slack is pending/i)).not.toBeInTheDocument();
 	},
 };
@@ -34,8 +34,8 @@ export const Suspended: Story = {
 	args: { connectionState: "SUSPENDED" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/reconnect to resume/i)).toBeInTheDocument();
+		canvas.getByText(/syncing is paused/i);
+		canvas.getByText(/reconnect to resume/i);
 	},
 };
 
@@ -44,7 +44,7 @@ export const Uninstalled: Story = {
 	args: { connectionState: "UNINSTALLED" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/the app was removed/i)).toBeInTheDocument();
+		canvas.getByText(/the app was removed/i);
 		await expect(canvas.queryByText(/slack is uninstalled/i)).not.toBeInTheDocument();
 	},
 };
@@ -54,7 +54,7 @@ export const SuspendedOutline: Story = {
 	args: { connectionState: "SUSPENDED", displayName: "Outline" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/outline was suspended by the provider/i)).toBeInTheDocument();
+		canvas.getByText(/outline was suspended by the provider/i);
 	},
 };
 

@@ -36,8 +36,8 @@ describe("AdminLlmModelsSection", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Manage access for GPT-5" }));
 		expect(onManageAccess).toHaveBeenCalledWith(model);
-		expect(screen.getByRole("columnheader", { name: "Workspace access" })).toBeTruthy();
-		expect(screen.getByText("Alpha")).toBeTruthy();
+		screen.getByRole("columnheader", { name: "Workspace access" });
+		screen.getByText("Alpha");
 	});
 
 	it("closes the delete confirm on confirming, while the DELETE is still in flight", async () => {
@@ -62,6 +62,6 @@ describe("AdminLlmModelsSection", () => {
 		rerender(<AdminLlmModelsSection {...props} models={[]} mutatingIds={new Set([model.id])} />);
 
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-		expect(screen.getByText("No models yet")).toBeTruthy();
+		screen.getByText("No models yet");
 	});
 });

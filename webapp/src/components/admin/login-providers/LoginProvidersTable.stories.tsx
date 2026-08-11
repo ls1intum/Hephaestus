@@ -70,17 +70,15 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("ACME GitLab")).toBeInTheDocument();
-		await expect(canvas.getByText("ACME Outline")).toBeInTheDocument();
+		canvas.getByText("ACME GitLab");
+		canvas.getByText("ACME Outline");
 		// The type column shows "Outline", never the raw enum "OUTLINE".
-		await expect(canvas.getByText("Outline")).toBeInTheDocument();
+		canvas.getByText("Outline");
 		await expect(canvas.queryByText("OUTLINE")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("GITLAB")).not.toBeInTheDocument();
 		// The env-seeded row carries the "seeded" badge; the admin-created ones do not.
-		await expect(canvas.getByText("seeded")).toBeInTheDocument();
-		await expect(
-			canvas.getByRole("button", { name: /Copy redirect URI for GitHub/i }),
-		).toBeInTheDocument();
+		canvas.getByText("seeded");
+		canvas.getByRole("button", { name: /Copy redirect URI for GitHub/i });
 	},
 };
 
@@ -130,7 +128,7 @@ export const Empty: Story = {
 	args: { providers: [] },
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/No login providers yet/i)).toBeInTheDocument();
+		canvas.getByText(/No login providers yet/i);
 		await userEvent.click(canvas.getByRole("button", { name: /Add provider/i }));
 		await expect(args.onAdd).toHaveBeenCalled();
 	},
@@ -145,8 +143,8 @@ export const ErrorState: Story = {
 	},
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Could not load login providers/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/Upstream database unavailable/i)).toBeInTheDocument();
+		canvas.getByText(/Could not load login providers/i);
+		canvas.getByText(/Upstream database unavailable/i);
 		await userEvent.click(canvas.getByRole("button", { name: /Retry/i }));
 		await expect(args.onRetry).toHaveBeenCalled();
 	},

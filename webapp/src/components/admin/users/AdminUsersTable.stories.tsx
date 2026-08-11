@@ -88,7 +88,7 @@ export const Loading: Story = { args: { users: [], isLoading: true } };
 export const Empty: Story = {
 	args: { users: [], totalLoaded: 0 },
 	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText("No users found")).toBeInTheDocument();
+		within(canvasElement).getByText("No users found");
 	},
 };
 
@@ -96,14 +96,14 @@ export const Empty: Story = {
 export const EmptySearch: Story = {
 	args: { users: [], hasSearch: true, totalLoaded: 3 },
 	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText(/adjusting your search/i)).toBeInTheDocument();
+		within(canvasElement).getByText(/adjusting your search/i);
 	},
 };
 
 export const ErrorState: Story = {
 	args: { users: [], isError: true },
 	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText(/failed to load users/i)).toBeInTheDocument();
+		within(canvasElement).getByText(/failed to load users/i);
 	},
 };
 

@@ -59,7 +59,7 @@ export const Triggering: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /starting/i })).toBeDisabled();
-		await expect(canvas.getByText("Starting reconciliation")).toBeInTheDocument();
+		canvas.getByText("Starting reconciliation");
 	},
 };
 
@@ -71,7 +71,7 @@ export const TriggeringBackfill: Story = {
 	args: { triggeringType: "BACKFILL" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Starting backfill")).toBeInTheDocument();
+		canvas.getByText("Starting backfill");
 	},
 };
 
@@ -81,7 +81,7 @@ export const ActiveJob: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /syncing/i })).toBeDisabled();
-		await expect(canvas.getByText("Reconciliation in progress")).toBeInTheDocument();
+		canvas.getByText("Reconciliation in progress");
 	},
 };
 
@@ -93,7 +93,7 @@ export const ActiveBackfill: Story = {
 	args: { activeJob: runningBackfill, triggeringType: "RECONCILIATION" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Backfill in progress")).toBeInTheDocument();
+		canvas.getByText("Backfill in progress");
 		await expect(canvas.queryByText(/starting/i)).not.toBeInTheDocument();
 	},
 };

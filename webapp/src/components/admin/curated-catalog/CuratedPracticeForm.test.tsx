@@ -123,7 +123,7 @@ describe("CuratedPracticeForm", () => {
 		).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-		expect(screen.getByDisplayValue("A new practice")).toBeTruthy();
+		screen.getByDisplayValue("A new practice");
 	});
 
 	it("does not call a freshly loaded practice edited", async () => {
@@ -156,7 +156,7 @@ describe("CuratedPracticeForm", () => {
 		fireEvent.keyDown(document, { key: "Escape" });
 
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-		expect(screen.getByDisplayValue("A new practice")).toBeTruthy();
+		screen.getByDisplayValue("A new practice");
 	});
 
 	it("preserves the draft and blocks saving after an edit conflict", async () => {
@@ -174,7 +174,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/practices/clear-pr-description",
 		);
 
-		expect(screen.getByDisplayValue("Write a clear pull request description")).toBeTruthy();
+		screen.getByDisplayValue("Write a clear pull request description");
 		expect(
 			(screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled,
 		).toBe(true);
@@ -369,7 +369,7 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("radio", { name: /^Issue/ }));
 		await user.click(screen.getByRole("radio", { name: /Pull or merge request/ }));
 
-		expect(screen.getByDisplayValue("Keep this limitation")).toBeTruthy();
+		screen.getByDisplayValue("Keep this limitation");
 	});
 
 	it("keeps the mentoring choice when the reviewed work type changes", async () => {
@@ -405,7 +405,7 @@ describe("CuratedPracticeForm", () => {
 		const user = userEvent.setup();
 		await renderForm();
 
-		expect(screen.getByRole("checkbox", { name: /Also while it is still a draft/ })).toBeTruthy();
+		screen.getByRole("checkbox", { name: /Also while it is still a draft/ });
 
 		await user.click(screen.getByRole("radio", { name: /^Issue/ }));
 

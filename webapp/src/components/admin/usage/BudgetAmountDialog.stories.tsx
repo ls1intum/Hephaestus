@@ -71,7 +71,7 @@ export const WithLiveCurrencyHint: Story = {
 	play: async ({ args }) => {
 		const dialog = await capDialog();
 		await expect(await dialog.findByText(/at today's rate\./)).toBeInTheDocument();
-		await expect(dialog.getByLabelText("approximately 44 euros")).toBeInTheDocument();
+		dialog.getByLabelText("approximately 44 euros");
 
 		const input = dialog.getByLabelText(/monthly cap/i);
 		await userEvent.clear(input);
@@ -107,7 +107,7 @@ export const ZeroPausesImmediately: Story = {
 
 		await expect(input).toHaveAttribute("aria-invalid", "false");
 		await expect(dialog.queryByRole("alert")).toBeNull();
-		await expect(dialog.getByRole("button", { name: /remove cap/i })).toBeInTheDocument();
+		dialog.getByRole("button", { name: /remove cap/i });
 		await expect(args.onSubmit).toHaveBeenCalledWith(0);
 	},
 };

@@ -31,7 +31,7 @@ function renderDialog(overrides: Partial<BudgetAmountDialogProps> = {}) {
 describe("the cap editor's currency hint", () => {
 	it("withdraws the estimate when the month behind the open dialog closes", () => {
 		const { rerender } = renderDialog();
-		expect(screen.getByText(/at today's rate/i)).toBeTruthy();
+		screen.getByText(/at today's rate/i);
 
 		rerender(
 			<BudgetAmountDialog

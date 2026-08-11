@@ -111,7 +111,7 @@ export const MultipleIdentities: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Outline")).toBeInTheDocument();
+		canvas.getByText("Outline");
 		await expect(canvas.queryByText("OUTLINE")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("GITHUB")).not.toBeInTheDocument();
 		// Outline is already linked → no Outline connect CTA is offered.
@@ -126,7 +126,7 @@ export const SingleIdentity: Story = {
 		const canvas = within(canvasElement);
 		// The lockout reason is always-visible text (not a disabled button), so SR/keyboard users
 		// can read why disconnect is unavailable.
-		await expect(canvas.getByText(/only sign-in method/i)).toBeInTheDocument();
+		canvas.getByText(/only sign-in method/i);
 		await expect(canvas.queryByRole("button", { name: /^disconnect /i })).toBeNull();
 		await expect(args.onUnlink).not.toHaveBeenCalled();
 	},
@@ -137,7 +137,7 @@ export const WithLinkableProvider: Story = {
 	args: { identities: [github] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /connect gitlab/i })).toBeInTheDocument();
+		canvas.getByRole("button", { name: /connect gitlab/i });
 	},
 };
 
@@ -153,8 +153,8 @@ export const OutlineConnectCTA: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		// Every unconnected Outline instance gets its own CTA, named by its display name.
-		await expect(canvas.getByText("ACME Outline is not connected")).toBeInTheDocument();
-		await expect(canvas.getByText("Research Outline is not connected")).toBeInTheDocument();
+		canvas.getByText("ACME Outline is not connected");
+		canvas.getByText("Research Outline is not connected");
 
 		await userEvent.click(canvas.getByRole("button", { name: "Connect Research Outline" }));
 		await expect(args.onLink).toHaveBeenCalledWith("outline-research");
@@ -171,8 +171,8 @@ export const Empty: Story = {
 	args: { identities: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no connected accounts yet/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /connect github/i })).toBeInTheDocument();
+		canvas.getByText(/no connected accounts yet/i);
+		canvas.getByRole("button", { name: /connect github/i });
 	},
 };
 
@@ -191,7 +191,7 @@ export const ErrorState: Story = {
 	},
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/could not load connected accounts/i)).toBeInTheDocument();
+		canvas.getByText(/could not load connected accounts/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalled();
 	},

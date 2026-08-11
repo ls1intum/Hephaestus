@@ -81,7 +81,7 @@ describe("instance catalog routes", () => {
 		renderRouteAt("/admin/catalog");
 
 		await screen.findByText("1 Hephaestus change needs review", undefined, ROUTE_RENDER_WAIT);
-		expect(screen.getByText("1 update would change review behavior")).toBeTruthy();
+		screen.getByText("1 update would change review behavior");
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
 		expect(await screen.findByRole("button", { name: "Show all entries" })).toBeTruthy();
 	});
@@ -316,10 +316,8 @@ describe("instance catalog routes", () => {
 			),
 		);
 		const confirmation = screen.getByRole("alertdialog");
-		expect(
-			within(confirmation).getByText(/also excludes 1 currently included practice/),
-		).toBeTruthy();
-		expect(within(confirmation).getByText("Say what changed and why")).toBeTruthy();
+		within(confirmation).getByText(/also excludes 1 currently included practice/);
+		within(confirmation).getByText("Say what changed and why");
 		fireEvent.click(within(confirmation).getByRole("button", { name: "Exclude area" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));

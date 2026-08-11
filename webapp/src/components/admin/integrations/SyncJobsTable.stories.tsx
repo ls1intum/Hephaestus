@@ -192,7 +192,7 @@ export const ExpandProgressDetail: Story = {
 		await expect(canvas.getAllByRole("button", { name: /show details for job/i })).toHaveLength(1);
 		await userEvent.click(canvas.getByRole("button", { name: /show details for job 3/i }));
 		await expect(await canvas.findByText(/backfilling ls1intum\/artemis/i)).toBeInTheDocument();
-		await expect(canvas.getByText("Pull requests")).toBeInTheDocument();
+		canvas.getByText("Pull requests");
 	},
 };
 
@@ -209,7 +209,7 @@ export const FirstPage: Story = {
 	args: { jobs, page: 0, totalPages: 4, onPageChange: fn() },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
+		canvas.getByRole("navigation", { name: "pagination" });
 		await expect(canvas.queryByText(/Page \d+ of \d+/)).toBeNull();
 	},
 };

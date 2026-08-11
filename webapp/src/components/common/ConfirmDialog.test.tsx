@@ -91,7 +91,7 @@ describe("ConfirmDialog", () => {
 		const confirm = screen.getByRole("alertdialog");
 		expect(confirm.textContent).toContain("Turn off “GPT-5”?");
 		expect(confirm.textContent).toContain("Everything on GPT-5 stops.");
-		expect(screen.getByRole("button", { name: "Keep active" })).toBeTruthy();
+		screen.getByRole("button", { name: "Keep active" });
 		expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
 	});
 });

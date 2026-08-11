@@ -12,10 +12,10 @@ describe("PriceModeEditor", () => {
 				onChange={vi.fn()}
 			/>,
 		);
-		expect(screen.getByLabelText(/Input \(USD\)/)).toBeTruthy();
-		expect(screen.getByLabelText(/Output \(USD\)/)).toBeTruthy();
+		screen.getByLabelText(/Input \(USD\)/);
+		screen.getByLabelText(/Output \(USD\)/);
 		expect(screen.queryByLabelText(/Reasoning \(USD\)/)).toBeNull();
-		expect(screen.getByText(/reasoning tokens are included in output/i)).toBeTruthy();
+		screen.getByText(/reasoning tokens are included in output/i);
 	});
 
 	it("describes an intentional zero API rate without calling infrastructure free", () => {
@@ -27,8 +27,8 @@ describe("PriceModeEditor", () => {
 				onChange={vi.fn()}
 			/>,
 		);
-		expect(screen.getByText("No metered API cost")).toBeTruthy();
+		screen.getByText("No metered API cost");
 		expect(screen.queryByText(/^Free$/)).toBeNull();
-		expect(screen.getByText(/infrastructure cost may still apply/i)).toBeTruthy();
+		screen.getByText(/infrastructure cost may still apply/i);
 	});
 });

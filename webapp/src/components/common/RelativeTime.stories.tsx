@@ -32,7 +32,7 @@ export const Stale: Story = {
 	args: { value: minutesAgo(180), tone: "stale" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /stale/i })).toBeInTheDocument();
+		canvas.getByRole("button", { name: /stale/i });
 	},
 };
 
@@ -40,7 +40,7 @@ export const VeryStale: Story = {
 	args: { value: minutesAgo(60 * 24 * 9), tone: "veryStale" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /very stale/i })).toBeInTheDocument();
+		canvas.getByRole("button", { name: /very stale/i });
 	},
 };
 
@@ -50,7 +50,7 @@ export const Never: Story = {
 	args: { value: undefined },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("–")).toBeInTheDocument();
+		canvas.getByText("–");
 	},
 };
 

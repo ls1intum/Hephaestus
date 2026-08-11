@@ -62,7 +62,7 @@ export const Create: Story = {
 	play: async () => {
 		await expect(await screen.findByText("Add login provider")).toBeInTheDocument();
 		await expect(screen.getByLabelText("Registration ID")).toBeEnabled();
-		await expect(screen.getByLabelText("Instance base URL")).toBeInTheDocument();
+		screen.getByLabelText("Instance base URL");
 	},
 };
 
@@ -71,9 +71,9 @@ export const CreateOutline: Story = {
 		await userEvent.click(await screen.findByRole("combobox", { name: "Provider type" }));
 		await userEvent.click(await screen.findByRole("option", { name: /Outline/i }));
 
-		await expect(screen.getByLabelText("Instance base URL")).toBeInTheDocument();
-		await expect(screen.getByText(/nobody signs in to Hephaestus with it/i)).toBeInTheDocument();
-		await expect(screen.getByText(/Settings → Applications/)).toBeInTheDocument();
+		screen.getByLabelText("Instance base URL");
+		screen.getByText(/nobody signs in to Hephaestus with it/i);
+		screen.getByText(/Settings → Applications/);
 	},
 };
 
@@ -82,9 +82,7 @@ export const EditSlack: Story = {
 	play: async () => {
 		await expect(await screen.findByText("Edit login provider")).toBeInTheDocument();
 		await expect(screen.queryByLabelText("Instance base URL")).not.toBeInTheDocument();
-		await expect(
-			screen.getByText(/Use the same Slack app client ID and secret/),
-		).toBeInTheDocument();
+		screen.getByText(/Use the same Slack app client ID and secret/);
 	},
 };
 
@@ -96,7 +94,7 @@ export const EditOutline: Story = {
 		await expect(screen.getByLabelText("Instance base URL")).toHaveValue(
 			"https://outline.acme.test",
 		);
-		await expect(screen.getByText(editingOutline.redirectUri)).toBeInTheDocument();
+		screen.getByText(editingOutline.redirectUri);
 	},
 };
 

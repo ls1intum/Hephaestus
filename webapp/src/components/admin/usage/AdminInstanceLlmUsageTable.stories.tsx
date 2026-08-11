@@ -192,7 +192,7 @@ export const DisplayCurrencyThisMonth: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(FX_DISCLOSURE)).toBeVisible();
-		await expect(canvas.getByLabelText("approximately 21.99 euros")).toBeInTheDocument();
+		canvas.getByLabelText("approximately 21.99 euros");
 	},
 };
 

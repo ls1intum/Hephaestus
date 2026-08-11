@@ -32,8 +32,8 @@ export const ServiceUnavailable: Story = {
 	},
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/github api is unavailable/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/on our side/i)).toBeInTheDocument();
+		canvas.getByText(/github api is unavailable/i);
+		canvas.getByText(/on our side/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalledTimes(1);
 	},
@@ -49,8 +49,8 @@ export const Forbidden: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/not an admin of this workspace/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/ask an admin for access/i)).toBeInTheDocument();
+		canvas.getByText(/not an admin of this workspace/i);
+		canvas.getByText(/ask an admin for access/i);
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };
@@ -62,7 +62,7 @@ export const NotFound: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/deleted or moved/i)).toBeInTheDocument();
+		canvas.getByText(/deleted or moved/i);
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };
@@ -78,7 +78,7 @@ export const Conflict: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/a sync is already running/i)).toBeInTheDocument();
+		canvas.getByText(/a sync is already running/i);
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };
@@ -92,8 +92,8 @@ export const RateLimited: Story = {
 		const canvas = within(canvasElement);
 		// The server's detail carries no terminal punctuation; the alert must terminate it before
 		// appending guidance rather than run the two together as "Rate limit exceeded Too many…".
-		await expect(canvas.getByText(/Rate limit exceeded\. Too many requests/)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+		canvas.getByText(/Rate limit exceeded\. Too many requests/);
+		canvas.getByRole("button", { name: /retry/i });
 	},
 };
 
@@ -104,7 +104,7 @@ export const Unauthorized: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/session has expired/i)).toBeInTheDocument();
+		canvas.getByText(/session has expired/i);
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };
@@ -118,7 +118,7 @@ export const BadRequest: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/owner\/name form/i)).toBeInTheDocument();
+		canvas.getByText(/owner\/name form/i);
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };
@@ -133,8 +133,8 @@ export const NetworkFailure: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/check your connection/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+		canvas.getByText(/check your connection/i);
+		canvas.getByRole("button", { name: /retry/i });
 	},
 };
 
@@ -163,7 +163,7 @@ export const NoServerDetail: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/^Something went wrong on our side/)).toBeInTheDocument();
+		canvas.getByText(/^Something went wrong on our side/);
 	},
 };
 

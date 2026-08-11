@@ -53,7 +53,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Failed sign-in")).toBeInTheDocument();
+		canvas.getByText("Failed sign-in");
 	},
 };
 
@@ -61,7 +61,7 @@ export const Empty: Story = {
 	args: { events: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no activity yet/i)).toBeInTheDocument();
+		canvas.getByText(/no activity yet/i);
 	},
 };
 
@@ -75,7 +75,7 @@ export const LoadFailed: Story = {
 		const canvas = within(canvasElement);
 		// The failure must not read as "no activity"; a 5xx is retryable so the affordance shows.
 		await expect(canvas.queryByText(/no activity yet/i)).not.toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+		canvas.getByRole("button", { name: /retry/i });
 	},
 };
 

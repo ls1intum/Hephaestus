@@ -73,10 +73,10 @@ export const NotStarted: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Not started")).toBeInTheDocument();
+		canvas.getByText("Not started");
 		// No announcement yet — the empty timestamp is the screen-reader-visible "Never", not an
 		// aria-hidden em-dash that vanishes for assistive tech.
-		await expect(canvas.getByText("Never")).toBeInTheDocument();
+		canvas.getByText("Never");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
 		await expect(
@@ -90,7 +90,7 @@ export const NotStarted: Story = {
 export const Monitoring: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Monitoring")).toBeInTheDocument();
+		canvas.getByText("Monitoring");
 		// The announced time is the shared ticking RelativeTime, exposed as a real tooltip button so
 		// its absolute time is one hover away and reachable by keyboard.
 		const announced = canvas.getByRole("button", { name: /ago$/i });
@@ -109,7 +109,7 @@ export const Paused: Story = {
 	args: { channel: { ...channel, consentState: "PAUSED" } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Paused")).toBeInTheDocument();
+		canvas.getByText("Paused");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
 		await expect(await screen.findByRole("menuitem", { name: /^resume$/i })).toBeInTheDocument();
@@ -121,7 +121,7 @@ export const Revoked: Story = {
 	args: { channel: { ...channel, consentState: "REVOKED" } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Revoked")).toBeInTheDocument();
+		canvas.getByText("Revoked");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
 		await expect(

@@ -86,8 +86,8 @@ export const ProjectReviewsDisabled: Story = {
 	args: { practicesEnabled: false },
 	play: async ({ canvas }) => {
 		const card = within(canvas.getByRole("region", { name: "Practice reviews" }));
-		await expect(card.getByText("Ready")).toBeInTheDocument();
-		await expect(card.getByText("Practice reviews off")).toBeInTheDocument();
+		card.getByText("Ready");
+		card.getByText("Practice reviews off");
 		await expect(card.getByRole("link", { name: "Open Review: When and where" })).toHaveAttribute(
 			"href",
 			"/w/acme/admin/practices/review?section=when-and-where",
@@ -111,9 +111,7 @@ export const OnlyThePendingCardIsFrozen: Story = {
 export const AdvancedDisclosure: Story = {
 	play: async ({ canvas }) => {
 		await openPracticeReviewAdvanced(canvas);
-		await expect(
-			purposeCard(canvas, "Practice reviews").getByLabelText("Timeout (seconds)"),
-		).toBeInTheDocument();
+		purposeCard(canvas, "Practice reviews").getByLabelText("Timeout (seconds)");
 	},
 };
 

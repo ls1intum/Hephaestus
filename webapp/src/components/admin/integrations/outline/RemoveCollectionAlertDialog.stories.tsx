@@ -39,7 +39,7 @@ type Story = StoryObj<typeof meta>;
 export const Open: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(dialog.getByText(/all 42 mirrored documents/i)).toBeInTheDocument();
+		dialog.getByText(/all 42 mirrored documents/i);
 
 		await userEvent.click(dialog.getByRole("button", { name: /remove & erase/i }));
 		await expect(args.onConfirm).toHaveBeenCalledWith({ collectionId: collection.collectionId });
@@ -51,7 +51,7 @@ export const SingleDoc: Story = {
 	args: { collection: { ...collection, documentCount: 1 } },
 	play: async () => {
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(dialog.getByText(/its 1 mirrored document/i)).toBeInTheDocument();
+		dialog.getByText(/its 1 mirrored document/i);
 	},
 };
 

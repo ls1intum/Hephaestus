@@ -109,7 +109,7 @@ export const ErrorState: Story = {
 	},
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/could not load your slack preferences/i)).toBeInTheDocument();
+		canvas.getByText(/could not load your slack preferences/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalled();
 	},

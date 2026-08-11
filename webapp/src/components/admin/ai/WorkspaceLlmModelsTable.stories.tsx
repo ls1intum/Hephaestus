@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { fn, screen, userEvent, within } from "storybook/test";
 import type { WorkspaceLlmModel } from "@/api/types.gen";
 import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
@@ -63,6 +63,6 @@ export const Empty: Story = {
 export const DeleteConfirm: Story = {
 	play: async ({ canvas }) => {
 		const dialog = await openDeleteConfirm(canvas, /delete gpt-5 mini/i);
-		await expect(within(dialog).getByText(/stop working/i)).toBeInTheDocument();
+		within(dialog).getByText(/stop working/i);
 	},
 };

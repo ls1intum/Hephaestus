@@ -72,8 +72,8 @@ export const WithErroredResources: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("3 errored")).toBeInTheDocument();
-		await expect(canvas.getByText(/of 12 resources/i)).toBeInTheDocument();
+		canvas.getByText("3 errored");
+		canvas.getByText(/of 12 resources/i);
 	},
 };
 
@@ -81,7 +81,7 @@ export const WithStaleResources: Story = {
 	args: { status: { ...status, resourceCounts: { total: 12, errored: 0, pending: 0, stale: 4 } } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("4 stale")).toBeInTheDocument();
+		canvas.getByText("4 stale");
 	},
 };
 
@@ -95,8 +95,8 @@ export const WithErroredAndStaleResources: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("1 errored")).toBeInTheDocument();
-		await expect(canvas.getByText("3 stale")).toBeInTheDocument();
+		canvas.getByText("1 errored");
+		canvas.getByText("3 stale");
 	},
 };
 
@@ -116,7 +116,7 @@ export const UnknownCadence: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByRole("button", { name: /stale/i })).not.toBeInTheDocument();
-		await expect(canvas.getByText(/ago$/)).toBeInTheDocument();
+		canvas.getByText(/ago$/);
 	},
 };
 
@@ -131,8 +131,8 @@ export const NeverSynced: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Never synced")).toBeInTheDocument();
-		await expect(canvas.getByText(/no events received yet/i)).toBeInTheDocument();
+		canvas.getByText("Never synced");
+		canvas.getByText(/no events received yet/i);
 	},
 };
 
@@ -145,8 +145,8 @@ export const StatusError: Story = {
 	},
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/couldn't load sync status/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/github api is unavailable/i)).toBeInTheDocument();
+		canvas.getByText(/couldn't load sync status/i);
+		canvas.getByText(/github api is unavailable/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetryStatus).toHaveBeenCalledTimes(1);
 	},
@@ -161,7 +161,7 @@ export const StatusErrorForbidden: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/not an admin of this workspace/i)).toBeInTheDocument();
+		canvas.getByText(/not an admin of this workspace/i);
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };
@@ -179,8 +179,8 @@ export const ConnectionSuspended: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/suspended by the provider/i)).toBeInTheDocument();
+		canvas.getByText(/syncing is paused/i);
+		canvas.getByText(/suspended by the provider/i);
 		await expect(canvas.queryByText(/connection is suspended/i)).not.toBeInTheDocument();
 	},
 };
@@ -198,7 +198,7 @@ export const ConnectionPending: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/finishing setup/i)).toBeInTheDocument();
+		canvas.getByText(/finishing setup/i);
 		await expect(canvas.queryByText(/slack is pending/i)).not.toBeInTheDocument();
 	},
 };
@@ -216,7 +216,7 @@ export const ConnectionUninstalled: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/the app was removed/i)).toBeInTheDocument();
+		canvas.getByText(/the app was removed/i);
 		await expect(canvas.queryByText(/slack is uninstalled/i)).not.toBeInTheDocument();
 	},
 };
@@ -228,9 +228,7 @@ export const ScmNotConnected: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByText(/source control is selected when the workspace is created/i),
-		).toBeInTheDocument();
+		canvas.getByText(/source control is selected when the workspace is created/i);
 		await expect(canvas.queryByRole("link", { name: /connect/i })).not.toBeInTheDocument();
 	},
 };

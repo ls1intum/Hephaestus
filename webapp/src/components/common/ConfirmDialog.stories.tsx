@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { type ReactNode, useState } from "react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { fn, screen, userEvent, within } from "storybook/test";
 import { expectControlOnScreen, expectDialogFitsViewport } from "@/test/reflow";
 import { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 
@@ -84,6 +84,6 @@ export const Confirming: Story = {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await userEvent.click(dialog.getByRole("button", { name: "Delete" }));
 
-		await expect(canvas.getByText("Deleted “GPT-5”")).toBeInTheDocument();
+		canvas.getByText("Deleted “GPT-5”");
 	},
 };

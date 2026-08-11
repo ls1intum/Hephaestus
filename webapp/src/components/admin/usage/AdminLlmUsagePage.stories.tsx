@@ -310,11 +310,9 @@ export const PastMonth: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /^(Change|Set) cap$/ })).toBeNull();
-		await expect(
-			canvas.getByText(
-				"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
-			),
-		).toBeInTheDocument();
+		canvas.getByText(
+			"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
+		);
 	},
 };
 

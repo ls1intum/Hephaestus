@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { within } from "storybook/test";
 import type { AdminWorkspaceView } from "@/api/types.gen";
 import { AdminWorkspacesTable } from "./AdminWorkspacesTable";
 
@@ -41,10 +41,10 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("AET")).toBeInTheDocument();
-		await expect(canvas.getByText("SUSPENDED")).toBeInTheDocument();
+		canvas.getByText("AET");
+		canvas.getByText("SUSPENDED");
 		// Owner falls back to an em dash when there is no OWNER member.
-		await expect(canvas.getByText("octocat")).toBeInTheDocument();
+		canvas.getByText("octocat");
 	},
 };
 
@@ -53,6 +53,6 @@ export const EmptyWithSearch: Story = {
 	args: { workspaces: [], hasSearch: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No matching workspaces.")).toBeInTheDocument();
+		canvas.getByText("No matching workspaces.");
 	},
 };

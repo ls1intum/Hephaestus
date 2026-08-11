@@ -42,7 +42,7 @@ export const ChooseARange: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/nothing is reviewed until you confirm/i)).toBeInTheDocument();
+		canvas.getByText(/nothing is reviewed until you confirm/i);
 		// A closed Base UI trigger falls back to printing the raw value, and "scm.pull_request" is not
 		// a decision anyone can check.
 		await expect(canvas.getByRole("combobox", { name: /Kind of work/ })).toHaveTextContent(
@@ -59,11 +59,9 @@ export const AwaitingConfirmation: Story = {
 	args: { runs: [run()] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("128 pull or merge requests")).toBeInTheDocument();
-		await expect(canvas.getByText("$15.36")).toBeInTheDocument();
-		await expect(
-			canvas.getByRole("button", { name: /review 128 pull or merge requests/i }),
-		).toBeInTheDocument();
+		canvas.getByText("128 pull or merge requests");
+		canvas.getByText("$15.36");
+		canvas.getByRole("button", { name: /review 128 pull or merge requests/i });
 	},
 };
 
@@ -75,7 +73,7 @@ export const CostUnknown: Story = {
 	args: { runs: [run({ estimatedCostUsd: undefined })] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Unknown")).toBeInTheDocument();
+		canvas.getByText("Unknown");
 	},
 };
 
@@ -88,7 +86,7 @@ export const NothingInRange: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /nothing to review/i })).toBeDisabled();
-		await expect(canvas.getByText(/discard this and try a longer one/i)).toBeInTheDocument();
+		canvas.getByText(/discard this and try a longer one/i);
 	},
 };
 
@@ -142,7 +140,7 @@ export const PausedOnBudget: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/nothing has been skipped/i)).toBeInTheDocument();
+		canvas.getByText(/nothing has been skipped/i);
 		await expectNoPageOverflow();
 	},
 };
@@ -184,7 +182,7 @@ export const LoadFailed: Story = {
 	args: { isError: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/backfills couldn't be loaded/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/already running is unaffected/i)).toBeInTheDocument();
+		canvas.getByText(/backfills couldn't be loaded/i);
+		canvas.getByText(/already running is unaffected/i);
 	},
 };

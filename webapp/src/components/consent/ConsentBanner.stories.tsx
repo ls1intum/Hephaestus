@@ -45,10 +45,10 @@ export const BothCategories: Story = {
 	args: { categories: [analytics, errorReports] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("region", { name: /your privacy/i })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Reject all" })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Accept all" })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Save choices" })).toBeInTheDocument();
+		canvas.getByRole("region", { name: /your privacy/i });
+		canvas.getByRole("button", { name: "Reject all" });
+		canvas.getByRole("button", { name: "Accept all" });
+		canvas.getByRole("button", { name: "Save choices" });
 	},
 };
 
@@ -57,8 +57,8 @@ export const AnalyticsOnly: Story = {
 	args: { categories: [analytics] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: "Allow" })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Decline" })).toBeInTheDocument();
+		canvas.getByRole("button", { name: "Allow" });
+		canvas.getByRole("button", { name: "Decline" });
 		await expect(canvas.queryByRole("button", { name: "Save choices" })).not.toBeInTheDocument();
 	},
 };
@@ -77,6 +77,6 @@ export const Editing: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+		canvas.getByRole("button", { name: "Cancel" });
 	},
 };

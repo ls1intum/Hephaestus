@@ -56,7 +56,7 @@ describe("PracticeMentoringSupportEditor", () => {
 		);
 
 		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
-		expect(screen.getByRole("textbox", { name: /Why is human review needed/ })).toBeTruthy();
+		screen.getByRole("textbox", { name: /Why is human review needed/ });
 		expect(screen.getByTestId("reason").textContent).toBe("set");
 		// The reason is not a limitation, so asking for a human adds nothing to that list.
 		expect(screen.getByTestId("limitation-count").textContent).toBe("0");
@@ -83,7 +83,7 @@ describe("PracticeMentoringSupportEditor", () => {
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
 		await user.click(screen.getByRole("radio", { name: /AI-supported mentoring/ }));
 
-		expect(screen.getByDisplayValue("Keep this edited limitation.")).toBeTruthy();
+		screen.getByDisplayValue("Keep this edited limitation.");
 	});
 
 	it("derives a stable limitation code from the text so retyping it is not a rule change", async () => {

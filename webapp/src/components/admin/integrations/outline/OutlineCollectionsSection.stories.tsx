@@ -69,7 +69,7 @@ export const Empty: Story = {
 	args: { collections: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no collections mirrored yet/i)).toBeInTheDocument();
+		canvas.getByText(/no collections mirrored yet/i);
 		await expect(canvas.getAllByRole("button", { name: /add collection/i }).length).toBeGreaterThan(
 			1,
 		);
@@ -86,9 +86,9 @@ export const Populated: Story = {
 	args: { collections: [engineering, decisions] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Engineering")).toBeInTheDocument();
-		await expect(canvas.getByText(/up to date/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/syncing…/i)).toBeInTheDocument();
+		canvas.getByText("Engineering");
+		canvas.getByText(/up to date/i);
+		canvas.getByText(/syncing…/i);
 
 		await expect(
 			canvas.queryByRole("columnheader", { name: /documents/i }),
@@ -115,8 +115,8 @@ export const LoadError: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByText(/no collections mirrored yet/i)).not.toBeInTheDocument();
-		await expect(canvas.getByText(/couldn't load the mirrored collections/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/outline sync is unavailable/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+		canvas.getByText(/couldn't load the mirrored collections/i);
+		canvas.getByText(/outline sync is unavailable/i);
+		canvas.getByRole("button", { name: /^retry$/i });
 	},
 };

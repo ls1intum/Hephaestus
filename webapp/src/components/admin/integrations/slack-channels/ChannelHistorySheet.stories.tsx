@@ -68,7 +68,7 @@ export const Populated: Story = {
 		const sheet = within(await screen.findByRole("dialog"));
 		await sheet.findAllByText("Monitoring");
 		sheet.getAllByText("Not started");
-		await expect(sheet.getByText("Exam week")).toBeInTheDocument();
+		sheet.getByText("Exam week");
 		await expect(sheet.queryByText("ACTIVE")).not.toBeInTheDocument();
 		await expect(sheet.queryByText("PENDING")).not.toBeInTheDocument();
 	},
@@ -106,7 +106,7 @@ export const LoadError: Story = {
 	play: async () => {
 		const sheet = within(await screen.findByRole("dialog"));
 		await expect(await sheet.findByText(/could not load the consent history/i)).toBeInTheDocument();
-		await expect(sheet.getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+		sheet.getByRole("button", { name: /^retry$/i });
 	},
 };
 

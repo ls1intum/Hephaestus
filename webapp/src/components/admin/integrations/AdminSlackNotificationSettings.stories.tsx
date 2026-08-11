@@ -32,9 +32,7 @@ export const NotConnected: Story = {
 	args: { hasSlackConnection: false },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByRole("button", { name: /connect slack workspace/i }),
-		).toBeInTheDocument();
+		canvas.getByRole("button", { name: /connect slack workspace/i });
 	},
 };
 
@@ -117,14 +115,14 @@ export const WithChannelPicker: Story = {
 			"aria-disabled",
 			"true",
 		);
-		await expect(screen.getByText(/needs invite/i)).toBeInTheDocument();
+		screen.getByText(/needs invite/i);
 
 		// Search narrows the option list to the match.
 		await userEvent.type(
 			screen.getByRole("combobox", { name: /search digest slack channels/i }),
 			"gen",
 		);
-		await expect(screen.getByRole("option", { name: /#general/i })).toBeInTheDocument();
+		screen.getByRole("option", { name: /#general/i });
 		await expect(screen.queryByRole("option", { name: /#private-team/i })).not.toBeInTheDocument();
 
 		await userEvent.click(screen.getByRole("option", { name: /#general/i }));
@@ -158,7 +156,7 @@ export const NonDefaultDay: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Thursday")).toBeInTheDocument();
+		canvas.getByText("Thursday");
 	},
 };
 
@@ -210,7 +208,7 @@ export const ConnectedWithDisconnect: Story = {
 		// AlertDialog renders in a portal — query the whole document, not just the canvas.
 		const dialog = await screen.findByRole("alertdialog", { name: /disconnect slack\?/i });
 		await expect(dialog).toBeInTheDocument();
-		await expect(within(dialog).getByText(/the bot is uninstalled/i)).toBeInTheDocument();
-		await expect(within(dialog).getByRole("button", { name: /^disconnect$/i })).toBeInTheDocument();
+		within(dialog).getByText(/the bot is uninstalled/i);
+		within(dialog).getByRole("button", { name: /^disconnect$/i });
 	},
 };

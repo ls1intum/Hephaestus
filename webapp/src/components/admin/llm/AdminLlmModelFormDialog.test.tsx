@@ -93,7 +93,7 @@ describe("AdminLlmModelFormDialog", () => {
 			per1mOutputUsd: 0,
 		}).per1mInputUsd;
 		expect(rejection).toBeTruthy();
-		expect(screen.getByText(rejection as string)).toBeTruthy();
+		screen.getByText(rejection as string);
 		expect(onSave).not.toHaveBeenCalled();
 	});
 
@@ -176,9 +176,7 @@ describe("AdminLlmModelFormDialog", () => {
 		expect(screen.getByRole("switch", { name: "Active" }).getAttribute("aria-checked")).toBe(
 			"false",
 		);
-		expect(
-			screen.getByText("Work on this model stops immediately, in every workspace"),
-		).toBeTruthy();
+		screen.getByText("Work on this model stops immediately, in every workspace");
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSave.mock.calls[0]?.[0].metadata).toEqual(expect.objectContaining({ enabled: false }));
 	});

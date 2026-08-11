@@ -36,8 +36,8 @@ describe("AdminLlmModelAccessDialog", () => {
 		);
 
 		fireEvent.click(screen.getByRole("radio", { name: /^Selected workspaces/i }));
-		expect(screen.getByText(/stop in the workspaces you removed/i)).toBeTruthy();
-		expect(screen.getByText(/no workspace will be able to use this model/i)).toBeTruthy();
+		screen.getByText(/stop in the workspaces you removed/i);
+		screen.getByText(/no workspace will be able to use this model/i);
 	});
 
 	it("saves the selected workspace allowlist", async () => {
@@ -118,7 +118,7 @@ describe("AdminLlmModelAccessDialog", () => {
 		fireEvent.click(await screen.findByRole("option", { name: /alpha/i }));
 		fireEvent.click(await screen.findByRole("option", { name: /beta/i }));
 
-		expect(screen.getByText("Future workspaces will need an explicit grant")).toBeTruthy();
+		screen.getByText("Future workspaces will need an explicit grant");
 		expect(screen.queryByText(/stop in the workspaces you removed/i)).toBeNull();
 	});
 
@@ -136,7 +136,7 @@ describe("AdminLlmModelAccessDialog", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Could not load workspaces")).toBeTruthy();
+		screen.getByText("Could not load workspaces");
 		expect(
 			(screen.getByRole("button", { name: "Save access" }) as HTMLButtonElement).disabled,
 		).toBe(true);

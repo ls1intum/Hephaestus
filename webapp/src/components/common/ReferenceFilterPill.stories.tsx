@@ -16,7 +16,7 @@ export const WithName: Story = {
 	args: { name: "Grace Hopper" },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Actor: Grace Hopper")).toBeInTheDocument();
+		canvas.getByText("Actor: Grace Hopper");
 	},
 };
 
@@ -24,7 +24,7 @@ export const IdOnly: Story = {
 	args: {},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Actor: #7")).toBeInTheDocument();
+		canvas.getByText("Actor: #7");
 	},
 };
 

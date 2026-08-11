@@ -97,8 +97,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 			/>,
 		);
 
-		expect(screen.getByRole("columnheader", { name: "Shared-model spend" })).toBeTruthy();
-		expect(screen.getByRole("columnheader", { name: "Provider spend" })).toBeTruthy();
+		screen.getByRole("columnheader", { name: "Shared-model spend" });
+		screen.getByRole("columnheader", { name: "Provider spend" });
 		const toggle = screen.getByRole("button", {
 			name: "View usage details for Example Workspace",
 		});
@@ -115,21 +115,19 @@ describe("AdminInstanceLlmUsageTable", () => {
 			{ ...workspace, ownProviderMonthlyBudgetUsd: 10, ownProviderBudgetVerdict: "WITHIN" },
 		]);
 
-		expect(screen.getByRole("columnheader", { name: "Shared-model budget" })).toBeTruthy();
-		expect(screen.getByRole("columnheader", { name: "Provider cap" })).toBeTruthy();
+		screen.getByRole("columnheader", { name: "Shared-model budget" });
+		screen.getByRole("columnheader", { name: "Provider cap" });
 		const row = within(firstDataRow());
-		expect(row.getByText("$25")).toBeTruthy();
-		expect(row.getByText("$10")).toBeTruthy();
+		row.getByText("$25");
+		row.getByText("$10");
 	});
 
 	it("shows how much of each cap is used, not just whether it is reached", () => {
 		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, instanceTotalCostUsd: 38.2 }]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("$38.20 · 76%")).toBeTruthy();
-		expect(
-			row.getByRole("progressbar", { name: "Shared-model budget used by Example Workspace" }),
-		).toBeTruthy();
+		row.getByText("$38.20 · 76%");
+		row.getByRole("progressbar", { name: "Shared-model budget used by Example Workspace" });
 		expect(screen.queryByText("Within budget")).toBeNull();
 	});
 
@@ -137,9 +135,9 @@ describe("AdminInstanceLlmUsageTable", () => {
 		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, instanceTotalCostUsd: 41 }]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Near cap · shared models")).toBeTruthy();
+		row.getByText("Near cap · shared models");
 		// The amber tone alone must never carry the state (WCAG SC 1.4.1).
-		expect(row.getByText("$41.00 · 82% · Near cap")).toBeTruthy();
+		row.getByText("$41.00 · 82% · Near cap");
 	});
 
 	it("names the cap that paused the workspace", () => {
@@ -156,8 +154,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Paused · shared models")).toBeTruthy();
-		expect(row.getByText("Paused · own provider")).toBeTruthy();
+		row.getByText("Paused · shared models");
+		row.getByText("Paused · own provider");
 	});
 
 	it("reports a provider-cap pause even when the shared-model budget is untouched", () => {
@@ -173,7 +171,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Paused · own provider")).toBeTruthy();
+		row.getByText("Paused · own provider");
 		expect(row.queryByText("Paused · shared models")).toBeNull();
 	});
 
@@ -198,7 +196,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 			.getAllByRole("button")
 			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
 		expect(buttons).toEqual(["View usage details for Example Workspace"]);
-		expect(screen.getByText(/applies from the moment it is saved/i)).toBeTruthy();
+		screen.getByText(/applies from the moment it is saved/i);
 	});
 
 	it("says nothing about month scope while the editors are on screen", () => {
@@ -231,11 +229,11 @@ describe("AdminInstanceLlmUsageTable", () => {
 				.getAttribute("aria-expanded"),
 		).toBe("true");
 		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
-		expect(within(byJobType).getByText("Mentor turn")).toBeTruthy();
-		expect(within(byJobType).getByText("$1.75")).toBeTruthy();
+		within(byJobType).getByText("Mentor turn");
+		within(byJobType).getByText("$1.75");
 		const byDay = screen.getByRole("table", { name: "AI spend by day" });
-		expect(within(byDay).getByText("Jul 5")).toBeTruthy();
-		expect(within(byDay).getByText("$4.25")).toBeTruthy();
+		within(byDay).getByText("Jul 5");
+		within(byDay).getByText("$4.25");
 	});
 
 	it("projects a near-cap month in the panel, in the third person the host is reading in", () => {
@@ -260,10 +258,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 			/>,
 		);
 
-		expect(
-			screen.getByText("Example Workspace has used 84% of its shared-model budget"),
-		).toBeTruthy();
-		expect(screen.getByText(/At this pace, the budget is reached around July 12\./)).toBeTruthy();
+		screen.getByText("Example Workspace has used 84% of its shared-model budget");
+		screen.getByText(/At this pace, the budget is reached around July 12\./);
 		expect(screen.queryByText(/of its provider cap/)).toBeNull();
 	});
 
@@ -279,8 +275,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 			renderTable([workspace], { fx: eur });
 
 			const row = within(firstDataRow());
-			expect(row.getByLabelText("approximately 3.74 euros")).toBeTruthy();
-			expect(row.getByLabelText("approximately 1.54 euros")).toBeTruthy();
+			row.getByLabelText("approximately 3.74 euros");
+			row.getByLabelText("approximately 1.54 euros");
 		});
 
 		it("stays silent about a rate nothing on the table used", () => {
@@ -294,7 +290,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 		it("survives a month with no workspaces in it", () => {
 			renderTable([], { fx: eur });
 
-			expect(screen.getByText("No workspaces on this instance yet")).toBeTruthy();
+			screen.getByText("No workspaces on this instance yet");
 			expect(screen.queryByText(/reference rate published on/)).toBeNull();
 		});
 

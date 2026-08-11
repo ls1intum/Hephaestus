@@ -42,7 +42,7 @@ export const NothingScheduled: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/nothing is checked on a schedule/i)).toBeInTheDocument();
+		canvas.getByText(/nothing is checked on a schedule/i);
 		// A closed Base UI trigger falls back to printing the raw value, and "scm.pull_request" is not
 		// a decision anyone can check.
 		await expect(canvas.getByRole("combobox", { name: /Kind of work/ })).toHaveTextContent(
@@ -53,10 +53,8 @@ export const NothingScheduled: Story = {
 		);
 		// The one control that authorises spending again and again names the work it commits to, and
 		// the sentence beside it says the commitment outlives the first check.
-		await expect(
-			canvas.getByRole("button", { name: "Start checking pull or merge requests" }),
-		).toBeInTheDocument();
-		await expect(canvas.getByText(/not just the first/i)).toBeInTheDocument();
+		canvas.getByRole("button", { name: "Start checking pull or merge requests" });
+		canvas.getByText(/not just the first/i);
 		await expectNoPageOverflow();
 	},
 };
@@ -87,16 +85,12 @@ export const Running: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/every day, covering the last 2 days/i)).toBeInTheDocument();
+		canvas.getByText(/every day, covering the last 2 days/i);
 		// The row's own kind is inside the accessible name: with a schedule per kind, three buttons
 		// reading "Pause" would leave a voice-control or screen-reader user guessing which row they
 		// stopped (WCAG 2.2 SC 2.5.3, SC 2.4.6).
-		await expect(
-			canvas.getByRole("button", { name: "Pause checking pull or merge requests" }),
-		).toBeInTheDocument();
-		await expect(
-			canvas.getByRole("button", { name: "Remove the recurring check on pull or merge requests" }),
-		).toBeInTheDocument();
+		canvas.getByRole("button", { name: "Pause checking pull or merge requests" });
+		canvas.getByRole("button", { name: "Remove the recurring check on pull or merge requests" });
 		await expectNoPageOverflow();
 	},
 };
@@ -110,7 +104,7 @@ export const NotRunYet: Story = {
 	args: { schedules: [schedule({ lastRunAt: undefined })] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/has not checked anything yet/i)).toBeInTheDocument();
+		canvas.getByText(/has not checked anything yet/i);
 	},
 };
 
@@ -118,10 +112,8 @@ export const Paused: Story = {
 	args: { schedules: [schedule({ enabled: false })] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/nothing is being checked/i)).toBeInTheDocument();
-		await expect(
-			canvas.getByRole("button", { name: "Resume checking pull or merge requests" }),
-		).toBeInTheDocument();
+		canvas.getByText(/nothing is being checked/i);
+		canvas.getByRole("button", { name: "Resume checking pull or merge requests" });
 	},
 };
 
@@ -168,10 +160,10 @@ export const CouldNotLoad: Story = {
 	args: { isError: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/recurring checks couldn't be loaded/i)).toBeInTheDocument();
+		canvas.getByText(/recurring checks couldn't be loaded/i);
 		// The failure is about this screen, not about the workspace: without saying so, an admin reads
 		// "couldn't be loaded" as "stopped" and schedules a second check over the same work.
-		await expect(canvas.getByText(/still running/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+		canvas.getByText(/still running/i);
+		canvas.getByRole("button", { name: "Try again" });
 	},
 };

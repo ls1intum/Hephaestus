@@ -131,7 +131,7 @@ describe("AdminDangerZoneSettings", () => {
 		await renderContainer();
 
 		expect(screen.queryByText(/only the workspace owner/i)).toBeNull();
-		expect(screen.getByText(/checking your permissions/i)).toBeTruthy();
+		screen.getByText(/checking your permissions/i);
 
 		resolveRole();
 		await waitFor(() => expect(deleteButton()).toBeTruthy(), WAIT);
