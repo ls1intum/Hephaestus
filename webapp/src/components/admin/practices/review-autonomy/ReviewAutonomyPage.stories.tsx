@@ -10,7 +10,11 @@ const small = buildAutonomyFixture({
 			slug: "pull-request-hygiene",
 			name: "Pull request hygiene",
 			practices: [
-				{ name: "States the motivation" },
+				{
+					name: "States the motivation",
+					whyItMatters:
+						"Your reviewer was not in your head when you wrote the code. A sentence on why you made the change spares them from reverse-engineering your intent from the diff.",
+				},
 				{ name: "Links the issue it closes", override: "PROPOSE" },
 			],
 		},
@@ -174,6 +178,53 @@ export const PracticeOverrideWithReset: Story = {
 };
 
 /**
+ * What a row says about the practice it is deciding for.
+ *
+ * <p>A name and a control cannot be acted on: "Explains the trade-off" tells an admin nothing about what
+ * Hephaestus would say to their team, or how often. So the row carries the kind of work — which is what
+ * makes Deliver cheap or expensive — and the catalogue's own sentence on why the practice exists. Both
+ * are optional on the API, and the second practice here carries neither, because a locally written
+ * practice usually will not.
+ */
+export const PracticeContext: Story = {
+	args: (() => {
+		const fixture = buildAutonomyFixture({
+			areas: [
+				{
+					slug: "documentation",
+					name: "Documentation",
+					practices: [
+						{
+							name: "Explains the trade-off it chose",
+							artifactKind: "docs.document",
+							whyItMatters:
+								"A decision without its alternatives reads as arbitrary six months later. Naming what you did not do is what lets the next person tell a considered choice from an accident.",
+						},
+						{ name: "Written by hand, and says nothing more" },
+					],
+				},
+			],
+		});
+		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
+	})(),
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Documentation/ }));
+
+		const described = canvas.getByText("Explains the trade-off it chose").closest("li");
+		if (!(described instanceof HTMLElement)) throw new Error("Practice row not rendered");
+		// The kind of work is named in the vocabulary the practice catalogue uses, not the raw id.
+		await expect(within(described).getByText("Document")).toBeVisible();
+		await expect(within(described).getByText(/reads as arbitrary six months later/)).toBeVisible();
+
+		// A practice carrying neither still reads as a row: the kind is always known, the prose is not.
+		const bare = canvas.getByText("Written by hand, and says nothing more").closest("li");
+		if (!(bare instanceof HTMLElement)) throw new Error("Bare row not rendered");
+		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
+		await expectNoPageOverflow();
+	},
+};
+
+/**
  * The highest-value control on a hundred-row page: what is left is the handful somebody changed —
  * including an area whose own tier was set even though none of its practices were.
  */
@@ -280,6 +331,40 @@ export const AtScale: Story = {
 		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(27);
 		await expect(canvas.queryByRole("checkbox", { name: /^Select / })).not.toBeInTheDocument();
 		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * Every decision on the page sits in one column.
+ *
+ * <p>This is a layout assertion because the bug was invisible to every other kind. An area's ladder used
+ * to be laid out after a content-width accordion header, so its left edge moved with the length of the
+ * area's name — 285px under "Documentation", 416px under "Pull request hygiene" — and the practice rows
+ * below pinned theirs to the right edge instead. Twenty-five areas meant twenty-five left edges. Nothing
+ * about the DOM, the roles or the text changed when that happened, so nothing caught it.
+ */
+export const DecisionsShareOneColumn: Story = {
+	args: (() => {
+		const fixture = scaleFixture();
+		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
+	})(),
+	globals: { viewport: { value: "desktop" } },
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		// The two-track layout only exists from `sm` up; below it every ladder is full width and shares a
+		// left edge whatever the bug is doing. Asserted, so a runner that ignored the viewport would fail
+		// here rather than pass the story for the wrong reason.
+		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
+
+		await userEvent.click(canvas.getByRole("button", { name: /^Pull request hygiene/ }));
+
+		const lefts = canvas
+			.getAllByRole("radiogroup", { name: /^How far Hephaestus may go (in|on) / })
+			.map((group) => Math.round(group.getBoundingClientRect().left));
+
+		await expect(lefts.length).toBeGreaterThan(25);
+		// One column, to within the sub-pixel rounding of a grid track inside a grid track.
+		await expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(2);
 	},
 };
 

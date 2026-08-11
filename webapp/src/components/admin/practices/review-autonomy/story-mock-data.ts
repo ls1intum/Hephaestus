@@ -27,6 +27,13 @@ export interface PracticeSpec {
 	override?: ReviewTier;
 	/** False for a practice Hephaestus cannot review — the server pins those to Off. */
 	reviewable?: boolean;
+	/**
+	 * The catalogue's own sentence on why the practice exists. Optional on the API and optional here:
+	 * a locally written practice need not carry one, and the row has to read without it.
+	 */
+	whyItMatters?: string;
+	/** Defaults to a pull request. Set it to prove the row names the kind it is deciding about. */
+	artifactKind?: string;
 }
 
 export interface AreaSpec {
@@ -92,7 +99,8 @@ export function buildAutonomyFixture({
 				areaSlug: area.slug ?? undefined,
 				bindings: [mockPullRequestBinding],
 				criteria: `## ${spec.name}\n\nWhat a review looks for.`,
-				artifactKind: "scm.pull_request",
+				artifactKind: spec.artifactKind ?? "scm.pull_request",
+				whyItMatters: spec.whyItMatters,
 				automatedReviewPolicy:
 					spec.reviewable === false
 						? {

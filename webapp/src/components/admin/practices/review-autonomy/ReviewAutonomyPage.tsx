@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -34,8 +35,11 @@ import {
 	FieldLabel,
 	FieldTitle,
 } from "@/components/ui/field";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { artifactKindLabel } from "@/lib/artifact-kinds";
 import {
 	FEEDBACK_REACH_DESCRIPTIONS,
 	FEEDBACK_REACH_LABELS,
@@ -49,6 +53,7 @@ import {
 	tierDistributionSentence,
 	tierTotal,
 } from "@/lib/review-tiers";
+import { cn } from "@/lib/utils";
 import { ReviewTierLadder } from "./ReviewTierLadder";
 import {
 	type AutonomyGroup,
@@ -57,6 +62,20 @@ import {
 	isOverridden,
 	reviewableByHephaestus,
 } from "./review-autonomy-model";
+
+/**
+ * The width of the decision column, shared by an area's ladder and its practices'.
+ *
+ * <p>They are the same control at two levels of the same chain, so they belong in one column. They used
+ * not to be: an area's ladder was laid out after a content-width accordion header, which put it at a
+ * different x for every area — 285px under "Documentation", 416px under "Pull request hygiene" — while
+ * the practice rows underneath pinned theirs to the right edge at 950px. Twenty-five areas, twenty-five
+ * left edges, and no column anywhere on the page.
+ */
+const DECISION_COLUMN = "sm:w-80";
+
+/** Area header and practice row lay out on the same two-track grid so the tracks line up. */
+const DECISION_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
 
 export interface ReviewAutonomyPendingState {
 	workspace: boolean;
@@ -159,6 +178,9 @@ export function ReviewAutonomyPage({
 			<div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<TierSummary counts={rollup.counts} overrides={overrides} />
+					{/* Hidden below `sm`, where the two stack and a rule between them is the gap already
+					    there. Vertical separators need a height to draw at all. */}
+					<Separator orientation="vertical" className="hidden h-8 sm:block" />
 					<Field orientation="horizontal" className="w-auto sm:justify-end">
 						<FieldLabel htmlFor="autonomy-overrides-only" className="font-normal text-sm">
 							Only what was set by hand
@@ -433,43 +455,50 @@ function BulkActionBar({
 	if (count === 0 && bulk === null) return null;
 
 	return (
-		<div
-			className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/50 px-3 py-2"
-			role="group"
-			aria-label="Selected practices"
-		>
-			<p aria-live="polite" aria-atomic="true" className="mr-auto text-sm">
-				{bulk
-					? `Changing ${bulk.done} of ${bulk.total}…`
-					: `${count} ${count === 1 ? "practice" : "practices"} selected`}
-			</p>
-			<DropdownMenu>
-				<DropdownMenuTrigger
-					render={
-						<Button size="sm" variant="outline" disabled={bulk !== null || count === 0}>
-							Change the selected
-						</Button>
-					}
-				/>
-				<DropdownMenuContent align="end">
-					{/* The label has to live inside a group: it renders Base UI's `Menu.GroupLabel`, which
-					    needs a `Menu.Group` above it and takes the whole popup down without one. */}
-					<DropdownMenuGroup>
-						<DropdownMenuLabel>Set every selected practice to</DropdownMenuLabel>
-						{REVIEW_TIER_ORDER.map((tier) => (
-							<DropdownMenuItem key={tier} onClick={() => onSet(tier)}>
-								{REVIEW_TIER_LABELS[tier]}
+		<Item variant="muted" size="sm" role="group" aria-label="Selected practices">
+			<ItemContent>
+				<ItemTitle aria-live="polite" aria-atomic="true" className="font-normal">
+					{bulk
+						? `Changing ${bulk.done} of ${bulk.total}…`
+						: `${count} ${count === 1 ? "practice" : "practices"} selected`}
+				</ItemTitle>
+			</ItemContent>
+			{/* Welded, because they are one decision taken two ways — act on the selection, or drop it.
+			    Two free-floating buttons of different variants at slightly different widths were the
+			    ragged right edge of this strip. */}
+			<ItemActions>
+				<ButtonGroup>
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							render={
+								<Button size="sm" variant="outline" disabled={bulk !== null || count === 0}>
+									Change the selected
+								</Button>
+							}
+						/>
+						<DropdownMenuContent align="end">
+							{/* The label has to live inside a group: it renders Base UI's `Menu.GroupLabel`,
+							    which needs a `Menu.Group` above it and takes the whole popup down without one. */}
+							<DropdownMenuGroup>
+								<DropdownMenuLabel>Set every selected practice to</DropdownMenuLabel>
+								{REVIEW_TIER_ORDER.map((tier) => (
+									<DropdownMenuItem key={tier} onClick={() => onSet(tier)}>
+										{REVIEW_TIER_LABELS[tier]}
+									</DropdownMenuItem>
+								))}
+							</DropdownMenuGroup>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => onSet(null)}>
+								Use the inherited setting
 							</DropdownMenuItem>
-						))}
-					</DropdownMenuGroup>
-					<DropdownMenuSeparator />
-					<DropdownMenuItem onClick={() => onSet(null)}>Use the inherited setting</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
-			<Button size="sm" variant="ghost" disabled={bulk !== null} onClick={onClear}>
-				Clear selection
-			</Button>
-		</div>
+						</DropdownMenuContent>
+					</DropdownMenu>
+					<Button size="sm" variant="outline" disabled={bulk !== null} onClick={onClear}>
+						Clear selection
+					</Button>
+				</ButtonGroup>
+			</ItemActions>
+		</Item>
 	);
 }
 
@@ -505,8 +534,15 @@ function AreaGroup({
 		selectableSlugs.length > 0 && selectableSlugs.every((slug) => selected.has(slug));
 
 	return (
-		<AccordionItem value={group.key} className="px-3 last:border-b-0">
-			<div className="flex flex-col gap-2 py-1 sm:flex-row sm:items-center sm:gap-4">
+		// `scroll-mt-24` clears the sticky summary. Tabbing to an area's trigger scrolls it into view, and
+		// `scroll-margin` is what that scroll respects; without it the heading a keyboard user just moved
+		// to landed under the strip — measured at 320px, the strip covers y 0–93.
+		<AccordionItem value={group.key} className="scroll-mt-24 px-3 last:border-b-0">
+			{/* A grid, not a flex row. `AccordionTrigger` wraps its button in a `Header` with a hardcoded
+			    `className="flex"`, so the `flex-1` handed to the trigger landed on the button *inside* a
+			    content-sized header and never widened it — which is why every area's ladder started at a
+			    different x. A grid track sizes the header from outside, so it cannot be opted out of. */}
+			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", DECISION_GRID)}>
 				<AccordionTrigger className="min-w-0 flex-1">
 					<span className="flex min-w-0 flex-col gap-1">
 						<span className="flex flex-wrap items-center gap-2">
@@ -525,11 +561,11 @@ function AreaGroup({
 				{areaSlug === null ? (
 					// The no-area bucket is not a row in any table, so it has nothing to hold a decision.
 					// Its practices inherit the workspace default directly.
-					<span className="min-w-0 text-muted-foreground text-xs sm:w-80">
+					<span className={cn("min-w-0 text-muted-foreground text-xs", DECISION_COLUMN)}>
 						Follows the workspace default
 					</span>
 				) : (
-					<div className="min-w-0 space-y-1 sm:w-80">
+					<div className={cn("min-w-0 space-y-1", DECISION_COLUMN)}>
 						<ReviewTierLadder
 							label={`How far Hephaestus may go in ${group.name}`}
 							value={group.reviewTier.effective}
@@ -556,18 +592,26 @@ function AreaGroup({
 					</p>
 				) : (
 					<>
+						{/* Sits in the first grid track, so it starts on the same left edge as the practice
+						    names it acts on rather than floating loose above the list. */}
 						{selectableSlugs.length > 0 && (
-							<Button
-								variant="link"
-								size="sm"
-								className="h-auto p-0 text-xs"
-								aria-label={`${allSelected ? "Deselect" : "Select"} all ${selectableSlugs.length} practices in ${group.name}`}
-								onClick={() => onSelectMany(selectableSlugs, !allSelected)}
-							>
-								{allSelected ? "Deselect" : "Select"} all {selectableSlugs.length}
-							</Button>
+							<div className={cn("grid gap-2 sm:gap-4", DECISION_GRID)}>
+								<Button
+									variant="link"
+									size="sm"
+									className="h-auto w-fit p-0 text-xs"
+									aria-label={`${allSelected ? "Deselect" : "Select"} all ${selectableSlugs.length} practices in ${group.name}`}
+									onClick={() => onSelectMany(selectableSlugs, !allSelected)}
+								>
+									{allSelected ? "Deselect" : "Select"} all {selectableSlugs.length}
+								</Button>
+							</div>
 						)}
-						<ul className="mt-2 divide-y rounded-md border">
+						{/* Ruled, not boxed. A bordered card here drew a second box inside the area's own, and
+						    its border plus the rows' padding inset the practice ladders 14px from the area
+						    ladder directly above them — near enough to look like a mistake rather than a
+						    nesting. Rules separate the rows and the decision column runs straight. */}
+						<ul className="mt-2 divide-y border-t">
 							{group.practices.map((practice) => (
 								<PracticeAutonomyRow
 									key={practice.slug}
@@ -612,31 +656,63 @@ function PracticeAutonomyRow({
 	const limitation = automatedReviewLimitationLabel(practice.automatedReviewPolicy.automatedReview);
 
 	return (
-		<li className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4">
-			<div className="flex min-w-0 flex-1 items-start gap-3">
+		<Item
+			render={<li />}
+			variant="default"
+			// `px-0`: the row's grid tracks have to be the area header's tracks, or the two ladders do
+			// not share a column. Vertical padding stays — the rhythm is the row's, not the list's.
+			className={cn("grid items-start gap-2 rounded-none px-0 py-3 sm:gap-4", DECISION_GRID)}
+		>
+			<div className="flex min-w-0 items-start gap-3">
+				{/* `mt-0.5` puts the box on the first line's cap height rather than its box top, which is
+				    where a reader expects a control that belongs to the title beside it. */}
 				<Checkbox
 					checked={selected}
 					disabled={!reviewable}
 					aria-label={`Select ${practice.name}`}
-					className="mt-0.5"
+					className="mt-0.5 shrink-0"
 					onCheckedChange={(checked) => onToggle(practice.slug, checked === true)}
 				/>
-				<div className="min-w-0 space-y-0.5">
-					<Link
-						to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-						params={{ workspaceSlug, practiceSlug: practice.slug }}
-						className="break-words rounded-sm text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						{practice.name}
-					</Link>
-					{limitation && (
-						<Badge variant="warning" className="ml-2 font-normal">
-							{limitation}
-						</Badge>
+				<ItemContent className="min-w-0 gap-0.5">
+					<ItemTitle className="w-full min-w-0 line-clamp-none">
+						<Link
+							to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+							params={{ workspaceSlug, practiceSlug: practice.slug }}
+							className="break-words rounded-sm font-normal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						>
+							{practice.name}
+						</Link>
+					</ItemTitle>
+					{/* The kind of work, because it is the one fact that changes what this decision costs:
+					    Deliver on a pull-request practice writes on every PR the team opens, and Deliver on
+					    a document practice may never fire at all. Same vocabulary as the practice catalogue,
+					    so the two screens name a kind the same way. */}
+					<ItemDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+						<span>{artifactKindLabel(practice.artifactKind)}</span>
+						{limitation && (
+							<Badge variant="warning" className="font-normal">
+								{limitation}
+							</Badge>
+						)}
+					</ItemDescription>
+					{/* Why the practice exists, in the catalogue's own words. An admin setting autonomy on a
+					    name like "Scope the change to one concern" cannot tell from the name what Hephaestus
+					    would be saying to their team; this is the sentence that tells them, and it is the
+					    only human-written prose a practice carries. Clamped to two lines: unbounded it makes
+					    a hundred-row list unscannable, and a prior pass tripped axe's
+					    `scrollable-region-focusable` on exactly this kind of overlong description. */}
+					{practice.whyItMatters && (
+						// `max-w-prose` because the first track is half a 1440px screen: unconstrained, this
+						// sentence set 105 characters to the line, well past the measure anyone reads
+						// comfortably. `mt-1` makes the step down from the meta line deliberate rather than
+						// whatever the two line-heights happened to leave.
+						<ItemDescription className="mt-1 max-w-prose text-xs">
+							{practice.whyItMatters}
+						</ItemDescription>
 					)}
-				</div>
+				</ItemContent>
 			</div>
-			<div className="min-w-0 space-y-1 sm:w-80">
+			<ItemActions className={cn("min-w-0 flex-col items-stretch gap-1", DECISION_COLUMN)}>
 				<ReviewTierLadder
 					label={`How far Hephaestus may go on ${practice.name}`}
 					value={practice.reviewTier.effective}
@@ -657,8 +733,8 @@ function PracticeAutonomyRow({
 						Hephaestus can't review this practice, so it stays off.
 					</p>
 				)}
-			</div>
-		</li>
+			</ItemActions>
+		</Item>
 	);
 }
 
