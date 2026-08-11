@@ -984,9 +984,9 @@ export type UpdateRepositorySettingsRequest = {
  */
 export type UpdatePracticeReviewTierRequest = {
     /**
-     * OFF = not reviewed at all · OBSERVE = the review runs and every observation is recorded, and nobody is told · DELIVER = feedback is delivered without asking. Send null (or omit the field) to hold no tier here and inherit — a practice inherits its area's, an area inherits the workspace default. PROPOSE is declared but not selectable yet: it would prepare feedback with no way for anyone to approve it.
+     * OFF = not reviewed at all · PROPOSE = the review runs and every observation is recorded, and nothing is sent · DELIVER = feedback is delivered without asking. Send null (or omit the field) to hold no tier here and inherit — a practice inherits its area's, an area inherits the workspace default.
      */
-    reviewTier?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    reviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
 };
 
 /**
@@ -1000,7 +1000,7 @@ export type UpdatePracticeReviewSettingsRequest = {
     /**
      * How much autonomy the system has over practices and areas that hold no tier of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet.
      */
-    defaultReviewTier?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    defaultReviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
     /**
      * Deliver feedback to already-merged PRs/MRs
      */
@@ -1892,9 +1892,9 @@ export type ReviewTierRollup = {
  */
 export type ReviewTierAssignment = {
     /**
-     * The tier actually in force. OFF = not reviewed · OBSERVE = reviewed and recorded, nobody is told · PROPOSE = feedback prepared for a human to approve (not selectable yet) · DELIVER = feedback delivered without asking
+     * The tier actually in force. OFF = not reviewed · PROPOSE = reviewed and recorded, feedback held back and nothing sent · DELIVER = feedback delivered without asking
      */
-    effective: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    effective: 'OFF' | 'PROPOSE' | 'DELIVER';
     /**
      * True when this practice or area holds no tier of its own and follows a level above
      */
@@ -1902,7 +1902,7 @@ export type ReviewTierAssignment = {
     /**
      * The tier set on this practice or area itself, or null when it holds none and inherits. Send null to the tier endpoint to clear it back to this state.
      */
-    override?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    override?: 'OFF' | 'PROPOSE' | 'DELIVER';
     /**
      * Which level decided the effective tier: PRACTICE, AREA or WORKSPACE
      */
@@ -3127,7 +3127,7 @@ export type PracticeTraceEntry = {
     /**
      * How much autonomy the workspace currently gives this practice, after inheritance
      */
-    reviewTier: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    reviewTier: 'OFF' | 'PROPOSE' | 'DELIVER';
     /**
      * The signals this practice watches
      */
@@ -3153,11 +3153,11 @@ export type PracticeReviewSettings = {
     /**
      * Effective: how much autonomy the system has over practices and areas that hold no tier of their own — the bottom of the practice → area → workspace chain
      */
-    defaultReviewTier: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    defaultReviewTier: 'OFF' | 'PROPOSE' | 'DELIVER';
     /**
      * Raw override; null = this workspace has never chosen, so DELIVER applies
      */
-    defaultReviewTierOverride?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+    defaultReviewTierOverride?: 'OFF' | 'PROPOSE' | 'DELIVER';
     /**
      * Effective: deliver feedback to merged PRs/MRs
      */
@@ -9084,7 +9084,7 @@ export type ListPracticesData = {
         /**
          * Keep only the practices whose tier IN FORCE is exactly this one, inherited or not
          */
-        reviewTier?: 'OFF' | 'OBSERVE' | 'PROPOSE' | 'DELIVER';
+        reviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
     };
     url: '/workspaces/{workspaceSlug}/practices';
 };

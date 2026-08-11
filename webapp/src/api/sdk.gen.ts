@@ -1521,7 +1521,7 @@ export const updateArea = <ThrowOnError extends boolean = false>(options: Option
 /**
  * Set how much autonomy the system has over one area
  *
- * Applies to every practice in the area that holds no tier of its own; practices that set their own are left alone. OFF stops their reviews entirely. OBSERVE runs them and records every observation without telling anyone. DELIVER sends feedback without asking. Send a null tier to clear the area's own setting so it follows the workspace default.
+ * Applies to every practice in the area that holds no tier of its own; practices that set their own are left alone. OFF stops their reviews entirely. PROPOSE runs them and records every observation, and sends nothing. DELIVER sends feedback without asking. Send a null tier to clear the area's own setting so it follows the workspace default.
  */
 export const setAreaReviewTier = <ThrowOnError extends boolean = false>(options: Options<SetAreaReviewTierData, ThrowOnError>) => (options.client ?? client).patch<SetAreaReviewTierResponses, SetAreaReviewTierErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -1965,7 +1965,7 @@ export const placePractice = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Set how much autonomy the system has over one practice
  *
- * OFF stops the review entirely. OBSERVE runs it and records every observation without telling anyone. DELIVER sends feedback without asking, as far as this workspace's reach allows. Send a null tier to clear the practice's own setting so it follows its area, and through the area the workspace default.
+ * OFF stops the review entirely. PROPOSE runs it and records every observation and sends nothing. DELIVER sends feedback without asking, as far as this workspace's reach allows. Send a null tier to clear the practice's own setting so it follows its area, and through the area the workspace default.
  */
 export const setReviewTier = <ThrowOnError extends boolean = false>(options: Options<SetReviewTierData, ThrowOnError>) => (options.client ?? client).patch<SetReviewTierResponses, SetReviewTierErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

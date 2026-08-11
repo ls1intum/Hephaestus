@@ -4187,11 +4187,11 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier:
     patch:
-      description: Applies to every practice in the area that holds no tier of its
-        own; practices that set their own are left alone. OFF stops their reviews
-        entirely. OBSERVE runs them and records every observation without telling
-        anyone. DELIVER sends feedback without asking. Send a null tier to clear the
-        area's own setting so it follows the workspace default.
+      description: "Applies to every practice in the area that holds no tier of its\
+        \ own; practices that set their own are left alone. OFF stops their reviews\
+        \ entirely. PROPOSE runs them and records every observation, and sends nothing.\
+        \ DELIVER sends feedback without asking. Send a null tier to clear the area's\
+        \ own setting so it follows the workspace default."
       operationId: setAreaReviewTier
       parameters:
       - description: Workspace slug
@@ -4280,7 +4280,6 @@ paths:
           type: string
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
       responses:
@@ -5804,9 +5803,9 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier:
     patch:
-      description: "OFF stops the review entirely. OBSERVE runs it and records every\
-        \ observation without telling anyone. DELIVER sends feedback without asking,\
-        \ as far as this workspace's reach allows. Send a null tier to clear the practice's\
+      description: "OFF stops the review entirely. PROPOSE runs it and records every\
+        \ observation and sends nothing. DELIVER sends feedback without asking, as\
+        \ far as this workspace's reach allows. Send a null tier to clear the practice's\
         \ own setting so it follows its area, and through the area the workspace default."
       operationId: setReviewTier
       parameters:
@@ -10740,7 +10739,6 @@ components:
             \ → area → workspace chain"
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
         defaultReviewTierOverride:
@@ -10749,7 +10747,6 @@ components:
             \ applies"
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
         deliverToMerged:
@@ -10867,7 +10864,6 @@ components:
             \ after inheritance"
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
         watches:
@@ -12625,13 +12621,11 @@ components:
       properties:
         effective:
           type: string
-          description: "The tier actually in force. OFF = not reviewed · OBSERVE =\
-            \ reviewed and recorded, nobody is told · PROPOSE = feedback prepared\
-            \ for a human to approve (not selectable yet) · DELIVER = feedback delivered\
-            \ without asking"
+          description: "The tier actually in force. OFF = not reviewed · PROPOSE =\
+            \ reviewed and recorded, feedback held back and nothing sent · DELIVER\
+            \ = feedback delivered without asking"
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
         inherited:
@@ -12645,7 +12639,6 @@ components:
             \ it back to this state."
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
         source:
@@ -13640,7 +13633,6 @@ components:
             to clear it. PROPOSE is not selectable yet.
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
         deliverToMerged:
@@ -13684,15 +13676,13 @@ components:
       properties:
         reviewTier:
           type: string
-          description: "OFF = not reviewed at all · OBSERVE = the review runs and\
-            \ every observation is recorded, and nobody is told · DELIVER = feedback\
+          description: "OFF = not reviewed at all · PROPOSE = the review runs and\
+            \ every observation is recorded, and nothing is sent · DELIVER = feedback\
             \ is delivered without asking. Send null (or omit the field) to hold no\
             \ tier here and inherit — a practice inherits its area's, an area inherits\
-            \ the workspace default. PROPOSE is declared but not selectable yet: it\
-            \ would prepare feedback with no way for anyone to approve it."
+            \ the workspace default."
           enum:
           - "OFF"
-          - OBSERVE
           - PROPOSE
           - DELIVER
     UpdateRepositorySettingsRequest:
