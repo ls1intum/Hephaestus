@@ -556,7 +556,7 @@ function SortableAreaSection<
 			<div
 				ref={setDroppableNodeRef}
 				className={cn(
-					"flex items-center gap-2 rounded-lg px-2 transition-colors [&>h3]:min-w-0 [&>h3]:flex-1",
+					"flex items-center gap-2 rounded-lg px-2 transition-colors",
 					isOver && active?.data.current?.type === "entry" && "bg-accent/70",
 				)}
 			>
@@ -576,7 +576,7 @@ function SortableAreaSection<
 				{renderLeading?.(area)}
 				<AccordionTrigger
 					disabled={collapseDisabled}
-					className="w-full min-w-0 py-2.5 hover:no-underline disabled:opacity-100"
+					className="py-2.5 hover:no-underline disabled:opacity-100"
 				>
 					<span className="flex min-w-0 flex-wrap items-center gap-2">
 						<span className="min-w-0 break-words font-medium">{area.name}</span>

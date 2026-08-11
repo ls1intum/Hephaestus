@@ -27,6 +27,16 @@ const buttonVariants = cva(
 				xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
 				sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
 				lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+				// A button that sits inside a sentence. Every other size sets a height and a padding box,
+				// which is right for a control and wrong for the word "Use the default" in the middle of a
+				// line of prose — four call sites in the review settings alone were undoing `size="sm"` with
+				// `h-auto p-0 text-xs` to get here.
+				//
+				// The type size is inherited from the sentence, which is what `text-[length:inherit]` says
+				// and what `text-inherit` does not: that one sets the *colour*, and because a size wins the
+				// merge against a variant it silently repainted `variant="link"` from `text-primary` to the
+				// surrounding muted grey — a reset that no longer looked like a control.
+				inline: "h-auto gap-1 rounded-sm p-0 font-normal text-[length:inherit]",
 				icon: "size-8",
 				"icon-xs":
 					"size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
