@@ -314,8 +314,9 @@ input, it needs a governed source kind and purpose authorization.
 Two workspace-level gates decide whether a review is admitted at all, before any source is captured. Both
 refuse the signal with a typed reason rather than silently doing nothing.
 
-- **Loudness tier.** A practice at `OFF` admits no review; the quieter tiers still run it. When every
-  practice bound to a signal sits at `OFF`, the signal is refused with `PRACTICE_TIER_OFF`.
+- **Autonomy tier.** A practice at `OFF` admits no review; `PROPOSE` and `DELIVER` both run it and differ
+  only in whether the result is sent. When every practice bound to a signal sits at `OFF`, the signal is
+  refused with `PRACTICE_TIER_OFF`.
 - **Review scope.** An artifact outside the workspace's declared branches or repositories is refused with
   `OUT_OF_REVIEW_SCOPE`.
 

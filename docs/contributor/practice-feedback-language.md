@@ -47,12 +47,14 @@ than a measurement. The read APIs and the reviews UI say *findings* because rena
 own change; that is a reason to leave them alone, not a licence to write *finding* in new copy.
 
 For how much a workspace lets the system do on its own about a practice — including whether it is
-reviewed at all — use **autonomy tier** and its values **Off**, **Observe**, **Propose**, **Deliver**, as
+reviewed at all — use **autonomy tier** and its three values **Off**, **Propose**, **Deliver**, as
 the [practice review glossary](./practice-review-glossary.mdx#product-terms) defines them. Do not write
-*used in new reviews*: it is a boolean where the concept has four values, so it cannot express the tiers
+*used in new reviews*: it is a boolean where the concept has three values, so it cannot express the tier
 between silent measurement and unasked delivery. "Not reviewed at all" is the **Off** tier, not a separate
-concept. Do not write *loudness tier*: it named a ladder that mixed how much the system does with where it
-says it, and the second half is now **feedback reach**, a separate workspace setting.
+concept. **Propose** reviews the work and records everything it sees and sends nothing; do not write that
+it prepares, drafts or previews feedback, because at that tier no feedback is ever composed. Do not write
+*loudness tier*: it named a ladder that mixed how much the system does with where it says it, and the
+second half is now **feedback reach**, a separate workspace setting.
 
 A tier is also rarely a fact about one practice alone. Most practices hold no tier and inherit their area's,
 and most areas inherit the workspace's, so write **effective tier** for the one in force and **override**

@@ -138,15 +138,15 @@ Database values and columns migrate automatically. This change removes ambiguous
 practice payload carries `reviewTier` instead of `usedInNewReviews`, and the catalogue list filter is
 `?reviewTier=<TIER>` instead of `?usedInNewReviews=<bool>`. There are no aliases.
 
-The settings are `OFF`, `OBSERVE` and `DELIVER`, in increasing order of what the system does on its
+The settings are `OFF`, `PROPOSE` and `DELIVER`, in increasing order of what the system does on its
 own. Existing data maps exactly and needs no decision from you: a practice that was used in new
 reviews becomes `DELIVER`, one that was not becomes `OFF`, and the migration runs automatically.
-`OBSERVE` is new ground — the review still runs and every observation is still recorded, and only the
-delivery is held back.
+`PROPOSE` is new ground, and it is the middle the boolean could not express — the review still runs
+and every observation is still recorded, and nothing is sent to anyone. All three values are settable
+at every level; a practice only lands on `PROPOSE` because somebody put it there.
 
 Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its area,
-and the area follows the workspace default. A fourth value, `PROPOSE`, is reserved for feedback that
-waits for a person to approve it; it is rejected until that approval step exists.
+and the area follows the workspace default.
 
 #### 🟢 A workspace can restrict review to some branches and repositories
 

@@ -7,4 +7,5 @@ picker, the review activity list and its filter showed the raw `docs.document` i
 "Pull or merge request" and "Issue", and a document's review results carried a chat-thread icon.
 
 A practice's review-autonomy setting is also called the same thing on both screens that show it: the practice
-catalog and review activity disagreed over whether the quiet tier was "Measure" or "Measure only".
+catalog and review activity disagreed over what to call the setting that reviews a piece of work and
+then says nothing.

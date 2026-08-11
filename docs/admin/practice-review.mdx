@@ -120,11 +120,12 @@ Whether a draft is reviewed is decided **per practice**, on the practice itself
 
 Three independent settings, and confusing them is the most common misconfiguration.
 
-- **How much the system does on its own** — `Off`, `Observe`, `Deliver`. Only `Off` stops the review.
-  `Observe` runs it and records every observation exactly as `Deliver` does, and tells nobody. Turning a
-  noisy practice down therefore does not put a hole in the measurement, which is the entire reason this is
-  a dial and not a checkbox. (`Propose`, which would hold feedback for you to approve, is not available
-  yet — the screen shows it greyed out rather than pretending it works.)
+- **How much the system does on its own** — `Off`, `Propose`, `Deliver`. Only `Off` stops the review.
+  `Propose` runs it and records every observation exactly as `Deliver` does, and sends nothing to anybody.
+  Turning a noisy practice down therefore does not put a hole in the measurement, which is the entire
+  reason this is a dial and not a checkbox. What a `Propose` practice held back is not lost: **Review
+  activity** shows it as reviewed, with the measurements it took, nothing delivered, and the tier named as
+  the reason. Raise the practice to `Deliver` when you want it heard.
 - **Where feedback goes** — *In the mentor conversation only*, or *Also on the work itself* (pull-request
   summaries, inline notes, issue comments). One choice for the whole workspace. It can only ever narrow
   where feedback lands; it never gives a practice more autonomy than its own tier allows.
@@ -149,14 +150,10 @@ The **Practice setup** page shows, above the list, how many practices currently 
 the workspace and per area. Read that line before changing anything; it is the fastest way to see whether
 an override you made years ago is still doing what you think.
 
-Upgrading from the earlier per-practice loudness setting: `Off` and `Measure` carried over unchanged
-(`Measure` is now called `Observe`), `Engage` became the workspace default so nothing got louder or
-quieter, and `Coach` — which meant "speak in the mentor conversation but never on the work" — became
-`Observe`. `Coach` mixed *how much* with *where*, and *where* is now a workspace setting, so it could not
-be carried over exactly. It was resolved downwards deliberately: a system that comments on somebody's work
-should get louder because a person decided so, never because of an upgrade. If you had practices on
-`Coach`, set the workspace to *In the mentor conversation only* and raise those practices to `Deliver` to
-get the old behaviour back.
+Upgrading from the earlier per-practice on/off switch needs no decision from you: a practice that was used
+in new reviews now sits at `Deliver`, one that was not sits at `Off`, and nothing got louder or quieter.
+`Propose` is new ground — it is the setting the old boolean could not express, and no practice lands there
+unless somebody puts it there.
 
 Both are defined in full, with their refusal semantics, in the
 [practice review glossary](/contributor/practice-review-glossary). Do not re-derive them from this page.

@@ -13,7 +13,7 @@ There is also an index of everything the workspace recorded something about, bui
 rather than from what was reviewed, so work that was never reviewed appears in it too.
 
 Measurement and delivery are reported separately: a practice can be assessed and deliberately quiet —
-set to observe only, or after somebody disputed the last message — and the trace shows
+set to Propose, or after somebody disputed the last message — and the trace shows
 both the measurements taken and the reason nothing was sent.
 
 Any workspace member can read a trace, not just an admin.

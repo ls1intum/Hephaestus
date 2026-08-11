@@ -23,7 +23,7 @@ it propagates:
 | Bindings — the occasions a practice is reviewed on and the evidence each reads | declared as `on` in the bundled catalog; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
 | Review frame — contract version, review mode, known limitations | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form | copied, then customizable in the same practice form |
 | Included in new workspaces | default is included | instance administrator can include or exclude | not applicable after installation |
-| Loudness tier | not a repository setting | not a curated-catalog setting | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
+| Autonomy tier | not a repository setting | not a curated-catalog setting | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
 | Review scope | not a repository setting | not a curated-catalog setting | workspace administrator sets it once for the whole workspace |
 | Area and order | JSON array order | inherited or changed with drag-and-drop or move actions | copied, then independently managed |
 
@@ -170,10 +170,10 @@ covers name, description, icon, and color; position is excluded.
 
 ## Turning a practice down
 
-Loudness is a workspace decision, not a catalog one: a practice's `reviewTier` and the workspace's review
+Autonomy is a workspace decision, not a catalog one: a practice's `reviewTier` and the workspace's review
 scope both live outside the curated catalogue, and a curator never sets either. The
-[practice review glossary](./practice-review-glossary.mdx) defines both in full — the four tiers, what each
-one reaches, and the refusal reasons an out-of-scope or tier-`OFF` artifact records.
+[practice review glossary](./practice-review-glossary.mdx) defines both in full — the three tiers, what each
+one does, and the refusal reasons an out-of-scope or tier-`OFF` artifact records.
 
 What matters for curation is only this: turning a noisy practice down does **not** stop measuring it, so
 "this practice is too noisy" is never a reason to remove it from the catalogue.

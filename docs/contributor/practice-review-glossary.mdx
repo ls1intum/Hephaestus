@@ -39,7 +39,7 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Source-use purpose** | Why Hephaestus processes evidence, such as automated review or feedback delivery. | audience, recipient |
 | **Audience / recipient** | Who may receive or inspect evidence. | purpose |
 | **Review readiness** | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks. | validation, activation |
-| **Autonomy tier** | How much the system may do on its own about one practice: `OFF`, `OBSERVE`, `PROPOSE`, or `DELIVER`. Nullable at the practice and area levels, where null means "inherit". | loudness tier, used in new reviews, enabled, detectable |
+| **Autonomy tier** | How much the system may do on its own about one practice: `OFF`, `PROPOSE`, or `DELIVER`. Nullable at the practice and area levels, where null means "inherit". | loudness tier, used in new reviews, enabled, detectable |
 | **Feedback reach** | Where a workspace lets feedback go at all: `CONVERSATION` or `ON_THE_WORK`. One decision per workspace, ANDed with every tier. | loudness, channel setting |
 | **Effective tier** | The tier in force after resolving practice → area → workspace. Always server-resolved, always reported with the level it came from. | tier |
 | **Review scope** | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories. | filter, path filter, include pattern |
@@ -103,35 +103,46 @@ no producer, so it is measured and never delivered.
 question a boolean cannot answer, because measuring and intervening are separate decisions. Each tier adds
 to the one before it.
 
-| Tier | Review runs | Observation recorded | Feedback prepared | Feedback delivered |
-| --- | --- | --- | --- | --- |
-| `OFF` | no | no | no | no |
-| `OBSERVE` | yes | yes | no | no |
-| `PROPOSE` | yes | yes | yes | only once a human approves |
-| `DELIVER` | yes | yes | yes | yes, without asking |
+| Tier | Review runs | Observation recorded | Feedback delivered |
+| --- | --- | --- | --- |
+| `OFF` | no | no | no |
+| `PROPOSE` | yes | yes | no |
+| `DELIVER` | yes | yes | yes, without asking |
 
-Only `OFF` stops the review. `OBSERVE` runs it and records every observation exactly as `DELIVER` does; they
+Only `OFF` stops the review. `PROPOSE` runs it and records every observation exactly as `DELIVER` does; they
 differ only in what the system may do next. That is the point of the tier: turning a noisy practice down
 does not put a hole in the behaviour series. `DELIVER` is what a practice, area or workspace that has
 expressed no opinion resolves to.
 
+**Three tiers, not four.** An earlier ladder split the middle into `OBSERVE` (runs, records, prepares
+nothing) and `PROPOSE` (runs, records, prepares feedback for someone to approve). Both sent nothing, and no
+screen that showed them could tell them apart, so the boundary between them was unpickable in exactly the
+way the reach ladder below was. One middle rung, `PROPOSE`, carries the whole of "runs, records, says
+nothing". Semgrep (*Monitor / Comment / Block*), Kyverno (*Audit / Enforce*) and ESLint (*off / warn /
+error*) all draw the line in the same place.
+
 **The tier is autonomy, not reach.** It says how far the system may act alone. *Where* feedback may go is a
 separate, workspace-level decision — see [Feedback reach](#feedback-reach). The two were once one ladder,
 which did not order: a mentor chat is not obviously quieter or louder than one review comment, so the
-boundary between the two middle tiers was unpickable. Autonomy does order, and it is the adoption ladder a
-team actually walks.
+boundary between the middle tiers was unpickable. Autonomy does order, and it is the adoption ladder a team
+actually walks.
 
-**`PROPOSE` is declared and not selectable.** It is in the enum and in the DB CHECK so the ladder reads
-whole and so the value is representable the day the approval queue ships, but every write boundary —
-practice, area and workspace — refuses it with a reason naming the missing queue. A practice parked there
-would prepare feedback nobody can approve and swallow it, which is worse than not offering the tier. Do not
-reuse `FeedbackDeliveryState.PREPARED` for that queue when it is built: that state is an auto-advancing
-mentor-conversation slot with a 14-day TTL, flipped to `DELIVERED` by the next chat turn that links the
-finding, so parking approvals there would deliver them without anybody approving anything.
+**Nothing is composed or stored at `PROPOSE`.** A withheld finding is filtered out before the feedback body
+is built, and the ledger row it leaves behind carries no body, so there is no draft anywhere: no surface can
+show an administrator the message the practice would have sent, because that message was never written. Do
+not describe the tier as preparing feedback or as offering a preview. Every write boundary — practice, area
+and workspace — accepts `PROPOSE` like any other tier.
 
-A finding withheld by a tier is written to the feedback ledger as `SUPPRESSED` with reason
-`PRACTICE_TIER_QUIET` rather than dropped, so "we saw it and chose to stay quiet" reads differently from
-"we missed it" in every later evaluation.
+**A held finding stays visible as a refusal, not as a queue.** Each one is written to the feedback ledger as
+`SUPPRESSED` with reason `PRACTICE_TIER_QUIET` rather than dropped, bound to the observation it came from,
+so "we saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation. On
+the artifact's practice trace the same fact reads as outcome `REVIEWED` with `observationCount > 0`,
+`deliveredCount = 0`, and `PRACTICE_TIER_QUIET` among the `withheldReasons`. There is no approval queue and
+nobody approves an individual finding: what is held is released by raising the practice's effective tier to
+`DELIVER`. Should an approval step ever be built, do not reuse `FeedbackDeliveryState.PREPARED` for it —
+that state is an auto-advancing mentor-conversation slot with a 14-day TTL, flipped to `DELIVERED` by the
+next chat turn that links the finding, so parking approvals there would deliver them without anybody
+approving anything.
 
 ## Tier inheritance
 
@@ -153,7 +164,7 @@ decided it (`ReviewTierSource`: `PRACTICE`, `AREA`, `WORKSPACE`), and an `inheri
 
 Setting a tier is `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier` or
 `PATCH /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier`, both with body
-`{"reviewTier": "OBSERVE"}` — or `{"reviewTier": null}` to clear the override back to inherit. Clearing has
+`{"reviewTier": "PROPOSE"}` — or `{"reviewTier": null}` to clear the override back to inherit. Clearing has
 to be expressible or the chain is write-once. `GET /workspaces/{workspaceSlug}/practices/review-tiers`
 returns the per-area and per-workspace counts. The catalog list endpoint's `?reviewTier=<TIER>` filters on
 the **effective** tier, which is the only tier visible on the screen doing the filtering.
