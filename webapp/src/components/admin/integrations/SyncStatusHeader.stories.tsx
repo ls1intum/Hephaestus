@@ -3,6 +3,7 @@ import { ExternalLinkIcon } from "lucide-react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 import { buttonVariants } from "@/components/ui/button";
+import { expectSettledVisible } from "@/test/overlay";
 import { SyncStatusHeader } from "./SyncStatusHeader";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
@@ -209,7 +210,7 @@ export const RateLimitResetTooltip: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.hover(canvas.getByText("4,812"));
-		await expect(await screen.findByText(/resets in/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/resets in/i));
 	},
 };
 

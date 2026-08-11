@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { expectAmountRejected } from "@/test/budget-amount-field";
+import { expectSettledVisible } from "@/test/overlay";
 import { BudgetAmountDialog } from "./BudgetAmountDialog";
 import type { Fx } from "./fx";
 
@@ -70,13 +71,13 @@ export const WithLiveCurrencyHint: Story = {
 	args: { currentValueUsd: 50, fx: EUR, isCurrentMonth: true },
 	play: async ({ args }) => {
 		const dialog = await capDialog();
-		await expect(await dialog.findByText(/at today's rate\./)).toBeInTheDocument();
+		await expectSettledVisible(await dialog.findByText(/at today's rate\./));
 		dialog.getByLabelText("approximately 44 euros");
 
 		const input = dialog.getByLabelText(/monthly cap/i);
 		await userEvent.clear(input);
 		await userEvent.type(input, "120");
-		await expect(await dialog.findByLabelText("approximately 105 euros")).toBeInTheDocument();
+		await expectSettledVisible(await dialog.findByLabelText("approximately 105 euros"));
 
 		// An empty field has nothing to estimate, so the hint leaves rather than reading "≈ €0".
 		await userEvent.clear(input);

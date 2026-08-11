@@ -136,6 +136,6 @@ export const SubmitRejected: Story = {
 		await userEvent.type(dialog.getByLabelText(/paste a channel link or id/i), "C0974LJBPBK");
 		await userEvent.click(dialog.getByRole("button", { name: /^add channel$/i }));
 
-		await expect(await screen.findByRole("dialog")).toBeInTheDocument();
+		await expect(await screen.findByRole("dialog")).toBeVisible();
 	},
 };

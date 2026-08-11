@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { fn, screen, userEvent } from "storybook/test";
 import type { WorkspaceLlmModel } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectDialogFitsViewport } from "@/test/reflow";
 import { WorkspaceLlmModelFormDialog } from "./WorkspaceLlmModelFormDialog";
 
@@ -65,7 +66,7 @@ export const MobileReflow: Story = {
 export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /add inactive model/i }));
-		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
-		await expect(await screen.findByText(/upstream model id is required/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/display name is required/i));
+		await expectSettledVisible(await screen.findByText(/upstream model id is required/i));
 	},
 };

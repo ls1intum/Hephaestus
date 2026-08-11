@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { LoginProviderView } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { LoginProviderFormDialog } from "./LoginProviderFormDialog";
 
 const editing: LoginProviderView = {
@@ -60,7 +61,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Create: Story = {
 	play: async () => {
-		await expect(await screen.findByText("Add login provider")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Add login provider"));
 		await expect(screen.getByLabelText("Registration ID")).toBeEnabled();
 		screen.getByLabelText("Instance base URL");
 	},
@@ -80,7 +81,7 @@ export const CreateOutline: Story = {
 export const EditSlack: Story = {
 	args: { editing: editingSlack },
 	play: async () => {
-		await expect(await screen.findByText("Edit login provider")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Edit login provider"));
 		await expect(screen.queryByLabelText("Instance base URL")).not.toBeInTheDocument();
 		screen.getByText(/Use the same Slack app client ID and secret/);
 	},
@@ -89,7 +90,7 @@ export const EditSlack: Story = {
 export const EditOutline: Story = {
 	args: { editing: editingOutline },
 	play: async () => {
-		await expect(await screen.findByText("Edit login provider")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Edit login provider"));
 		await expect(screen.getByLabelText("Registration ID")).toBeDisabled();
 		await expect(screen.getByLabelText("Instance base URL")).toHaveValue(
 			"https://outline.acme.test",
@@ -101,7 +102,7 @@ export const EditOutline: Story = {
 export const Edit: Story = {
 	args: { editing },
 	play: async () => {
-		await expect(await screen.findByText("Edit login provider")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Edit login provider"));
 		await expect(screen.getByLabelText("Registration ID")).toBeDisabled();
 	},
 };

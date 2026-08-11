@@ -26,7 +26,7 @@ export const Empty: Story = {
 	parameters: { msw: { handlers: [noSessions] } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(await canvas.findByText("No active sessions found.")).toBeInTheDocument();
+		await expect(await canvas.findByText("No active sessions found.")).toBeVisible();
 	},
 };
 
@@ -35,6 +35,6 @@ export const ErrorState: Story = {
 	parameters: { msw: { handlers: [sessionsError] } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(await canvas.findByText(/Failed to load sessions/i)).toBeInTheDocument();
+		await expect(await canvas.findByText(/Failed to load sessions/i)).toBeVisible();
 	},
 };

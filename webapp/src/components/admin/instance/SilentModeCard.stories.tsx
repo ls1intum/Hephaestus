@@ -55,7 +55,7 @@ export const Engaged: Story = {
 		await userEvent.type(screen.getByLabelText(/type/i), "nope");
 		await userEvent.click(confirm);
 		await expect(args.onRelease).not.toHaveBeenCalled();
-		await expect(await screen.findByText(/does not match/i)).toBeInTheDocument();
+		await expect(await screen.findByText(/does not match/i)).toBeVisible();
 
 		await userEvent.clear(screen.getByLabelText(/type/i));
 		await userEvent.type(screen.getByLabelText(/type/i), "release");

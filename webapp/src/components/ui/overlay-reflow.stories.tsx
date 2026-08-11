@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactElement, ReactNode } from "react";
-import { expect, screen, userEvent, waitFor } from "storybook/test";
+import { screen, userEvent } from "storybook/test";
 import {
 	Combobox,
 	ComboboxContent,
@@ -33,6 +33,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { settledPopup } from "@/test/overlay";
 import { expectNoPageOverflow, expectOverlayFollowsTrigger } from "@/test/reflow";
 
 /**
@@ -83,36 +84,6 @@ function Page({ children }: { children: ReactNode }) {
 			<div className="flex justify-end">{children}</div>
 		</div>
 	);
-}
-
-/** The six popups this file is about — spelled out, so an open dialog is not mistaken for one. */
-const POSITIONED_POPUPS = [
-	"popover-content",
-	"hover-card-content",
-	"tooltip-content",
-	"dropdown-menu-content",
-	"select-content",
-	"combobox-content",
-]
-	.map((slot) => `[data-slot='${slot}']`)
-	.join(", ");
-
-/**
- * The popup is the box the positioner places. Its enter animation fades it in from nothing and
- * scales it to 95%, which would both fail `toBeVisible` and let a slightly-too-wide popup pass —
- * so wait for it to land before measuring anything.
- */
-async function settledPopup(): Promise<HTMLElement> {
-	const popup = await waitFor(() => {
-		const open = document.querySelector<HTMLElement>(POSITIONED_POPUPS);
-		if (open == null) {
-			throw new Error("No overlay is open, so measuring the page would prove nothing.");
-		}
-		return open;
-	});
-	await Promise.all(popup.getAnimations().map((animation) => animation.finished));
-	await waitFor(() => expect(popup).toBeVisible());
-	return popup;
 }
 
 function reflowStory(render: () => ReactElement, open: () => Promise<unknown>): Story {

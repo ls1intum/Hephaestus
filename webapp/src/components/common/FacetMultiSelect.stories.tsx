@@ -70,7 +70,7 @@ export const AccentInsensitiveSearch: Story = {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: "Workspaces" }));
 		await userEvent.type(await screen.findByPlaceholderText("Search…"), "arztliche");
-		await expect(await screen.findByRole("option", { name: /Ärztliche/ })).toBeInTheDocument();
+		await expect(await screen.findByRole("option", { name: /Ärztliche/ })).toBeVisible();
 		await expect(screen.queryByRole("option", { name: /Teaching/ })).toBeNull();
 	},
 };

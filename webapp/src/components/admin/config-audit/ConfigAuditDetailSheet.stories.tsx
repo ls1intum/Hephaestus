@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
 
 const baseEntry: ConfigAuditEntryView = {
@@ -36,8 +37,8 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async () => {
 		const body = within(document.body);
-		await expect(await body.findByText("Acme (#3)")).toBeInTheDocument();
-		await expect(await body.findByText(/timeoutSeconds/)).toBeInTheDocument();
+		await expectSettledVisible(await body.findByText("Acme (#3)"));
+		await expectSettledVisible(await body.findByText(/timeoutSeconds/));
 	},
 };
 

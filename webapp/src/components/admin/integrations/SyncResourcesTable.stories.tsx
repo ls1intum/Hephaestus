@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SyncResourceState } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { SCM_CLASS_KEYS, SyncResourcesTable } from "./SyncResourcesTable";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
@@ -253,7 +254,11 @@ const facetMix: SyncResourceState[] = [
 	},
 ];
 
-function FacetFallbackHarness() {
+/**
+ * Swaps the row set on click, so `resources` is the one prop the story owns rather than passes.
+ * Everything else still arrives as args, so the Controls panel keeps working.
+ */
+function FacetFallbackHarness(props: Omit<ComponentProps<typeof SyncResourcesTable>, "resources">) {
 	const [healed, setHealed] = useState(false);
 	const withAttention: SyncResourceState[] = [
 		{
@@ -287,13 +292,7 @@ function FacetFallbackHarness() {
 			<button type="button" onClick={() => setHealed(true)}>
 				Heal the stale row
 			</button>
-			<SyncResourcesTable
-				resources={healed ? allFresh : withAttention}
-				resourceNoun="repository"
-				resourceNounPlural="repositories"
-				syncIntervalSeconds={SYNC_INTERVAL_SECONDS}
-				expectedClassKeys={SCM_CLASS_KEYS}
-			/>
+			<SyncResourcesTable {...props} resources={healed ? allFresh : withAttention} />
 		</div>
 	);
 }
@@ -338,7 +337,7 @@ export const WatermarkDivergence: Story = {
 		canvas.getByLabelText(/further behind/);
 
 		await userEvent.hover(canvas.getByText(/ago$/));
-		await expect(await screen.findByText("Pull requests")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Pull requests"));
 	},
 };
 
@@ -348,7 +347,7 @@ export const ZeroCommentsAgainstManyIssues: Story = {
 		const canvas = within(canvasElement);
 		const totals = canvas.getByRole("row", { name: /All repositories/ });
 		await userEvent.hover(within(totals).getByText("0"));
-		await expect(await screen.findByText(/pipeline may not be running/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/pipeline may not be running/i));
 	},
 };
 
@@ -393,7 +392,7 @@ export const NeverSynced: Story = {
 
 		canvas.getByText("Never");
 		await userEvent.hover(canvas.getByText("Never"));
-		await expect(await screen.findByText(/has not synced yet/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/has not synced yet/i));
 	},
 };
 
@@ -411,8 +410,8 @@ export const RowHover: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.hover(canvas.getByText("ls1intum/Artemis"));
-		await expect(await screen.findByText("Items")).toBeInTheDocument();
-		await expect(await screen.findByText(/no backfill has run/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Items"));
+		await expectSettledVisible(await screen.findByText(/no backfill has run/i));
 	},
 };
 
@@ -453,10 +452,10 @@ export const OutlineCollections: Story = {
 		within(firstRow).getByRole("button", { name: /very stale/i });
 
 		await userEvent.hover(canvas.getByText("Engineering Handbook"));
-		await expect(await screen.findByText("350 items")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("350 items"));
 
 		await userEvent.hover(canvas.getByRole("button", { name: /error for archived notes/i }));
-		await expect(await screen.findByText(/api token was revoked/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/api token was revoked/i));
 	},
 };
 
@@ -499,7 +498,7 @@ export const AttentionFilter: Story = {
 
 export const AttentionFacetFallsBackWhenCleared: Story = {
 	args: { resources: [] },
-	render: () => <FacetFallbackHarness />,
+	render: ({ resources: _ownedByTheHarness, ...args }) => <FacetFallbackHarness {...args} />,
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 

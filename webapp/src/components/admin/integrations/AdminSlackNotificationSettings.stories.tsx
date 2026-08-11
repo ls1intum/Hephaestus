@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expectSettledVisible } from "@/test/overlay";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 const meta = {
@@ -203,11 +204,11 @@ export const ConnectedWithDisconnect: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		const trigger = canvas.getByRole("button", { name: /disconnect slack/i });
-		await expect(trigger).toBeInTheDocument();
+		await expect(trigger).toBeVisible();
 		await userEvent.click(trigger);
 		// AlertDialog renders in a portal — query the whole document, not just the canvas.
 		const dialog = await screen.findByRole("alertdialog", { name: /disconnect slack\?/i });
-		await expect(dialog).toBeInTheDocument();
+		await expectSettledVisible(dialog);
 		within(dialog).getByText(/the bot is uninstalled/i);
 		within(dialog).getByRole("button", { name: /^disconnect$/i });
 	},

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { expectSettledVisible } from "@/test/overlay";
 import { SlackChannelRow } from "./SlackChannelRow";
 
 const iso = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -79,9 +80,9 @@ export const NotStarted: Story = {
 		canvas.getByText("Never");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
-		await expect(
+		await expectSettledVisible(
 			await screen.findByRole("menuitem", { name: /activate monitoring/i }),
-		).toBeInTheDocument();
+		);
 		await expect(screen.queryByRole("menuitem", { name: /^pause$/i })).not.toBeInTheDocument();
 	},
 };
@@ -97,7 +98,7 @@ export const Monitoring: Story = {
 		await expect(announced.tagName).toBe("BUTTON");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
-		await expect(await screen.findByRole("menuitem", { name: /^pause$/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /^pause$/i }));
 		await expect(
 			screen.queryByRole("menuitem", { name: /activate monitoring/i }),
 		).not.toBeInTheDocument();
@@ -112,7 +113,7 @@ export const Paused: Story = {
 		canvas.getByText("Paused");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
-		await expect(await screen.findByRole("menuitem", { name: /^resume$/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /^resume$/i }));
 	},
 };
 
@@ -124,12 +125,8 @@ export const Revoked: Story = {
 		canvas.getByText("Revoked");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
-		await expect(
-			await screen.findByRole("menuitem", { name: /set up again/i }),
-		).toBeInTheDocument();
-		await expect(
-			await screen.findByRole("menuitem", { name: /view history/i }),
-		).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /set up again/i }));
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /view history/i }));
 
 		await expect(
 			screen.queryByRole("menuitem", { name: /activate monitoring/i }),

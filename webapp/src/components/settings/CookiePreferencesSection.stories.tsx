@@ -49,7 +49,7 @@ export const Default: Story = {
 
 		await userEvent.click(canvas.getByRole("button", { name: /change cookie choices/i }));
 		// A user-initiated reopen surfaces the banner and moves focus to it (keyboard/AT parity).
-		await expect(await screen.findByRole("region", { name: /your privacy/i })).toBeInTheDocument();
+		await expect(await screen.findByRole("region", { name: /your privacy/i })).toBeVisible();
 		await expect(screen.getByRole("region", { name: /your privacy/i })).toHaveFocus();
 	},
 };

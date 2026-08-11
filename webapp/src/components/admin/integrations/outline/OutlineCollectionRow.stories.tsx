@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { OutlineCollection } from "@/api/types.gen";
 import { Table, TableBody } from "@/components/ui/table";
+import { expectSettledVisible } from "@/test/overlay";
 import { OutlineCollectionRow } from "./OutlineCollectionRow";
 
 /**
@@ -63,7 +64,7 @@ export const Mirroring: Story = {
 		await expect(canvas.queryByText("87")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for engineering/i }));
-		await expect(await screen.findByRole("menuitem", { name: /^pause$/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /^pause$/i }));
 	},
 };
 
@@ -77,7 +78,7 @@ export const Paused: Story = {
 		canvas.getByText("Paused");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for handbook/i }));
-		await expect(await screen.findByRole("menuitem", { name: /resume/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /resume/i }));
 		await expect(screen.queryByRole("menuitem", { name: /^pause$/i })).not.toBeInTheDocument();
 	},
 };
@@ -124,7 +125,7 @@ export const SyncError: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("button", { name: /sync error for legacy wiki/i }));
-		await expect(await screen.findByText(/the bot user lost access/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/the bot user lost access/i));
 	},
 };
 
@@ -156,6 +157,6 @@ export const BudgetSkipped: Story = {
 		await userEvent.click(
 			canvas.getByRole("button", { name: /32 exports skipped for budget for research notes/i }),
 		);
-		await expect(await screen.findByText(/catch up on the next reconcile/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/catch up on the next reconcile/i));
 	},
 };

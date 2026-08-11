@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { fn, screen, userEvent } from "storybook/test";
 import type { WorkspaceLlmConnection } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectDialogFitsViewport } from "@/test/reflow";
 import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
 
@@ -59,6 +60,6 @@ export const MobileReflow: Story = {
 export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /^connect provider$/i }));
-		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/display name is required/i));
 	},
 };

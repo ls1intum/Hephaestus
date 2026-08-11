@@ -77,7 +77,7 @@ export const LoadForbidden: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByText("Couldn't load AI models")).toBeInTheDocument();
+		await expect(await canvas.findByText("Couldn't load AI models")).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: "Retry" })).toBeNull();
 	},
 };
@@ -123,7 +123,7 @@ export const InvalidRunLimit: Story = {
 		await userEvent.clear(card.getByLabelText("Timeout (seconds)"));
 		await userEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
-		await expect(await canvas.findByText("Enter a number of seconds.")).toBeInTheDocument();
+		await expect(await canvas.findByText("Enter a number of seconds.")).toBeVisible();
 		await expect(screen.queryByRole("status")).toBeNull();
 	},
 };

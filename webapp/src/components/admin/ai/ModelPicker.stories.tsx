@@ -88,7 +88,7 @@ export const OpensAndListsGroups: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox"));
-		await expect(await screen.findByRole("option", { name: /GPT-5/ })).toBeInTheDocument();
-		await expect(await screen.findByRole("option", { name: /My OpenAI key/ })).toBeInTheDocument();
+		await expect(await screen.findByRole("option", { name: /GPT-5/ })).toBeVisible();
+		await expect(await screen.findByRole("option", { name: /My OpenAI key/ })).toBeVisible();
 	},
 };

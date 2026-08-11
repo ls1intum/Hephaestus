@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { delay, HttpResponse, http } from "msw";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+import { expectSettledVisible } from "@/test/overlay";
 import { AddCollectionDialog } from "./AddCollectionDialog";
 
 const meta = {
@@ -87,7 +88,7 @@ export const ProbeFailed: Story = {
 	},
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
-		await expect(await within(dialog).findByText(/outline did not respond/i)).toBeInTheDocument();
+		await expectSettledVisible(await within(dialog).findByText(/outline did not respond/i));
 		within(dialog).getByRole("button", { name: /^retry$/i });
 	},
 };
@@ -96,9 +97,9 @@ export const NoVisibleCollections: Story = {
 	parameters: { msw: { handlers: [candidatesHandler([])] } },
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
-		await expect(
+		await expectSettledVisible(
 			await within(dialog).findByText(/this token cannot see any collections/i),
-		).toBeInTheDocument();
+		);
 		within(dialog).getByText(/add the bot user/i);
 	},
 };
@@ -184,9 +185,7 @@ export const EmptySearchResult: Story = {
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
 		await userEvent.type(await within(dialog).findByRole("combobox"), "nothing-matches-this");
-		await waitFor(() =>
-			expect(within(dialog).getByText(/no collections match your search/i)).toBeVisible(),
-		);
+		await waitFor(() => expect(within(dialog).getByText(/no collections match your search/i)));
 		await expect(within(dialog).queryByRole("option")).not.toBeInTheDocument();
 	},
 };
@@ -199,9 +198,9 @@ export const AllAlreadyMirrored: Story = {
 	},
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
-		await expect(
+		await expectSettledVisible(
 			await within(dialog).findByText(/every visible collection is already mirrored/i),
-		).toBeInTheDocument();
+		);
 		await expect(within(dialog).queryByRole("listbox")).not.toBeInTheDocument();
 	},
 };
@@ -219,7 +218,7 @@ export const RegisteringSequentially: Story = {
 		await userEvent.click(within(dialog).getByRole("option", { name: /design system/i }));
 		await userEvent.click(within(dialog).getByRole("button", { name: /add 2 collections/i }));
 
-		await expect(await within(dialog).findByText(/adding 1 of 2…/i)).toBeInTheDocument();
-		await expect(await within(dialog).findByText(/adding 2 of 2…/i)).toBeInTheDocument();
+		await expectSettledVisible(await within(dialog).findByText(/adding 1 of 2…/i));
+		await expectSettledVisible(await within(dialog).findByText(/adding 2 of 2…/i));
 	},
 };

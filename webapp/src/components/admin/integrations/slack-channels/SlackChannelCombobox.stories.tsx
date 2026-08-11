@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import type { SlackChannelCandidate } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
+import { expectSettledVisible } from "@/test/overlay";
 import { SlackChannelCombobox } from "./SlackChannelCombobox";
 
 const candidates: SlackChannelCandidate[] = [
@@ -69,14 +70,14 @@ export const Searching: Story = {
 		const search = await screen.findByPlaceholderText(/search channels/i);
 
 		await userEvent.type(search, "team");
-		await expect(await screen.findByRole("option", { name: /#team-standup/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("option", { name: /#team-standup/i }));
 		screen.getByRole("option", { name: /#team-listed/i });
 		screen.getByRole("option", { name: /#team-archive/i });
 		await expect(screen.queryByRole("option", { name: /#general/i })).not.toBeInTheDocument();
 
 		await userEvent.clear(search);
 		await userEvent.type(search, "C05GENERAL5");
-		await expect(await screen.findByRole("option", { name: /#general/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("option", { name: /#general/i }));
 		await expect(screen.queryByRole("option", { name: /#team-standup/i })).not.toBeInTheDocument();
 	},
 };
@@ -117,7 +118,7 @@ export const AccessibleStructure: Story = {
 		await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
 		await userEvent.click(trigger);
-		await expect(await screen.findByRole("listbox")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("listbox"));
 		await expect(trigger).toHaveAttribute("aria-expanded", "true");
 		await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
 		await expect(screen.getByRole("option", { name: /#general/i })).toHaveAttribute(
@@ -180,7 +181,7 @@ export const PrivateChannel: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox"));
-		await expect(await screen.findByRole("img", { name: /private/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("img", { name: /private/i }));
 	},
 };
 
@@ -189,7 +190,7 @@ export const Empty: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox"));
-		await expect(await screen.findByText(/no channels found/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/no channels found/i));
 	},
 };
 
@@ -201,7 +202,7 @@ export const EmptySearchResult: Story = {
 			await screen.findByPlaceholderText(/search channels/i),
 			"nothing-matches-this",
 		);
-		await expect(await screen.findByText(/no channels found/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/no channels found/i));
 		await expect(screen.queryByRole("option")).not.toBeInTheDocument();
 	},
 };

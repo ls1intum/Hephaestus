@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, screen, userEvent, within } from "storybook/test";
+import { expectSettledVisible } from "@/test/overlay";
 import { RelativeTime } from "./RelativeTime";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
@@ -22,7 +23,7 @@ export const HoverRevealsAbsoluteTime: Story = {
 		const canvas = within(canvasElement);
 		const trigger = canvas.getByText(/ago$/);
 		await userEvent.hover(trigger);
-		await expect(await screen.findByText(/14 Jul 2026, /)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/14 Jul 2026, /));
 	},
 };
 
@@ -77,6 +78,8 @@ export const WithoutTooltip: Story = {
 };
 
 export const AllTones: Story = {
+	// Five fixed tones side by side, so there is no single `value` for the control to act on.
+	parameters: { controls: { disable: true } },
 	render: () => (
 		<dl className="grid grid-cols-[8rem_1fr] gap-x-6 gap-y-2 text-sm">
 			<dt className="text-muted-foreground">fresh</dt>

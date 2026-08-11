@@ -107,7 +107,7 @@ export const Loading: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		// The loading pill uses the vendored <Spinner/> (role="status"), not a bare Loader2 icon.
-		await expect(await canvas.findByRole("status", { name: "Loading" })).toBeInTheDocument();
+		await expect(await canvas.findByRole("status", { name: "Loading" })).toBeVisible();
 	},
 };
 

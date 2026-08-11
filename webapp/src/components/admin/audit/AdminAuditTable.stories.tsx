@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { AdminAuditTable } from "./AdminAuditTable";
 
 const events: AuthEventView[] = [
@@ -94,7 +95,7 @@ export const RowDetail: Story = {
 		const canvas = within(canvasElement);
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
-		await expect(await screen.findByText("User agent")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("User agent"));
 		screen.getByText("Workspace");
 	},
 };

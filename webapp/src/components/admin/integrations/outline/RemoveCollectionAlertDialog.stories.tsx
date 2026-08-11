@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { OutlineCollection } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";
 
 const collection: OutlineCollection = {
@@ -65,7 +66,7 @@ export const Rejected: Story = {
 	play: async () => {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await userEvent.click(dialog.getByRole("button", { name: /remove & erase/i }));
-		await expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("alertdialog"));
 	},
 };
 
