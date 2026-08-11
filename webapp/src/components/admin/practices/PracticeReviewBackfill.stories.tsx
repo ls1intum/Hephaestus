@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
+import { expectClosedSelectShows } from "@/test/controls";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewBackfill } from "./PracticeReviewBackfill";
 import { backfillRun as run } from "./story-mock-data";
@@ -43,14 +44,8 @@ export const ChooseARange: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		canvas.getByText(/nothing is reviewed until you confirm/i);
-		// A closed Base UI trigger falls back to printing the raw value, and "scm.pull_request" is not
-		// a decision anyone can check.
-		await expect(canvas.getByRole("combobox", { name: /Kind of work/ })).toHaveTextContent(
-			"Pull or merge requests",
-		);
-		await expect(canvas.getByRole("combobox", { name: /How far back/ })).toHaveTextContent(
-			"The last 30 days",
-		);
+		await expectClosedSelectShows(canvas, /Kind of work/, "Pull or merge requests");
+		await expectClosedSelectShows(canvas, /How far back/, "The last 30 days");
 		await expectNoPageOverflow();
 	},
 };

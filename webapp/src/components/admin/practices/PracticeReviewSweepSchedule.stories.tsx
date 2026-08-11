@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
+import { expectClosedSelectShows } from "@/test/controls";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSweepSchedule } from "./PracticeReviewSweepSchedule";
 import { sweepSchedule as schedule } from "./story-mock-data";
@@ -43,14 +44,8 @@ export const NothingScheduled: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		canvas.getByText(/nothing is checked on a schedule/i);
-		// A closed Base UI trigger falls back to printing the raw value, and "scm.pull_request" is not
-		// a decision anyone can check.
-		await expect(canvas.getByRole("combobox", { name: /Kind of work/ })).toHaveTextContent(
-			"Pull or merge requests",
-		);
-		await expect(canvas.getByRole("combobox", { name: /How often/ })).toHaveTextContent(
-			"Every day",
-		);
+		await expectClosedSelectShows(canvas, /Kind of work/, "Pull or merge requests");
+		await expectClosedSelectShows(canvas, /How often/, "Every day");
 		// The one control that authorises spending again and again names the work it commits to, and
 		// the sentence beside it says the commitment outlives the first check.
 		canvas.getByRole("button", { name: "Start checking pull or merge requests" });
@@ -71,9 +66,7 @@ export const WeeklyOffersAFullWeek: Story = {
 		// document rather than within the story's own subtree.
 		await userEvent.click(await screen.findByRole("option", { name: "Every week" }));
 
-		await expect(canvas.getByRole("combobox", { name: /How far back/ })).toHaveTextContent(
-			"The last 7 days",
-		);
+		await expectClosedSelectShows(canvas, /How far back/, "The last 7 days");
 	},
 };
 
