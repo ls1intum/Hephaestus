@@ -33,8 +33,7 @@ type Story = StoryObj<typeof meta>;
 
 /** Every outcome the API can report, each with its own reason, none of them behind a toggle. */
 export const EveryOutcome: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			await canvas.findByRole("heading", { name: /Member-facing review activity/ }),
 		).toBeVisible();
@@ -55,8 +54,7 @@ export const EveryOutcome: Story = {
  * occurrence, not at the name.
  */
 export const SameSignalTwice: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas, canvasElement }) => {
 		await canvas.findByText("Small, reviewable changes");
 
 		const jumpFrom = (practiceName: string) => {
@@ -82,8 +80,7 @@ export const SameSignalTwice: Story = {
 
 /** The timeline carries the reason a signal never became a review, not just that it did not. */
 export const SignalsExplainThemselves: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// Scoped to the timeline: an occurrence's label also appears as "Rests on" text on every
 		// practice row that rests on it, so a page-wide query is ambiguous by design.
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
@@ -102,14 +99,13 @@ export const SignalsExplainThemselves: Story = {
 /**
  * A refusal that can be undone offers the way to undo it, and one that cannot says nothing extra.
  *
- * <p>This is the whole thesis of the page in one line of markup. "The workspace's review settings
+ * This is the whole thesis of the page in one line of markup. "The workspace's review settings
  * turned it away" names a screen an admin has to go and find; a link is that screen. The two quiet
  * reasons beside it are the control: a cooldown expires on its own and a missed deadline is already
  * past, so a settings link there would only invite somebody to widen a limit to fix a non-fault.
  */
 export const RefusalsLinkToTheirFix: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
 
 		// The accessible name names the destination. It survives being read out of its sentence, in a
@@ -124,14 +120,13 @@ export const RefusalsLinkToTheirFix: Story = {
 /**
  * The same page for somebody who cannot open administration: the reasons stay, the links go.
  *
- * <p>Every member of a workspace can read a trace, and most of them are not admins. A link into
+ * Every member of a workspace can read a trace, and most of them are not admins. A link into
  * `/admin` would bounce them off the route guard and back to the workspace home — losing the page
  * they were reading, to be told nothing. The sentence already says everything they can act on.
  */
 export const MembersAreOfferedNoAdminLinks: Story = {
 	args: { canAdminister: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
 		await expect(
 			timeline.getByText("This workspace's review settings turned it away."),
@@ -146,8 +141,7 @@ export const NothingWasReviewed: Story = {
 	parameters: {
 		msw: { handlers: [http.get(TRACE_URL, () => HttpResponse.json(untouchedArtifactTrace))] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Opened")).toBeVisible();
 		await expect(
 			canvas.getByText("No practice was watching for this when it happened."),
@@ -178,8 +172,7 @@ export const OccurrenceMissingFromTheTimeline: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const row = (await canvas.findByText("Small, reviewable changes")).closest('[role="listitem"]');
 		if (!(row instanceof HTMLElement)) throw new Error("No row for the skipped practice");
 
@@ -213,8 +206,7 @@ export const NothingReachedIt: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Nothing was recorded about this work")).toBeVisible();
 		await expect(canvas.getByText("No practice covers this kind of work")).toBeVisible();
 		// Named in the reader's words, not as `scm.issue`.
@@ -232,8 +224,7 @@ export const DocumentHasNoButtonToAsk: Story = {
 	parameters: {
 		msw: { handlers: [http.get(TRACE_URL, () => HttpResponse.json(documentArtifactTrace))] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			await canvas.findByRole("heading", { name: /Onboarding: your first week/ }),
 		).toBeVisible();
@@ -256,9 +247,9 @@ export const NotFound: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
+	play: async ({ canvas }) => {
 		await expect(
-			await within(canvasElement).findByText("Couldn't load this work's review activity"),
+			await canvas.findByText("Couldn't load this work's review activity"),
 		).toBeVisible();
 	},
 };
@@ -268,8 +259,7 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Thin controllers")).toBeVisible();
 		await expect(canvas.getByText("Waiting on a connection")).toBeVisible();
 		await expectNoPageOverflow();
@@ -298,8 +288,7 @@ export const RefusesTheAskInTheServersWords: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
 		await expect(await canvas.findByText("No review was started")).toBeVisible();
 		const alert = within(await canvas.findByRole("alert"));
@@ -318,7 +307,7 @@ export const RefusesTheAskInTheServersWords: Story = {
  * Somebody pressed a button and was told no. That is the reader with the most immediate use for the
  * fix, and until now this alert was the one refusal surface that named none.
  *
- * <p>The server's sentence is still printed exactly as it phrased it — the link is added beside it,
+ * The server's sentence is still printed exactly as it phrased it — the link is added beside it,
  * keyed on the coded reason, never on the prose.
  */
 export const RefusalOffersTheFixToAnAdmin: Story = {
@@ -336,8 +325,7 @@ export const RefusalOffersTheFixToAnAdmin: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
 		const alert = within(await canvas.findByRole("alert"));
 		await expect(
@@ -367,8 +355,7 @@ export const RefusalWithheldFixFromAMember: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
 		const alert = within(await canvas.findByRole("alert"));
 		await expect(
@@ -393,8 +380,7 @@ export const StartsAReview: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
 		await expect(await canvas.findByRole("button", { name: "Review this now" })).toBeEnabled();
 		await expect(canvas.queryByText("No review was started")).not.toBeInTheDocument();
@@ -424,8 +410,7 @@ export const RefusesSomebodyWithNoStanding: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
 		await expect(await canvas.findByRole("button", { name: "Review this now" })).toBeEnabled();
 		await expect(canvas.queryByText("No review was started")).not.toBeInTheDocument();

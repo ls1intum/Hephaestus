@@ -17,24 +17,44 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+/**
+ * The words on every badge, in the order the outcome union declares them.
+ *
+ * Written out rather than read back off `OUTCOME_LABELS`: an outcome the server adds, or a label
+ * changed to something a reader cannot act on, has to show up here as a diff somebody approved.
+ */
+const EVERY_LABEL = [
+	"Reviewed",
+	"Running",
+	"Waiting",
+	"Skipped",
+	"Couldn't assess",
+	"Turned off",
+	"Not triggered",
+	"Waiting on a connection",
+	"Expired",
+	"Failed",
+];
+
+const everyOutcome = () => (
+	<ul className="flex flex-col items-start gap-2">
+		{OUTCOMES.map((outcome) => (
+			<li key={outcome}>
+				<TraceOutcomeBadge outcome={outcome} />
+			</li>
+		))}
+	</ul>
+);
+
 export const EveryOutcome: Story = {
 	parameters: { layout: "padded" },
-	render: () => (
-		<ul className="flex flex-col items-start gap-2">
-			{OUTCOMES.map((outcome) => (
-				<li key={outcome}>
-					<TraceOutcomeBadge outcome={outcome} />
-				</li>
-			))}
-		</ul>
-	),
+	render: everyOutcome,
 	play: async ({ canvasElement }) => {
-		// WCAG 2.2 SC 1.4.1: every outcome is told apart by an icon and words, never by colour alone.
 		const badges = within(canvasElement).getAllByRole("listitem");
-		await expect(badges).toHaveLength(OUTCOMES.length);
+		await expect(badges.map((badge) => badge.textContent?.trim())).toEqual(EVERY_LABEL);
+		// WCAG 2.2 SC 1.4.1: every outcome is told apart by an icon as well as words, never by colour.
 		for (const badge of badges) {
 			await expect(badge.querySelector("svg")).not.toBeNull();
-			await expect(badge.textContent?.trim()).toBeTruthy();
 		}
 	},
 };
@@ -45,15 +65,7 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	render: () => (
-		<ul className="flex flex-col items-start gap-2">
-			{OUTCOMES.map((outcome) => (
-				<li key={outcome}>
-					<TraceOutcomeBadge outcome={outcome} />
-				</li>
-			))}
-		</ul>
-	),
+	render: everyOutcome,
 	play: async () => {
 		await expectNoPageOverflow();
 	},

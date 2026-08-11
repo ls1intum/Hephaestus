@@ -31,11 +31,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(
-			await canvas.findByText(`${tracedArtifacts.length} pieces of work.`),
-		).toBeVisible();
+	play: async ({ canvas }) => {
+		// The five kinds the fixture carries, counted here rather than read back off it: a fixture
+		// that loses a row should fail this story instead of quietly agreeing with it.
+		await expect(await canvas.findByText("5 pieces of work.")).toBeVisible();
 		await expect(canvas.getByRole("link", { name: /Member-facing review activity/ })).toBeVisible();
 		await expect(canvas.getByText("6 moments recorded · 2 started a review")).toBeVisible();
 	},
@@ -50,8 +49,7 @@ export const UnlinkableArtifact: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("1 piece of work.")).toBeVisible();
 		await expect(canvas.getByText("1 moment recorded · 0 started a review")).toBeVisible();
 	},
@@ -62,8 +60,7 @@ export const UnlinkableArtifact: Story = {
  * is the failure this list already fixed once for pull requests, and documents ship reviewable now.
  */
 export const EveryKindIsNamed: Story = {
-	play: async ({ canvasElement, userEvent }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas, userEvent }) => {
 		await expect(await canvas.findByText("Onboarding: your first week")).toBeVisible();
 		await expect(canvas.queryByText("docs.document")).not.toBeInTheDocument();
 
@@ -74,19 +71,15 @@ export const EveryKindIsNamed: Story = {
 	},
 };
 
-/** Nothing recorded is a fact about the connection, not a fact about the reader's work. */
 export const NothingRecorded: Story = {
 	parameters: {
 		msw: { handlers: [http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage([])))] },
 	},
-	play: async ({ canvasElement }) => {
-		await expect(
-			await within(canvasElement).findByText("Nothing has been recorded here yet"),
-		).toBeVisible();
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("Nothing has been recorded here yet")).toBeVisible();
 	},
 };
 
-/** A filter that arrives by link stays visible in the picker, and clearable. */
 export const FilteredToOneKind: Story = {
 	args: { search: { kind: "scm.issue" }, onSearchChange: fn() },
 	parameters: {
@@ -96,8 +89,7 @@ export const FilteredToOneKind: Story = {
 			],
 		},
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await expect(await canvas.findByRole("combobox", { name: "Show" })).toHaveTextContent("Issues");
 
 		await userEvent.click(canvas.getByRole("button", { name: /Reset/ }));
@@ -111,8 +103,7 @@ export const FilteredToOneKind: Story = {
  */
 export const ClearingTheFilterFromThePicker: Story = {
 	args: { search: { kind: "scm.issue", page: 3 }, onSearchChange: fn() },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(await canvas.findByRole("combobox", { name: "Show" }));
 		await userEvent.click(await within(document.body).findByRole("option", { name: "All work" }));
 
@@ -121,14 +112,12 @@ export const ClearingTheFilterFromThePicker: Story = {
 	},
 };
 
-/** Filtered down to nothing is a fact about the filter, and says how to get back. */
 export const NoWorkOfThatKind: Story = {
 	args: { search: { kind: "chat.conversation_thread" }, onSearchChange: fn() },
 	parameters: {
 		msw: { handlers: [http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage([])))] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("No conversations recorded yet")).toBeVisible();
 		await expect(canvas.getByText(/Switch back to all work/)).toBeVisible();
 	},
@@ -147,10 +136,8 @@ export const LoadFailed: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		await expect(
-			await within(canvasElement).findByText("Couldn't load review activity"),
-		).toBeVisible();
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("Couldn't load review activity")).toBeVisible();
 	},
 };
 
@@ -159,10 +146,8 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		await expect(
-			await within(canvasElement).findByText(`${tracedArtifacts.length} pieces of work.`),
-		).toBeVisible();
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("5 pieces of work.")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
