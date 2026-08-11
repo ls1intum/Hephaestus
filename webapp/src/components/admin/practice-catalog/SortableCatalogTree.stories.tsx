@@ -48,8 +48,11 @@ const entries: SortableCatalogEntry[] = [
 ];
 
 interface HarnessProps {
-	/** Areas whose rows may not be reordered and which no row may be moved into. */
-	blocked?: readonly string[];
+	/** Areas whose own rows may not be reordered. Kept apart from {@link blockedDestinations} so a
+	 * story can tell which of the tree's two independent guards it exercised. */
+	blockedOrderBuckets?: readonly string[];
+	/** Areas no row may be moved into. */
+	blockedDestinations?: readonly string[];
 	/** When set, only these rows are listed — the shape a search box produces. */
 	visible?: readonly string[];
 	onPlaceEntry: (entrySlug: string, areaSlug: string | null, position: number) => void;
@@ -64,9 +67,14 @@ interface HarnessProps {
  * a11y-preferred shape for a menu item, and what lets these stories ask both halves of the question:
  * *is* the destination offered, and does asking for it anyway do nothing.
  */
-function CatalogTreeHarness({ blocked = [], visible, onPlaceEntry, onReorderAreas }: HarnessProps) {
+function CatalogTreeHarness({
+	blockedOrderBuckets = [],
+	blockedDestinations = [],
+	visible,
+	onPlaceEntry,
+	onReorderAreas,
+}: HarnessProps) {
 	const [rows, setRows] = useState(entries);
-	const blockedSlugs = new Set(blocked);
 
 	const place = (entrySlug: string, areaSlug: string | null, position: number) => {
 		onPlaceEntry(entrySlug, areaSlug, position);
@@ -96,8 +104,8 @@ function CatalogTreeHarness({ blocked = [], visible, onPlaceEntry, onReorderArea
 			areaReorderDisabled={false}
 			disabledAreaSlugs={new Set()}
 			disabledEntrySlugs={new Set()}
-			blockedEntryOrderBuckets={blockedSlugs}
-			blockedMoveDestinationSlugs={blockedSlugs}
+			blockedEntryOrderBuckets={new Set(blockedOrderBuckets)}
+			blockedMoveDestinationSlugs={new Set(blockedDestinations)}
 			showEntryReorderHandles
 			onReorderAreas={onReorderAreas}
 			onPlaceEntry={place}
@@ -160,12 +168,18 @@ function CatalogTreeHarness({ blocked = [], visible, onPlaceEntry, onReorderArea
 	);
 }
 
+/**
+ * No `autodocs`: the component under test is `SortableCatalogTree`, whose API is twelve props and
+ * five render callbacks, and what the stories render is a four-prop harness around it. An
+ * auto-generated page here would publish the harness's props as if they were the component's, which
+ * is worse than no page. The harness's own props are still Controls, because they are what these
+ * stories vary.
+ */
 const meta = {
 	title: "Workspace admin/Practices/Catalog tree",
 	component: CatalogTreeHarness,
 	parameters: { layout: "padded" },
 	args: { onPlaceEntry: fn(), onReorderAreas: fn() },
-	tags: ["autodocs"],
 } satisfies Meta<typeof CatalogTreeHarness>;
 
 export default meta;
@@ -247,10 +261,10 @@ export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
  * control rather than accepting the click and being refused a round trip later.
  */
 export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
-	args: { blocked: ["quality"] },
+	args: { blockedDestinations: ["quality"] },
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		const menu = await openActions(canvas, "Small, reviewable changes");
+		const menu = await openActions(canvas, "Explain what changed and why");
 		const blocked = menu.getByRole("menuitem", { name: "Move to Quality" });
 
 		await expect(blocked).toHaveAttribute("aria-disabled", "true");
@@ -260,8 +274,42 @@ export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 			"aria-disabled",
 			"false",
 		);
+		// Blocking a destination says nothing about ordering inside the row's own area, which is the
+		// other prop. A mid-list row can still move within Delivery.
+		await expect(menu.getByRole("menuitem", { name: "Move up" })).toHaveAttribute(
+			"aria-disabled",
+			"false",
+		);
 
 		await userEvent.click(blocked);
+		await expect(args.onPlaceEntry).not.toHaveBeenCalled();
+	},
+};
+
+/**
+ * The mirror image, and the reason the two are separate props: a bucket whose order is in flight
+ * refuses its own up and down while remaining a destination anything may be moved into.
+ */
+export const AnAreaWithAReorderInFlightStillAcceptsArrivals: Story = {
+	args: { blockedOrderBuckets: ["delivery"] },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		const menu = await openActions(canvas, "Explain what changed and why");
+
+		await expect(menu.getByRole("menuitem", { name: "Move up" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(menu.getByRole("menuitem", { name: "Move down" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(menu.getByRole("menuitem", { name: "Move to Quality" })).toHaveAttribute(
+			"aria-disabled",
+			"false",
+		);
+
+		await userEvent.click(menu.getByRole("menuitem", { name: "Move up" }));
 		await expect(args.onPlaceEntry).not.toHaveBeenCalled();
 	},
 };

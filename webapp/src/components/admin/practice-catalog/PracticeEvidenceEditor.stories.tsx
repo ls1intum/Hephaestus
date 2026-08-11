@@ -55,7 +55,6 @@ export const EveryChoiceIsVisible: Story = {
 	},
 };
 
-/** A source dropped to optional context loses the absence claim with it. */
 export const AbsenceClaimNeedsARequiredSource: Story = {
 	render: (args) => <ControlledEvidence {...args} />,
 	play: async ({ canvas, userEvent }) => {
@@ -75,7 +74,6 @@ export const AbsenceClaimNeedsARequiredSource: Story = {
 	},
 };
 
-/** The occasion that licenses an absence claim: the review that reads the threads whole. */
 export const ReadsASourceExhaustively: Story = {
 	args: {
 		needs: [
@@ -89,7 +87,7 @@ export const ReadsASourceExhaustively: Story = {
 	},
 };
 
-/** Nothing required yet — the state the form refuses to save, shown as the author would meet it. */
+/** The state the form refuses to save, shown as the author would meet it. */
 export const NothingRequiredYet: Story = {
 	args: { needs: [], invalid: true },
 	play: async ({ canvas }) => {

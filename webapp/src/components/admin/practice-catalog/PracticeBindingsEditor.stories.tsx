@@ -9,6 +9,7 @@ import {
 } from "@/mocks/fixtures/practice";
 import { ADD_BINDING_ID } from "./bindings";
 import { PracticeBindingsEditor } from "./PracticeBindingsEditor";
+import { outcome } from "./story-mock-data";
 
 const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
 const issues = mockPracticeDefinitionOptions.workTypes[1];
@@ -73,7 +74,6 @@ export const AMomentBelongsToOneOccasion: Story = {
 	},
 };
 
-/** Every moment claimed: adding another occasion would have nothing left to start it. */
 export const EveryMomentClaimed: Story = {
 	args: {
 		options: conversations,
@@ -95,7 +95,6 @@ export const IssuesHaveNoDrafts: Story = {
 	},
 };
 
-/** Drafts are answered per occasion, not by one switch for the practice. */
 export const DraftsAreAPropertyOfTheOccasion: Story = {
 	args: {
 		bindings: [{ ...mockPullRequestBinding, onDrafts: true }, mockMergeBinding],
@@ -118,14 +117,13 @@ export const GuidanceOnly: Story = {
 	},
 };
 
-/** Recent outcomes are shown once for the practice rather than per occasion. */
 export const WithRecentOutcomes: Story = {
 	args: {
-		outcome: {
+		outcome: outcome({
 			practiceSlug: "clear-pr-description",
-			consideredReviews: 12,
-			reviewedCount: 7,
-			blockersObserved: [
+			considered: 12,
+			skipped: 5,
+			blockers: [
 				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_EMPTY", reviewsAffected: 4 },
 				{
 					sourceKind: "scm.pull-request.comments",
@@ -133,7 +131,7 @@ export const WithRecentOutcomes: Story = {
 					reviewsAffected: 1,
 				},
 			],
-		},
+		}),
 	},
 	play: async ({ canvas }) => {
 		await expect(
@@ -179,8 +177,21 @@ export const NoOccasionAtAll: Story = {
 	},
 };
 
-/** Every edit reports the whole list back, because the editor holds no state of its own. */
+/**
+ * Every edit reports the whole list back, because the editor holds no state of its own — and a new
+ * occasion is seeded from the *work type's* recommended evidence rather than copied off the occasion
+ * above it.
+ *
+ * The shared fixture aliases the two to the same list, which would let either behaviour satisfy the
+ * assertion below, so this story gives the work type a recommendation of its own.
+ */
 export const AddingAnOccasion: Story = {
+	args: {
+		options: {
+			...pullRequests,
+			recommendedNeeds: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }],
+		},
+	},
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Add occasion" }));
 
@@ -188,7 +199,10 @@ export const AddingAnOccasion: Story = {
 		// free rather than a moment the server would refuse for being bound twice.
 		await expect(args.onChange).toHaveBeenCalledWith([
 			mockPullRequestBinding,
-			{ signals: ["scm.pull_request.reviewed"], needs: mockPullRequestBinding.needs },
+			{
+				signals: ["scm.pull_request.reviewed"],
+				needs: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }],
+			},
 		]);
 	},
 };

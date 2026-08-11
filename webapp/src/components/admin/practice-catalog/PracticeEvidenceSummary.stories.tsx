@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect } from "storybook/test";
 import {
 	mockMergeBinding,
 	mockPracticeDefinitionOptions,
@@ -27,12 +28,30 @@ const meta = {
 			validationReference: "review-1437",
 		},
 	},
+	parameters: { layout: "padded" },
+	tags: ["autodocs"],
 } satisfies Meta<typeof PracticeEvidenceSummary>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const StaleIndependentValidation: Story = {};
+/**
+ * A validation that was independent and no longer answers for what ships.
+ *
+ * Stale is the state an author is least likely to look for and most needs told: the badge said
+ * somebody checked this, and the fingerprints it was checked against have since moved. It is warned
+ * about rather than merely labelled, and the reference to the review that granted it stays, because
+ * that is what an author has to go and repeat.
+ */
+export const StaleIndependentValidation: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Validation is stale")).toBeVisible();
+		await expect(canvas.getByText(/Independent AI mentoring review/)).toHaveTextContent(
+			"review-1437",
+		);
+		await expect(canvas.getByText(/Validated for source contract 1\.0\.0/)).toBeVisible();
+	},
+};
 
 export const OneOccasion: Story = {
 	args: { bindings: [mockPullRequestBinding] },
