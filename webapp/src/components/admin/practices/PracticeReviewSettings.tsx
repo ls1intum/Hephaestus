@@ -29,6 +29,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { reviewModelRunnable } from "./review/review-readiness";
 
 export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
 export type PracticeReviewWorkspaceUpdate = Pick<
@@ -87,8 +88,7 @@ function ProjectReviewStatusCard({
 	model,
 	workspace,
 }: Pick<PracticeReviewSettingsProps, "workspaceSlug" | "model" | "workspace">) {
-	const modelRunnable =
-		!model.isLoading && !model.isError && model.binding?.ready === true && model.binding.enabled;
+	const modelRunnable = reviewModelRunnable(model);
 	const hasTrigger = workspace.autoTriggerEnabled || workspace.manualTriggerEnabled;
 
 	let status: string;

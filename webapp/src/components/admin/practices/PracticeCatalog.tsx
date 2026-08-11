@@ -461,13 +461,13 @@ function PracticeActions({
 				<DropdownMenuItem
 					render={
 						<Link
-							to="/w/$workspaceSlug/admin/practices/autonomy"
+							to="/w/$workspaceSlug/admin/practices/review"
 							params={{ workspaceSlug }}
-							search={{ overrides: undefined }}
+							search={{}}
 						/>
 					}
 				>
-					Change on Review autonomy
+					Change on Review
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>

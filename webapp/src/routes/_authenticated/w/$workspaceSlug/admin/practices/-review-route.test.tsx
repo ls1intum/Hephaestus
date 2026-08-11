@@ -4,7 +4,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { buildAutonomyFixture } from "@/components/admin/practices/review-autonomy/story-mock-data";
 import { server } from "@/mocks/server";
-import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -35,13 +35,13 @@ function stubWorkspace(extra: Parameters<typeof server.use>) {
 	);
 }
 
-describe("review autonomy route", () => {
+describe("review route", () => {
 	it("answers 'what is this workspace doing' from the rollup rather than from the rows", async () => {
 		stubWorkspace([]);
 
-		renderRouteAt("/w/acme/admin/practices/autonomy");
+		renderRouteAt("/w/acme/admin/practices/review");
 
-		await screen.findByRole("heading", { name: "Review autonomy" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: "Review" }, ROUTE_RENDER_WAIT);
 		await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
 
 		// The counts are the server's; nothing here adds up practice rows, and the areas are shut.
@@ -49,6 +49,39 @@ describe("review autonomy route", () => {
 		// only area, which happens to hold every practice.
 		expect(screen.getAllByText("2 practices: 1 off and 1 propose.")).toHaveLength(2);
 		expect(screen.queryByText("States the motivation")).toBeNull();
+	});
+
+	/**
+	 * The three pages this replaced were in the sidebar, in the admin docs, and in bookmarks. Each
+	 * lands on the section that absorbed it — and the autonomy screen's overrides filter, the one deep
+	 * link into it anybody had reason to save, survives the move.
+	 */
+	it.each([
+		["/w/acme/admin/practices/autonomy", "/w/acme/admin/practices/review"],
+		[
+			"/w/acme/admin/practices/autonomy?overrides=true",
+			"/w/acme/admin/practices/review?overrides=true",
+		],
+		["/w/acme/admin/practices/settings", "/w/acme/admin/practices/review?section=when-and-where"],
+		["/w/acme/admin/practices/backfill", "/w/acme/admin/practices/review?section=past-work"],
+	])("redirects %s to %s", async (from, to) => {
+		stubWorkspace([]);
+
+		const { router } = renderRouteAtWithRouter(from);
+
+		await waitFor(() => expect(router.state.location.href).toBe(to), ROUTE_RENDER_WAIT);
+	});
+
+	it("opens the section a deep link names", async () => {
+		stubWorkspace([]);
+
+		renderRouteAt("/w/acme/admin/practices/review?section=past-work");
+
+		const tab = await screen.findByRole("tab", { name: "Past work" }, ROUTE_RENDER_WAIT);
+		expect(tab.getAttribute("aria-selected")).toBe("true");
+		// Only the named panel is rendered, which is what keeps the other two sections' queries — and
+		// the autonomy screen's sticky strip — off a page nobody has opened them on.
+		expect(screen.queryByRole("tabpanel", { name: "How much" })).toBeNull();
 	});
 
 	/**
@@ -71,7 +104,7 @@ describe("review autonomy route", () => {
 			),
 		]);
 
-		renderRouteAt("/w/acme/admin/practices/autonomy");
+		renderRouteAt("/w/acme/admin/practices/review");
 
 		const area = await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
 		await userEvent.click(area);

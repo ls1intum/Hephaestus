@@ -31,7 +31,7 @@ const run = (overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRu
 	}) satisfies Wire<ReviewBackfillRun> as unknown as ReviewBackfillRun;
 
 const meta = {
-	title: "Workspace admin/Practices/Review past work",
+	title: "Workspace admin/Practices/Review/Past work",
 	component: PracticeReviewBackfill,
 	parameters: {
 		layout: "padded",

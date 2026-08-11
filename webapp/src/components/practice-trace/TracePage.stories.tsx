@@ -112,12 +112,11 @@ export const RefusalsLinkToTheirFix: Story = {
 		const canvas = within(canvasElement);
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
 
-		// The accessible name names the destination. "Open review settings" survives being read out of
-		// its sentence, in a screen reader's list of the page's links, which "here" does not.
-		await expect(timeline.getByRole("link", { name: "Open review settings" })).toHaveAttribute(
-			"href",
-			"/w/demo/admin/practices/settings",
-		);
+		// The accessible name names the destination. It survives being read out of its sentence, in a
+		// screen reader's list of the page's links, which "here" does not.
+		await expect(
+			timeline.getByRole("link", { name: "Open Review: When and where" }),
+		).toHaveAttribute("href", "/w/demo/admin/practices/review?section=when-and-where");
 		await expect(timeline.getAllByRole("link", { name: /^Open |^Set up / })).toHaveLength(1);
 	},
 };

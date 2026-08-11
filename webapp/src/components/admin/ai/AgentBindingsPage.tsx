@@ -283,23 +283,32 @@ function AgentPurposeCard({
 						<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
 						<CardDescription>
 							{meta.description}
-							{!featureEnabled && (
-								<div>
-									<Link
-										to={
-											meta.purpose === "PRACTICE_REVIEW"
-												? "/w/$workspaceSlug/admin/practices/settings"
-												: "/w/$workspaceSlug/admin/settings"
-										}
-										params={{ workspaceSlug }}
-										className="underline underline-offset-4"
-									>
-										{meta.purpose === "PRACTICE_REVIEW"
-											? "Open Review settings"
-											: "Open Workspace settings"}
-									</Link>
-								</div>
-							)}
+							{!featureEnabled &&
+								// Two links rather than one with a ternary destination: the switch that turns
+								// practice reviews on lives in a section of the Review page, which is a search
+								// param, and the workspace one is a route of its own.
+								(meta.purpose === "PRACTICE_REVIEW" ? (
+									<div>
+										<Link
+											to="/w/$workspaceSlug/admin/practices/review"
+											params={{ workspaceSlug }}
+											search={{ section: "when-and-where" }}
+											className="underline underline-offset-4"
+										>
+											Open Review: When and where
+										</Link>
+									</div>
+								) : (
+									<div>
+										<Link
+											to="/w/$workspaceSlug/admin/settings"
+											params={{ workspaceSlug }}
+											className="underline underline-offset-4"
+										>
+											Open Workspace settings
+										</Link>
+									</div>
+								))}
 						</CardDescription>
 					</div>
 					<div className="flex flex-wrap justify-end gap-2">

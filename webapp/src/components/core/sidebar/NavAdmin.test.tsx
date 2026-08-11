@@ -15,10 +15,8 @@ const PATHS = [
 	"w/$workspaceSlug/admin/practices",
 	"w/$workspaceSlug/admin/practices/new",
 	"w/$workspaceSlug/admin/practices/$practiceSlug",
-	"w/$workspaceSlug/admin/practices/autonomy",
-	"w/$workspaceSlug/admin/practices/settings",
+	"w/$workspaceSlug/admin/practices/review",
 	"w/$workspaceSlug/admin/practices/reviews",
-	"w/$workspaceSlug/admin/practices/backfill",
 	"w/$workspaceSlug/admin/integrations",
 	"w/$workspaceSlug/admin/integrations/scm",
 ] as const;
@@ -62,9 +60,10 @@ describe("NavAdmin", () => {
 		["/w/acme/admin/practices", "Practice setup"],
 		["/w/acme/admin/practices/new", "Practice setup"],
 		["/w/acme/admin/practices/clean-code", "Practice setup"],
-		["/w/acme/admin/practices/autonomy", "Review autonomy"],
-		["/w/acme/admin/practices/settings", "Review settings"],
-		["/w/acme/admin/practices/backfill", "Review past work"],
+		["/w/acme/admin/practices/review", "Review"],
+		// `review` is a prefix of `reviews`, so a fuzzy match on the shorter path lights both entries
+		// up at once. Both directions are checked, because only one of them is the confusable one.
+		["/w/acme/admin/practices/reviews", "Practice reviews"],
 		["/w/acme/admin/integrations/scm", "GitHub"],
 	])("marks only the destination for %s as current", async (path, currentLabel) => {
 		renderNavigation(path);
@@ -75,14 +74,27 @@ describe("NavAdmin", () => {
 	});
 
 	it("keeps the active section visible when its children are collapsed", async () => {
-		renderNavigation("/w/acme/admin/practices/settings");
+		renderNavigation("/w/acme/admin/practices/review");
 
-		await screen.findByRole("link", { name: "Review settings" });
+		await screen.findByRole("link", { name: "Review" });
 		const practices = screen.getByRole("button", { name: "Practices" });
 		fireEvent.click(practices);
 
-		await waitFor(() => expect(screen.queryByRole("link", { name: "Review settings" })).toBeNull());
+		await waitFor(() => expect(screen.queryByRole("link", { name: "Review" })).toBeNull());
 		expect(practices.hasAttribute("data-active")).toBe(true);
+	});
+
+	it("offers three destinations under Practices, not five", async () => {
+		renderNavigation("/w/acme/admin/practices");
+
+		const practices = await screen.findByRole("link", { name: "Practice setup" });
+		const submenu = practices.closest("ul");
+		if (!submenu) throw new Error("Practices submenu not rendered");
+		expect([...submenu.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
+			"Practice setup",
+			"Review",
+			"Practice reviews",
+		]);
 	});
 
 	it("keeps sections expandable on mobile when the desktop sidebar is collapsed", async () => {

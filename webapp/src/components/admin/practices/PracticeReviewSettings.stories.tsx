@@ -47,7 +47,7 @@ const policy = {
 };
 
 const meta = {
-	title: "Workspace admin/Practices/Review settings",
+	title: "Workspace admin/Practices/Review/When and where",
 	component: PracticeReviewSettings,
 	parameters: {
 		layout: "padded",

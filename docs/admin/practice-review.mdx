@@ -23,7 +23,7 @@ flowchart LR
     Event[A live event from GitHub or GitLab] --> Live[Live event]
     Command[The /hephaestus review comment command] --> Hand[Requested by hand]
     Button[The Review this now button] --> Hand
-    Campaign[A confirmed Review past work campaign] --> Back[Backfill of past work]
+    Campaign[A confirmed Past work campaign] --> Back[Backfill of past work]
     Sweep[A recurring Keep checking new work schedule] --> Rec[Found by a recurring check]
     Reconcile[Reconciling with the provider] --> Sync[Noticed during a sync]
     Live --> Review[A review starts]
@@ -48,7 +48,7 @@ diagram directly. Two things in it will bite you if you assume otherwise:
 | Live event | Nobody — it is automatic, per the practices' occasions | The per-workspace cooldown between reviews of the same work | The workspace's AI budget |
 | `/hephaestus review` in a **GitLab merge request** comment | The work's author or assignees, or a workspace admin | Per-person hourly allowance | The workspace's AI budget |
 | **Review this now** on Review activity | The same people. Every member sees the button; anyone else is refused with an explanation on the page | Per-person hourly allowance | The workspace's AI budget |
-| **Review past work** campaign | A workspace admin, and only after confirming a priced estimate | Bounded by the campaign's own scope | The workspace's AI budget |
+| **Past work** campaign | A workspace admin, and only after confirming a priced estimate | Bounded by the campaign's own scope | The workspace's AI budget |
 | **Keep checking new work** schedule | A workspace admin | One campaign at a time per workspace | The workspace's AI budget |
 
 There is no equivalent comment command on GitHub pull requests. Reviews there start from live events, from
@@ -71,6 +71,7 @@ quiet until both are done.
 | `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | `30` | Age after which replay directories and unreferenced evidence blobs become collectable |
 
 :::caution Two of these do not behave the way the variable name suggests
+
 - **`PRACTICE_REVIEW_RUN_FOR_ALL` is inert in the shipped Compose files.** The `application-server`
   service pins the underlying setting to `PRACTICE_REVIEW_FOR_ALL`, so setting the other name in
   `docker/.env` changes nothing. Use `PRACTICE_REVIEW_FOR_ALL`.
@@ -93,13 +94,24 @@ narrow them. A source a workspace has not connected is simply never captured. Se
 
 ### Per workspace, in screen order
 
+:::note Three screens became one
+
+*Review autonomy*, *Review settings* and *Review past work* are now the **How much**, **When and where**
+and **Past work** sections of a single **Review** page, because all three answer the same question and an
+admin chasing it should not have to know which of them holds the answer. The recurring check moved with
+the change: it is a standing policy about recent work, so it sits with the other triggers under *When and
+where* rather than under *Past work*. Old bookmarks redirect to the right section.
+
+:::
+
 1. **Administration → AI models.** On the **Practice reviews** card, bind a model. A workspace with no
    model bound runs no reviews at all — this is the expected state immediately after upgrading from named
    agent configurations, where everything is carried over switched off. The card's readiness indicator also
    tells you whether the bound model is still usable.
-2. **Administration → Practices → Review settings → Practice review status.** Turn on
+2. **Administration → Practices → Review → When and where → Practice review status.** Turn on
    **Start practice reviews**. The same card repeats the review model's readiness, so you can confirm step 1
-   without leaving the page.
+   without leaving the page, and the banner at the top of Review says in one line whether this workspace is
+   reviewing anything at all.
 3. **Same page → Project review triggers.** **Automatic reviews** admits live events. **Manual reviews**
    admits `/hephaestus review`. **Time between reviews (minutes)** is the cooldown, 0 to 1,440.
 4. **Same page → Project review rules.** **Post feedback after merge** decides whether a merged pull
@@ -107,11 +119,12 @@ narrow them. A source a workspace has not connected is simply never captured. Se
    *Assigned review participants*.
 5. **Same page → Review scope.** **Target branches** and **Repositories** narrow which work is reviewed at
    all. Leave both empty to review everything the workspace monitors.
-6. **Same page → Review settings.** Set **How much the system does on its own** and **Where feedback goes**
-   for the whole workspace. These two are the only settings you need to start; everything below inherits
-   from them.
-7. **Administration → Practices → Practice setup.** Override step 6 only for the areas or practices where
-   the workspace answer is wrong. You are not expected to touch most of them.
+6. **Same page's *How much* section.** Set **How much the system does on its own** and **Where feedback
+   goes** for the whole workspace. These two are the only settings you need to start; everything below
+   inherits from them.
+7. **Same section, further down.** Override step 6 only for the areas or practices where the workspace
+   answer is wrong. You are not expected to touch most of them. Practice setup shows each practice's tier
+   and where it came from, but does not change it — the tier has one editor, and this is it.
 
 Whether a draft is reviewed is decided **per practice**, on the practice itself
 (*Also while it is still a draft*), not by a workspace switch.
@@ -146,8 +159,8 @@ have to apply per row is a setting nobody applies, so the shipped default become
 anyone ever runs. Start with the two workspace answers, then override the handful of areas where they are
 wrong.
 
-The **Practice setup** page shows, above the list, how many practices currently sit at each setting — for
-the workspace and per area. Read that line before changing anything; it is the fastest way to see whether
+The **Review → How much** section shows, above the list, how many practices currently sit at each setting
+— for the workspace and per area. Read that line before changing anything; it is the fastest way to see whether
 an override you made years ago is still doing what you think.
 
 Upgrading from the earlier per-practice on/off switch needs no decision from you: a practice that was used
@@ -187,7 +200,9 @@ Full budget mechanics, including what an unverifiable month does, are on
 ## Reviewing past work
 
 Two instruments, and the difference between them is the difference between a purchase and a standing
-order. Both live on **Administration → Practices → Review past work**.
+order — which is why they no longer share a screen. The campaign is on
+**Administration → Practices → Review → Past work**; the recurring check is on the same page's
+**When and where** section, beside the other things that start a review.
 
 **A campaign — *Review past work*.** You choose a kind of work and a lookback window, press
 **Estimate this backfill**, and see how many pieces of work are in range and what they are estimated to
@@ -239,7 +254,7 @@ upstream of practice review — check the integration's sync.
    can lift it. `agent.queue.held` counts jobs parked on a cap; `agent.queue.depth` counts only what a
    worker could claim now, so alert on held rather than reading depth.
 4. **Is practice review, or the workspace, switched off?** The switch is **Start practice reviews** on
-   Administration → Practices → **Review settings** — *not* on the Workspace settings page. A paused
+   Administration → Practices → **Review → When and where** — *not* on the Workspace settings page. A paused
    workspace runs nothing regardless of its AI configuration.
 5. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates submission,
    execution *and* orphan recovery independently of the worker role. Set on the worker only, nothing is
@@ -263,14 +278,15 @@ status, the model it ran on, and its error message — the fastest way to tell "
 | Setting | Where |
 | --- | --- |
 | Bind a model for reviews | Administration → AI models → **Practice reviews** card |
-| Start or stop practice reviews | Administration → Practices → Review settings → **Start practice reviews** |
-| Live events, comment command, cooldown | Administration → Practices → Review settings → **Project review triggers** |
-| Post after merge, eligible work | Administration → Practices → Review settings → **Project review rules** |
-| Target branches, repositories | Administration → Practices → Review settings → **Review scope** |
-| Workspace default and where feedback goes | Administration → Practices → Review settings |
-| Per-area and per-practice overrides | Administration → Practices → **Practice setup** |
+| Start or stop practice reviews | Administration → Practices → Review → **When and where** → *Start practice reviews* |
+| Live events, comment command, cooldown | Administration → Practices → Review → **When and where** → *Project review triggers* |
+| Post after merge, eligible work | Administration → Practices → Review → **When and where** → *Project review rules* |
+| Target branches, repositories | Administration → Practices → Review → **When and where** → *Review scope* |
+| Workspace default and where feedback goes | Administration → Practices → Review → **How much** |
+| Per-area and per-practice overrides | Administration → Practices → Review → **How much** |
 | Draft handling | On the practice itself — *Also while it is still a draft* |
-| One-off campaign, recurring schedule | Administration → Practices → **Review past work** |
+| One-off campaign | Administration → Practices → Review → **Past work** |
+| Recurring check over recent work | Administration → Practices → Review → **When and where** |
 | What actually ran, and why not | Administration → Practices → **Practice reviews**, or **Review activity** for any member |
 | Workspace AI spend and cap | Administration → **AI usage** |
 | Instance-wide budget cap | Instance admin → AI usage → **Set budget** |

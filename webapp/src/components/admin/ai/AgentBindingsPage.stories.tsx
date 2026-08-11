@@ -88,9 +88,9 @@ export const ProjectReviewsDisabled: Story = {
 		const card = within(canvas.getByRole("region", { name: "Practice reviews" }));
 		await expect(card.getByText("Ready")).toBeInTheDocument();
 		await expect(card.getByText("Practice reviews off")).toBeInTheDocument();
-		await expect(card.getByRole("link", { name: "Open Review settings" })).toHaveAttribute(
+		await expect(card.getByRole("link", { name: "Open Review: When and where" })).toHaveAttribute(
 			"href",
-			"/w/acme/admin/practices/settings",
+			"/w/acme/admin/practices/review?section=when-and-where",
 		);
 		await expect(card.getByRole("button", { name: "Save assignment" })).toBeEnabled();
 	},

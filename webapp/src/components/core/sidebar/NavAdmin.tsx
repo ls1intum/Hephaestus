@@ -5,15 +5,13 @@ import {
 	ChevronRight,
 	CircleDollarSign,
 	ClipboardCheck,
-	Gauge,
-	History,
 	LayoutGridIcon,
 	ListChecks,
 	Map as MapIcon,
 	PlugZapIcon,
+	ScanEye,
 	ScrollText,
 	Settings2,
-	SlidersHorizontal,
 	Trophy,
 	Users,
 	Workflow,
@@ -62,20 +60,16 @@ export function NavAdmin({
 	const onAchievementDesigner = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/achievement-designer", fuzzy: true }),
 	);
-	const onReviewSettings = Boolean(
-		matchRoute({ to: "/w/$workspaceSlug/admin/practices/settings", fuzzy: true }),
+	const onReview = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/practices/review", fuzzy: true }),
 	);
 	const onReviews = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/reviews", fuzzy: true }),
 	);
-	const onAutonomy = Boolean(
-		matchRoute({ to: "/w/$workspaceSlug/admin/practices/autonomy", fuzzy: true }),
-	);
-	const onBackfill = Boolean(
-		matchRoute({ to: "/w/$workspaceSlug/admin/practices/backfill", fuzzy: true }),
-	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
-	const onCatalog = onSection && !onReviewSettings && !onReviews && !onBackfill && !onAutonomy;
+	// `review` is a prefix of `reviews`, and a fuzzy match on the shorter one would light both
+	// entries up on every run page. The catalogue is what is left when neither claimed the route.
+	const onCatalog = onSection && !onReview && !onReviews;
 
 	const onIntegrationsScm = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/scm", fuzzy: true }),
@@ -205,17 +199,17 @@ export function NavAdmin({
 					</SidebarMenuSubItem>
 					<SidebarMenuSubItem>
 						<SidebarMenuSubButton
-							isActive={onAutonomy}
+							isActive={onReview}
 							render={
 								<Link
-									to="/w/$workspaceSlug/admin/practices/autonomy"
+									to="/w/$workspaceSlug/admin/practices/review"
 									params={{ workspaceSlug }}
 									search={{}}
 								/>
 							}
 						>
-							<Gauge />
-							<span>Review autonomy</span>
+							<ScanEye />
+							<span>Review</span>
 						</SidebarMenuSubButton>
 					</SidebarMenuSubItem>
 					<SidebarMenuSubItem>
@@ -227,28 +221,6 @@ export function NavAdmin({
 						>
 							<Workflow />
 							<span>Practice reviews</span>
-						</SidebarMenuSubButton>
-					</SidebarMenuSubItem>
-					<SidebarMenuSubItem>
-						<SidebarMenuSubButton
-							isActive={onReviewSettings}
-							render={
-								<Link to="/w/$workspaceSlug/admin/practices/settings" params={{ workspaceSlug }} />
-							}
-						>
-							<SlidersHorizontal />
-							<span>Review settings</span>
-						</SidebarMenuSubButton>
-					</SidebarMenuSubItem>
-					<SidebarMenuSubItem>
-						<SidebarMenuSubButton
-							isActive={onBackfill}
-							render={
-								<Link to="/w/$workspaceSlug/admin/practices/backfill" params={{ workspaceSlug }} />
-							}
-						>
-							<History />
-							<span>Review past work</span>
 						</SidebarMenuSubButton>
 					</SidebarMenuSubItem>
 				</AdminNavSection>

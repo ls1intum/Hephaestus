@@ -97,16 +97,23 @@ occurrence.
 **Retryable — parked as `PENDING`, re-offered until it lapses.** Somebody can lift these without the
 artifact changing.
 
-| Reason | What lifts it |
-| --- | --- |
-| `WORKSPACE_INACTIVE` | The workspace becomes active again |
-| `PRACTICES_DISABLED` | An admin starts practice reviews |
-| `NO_ACTIVE_PRACTICE` | A practice covering this kind of work is installed |
-| `REVIEW_MODEL_UNBOUND` | An admin binds a model for practice review |
-| `PRACTICE_TIER_OFF` | An admin raises a watching practice above `OFF` — at the practice, its area, or the workspace default |
-| `BUDGET_EXHAUSTED` | The cap is raised, or the month rolls over |
-| `SUBJECT_UNLINKED` | The author links a Hephaestus account |
-| `MODEL_UNAVAILABLE` | The bound model or its connection becomes usable |
+Most of them also carry a destination. `webapp/src/components/practice-trace/trace-format.ts` maps a
+reason to the screen that undoes it, and the trace renders that as a link — but only for a reader who may
+open workspace administration, since every member of a workspace can read a trace. A reason with no entry
+in that map renders as a sentence and nothing more, which is the correct answer for the self-healing and
+terminal ones below: sending somebody to a settings page that cannot affect what they just read is how a
+limit gets widened to fix a non-fault.
+
+| Reason | What lifts it | Where the trace links |
+| --- | --- | --- |
+| `WORKSPACE_INACTIVE` | The workspace becomes active again | Administration → Workspace settings |
+| `PRACTICES_DISABLED` | An admin starts practice reviews | Practices → Review → *When and where* |
+| `NO_ACTIVE_PRACTICE` | A practice covering this kind of work is installed | Practices → Practice setup |
+| `REVIEW_MODEL_UNBOUND` | An admin binds a model for practice review | Administration → AI models |
+| `PRACTICE_TIER_OFF` | An admin raises a watching practice above `OFF` — at the practice, its area, or the workspace default | Practices → Review → *How much* |
+| `BUDGET_EXHAUSTED` | The cap is raised, or the month rolls over | Administration → AI usage |
+| `SUBJECT_UNLINKED` | The author links a Hephaestus account | — the author's own account page, which an admin cannot open for them |
+| `MODEL_UNAVAILABLE` | The bound model or its connection becomes usable | Administration → AI models |
 
 **Retired — terminal, but not a decision.** These close a row nobody will come back to.
 

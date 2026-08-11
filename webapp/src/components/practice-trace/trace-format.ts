@@ -1,5 +1,6 @@
 import type { PracticeTraceEntry, ReviewRequestOutcome, TracedSignal } from "@/api/types.gen";
 import { SUPPRESSION_REASON_LABELS } from "@/components/admin/practice-reviews/review-format";
+import type { ReviewSectionId } from "@/components/admin/practices/review/review-sections";
 
 /**
  * Labels key off the generated wire union rather than a hand-kept string list, so a value the
@@ -79,21 +80,32 @@ export type RefusalReason =
 			: never
 		: never;
 
-export interface RefusalFix {
-	/** A workspace-admin route, taking `workspaceSlug` and nothing else. */
-	to:
-		| "/w/$workspaceSlug/admin/models"
-		| "/w/$workspaceSlug/admin/practices"
-		| "/w/$workspaceSlug/admin/practices/autonomy"
-		| "/w/$workspaceSlug/admin/practices/settings"
-		| "/w/$workspaceSlug/admin/settings"
-		| "/w/$workspaceSlug/admin/usage";
-	/**
-	 * Names the destination on its own. A link is read out of its sentence — by a screen reader
-	 * listing the page's links, and by anyone scanning — so "here" identifies nothing (WCAG 2.4.4).
-	 */
+/**
+ * Names the destination on its own. A link is read out of its sentence — by a screen reader listing
+ * the page's links, and by anyone scanning — so "here" identifies nothing (WCAG 2.4.4).
+ */
+interface RefusalFixLabel {
 	label: string;
 }
+
+/**
+ * A destination as a link can be built from it, in the two shapes the app actually has: a plain
+ * admin route that takes only `workspaceSlug`, or a section of the Review page, which is one route
+ * plus a search param. Split rather than an optional `search`, so a fix cannot name a section of a
+ * page that has none.
+ */
+export type RefusalFix = RefusalFixLabel &
+	(
+		| {
+				to:
+					| "/w/$workspaceSlug/admin/models"
+					| "/w/$workspaceSlug/admin/practices"
+					| "/w/$workspaceSlug/admin/settings"
+					| "/w/$workspaceSlug/admin/usage";
+				section?: never;
+		  }
+		| { to?: never; section: ReviewSectionId }
+	);
 
 /**
  * Where each refusal is undone, for the readers who can undo it.
@@ -110,23 +122,14 @@ export interface RefusalFix {
  * setting working, not a fault, and a link there invites an admin to widen a limit to fix a non-fault.
  */
 export const REFUSAL_FIXES: Partial<Record<SignalStateReason, RefusalFix>> = {
-	GATE_SKIPPED: { to: "/w/$workspaceSlug/admin/practices/settings", label: "Open review settings" },
-	OUT_OF_REVIEW_SCOPE: {
-		to: "/w/$workspaceSlug/admin/practices/settings",
-		label: "Open review scope",
-	},
-	PRACTICES_DISABLED: {
-		to: "/w/$workspaceSlug/admin/practices/settings",
-		label: "Open review settings",
-	},
+	GATE_SKIPPED: { section: "when-and-where", label: "Open Review: When and where" },
+	OUT_OF_REVIEW_SCOPE: { section: "when-and-where", label: "Open Review: When and where" },
+	PRACTICES_DISABLED: { section: "when-and-where", label: "Open Review: When and where" },
+	PRACTICE_TIER_OFF: { section: "how-much", label: "Open Review: How much" },
 	WORKSPACE_INACTIVE: { to: "/w/$workspaceSlug/admin/settings", label: "Open workspace settings" },
 	NO_ACTIVE_PRACTICE: { to: "/w/$workspaceSlug/admin/practices", label: "Open Practice setup" },
 	REVIEW_MODEL_UNBOUND: { to: "/w/$workspaceSlug/admin/models", label: "Set up a review model" },
 	MODEL_UNAVAILABLE: { to: "/w/$workspaceSlug/admin/models", label: "Open AI models" },
-	PRACTICE_TIER_OFF: {
-		to: "/w/$workspaceSlug/admin/practices/autonomy",
-		label: "Open Review autonomy",
-	},
 	BUDGET_EXHAUSTED: { to: "/w/$workspaceSlug/admin/usage", label: "Open AI usage" },
 };
 

@@ -36,7 +36,7 @@ const idle = {
 };
 
 const meta = {
-	title: "Workspace admin/Practices/Review autonomy",
+	title: "Workspace admin/Practices/Review/How much",
 	component: ReviewAutonomyPage,
 	parameters: {
 		layout: "padded",

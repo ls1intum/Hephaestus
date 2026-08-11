@@ -60,8 +60,9 @@ export const EveryReason: Story = {
 /**
  * The reasons a workspace admin can undo, one destination each.
  *
- * <p>Two reasons share the review settings page and two share AI models — the same screen, reached
- * by different sentences, which is why the label names the section rather than the page.
+ * <p>Three of them share the Review page's *When and where* section and two share AI models — the
+ * same screen reached by different sentences, which is why a label names the section it lands on
+ * rather than repeating the reason it came from.
  */
 export const WhereEachFixLives: Story = {
 	render: () => <RefusalCatalogue canAdminister />,
@@ -72,9 +73,12 @@ export const WhereEachFixLives: Story = {
 			const sentence = SIGNAL_STATE_REASON_LABELS[reason as SignalStateReason];
 			const row = canvas.getByText(`${sentence}.`).closest("li");
 			if (!(row instanceof HTMLElement)) throw new Error(`No row for ${reason}`);
+			const expected = fix.section
+				? `/w/demo/admin/practices/review${fix.section === "how-much" ? "" : `?section=${fix.section}`}`
+				: fix.to.replace("$workspaceSlug", "demo");
 			await expect(within(row).getByRole("link", { name: fix.label })).toHaveAttribute(
 				"href",
-				fix.to.replace("$workspaceSlug", "demo"),
+				expected,
 			);
 		}
 	},

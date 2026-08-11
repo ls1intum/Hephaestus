@@ -149,7 +149,7 @@ approving anything.
 A tier is never read raw. `practice.review_tier` and `practice_area.review_tier` are both **nullable**, and
 null means "this level holds no opinion":
 
-```
+```text
 effective tier = practice.review_tier ?? area.review_tier ?? workspace default ?? DELIVER
 ```
 

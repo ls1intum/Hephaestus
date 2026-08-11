@@ -437,9 +437,9 @@ export const TierIsReadOnlyHere: Story = {
 
 		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
 		const menu = within(await screen.findByRole("menu"));
-		await expect(menu.getByRole("menuitem", { name: "Change on Review autonomy" })).toHaveAttribute(
+		await expect(menu.getByRole("menuitem", { name: "Change on Review" })).toHaveAttribute(
 			"href",
-			"/w/demo/admin/practices/autonomy",
+			"/w/demo/admin/practices/review",
 		);
 		// The way off an override left with the picker, so nothing here may still offer it.
 		await expect(menu.queryByRole("menuitem", { name: "Use the default" })).not.toBeInTheDocument();

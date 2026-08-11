@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { DEFAULT_REVIEW_SECTION } from "@/components/admin/practices/review/review-sections";
 import { REFUSAL_FIXES, type SignalStateReason } from "./trace-format";
 
 export interface RefusalFixLinkProps {
@@ -33,12 +34,24 @@ export function RefusalFixLink({
 }: RefusalFixLinkProps) {
 	const fix = REFUSAL_FIXES[reason];
 	if (!fix || !canAdminister) return null;
+	const linkClass = className ?? "font-medium underline underline-offset-4 hover:no-underline";
+
+	// Two shapes, because the Review page's sections are one route plus a search param while the
+	// other destinations are routes of their own. Branching keeps both ends typed against the router.
+	if (fix.section) {
+		return (
+			<Link
+				to="/w/$workspaceSlug/admin/practices/review"
+				params={{ workspaceSlug }}
+				search={{ section: fix.section === DEFAULT_REVIEW_SECTION ? undefined : fix.section }}
+				className={linkClass}
+			>
+				{fix.label}
+			</Link>
+		);
+	}
 	return (
-		<Link
-			to={fix.to}
-			params={{ workspaceSlug }}
-			className={className ?? "font-medium underline underline-offset-4 hover:no-underline"}
-		>
+		<Link to={fix.to} params={{ workspaceSlug }} className={linkClass}>
 			{fix.label}
 		</Link>
 	);

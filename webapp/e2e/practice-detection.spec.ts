@@ -6,8 +6,8 @@ test("dev-login then configure practice review settings (read + mutate over http
 }) => {
 	await loginAsDevAdmin(page);
 
-	await page.goto("/w/e2e/admin/practices/settings");
-	await expect(page.getByRole("heading", { name: "Review settings" })).toBeVisible();
+	await page.goto("/w/e2e/admin/practices/review?section=when-and-where");
+	await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
 	// Card titles are `<div>`s, not headings, and "Model" needs `exact` or it also takes "AI models".
 	await expect(page.getByText("Model", { exact: true })).toBeVisible();
 	await expect(page.getByText("Review policy", { exact: true })).toBeVisible();
