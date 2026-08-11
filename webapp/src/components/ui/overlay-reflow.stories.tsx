@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactElement, ReactNode } from "react";
 import { expect, screen, userEvent, waitFor } from "storybook/test";
 import {
@@ -36,8 +36,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { expectNoPageOverflow, expectOverlayFollowsTrigger } from "@/test/reflow";
 
 /**
- * Six primitives in this kit hang their popup off a Base UI `Positioner`, and all six share one
- * reflow hazard.
+ * A cross-cutting regression suite, not a component's own stories: six primitives in this kit hang
+ * their popup off a Base UI `Positioner`, and all six share one reflow hazard. It lives under
+ * `Tests/` rather than beside the design-system entries because there is no `overlay-reflow`
+ * component to document — the subject is the hazard, and the six primitives are its cases.
  *
  * Base UI positions with `position: absolute` by default: the positioner is laid out in the
  * document at `left: 0` and moved into place by a transform. Its box is shrink-to-fit, so it only
@@ -57,7 +59,7 @@ import { expectNoPageOverflow, expectOverlayFollowsTrigger } from "@/test/reflow
  * measuring: the closed state never overflowed, which is exactly why this shipped.
  */
 const meta = {
-	title: "Shared/OverlayReflow",
+	title: "Tests/Overlay reflow",
 	parameters: {
 		layout: "fullscreen",
 		viewport: { defaultViewport: "reflow" },
