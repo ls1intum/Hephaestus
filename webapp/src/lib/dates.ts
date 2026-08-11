@@ -9,13 +9,6 @@ export function asDate(value: Date | string | undefined | null): Date | undefine
 }
 
 /**
- * A generated view as it actually arrives: every `Date` in it, however deeply nested, is a string.
- *
- * Type fixtures with this rather than with the generated view: a fixture built from `new Date(…)`
- * type-checks and then tests a shape production never produces, so `value.toLocaleDateString()`
- * stays green in the story and throws on the first real response.
- */
-/**
  * Hands a wire-shaped fixture to a prop typed with the generated view.
  *
  * A fixture that reaches the component through MSW needs none of this — it is serialised on the way
@@ -28,6 +21,13 @@ export function asWire<T>(value: Wire<T>): T {
 	return value as unknown as T;
 }
 
+/**
+ * A generated view as it actually arrives: every `Date` in it, however deeply nested, is a string.
+ *
+ * Type fixtures with this rather than with the generated view: a fixture built from `new Date(…)`
+ * type-checks and then tests a shape production never produces, so `value.toLocaleDateString()`
+ * stays green in the story and throws on the first real response.
+ */
 export type Wire<T> = T extends Date
 	? string
 	: T extends readonly (infer Element)[]
