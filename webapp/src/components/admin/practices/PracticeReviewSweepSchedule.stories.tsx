@@ -1,28 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
-import type { ReviewSweepSchedule } from "@/api/types.gen";
-import type { Wire } from "@/lib/dates";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSweepSchedule } from "./PracticeReviewSweepSchedule";
-
-/**
- * The schedule as it reaches the component: ISO strings, because no response transformer revives them.
- * A fixture built from `new Date(…)` would let a screen that calls `.toLocaleString()` on a string pass
- * here and break in the browser.
- */
-const schedule = (overrides: Partial<Wire<ReviewSweepSchedule>> = {}): ReviewSweepSchedule =>
-	({
-		id: "22222222-2222-2222-2222-222222222222",
-		artifactKind: "scm.pull_request",
-		cadence: "DAILY",
-		lookbackDays: 2,
-		enabled: true,
-		nextRunAt: "2026-08-10T02:17:00Z",
-		lastRunAt: "2026-08-09T02:17:00Z",
-		createdByAccountId: 7,
-		createdAt: "2026-08-01T09:00:00Z",
-		...overrides,
-	}) satisfies Wire<ReviewSweepSchedule> as unknown as ReviewSweepSchedule;
+import { sweepSchedule as schedule } from "./story-mock-data";
 
 const meta = {
 	title: "Workspace admin/Practices/Keep checking new work",
@@ -148,13 +128,20 @@ export const Paused: Story = {
 /**
  * Paused before it ever ran — the one combination whose copy used to contradict itself, promising a
  * first check "within the hour" on a schedule that was doing nothing at all.
+ *
+ * Neither half of the sentence is new: `Paused` shows the first clause with a last run beside it and
+ * `NotRunYet` shows the second while the schedule is still running. Only their meeting is, so the
+ * whole line is written out rather than matched a clause at a time.
  */
 export const PausedBeforeItEverRan: Story = {
 	args: { schedules: [schedule({ enabled: false, lastRunAt: undefined })] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/paused, so nothing is being checked/i)).toBeInTheDocument();
-		await expect(canvas.queryByText(/within the hour/i)).not.toBeInTheDocument();
+		await expect(
+			canvas.getByText(
+				"Every day, covering the last 2 days. Paused, so nothing is being checked. It has not checked anything yet.",
+			),
+		).toBeVisible();
 	},
 };
 

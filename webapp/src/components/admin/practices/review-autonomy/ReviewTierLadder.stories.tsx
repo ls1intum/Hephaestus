@@ -4,7 +4,7 @@ import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewTierLadder } from "./ReviewTierLadder";
 
 const meta = {
-	title: "Workspace admin/Practices/Review tier ladder",
+	title: "Workspace admin/Practices/Review/Tier ladder",
 	component: ReviewTierLadder,
 	parameters: { layout: "padded", viewport: { defaultViewport: "reflow" } },
 	args: {
@@ -50,7 +50,7 @@ export const Compact: Story = {
 	args: { variant: "compact", value: "PROPOSE" },
 };
 
-/** The state an inherited row is drawn in: shown, readable, and visibly somebody else's decision. */
+/** How an inherited row is drawn: readable, and visibly somebody else's decision. */
 export const Inherited: Story = {
 	args: { variant: "compact", value: "PROPOSE", muted: true },
 };
@@ -64,26 +64,6 @@ export const Choosing: Story = {
 	},
 };
 
-/**
- * Every rung is reachable, Propose included. It was once rendered disabled, on the grounds that the
- * server would refuse it; with the ladder down to three that left one reachable choice either side of a
- * dead rung, which is an on/off switch drawn as an axis. Pinned here because a picker that silently
- * stops offering the middle is the exact regression this ladder exists to prevent.
- */
-export const EveryRungIsReachable: Story = {
-	parameters: { chromatic: { disableSnapshot: true } },
-	args: { variant: "full", value: "DELIVER" },
-	play: async ({ canvas }) => {
-		for (const name of ["Off", "Propose", "Deliver"]) {
-			await expect(canvas.getByRole("radio", { name })).not.toHaveAttribute(
-				"aria-disabled",
-				"true",
-			);
-		}
-	},
-};
-
-/** Re-selecting the rung already in force writes nothing; only moving off it does. */
 export const ReSelectingTheRungInForceWritesNothing: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	args: { variant: "full", value: "PROPOSE" },

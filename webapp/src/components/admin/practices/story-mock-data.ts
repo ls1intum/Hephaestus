@@ -1,4 +1,12 @@
-import type { Practice, PracticeArea, ReviewTierAssignment } from "@/api/types.gen";
+import type {
+	Practice,
+	PracticeArea,
+	PracticeReviewSettings,
+	ReviewBackfillRun,
+	ReviewSweepSchedule,
+	ReviewTierAssignment,
+} from "@/api/types.gen";
+import type { Wire } from "@/lib/dates";
 import type { ReviewTier } from "@/lib/review-tiers";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -6,6 +14,69 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+
+/**
+ * What a workspace that has never been configured gets. Overrides are spread last, so a story names
+ * only the one setting it is about and cannot drift from the defaults on the settings it is not.
+ */
+export function mockReviewSettings(
+	overrides: Partial<PracticeReviewSettings> = {},
+): PracticeReviewSettings {
+	return {
+		cooldownMinutes: 30,
+		defaultReviewTier: "DELIVER",
+		deliverToMerged: true,
+		feedbackReach: "ON_THE_WORK",
+		reviewScope: { targetBranches: [], repositories: [] },
+		runForAllUsers: true,
+		...overrides,
+	};
+}
+
+/**
+ * A recurring check as it reaches the component: ISO strings, because no response transformer revives
+ * them. A fixture built from `new Date(…)` would let a screen that calls `.toLocaleString()` on a
+ * string pass in a story and break in the browser — hence the cast, which is the one place the lie
+ * the generated types tell about these two fields is written down.
+ */
+export function sweepSchedule(
+	overrides: Partial<Wire<ReviewSweepSchedule>> = {},
+): ReviewSweepSchedule {
+	return {
+		id: "22222222-2222-2222-2222-222222222222",
+		artifactKind: "scm.pull_request",
+		cadence: "DAILY",
+		lookbackDays: 2,
+		enabled: true,
+		nextRunAt: "2026-08-10T02:17:00Z",
+		lastRunAt: "2026-08-09T02:17:00Z",
+		createdByAccountId: 7,
+		createdAt: "2026-08-01T09:00:00Z",
+		...overrides,
+	} satisfies Wire<ReviewSweepSchedule> as unknown as ReviewSweepSchedule;
+}
+
+/** A past-work campaign, on the same terms as {@link sweepSchedule}: dates arrive as ISO strings. */
+export function backfillRun(overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRun {
+	return {
+		id: "11111111-1111-1111-1111-111111111111",
+		artifactKind: "scm.pull_request",
+		fromAt: "2026-07-08T00:00:00Z",
+		toAt: "2026-08-07T00:00:00Z",
+		status: "AWAITING_CONFIRMATION",
+		// A campaign an admin scoped by hand. The other value, SWEEP, belongs to a run a recurring
+		// check opened, and those are shown by the schedule card rather than here.
+		discoveredVia: "BACKFILL",
+		estimatedArtifacts: 128,
+		estimatedCostUsd: 15.36,
+		submittedCount: 0,
+		passedCount: 0,
+		failedCount: 0,
+		requestedByAccountId: 7,
+		createdAt: "2026-08-07T09:00:00Z",
+		...overrides,
+	} satisfies Wire<ReviewBackfillRun> as unknown as ReviewBackfillRun;
+}
 
 /**
  * The ordinary state of a practice nobody has configured: it holds no tier of its own and follows the

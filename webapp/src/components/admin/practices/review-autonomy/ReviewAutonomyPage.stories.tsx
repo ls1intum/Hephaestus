@@ -1,8 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewAutonomyPage } from "./ReviewAutonomyPage";
-import { buildAutonomyFixture, scaleFixture } from "./story-mock-data";
+import { type AutonomyFixture, buildAutonomyFixture, scaleFixture } from "./story-mock-data";
+
+/**
+ * A fixture supplies three of the page's args and nothing else; the rest come from the meta. Named
+ * here rather than inline so the fixtures read as a set and a story can be about the one field it
+ * changes.
+ */
+const from = ({ settings, rollup, practices }: AutonomyFixture) => ({
+	settings,
+	rollup,
+	practices,
+});
 
 const small = buildAutonomyFixture({
 	areas: [
@@ -31,6 +43,69 @@ const small = buildAutonomyFixture({
 		},
 	],
 });
+
+const chosenByTheWorkspace = buildAutonomyFixture({
+	workspaceDefault: "PROPOSE",
+	feedbackReach: "CONVERSATION",
+	areas: [
+		{
+			slug: "pull-request-hygiene",
+			name: "Pull request hygiene",
+			practices: [{ name: "States the motivation" }, { name: "Links the issue it closes" }],
+		},
+	],
+});
+
+const oneDescribedAndOneBare = buildAutonomyFixture({
+	areas: [
+		{
+			slug: "documentation",
+			name: "Documentation",
+			practices: [
+				{
+					name: "Explains the trade-off it chose",
+					artifactKind: "docs.document",
+					whyItMatters:
+						"A decision without its alternatives reads as arbitrary six months later. Naming what you did not do is what lets the next person tell a considered choice from an accident.",
+				},
+				{ name: "Written by hand, and says nothing more" },
+			],
+		},
+	],
+});
+
+const oneDescribedPractice = buildAutonomyFixture({
+	areas: [
+		{
+			slug: "documentation",
+			name: "Documentation",
+			practices: [
+				{
+					name: "Explains the trade-off it chose",
+					artifactKind: "docs.document",
+					whyItMatters: "A decision without its alternatives reads as arbitrary six months later.",
+				},
+			],
+		},
+	],
+});
+
+const nothingSetByHand = buildAutonomyFixture({
+	areas: [{ slug: "testing", name: "Testing", practices: [{ name: "Covers the new branch" }] }],
+});
+
+const oneUnreviewablePractice = buildAutonomyFixture({
+	areas: [
+		{
+			slug: "observability",
+			name: "Observability",
+			practices: [{ name: "Alerts a human on failure", reviewable: false }],
+		},
+	],
+});
+
+/** Built once: three stories render the same hundred rows, and building it is not free. */
+const atScale = scaleFixture();
 
 const idle = {
 	workspace: false,
@@ -65,13 +140,7 @@ const meta = {
 		onClearPracticeTier: fn(),
 		onBulkSetTier: fn(),
 	},
-	decorators: [
-		(Story) => (
-			<div className="mx-auto w-full max-w-6xl">
-				<Story />
-			</div>
-		),
-	],
+	decorators: [withWidePage],
 	tags: ["autodocs"],
 } satisfies Meta<typeof ReviewAutonomyPage>;
 
@@ -95,20 +164,7 @@ export const WorkspaceDefaultUnset: Story = {
 
 /** The one decision that replaces a hundred, made — and reversible from the same place. */
 export const WorkspaceDefaultSet: Story = {
-	args: (() => {
-		const fixture = buildAutonomyFixture({
-			workspaceDefault: "PROPOSE",
-			feedbackReach: "CONVERSATION",
-			areas: [
-				{
-					slug: "pull-request-hygiene",
-					name: "Pull request hygiene",
-					practices: [{ name: "States the motivation" }, { name: "Links the issue it closes" }],
-				},
-			],
-		});
-		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
-	})(),
+	args: from(chosenByTheWorkspace),
 	play: async ({ args, canvas, userEvent }) => {
 		await expect(
 			within(
@@ -182,37 +238,18 @@ export const PracticeOverrideWithReset: Story = {
 /**
  * What a row says about the practice it is deciding for, and what it keeps one gesture away.
  *
- * <p>A name and a control cannot be acted on: "Explains the trade-off" tells an admin nothing about what
+ * A name and a control cannot be acted on: "Explains the trade-off" tells an admin nothing about what
  * Hephaestus would say to their team, or how often. The kind of work stays on the row, because it is what
  * makes Deliver cheap or expensive and it has to be readable without a pointer. The catalogue's sentence
  * on why the practice exists moves to a preview card on the name: it is worth reading, it is not what the
  * row is deciding, and under a hundred rows it was what made the list unscannable.
  *
- * <p>The card is optional in both directions — it opens on hover and on focus, and a practice carrying no
+ * The card is optional in both directions — it opens on hover and on focus, and a practice carrying no
  * prose does not get one at all, because an empty popup appearing under the pointer is worse than none.
  * A locally written practice usually carries none, which is the second row here.
  */
 export const PracticeContext: Story = {
-	args: (() => {
-		const fixture = buildAutonomyFixture({
-			areas: [
-				{
-					slug: "documentation",
-					name: "Documentation",
-					practices: [
-						{
-							name: "Explains the trade-off it chose",
-							artifactKind: "docs.document",
-							whyItMatters:
-								"A decision without its alternatives reads as arbitrary six months later. Naming what you did not do is what lets the next person tell a considered choice from an accident.",
-						},
-						{ name: "Written by hand, and says nothing more" },
-					],
-				},
-			],
-		});
-		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
-	})(),
+	args: from(oneDescribedAndOneBare),
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Documentation/ }));
 
@@ -252,36 +289,18 @@ export const PracticeContext: Story = {
 /**
  * The card is reachable without a mouse.
  *
- * <p>The reason this is a preview card and not a tooltip on a help icon: Base UI's opens on
+ * The reason this is a preview card and not a tooltip on a help icon: Base UI's opens on
  * focus-visible as well as on hover, so the tab stop the row already has — the practice's own link — is
  * the keyboard path, and no row grows a second one. Radix's hover card does not do this, which is why
  * its documentation says a hover card may not carry content that matters; this assertion is what keeps
  * that difference from being a claim in a comment.
  *
- * <p>Touch has neither hover nor a focus ring, so the card never opens there. That is why it hangs off
+ * Touch has neither hover nor a focus ring, so the card never opens there. That is why it hangs off
  * the link: the tap goes to the practice, where the same sentence is a field on the form.
  */
 export const PracticeDetailOnKeyboardFocus: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	args: (() => {
-		const fixture = buildAutonomyFixture({
-			areas: [
-				{
-					slug: "documentation",
-					name: "Documentation",
-					practices: [
-						{
-							name: "Explains the trade-off it chose",
-							artifactKind: "docs.document",
-							whyItMatters:
-								"A decision without its alternatives reads as arbitrary six months later.",
-						},
-					],
-				},
-			],
-		});
-		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
-	})(),
+	args: from(oneDescribedPractice),
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Documentation/ }));
 		const link = canvas.getByRole("link", { name: "Explains the trade-off it chose" });
@@ -316,23 +335,7 @@ export const OverridesOnly: Story = {
 };
 
 export const OverridesOnlyEmpty: Story = {
-	args: (() => {
-		const fixture = buildAutonomyFixture({
-			areas: [
-				{
-					slug: "testing",
-					name: "Testing",
-					practices: [{ name: "Covers the new branch" }],
-				},
-			],
-		});
-		return {
-			overridesOnly: true,
-			settings: fixture.settings,
-			rollup: fixture.rollup,
-			practices: fixture.practices,
-		};
-	})(),
+	args: { overridesOnly: true, ...from(nothingSetByHand) },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Nothing was set by hand")).toBeVisible();
 	},
@@ -391,16 +394,13 @@ export const BulkInFlight: Story = {
  * A hundred practices across twenty-five areas — the size the old one-row-at-a-time screen could not
  * be used at, and the case nobody tests.
  *
- * <p>The assertions here are about scale rather than about any one row: the summary answers without
+ * The assertions here are about scale rather than about any one row: the summary answers without
  * scrolling and comes from the rollup rather than from counting the rows on screen, and a shut area
  * renders none of its practices, so the page carries twenty-five tier controls rather than a hundred
  * and twenty-five.
  */
 export const AtScale: Story = {
-	args: (() => {
-		const fixture = scaleFixture();
-		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
-	})(),
+	args: from(atScale),
 	play: async ({ canvas }) => {
 		// The summary is one visible sentence now rather than a middot-separated line with a second,
 		// `sr-only` copy of itself spoken beside it. This assertion used to pass against the hidden copy;
@@ -419,17 +419,14 @@ export const AtScale: Story = {
 /**
  * Every decision on the page sits in one column.
  *
- * <p>This is a layout assertion because the bug was invisible to every other kind. An area's ladder used
+ * This is a layout assertion because the bug was invisible to every other kind. An area's ladder used
  * to be laid out after a content-width accordion header, so its left edge moved with the length of the
  * area's name — 285px under "Documentation", 416px under "Pull request hygiene" — and the practice rows
  * below pinned theirs to the right edge instead. Twenty-five areas meant twenty-five left edges. Nothing
  * about the DOM, the roles or the text changed when that happened, so nothing caught it.
  */
 export const DecisionsShareOneColumn: Story = {
-	args: (() => {
-		const fixture = scaleFixture();
-		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
-	})(),
+	args: from(atScale),
 	globals: { viewport: { value: "desktop" } },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
@@ -451,15 +448,7 @@ export const DecisionsShareOneColumn: Story = {
 };
 
 export const AtScaleOverridesOnly: Story = {
-	args: (() => {
-		const fixture = scaleFixture();
-		return {
-			overridesOnly: true,
-			settings: fixture.settings,
-			rollup: fixture.rollup,
-			practices: fixture.practices,
-		};
-	})(),
+	args: { overridesOnly: true, ...from(atScale) },
 	play: async ({ canvas }) => {
 		// Two areas set their own tier, three practices did (one of them because Hephaestus cannot
 		// review it). Out of a hundred rows, that is the list.
@@ -471,18 +460,7 @@ export const AtScaleOverridesOnly: Story = {
 
 /** A practice Hephaestus cannot review is pinned to Off, and says why rather than failing on click. */
 export const NotReviewable: Story = {
-	args: (() => {
-		const fixture = buildAutonomyFixture({
-			areas: [
-				{
-					slug: "observability",
-					name: "Observability",
-					practices: [{ name: "Alerts a human on failure", reviewable: false }],
-				},
-			],
-		});
-		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
-	})(),
+	args: from(oneUnreviewablePractice),
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Observability/ }));
 		await expect(

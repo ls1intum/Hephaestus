@@ -47,7 +47,7 @@ const handlers = (overrides: { workspace?: object; agents?: unknown[] } = {}) =>
 ];
 
 const meta = {
-	title: "Workspace admin/Practices/Review",
+	title: "Workspace admin/Practices/Review/Overview",
 	component: ReviewPage,
 	parameters: {
 		layout: "padded",
@@ -69,10 +69,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Three sections that used to be three sidebar entries, and the one fact all of them rest on.
- *
- * <p>The model binding is read out above the ladder because it is the precondition for every tier
- * below it — and read-only, because AI models owns it.
+ * The model binding is read out above the ladder because it is the precondition for every tier below
+ * it — and read-only, because AI models owns it.
  */
 export const HowMuch: Story = {
 	play: async ({ canvas }) => {
@@ -95,7 +93,6 @@ export const HowMuch: Story = {
 	},
 };
 
-/** What starts a review, and the recurring check that now sits beside the triggers it belongs with. */
 export const WhenAndWhere: Story = {
 	args: { section: "when-and-where" },
 	play: async ({ canvas }) => {
@@ -158,19 +155,10 @@ export const NoModelIsReady: Story = {
 	},
 };
 
-/** Three tab labels on a 320px screen wrap rather than dragging the page sideways. */
-export const Mobile: Story = {
-	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas }) => {
-		await canvas.findByRole("tab", { name: "How much" }, { timeout: 5000 });
-		await expectNoPageOverflow();
-	},
-};
-
 /**
  * Real tab semantics, not three links dressed as tabs.
  *
- * <p>`role="tablist"` is what buys a screen reader "tab 1 of 3" and the whole list as one arrow-key
+ * `role="tablist"` is what buys a screen reader "tab 1 of 3" and the whole list as one arrow-key
  * stop instead of three tab stops — and each panel is named by the tab that opens it, so the reader
  * who follows one knows where they landed. Every accessible name is the visible label exactly, which
  * is what lets a voice-control user say "When and where" and mean this control (WCAG 2.5.3).

@@ -5,6 +5,7 @@ import type {
 	ReviewTierAssignment,
 	ReviewTierRollup,
 } from "@/api/types.gen";
+import { mockReviewSettings } from "@/components/admin/practices/story-mock-data";
 import { REVIEW_TIER_ORDER, type ReviewTier } from "@/lib/review-tiers";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -147,20 +148,6 @@ export function buildAutonomyFixture({
 			workspaceDefault: assignment(workspaceDefault, effectiveDefault, "WORKSPACE"),
 		},
 		practices,
-	};
-}
-
-export function mockReviewSettings(
-	overrides: Partial<PracticeReviewSettings> = {},
-): PracticeReviewSettings {
-	return {
-		cooldownMinutes: 30,
-		defaultReviewTier: "DELIVER",
-		deliverToMerged: true,
-		feedbackReach: "ON_THE_WORK",
-		reviewScope: { targetBranches: [], repositories: [] },
-		runForAllUsers: true,
-		...overrides,
 	};
 }
 

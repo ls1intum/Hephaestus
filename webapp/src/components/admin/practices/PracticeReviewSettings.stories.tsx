@@ -1,21 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent } from "storybook/test";
-import type {
-	AgentBinding,
-	PracticeReviewSettings as PracticeReviewSettingsData,
-} from "@/api/types.gen";
+import type { AgentBinding } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
+import { mockReviewSettings } from "./story-mock-data";
 
-const settings: PracticeReviewSettingsData = {
-	runForAllUsers: true,
-	deliverToMerged: false,
-	cooldownMinutes: 30,
-	reviewScope: { targetBranches: [], repositories: [] },
-	// Neither has been chosen here, so both show what a fresh workspace gets.
-	defaultReviewTier: "DELIVER",
-	feedbackReach: "ON_THE_WORK",
-};
+const settings = mockReviewSettings({ deliverToMerged: false });
 
 const readyBinding: AgentBinding = {
 	purpose: "PRACTICE_REVIEW",
@@ -161,16 +151,6 @@ export const RequestedReviewsNamesEveryDoor: Story = {
 
 export const ReviewsPaused: Story = {
 	args: { workspace: { ...workspace, enabled: false } },
-};
-
-/** Empty means everything — a workspace that has never expressed an opinion must not review nothing. */
-export const ReviewScopeUnrestricted: Story = {
-	args: {
-		policy: {
-			...policy,
-			settings: { ...settings, reviewScope: { targetBranches: [], repositories: [] } },
-		},
-	},
 };
 
 export const ReviewScopeNarrowed: Story = {

@@ -93,15 +93,7 @@ export const Populated: Story = {
 };
 
 /**
- * What a practice is for, on the name that already links to it.
- *
- * <p>This screen's rows are a name and a set of badges — an admin grouping practices into areas could
- * not tell from "PR Description Quality" what it asks of their team without opening each one. The
- * catalogue's own prose is a preview card now, the same card the review screen shows, so one gesture
- * learns both. It opens on hover and on keyboard focus; on touch the tap follows the link to the
- * practice, where the same sentences are fields on the form.
- *
- * <p>The second row here carries no prose and gets no card: a locally written practice usually will
+ * The second row here carries no prose and gets no card: a locally written practice usually will
  * not, and a popup that appears empty under the pointer is worse than no popup.
  */
 export const PracticeDetailOnHover: Story = {
@@ -403,7 +395,7 @@ export const BlockedDestinationDrag: Story = {
 /**
  * The tier, and the level that decided it, on rows that differ only in where the answer came from.
  *
- * <p>All three read the same tier out. What separates them is the sentence beside it: an admin who
+ * All three read the same tier out. What separates them is the sentence beside it: an admin who
  * sees "Off" needs to know whether this practice was singled out or whether every practice in the
  * workspace is off, because those have different fixes and only one of them is on this row.
  */
@@ -432,19 +424,25 @@ export const AutonomyTiers: Story = {
 		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
 	},
 	play: async ({ canvas }) => {
-		// Every tier is read out, Deliver included. The badge used to hide there, which was defensible
-		// while a picker beside it always said the tier; as the only read-out, a hidden one would leave
-		// the rows an admin is least likely to question saying nothing about how far the system may go.
-		const badges = canvas.getAllByText(/^(Off|Propose|Deliver)$/, {
-			selector: '[data-slot="badge"]',
-		});
-		await expect(badges).toHaveLength(3);
+		// Scoped row by row. Asserting that all three sentences exist somewhere on the page would pass
+		// just as well if every row carried the same one, which is the mix-up this story is about — and
+		// an area holding no tier of its own must send the reader to the workspace, not to the area.
+		const expected = [
+			["Nobody has touched this one", "Deliver", "Follows the workspace default"],
+			["Its area decided", "Propose", `Follows ${mockAreas[0].name}`],
+			// Every tier is read out, Deliver included. The badge used to hide there, which was
+			// defensible while a picker beside it always said the tier; as the only read-out, a hidden
+			// one would leave the rows an admin is least likely to question saying nothing.
+			["Singled out", "Off", "Set for this practice"],
+		];
 
-		// An area that holds no tier of its own is not the level that decided anything, so a practice
-		// under it is told about the workspace — the level it would actually have to go and change.
-		await expect(canvas.getByText(`Follows ${mockAreas[0].name}`)).toBeVisible();
-		await expect(canvas.getByText("Follows the workspace default")).toBeVisible();
-		await expect(canvas.getByText("Set for this practice")).toBeVisible();
+		for (const [name, tier, decidedBy] of expected) {
+			const listitem = canvas.getByText(name).closest('[role="listitem"]');
+			if (!(listitem instanceof HTMLElement)) throw new Error(`No row for ${name}`);
+			const row = within(listitem);
+			await expect(row.getByText(tier, { selector: '[data-slot="badge"]' })).toBeVisible();
+			await expect(row.getByText(decidedBy)).toBeVisible();
+		}
 		await expectNoPageOverflow();
 	},
 };

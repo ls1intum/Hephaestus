@@ -1,34 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
-import type { ReviewBackfillRun } from "@/api/types.gen";
-import type { Wire } from "@/lib/dates";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewBackfill } from "./PracticeReviewBackfill";
-
-/**
- * The run as it reaches the component: ISO strings, because no response transformer revives them.
- * A fixture built from `new Date(…)` would let a screen that calls `.toLocaleDateString()` on a
- * string pass here and break in the browser.
- */
-const run = (overrides: Partial<Wire<ReviewBackfillRun>> = {}): ReviewBackfillRun =>
-	({
-		id: "11111111-1111-1111-1111-111111111111",
-		artifactKind: "scm.pull_request",
-		fromAt: "2026-07-08T00:00:00Z",
-		toAt: "2026-08-07T00:00:00Z",
-		status: "AWAITING_CONFIRMATION",
-		// A campaign an admin scoped by hand. The other value, SWEEP, belongs to a run a recurring
-		// check opened, and those are shown by the schedule card rather than here.
-		discoveredVia: "BACKFILL",
-		estimatedArtifacts: 128,
-		estimatedCostUsd: 15.36,
-		submittedCount: 0,
-		passedCount: 0,
-		failedCount: 0,
-		requestedByAccountId: 7,
-		createdAt: "2026-08-07T09:00:00Z",
-		...overrides,
-	}) satisfies Wire<ReviewBackfillRun> as unknown as ReviewBackfillRun;
+import { backfillRun as run } from "./story-mock-data";
 
 const meta = {
 	title: "Workspace admin/Practices/Review/Past work",
