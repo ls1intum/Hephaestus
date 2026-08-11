@@ -44,10 +44,14 @@ describe("review route", () => {
 		await screen.findByRole("heading", { name: "Review" }, ROUTE_RENDER_WAIT);
 		await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
 
-		// The counts are the server's; nothing here adds up practice rows, and the areas are shut.
-		// Twice over, on purpose: once for the workspace in the strip that stays on screen, once for the
-		// only area, which happens to hold every practice.
-		expect(screen.getAllByText("2 practices: 1 off and 1 propose.")).toHaveLength(2);
+		// The counts are the server's; nothing here adds up practice rows, and the areas are shut. Twice
+		// over, on purpose: once for the workspace in the strip that stays on screen, once for the only
+		// area, which happens to hold every practice. The strip's copy carries a second sentence — how
+		// many of those counts somebody chose one at a time — which the area heading has no room for.
+		expect(
+			screen.getByText("2 practices: 1 off and 1 propose. 1 practice set by hand."),
+		).toBeTruthy();
+		expect(screen.getByText("2 practices: 1 off and 1 propose.")).toBeTruthy();
 		expect(screen.queryByText("States the motivation")).toBeNull();
 	});
 

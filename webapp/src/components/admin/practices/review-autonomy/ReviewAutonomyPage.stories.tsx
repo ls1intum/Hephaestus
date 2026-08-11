@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewAutonomyPage } from "./ReviewAutonomyPage";
 import { buildAutonomyFixture, scaleFixture } from "./story-mock-data";
@@ -157,7 +157,9 @@ export const PracticeOverrideWithReset: Story = {
 		const row = canvas.getByText("Links the issue it closes").closest("li");
 		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
 
-		await expect(within(row).getByText("Set here")).toBeVisible();
+		// The status and its reset are one line now. `getByText` matches an element's own text nodes, so
+		// this is the paragraph — the button inside it is asserted by role below, which is the pair.
+		await expect(within(row).getByText("Set here.")).toBeVisible();
 		await expect(
 			within(row).getByRole("radiogroup", {
 				name: "How far Hephaestus may go on Links the issue it closes",
@@ -178,13 +180,17 @@ export const PracticeOverrideWithReset: Story = {
 };
 
 /**
- * What a row says about the practice it is deciding for.
+ * What a row says about the practice it is deciding for, and what it keeps one gesture away.
  *
  * <p>A name and a control cannot be acted on: "Explains the trade-off" tells an admin nothing about what
- * Hephaestus would say to their team, or how often. So the row carries the kind of work — which is what
- * makes Deliver cheap or expensive — and the catalogue's own sentence on why the practice exists. Both
- * are optional on the API, and the second practice here carries neither, because a locally written
- * practice usually will not.
+ * Hephaestus would say to their team, or how often. The kind of work stays on the row, because it is what
+ * makes Deliver cheap or expensive and it has to be readable without a pointer. The catalogue's sentence
+ * on why the practice exists moves to a preview card on the name: it is worth reading, it is not what the
+ * row is deciding, and under a hundred rows it was what made the list unscannable.
+ *
+ * <p>The card is optional in both directions — it opens on hover and on focus, and a practice carrying no
+ * prose does not get one at all, because an empty popup appearing under the pointer is worse than none.
+ * A locally written practice usually carries none, which is the second row here.
  */
 export const PracticeContext: Story = {
 	args: (() => {
@@ -214,13 +220,82 @@ export const PracticeContext: Story = {
 		if (!(described instanceof HTMLElement)) throw new Error("Practice row not rendered");
 		// The kind of work is named in the vocabulary the practice catalogue uses, not the raw id.
 		await expect(within(described).getByText("Document")).toBeVisible();
-		await expect(within(described).getByText(/reads as arbitrary six months later/)).toBeVisible();
+		// The prose is off the row, so a hundred of these stay scannable.
+		await expect(
+			within(described).queryByText(/reads as arbitrary six months later/),
+		).not.toBeInTheDocument();
 
-		// A practice carrying neither still reads as a row: the kind is always known, the prose is not.
+		// Hover the name — the card is portalled, so it is found on the screen and not in the row.
+		await userEvent.hover(
+			within(described).getByRole("link", { name: "Explains the trade-off it chose" }),
+		);
+		// Re-queried on each poll rather than found once and asserted: the popup mounts at `opacity: 0`
+		// and fades in, so a single `findByText` resolves on an element that is not yet visible.
+		await waitFor(() =>
+			expect(screen.getByText(/reads as arbitrary six months later/)).toBeVisible(),
+		);
+
+		// A practice carrying no prose still reads as a row — and gets no card, because there is nothing
+		// to put in one. The kind of work is always known; the sentence is not.
 		const bare = canvas.getByText("Written by hand, and says nothing more").closest("li");
 		if (!(bare instanceof HTMLElement)) throw new Error("Bare row not rendered");
 		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
+		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
+		// as well if the card were merely slow.
+		await expect(
+			within(bare).getByRole("link", { name: "Written by hand, and says nothing more" }),
+		).not.toHaveAttribute("data-slot", "hover-card-trigger");
 		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * The card is reachable without a mouse.
+ *
+ * <p>The reason this is a preview card and not a tooltip on a help icon: Base UI's opens on
+ * focus-visible as well as on hover, so the tab stop the row already has — the practice's own link — is
+ * the keyboard path, and no row grows a second one. Radix's hover card does not do this, which is why
+ * its documentation says a hover card may not carry content that matters; this assertion is what keeps
+ * that difference from being a claim in a comment.
+ *
+ * <p>Touch has neither hover nor a focus ring, so the card never opens there. That is why it hangs off
+ * the link: the tap goes to the practice, where the same sentence is a field on the form.
+ */
+export const PracticeDetailOnKeyboardFocus: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	args: (() => {
+		const fixture = buildAutonomyFixture({
+			areas: [
+				{
+					slug: "documentation",
+					name: "Documentation",
+					practices: [
+						{
+							name: "Explains the trade-off it chose",
+							artifactKind: "docs.document",
+							whyItMatters:
+								"A decision without its alternatives reads as arbitrary six months later.",
+						},
+					],
+				},
+			],
+		});
+		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
+	})(),
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Documentation/ }));
+		const link = canvas.getByRole("link", { name: "Explains the trade-off it chose" });
+
+		await expect(screen.queryByText(/reads as arbitrary six months later/)).not.toBeInTheDocument();
+		// `link.focus()` would not do: the card opens on focus-*visible*, so focus has to arrive by
+		// keyboard. Bounded, so a DOM change ahead of the link fails the story instead of hanging it.
+		for (let step = 0; step < 12 && document.activeElement !== link; step++) {
+			await userEvent.tab();
+		}
+		await expect(link).toHaveFocus();
+		await waitFor(() =>
+			expect(screen.getByText(/reads as arbitrary six months later/)).toBeVisible(),
+		);
 	},
 };
 
@@ -327,7 +402,14 @@ export const AtScale: Story = {
 		return { settings: fixture.settings, rollup: fixture.rollup, practices: fixture.practices };
 	})(),
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("100 practices: 6 off, 89 propose and 5 deliver.")).toBeVisible();
+		// The summary is one visible sentence now rather than a middot-separated line with a second,
+		// `sr-only` copy of itself spoken beside it. This assertion used to pass against the hidden copy;
+		// it now pins the line an admin actually reads, including the count of exceptions.
+		await expect(
+			canvas.getByText(
+				/^100 practices: 6 off, 89 propose and 5 deliver\. \d+ practices and \d+ areas set by hand\.$/,
+			),
+		).toBeVisible();
 		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(27);
 		await expect(canvas.queryByRole("checkbox", { name: /^Select / })).not.toBeInTheDocument();
 		await expectNoPageOverflow();

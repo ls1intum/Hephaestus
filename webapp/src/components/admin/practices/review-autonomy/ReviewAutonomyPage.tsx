@@ -1,12 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import type {
-	Practice,
-	PracticeReviewSettings,
-	ReviewTierAssignment,
-	ReviewTierRollup,
-} from "@/api/types.gen";
+import type { Practice, PracticeReviewSettings, ReviewTierRollup } from "@/api/types.gen";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
+import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import {
 	Accordion,
 	AccordionContent,
@@ -35,10 +31,16 @@ import {
 	FieldLabel,
 	FieldTitle,
 } from "@/components/ui/field";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import {
 	FEEDBACK_REACH_DESCRIPTIONS,
@@ -49,9 +51,8 @@ import {
 	REVIEW_TIER_LABELS,
 	REVIEW_TIER_ORDER,
 	type ReviewTier,
-	tierDistribution,
 	tierDistributionSentence,
-	tierTotal,
+	WORKSPACE_DEFAULT_SOURCE,
 } from "@/lib/review-tiers";
 import { cn } from "@/lib/utils";
 import { ReviewTierLadder } from "./ReviewTierLadder";
@@ -74,8 +75,21 @@ import {
  */
 const DECISION_COLUMN = "sm:w-80";
 
-/** Area header and practice row lay out on the same two-track grid so the tracks line up. */
-const DECISION_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
+/** An area header: everything it says, then the decision. */
+const AREA_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
+
+/**
+ * A practice row: its checkbox, everything it says, then the decision.
+ *
+ * <p>A track more than the area header above it, and still one column — the decision track is a fixed
+ * 20rem at the end of both grids, and both grids are laid out across the same width, so the extra
+ * leading track changes where the *name* starts and not where the ladder does.
+ *
+ * <p>The checkbox keeps its own track below `sm` too, where the ladder drops to a full-width row
+ * beneath. Two tracks rather than one: a single-column stack would give the checkbox a line of its own
+ * above the name it selects.
+ */
+const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_20rem]";
 
 export interface ReviewAutonomyPendingState {
 	workspace: boolean;
@@ -172,25 +186,13 @@ export function ReviewAutonomyPage({
 				onClearFeedbackReach={onClearFeedbackReach}
 			/>
 
-			{/* Sticky, because "what is my workspace doing right now" is the question the screen answers
-			    and the answer must survive scrolling past the twentieth area. No negative margin: at
-			    320px a strip wider than its parent drags the whole page sideways. */}
-			<div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
+			{/* Sticky, because a selection made at the eightieth row has to be actionable without scrolling
+			    back to the top. No horizontal padding: the strip's contents line up with the card above and
+			    the areas below, and at 320px a strip wider than its parent drags the whole page sideways. */}
+			<div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<TierSummary counts={rollup.counts} overrides={overrides} />
-					{/* Hidden below `sm`, where the two stack and a rule between them is the gap already
-					    there. Vertical separators need a height to draw at all. */}
-					<Separator orientation="vertical" className="hidden h-8 sm:block" />
-					<Field orientation="horizontal" className="w-auto sm:justify-end">
-						<FieldLabel htmlFor="autonomy-overrides-only" className="font-normal text-sm">
-							Only what was set by hand
-						</FieldLabel>
-						<Switch
-							id="autonomy-overrides-only"
-							checked={overridesOnly}
-							onCheckedChange={onOverridesOnlyChange}
-						/>
-					</Field>
+					<ScopeFilter value={overridesOnly} onChange={onOverridesOnlyChange} />
 				</div>
 				<BulkActionBar
 					count={actionable.length}
@@ -217,7 +219,7 @@ export function ReviewAutonomyPage({
 				<Accordion
 					value={openValue}
 					onValueChange={(next) => setOpenAreas(next as string[])}
-					className="rounded-lg border"
+					className="space-y-2"
 				>
 					{groups.map((group) => (
 						<AreaGroup
@@ -295,32 +297,16 @@ function WorkspaceDecisionCard({
 						disabled={saving}
 						onChange={onSetWorkspaceDefault}
 					/>
-					{tierChosen ? (
-						<div className="text-left">
-							{/* The name opens with the visible words, so a voice-control user can say what they
-							    read (WCAG 2.2 SC 2.5.3). Spelled as an `aria-label` rather than the house
-							    `sr-only` tail because it states the whole name in one place, independent of
-							    CSS. The `sr-only` tail is NOT broken — `position: absolute` blockifies the
-							    span, and every engine inserts a separating space between non-inline children,
-							    so "Add" + " to target branches" is announced "Add to target branches". It
-							    only reads welded in jsdom, which loads no stylesheet; do not "fix" the
-							    sr-only sites on the strength of a jsdom-only reproduction. */}
-							<Button
-								variant="link"
-								size="sm"
-								className="h-auto p-0 text-xs"
-								aria-label="Use the default for how far Hephaestus may go without you"
-								disabled={saving}
-								onClick={onClearWorkspaceDefault}
-							>
-								Use the default
-							</Button>
-						</div>
-					) : (
-						<span className="text-muted-foreground text-xs">
-							Not chosen yet, so {REVIEW_TIER_LABELS[settings.defaultReviewTier]} applies.
-						</span>
-					)}
+					<DecisionNote
+						follows={
+							tierChosen
+								? null
+								: `Not chosen yet, so ${REVIEW_TIER_LABELS[settings.defaultReviewTier]} applies.`
+						}
+						resetLabel="Use the default for how far Hephaestus may go without you"
+						disabled={saving}
+						onClear={onClearWorkspaceDefault}
+					/>
 				</Field>
 
 				<Field>
@@ -354,25 +340,16 @@ function WorkspaceDecisionCard({
 							</FieldLabel>
 						))}
 					</RadioGroup>
-					{reachChosen ? (
-						<div className="text-left">
-							<Button
-								variant="link"
-								size="sm"
-								className="h-auto p-0 text-xs"
-								aria-label="Use the default for where feedback may go"
-								disabled={saving}
-								onClick={onClearFeedbackReach}
-							>
-								Use the default
-							</Button>
-						</div>
-					) : (
-						<span className="text-muted-foreground text-xs">
-							Not chosen yet, so {FEEDBACK_REACH_LABELS[settings.feedbackReach].toLowerCase()}{" "}
-							applies.
-						</span>
-					)}
+					<DecisionNote
+						follows={
+							reachChosen
+								? null
+								: `Not chosen yet, so ${FEEDBACK_REACH_LABELS[settings.feedbackReach].toLowerCase()} applies.`
+						}
+						resetLabel="Use the default for where feedback may go"
+						disabled={saving}
+						onClear={onClearFeedbackReach}
+					/>
 				</Field>
 			</CardContent>
 		</Card>
@@ -393,44 +370,57 @@ function TierSummary({
 	counts: Record<string, number>;
 	overrides: { practices: number; areas: number };
 }) {
-	const distribution = tierDistribution(counts);
-	const total = tierTotal(counts);
-	const byHand = overrides.practices + overrides.areas;
-
 	return (
-		<div className="min-w-0">
-			{/* Announced as a sentence when a change lands: the visible line is separated by middots,
-			    which a screen reader either swallows or reads out as punctuation. */}
-			<p className="sr-only" aria-live="polite" aria-atomic="true">
-				{tierDistributionSentence(counts)}
-			</p>
-			<p aria-hidden="true" className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-				{total === 0 ? (
-					<span className="text-muted-foreground">No practices yet</span>
-				) : (
-					distribution.map(({ tier, count }, index) => (
-						<span key={tier} className="flex items-baseline gap-2">
-							{index > 0 && <span className="text-muted-foreground/50">·</span>}
-							<span>
-								<span className="font-semibold tabular-nums">{count}</span>{" "}
-								<span className="text-muted-foreground">
-									{REVIEW_TIER_LABELS[tier].toLowerCase()}
-								</span>
-							</span>
-						</span>
-					))
-				)}
-			</p>
-			{byHand > 0 && (
-				<p className="text-muted-foreground text-xs">
-					{overrides.practices > 0 &&
-						`${overrides.practices} ${overrides.practices === 1 ? "practice" : "practices"}`}
-					{overrides.practices > 0 && overrides.areas > 0 && " and "}
-					{overrides.areas > 0 && `${overrides.areas} ${overrides.areas === 1 ? "area" : "areas"}`}
-					{" set by hand"}
-				</p>
-			)}
-		</div>
+		<p className="min-w-0 text-muted-foreground text-sm" aria-live="polite" aria-atomic="true">
+			{tierDistributionSentence(counts)} {byHandSentence(overrides)}
+		</p>
+	);
+}
+
+/**
+ * How many of them somebody decided personally, or nothing when nobody has.
+ *
+ * <p>A second sentence in the summary rather than a second line under it, because it is the same
+ * answer: what the workspace is doing, and how much of that was chosen one row at a time.
+ */
+function byHandSentence(overrides: { practices: number; areas: number }): string {
+	const parts: string[] = [];
+	if (overrides.practices > 0) {
+		parts.push(`${overrides.practices} ${overrides.practices === 1 ? "practice" : "practices"}`);
+	}
+	if (overrides.areas > 0) {
+		parts.push(`${overrides.areas} ${overrides.areas === 1 ? "area" : "areas"}`);
+	}
+	return parts.length === 0 ? "" : `${parts.join(" and ")} set by hand.`;
+}
+
+/**
+ * Which practices the list is showing — all of them, or the exceptions.
+ *
+ * <p>A toggle group, because Practice setup filters its list with one and this is the same act on the
+ * same practices; a reader who has learned that page should not have to learn a second control here.
+ * It was a `Switch` inside a `Field`, which is the shape this screen uses for the two settings it
+ * *writes* — an admin had no way to tell from the control that this one changes nothing.
+ *
+ * <p>Both states are named on screen rather than one being the unlabelled absence of the other, which
+ * is the other thing a switch could not do: "Only what was set by hand", off, does not say that what
+ * you are looking at is everything.
+ */
+function ScopeFilter({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
+	return (
+		// `role="toolbar"`, as on Practice setup: `ToggleGroup` emits `aria-orientation`, which ARIA
+		// allows on toolbar but not on group, and the items are `aria-pressed` buttons rather than radios.
+		<ToggleGroup
+			role="toolbar"
+			variant="outline"
+			size="sm"
+			aria-label="Filter practices"
+			value={[value ? "OVERRIDES" : "ALL"]}
+			onValueChange={(next) => next[0] && onChange(next[0] === "OVERRIDES")}
+		>
+			<ToggleGroupItem value="ALL">All</ToggleGroupItem>
+			<ToggleGroupItem value="OVERRIDES">Set by hand</ToggleGroupItem>
+		</ToggleGroup>
 	);
 }
 
@@ -537,20 +527,22 @@ function AreaGroup({
 		// `scroll-mt-24` clears the sticky summary. Tabbing to an area's trigger scrolls it into view, and
 		// `scroll-margin` is what that scroll respects; without it the heading a keyboard user just moved
 		// to landed under the strip — measured at 320px, the strip covers y 0–93.
-		<AccordionItem value={group.key} className="scroll-mt-24 px-3 last:border-b-0">
-			{/* A grid, not a flex row. `AccordionTrigger` wraps its button in a `Header` with a hardcoded
-			    `className="flex"`, so the `flex-1` handed to the trigger landed on the button *inside* a
-			    content-sized header and never widened it — which is why every area's ladder started at a
-			    different x. A grid track sizes the header from outside, so it cannot be opted out of. */}
-			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", DECISION_GRID)}>
-				<AccordionTrigger className="min-w-0 flex-1">
+		// One box per area, as on Practice setup — twenty-five sections inside a single border read as one
+		// very long thing rather than as twenty-five. `scroll-mt-24` clears the sticky strip: tabbing to an
+		// area's trigger scrolls it into view, and `scroll-margin` is what that scroll respects; without it
+		// the heading a keyboard user just moved to landed under the strip, which covers y 0–93 at 320px.
+		<AccordionItem value={group.key} className="scroll-mt-24 rounded-lg border bg-card px-3">
+			{/* A grid, not a flex row: the ladder sits in a track of a stated width, so it starts at the
+			    same x under a short area name and a long one. */}
+			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", AREA_GRID)}>
+				<AccordionTrigger>
+					{/* Spans, not `ItemTitle`/`ItemDescription`: this is inside a `<button>`, which may only
+					    contain phrasing content, and those render `<div>`s. */}
 					<span className="flex min-w-0 flex-col gap-1">
 						<span className="flex flex-wrap items-center gap-2">
 							<span className="break-words">{group.name}</span>
 							{group.overriddenCount > 0 && (
-								<Badge variant="outline" className="font-normal">
-									{group.overriddenCount} set by hand
-								</Badge>
+								<Badge variant="outline">{group.overriddenCount} set by hand</Badge>
 							)}
 						</span>
 						<span className="font-normal text-muted-foreground text-xs">
@@ -573,10 +565,9 @@ function AreaGroup({
 							disabled={areaPending}
 							onChange={(tier) => onSetAreaTier(areaSlug, tier)}
 						/>
-						<InheritanceNote
-							assignment={group.reviewTier}
-							inheritedFrom="the workspace default"
-							name={group.name}
+						<DecisionNote
+							follows={inheritedTierSourceSentence(group.reviewTier, WORKSPACE_DEFAULT_SOURCE)}
+							resetLabel={`Use the default for ${group.name}`}
 							disabled={areaPending}
 							onClear={() => onClearAreaTier(areaSlug)}
 						/>
@@ -592,20 +583,16 @@ function AreaGroup({
 					</p>
 				) : (
 					<>
-						{/* Sits in the first grid track, so it starts on the same left edge as the practice
-						    names it acts on rather than floating loose above the list. */}
 						{selectableSlugs.length > 0 && (
-							<div className={cn("grid gap-2 sm:gap-4", DECISION_GRID)}>
-								<Button
-									variant="link"
-									size="sm"
-									className="h-auto w-fit p-0 text-xs"
-									aria-label={`${allSelected ? "Deselect" : "Select"} all ${selectableSlugs.length} practices in ${group.name}`}
-									onClick={() => onSelectMany(selectableSlugs, !allSelected)}
-								>
-									{allSelected ? "Deselect" : "Select"} all {selectableSlugs.length}
-								</Button>
-							</div>
+							<Button
+								variant="link"
+								size="inline"
+								className="text-xs"
+								aria-label={`${allSelected ? "Deselect" : "Select"} all ${selectableSlugs.length} practices in ${group.name}`}
+								onClick={() => onSelectMany(selectableSlugs, !allSelected)}
+							>
+								{allSelected ? "Deselect" : "Select"} all {selectableSlugs.length}
+							</Button>
 						)}
 						{/* Ruled, not boxed. A bordered card here drew a second box inside the area's own, and
 						    its border plus the rows' padding inset the practice ladders 14px from the area
@@ -659,60 +646,56 @@ function PracticeAutonomyRow({
 		<Item
 			render={<li />}
 			variant="default"
-			// `px-0`: the row's grid tracks have to be the area header's tracks, or the two ladders do
-			// not share a column. Vertical padding stays — the rhythm is the row's, not the list's.
-			className={cn("grid items-start gap-2 rounded-none px-0 py-3 sm:gap-4", DECISION_GRID)}
+			// `px-0`: the row's grid tracks have to end where the area header's tracks end, or the two
+			// ladders do not share a column. Vertical padding stays — the rhythm is the row's, not the
+			// list's.
+			className={cn("grid items-start gap-2 rounded-none px-0 py-3 sm:gap-4", ROW_GRID)}
 		>
-			<div className="flex min-w-0 items-start gap-3">
-				{/* `mt-0.5` puts the box on the first line's cap height rather than its box top, which is
-				    where a reader expects a control that belongs to the title beside it. */}
+			{/* `ItemMedia` rather than a bare checkbox: it is the leading slot of a row, and it already
+			    drops to the first line's cap height when the row carries a description — which is where a
+			    reader expects a control that belongs to the title beside it, and what a hand-set `mt-0.5`
+			    was approximating. */}
+			<ItemMedia>
 				<Checkbox
 					checked={selected}
 					disabled={!reviewable}
 					aria-label={`Select ${practice.name}`}
-					className="mt-0.5 shrink-0"
 					onCheckedChange={(checked) => onToggle(practice.slug, checked === true)}
 				/>
-				<ItemContent className="min-w-0 gap-0.5">
-					<ItemTitle className="w-full min-w-0 line-clamp-none">
+			</ItemMedia>
+			<ItemContent className="min-w-0 gap-0.5">
+				<ItemTitle className="w-full min-w-0 line-clamp-none">
+					{/* Why the practice exists is a hover card on its name, not a third line under it. The
+					    sentence is the only human-written prose a practice carries and it is worth reading —
+					    but under a hundred rows it is what makes the list unscannable, and it is not what
+					    this row is deciding. Same card on Practice setup, so one gesture learns both. */}
+					<PracticeDetailHoverCard practice={practice}>
 						<Link
 							to="/w/$workspaceSlug/admin/practices/$practiceSlug"
 							params={{ workspaceSlug, practiceSlug: practice.slug }}
-							className="break-words rounded-sm font-normal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						>
 							{practice.name}
 						</Link>
-					</ItemTitle>
-					{/* The kind of work, because it is the one fact that changes what this decision costs:
-					    Deliver on a pull-request practice writes on every PR the team opens, and Deliver on
-					    a document practice may never fire at all. Same vocabulary as the practice catalogue,
-					    so the two screens name a kind the same way. */}
-					<ItemDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-						<span>{artifactKindLabel(practice.artifactKind)}</span>
-						{limitation && (
-							<Badge variant="warning" className="font-normal">
-								{limitation}
-							</Badge>
-						)}
-					</ItemDescription>
-					{/* Why the practice exists, in the catalogue's own words. An admin setting autonomy on a
-					    name like "Scope the change to one concern" cannot tell from the name what Hephaestus
-					    would be saying to their team; this is the sentence that tells them, and it is the
-					    only human-written prose a practice carries. Clamped to two lines: unbounded it makes
-					    a hundred-row list unscannable, and a prior pass tripped axe's
-					    `scrollable-region-focusable` on exactly this kind of overlong description. */}
-					{practice.whyItMatters && (
-						// `max-w-prose` because the first track is half a 1440px screen: unconstrained, this
-						// sentence set 105 characters to the line, well past the measure anyone reads
-						// comfortably. `mt-1` makes the step down from the meta line deliberate rather than
-						// whatever the two line-heights happened to leave.
-						<ItemDescription className="mt-1 max-w-prose text-xs">
-							{practice.whyItMatters}
-						</ItemDescription>
-					)}
-				</ItemContent>
-			</div>
-			<ItemActions className={cn("min-w-0 flex-col items-stretch gap-1", DECISION_COLUMN)}>
+					</PracticeDetailHoverCard>
+				</ItemTitle>
+				{/* The kind of work, because it is the one fact that changes what this decision costs:
+				    Deliver on a pull-request practice writes on every PR the team opens, and Deliver on a
+				    document practice may never fire at all. Same line, same vocabulary and same spacing as
+				    the catalogue's row, so the two screens describe a practice identically. */}
+				<ItemDescription className="flex flex-wrap items-center gap-1.5">
+					<span>{artifactKindLabel(practice.artifactKind)}</span>
+					{limitation && <Badge variant="warning">{limitation}</Badge>}
+				</ItemDescription>
+			</ItemContent>
+			{/* `col-span-2` below `sm`: the decision gets a full-width row under the name rather than being
+			    squeezed into the narrow track the checkbox sits in. */}
+			<ItemActions
+				className={cn(
+					"col-span-2 min-w-0 flex-col items-stretch gap-1 sm:col-span-1",
+					DECISION_COLUMN,
+				)}
+			>
 				<ReviewTierLadder
 					label={`How far Hephaestus may go on ${practice.name}`}
 					value={practice.reviewTier.effective}
@@ -721,10 +704,12 @@ function PracticeAutonomyRow({
 					onChange={(tier) => onSetTier(practice.slug, tier)}
 				/>
 				{reviewable ? (
-					<InheritanceNote
-						assignment={practice.reviewTier}
-						inheritedFrom={areaName ? `${areaName}` : "the workspace default"}
-						name={practice.name}
+					<DecisionNote
+						follows={inheritedTierSourceSentence(
+							practice.reviewTier,
+							areaName ?? WORKSPACE_DEFAULT_SOURCE,
+						)}
+						resetLabel={`Use the default for ${practice.name}`}
 						disabled={pending}
 						onClear={() => onClearTier(practice.slug)}
 					/>
@@ -738,44 +723,51 @@ function PracticeAutonomyRow({
 	);
 }
 
-/**
- * Inherited or set here, and the way back.
- *
- * <p>The source is named rather than badged with the level's name: "Deliver, from Code review" tells an
- * admin where to go and change it once, which "AREA" does not. The reset repeats the wording the rest of
- * the review settings already use, so the two screens do not teach two idioms for the same act.
- */
-function InheritanceNote({
-	assignment,
-	inheritedFrom,
-	name,
-	disabled,
-	onClear,
-}: {
-	assignment: ReviewTierAssignment;
-	inheritedFrom: string;
-	name: string;
+export interface DecisionNoteProps {
+	/**
+	 * What this level follows when nobody set it here, ready to print — or null when it was set here,
+	 * which is the only case that offers a way back.
+	 */
+	follows: string | null;
+	/**
+	 * The reset's accessible name. It opens with the visible words, so a voice-control user can say
+	 * what they read (WCAG 2.2 SC 2.5.3), and names the thing it resets, because there are up to
+	 * twenty-six "Use the default" buttons on this screen.
+	 */
+	resetLabel: string;
 	disabled: boolean;
 	onClear: () => void;
-}) {
-	const follows = inheritedTierSourceSentence(assignment, inheritedFrom);
-	if (follows) {
-		return <p className="text-muted-foreground text-xs">{follows}</p>;
-	}
+}
 
+/**
+ * What decided this setting, and the way back — one line, in one shape, at all four levels.
+ *
+ * <p>Where the value came from is named rather than badged with the level's name: "Follows Code
+ * review" tells an admin where to go and change it once, which "AREA" does not.
+ *
+ * <p>One paragraph rather than a flex row holding a span and a button. `Field` stretches every child
+ * to its full width, so each of the four sites had wrapped its reset in a `div` to stop a link-styled
+ * button spanning the card — and each had then re-derived an inline button by undoing `size="sm"`
+ * with `h-auto p-0 text-xs`. A button that belongs in a sentence goes in the sentence, at
+ * `size="inline"`, which inherits the type around it.
+ */
+function DecisionNote({ follows, resetLabel, disabled, onClear }: DecisionNoteProps) {
 	return (
-		<div className="flex flex-wrap items-center gap-2 text-left">
-			<span className="text-foreground text-xs">Set here</span>
-			<Button
-				variant="link"
-				size="sm"
-				className="h-auto p-0 text-xs"
-				aria-label={`Use the default for ${name}`}
-				disabled={disabled}
-				onClick={onClear}
-			>
-				Use the default
-			</Button>
-		</div>
+		<p className="text-muted-foreground text-xs">
+			{follows ?? (
+				<>
+					Set here.{" "}
+					<Button
+						variant="link"
+						size="inline"
+						aria-label={resetLabel}
+						disabled={disabled}
+						onClick={onClear}
+					>
+						Use the default
+					</Button>
+				</>
+			)}
+		</p>
 	);
 }
