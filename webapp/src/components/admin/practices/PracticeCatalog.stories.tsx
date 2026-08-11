@@ -92,6 +92,45 @@ export const Populated: Story = {
 	},
 };
 
+/**
+ * What a practice is for, on the name that already links to it.
+ *
+ * <p>This screen's rows are a name and a set of badges — an admin grouping practices into areas could
+ * not tell from "PR Description Quality" what it asks of their team without opening each one. The
+ * catalogue's own prose is a preview card now, the same card the review screen shows, so one gesture
+ * learns both. It opens on hover and on keyboard focus; on touch the tap follows the link to the
+ * practice, where the same sentences are fields on the form.
+ *
+ * <p>The second row here carries no prose and gets no card: a locally written practice usually will
+ * not, and a popup that appears empty under the pointer is worse than no popup.
+ */
+export const PracticeDetailOnHover: Story = {
+	args: {
+		practices: [
+			{ ...mockPractices[0], areaSlug: areas[0].slug, displayOrder: 0 },
+			{ ...mockUnassignedPractice, areaSlug: areas[0].slug, displayOrder: 1 },
+		],
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		await expect(screen.queryByText(/reverse-engineering the diff/)).not.toBeInTheDocument();
+
+		// A practice with nothing to say is not a trigger at all — asserted on the element rather than by
+		// hovering it and waiting for nothing, which would pass just as well if the card were merely slow.
+		await expect(
+			canvas.getByRole("link", { name: mockUnassignedPractice.name }),
+		).not.toHaveAttribute("data-slot", "hover-card-trigger");
+
+		const trigger = canvas.getByRole("link", { name: mockPractices[0].name });
+		await expect(trigger).toHaveAttribute("data-slot", "hover-card-trigger");
+		await userEvent.hover(trigger);
+		// Re-queried on each poll: the popup mounts at `opacity: 0` and fades in, so a single find would
+		// resolve on an element that is not visible yet.
+		await waitFor(() => expect(screen.getByText(/reverse-engineering the diff/)).toBeVisible());
+		await expect(screen.getByText(/lists the exact steps a reviewer ran/)).toBeVisible();
+	},
+};
+
 export const Filtered: Story = {
 	args: { focusFilter: "scm.issue" },
 	parameters: { chromatic: { viewports: [1440] } },

@@ -5,6 +5,7 @@ import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/ty
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { WORK_ARTIFACT_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
+import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
@@ -190,13 +191,19 @@ export function PracticeCatalog({
 						supportedModes={supportedModesFor(practice)}
 						inheritedFrom={inheritedFromFor(practice)}
 						title={
-							<Link
-								to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-								params={{ workspaceSlug, practiceSlug: practice.slug }}
-								className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								{practice.name}
-							</Link>
+							// The prose a practice carries has never been on this screen at all: a row is a name
+							// and a set of badges, and an admin deciding where a practice belongs could not tell
+							// from "Scope the change to one concern" what it asks of their team without opening
+							// it. On the name, on hover or on focus, and on the same card the review screen uses.
+							<PracticeDetailHoverCard practice={practice}>
+								<Link
+									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+									params={{ workspaceSlug, practiceSlug: practice.slug }}
+									className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									{practice.name}
+								</Link>
+							</PracticeDetailHoverCard>
 						}
 					/>
 				)}
