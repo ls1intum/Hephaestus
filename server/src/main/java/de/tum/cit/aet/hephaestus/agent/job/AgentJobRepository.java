@@ -68,26 +68,32 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         Instant getCompletedAt();
     }
 
+    /**
+     * One page of review runs, narrowed by any combination of status and a {@code createdAt} window.
+     *
+     * <p>Every filter is independently optional; a null one drops out of the predicate. The window is
+     * inclusive at {@code from} and exclusive at {@code to}, the same half-open convention the
+     * observation and feedback listings use, so a day picked in both surfaces means the same day.
+     *
+     * <p>The one query replaced a pair of overloads that differed only in the status clause — a third
+     * and fourth filter would have needed four. {@code CAST(:from AS Instant)} is what lets Hibernate
+     * type a null bound; see {@code AuthEventRepository#findForAdmin}, which is allowlisted out of the
+     * parameter-count arch rule for exactly this reason.
+     */
     @Query(
         "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
             "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +
-            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose"
+            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose " +
+            "AND (:status IS NULL OR j.status = :status) " +
+            "AND (CAST(:from AS Instant) IS NULL OR j.createdAt >= :from) " +
+            "AND (CAST(:to AS Instant) IS NULL OR j.createdAt < :to)"
     )
     Page<ReviewRunSummaryRow> findReviewRunSummaries(
         @Param("workspaceId") Long workspaceId,
         @Param("purpose") AgentPurpose purpose,
-        Pageable pageable
-    );
-
-    @Query(
-        "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
-            "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +
-            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose AND j.status = :status"
-    )
-    Page<ReviewRunSummaryRow> findReviewRunSummaries(
-        @Param("workspaceId") Long workspaceId,
-        @Param("purpose") AgentPurpose purpose,
-        @Param("status") AgentJobStatus status,
+        @Param("status") @Nullable AgentJobStatus status,
+        @Param("from") @Nullable Instant from,
+        @Param("to") @Nullable Instant to,
         Pageable pageable
     );
 

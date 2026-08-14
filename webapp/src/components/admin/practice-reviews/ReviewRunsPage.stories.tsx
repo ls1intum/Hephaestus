@@ -139,6 +139,62 @@ export const StatusFilter: Story = {
 	},
 };
 
+/**
+ * Arriving on a filtered link: the two days the URL names, already narrowed, with rows.
+ *
+ * The row shows when a review was requested and nothing could filter by it — the list item carried a
+ * date the toolbar could not act on, which is the case Baymard's "Have Filters for All Displayed
+ * List Item Info" describes, and the two sibling lists on this screen had taken a range all along.
+ *
+ * The story is deliberately not "open the calendar and click two days": the interesting state is a
+ * *populated* filtered list, and it also has to show that the range and the status intersect. The
+ * window holds three reviews, two of them completed; the only failed review sits outside it. So
+ * status alone would show five, the range alone shows three, and the two together show two — then
+ * zero, which no single filter on this fixture can produce.
+ */
+export const FilterByRequestedDate: Story = {
+	args: { search: { from: "2026-07-28", to: "2026-07-29" } },
+	parameters: { viewport: { defaultViewport: "desktop" }, chromatic: { viewports: [1440] } },
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("3 reviews match your filters.");
+		const list = canvas.getByRole("list", { name: /Practice reviews/ });
+		within(list).getByRole("link", { name: /Retry webhook deliveries with backoff/ });
+		within(list).getByRole("link", {
+			name: "Cache the workspace member lookup on the review path",
+		});
+		// A review requested the day before the window is gone, not merely pushed down the list.
+		await expect(
+			within(list).queryByRole("link", {
+				name: /Move invoice numbering behind the billing boundary/,
+			}),
+		).not.toBeInTheDocument();
+
+		// The facet says which date it filters and wears the range it applied.
+		canvas.getByRole("button", { name: "Requested: Jul 28 – Jul 29, 2026" });
+
+		// Adding a status narrows what the range selected instead of replacing it: five reviews are
+		// completed, three are in the window, and two are both.
+		await userEvent.click(canvas.getByRole("combobox"));
+		await userEvent.click(
+			within(await screen.findByRole("listbox")).getByRole("option", { name: /Completed/ }),
+		);
+		await canvas.findByText("2 reviews match your filters.");
+
+		// The one failed review was requested outside the window, so the intersection is empty — and
+		// the empty state says these are filters rather than blaming an untriggered practice.
+		await userEvent.click(canvas.getByRole("combobox"));
+		await userEvent.click(
+			within(await screen.findByRole("listbox")).getByRole("option", { name: /Failed/ }),
+		);
+		await canvas.findByText("No reviews found");
+		canvas.getByText("No review matches these filters. Other reviews may exist outside them.");
+
+		// One button clears both filters, not just the status it used to know about.
+		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
+		await canvas.findByText("7 reviews.");
+	},
+};
+
 export const Mobile: Story = {
 	parameters: {
 		chromatic: { viewports: [320, 768] },
@@ -148,6 +204,24 @@ export const Mobile: Story = {
 		const canvas = within(canvasElement);
 		const list = await canvas.findByRole("list", { name: /Practice reviews/ });
 		await within(list).findByRole("link", { name: /Retry webhook deliveries with backoff/ });
+		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * The applied range at 320px.
+ *
+ * `DateRangeFacet` keeps its badge at every width, unlike `FacetMultiSelect`, which collapses to
+ * "N selected" — that collapse is why the sibling lists carry a separate applied-pill row, and why
+ * none of them puts the date range in it. Adding a pill here would print the same range twice.
+ */
+export const MobileAppliedDateRange: Story = {
+	args: { search: { from: "2026-07-28", to: "2026-07-29" } },
+	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await canvas.findByText("3 reviews match your filters.");
+		canvas.getByRole("button", { name: "Requested: Jul 28 – Jul 29, 2026" });
 		await expectNoPageOverflow();
 	},
 };

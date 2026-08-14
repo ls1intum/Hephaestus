@@ -4958,18 +4958,6 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: query
-        name: status
-        required: false
-        schema:
-          type: string
-          enum:
-          - QUEUED
-          - RUNNING
-          - COMPLETED
-          - FAILED
-          - TIMED_OUT
-          - CANCELLED
-      - in: query
         name: page
         required: false
         schema:
@@ -4986,6 +4974,32 @@ paths:
           default: 20
           maximum: 100
           minimum: 1
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      - description: Inclusive lower bound on when the review was requested
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: Exclusive upper bound on when the review was requested
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           content:

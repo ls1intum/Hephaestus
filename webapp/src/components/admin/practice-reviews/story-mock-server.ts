@@ -189,7 +189,11 @@ export function reviewHandlers({
 			const url = new URL(request.url);
 			const status = single(url, "status");
 			return page(
-				reviewRuns.filter((run) => !status || run.status === status),
+				// Both filters, intersected, exactly as the endpoint applies them. Honouring only
+				// `status` here would let a story "prove" a date range that the screen never sent.
+				reviewRuns.filter(
+					(run) => (!status || run.status === status) && withinDates(url, run.createdAt),
+				),
 				url,
 			);
 		}),

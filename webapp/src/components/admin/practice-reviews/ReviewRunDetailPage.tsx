@@ -103,11 +103,14 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 			workspaceSlug={workspaceSlug}
 			section={{
 				label: "Reviews",
+				// The whole search goes back, not a hand-listed subset: "Reviews" has to return the
+				// reader to the filtered page they came from, and a filter added to the list would
+				// otherwise be dropped here without anything failing.
 				link: (
 					<Link
 						to="/w/$workspaceSlug/admin/practices/reviews"
 						params={{ workspaceSlug }}
-						search={{ page: search.page, status: search.status }}
+						search={search}
 					/>
 				),
 			}}

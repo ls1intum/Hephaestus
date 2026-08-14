@@ -9647,9 +9647,17 @@ export type ListPracticeReviewsData = {
         workspaceSlug: string;
     };
     query?: {
-        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
         page?: number;
         size?: number;
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        /**
+         * Inclusive lower bound on when the review was requested
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound on when the review was requested
+         */
+        to?: Date;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews';
 };

@@ -32,6 +32,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -234,6 +235,113 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 )
             )
         );
+    }
+
+    /**
+     * The window narrows the list, and it narrows what {@code status} already selected rather than
+     * replacing it — the two filters have to intersect, or an operator who picks a status and then a
+     * date range silently gets one of the two answers back.
+     *
+     * <p>The window is half-open like the sibling observation and feedback listings: a review created
+     * exactly at {@code from} is in, one created exactly at {@code to} is out.
+     */
+    @Test
+    @WithAdminUser
+    void narrowsReviewsToTheRequestedWindowAndIntersectsWithStatus() {
+        Instant from = Instant.parse("2026-03-10T00:00:00Z");
+        Instant to = Instant.parse("2026-03-12T00:00:00Z");
+        jobRepository.delete(job);
+        AgentJob justBefore = persistReviewAt(workspace, from.minusSeconds(1), AgentJobStatus.COMPLETED);
+        AgentJob onLowerBound = persistReviewAt(workspace, from, AgentJobStatus.COMPLETED);
+        AgentJob insideButFailed = persistReviewAt(workspace, from.plusSeconds(3600), AgentJobStatus.FAILED);
+        AgentJob onUpperBound = persistReviewAt(workspace, to, AgentJobStatus.COMPLETED);
+        // Same window, another tenant: the workspace predicate must survive the new filters.
+        persistReviewAt(otherWorkspace, from.plusSeconds(60), AgentJobStatus.COMPLETED);
+
+        // Unfiltered: every review in this workspace, and none of the other workspace's.
+        listReviews("").jsonPath("$.page.totalElements").isEqualTo(4);
+
+        // The window alone keeps the lower bound and the failed run inside it, and drops both ends.
+        listReviews("?from=2026-03-10T00:00:00Z&to=2026-03-12T00:00:00Z")
+            .jsonPath("$.page.totalElements")
+            .isEqualTo(2)
+            .jsonPath("$.content[0].id")
+            .isEqualTo(insideButFailed.getId().toString())
+            .jsonPath("$.content[1].id")
+            .isEqualTo(onLowerBound.getId().toString());
+
+        // The window intersected with a status: the failed run inside the window drops out, and the
+        // completed runs outside it stay out. A filter that replaced the other would return 3 or 2.
+        listReviews("?status=COMPLETED&from=2026-03-10T00:00:00Z&to=2026-03-12T00:00:00Z")
+            .jsonPath("$.page.totalElements")
+            .isEqualTo(1)
+            .jsonPath("$.content[0].id")
+            .isEqualTo(onLowerBound.getId().toString());
+
+        // An open-ended lower bound still excludes what precedes it: three left, oldest is the one
+        // sitting exactly on the bound rather than the review a second before it.
+        listReviews("?from=2026-03-10T00:00:00Z")
+            .jsonPath("$.page.totalElements")
+            .isEqualTo(3)
+            .jsonPath("$.content[0].id")
+            .isEqualTo(onUpperBound.getId().toString())
+            .jsonPath("$.content[2].id")
+            .isEqualTo(onLowerBound.getId().toString());
+
+        // An open-ended upper bound is exclusive, so the review created exactly on it is the one gone.
+        listReviews("?to=2026-03-12T00:00:00Z")
+            .jsonPath("$.page.totalElements")
+            .isEqualTo(3)
+            .jsonPath("$.content[0].id")
+            .isEqualTo(insideButFailed.getId().toString())
+            .jsonPath("$.content[2].id")
+            .isEqualTo(justBefore.getId().toString());
+    }
+
+    /** A backwards window is a mistake, not an empty page — the siblings answer it the same way. */
+    @Test
+    @WithAdminUser
+    void rejectsAWindowThatEndsBeforeItStarts() {
+        webTestClient
+            .get()
+            .uri(
+                "/workspaces/{slug}/practices/reviews?from=2026-03-12T00:00:00Z&to=2026-03-10T00:00:00Z",
+                workspace.getWorkspaceSlug()
+            )
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+            .expectHeader()
+            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+            .expectBody()
+            .jsonPath("$.status")
+            .isEqualTo(400)
+            .jsonPath("$.detail")
+            .isEqualTo("from must not be after to");
+    }
+
+    private WebTestClient.BodyContentSpec listReviews(String query) {
+        return webTestClient
+            .get()
+            .uri("/workspaces/{slug}/practices/reviews" + query, workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody();
+    }
+
+    /** {@code createdAt} is only defaulted when unset, so a review can be seeded at a chosen instant. */
+    private AgentJob persistReviewAt(Workspace targetWorkspace, Instant createdAt, AgentJobStatus status) {
+        AgentJob result = new AgentJob();
+        result.setWorkspace(targetWorkspace);
+        result.setPurpose(AgentPurpose.PRACTICE_REVIEW);
+        result.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        result.setConfigSnapshot(objectMapper.valueToTree(Map.of("model", "test")));
+        result.setCreatedAt(createdAt);
+        result.setStatus(status);
+        return jobRepository.save(result);
     }
 
     @Test

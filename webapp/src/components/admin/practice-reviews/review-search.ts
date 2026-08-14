@@ -102,10 +102,26 @@ export const observationsSearchSchema = z
 	})
 	.transform(canonicalDateRange);
 
-export const runsSearchSchema = z.object({
-	page,
-	status: z.enum(statusValues(REVIEW_STATUS_DEFS)).optional().catch(undefined),
-});
+/**
+ * The reviews list carries a window over when each review was *requested*, alongside the status.
+ *
+ * A row shows that timestamp, and every piece of information a list item displays is important
+ * enough that someone will look for a way to filter by it — finding none, they search the toolbar
+ * again rather than concluding it is absent (Baymard, "Have Filters for All Displayed List Item
+ * Info"). The two sibling lists on this screen took a range all along; this one did not.
+ *
+ * Only `from`/`to` are borrowed from `scope`, not the whole object: a review *is* the job, so
+ * `agentJobId` would be a self-reference and the artifact pair belongs to the lists of what a review
+ * produced, not to the list of reviews.
+ */
+export const runsSearchSchema = z
+	.object({
+		page,
+		status: z.enum(statusValues(REVIEW_STATUS_DEFS)).optional().catch(undefined),
+		from: day,
+		to: day,
+	})
+	.transform(canonicalDateRange);
 
 export type FeedbackSearch = z.infer<typeof feedbackSearchSchema>;
 export type ObservationsSearch = z.infer<typeof observationsSearchSchema>;
@@ -129,15 +145,37 @@ export function reviewScopeSearch(search: ReviewScopeSearch): ReviewScopeSearch 
 	};
 }
 
-function scopeQuery(search: ReviewScopeSearch) {
+/**
+ * A picked pair of days becomes the half-open instant window the API takes: midnight on `from`, and
+ * midnight on the day *after* `to`, so the day the reader picked last is included whole.
+ *
+ * Shared by all three lists rather than written out per list — the rule is the one thing the URL and
+ * the endpoint have to agree on, and `review-search.test.ts` pins it once.
+ */
+function dateWindowQuery(search: { from?: string; to?: string }) {
 	const from = fromDayParam(search.from);
 	const to = fromDayParam(search.to);
+	return {
+		from: from ? dayStartInstant(from) : undefined,
+		to: to ? dayAfterInstant(to) : undefined,
+	};
+}
+
+function scopeQuery(search: ReviewScopeSearch) {
 	return {
 		agentJobId: search.agentJobId,
 		artifactKind: search.artifactKind,
 		artifactId: search.artifactKind ? search.artifactId : undefined,
-		from: from ? dayStartInstant(from) : undefined,
-		to: to ? dayAfterInstant(to) : undefined,
+		...dateWindowQuery(search),
+	};
+}
+
+export function runsQuery(search: RunsSearch, size: number) {
+	return {
+		...dateWindowQuery(search),
+		page: search.page ?? 0,
+		size,
+		status: search.status,
 	};
 }
 

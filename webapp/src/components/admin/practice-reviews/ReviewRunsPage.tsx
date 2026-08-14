@@ -4,6 +4,7 @@ import { WorkflowIcon } from "lucide-react";
 import { useEffect, useId } from "react";
 import { listPracticeReviewsOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewRunSummary } from "@/api/types.gen";
+import { DateRangeFacet } from "@/components/common/DateRangeFacet";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -32,11 +33,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { ReviewArtifactLabel } from "./ReviewArtifact";
 import { feedbackCountSlots, observationCountSlots, ReviewCountStrip } from "./ReviewBadges";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { REVIEW_PAGE_SIZE, type RunsSearch } from "./review-search";
+import { REVIEW_PAGE_SIZE, type RunsSearch, runsQuery } from "./review-search";
 
 const ACTIVE_REVIEW_POLL_MS = 5_000;
 const STATUSES = statusValues(REVIEW_STATUS_DEFS);
@@ -75,7 +77,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 	const query = useQuery({
 		...listPracticeReviewsOptions({
 			path: { workspaceSlug },
-			query: { page: search.page ?? 0, size: REVIEW_PAGE_SIZE, status: search.status },
+			query: runsQuery(search, REVIEW_PAGE_SIZE),
 		}),
 		refetchInterval: (result) =>
 			result.state.data?.content?.some(
@@ -85,8 +87,12 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 				: false,
 	});
 	const reviews = query.data?.content ?? [];
-	const hasFilter = Boolean(search.status);
+	const hasFilter = Boolean(search.status || search.from || search.to);
 	const totalPages = query.data?.page?.totalPages;
+	/** Every filter this toolbar can set, cleared at once — the toolbar's Reset and the empty state's
+	    button are the same action and were two drifting copies of it. */
+	const reset = () =>
+		onSearchChange({ status: undefined, from: undefined, to: undefined, page: 0 });
 
 	useEffect(() => {
 		if (totalPages !== undefined && search.page && search.page >= totalPages) {
@@ -98,7 +104,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 		<section aria-label="Practice reviews" className="space-y-4">
 			<FilterToolbar
 				hasFilter={hasFilter}
-				onReset={() => onSearchChange({ status: undefined, page: 0 })}
+				onReset={reset}
 				actions={
 					<ResultCount
 						total={query.data?.page?.totalElements}
@@ -133,6 +139,15 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 						</SelectContent>
 					</Select>
 				</Field>
+				{/* "Requested" rather than "Date", and not "Started": the timestamp the rows show is the
+				    review's `createdAt`, which is when it was enqueued. A review can sit queued before a
+				    worker claims it, so "Started" would name a moment neither the row nor this filter
+				    uses. See `DateRangeFacet`, which requires the title for exactly this reason. */}
+				<DateRangeFacet
+					title="Requested"
+					value={toDateRange(search)}
+					onChange={(range) => onSearchChange({ ...fromDateRange(range), page: 0 })}
+				/>
 			</FilterToolbar>
 			{query.isError ? (
 				<QueryErrorAlert
@@ -150,20 +165,21 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 						</EmptyMedia>
 						<EmptyTitle>No reviews found</EmptyTitle>
 						<EmptyDescription>
-							{search.status
-								? `No review is ${REVIEW_STATUS_DEFS[search.status].label.toLowerCase()}. Other reviews may exist under another status.`
-								: "Reviews appear when an enabled practice is triggered or a contributor requests one."}
+							{/* A date range narrows this list too now, so "never triggered" is no longer the
+							    only reason it can be empty — saying so to someone who has just picked a
+							    window would be false. */}
+							{!hasFilter
+								? "Reviews appear when an enabled practice is triggered or a contributor requests one."
+								: search.status && !search.from && !search.to
+									? `No review is ${REVIEW_STATUS_DEFS[search.status].label.toLowerCase()}. Other reviews may exist under another status.`
+									: "No review matches these filters. Other reviews may exist outside them."}
 						</EmptyDescription>
 					</EmptyHeader>
-					{search.status && (
+					{hasFilter && (
 						<EmptyContent>
 							{/* The advice used to be "Try another status" with nothing to press. See
 							    `ObservationResultsState`. */}
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => onSearchChange({ status: undefined, page: 0 })}
-							>
+							<Button variant="outline" size="sm" onClick={reset}>
 								Clear all filters
 							</Button>
 						</EmptyContent>
@@ -189,7 +205,9 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 						{...props}
 						to="/w/$workspaceSlug/admin/practices/reviews"
 						params={{ workspaceSlug }}
-						search={{ page: page === 0 ? undefined : page, status: search.status }}
+						// Spread rather than list the filters: page 2 of a filtered list has to stay
+						// filtered, and naming them one by one is what silently dropped the next one.
+						search={{ ...search, page: page === 0 ? undefined : page }}
 					/>
 				)}
 			/>
@@ -219,7 +237,9 @@ export function ReviewRunRow({ workspaceSlug, review, search }: ReviewRunRowProp
 				<Link
 					to="/w/$workspaceSlug/admin/practices/reviews/$jobId"
 					params={{ workspaceSlug, jobId: review.id }}
-					search={{ page: search.page, status: search.status }}
+					// The detail route validates with this same schema, so the whole search carries and
+					// the reader comes back to the list they left, filters intact.
+					search={search}
 				>
 					{review.target.title}
 				</Link>
