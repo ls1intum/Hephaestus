@@ -1,4 +1,3 @@
-import { HandIcon } from "lucide-react";
 import type { PracticeSignalOption, PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
 import { hasDrafts } from "@/components/admin/practice-catalog/bindings";
 import {
@@ -88,12 +87,16 @@ export function OccasionLifecycle({
 			<FieldLegend variant="label">Reviews when *</FieldLegend>
 			<div className="flex flex-wrap items-start gap-x-6 gap-y-4">
 				{bands.map((band) => {
+					// No rail inside "Ends": merged and closed without merging are alternatives, and a line
+					// between them would say a pull request is merged and then closed.
+					const railed = band.phase !== "end";
 					const rail = (
 						<div className="flex items-start">
 							{band.moments.map((moment) => (
 								<MomentNode
 									key={moment.signal}
 									moment={moment}
+									railed={railed}
 									chosen={chosen.has(moment.signal)}
 									heldBy={heldElsewhere?.get(moment.signal)}
 									controlId={`${idPrefix}-signal-${moment.signal}`}
@@ -137,22 +140,11 @@ export function OccasionLifecycle({
 						<span>
 							Include drafts
 							<FieldDescription>
-								Off by default, so these moments are read once the work is offered as finished. Turn
-								it on where the point is to help early.
+								Off by default: read the work once it is offered as finished.
 							</FieldDescription>
 						</span>
 					</FieldLabel>
 				</Field>
-			)}
-
-			{offLifecycle && (
-				<p className="flex items-start gap-2 text-sm text-muted-foreground">
-					<HandIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-					<span>
-						Anyone can also ask for a review by hand. That reviews this practice whatever state the
-						work is in, drafts included, so it is not a moment to choose here.
-					</span>
-				</p>
 			)}
 		</FieldSet>
 	);
@@ -160,6 +152,8 @@ export function OccasionLifecycle({
 
 interface MomentNodeProps {
 	moment: PracticeSignalOption;
+	/** Draw the hairline reaching back to the moment before it, where the band is a progression. */
+	railed: boolean;
 	chosen: boolean;
 	/** The occasion number already holding this moment, if it is not this one. */
 	heldBy?: number;
@@ -178,6 +172,7 @@ interface MomentNodeProps {
  */
 function MomentNode({
 	moment,
+	railed,
 	chosen,
 	heldBy,
 	controlId,
@@ -192,10 +187,12 @@ function MomentNode({
 		<label
 			htmlFor={controlId}
 			className={cn(
-				// The rail: a hairline from the node's left edge to the circle it feeds, drawn on every
-				// node but the first of its band, so the line never leaves a band or dangles.
 				"group/moment relative flex w-24 shrink-0 flex-col items-center gap-1 px-1 pt-1 pb-0.5 text-center",
-				"before:absolute before:top-5 before:left-0 before:right-1/2 before:mr-4 before:h-px before:bg-border first:before:hidden",
+				// The rail: a hairline spanning circle edge to circle edge. Every node is the same width
+				// with its circle centred, so -50% of the node plus half a circle lands exactly on the
+				// previous one. Hidden on the first node of a band, so the line never dangles.
+				railed &&
+					"before:absolute before:top-5 before:-left-1/2 before:right-1/2 before:mr-4 before:ml-4 before:h-px before:bg-border first:before:hidden",
 				"rounded-md has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
 				disabled || locked ? "cursor-not-allowed" : "cursor-pointer",
 			)}

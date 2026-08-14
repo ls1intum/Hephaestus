@@ -1,4 +1,4 @@
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { HandIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import type {
 	PracticeBinding,
 	PracticeEvidenceOutcome,
@@ -11,12 +11,14 @@ import {
 	bindingIdPrefix,
 	claimedSignals,
 	everyMomentClaimed,
+	hasDrafts,
 	MAX_BINDINGS,
 	normalizeBinding,
 	recommendedBinding,
 	signalOwners,
 } from "@/components/admin/practice-catalog/bindings";
 import { OccasionLifecycle } from "@/components/admin/practice-catalog/OccasionLifecycle";
+import { manualRequestSignal } from "@/components/admin/practice-catalog/occasion-moments";
 import { PracticeEvidenceEditor } from "@/components/admin/practice-catalog/PracticeEvidenceEditor";
 import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-catalog/PracticeEvidenceOutcomeSummary";
 import { Button } from "@/components/ui/button";
@@ -64,17 +66,39 @@ export function PracticeBindingsEditor({
 	const allClaimed = everyMomentClaimed(options, claimed);
 	const canAdd = bindings.length < MAX_BINDINGS && !allClaimed;
 	const WorkIcon = artifactKindIcon(options.artifactKind);
+	const handAsked = manualRequestSignal(options.signals) !== undefined;
 	const replaceAt = (index: number, binding: PracticeBinding) =>
 		onChange(bindings.map((item, itemIndex) => (itemIndex === index ? binding : item)));
 
 	return (
 		<div className="space-y-4">
-			{/* The work type once, above every occasion, so each card can be about the moments alone
-			    rather than restating which kind of work they belong to. */}
-			<p className="flex items-center gap-2 text-sm font-medium">
-				<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
-				{artifactKindLabel(options.artifactKind)}
-			</p>
+			{/* Everything true of the work type rather than of one occasion sits here once. Repeated on
+			    every card — as the kind, the evidence rule and the hand-asked review all were — it is
+			    three paragraphs an author reads twice and a wall before the first strip. */}
+			<div className="space-y-1.5">
+				<p className="flex items-center gap-2 text-sm font-medium">
+					<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
+					{artifactKindLabel(options.artifactKind)}
+				</p>
+				{!guidanceOnly && (
+					<p className="text-sm text-muted-foreground">
+						{canAttemptReview
+							? "Each occasion is checked for the evidence it must have before its review runs. Missing or incomplete evidence skips the practice rather than guessing."
+							: "Evidence is recorded for each occasion, but nothing is reviewed while the practice asks for a human."}
+					</p>
+				)}
+				{handAsked && (
+					<p className="flex items-start gap-2 text-sm text-muted-foreground">
+						<HandIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+						<span>
+							Anyone can also ask for a review by hand. That reviews this practice whatever state
+							the work is in
+							{hasDrafts(options.artifactKind) && ", drafts included"}, so it is not a moment to
+							choose here.
+						</span>
+					</p>
+				)}
+			</div>
 			{outcome && (
 				<PracticeEvidenceOutcomeSummary outcome={outcome} sources={options.allowedSources} />
 			)}
@@ -92,7 +116,6 @@ export function PracticeBindingsEditor({
 							index={index}
 							total={bindings.length}
 							heldElsewhere={signalOwners(bindings, index)}
-							canAttemptReview={canAttemptReview}
 							guidanceOnly={guidanceOnly}
 							errorFocusId={belongsToBinding(errorFocusId, index) ? errorFocusId : undefined}
 							errorId={error ? BINDINGS_ERROR_ID : undefined}
@@ -142,7 +165,6 @@ interface BindingCardProps {
 	index: number;
 	total: number;
 	heldElsewhere: ReadonlyMap<string, number>;
-	canAttemptReview: boolean;
 	guidanceOnly: boolean;
 	errorFocusId?: string;
 	errorId?: string;
@@ -157,7 +179,6 @@ function BindingCard({
 	index,
 	total,
 	heldElsewhere,
-	canAttemptReview,
 	guidanceOnly,
 	errorFocusId,
 	errorId,
@@ -224,7 +245,6 @@ function BindingCard({
 					needs={binding.needs}
 					idPrefix={idPrefix}
 					occasionLabel={occasionLabel}
-					canAttemptReview={canAttemptReview}
 					disabled={disabled}
 					invalid={evidenceInvalid}
 					errorId={evidenceInvalid ? errorId : undefined}

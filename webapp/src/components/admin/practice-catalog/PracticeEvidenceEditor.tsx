@@ -24,10 +24,24 @@ import { cn } from "@/lib/utils";
  * offered as that claim — see {@link AbsenceClaim}.
  */
 const EVIDENCE_ROLE_OPTIONS = [
-	{ value: "REQUIRED", label: "Required" },
-	{ value: "CONTEXTUAL", label: "Context" },
-	{ value: "NOT_USED", label: "Off" },
-] satisfies Array<{ value: Exclude<EvidenceRole, "EXHAUSTIVE">; label: string }>;
+	{
+		value: "REQUIRED",
+		label: "Required",
+		selected: "bg-primary text-primary-foreground hover:bg-primary",
+	},
+	{
+		value: "CONTEXTUAL",
+		label: "Context",
+		selected: "bg-secondary text-secondary-foreground hover:bg-secondary",
+	},
+	// Off is the answer on most of a work type's sources, and a filled black pill on every one of
+	// them shouts the baseline and hides the two or three that are on. It is marked, not shouted.
+	{ value: "NOT_USED", label: "Off", selected: "bg-muted text-foreground hover:bg-muted" },
+] satisfies Array<{
+	value: Exclude<EvidenceRole, "EXHAUSTIVE">;
+	label: string;
+	selected: string;
+}>;
 
 function selectedRole(role: EvidenceRole): string {
 	return role === "EXHAUSTIVE" ? "REQUIRED" : role;
@@ -38,11 +52,6 @@ export interface PracticeEvidenceEditorProps {
 	/** One occasion's evidence, not the practice's. */
 	needs: PracticeEvidenceRequirement[];
 	onChange: (needs: PracticeEvidenceRequirement[]) => void;
-	/**
-	 * Only changes the copy: an author who has said a human is needed is still choosing what a future
-	 * automated review would read.
-	 */
-	canAttemptReview?: boolean;
 	/** Prefix for control ids, so a form-level error can send focus into the right occasion. */
 	idPrefix: string;
 	/**
@@ -67,7 +76,6 @@ export function PracticeEvidenceEditor({
 	options,
 	needs,
 	onChange,
-	canAttemptReview = true,
 	idPrefix,
 	occasionLabel,
 	disabled = false,
@@ -130,12 +138,6 @@ export function PracticeEvidenceEditor({
 					)}
 				</dd>
 			</dl>
-			<p className="text-sm text-muted-foreground">
-				{canAttemptReview
-					? "Everything under “Must have” is checked before the review runs. Missing or incomplete evidence skips the practice rather than guessing."
-					: "Recorded for this occasion, but nothing is reviewed while the practice asks for a human."}
-			</p>
-
 			<Collapsible open={open} onOpenChange={setOpen}>
 				<div className="flex flex-wrap items-center gap-2">
 					<CollapsibleTrigger
@@ -255,9 +257,9 @@ function SourceRow({
 						htmlFor={`${controlId}-${option.value}`}
 						className={cn(
 							"cursor-pointer border-l px-2.5 py-1 text-[0.8rem] font-medium text-muted-foreground transition-colors first:border-l-0",
-							"has-[[aria-checked=true]]:bg-primary has-[[aria-checked=true]]:text-primary-foreground",
-							"hover:bg-muted has-[[aria-checked=true]]:hover:bg-primary",
-							"has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset",
+							"hover:bg-muted",
+							"has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-ring",
+							selectedRole(role) === option.value && option.selected,
 							disabled && "cursor-not-allowed opacity-70",
 						)}
 					>

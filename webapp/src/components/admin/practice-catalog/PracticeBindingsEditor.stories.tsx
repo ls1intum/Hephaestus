@@ -155,6 +155,14 @@ export const DraftsAreAPropertyOfTheOccasion: Story = {
 	},
 };
 
+/** Under "Human review needed" the evidence is still authored, but nothing checks it. */
+export const RecordedButNotReviewed: Story = {
+	args: { canAttemptReview: false },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/nothing is reviewed while the practice asks/)).toBeVisible();
+	},
+};
+
 /** With no review running, an occasion reads nothing — and saying so is clearer than an empty list. */
 export const GuidanceOnly: Story = {
 	args: {

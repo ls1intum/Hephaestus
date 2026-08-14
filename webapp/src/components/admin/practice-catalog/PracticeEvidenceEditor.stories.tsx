@@ -200,14 +200,6 @@ export const SubmittingRevealsTheSources: Story = {
 	},
 };
 
-/** Under "Human review needed" the evidence is still authored, but nothing checks it. */
-export const RecordedButNotReviewed: Story = {
-	args: { canAttemptReview: false },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/nothing is reviewed while the practice asks/)).toBeVisible();
-	},
-};
-
 export const Disabled: Story = {
 	args: { disabled: true },
 };
