@@ -19,7 +19,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Every outcome, on both places feedback can go.
+ * Every outcome, on both places feedback can go, with a withheld row from each of the four reason
+ * families.
  *
  * <p>The row's name is the feedback's own opening words. It used to be "Feedback for {person}",
  * computed from the recipient, so a page of twenty-five rows was twenty-five near-identical titles
@@ -28,7 +29,6 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		canvas.getByRole("link", { name: new RegExp(reviewFeedback[0].bodyPreview) });
 		// A conversation row's outcome is refined by its place, and still begins with the stem of the
 		// stored state so the Outcome facet remains findable from the row.
 		canvas.getByText("Queued for conversation");
@@ -37,7 +37,36 @@ export const Default: Story = {
 		canvas.getByText("Replaced by newer");
 		// A withheld row carries its own precise reason; the badge only says something stopped it.
 		canvas.getByText("The work was already merged, so a note on it would arrive too late.");
+		canvas.getByText("The developer has opted out of AI feedback.");
+		canvas.getByText("Found while reviewing past work, which is measured but never sent.");
+		canvas.getByText("Nearly the same as other feedback from the same review.");
 		await expect(canvas.queryAllByText(/Feedback for/)).toHaveLength(0);
+	},
+};
+
+/**
+ * A row whose feedback runs to seventeen hundred characters of Markdown.
+ *
+ * The endpoint sends the first 320 of them, which on a note of that length is the lead line, a bold
+ * finding heading, a file locator in backticks and the opening of a fenced Java block. The row shows
+ * the sentence a person would read out and marks the cut; the code and the markers do not appear.
+ */
+export const LongFeedback: Story = {
+	args: {
+		state: {
+			status: "ready",
+			feedback: reviewFeedback.filter((item) => item.bodyTruncated),
+		},
+	},
+	parameters: { chromatic: { viewports: [320, 1440] } },
+	play: async ({ canvas }) => {
+		const title = await canvas.findByRole("link", {
+			name: /2 issues to tighten in this change, plus one thing worth keeping/,
+		});
+		await expect(title).toHaveAccessibleName(expect.stringContaining("…"));
+		await expect(title).not.toHaveAccessibleName(expect.stringContaining("**"));
+		await expect(canvas.queryByText(/```/)).not.toBeInTheDocument();
+		await expectNoPageOverflow();
 	},
 };
 
@@ -57,7 +86,7 @@ export const WithoutAPreview: Story = {
 	args: {
 		state: {
 			status: "ready",
-			feedback: [{ ...reviewFeedback[1], bodyPreview: undefined }],
+			feedback: [{ ...reviewFeedback[0], bodyPreview: undefined, bodyTruncated: false }],
 		},
 	},
 	parameters: { chromatic: { viewports: [1440] } },

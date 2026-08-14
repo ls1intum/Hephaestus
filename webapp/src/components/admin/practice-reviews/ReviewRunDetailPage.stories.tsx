@@ -1,46 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, waitFor, within } from "storybook/test";
-import { mockJobCompleted, mockJobRunning } from "@/components/admin/ai/story-mock-data";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunDetailPage } from "./ReviewRunDetailPage";
-import { reviewFeedback, reviewObservations, workspacePractices } from "./story-mock-data";
+import { manyObservations, reviewJob } from "./story-mock-data";
+import { reviewHandlers } from "./story-mock-server";
 
-const rawFailure = "Cannot compute diff: all resolution strategies failed for commit 27f4e88c.";
-const failedJob = {
-	...mockJobRunning,
-	id: "job-failed-review",
-	status: "FAILED",
-	completedAt: new Date("2026-05-20T12:03:00Z"),
-	errorMessage: rawFailure,
-} as const;
+const COMPLETED_RUN = "11111111-1111-1111-1111-111111111111";
+const RUNNING_RUN = "aaaaaaaa-8888-8888-8888-888888888888";
+const FAILED_RUN = "bbbbbbbb-8888-8888-8888-888888888888";
 
-const previewObservations = [reviewObservations[1], reviewObservations[0]];
+const sorted = { requireObservationSort: "ACTIONABILITY" };
 
-const page = (content: unknown[], totalElements = content.length) => ({
-	content,
-	page: { number: 0, size: 5, totalElements, totalPages: Math.ceil(totalElements / 5) },
-});
-
-const handlers = (
-	job = mockJobCompleted,
-	feedback: unknown[] = reviewFeedback,
-	observations: unknown[] = previewObservations,
-	observationTotal = observations.length,
-) => [
-	http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => HttpResponse.json(job)),
-	http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(workspacePractices)),
-	http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
-		HttpResponse.json(page(feedback)),
-	),
-	http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
-		if (new URL(request.url).searchParams.get("sort") !== "ACTIONABILITY") {
-			return HttpResponse.json({ detail: "Expected actionability order" }, { status: 400 });
-		}
-		return HttpResponse.json(page(observations, observationTotal));
-	}),
-];
-
+/**
+ * The job and the rows come from one fixture, so the heading and the list under it describe the same
+ * review. They used to come from two: the job from the agent fixtures and the rows from the review
+ * ones, so this screen showed a header naming one pull request above rows naming another.
+ */
 const meta = {
 	title: "Workspace admin/Practice reviews/Review details",
 	component: ReviewRunDetailPage,
@@ -48,14 +24,12 @@ const meta = {
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: {
-			handlers: handlers(mockJobCompleted, reviewFeedback.slice(0, 2), previewObservations, 30),
-		},
+		msw: { handlers: reviewHandlers(sorted) },
 	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
-		jobId: mockJobCompleted.id,
+		jobId: COMPLETED_RUN,
 		search: {},
 	},
 } satisfies Meta<typeof ReviewRunDetailPage>;
@@ -63,17 +37,39 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * A finished review of a pull request: one strength, three things to tighten, and four pieces of
+ * feedback that between them were delivered, replaced and withheld.
+ */
 export const CompletedWithMixedOutput: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(
-			await canvas.findByRole("heading", { name: mockJobCompleted.target.title }),
-		).toBeVisible();
-		await expect(canvas.getByText("Summary posted")).toBeVisible();
-		await expect(await canvas.findByText(reviewFeedback[0].bodyPreview)).toBeVisible();
-		await expect(await canvas.findByText(reviewObservations[1].title)).toBeVisible();
-		await expect(canvas.getByRole("link", { name: "See all 30 observations" })).toBeVisible();
+		await canvas.findByRole("heading", {
+			name: "Cache the workspace member lookup on the review path",
+		});
+		canvas.getByText("Summary posted");
+		await canvas.findByText("A cache miss and a permission failure come back as the same 404");
+		await canvas.findByText(/2 issues to tighten in this change/);
 		await expectNoPageOverflow();
+	},
+};
+
+/** More observations than the five this screen previews, so it offers the way to the rest. */
+export const MoreObservationsThanItShows: Story = {
+	parameters: {
+		chromatic: { viewports: [1440] },
+		msw: {
+			handlers: reviewHandlers({
+				...sorted,
+				observations: manyObservations(64).map((observation) => ({
+					...observation,
+					agentJobId: COMPLETED_RUN,
+				})),
+			}),
+		},
+	},
+	play: async ({ canvas }) => {
+		await canvas.findByRole("link", { name: "See all 64 observations" });
 	},
 };
 
@@ -85,16 +81,15 @@ export const CompletedWithMixedOutput: Story = {
 export const DeclinedForInsufficientEvidence: Story = {
 	parameters: {
 		msw: {
-			handlers: handlers(
-				{
-					...mockJobCompleted,
-					id: "job-insufficient-evidence",
-					reviewOutcome: "INSUFFICIENT_EVIDENCE",
-				},
-				[],
-				[],
-				0,
-			),
+			handlers: [
+				http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () =>
+					HttpResponse.json({
+						...reviewJob(COMPLETED_RUN),
+						reviewOutcome: "INSUFFICIENT_EVIDENCE",
+					}),
+				),
+				...reviewHandlers({ ...sorted, observations: [], feedback: [] }),
+			],
 		},
 	},
 	play: async ({ canvasElement }) => {
@@ -112,12 +107,10 @@ export const DeclinedForInsufficientEvidence: Story = {
 	},
 };
 
+/** A review still going, which says results are coming rather than reporting an absence. */
 export const InProgressWithoutOutput: Story = {
-	args: { jobId: mockJobRunning.id },
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: { handlers: handlers(mockJobRunning, [], []) },
-	},
+	args: { jobId: RUNNING_RUN },
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Running")).toBeVisible();
@@ -133,11 +126,8 @@ export const InProgressWithoutOutput: Story = {
 };
 
 export const FailedWithoutOutput: Story = {
-	args: { jobId: failedJob.id },
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: { handlers: handlers(failedJob, [], []) },
-	},
+	args: { jobId: FAILED_RUN },
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Review couldn't be completed")).toBeVisible();
@@ -147,21 +137,36 @@ export const FailedWithoutOutput: Story = {
 		// The failure text is on the page. It used to be inside a collapsed "Technical details"
 		// accordion, together with the model and token counts — so the one screen that could say why a
 		// review produced nothing hid the answer behind a drawer labelled for technicians.
-		await canvas.findByText(rawFailure);
+		await canvas.findByText(/Cannot compute diff/);
 		await expect(canvas.queryByText("Technical details")).not.toBeInTheDocument();
 	},
 };
 
+/** A review that stopped after recording something, which is worth showing rather than discarding. */
 export const FailedWithPartialOutput: Story = {
-	args: { jobId: failedJob.id },
+	args: { jobId: FAILED_RUN },
 	parameters: {
 		chromatic: { viewports: [1440] },
-		msw: { handlers: handlers(failedJob, [], [reviewObservations[0]]) },
+		msw: {
+			handlers: [
+				http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () =>
+					HttpResponse.json(reviewJob(FAILED_RUN)),
+				),
+				...reviewHandlers({
+					...sorted,
+					feedback: [],
+					observations: manyObservations(1).map((observation) => ({
+						...observation,
+						agentJobId: FAILED_RUN,
+					})),
+				}),
+			],
+		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Review output may be incomplete")).toBeVisible();
-		await expect(await canvas.findByText(reviewObservations[0].title)).toBeVisible();
+		await canvas.findByText("A dropped delivery is logged at debug and never counted");
 	},
 };
 
@@ -179,5 +184,33 @@ export const HowTheRunWent: Story = {
 		canvas.getByRole("button", { name: "Copy configuration" });
 		canvas.getByText("Tokens read");
 		await expect(canvas.queryByText("Configuration snapshot")).not.toBeInTheDocument();
+	},
+};
+
+/** A review of a chat thread, so the same screen can be judged across kinds of work. */
+export const ReviewOfAConversation: Story = {
+	args: { jobId: "33333333-3333-3333-3333-333333333333" },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await canvas.findByRole("heading", { name: "How should we roll back the pricing migration?" });
+		canvas.getByText("The thread ends without naming what was chosen");
+	},
+};
+
+export const LoadFailed: Story = {
+	parameters: {
+		chromatic: { viewports: [1440] },
+		msw: {
+			handlers: [
+				http.get(
+					"*/workspaces/:workspaceSlug/agents/jobs/:jobId",
+					() => new HttpResponse(null, { status: 500 }),
+				),
+				...reviewHandlers(sorted),
+			],
+		},
+	},
+	play: async ({ canvas }) => {
+		await canvas.findByText("Couldn't load this review");
 	},
 };

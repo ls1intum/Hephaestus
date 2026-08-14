@@ -1,15 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { fn, screen, within } from "storybook/test";
+import { expect, fn, screen, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationsListPage } from "./ObservationsListPage";
-import {
-	practiceAreas,
-	reviewObservations,
-	workspaceMembers,
-	workspacePractices,
-} from "./story-mock-data";
+import { manyObservations } from "./story-mock-data";
+import { reviewHandlers } from "./story-mock-server";
 import { StatefulSearch } from "./story-search-harness";
 
 const meta = {
@@ -18,28 +14,7 @@ const meta = {
 	parameters: {
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: {
-			handlers: [
-				http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", () =>
-					HttpResponse.json({
-						content: reviewObservations,
-						page: {
-							number: 0,
-							size: 25,
-							totalElements: reviewObservations.length,
-							totalPages: 1,
-						},
-					}),
-				),
-				http.get("*/workspaces/:workspaceSlug/practice-areas", () =>
-					HttpResponse.json(practiceAreas),
-				),
-				http.get("*/workspaces/:workspaceSlug/practices", () =>
-					HttpResponse.json(workspacePractices),
-				),
-				http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(workspaceMembers)),
-			],
-		},
+		msw: { handlers: reviewHandlers() },
 	},
 	decorators: [withWidePage, withStandardPage],
 	tags: ["autodocs"],
@@ -53,6 +28,9 @@ const meta = {
 	 * reports. Every story here goes through the harness — with a `fn()` in `onSearchChange` and a
 	 * frozen `search`, choosing a severity left the facet unselected and clicking two days in the
 	 * calendar highlighted neither, because `selected` comes back through the same dead prop.
+	 *
+	 * The mock endpoint behind it filters too, so a chosen facet visibly removes rows. A mock that
+	 * returned the same array for every query made a working filter look broken all over again.
 	 */
 	render: (args) => (
 		<StatefulSearch initial={args.search}>
@@ -69,12 +47,36 @@ type Story = StoryObj<typeof meta>;
 /** Every facet is on the toolbar. "More filters" is gone; a filter you must find is one you do not use. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await canvas.findByText(`${reviewObservations.length} observations.`);
+		await canvas.findByText("12 observations.");
 		for (const name of ["Area", "Practice", "Result", "Severity", "Practice status"]) {
 			canvas.getByRole("combobox", { name });
 		}
 		canvas.getByRole("combobox", { name: "Developer" });
 		canvas.getByRole("button", { name: "Date" });
+		// Twelve observations over four kinds of work, not one shape repeated: a pull request, a merge
+		// request, a chat thread and a document all reach this list and have to read as one language.
+		canvas.getByText("The controller delegates before it does anything else");
+		canvas.getByText("The thread ends without naming what was chosen");
+		canvas.getByText("The runbook opens with the one step that cannot be undone");
+	},
+};
+
+/**
+ * Choosing a severity removes the rows that do not carry it.
+ *
+ * Both halves of the loop have to work for this to be true: the screen has to be able to record the
+ * choice, and the endpoint has to answer the narrowed query. Each was broken on its own.
+ */
+export const FilterToOneSeverity: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("12 observations.");
+		await userEvent.click(canvas.getByRole("combobox", { name: "Severity" }));
+		const listbox = await screen.findByRole("listbox");
+		await userEvent.click(await within(listbox).findByRole("option", { name: /Major/ }));
+		await userEvent.keyboard("{Escape}");
+		await canvas.findByText("2 observations match your filters.");
+		await expect(canvas.queryByText(/leaks the ledger's table name/)).not.toBeInTheDocument();
 	},
 };
 
@@ -88,12 +90,31 @@ export const Default: Story = {
 export const FilterToOnePerson: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText(`${reviewObservations.length} observations.`);
+		await canvas.findByText("12 observations.");
 		await userEvent.click(canvas.getByRole("combobox", { name: "Developer" }));
 		const listbox = await screen.findByRole("listbox");
 		await userEvent.click(await within(listbox).findByRole("option", { name: /Grace Hopper/ }));
-		// The choice sticks, which is the whole point of the harness.
+		// The choice sticks, and the list narrows to her two observations.
 		await canvas.findByRole("combobox", { name: "Developer: Grace Hopper" });
+		await canvas.findByText("2 observations match your filters.");
+	},
+};
+
+/** Over-filtering reaches the empty state by a route an operator can retrace and undo. */
+export const FilteredToNothing: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("12 observations.");
+		await userEvent.click(canvas.getByRole("combobox", { name: "Severity" }));
+		const listbox = await screen.findByRole("listbox");
+		await userEvent.click(await within(listbox).findByRole("option", { name: /Critical/ }));
+		await userEvent.keyboard("{Escape}");
+		await userEvent.click(canvas.getByRole("combobox", { name: "Area" }));
+		const areas = await screen.findByRole("listbox");
+		await userEvent.click(await within(areas).findByRole("option", { name: /Testing/ }));
+		await userEvent.keyboard("{Escape}");
+		await canvas.findByText("No observations match these filters");
+		canvas.getByRole("button", { name: "Reset" });
 	},
 };
 
@@ -106,7 +127,7 @@ export const FilterToOnePerson: Story = {
 export const PickADateRange: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText(`${reviewObservations.length} observations.`);
+		await canvas.findByText("12 observations.");
 		await userEvent.click(canvas.getByRole("button", { name: "Date" }));
 		const dialog = await screen.findByRole("dialog");
 		// The month is the only `role="grid"` on screen and the day buttons are the only buttons
@@ -134,13 +155,38 @@ export const SeverityFacetOpen: Story = {
 	},
 };
 
+/**
+ * Sixty-four rows, opened at the middle page — the size at which this screen stops being a list you
+ * can check by eye and starts being one you have to filter.
+ *
+ * <p>The story sets the page rather than clicking to it. Pagination here is real links, so that the
+ * third page can be bookmarked and opened in a new tab, and the page number therefore travels
+ * through the router rather than through `onSearchChange`. Storybook mounts these screens under a
+ * single bare route, so there is nothing to navigate to and a click would go nowhere. This is a
+ * property of the harness, not a dead control: the same links work in the app.
+ */
+export const MoreThanOnePage: Story = {
+	args: { search: { page: 1, presence: undefined, assessment: undefined, severity: undefined } },
+	parameters: {
+		chromatic: { viewports: [1440] },
+		msw: { handlers: reviewHandlers({ observations: manyObservations(64) }) },
+	},
+	play: async ({ canvas }) => {
+		await canvas.findByText("64 observations.");
+		const current = await canvas.findByRole("link", { name: "Go to page 2" });
+		await expect(current).toHaveAttribute("aria-current", "page");
+		canvas.getByRole("link", { name: "Go to previous page" });
+		canvas.getByRole("link", { name: "Go to next page" });
+	},
+};
+
 export const Mobile: Story = {
 	parameters: {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvasElement }) => {
-		await within(canvasElement).findByText(`${reviewObservations.length} observations.`);
+		await within(canvasElement).findByText("12 observations.");
 		await expectNoPageOverflow();
 	},
 };
@@ -154,6 +200,7 @@ export const LoadFailed: Story = {
 					"*/workspaces/:workspaceSlug/practices/reviews/observations",
 					() => new HttpResponse(null, { status: 500 }),
 				),
+				...reviewHandlers(),
 			],
 		},
 	},

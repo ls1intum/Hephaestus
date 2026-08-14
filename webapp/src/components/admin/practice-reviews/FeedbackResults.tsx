@@ -13,6 +13,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import { feedbackPreviewText } from "./feedback-preview";
 import { ReviewArtifactLabel } from "./ReviewArtifact";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
@@ -92,7 +93,9 @@ export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps
 					search={scope ?? ((previous) => previous)}
 					className="line-clamp-2"
 				>
-					{feedback.bodyPreview || "No feedback text was composed"}
+					{/* Flattened, not printed raw: the wire preview is 320 characters of the Markdown note,
+					    which lands inside a fenced code block on any feedback of ordinary length. */}
+					{feedbackPreviewText(feedback) ?? "No feedback text was composed"}
 				</Link>
 			}
 			meta={
