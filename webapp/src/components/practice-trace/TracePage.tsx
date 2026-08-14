@@ -382,7 +382,11 @@ export function TracePage({
 													aria-label="Held back because"
 												>
 													{entry.withheldReasons.map((reason) => (
-														<li key={reason}>
+														// `min-w-0`, or the badge cannot truncate: a `truncate` span is
+														// `white-space: nowrap`, so its min-content width is the whole
+														// sentence, and a flex item's automatic minimum size would hold
+														// the list open to it and push the page wider than the viewport.
+														<li key={reason} className="min-w-0">
 															<Badge variant="outline" className="max-w-full">
 																<span className="truncate">{WITHHELD_REASON_LABELS[reason]}</span>
 															</Badge>
