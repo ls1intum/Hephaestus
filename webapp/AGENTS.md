@@ -42,7 +42,7 @@ React 19 + React Compiler (auto-memoization)
 ├── Data Tables: TanStack Table v8
 ├── Server State: TanStack Query v5 (generated @hey-api client)
 ├── Client State: Zustand v5 (src/stores/**)
-├── UI: shadcn/ui + Radix primitives
+├── UI: shadcn/ui on Base UI (`@base-ui/react`) — NOT Radix, see the rubric below
 ├── Styling: Tailwind CSS v4 (design tokens in styles.css)
 ├── Testing: Vitest + Testing Library + Storybook 10
 └── Build: Vite + Biome
@@ -236,6 +236,57 @@ The webapp uses React Compiler (`babel-plugin-react-compiler`).
 - `React.memo()`
 
 The compiler handles memoization automatically. Existing usages can remain.
+
+## Component design rubric
+
+Seven rules. They are short because a rubric nobody finishes reading is not a rubric, and every one
+of them is here because its absence already cost us a rewrite.
+
+**1. An atom takes the domain object, not five scalars.** `<StatusBadge def={…} />`, not `label` +
+`variant` + `icon`. A caller holding the pieces can combine pieces that do not belong together — a
+"Delivered" label wearing the destructive variant — and no type catches it. Where the answer depends
+on several fields at once, take the record: `deliveryOutcome(feedback)` reads channel, state and
+reason together, because a state without its channel can produce a sentence that never happens.
+`Pick<WireType, …>` for the prop type, so every read model that has those fields fits as it is.
+
+**2. One defs module per enum, and no component defines its own copy for one.**
+`src/components/practice-vocabulary/*-defs.ts` holds `{ label, icon, badgeVariant, description }` per
+value, as a total `Record` over the generated wire union — so a value the server adds fails
+`typecheck:webapp` rather than rendering blank. Badges, facet options, select items and empty states
+all read that one entry. The rule exists because six label maps and two `switch`es returning badge
+variants were spread over four files, and the filter dropdown ended up as grey text beside a table of
+coloured tags. Colour is never the only channel, so `icon` is required, not optional (WCAG 2.2 SC
+1.4.1) — and within one enum no two entries may share an icon.
+
+**3. An async list surface takes a discriminated-union `state` prop.** The house pattern is
+`FeedbackResults.tsx`: `{ status: "loading" } | { status: "empty"; filtered: boolean } | { status:
+"ready"; … }`. The container turns query flags into one value; the presentational component renders
+one branch. Never pass `isLoading` and `items` and `error` as parallel props — that shape can express
+"loading with an error and three rows", which is four impossible states per surface, and a story then
+has to reproduce a combination production never sends.
+
+**4. Slots go through Base UI's `render=`, never `asChild`.** This kit is Base UI (`@base-ui/react`),
+not Radix. `<Item render={<Link to="…" />}>`, `<PopoverTrigger render={<Button …/>} />`. Anything
+copied from a Radix-based registry — including most "shadcn Timeline" snippets — will not drop in;
+port the markup and rewire the slot. Check `src/components/ui/` for what actually exists before
+assuming a primitive is available: there is **no** Timeline component, and three steps of a vertical
+rail is ~30 lines of border and rounded spans (`DeliveryTrace.tsx`), not a dependency.
+
+**5. Badge the exception, not the norm.** A badge on every row colours the baseline and hides the one
+row that is different. `ObservationOriginBadge` renders nothing for `LIVE`; `ClaimCurrentnessBadge`
+renders nothing for `CURRENT`; a tally of five delivery outcomes is a sentence, not five badges. The
+words in that sentence still come from the registry — a count reading "not delivered" beside a badge
+reading "Withheld" is rule 2 broken by the back door.
+
+**6. A hover card carries supplementary content only, on a link whose destination is a superset of
+the card.** It must never hold the only copy of a fact, or the only control that reaches one: hover
+is unavailable on touch and awkward on keyboard, so anything reachable only that way is unreachable
+for some readers. Everything in the card must also be on the page the link goes to.
+
+**7. Every prop needs two real call sites, or it dies.** One caller means the value belongs inline at
+that caller, where it can be read. A `variant`, a `display`, a `size` earns its place when two
+screens genuinely disagree — otherwise it is a fork you are paying to keep open in every story,
+snapshot and type. The same applies to a whole component: delete it and inline it.
 
 ## Routing (TanStack Router)
 
