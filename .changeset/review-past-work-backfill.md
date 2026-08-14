@@ -19,16 +19,16 @@ it finishes it says plainly whether the baseline is whole: the items it could no
 and reported separately from the ones it deliberately walked past, so a campaign that hit errors
 cannot announce itself complete over a baseline with gaps in it.
 
-The findings reach the developers they are about. They flow through the same reads as live feedback —
+The observations reach the developers they are about. They flow through the same reads as live feedback —
 the reflective read model, the mentor's history of what it can refer to, and the earlier observations
 a later review is given — each carrying what occasioned it, so a surface can say an item came from a
-review of past work rather than passing it off as something that just happened. The admin findings
+review of past work rather than passing it off as something that just happened. The admin observations
 list can filter on the same thing: live, requested by hand, or from a campaign.
 
 Two things a campaign deliberately does *not* do:
 
 - **It says nothing on the work itself.** Commenting on pull requests that were merged months ago
-  would notify everyone still subscribed to them about work nobody can act on. Backfilled findings
+  would notify everyone still subscribed to them about work nobody can act on. Backfilled observations
   are measured and recorded, and delivered nowhere.
 - **It is kept out of your live trends.** Older work has been polished since it was written, so
   mixing the two would show a dramatic improvement on the day you adopted Hephaestus that nobody

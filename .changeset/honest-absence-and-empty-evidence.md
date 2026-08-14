@@ -6,7 +6,7 @@ A review can now tell the difference between evidence it looked at and found not
 it never got to look at. Sources that turned up empty — a pull request nobody commented on, a project
 with no other tracked work, a change that links no documentation — used to be left out of the
 review's workspace entirely, which looks exactly like a source that failed to collect. They are now
-always present and simply empty, which removes a class of findings that were confidently right or
+always present and simply empty, which removes a class of observations that were confidently right or
 confidently wrong for the same reason.
 
 The trace says one thing about a source rather than three that contradict each other: a source

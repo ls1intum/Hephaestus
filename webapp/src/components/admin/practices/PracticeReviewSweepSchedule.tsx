@@ -59,7 +59,7 @@ type Cadence = (typeof CADENCES)[number]["value"];
  * At most twice the cadence, never more than a week — the same ceiling the server enforces, offered
  * here so an admin picks from what is allowed instead of discovering the rule through a 400.
  *
- * <p>The ceiling is not a UI nicety. A sweep's findings are counted alongside reviews that the work
+ * <p>The ceiling is not a UI nicety. A sweep's observations are counted alongside reviews that the work
  * itself triggered, and that only holds while its window is "the last few days". Anything longer is a
  * stretch of history somebody chose, which is what the separate "review past work" backfill is for.
  */
@@ -88,7 +88,7 @@ const formatMoment = (value: Date | undefined) => {
  * Keeping new work reviewed even when nothing announced it.
  *
  * <p>Separate from the backfill card above it because the two answer different questions. A backfill
- * measures history once, on purpose, and its findings are kept out of the live trend. A sweep is the
+ * measures history once, on purpose, and its observations are kept out of the live trend. A sweep is the
  * standing safety net for work a missed webhook never told us about, and because its window is bounded
  * to the last few days, what it finds counts exactly like anything the work itself triggered.
  */

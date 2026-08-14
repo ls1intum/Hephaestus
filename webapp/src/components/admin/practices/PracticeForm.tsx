@@ -117,7 +117,7 @@ export function PracticeForm(props: PracticeFormProps) {
 						<p className="text-sm text-muted-foreground">
 							The requirements above are the author's declaration. This status says whether an
 							independent evaluator has validated the exact practice definition; it does not
-							guarantee every finding is correct.
+							guarantee every observation is correct.
 						</p>
 					</div>
 					<PracticeAutomatedReviewValidationSummary
@@ -129,7 +129,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					<div>
 						<h2 className="text-lg font-semibold">Review results</h2>
 						<p className="text-sm text-muted-foreground">
-							View every finding this practice produced across the workspace.
+							View every observation this practice produced across the workspace.
 						</p>
 					</div>
 					<Link
@@ -138,7 +138,7 @@ export function PracticeForm(props: PracticeFormProps) {
 						search={{ practiceSlug: [initialData.slug] }}
 						className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
 					>
-						View findings
+						View observations
 					</Link>
 				</section>
 			</>

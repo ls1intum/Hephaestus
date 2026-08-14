@@ -22,7 +22,7 @@ export interface ReviewPastWorkSectionProps {
  *
  * <p>The recurring check moved out, to the triggers it belongs with. What is left is the single thing
  * this section was ever about: a bounded, priced, explicitly confirmed pass over work that predates
- * the connection, whose findings are deliberately kept out of the live trend.
+ * the connection, whose observations are deliberately kept out of the live trend.
  *
  * <p>Also the one section that polls, and only while a campaign is actually running.
  */

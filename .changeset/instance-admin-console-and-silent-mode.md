@@ -15,6 +15,6 @@ click and an optional reason; releasing asks you to type "release", because resu
 every workspace at once deserves more thought than pausing it. Both directions are recorded on the
 audit log.
 
-Silent mode holds feedback back rather than throwing it away: reviews keep running and their findings
+Silent mode holds feedback back rather than throwing it away: reviews keep running and their observations
 are still saved and marked as withheld, so nothing is lost — but they are not posted retroactively
 when you release it. Workspace settings are untouched throughout and apply again immediately.
