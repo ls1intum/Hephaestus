@@ -31,7 +31,7 @@ import {
 } from "./ReviewDetailHeader";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
-import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
+import { ReviewRow, ReviewRowList } from "./ReviewRow";
 import { confidenceLabel } from "./review-format";
 import { type ObservationsSearch, reviewScopeSearch } from "./review-search";
 
@@ -205,14 +205,19 @@ export function ObservationDetailPage({
 									</Link>
 								}
 								meta={
+									feedback.suppressionReason ? (
+										<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
+									) : undefined
+								}
+								// Where it went is a tag, not a word on the meta line. It is one of a closed
+								// set of three, and the registry already gives each one a mark and a tone —
+								// as prose it was the one fact on the row a reader had to stop and parse.
+								chips={
 									<>
-										<ReviewRowMeta items={[DELIVERY_PLACE_DEFS[feedback.channel].label]} />
-										{feedback.suppressionReason && (
-											<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
-										)}
+										<StatusBadge def={DELIVERY_PLACE_DEFS[feedback.channel]} />
+										<StatusBadge def={deliveryOutcome(feedback)} />
 									</>
 								}
-								chips={<StatusBadge def={deliveryOutcome(feedback)} />}
 							/>
 						))}
 					</ReviewRowList>

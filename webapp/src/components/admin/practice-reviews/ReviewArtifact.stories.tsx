@@ -7,6 +7,7 @@ import {
 	outlineDocument,
 	reviewArtifact,
 	slackConversation,
+	trackerIssue,
 } from "./story-mock-data";
 
 /**
@@ -35,6 +36,20 @@ export const GitLabMergeRequest: Story = {
 	play: async ({ canvas }) => {
 		// GitLab calls it a merge request and numbers it with a bang; the words follow the forge.
 		canvas.getByText("platform/billing-service · MR !88");
+	},
+};
+
+/**
+ * An issue on the same forge as a pull request, told apart by its words rather than its mark.
+ *
+ * <p>Both wear GitHub's glyph, so `Issue #204` against `PR #1423` is the whole difference — which is
+ * the case for keeping the wording in one place and rendering it here.
+ */
+export const GitHubIssue: Story = {
+	name: "GitHub issue",
+	args: { artifact: trackerIssue },
+	play: async ({ canvas }) => {
+		canvas.getByText("ls1intum/Hephaestus · Issue #204");
 	},
 };
 

@@ -85,6 +85,10 @@ export const EvidenceAcrossSources: Story = {
  * Two pieces of feedback lead with this observation: the note that went out, and the earlier one it
  * replaced. Each is named by what it is to the observation, not by where it went — the row used to be
  * titled with the delivery place, so a link to a piece of feedback read "On the work".
+ *
+ * <p>Where it went is still on the row, as the tag beside the outcome. Two tags, because they answer
+ * two questions: *where* it was placed, and *what became of it*. It was a word on the meta line until
+ * a reader had to parse a sentence to sort a list by the one fact these rows differ in.
  */
 export const LinkedFeedback: Story = {
 	play: async ({ canvas }) => {
@@ -95,6 +99,8 @@ export const LinkedFeedback: Story = {
 			expect.stringContaining("/admin/practices/reviews/delivery/"),
 		);
 		canvas.getByText("Replaced by newer");
+		// The place, as a tag with the registry's own mark and tone — not prose.
+		await expect(await canvas.findAllByText("On the work")).toHaveLength(2);
 	},
 };
 

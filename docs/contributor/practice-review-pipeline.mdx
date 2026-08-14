@@ -257,7 +257,7 @@ sequenceDiagram
     W->>SB: start the container, stage inputs
     SB->>W: model calls, through the worker's own LLM proxy
     SB->>W: out/ files and an exit code
-    W->>W: parse findings, gate delivery, compose
+    W->>W: parse observations, gate delivery, compose
     W->>DB: write observations and the feedback ledger
     W->>SCM: post the comment
     W->>DB: record whether delivery succeeded

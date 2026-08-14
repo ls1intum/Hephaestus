@@ -15,7 +15,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
-import { FeedbackMessage } from "./FeedbackMessage";
+import { FeedbackBody } from "./FeedbackBody";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
 import { ClaimCurrentnessBadge, ObservationResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
@@ -138,7 +138,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 				<h3 id="feedback-body-heading" className="text-lg font-semibold">
 					What it says
 				</h3>
-				<FeedbackMessage feedback={feedback} />
+				<FeedbackBody feedback={feedback} />
 			</section>
 
 			<section aria-labelledby="delivery-heading" className="space-y-3">

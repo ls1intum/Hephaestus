@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
-import { FeedbackMessage } from "./FeedbackMessage";
+import { FeedbackBody } from "./FeedbackBody";
 
 const body =
 	"## What worked\n\nThe controller stays focused on HTTP concerns.\n\n[Read the guide](https://example.com/guide).";
@@ -15,13 +15,13 @@ const body =
  */
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Feedback preview",
-	component: FeedbackMessage,
+	component: FeedbackBody,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 768] } },
 	tags: ["autodocs"],
 	args: {
 		feedback: { body, channel: "IN_CONTEXT", deliveryState: "DELIVERED" },
 	},
-} satisfies Meta<typeof FeedbackMessage>;
+} satisfies Meta<typeof FeedbackBody>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

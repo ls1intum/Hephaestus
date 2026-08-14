@@ -43,10 +43,14 @@ describe("feedbackPreviewText", () => {
 		);
 	});
 
-	it("leaves out a fence the preview was cut inside", () => {
-		expect(
-			preview("The lookup reads:\n\n```java\nreturn repository.findVisi", true),
-		).toBeUndefined();
+	// Dropping the lead-in is right when prose follows the block and wrong when nothing does: on a
+	// preview cut inside the first fence it is every word of prose there is, and popping it left the
+	// row titled "No feedback text was composed" for feedback that has a body. The colon stays — it
+	// is what says the omitted thing was going to follow, which is exactly the case.
+	it("keeps the lead-in when the fence it introduced was all the preview had left", () => {
+		expect(preview("The lookup reads:\n\n```java\nreturn repository.findVisi", true)).toBe(
+			"The lookup reads:…",
+		);
 	});
 
 	it("drops the rule between two findings", () => {

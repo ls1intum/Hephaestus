@@ -3,6 +3,7 @@ import {
 	evidenceQualityRequirement,
 	groupEvidenceSources,
 } from "@/components/admin/practice-catalog/evidence-presentation";
+import { knownEvidenceSourceKinds } from "@/components/practice-vocabulary/evidence-source-defs";
 import {
 	mockDocumentWorkType,
 	mockPracticeDefinitionOptions,
@@ -18,6 +19,28 @@ describe("groupEvidenceSources", () => {
 		);
 
 		expect(orphans).toEqual([]);
+	});
+
+	// The catalogue fixture above is one workspace's sources; this is every kind the app has words
+	// for. The two tables are edited in different directories, and a kind added to the vocabulary but
+	// not to a family degrades quietly — it keeps its own label and files itself under "Other
+	// sources", which reads as a deliberate answer rather than as a gap.
+	it("gives every kind the vocabulary knows a family, not just the ones this catalogue ships", () => {
+		const unfiled = knownEvidenceSourceKinds().filter(
+			(sourceKind) =>
+				groupEvidenceSources([
+					{
+						sourceKind,
+						displayName: sourceKind,
+						description: "",
+						privacyClass: "INTERNAL",
+						requiredQuality: "ANY_CAPTURE",
+						supportsExhaustiveEvidence: false,
+					},
+				])[0]?.family === "other",
+		);
+
+		expect(unfiled).toEqual([]);
 	});
 
 	it("splits a pull request's eleven sources into three short decisions", () => {

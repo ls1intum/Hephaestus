@@ -75,8 +75,8 @@ export const MoreObservationsThanItShows: Story = {
 
 /**
  * A run that skipped automated review for insufficient evidence completes successfully with no
- * findings, exactly like a review that assessed the work and found none: the empty state must
- * distinguish the two.
+ * observations, exactly like a review that assessed the work and recorded none: the empty state
+ * must distinguish the two.
  */
 export const DeclinedForInsufficientEvidence: Story = {
 	parameters: {

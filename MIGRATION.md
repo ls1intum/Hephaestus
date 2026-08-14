@@ -112,7 +112,7 @@ No value switches the sweep off; set a long window instead.
 
 #### 🔴 Practice-review API uses one vocabulary
 
-**Affected**: API clients that configure practices, read findings, or manage AI bindings.
+**Affected**: API clients that configure practices, read findings (now observations), or manage AI bindings.
 
 Update clients in the same deployment as the server and webapp. The old names have no aliases:
 

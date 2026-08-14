@@ -129,6 +129,20 @@ export function PracticeAutomatedReviewValidationSummary({
 					<RelativeTime value={validation.validatedAt} fallback="at an unknown time" />
 				</p>
 			)}
+			{/* The digests answer one question — which exact rules produced this verdict — so they
+			    belong beside the verdict, not in a disclosure of their own. Small and monospaced:
+			    nobody reads a hash, they compare one. */}
+			<p className="text-muted-foreground text-xs">
+				Rules <code className="break-all">{validation.reviewRuleFingerprint}</code> · policy{" "}
+				<code className="break-all">{validation.policyDigest}</code>
+				{validation.evaluatorProcedureFingerprint && (
+					<>
+						{" "}
+						· procedure{" "}
+						<code className="break-all">{validation.evaluatorProcedureFingerprint}</code>
+					</>
+				)}
+			</p>
 		</div>
 	);
 }
@@ -144,6 +158,19 @@ export function PracticeEvidenceSummary({
 }: PracticeEvidenceSummaryProps) {
 	return (
 		<dl className={cn("grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2", className)}>
+			{/* The work it applies to, and the contract version its evidence is written against, are
+			    facts an operator comparing two versions of a practice reads first. They spent this
+			    branch inside a "Technical details" triangle next to three digests, which is where a
+			    fact goes to be missed. */}
+			<div>
+				<dt className="font-medium">Work it reviews</dt>
+				<dd className="text-muted-foreground">
+					{workTypeLabel}
+					<span className="mt-1 block text-xs">
+						Evidence written against source contract {policy.sourceContractVersion}
+					</span>
+				</dd>
+			</div>
 			<div>
 				<dt className="font-medium">Mentoring support</dt>
 				<dd className="text-muted-foreground">
@@ -192,31 +219,6 @@ export function PracticeEvidenceSummary({
 					</dd>
 				</div>
 			)}
-			<div className="sm:col-span-2">
-				<dt className="sr-only">Technical details</dt>
-				<dd>
-					{/* One disclosure, not two. The contract version and the digests are the same kind of
-					    answer — provenance for somebody reproducing a decision — and splitting them left two
-					    identically named triangles a paragraph apart. */}
-					<details className="text-muted-foreground">
-						<summary className="cursor-pointer">Technical details</summary>
-						<p className="mt-1">
-							Source contract {policy.sourceContractVersion} · {workTypeLabel}
-							<br />
-							Review rules <code className="break-all">{validation.reviewRuleFingerprint}</code>
-							<br />
-							Review policy <code className="break-all">{validation.policyDigest}</code>
-							{validation.evaluatorProcedureFingerprint && (
-								<>
-									<br />
-									Evaluator procedure{" "}
-									<code className="break-all">{validation.evaluatorProcedureFingerprint}</code>
-								</>
-							)}
-						</p>
-					</details>
-				</dd>
-			</div>
 		</dl>
 	);
 }

@@ -20,7 +20,7 @@ export const Default: Story = {};
 /**
  * The words on every badge, in the order the outcome union declares them.
  *
- * Written out rather than read back off `OUTCOME_LABELS`: an outcome the server adds, or a label
+ * Written out rather than read back off `TRACE_OUTCOME_DEFS`: an outcome the server adds, or a label
  * changed to something a reader cannot act on, has to show up here as a diff somebody approved.
  */
 const EVERY_LABEL = [

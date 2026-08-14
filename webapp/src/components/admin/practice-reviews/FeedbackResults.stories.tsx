@@ -48,7 +48,7 @@ export const Default: Story = {
  * A row whose feedback runs to seventeen hundred characters of Markdown.
  *
  * The endpoint sends the first 320 of them, which on a note of that length is the lead line, a bold
- * finding heading, a file locator in backticks and the opening of a fenced Java block. The row shows
+ * observation heading, a file locator in backticks and the opening of a fenced Java block. The row shows
  * the sentence a person would read out and marks the cut; the code and the markers do not appear.
  */
 export const LongFeedback: Story = {

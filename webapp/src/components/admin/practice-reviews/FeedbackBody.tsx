@@ -17,10 +17,10 @@ import { cn } from "@/lib/utils";
  * depends on all of them together, so a caller that could pass a state without its channel could
  * label a conversation unit with words that only make sense on the work.
  */
-export type FeedbackMessageFeedback = DeliveryFacts & { body?: string };
+export type FeedbackBodyFeedback = DeliveryFacts & { body?: string };
 
-export interface FeedbackMessageProps {
-	feedback: FeedbackMessageFeedback;
+export interface FeedbackBodyProps {
+	feedback: FeedbackBodyFeedback;
 	className?: string;
 }
 
@@ -84,7 +84,7 @@ type FeedbackView = "rendered" | "source";
  * section already says so. Text that was withheld, failed, is still queued, or has since been replaced
  * is the case that needs marking, because it can otherwise be quoted as though it was sent.
  */
-export function FeedbackMessage({ feedback, className }: FeedbackMessageProps) {
+export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 	const [view, setView] = useState<FeedbackView>("rendered");
 	const { body } = feedback;
 	const unsent = feedback.deliveryState !== "DELIVERED";

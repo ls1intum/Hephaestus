@@ -189,7 +189,7 @@ function PracticeCatalogRoute() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{deletingPractice?.name}&rdquo;?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently deletes the practice and its findings. This can't be undone.
+							This permanently deletes the practice and its observations. This can't be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

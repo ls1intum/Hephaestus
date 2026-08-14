@@ -94,8 +94,13 @@ export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps
 					className="line-clamp-2"
 				>
 					{/* Flattened, not printed raw: the wire preview is 320 characters of the Markdown note,
-					    which lands inside a fenced code block on any feedback of ordinary length. */}
-					{feedbackPreviewText(feedback) ?? "No feedback text was composed"}
+					    which lands inside a fenced code block on any feedback of ordinary length. Feedback
+					    that opens straight into that block has a body but no prose to show for it, which
+					    is not the same state as feedback nobody has composed yet. */}
+					{feedbackPreviewText(feedback) ??
+						(feedback.bodyPreview
+							? "Opens with a quote from the work…"
+							: "No feedback text was composed")}
 				</Link>
 			}
 			meta={

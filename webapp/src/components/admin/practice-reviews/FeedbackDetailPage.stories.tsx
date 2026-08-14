@@ -3,7 +3,7 @@ import { HttpResponse, http } from "msw";
 import { expect, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackDetailPage } from "./FeedbackDetailPage";
-import { reviewFeedbackDetail } from "./story-mock-data";
+import { longFeedbackDetail, reviewFeedbackDetail } from "./story-mock-data";
 import { reviewHandlers } from "./story-mock-server";
 
 const meta = {
@@ -64,8 +64,8 @@ export const Delivered: Story = {
 };
 
 /**
- * A note of the length the composer really produces: two findings and a strength, seventeen hundred
- * characters, with headings, a fenced code quote and a rule between the findings.
+ * A note of the length the composer really produces: two observations and a strength, seventeen
+ * hundred characters, with headings, a fenced code quote and a rule between the observations.
  *
  * <p>Nothing on this page truncates it. The 320-character cut an operator sees in the delivery list
  * is a list preview and stops here — which is the answer to "what about longer feedback?". What the
@@ -73,7 +73,7 @@ export const Delivered: Story = {
  * Typography's `mt-8` above every heading is what made the spacing look almost doubled.
  */
 export const LongFeedback: Story = {
-	args: { feedbackId: "44444444-4444-4444-4444-444444444444" },
+	args: { feedbackId: longFeedbackDetail.id },
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText(/2 issues to tighten in this change/);

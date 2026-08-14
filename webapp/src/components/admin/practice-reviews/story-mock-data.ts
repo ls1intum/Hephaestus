@@ -50,12 +50,15 @@ export const workspaceMembers: WorkspaceMembership[] = [
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Seven pieces of work across the four kinds the product reviews, on their real providers.
+ * The work under review, on the providers it really comes from.
  *
  * Every list row and every detail header draws its glyph from the provider and its words from the
  * kind, so a fixture of seven GitHub pull requests would let a wrong mark or a missing label ship.
- * Three of these are pull requests because that is the shape of a real workspace — the point is that
- * the merge request, the thread and the document sit beside them and read as the same language.
+ * Five of the seven reviewed here are pull or merge requests because that is the shape of a real
+ * workspace — the point is that the thread and the document sit beside them and read as the same
+ * language. The eighth, {@link trackerIssue}, is reviewed by nothing and exists only so the fourth
+ * kind is rendered somewhere; this comment claimed four kinds for a whole branch while shipping
+ * three.
  */
 export const reviewArtifact: ReviewArtifact = {
 	id: 42,
@@ -92,6 +95,24 @@ export const outlineDocument: ReviewArtifact = {
 	provider: "OUTLINE",
 	title: "Runbook: restoring a workspace from backup",
 	url: "https://docs.example.com/doc/runbook-restore",
+};
+
+/**
+ * An issue, which no review in the fixture reaches but every list row can be asked to name.
+ *
+ * `scm.issue` is one of the four kinds this build has copy and a glyph for, and it was the only one
+ * no story rendered — so `Issue #204` and its `CircleDotIcon` shipped a whole branch without once
+ * being looked at. It is a fixture rather than a seventh review because an issue review is not
+ * something this workspace's practices do yet; the label still has to be right the day it is.
+ */
+export const trackerIssue: ReviewArtifact = {
+	id: 204,
+	type: "scm.issue",
+	provider: "GITHUB",
+	number: 204,
+	repositoryName: "ls1intum/Hephaestus",
+	title: "Reviews of documents do not record which revision they read",
+	url: "https://github.com/ls1intum/Hephaestus/issues/204",
 };
 
 const webhookRetryPullRequest: ReviewArtifact = {

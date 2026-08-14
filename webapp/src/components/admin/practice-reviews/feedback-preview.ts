@@ -23,8 +23,10 @@ import type { ReviewFeedback } from "@/api/types.gen";
  * feedback that was itself truncated, which is the reading the product owner arrived at. `bodyTruncated`
  * has been on the wire since the endpoint shipped and nothing had ever read it.
  *
- * Returns `undefined` when there is no body, which is a real state — conversation feedback is
- * recorded before anything is composed — and the caller says so in its own words.
+ * Returns `undefined` for the two states with no prose to show: no body at all — conversation
+ * feedback is recorded before anything is composed — and a preview that is nothing but a code
+ * quote. They read differently to an operator, so the caller tells them apart on `bodyPreview`
+ * rather than printing one sentence for both.
  */
 export function feedbackPreviewText(
 	feedback: Pick<ReviewFeedback, "bodyPreview" | "bodyTruncated">,
@@ -49,6 +51,8 @@ function flattenMarkdown(source: string): Flattened {
 	const kept: string[] = [];
 	let dropped = false;
 	let insideFence = false;
+	/** The "You wrote:" line dropped with its block, held in case the block was all there was. */
+	let leadIn: string | undefined;
 
 	for (const line of lines) {
 		if (line.trimStart().startsWith("```")) {
@@ -56,7 +60,7 @@ function flattenMarkdown(source: string): Flattened {
 			// never sees the closing fence, which is why `insideFence` also ends the loop's output.
 			// The line introducing the block goes with it: "You wrote:" followed by the *next* paragraph
 			// instead of the code claims the developer wrote something they did not.
-			if (!insideFence && kept.at(-1)?.endsWith(":")) kept.pop();
+			if (!insideFence && kept.at(-1)?.endsWith(":")) leadIn = kept.pop();
 			insideFence = !insideFence;
 			dropped = true;
 			continue;
@@ -71,6 +75,12 @@ function flattenMarkdown(source: string): Flattened {
 		}
 		kept.push(inlineToText(trimmed.replace(/^#{1,6}\s+/, "").replace(/^([-*+]|\d+\.|>)\s+/, "")));
 	}
+
+	// Dropping the lead-in is right when prose follows the block and wrong when nothing does: on a
+	// preview the server cut inside the first fence, that one line is every word of prose there is,
+	// and popping it turns a row title into "No feedback text was composed" for feedback that has a
+	// body. Put it back rather than report the note as empty.
+	if (kept.length === 0 && leadIn) kept.push(leadIn);
 
 	return { text: kept.join(" ").replace(/\s+/g, " ").trim(), dropped };
 }

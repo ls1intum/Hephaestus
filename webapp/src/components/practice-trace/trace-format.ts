@@ -1,36 +1,29 @@
 import type { PracticeTraceEntry, ReviewRequestOutcome, TracedSignal } from "@/api/types.gen";
 import type { ReviewSectionId } from "@/components/admin/practices/review/review-sections";
+import { statusValues } from "@/components/practice-vocabulary/status-def";
+import {
+	TRACE_OUTCOME_DEFS,
+	type TraceOutcome,
+} from "@/components/practice-vocabulary/trace-outcome-defs";
 import { WITHHOLDING_REASON_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 
 /**
  * Labels key off the generated wire union rather than a hand-kept string list, so a value the
  * server adds or renames fails `typecheck:webapp` here instead of rendering as a blank cell.
  */
-export type TraceOutcome = PracticeTraceEntry["outcome"];
+export type { TraceOutcome };
 export type WithheldReason = PracticeTraceEntry["withheldReasons"][number];
 export type SignalState = TracedSignal["state"];
 export type SignalStateReason = NonNullable<TracedSignal["stateReason"]>;
 export type DiscoveredVia = TracedSignal["discoveredVia"];
 
 /**
- * Was the practice *measured*, and nothing more: whether anyone heard about it is the separate
- * `observationCount`/`deliveredCount`/`withheldReasons` axis. "Reviewed" having delivered nothing
- * is the PROPOSE tier working as configured.
+ * The outcomes in the order a reader should meet them, which is also the filter's order.
+ *
+ * <p>Their words, icons and colours live in {@link TRACE_OUTCOME_DEFS} with every other status
+ * registry — this file keeps only the vocabularies the trace does not share with anything else.
  */
-export const OUTCOME_LABELS: Record<TraceOutcome, string> = {
-	REVIEWED: "Reviewed",
-	RUNNING: "Running",
-	PENDING: "Waiting",
-	SKIPPED: "Skipped",
-	NOT_ASSESSABLE: "Couldn't assess",
-	TURNED_OFF: "Turned off",
-	NOT_OCCASIONED: "Not triggered",
-	DORMANT: "Waiting on a connection",
-	LAPSED: "Expired",
-	FAILED: "Failed",
-};
-
-export const OUTCOMES = Object.keys(OUTCOME_LABELS) as TraceOutcome[];
+export const OUTCOMES = statusValues(TRACE_OUTCOME_DEFS);
 
 export const SIGNAL_STATE_LABELS: Record<SignalState, string> = {
 	RECORDED: "Recorded",

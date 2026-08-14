@@ -237,6 +237,20 @@ The webapp uses React Compiler (`babel-plugin-react-compiler`).
 
 The compiler handles memoization automatically. Existing usages can remain.
 
+### Name a component for the concept, not for the wire
+
+A component, its file, its props type and its story title all name the same thing, and that name is
+the one in `docs/contributor/practice-feedback-language.md` — the product's word, not the server's
+and not the one the screen used to use. The unit a review detects is an **observation**; the unit
+delivered to a developer is **feedback**. Neither is a "finding" or a "message".
+
+This is a rule because renaming the copy alone does not hold. `FeedbackMessage` kept the old noun in
+its filename, its symbol and its props type for a whole branch after every string it rendered said
+"feedback" — and a name that survives in the import list is the one the next component gets named
+after. When a concept is renamed, the sweep is: wire contract, route, component file, exported
+symbols, props type, story title, story export names, then copy. Stopping at copy leaves the old
+vocabulary somewhere a grep for the screen text will not find it.
+
 ## Component design rubric
 
 Seven rules. They are short because a rubric nobody finishes reading is not a rubric, and every one
