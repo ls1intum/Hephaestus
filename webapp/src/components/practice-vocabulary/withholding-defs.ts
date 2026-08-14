@@ -109,19 +109,20 @@ export function withholdingReasonSentence(reason: WithholdingReason): string {
  * family filter has to expand to exactly the reasons the row filter would have matched, and two
  * hand-kept lists is how that stops being true.
  */
-export const WITHHOLDING_FAMILY_REASONS: Record<WithholdingFamily, WithholdingReason[]> =
-	Object.entries(REASON_FAMILY).reduce(
-		(families, [reason, family]) => {
-			families[family].push(reason as WithholdingReason);
-			return families;
-		},
-		{
-			WORK_MOVED_ON: [],
-			POLICY: [],
-			DEVELOPER_CHOICE: [],
-			HOUSEKEEPING: [],
-		} as Record<WithholdingFamily, WithholdingReason[]>,
-	);
+const WITHHOLDING_FAMILY_REASONS: Record<WithholdingFamily, WithholdingReason[]> = Object.entries(
+	REASON_FAMILY,
+).reduce(
+	(families, [reason, family]) => {
+		families[family].push(reason as WithholdingReason);
+		return families;
+	},
+	{
+		WORK_MOVED_ON: [],
+		POLICY: [],
+		DEVELOPER_CHOICE: [],
+		HOUSEKEEPING: [],
+	} as Record<WithholdingFamily, WithholdingReason[]>,
+);
 
 /** Every reason the named families cover, for the query a family filter turns into. */
 export function reasonsInFamilies(families: readonly WithholdingFamily[]): WithholdingReason[] {

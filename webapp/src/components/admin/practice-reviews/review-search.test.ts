@@ -5,7 +5,7 @@ describe("practice review search", () => {
 	it("canonicalizes invalid URL filters", () => {
 		const feedback = feedbackSearchSchema.parse({
 			deliveryState: ["DELIVERED", "made-up"],
-			channel: ["PROFILE", "made-up"],
+			channel: ["PROFILE", "CONVERSATION", "made-up"],
 			from: "not-a-date",
 			page: -4,
 		});
@@ -17,7 +17,10 @@ describe("practice review search", () => {
 		});
 
 		expect(feedback).toMatchObject({ deliveryState: ["DELIVERED"] });
-		expect(feedback.channel).toEqual(["PROFILE"]);
+		// PROFILE is a real wire value the API accepts, and is dropped here anyway: the toolbar never
+		// offers it, so a filter on it would be applied with nothing on screen saying so and no way to
+		// clear it short of a full reset.
+		expect(feedback.channel).toEqual(["CONVERSATION"]);
 		expect(feedback.from).toBeUndefined();
 		expect(feedback.page).toBeUndefined();
 		expect(findings).toMatchObject({ assessment: ["GOOD"], severity: ["MAJOR"] });

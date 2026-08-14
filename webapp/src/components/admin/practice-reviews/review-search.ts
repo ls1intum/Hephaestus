@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-defs";
 import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { FILTERABLE_PLACES } from "@/components/practice-vocabulary/delivery-place-defs";
 import { PRESENCE_DEFS } from "@/components/practice-vocabulary/presence-defs";
 import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
@@ -22,10 +22,11 @@ const day = z.iso.date().optional().catch(undefined);
  * Every allowlist below is the status registry's own key set, so a URL filter and the dropdown that
  * offers it cannot come apart — and a value the server adds shows up in both at once.
  *
- * <p>`DELIVERY_PLACE_DEFS` is the exception worth naming: the schema stays total over the wire union
- * while the *dropdown* offers `FILTERABLE_PLACES`. A hand-typed `channel=PROFILE` is still a value
- * the API accepts, so narrowing it away here would be the schema lying about the contract; the
- * product decision not to offer it belongs to the control, not to the parser.
+ * <p>Place narrows to `FILTERABLE_PLACES` rather than the whole wire union, so a hand-typed
+ * `channel=PROFILE` is dropped at the door. Accepting it would apply a filter the toolbar cannot
+ * show — no chip, no count, an empty page for no visible reason — and the next tick of any place
+ * would silently discard it, because a facet emits only the options it was given. A parser must not
+ * admit a value the control it feeds has no way to display or clear.
  */
 const enumValues = <T extends string>(allowed: readonly T[]) =>
 	multiValue.transform((values): T[] | undefined => narrowToEnum(values, allowed));
@@ -53,7 +54,7 @@ export const feedbackSearchSchema = z
 		// The URL carries families, not the fourteen reasons: it is the question an operator asks,
 		// and `feedbackQuery` expands it to the reasons the API filters on.
 		withheldFamily: enumValues(statusValues(WITHHOLDING_FAMILY_DEFS)),
-		channel: enumValues(statusValues(DELIVERY_PLACE_DEFS)),
+		channel: enumValues(FILTERABLE_PLACES),
 		recipientUserId: positiveId,
 	})
 	.transform(canonicalDateRange);

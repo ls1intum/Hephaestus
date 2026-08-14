@@ -47,8 +47,15 @@ export function DeliveryTrace({ feedback, className }: DeliveryTraceProps) {
 	const outcome = deliveryOutcome(feedback);
 	const place = DELIVERY_PLACE_DEFS[feedback.channel];
 	const placements = feedback.placements ?? [];
+	// Distinct shapes, not one phrase per row. The server writes a placement per inline note, so a
+	// review with four of them would otherwise repeat "As an inline note on the work" four times. How
+	// many there were, and where each landed, is the list of anchors the detail page renders below.
 	const where = placements.length
-		? placements.map((placement) => placementLabel(feedback.channel, placement.placementType))
+		? [
+				...new Set(
+					placements.map((placement) => placementLabel(feedback.channel, placement.placementType)),
+				),
+			]
 		: [place.label];
 
 	return (
@@ -64,9 +71,11 @@ export function DeliveryTrace({ feedback, className }: DeliveryTraceProps) {
 					<StatusBadge def={outcome} />
 					<p className="text-sm text-muted-foreground">
 						{where.join(" · ")}
+						{/* Labelled, because `deliveredAt` survives a later replacement: on a superseded unit a
+						    bare timestamp here reads as when it was replaced, and it is when it was posted. */}
 						{feedback.deliveredAt && (
 							<>
-								{" · "}
+								{" · delivered "}
 								<RelativeTime value={feedback.deliveredAt} />
 							</>
 						)}

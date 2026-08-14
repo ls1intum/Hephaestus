@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect } from "storybook/test";
 import { DeliveryTrace } from "./DeliveryTrace";
 
 const composedAt = new Date("2026-07-28T13:42:00Z");
@@ -104,7 +105,7 @@ export const QueuedForConversation: Story = {
 };
 
 /** Delivered on the conversation lane: the developer turned up, and the mentor raised it. */
-export const RaisedInConversation: Story = {
+export const DeliveredInConversation: Story = {
 	args: {
 		feedback: {
 			channel: "CONVERSATION",
@@ -115,16 +116,17 @@ export const RaisedInConversation: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("Raised in conversation");
+		canvas.getByText("Delivered in conversation");
 		canvas.getByText(/As a turn in the conversation/);
 	},
 };
 
 /**
- * A queue entry that timed out. Stored as an ordinary withholding, but "withheld" would lose the one
- * fact a reader needs: nobody decided anything, the chat simply never came.
+ * A queue entry that timed out. Stored as an ordinary withholding, and the label keeps that stem so
+ * the Outcome filter is findable, while the second clause carries the fact "withheld" alone loses:
+ * nobody decided anything, the chat simply never came.
  */
-export const ExpiredUnraised: Story = {
+export const WithheldNeverRaised: Story = {
 	args: {
 		feedback: {
 			channel: "CONVERSATION",
@@ -134,7 +136,7 @@ export const ExpiredUnraised: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("Expired unraised");
+		canvas.getByText("Withheld, never raised");
 		canvas.getByText("Housekeeping");
 	},
 };
@@ -153,6 +155,39 @@ export const FailedToDeliver: Story = {
 	},
 };
 
+/**
+ * The server writes one placement per inline note, so a real review carries several of the same
+ * shape. The step names the distinct shapes; how many there were, and where each one landed, is the
+ * list of anchors the detail page renders under the trace.
+ */
+export const ManyInlineNotes: Story = {
+	args: {
+		feedback: {
+			channel: "IN_CONTEXT",
+			deliveryState: "DELIVERED",
+			createdAt: composedAt,
+			deliveredAt,
+			placements: [
+				{ id: "p1", placementType: "SUMMARY" },
+				{ id: "p2", placementType: "INLINE" },
+				{ id: "p3", placementType: "INLINE" },
+				{ id: "p4", placementType: "INLINE" },
+			],
+		},
+	},
+	play: async ({ canvas, canvasElement }) => {
+		canvas.getByText(/As a summary comment on the work/);
+		// Three inline placements, one phrase. Counted over the whole trace rather than queried,
+		// because a repeat would render inside the same paragraph and still satisfy a `getByText`.
+		const inlinePhrases = canvasElement.textContent?.match(/As an inline note on the work/g) ?? [];
+		await expect(inlinePhrases).toHaveLength(1);
+	},
+};
+
+/**
+ * `deliveredAt` survives being replaced, so it is when this was *posted*, not when it was replaced.
+ * The word "delivered" in front of it is what stops the last step being read as the latter.
+ */
 export const ReplacedByNewer: Story = {
 	args: {
 		feedback: {
@@ -162,6 +197,10 @@ export const ReplacedByNewer: Story = {
 			deliveredAt,
 			placements: [{ id: "p1", placementType: "SUMMARY" }],
 		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("Replaced by newer");
+		canvas.getByText(/delivered/);
 	},
 };
 

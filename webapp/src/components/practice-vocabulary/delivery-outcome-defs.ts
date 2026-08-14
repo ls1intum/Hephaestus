@@ -73,16 +73,23 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
  * A conversation unit is delivered by the developer showing up, so "delivered" alone loses the one
  * fact worth knowing — that a conversation took place. And a queue entry that times out is stored as
  * an ordinary withholding, when what a reader needs is that the chat never came.
+ *
+ * <p>Each label **begins with the label of the state it refines**, and that is load-bearing rather
+ * than a style. The Outcome facet can only offer the five stored states, so a badge whose words
+ * share no stem with any option — "Raised in conversation" against a list starting "Delivered" —
+ * leaves a reader unable to find the filter for the row in front of them. Sharing the stem makes the
+ * refinement legible as a refinement: pick Outcome "Delivered" and Place "In conversation" to get
+ * exactly these rows, and Outcome "Withheld" with reason family "Housekeeping" for the other.
  */
 const CONVERSATION_OVERRIDES = {
 	RAISED: {
-		label: "Raised in conversation",
+		label: "Delivered in conversation",
 		icon: BotMessageSquareIcon,
 		badgeVariant: "success",
-		description: "The mentor brought it up the next time the developer was talking to it.",
+		description: "The mentor raised it the next time the developer was talking to it.",
 	},
 	EXPIRED: {
-		label: "Expired unraised",
+		label: "Withheld, never raised",
 		icon: HourglassIcon,
 		badgeVariant: "warning",
 		description: "It sat in the conversation queue until it aged out, and was never said.",
