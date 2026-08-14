@@ -5,6 +5,10 @@ import { getPracticeReviewObservationOptions } from "@/api/@tanstack/react-query
 import { DetailRow } from "@/components/common/DetailRow";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -19,17 +23,12 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { FindingEvidence } from "./FindingEvidence";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
-import {
-	ClaimCurrentnessAlert,
-	ClaimCurrentnessBadge,
-	FeedbackStateBadge,
-	FindingResultBadge,
-} from "./ReviewBadges";
+import { ClaimCurrentnessAlert, ClaimCurrentnessBadge, FindingResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
 import { ReviewTechnicalDetails } from "./ReviewTechnicalDetails";
-import { CHANNEL_LABELS, confidenceLabel, SUPPRESSION_REASON_LABELS } from "./review-format";
+import { confidenceLabel } from "./review-format";
 import { type FindingsSearch, reviewScopeSearch } from "./review-search";
 
 export interface FindingDetailPageProps {
@@ -175,21 +174,19 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 								>
 									<ItemContent className="min-w-0">
 										<ItemTitle className="w-full min-w-0">
-											{CHANNEL_LABELS[feedback.channel]}
+											{DELIVERY_PLACE_DEFS[feedback.channel].label}
 										</ItemTitle>
 										<ItemDescription>
-											{feedback.suppressionReason ? (
-												SUPPRESSION_REASON_LABELS[feedback.suppressionReason]
-											) : (
-												<RelativeTime value={feedback.createdAt} />
-											)}
+											Composed <RelativeTime value={feedback.createdAt} />
+											{feedback.suppressionReason &&
+												` · ${withholdingReasonSentence(feedback.suppressionReason)}`}
 										</ItemDescription>
 									</ItemContent>
 									<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
 										<Badge variant="outline">
 											{feedback.role === "PRIMARY" ? "Main observation" : "Supporting observation"}
 										</Badge>
-										<FeedbackStateBadge state={feedback.deliveryState} />
+										<StatusBadge def={deliveryOutcome(feedback)} />
 									</ItemFooter>
 								</Item>
 							</div>

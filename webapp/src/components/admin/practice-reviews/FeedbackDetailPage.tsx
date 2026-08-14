@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { MapPinIcon, ScanSearchIcon } from "lucide-react";
+import { ScanSearchIcon } from "lucide-react";
 import { getPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewPlacement } from "@/api/types.gen";
 import { DetailRow } from "@/components/common/DetailRow";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { DeliveryTrace } from "@/components/practice-vocabulary/DeliveryTrace";
+import { PLACEMENT_DEFS } from "@/components/practice-vocabulary/placement-defs";
 import {
 	Accordion,
 	AccordionContent,
@@ -14,15 +16,7 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import {
-	Item,
-	ItemContent,
-	ItemDescription,
-	ItemFooter,
-	ItemGroup,
-	ItemMedia,
-	ItemTitle,
-} from "@/components/ui/item";
+import { Item, ItemContent, ItemFooter, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
 import { FeedbackMessage } from "./FeedbackMessage";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
@@ -31,7 +25,7 @@ import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
 import { ReviewTechnicalDetails } from "./ReviewTechnicalDetails";
-import { CHANNEL_LABELS, PLACEMENT_TYPE_LABELS, subjectLabel } from "./review-format";
+import { subjectLabel } from "./review-format";
 import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 
 export interface FeedbackDetailPageProps {
@@ -131,11 +125,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 				<h3 id="feedback-body-heading" className="text-lg font-semibold">
 					Feedback
 				</h3>
-				<FeedbackMessage
-					body={feedback.body}
-					deliveryState={feedback.deliveryState}
-					suppressionReason={feedback.suppressionReason}
-				/>
+				<FeedbackMessage feedback={feedback} />
 				{feedback.body && (
 					<Accordion aria-label="Feedback source">
 						<AccordionItem value="source">
@@ -205,22 +195,20 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 			</section>
 
 			<section aria-labelledby="delivery-location-heading" className="space-y-3">
-				<div>
-					<h3 id="delivery-location-heading" className="text-lg font-semibold">
-						Delivery
-					</h3>
-					<p className="text-sm text-muted-foreground">
-						Channel: {CHANNEL_LABELS[feedback.channel]}
-					</p>
-				</div>
-				{feedback.placements.length > 0 ? (
-					<ItemGroup>
-						{feedback.placements.map((placement) => (
-							<PlacementItem key={placement.id} placement={placement} />
-						))}
-					</ItemGroup>
-				) : (
-					<p className="text-sm text-muted-foreground">This feedback was not posted.</p>
+				<h3 id="delivery-location-heading" className="text-lg font-semibold">
+					Delivery
+				</h3>
+				<DeliveryTrace feedback={feedback} />
+				{feedback.placements.some((placement) => placement.anchorPath) && (
+					<dl className="divide-y border-t">
+						{feedback.placements.map((placement) =>
+							placement.anchorPath ? (
+								<DetailRow key={placement.id} label={PLACEMENT_DEFS[placement.placementType].label}>
+									<code className="break-all">{anchorLabel(placement)}</code>
+								</DetailRow>
+							) : null,
+						)}
+					</dl>
 				)}
 			</section>
 
@@ -239,12 +227,6 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 						</Link>
 					</DetailRow>
 					<DetailRow label="Subject">{subjectLabel(feedback.subject)}</DetailRow>
-					<DetailRow label="Channel">{CHANNEL_LABELS[feedback.channel]}</DetailRow>
-					{feedback.deliveredAt && (
-						<DetailRow label="Delivered">
-							<RelativeTime value={feedback.deliveredAt} />
-						</DetailRow>
-					)}
 					{feedback.replacesId && (
 						<DetailRow label="Replaces">
 							<code>{feedback.replacesId}</code>
@@ -261,19 +243,13 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 	);
 }
 
-function PlacementItem({ placement }: { placement: ReviewPlacement }) {
-	const location = placement.anchorPath
-		? `${placement.anchorPath}${placement.anchorStartLine ? `:${placement.anchorStartLine}${placement.anchorEndLine && placement.anchorEndLine !== placement.anchorStartLine ? `–${placement.anchorEndLine}` : ""}` : ""}`
-		: undefined;
-	return (
-		<Item variant="outline" role="listitem">
-			<ItemMedia variant="icon">
-				<MapPinIcon />
-			</ItemMedia>
-			<ItemContent>
-				<ItemTitle>{PLACEMENT_TYPE_LABELS[placement.placementType]}</ItemTitle>
-				{location && <ItemDescription>{location}</ItemDescription>}
-			</ItemContent>
-		</Item>
-	);
+/** The file and lines an inline note is anchored to; only inline placements have one. */
+function anchorLabel(placement: ReviewPlacement): string {
+	const { anchorPath, anchorStartLine, anchorEndLine } = placement;
+	if (!anchorStartLine) return anchorPath ?? "";
+	const span =
+		anchorEndLine && anchorEndLine !== anchorStartLine
+			? `${anchorStartLine}–${anchorEndLine}`
+			: `${anchorStartLine}`;
+	return `${anchorPath}:${span}`;
 }

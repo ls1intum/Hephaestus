@@ -211,11 +211,11 @@ function FeedbackStage({ mobile = false }: { mobile?: boolean }) {
 				<div className="mt-3 grid gap-2 sm:grid-cols-2">
 					<div className="flex items-center gap-2 rounded-full border border-mentor/25 bg-background/80 px-3 py-2 text-xs dark:bg-secondary/80">
 						<GitPullRequest className="size-4 text-mentor" />
-						Alongside the work
+						On the work
 					</div>
 					<div className="flex items-center gap-2 rounded-full border border-mentor/25 bg-background/80 px-3 py-2 text-xs dark:bg-secondary/80">
 						<MentorIcon size={20} pad={3} />
-						In conversation with Heph
+						In conversation
 					</div>
 				</div>
 			</div>

@@ -66,7 +66,7 @@ export const CompletedWithMixedOutput: Story = {
 		await expect(
 			await canvas.findByRole("heading", { name: mockJobCompleted.target.title }),
 		).toBeVisible();
-		await expect(canvas.getByText("Summary comment: Delivered")).toBeVisible();
+		await expect(canvas.getByText("Summary posted")).toBeVisible();
 		await expect(await canvas.findByText(reviewFeedback[0].bodyPreview)).toBeVisible();
 		await expect(await canvas.findByText(reviewFindings[1].title)).toBeVisible();
 		await expect(canvas.getByRole("link", { name: "View all 30 observations" })).toBeVisible();

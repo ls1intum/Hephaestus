@@ -43,7 +43,7 @@ export const EvidenceAndLinkedFeedback: Story = {
 			await canvas.findByRole("heading", { name: reviewFindingDetail.title }),
 		).toBeVisible();
 		await expect(canvas.getByText(/\$artifactId\.tsx:1/)).toBeVisible();
-		await expect(canvas.getByRole("link", { name: /Alongside the work/ })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: /On the work/ })).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };

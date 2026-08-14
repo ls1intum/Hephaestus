@@ -2,54 +2,12 @@ import type { AgentJob } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
 import { humanizeToken } from "@/lib/humanize";
 
-export type JobStatus = AgentJob["status"];
-export type DeliveryStatus = NonNullable<AgentJob["deliveryStatus"]>;
-
-export const STATUS_LABELS: Record<JobStatus, string> = {
-	QUEUED: "Queued",
-	RUNNING: "Running",
-	COMPLETED: "Completed",
-	FAILED: "Failed",
-	TIMED_OUT: "Timed out",
-	CANCELLED: "Cancelled",
-};
-
-export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
-	PENDING: "Pending",
-	DELIVERED: "Delivered",
-	FAILED: "Failed",
-};
-
-export function statusBadgeVariant(
-	status: JobStatus,
-): "default" | "secondary" | "destructive" | "outline" {
-	switch (status) {
-		case "COMPLETED":
-			return "default";
-		case "RUNNING":
-		case "QUEUED":
-			return "secondary";
-		case "FAILED":
-		case "TIMED_OUT":
-			return "destructive";
-		case "CANCELLED":
-			return "outline";
-	}
-}
-
-export function deliveryBadgeVariant(
-	status: DeliveryStatus,
-): "default" | "secondary" | "destructive" {
-	switch (status) {
-		case "DELIVERED":
-			return "default";
-		case "PENDING":
-			return "secondary";
-		case "FAILED":
-			return "destructive";
-	}
-}
-
+/**
+ * Status vocabularies used to live here. They now live in `@/components/practice-vocabulary`, next
+ * to the other status registries and the badge they all render through: the only screens that read
+ * them are the practice-review screens, and keeping the words here is how the same status ended up
+ * wearing one badge in a table and none in the filter beside it.
+ */
 export type JobWait = { kind: "hold"; reason: string } | { kind: "backoff" };
 
 /**
@@ -94,7 +52,7 @@ export function holdReasonCopy(reason: string): HoldReasonCopy {
 	return { label: humanizeToken(reason), detail: UNKNOWN_HOLD_DETAIL };
 }
 
-export function isCancellable(status: JobStatus): boolean {
+export function isCancellable(status: AgentJob["status"]): boolean {
 	return status === "QUEUED" || status === "RUNNING";
 }
 

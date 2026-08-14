@@ -3,6 +3,13 @@ import { ChevronRightIcon, MessageSquareTextIcon } from "lucide-react";
 import type { ReviewFeedback } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import {
+	type DeliveryFacts,
+	deliveryOutcome,
+} from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
+import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
@@ -26,10 +33,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ReviewArtifact, ReviewArtifactLink } from "./ReviewArtifact";
-import { FeedbackStateBadge } from "./ReviewBadges";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
-import { CHANNEL_LABELS, SUPPRESSION_REASON_LABELS, subjectLabel } from "./review-format";
+import { subjectLabel } from "./review-format";
 
 export type FeedbackResultsState =
 	| { status: "loading" }
@@ -39,6 +46,30 @@ export type FeedbackResultsState =
 export interface FeedbackResultsProps {
 	workspaceSlug: string;
 	state: FeedbackResultsState;
+}
+
+/**
+ * The delivery of one piece of feedback, as the two axes stacked rather than folded together.
+ *
+ * The cell this replaces printed the withholding reason *or* the place, whichever was set — so a
+ * reader could not tell whether they were being told what happened or where it would have happened,
+ * and a delivered row never said where it went at all. Outcome first because it is what the column
+ * is called, then where, then why if a gate had a say.
+ */
+function DeliveryCell({ feedback, className }: { feedback: DeliveryFacts; className?: string }) {
+	return (
+		<div className={cn("flex flex-col items-start gap-1", className)}>
+			<StatusBadge def={deliveryOutcome(feedback)} />
+			<p className="max-w-52 text-xs text-muted-foreground">
+				{DELIVERY_PLACE_DEFS[feedback.channel].label}
+			</p>
+			{feedback.suppressionReason && (
+				<p className="max-w-52 text-xs text-muted-foreground">
+					{withholdingReasonSentence(feedback.suppressionReason)}
+				</p>
+			)}
+		</div>
+	);
 }
 
 export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) {
@@ -102,12 +133,7 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 									</div>
 								</TableCell>
 								<TableCell className="whitespace-normal align-top">
-									<FeedbackStateBadge state={item.deliveryState} />
-									<p className="mt-1 max-w-52 text-xs text-muted-foreground">
-										{item.suppressionReason
-											? SUPPRESSION_REASON_LABELS[item.suppressionReason]
-											: CHANNEL_LABELS[item.channel]}
-									</p>
+									<DeliveryCell feedback={item} />
 								</TableCell>
 								<TableCell className="max-w-xs whitespace-normal align-top">
 									<ReviewArtifactLink artifact={item.artifact} />
@@ -145,17 +171,10 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 								)}
 								<p className="text-xs text-muted-foreground">
 									{item.observationCount}{" "}
-									{item.observationCount === 1 ? "observation" : "observations"}
-								</p>
-								<div className="mt-1 flex flex-wrap items-center gap-2">
-									<FeedbackStateBadge state={item.deliveryState} />
+									{item.observationCount === 1 ? "observation" : "observations"} · composed{" "}
 									<RelativeTime value={item.createdAt} />
-								</div>
-								<p className="text-xs text-muted-foreground">
-									{item.suppressionReason
-										? SUPPRESSION_REASON_LABELS[item.suppressionReason]
-										: CHANNEL_LABELS[item.channel]}
 								</p>
+								<DeliveryCell feedback={item} className="mt-1" />
 								<ReviewArtifact artifact={item.artifact} display="full" />
 							</ItemContent>
 							<ItemActions>

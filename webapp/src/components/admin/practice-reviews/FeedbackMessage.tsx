@@ -1,25 +1,23 @@
-import {
-	AlertTriangleIcon,
-	CheckCircle2Icon,
-	Clock3Icon,
-	EyeOffIcon,
-	HistoryIcon,
-} from "lucide-react";
 import type { AnchorHTMLAttributes, HTMLAttributes } from "react";
 import { Streamdown } from "streamdown";
 import { MarkdownCode } from "@/components/common/MarkdownCode";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import {
-	type FeedbackDeliveryState,
-	type FeedbackSuppressionReason,
-	SUPPRESSION_REASON_LABELS,
-} from "./review-format";
+	type DeliveryFacts,
+	deliveryOutcome,
+} from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+/**
+ * Everything the card reads, and it takes the record rather than three fields off it. The outcome
+ * depends on all of them together, so a caller that could pass a state without its channel could
+ * label a conversation unit with words that only make sense on the work.
+ */
+export type FeedbackMessageFeedback = DeliveryFacts & { body?: string };
 
 export interface FeedbackMessageProps {
-	body: string | undefined;
-	deliveryState: FeedbackDeliveryState;
-	suppressionReason?: FeedbackSuppressionReason;
+	feedback: FeedbackMessageFeedback;
 	className?: string;
 }
 
@@ -52,24 +50,30 @@ const UNTRUSTED_MARKDOWN_COMPONENTS = {
 	h6: PreviewHeading,
 };
 
-export function FeedbackMessage({
-	body,
-	deliveryState,
-	suppressionReason,
-	className,
-}: FeedbackMessageProps) {
-	const outcome = feedbackOutcome(deliveryState, suppressionReason);
-	const Icon = outcome.icon;
+/**
+ * The composed feedback as the developer would read it, under one badge saying what became of it.
+ *
+ * The header used to be a tinted panel carrying its own five-case copy table — a fifth set of words
+ * for the delivery states, and the place the owner found "Ready for a future conversation with Heph.
+ * It has not been delivered." The narrative moved to `DeliveryTrace`, which is where a reader looks
+ * for it.
+ *
+ * <p>What is left is one badge, and only on text that did *not* simply reach the developer. Badging
+ * the ordinary case would colour every card and put a second "Delivered" on a page whose Delivery
+ * section already says so. Text that was withheld, failed, is still queued, or has since been
+ * replaced is the case that needs marking, because it can otherwise be quoted as though it was sent.
+ */
+export function FeedbackMessage({ feedback, className }: FeedbackMessageProps) {
+	const { body } = feedback;
+	const unsent = feedback.deliveryState !== "DELIVERED";
 
 	return (
-		<Card className={cn("gap-0 border py-0", outcome.frameClass, className)}>
-			<CardHeader
-				className={cn("grid grid-cols-[auto_1fr] gap-x-2 border-b py-3", outcome.headerClass)}
-			>
-				<Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
-				<CardTitle className="text-sm">{outcome.title}</CardTitle>
-				<CardDescription className="col-start-2">{outcome.description}</CardDescription>
-			</CardHeader>
+		<Card className={cn("gap-0 border py-0", className)}>
+			{unsent && (
+				<CardHeader className="border-b py-3">
+					<StatusBadge def={deliveryOutcome(feedback)} />
+				</CardHeader>
+			)}
 			{body ? (
 				<CardContent className="prose prose-sm dark:prose-invert max-w-none break-words py-4">
 					<Streamdown
@@ -83,62 +87,9 @@ export function FeedbackMessage({
 				</CardContent>
 			) : (
 				<CardContent className="py-4 text-sm text-muted-foreground">
-					No composed message is available for this record.
+					No feedback text was composed for this record.
 				</CardContent>
 			)}
 		</Card>
 	);
-}
-
-type FeedbackOutcome = {
-	title: string;
-	description: string;
-	icon: typeof CheckCircle2Icon;
-	frameClass?: string;
-	headerClass?: string;
-};
-
-function feedbackOutcome(
-	state: FeedbackDeliveryState,
-	reason: FeedbackSuppressionReason | undefined,
-): FeedbackOutcome {
-	switch (state) {
-		case "DELIVERED":
-			return {
-				title: "Delivered",
-				description: "This message was delivered.",
-				icon: CheckCircle2Icon,
-				headerClass: "bg-success/5 text-success",
-			};
-		case "SUPERSEDED":
-			return {
-				title: "Delivered, then updated",
-				description: "A newer message replaced this version.",
-				icon: HistoryIcon,
-			};
-		case "PREPARED":
-			return {
-				title: "Awaiting conversation",
-				description: "Ready for a future conversation with Heph. It has not been delivered.",
-				icon: Clock3Icon,
-			};
-		case "FAILED":
-			return {
-				title: "Delivery failed",
-				description: "Hephaestus prepared this message but could not deliver it.",
-				icon: AlertTriangleIcon,
-				frameClass: "border-destructive/40",
-				headerClass: "bg-destructive/5 text-destructive",
-			};
-		case "SUPPRESSED":
-			return {
-				title: "Not delivered",
-				description: reason
-					? `${SUPPRESSION_REASON_LABELS[reason]}.`
-					: "Why this message was withheld is unavailable.",
-				icon: EyeOffIcon,
-				frameClass: "border-warning/50",
-				headerClass: "bg-warning/5 text-warning",
-			};
-	}
 }

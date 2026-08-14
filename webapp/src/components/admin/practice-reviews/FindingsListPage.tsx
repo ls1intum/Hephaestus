@@ -7,35 +7,27 @@ import {
 	listPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { DateRangeFacet } from "@/components/common/DateRangeFacet";
-import {
-	FacetMultiSelect,
-	type FacetOption,
-	toFacetOptions,
-} from "@/components/common/FacetMultiSelect";
+import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMultiSelect";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { ResultCount } from "@/components/common/ResultCount";
 import { TablePagination } from "@/components/common/TablePagination";
+import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-defs";
+import { PRESENCE_DEFS } from "@/components/practice-vocabulary/presence-defs";
+import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
+import { statusFacetOptions } from "@/components/practice-vocabulary/status-def";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
 import { FindingResults } from "./FindingResults";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
-import { ReviewMoreFilters } from "./ReviewMoreFilters";
-import {
-	PRESENCE_LABELS,
-	type Presence,
-	REVIEW_RESULT_LABELS,
-	type ReviewResult,
-	SEVERITY_LABELS,
-	type Severity,
-} from "./review-format";
 import { type FindingsSearch, findingsQuery } from "./review-search";
 
 const PAGE_SIZE = 25;
-const REVIEW_RESULT_OPTIONS: FacetOption<ReviewResult>[] = toFacetOptions(REVIEW_RESULT_LABELS);
-const PRESENCE_OPTIONS: FacetOption<Presence>[] = toFacetOptions(PRESENCE_LABELS);
-const SEVERITY_OPTIONS: FacetOption<Severity>[] = toFacetOptions(SEVERITY_LABELS);
+/** Every option wears the badge its rows wear; see the note on `FeedbackListPage`'s facets. */
+const ASSESSMENT_OPTIONS = statusFacetOptions(ASSESSMENT_DEFS);
+const PRESENCE_OPTIONS = statusFacetOptions(PRESENCE_DEFS);
+const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
 
 export interface FindingsListPageProps {
 	workspaceSlug: string;
@@ -76,7 +68,6 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 			search.from ||
 			search.to,
 	);
-	const advancedCount = (search.presence?.length ?? 0) + (search.severity?.length ?? 0);
 	const reset = () =>
 		onSearchChange({
 			page: 0,
@@ -134,30 +125,26 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 					/>
 					<FacetMultiSelect
 						title="Result"
-						options={REVIEW_RESULT_OPTIONS}
+						options={ASSESSMENT_OPTIONS}
 						selected={search.assessment ?? []}
 						onChange={(values) => patchFilter({ assessment: nonEmpty(values) })}
+					/>
+					<FacetMultiSelect
+						title="Severity"
+						options={SEVERITY_OPTIONS}
+						selected={search.severity ?? []}
+						onChange={(values) => patchFilter({ severity: nonEmpty(values) })}
+					/>
+					<FacetMultiSelect
+						title="Practice status"
+						options={PRESENCE_OPTIONS}
+						selected={search.presence ?? []}
+						onChange={(values) => patchFilter({ presence: nonEmpty(values) })}
 					/>
 					<DateRangeFacet
 						value={toDateRange(search)}
 						onChange={(range) => patchFilter(fromDateRange(range))}
 					/>
-					<ReviewMoreFilters activeCount={advancedCount}>
-						<FacetMultiSelect
-							title="Severity"
-							variant="field"
-							options={SEVERITY_OPTIONS}
-							selected={search.severity ?? []}
-							onChange={(values) => patchFilter({ severity: nonEmpty(values) })}
-						/>
-						<FacetMultiSelect
-							title="Practice status"
-							variant="field"
-							options={PRESENCE_OPTIONS}
-							selected={search.presence ?? []}
-							onChange={(values) => patchFilter({ presence: nonEmpty(values) })}
-						/>
-					</ReviewMoreFilters>
 				</div>
 				{search.agentJobId && (
 					<ReferenceFilterPill

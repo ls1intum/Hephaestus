@@ -4,13 +4,17 @@ import { ChevronRightIcon, WorkflowIcon } from "lucide-react";
 import { useEffect, useId } from "react";
 import { listPracticeReviewsOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewRunSummary } from "@/api/types.gen";
-import { STATUS_LABELS, statusBadgeVariant } from "@/components/admin/ai/job-utils";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { ResultCount } from "@/components/common/ResultCount";
 import { TablePagination } from "@/components/common/TablePagination";
-import { Badge } from "@/components/ui/badge";
+import {
+	REVIEW_STATUS_DEFS,
+	type ReviewStatus,
+} from "@/components/practice-vocabulary/review-status-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { statusToneClass, statusValues } from "@/components/practice-vocabulary/status-def";
 import {
 	Empty,
 	EmptyDescription,
@@ -43,6 +47,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ReviewArtifact } from "./ReviewArtifact";
 import { FeedbackCountsSummary, FindingCountsSummary } from "./ReviewBadges";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
@@ -50,14 +55,35 @@ import type { RunsSearch } from "./review-search";
 
 const PAGE_SIZE = 20;
 const ACTIVE_REVIEW_POLL_MS = 5_000;
-const STATUSES = ["QUEUED", "RUNNING", "COMPLETED", "FAILED", "TIMED_OUT", "CANCELLED"] as const;
-const STATUS_ITEMS = [
-	{ value: "ALL", label: "All statuses" },
-	...STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
-] as const;
+const STATUSES = statusValues(REVIEW_STATUS_DEFS);
+/** The "no filter" sentinel. A `Select` has to hold some value, and `undefined` is not one. */
+const ALL_STATUSES = "ALL";
+const STATUS_ITEMS: { value: string; label: string }[] = [
+	{ value: ALL_STATUSES, label: "All statuses" },
+	...STATUSES.map((status) => ({ value: status, label: REVIEW_STATUS_DEFS[status].label })),
+];
 
-function isReviewStatus(value: string | null): value is NonNullable<RunsSearch["status"]> {
+function isReviewStatus(value: string | null): value is ReviewStatus {
 	return STATUSES.some((status) => status === value);
+}
+
+/**
+ * One status, drawn the same way in the closed trigger and in the open list — the two places a
+ * reader compares. The dropdown used to be plain text while the table beside it carried coloured
+ * badges, so choosing a filter meant matching a word to a tag by memory.
+ */
+function StatusItemLabel({ value }: { value: string }) {
+	if (!isReviewStatus(value)) return <>All statuses</>;
+	const def = REVIEW_STATUS_DEFS[value];
+	return (
+		<>
+			<def.icon
+				aria-hidden
+				className={cn("size-3.5 shrink-0", statusToneClass(def.badgeVariant))}
+			/>
+			{def.label}
+		</>
+	);
 }
 
 export interface ReviewRunsPageProps {
@@ -109,7 +135,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 					</FieldLabel>
 					<Select
 						items={STATUS_ITEMS}
-						value={search.status ?? "ALL"}
+						value={search.status ?? ALL_STATUSES}
 						onValueChange={(value) =>
 							onSearchChange({
 								status: isReviewStatus(value) ? value : undefined,
@@ -117,13 +143,13 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 							})
 						}
 					>
-						<SelectTrigger id={statusId} size="sm" className="w-44 max-w-full">
-							<SelectValue />
+						<SelectTrigger id={statusId} size="sm" className="w-48 max-w-full">
+							<SelectValue>{(value: string) => <StatusItemLabel value={value} />}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{STATUS_ITEMS.map((item) => (
 								<SelectItem key={item.value} value={item.value}>
-									{item.label}
+									<StatusItemLabel value={item.value} />
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -266,9 +292,7 @@ function ReviewList({
 									</Link>
 								</TableCell>
 								<TableCell className="whitespace-normal align-top">
-									<Badge variant={statusBadgeVariant(review.status)}>
-										{STATUS_LABELS[review.status]}
-									</Badge>
+									<StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />
 								</TableCell>
 								<TableCell className="whitespace-normal align-top">
 									<RunFindingSummary review={review} />
@@ -303,9 +327,7 @@ function ReviewList({
 								</ItemTitle>
 								<ItemDescription>{review.target.title}</ItemDescription>
 								<div className="mt-1">
-									<Badge variant={statusBadgeVariant(review.status)}>
-										{STATUS_LABELS[review.status]}
-									</Badge>
+									<StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />
 								</div>
 								<RunCardOutputSummary review={review} />
 								<span className="text-xs text-muted-foreground">

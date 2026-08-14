@@ -32,7 +32,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
-		search: { deliveryState: undefined, suppressionReason: undefined, channel: undefined },
+		search: { deliveryState: undefined, withheldFamily: undefined, channel: undefined },
 		onSearchChange: fn(),
 	},
 } satisfies Meta<typeof FeedbackListPage>;

@@ -48,7 +48,7 @@ const meta = {
 		search: {
 			agentJobId: reviewFeedbackDetail.agentJobId,
 			deliveryState: undefined,
-			suppressionReason: undefined,
+			withheldFamily: undefined,
 			channel: undefined,
 		},
 	},
@@ -60,11 +60,14 @@ type Story = StoryObj<typeof meta>;
 export const NotDelivered: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(await canvas.findByText("Not delivered")).toBeVisible();
+		// Withheld text is badged where it is shown *and* traced under Delivery, and the trace is the
+		// only place the reason sentence appears.
+		await expect(await canvas.findAllByText("Withheld")).toHaveLength(2);
 		await expect(
 			canvas.getByRole("link", { name: "View all observations and feedback for this work" }),
 		).toBeVisible();
-		await expect(canvas.getByText("This feedback was not posted.")).toBeVisible();
+		canvas.getByText("The work moved on");
+		canvas.getByText("The work was already merged, so a note on it would arrive too late.");
 		await expectNoPageOverflow();
 	},
 };
@@ -82,11 +85,13 @@ export const Delivered: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(await canvas.findByText("Delivered")).toBeVisible();
-		await expect(canvas.getByText("Inline note")).toBeVisible();
+		// Exactly one "Delivered": the trace's terminal step. The composed text carries no badge,
+		// because reaching the developer is the ordinary case.
+		await expect(await canvas.findAllByText("Delivered")).toHaveLength(1);
+		canvas.getByText(/As an inline note on the work/);
+		canvas.getByText("As an inline note");
 		await expect(
 			canvas.getByText("server/src/main/java/ReviewController.java:42–44"),
 		).toBeVisible();
-		await expect(canvas.queryByText("This feedback was not posted.")).not.toBeInTheDocument();
 	},
 };

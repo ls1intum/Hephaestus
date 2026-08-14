@@ -1,105 +1,13 @@
-import type {
-	ReviewFeedback,
-	ReviewObservation,
-	ReviewPlacement,
-	ReviewSubject,
-} from "@/api/types.gen";
+import type { ReviewSubject } from "@/api/types.gen";
 
-export type Presence = ReviewObservation["presence"];
-export type ReviewResult = NonNullable<ReviewObservation["assessment"]>;
-export type Severity = NonNullable<ReviewObservation["severity"]>;
-export type FeedbackDeliveryState = ReviewFeedback["deliveryState"];
-export type FeedbackSuppressionReason = NonNullable<ReviewFeedback["suppressionReason"]>;
-export type FeedbackChannel = ReviewFeedback["channel"];
-export type PlacementType = ReviewPlacement["placementType"];
-
-export const PRESENCE_LABELS: Record<Presence, string> = {
-	PRESENT: "Observed",
-	ABSENT: "Expected but not observed",
-	NOT_APPLICABLE: "Not applicable",
-	INCONCLUSIVE: "Could not be determined",
-};
-
-export const REVIEW_RESULT_LABELS: Record<ReviewResult, string> = {
-	GOOD: "Strength",
-	BAD: "Needs improvement",
-};
-
-export const SEVERITY_LABELS: Record<Severity, string> = {
-	CRITICAL: "Critical",
-	MAJOR: "Major",
-	MINOR: "Minor",
-	INFO: "Informational",
-};
-
-export const CHANNEL_LABELS: Record<FeedbackChannel, string> = {
-	IN_CONTEXT: "Alongside the work",
-	CONVERSATION: "In conversation with Heph",
-	PROFILE: "On the developer profile",
-};
-
-export const FEEDBACK_CHANNELS = Object.keys(CHANNEL_LABELS) as FeedbackChannel[];
-
-export const DELIVERY_STATE_LABELS: Record<FeedbackDeliveryState, string> = {
-	PREPARED: "Awaiting conversation",
-	DELIVERED: "Delivered",
-	SUPERSEDED: "Replaced",
-	SUPPRESSED: "Not delivered",
-	FAILED: "Delivery failed",
-};
-
-export const SUPPRESSION_REASON_LABELS: Record<FeedbackSuppressionReason, string> = {
-	VOLUME_CAPPED: "Over the delivery volume limit",
-	COMPOSER_DEDUPED: "Near-duplicate of another observation in the same review",
-	REACTED_DISPUTED: "The developer disputed this earlier",
-	REACTED_NOT_APPLICABLE: "The developer marked this not applicable earlier",
-	CONVERSATION_EXPIRED: "Never raised in a conversation with Heph, then aged out",
-	ARTIFACT_GONE: "The reviewed work no longer exists",
-	ARTIFACT_CLOSED: "The reviewed work was closed",
-	ARTIFACT_MERGED: "The reviewed work was already merged",
-	ARTIFACT_DRAFT: "The reviewed work was a draft",
-	RECIPIENT_OPTED_OUT: "The developer opted out of AI feedback",
-	EMPTY_AFTER_SANITIZE: "No deliverable content remained after sanitisation",
-	PRACTICE_TIER_QUIET: "Measured, kept quiet by the practice's autonomy tier",
-	BACKFILL_QUIET: "Measured by a review of past work, which is never delivered",
-	INSTANCE_SILENCED: "Instance-wide silent mode was engaged",
-};
-
-export type BadgeVariant =
-	| "default"
-	| "secondary"
-	| "destructive"
-	| "outline"
-	| "success"
-	| "warning";
-
-export function severityBadgeVariant(severity: Severity): BadgeVariant {
-	switch (severity) {
-		case "CRITICAL":
-		case "MAJOR":
-			return "destructive";
-		case "MINOR":
-			return "warning";
-		case "INFO":
-			return "secondary";
-	}
-}
-
-export function deliveryStateBadgeVariant(state: FeedbackDeliveryState): BadgeVariant {
-	switch (state) {
-		case "DELIVERED":
-			return "success";
-		case "PREPARED":
-			return "secondary";
-		case "SUPERSEDED":
-			return "outline";
-		case "SUPPRESSED":
-			return "warning";
-		case "FAILED":
-			return "destructive";
-	}
-}
-
+/**
+ * What is left of this module once every enum's words moved to `@/components/practice-vocabulary`:
+ * two formatters over values that are not enums at all.
+ *
+ * <p>Nothing else belongs here. A label map, a badge variant or an icon for an enum value goes in
+ * that enum's defs module, where the filter dropdown, the table badge and the detail header all read
+ * the same entry — this file having held six of them is why those three disagreed.
+ */
 export function confidenceLabel(confidence: number | undefined): string {
 	if (confidence == null) return "—";
 	return `${Math.round(confidence * 100)}%`;
@@ -109,9 +17,3 @@ export function subjectLabel(subject: ReviewSubject | undefined): string {
 	if (!subject) return "Unavailable developer";
 	return subject.name || subject.login || `#${subject.id}`;
 }
-
-export const PLACEMENT_TYPE_LABELS: Record<PlacementType, string> = {
-	SUMMARY: "Summary comment",
-	INLINE: "Inline note",
-	CONVERSATION_TURN: "Conversation turn",
-};

@@ -72,23 +72,27 @@ export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText(`${reviewFindings.length} observations.`)).toBeVisible();
-		for (const name of ["Area", "Practice", "Result"]) {
+		// Every facet sits on the toolbar. Severity and practice status used to hide behind a "More
+		// filters" popover, which is a filter an operator has to already know about to find.
+		for (const name of ["Area", "Practice", "Result", "Severity", "Practice status"]) {
 			await expect(canvas.getByRole("combobox", { name })).toBeVisible();
 		}
 		await expect(canvas.getByRole("button", { name: "Date" })).toBeVisible();
 	},
 };
 
-export const MoreFiltersOpen: Story = {
+/**
+ * The severity facet open, showing that a filter option carries the same icon and tone as the badge
+ * it filters for — the dropdown and the table are recognisably about one thing.
+ */
+export const SeverityFacetOpen: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvasElement, userEvent }) => {
-		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /More filters/ }));
-		const dialog = await screen.findByRole("dialog");
-		const practiceStatus = await within(dialog).findByRole("combobox", {
-			name: "Practice status",
-		});
-		await waitFor(() => expect(practiceStatus).toBeVisible());
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: "Severity" }));
+		const listbox = await screen.findByRole("listbox");
+		const critical = await within(listbox).findByRole("option", { name: /Critical/ });
+		await waitFor(() => expect(critical).toBeVisible());
+		within(listbox).getByRole("option", { name: /Informational/ });
 	},
 };
 

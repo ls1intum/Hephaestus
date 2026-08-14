@@ -1,20 +1,17 @@
 import { CircleHelp, ClockAlert } from "lucide-react";
 import type {
-	ReviewFeedback,
 	ReviewFeedbackCounts,
 	ReviewFeedbackDisposition,
 	ReviewObservation,
 	ReviewObservationCounts,
 } from "@/api/types.gen";
+import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-defs";
+import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { PRESENCE_DEFS } from "@/components/practice-vocabulary/presence-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import {
-	DELIVERY_STATE_LABELS,
-	deliveryStateBadgeVariant,
-	REVIEW_RESULT_LABELS,
-	SEVERITY_LABELS,
-	severityBadgeVariant,
-} from "./review-format";
 
 type NonCurrentClaimCurrentness = Exclude<ReviewObservation["claimCurrentness"], "CURRENT">;
 
@@ -45,33 +42,30 @@ const CLAIM_CURRENTNESS_CONFIG = {
 	}
 >;
 
-export function FeedbackStateBadge({ state }: { state: ReviewFeedback["deliveryState"] }) {
-	return <Badge variant={deliveryStateBadgeVariant(state)}>{DELIVERY_STATE_LABELS[state]}</Badge>;
-}
-
 type FindingResult = Pick<ReviewObservation, "presence" | "assessment" | "severity">;
 
+/**
+ * What one observation concluded, as the smallest true set of badges.
+ *
+ * The two presence values that end the question answer it alone; only a practice that was in play
+ * gets an assessment, and only a shortfall gets a severity beside it. Every badge is a registry
+ * entry, so this decides *which* badges appear and never what any of them looks like.
+ */
 export function FindingResultBadge({ finding }: { finding: FindingResult }) {
 	if (finding.presence === "NOT_APPLICABLE") {
-		return <Badge variant="outline">Not applicable</Badge>;
+		return <StatusBadge def={PRESENCE_DEFS.NOT_APPLICABLE} />;
 	}
-	// Distinct from "Not applicable": the practice did apply and the evidence was read, it just did
-	// not settle the question. Collapsing the two would claim nothing here was worth looking at.
 	if (finding.presence === "INCONCLUSIVE") {
-		return <Badge variant="outline">Could not be determined</Badge>;
+		return <StatusBadge def={PRESENCE_DEFS.INCONCLUSIVE} />;
 	}
 	if (!finding.assessment) {
 		return <Badge variant="secondary">No result</Badge>;
 	}
 	return (
 		<span className="flex flex-wrap items-center gap-1.5">
-			<Badge variant={finding.assessment === "GOOD" ? "success" : "destructive"}>
-				{REVIEW_RESULT_LABELS[finding.assessment]}
-			</Badge>
+			<StatusBadge def={ASSESSMENT_DEFS[finding.assessment]} />
 			{finding.assessment === "BAD" && finding.severity && (
-				<Badge variant={severityBadgeVariant(finding.severity)}>
-					{SEVERITY_LABELS[finding.severity]}
-				</Badge>
+				<StatusBadge def={SEVERITY_DEFS[finding.severity]} />
 			)}
 		</span>
 	);
@@ -135,14 +129,25 @@ export function FindingFeedbackSummary({
 
 type FeedbackCounts = ReviewFeedbackCounts | ReviewFeedbackDisposition;
 
+/**
+ * A tally of delivery outcomes reads as a sentence rather than a row of badges: badging five
+ * counts on every row would colour the norm, which is what makes the one exceptional row invisible.
+ *
+ * The words still come from the registry — a count saying "not delivered" while the badge one column
+ * over says "Withheld" is how the same enum ends up with two names.
+ */
 function feedbackCountsLabel(counts: FeedbackCounts): string | undefined {
-	const parts = [
-		counts.delivered > 0 ? `${counts.delivered} delivered` : undefined,
-		counts.superseded > 0 ? `${counts.superseded} replaced` : undefined,
-		counts.prepared > 0 ? `${counts.prepared} awaiting conversation` : undefined,
-		counts.suppressed > 0 ? `${counts.suppressed} not delivered` : undefined,
-		counts.failed > 0 ? `${counts.failed} failed` : undefined,
-	].filter(Boolean);
+	const parts = (
+		[
+			["DELIVERED", counts.delivered],
+			["SUPERSEDED", counts.superseded],
+			["PREPARED", counts.prepared],
+			["SUPPRESSED", counts.suppressed],
+			["FAILED", counts.failed],
+		] as const
+	)
+		.filter(([, count]) => count > 0)
+		.map(([state, count]) => `${count} ${DELIVERY_STATE_DEFS[state].label.toLowerCase()}`);
 	return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 

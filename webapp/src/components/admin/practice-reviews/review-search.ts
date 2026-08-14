@@ -1,33 +1,32 @@
 import { z } from "zod";
+import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-defs";
+import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { PRESENCE_DEFS } from "@/components/practice-vocabulary/presence-defs";
+import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
+import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
+import { statusValues } from "@/components/practice-vocabulary/status-def";
+import {
+	reasonsInFamilies,
+	WITHHOLDING_FAMILY_DEFS,
+} from "@/components/practice-vocabulary/withholding-defs";
 import { ARTIFACT_KIND_VALUES, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { dayAfterInstant, dayStartInstant, fromDayParam } from "@/lib/date-range-search";
 import { multiValue, narrowToEnum } from "@/lib/search-params";
-import type {
-	FeedbackChannel,
-	FeedbackDeliveryState,
-	FeedbackSuppressionReason,
-	Presence,
-	ReviewResult,
-	Severity,
-} from "./review-format";
-import {
-	DELIVERY_STATE_LABELS,
-	FEEDBACK_CHANNELS,
-	PRESENCE_LABELS,
-	REVIEW_RESULT_LABELS,
-	SEVERITY_LABELS,
-	SUPPRESSION_REASON_LABELS,
-} from "./review-format";
 
 const uuidParam = z.uuid().optional().catch(undefined);
 const positiveId = z.coerce.number().int().positive().optional().catch(undefined);
 const page = z.coerce.number().int().min(0).optional().catch(undefined);
 const day = z.iso.date().optional().catch(undefined);
-const PRESENCES = Object.keys(PRESENCE_LABELS) as Presence[];
-const REVIEW_RESULTS = Object.keys(REVIEW_RESULT_LABELS) as ReviewResult[];
-const SEVERITIES = Object.keys(SEVERITY_LABELS) as Severity[];
-const DELIVERY_STATES = Object.keys(DELIVERY_STATE_LABELS) as FeedbackDeliveryState[];
-const SUPPRESSION_REASONS = Object.keys(SUPPRESSION_REASON_LABELS) as FeedbackSuppressionReason[];
+/**
+ * Every allowlist below is the status registry's own key set, so a URL filter and the dropdown that
+ * offers it cannot come apart — and a value the server adds shows up in both at once.
+ *
+ * <p>`DELIVERY_PLACE_DEFS` is the exception worth naming: the schema stays total over the wire union
+ * while the *dropdown* offers `FILTERABLE_PLACES`. A hand-typed `channel=PROFILE` is still a value
+ * the API accepts, so narrowing it away here would be the schema lying about the contract; the
+ * product decision not to offer it belongs to the control, not to the parser.
+ */
 const enumValues = <T extends string>(allowed: readonly T[]) =>
 	multiValue.transform((values): T[] | undefined => narrowToEnum(values, allowed));
 
@@ -50,9 +49,11 @@ export const feedbackSearchSchema = z
 	.object({
 		...scope,
 		page,
-		deliveryState: enumValues(DELIVERY_STATES),
-		suppressionReason: enumValues(SUPPRESSION_REASONS),
-		channel: enumValues<FeedbackChannel>(FEEDBACK_CHANNELS),
+		deliveryState: enumValues(statusValues(DELIVERY_STATE_DEFS)),
+		// The URL carries families, not the fourteen reasons: it is the question an operator asks,
+		// and `feedbackQuery` expands it to the reasons the API filters on.
+		withheldFamily: enumValues(statusValues(WITHHOLDING_FAMILY_DEFS)),
+		channel: enumValues(statusValues(DELIVERY_PLACE_DEFS)),
 		recipientUserId: positiveId,
 	})
 	.transform(canonicalDateRange);
@@ -63,19 +64,16 @@ export const findingsSearchSchema = z
 		page,
 		areaSlug: multiValue,
 		practiceSlug: multiValue,
-		presence: enumValues(PRESENCES),
-		assessment: enumValues(REVIEW_RESULTS),
-		severity: enumValues(SEVERITIES),
+		presence: enumValues(statusValues(PRESENCE_DEFS)),
+		assessment: enumValues(statusValues(ASSESSMENT_DEFS)),
+		severity: enumValues(statusValues(SEVERITY_DEFS)),
 		subjectUserId: positiveId,
 	})
 	.transform(canonicalDateRange);
 
 export const runsSearchSchema = z.object({
 	page,
-	status: z
-		.enum(["QUEUED", "RUNNING", "COMPLETED", "FAILED", "TIMED_OUT", "CANCELLED"])
-		.optional()
-		.catch(undefined),
+	status: z.enum(statusValues(REVIEW_STATUS_DEFS)).optional().catch(undefined),
 });
 
 export type FeedbackSearch = z.infer<typeof feedbackSearchSchema>;
@@ -118,7 +116,11 @@ export function feedbackQuery(search: FeedbackSearch, size: number) {
 		page: search.page ?? 0,
 		size,
 		deliveryState: search.deliveryState,
-		suppressionReason: search.suppressionReason,
+		// A family expands to exactly the reasons it covers, so the rows that come back are the rows
+		// whose own sentence sits under that family heading.
+		suppressionReason: search.withheldFamily?.length
+			? reasonsInFamilies(search.withheldFamily)
+			: undefined,
 		channel: search.channel,
 		recipientUserId: search.recipientUserId,
 	};

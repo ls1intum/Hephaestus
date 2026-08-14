@@ -40,7 +40,7 @@ export const EveryOutcome: Story = {
 		// Measured and delivered are two axes: this practice was reviewed and still said nothing.
 		await expect(canvas.getByText("2 measurements, none sent")).toBeVisible();
 		await expect(
-			canvas.getByText("Measured, kept quiet by the practice's autonomy tier"),
+			canvas.getByText("This practice is set to measure quietly rather than to speak up."),
 		).toBeVisible();
 		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
 		// The tier is named exactly as the catalog names it, from one shared list. This screen used to

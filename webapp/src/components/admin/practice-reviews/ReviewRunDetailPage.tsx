@@ -12,18 +12,15 @@ import {
 	retryAgentJobDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentJob } from "@/api/types.gen";
-import {
-	DELIVERY_STATUS_LABELS,
-	deliveryBadgeVariant,
-	holdReasonCopy,
-	jobWait,
-	STATUS_LABELS,
-	statusBadgeVariant,
-} from "@/components/admin/ai/job-utils";
+import { holdReasonCopy, jobWait } from "@/components/admin/ai/job-utils";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import {
+	REVIEW_STATUS_DEFS,
+	SUMMARY_POST_DEFS,
+} from "@/components/practice-vocabulary/review-status-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import {
 	Empty,
 	EmptyDescription,
@@ -161,12 +158,8 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 					<div className="min-w-0 space-y-2">
 						<div className="flex flex-wrap items-center gap-2">
-							<Badge variant={statusBadgeVariant(job.status)}>{STATUS_LABELS[job.status]}</Badge>
-							{job.deliveryStatus && (
-								<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
-									Summary comment: {DELIVERY_STATUS_LABELS[job.deliveryStatus]}
-								</Badge>
-							)}
+							<StatusBadge def={REVIEW_STATUS_DEFS[job.status]} />
+							{job.deliveryStatus && <StatusBadge def={SUMMARY_POST_DEFS[job.deliveryStatus]} />}
 						</div>
 						<ReviewArtifactLink artifact={job.target} variant="label" display="full" />
 						<h2 className="break-words text-2xl font-semibold tracking-tight">

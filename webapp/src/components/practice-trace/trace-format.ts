@@ -1,6 +1,6 @@
 import type { PracticeTraceEntry, ReviewRequestOutcome, TracedSignal } from "@/api/types.gen";
-import { SUPPRESSION_REASON_LABELS } from "@/components/admin/practice-reviews/review-format";
 import type { ReviewSectionId } from "@/components/admin/practices/review/review-sections";
+import { WITHHOLDING_REASON_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 
 /**
  * Labels key off the generated wire union rather than a hand-kept string list, so a value the
@@ -173,7 +173,7 @@ export const DISCOVERED_VIA_DESCRIPTIONS: Record<DiscoveredVia, string> = {
  * value is how a support answer and a screen stop agreeing. The `Record<WithheldReason, …>`
  * annotation fails the build if the trace endpoint reports a reason delivery has no words for.
  */
-export const WITHHELD_REASON_LABELS: Record<WithheldReason, string> = SUPPRESSION_REASON_LABELS;
+export const WITHHELD_REASON_LABELS: Record<WithheldReason, string> = WITHHOLDING_REASON_DEFS;
 
 /** The anchor a practice row links to and the element it lands on both go through here. */
 export function occurrenceDomId(signalId: string): string {

@@ -4,6 +4,10 @@ import { useId } from "react";
 import type { AgentJob, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
 import {
 	Empty,
 	EmptyDescription,
@@ -21,9 +25,9 @@ import {
 } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
 import type { KnownArtifactKind } from "@/lib/artifact-kinds";
-import { ClaimCurrentnessBadge, FeedbackStateBadge, FindingResultBadge } from "./ReviewBadges";
+import { ClaimCurrentnessBadge, FindingResultBadge } from "./ReviewBadges";
 import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
-import { CHANNEL_LABELS, SUPPRESSION_REASON_LABELS, subjectLabel } from "./review-format";
+import { subjectLabel } from "./review-format";
 
 export type ReviewSectionState<T> =
 	| { status: "loading" }
@@ -158,9 +162,9 @@ function FeedbackSection({
 										</ItemDescription>
 									)}
 									<p className="text-xs text-muted-foreground">
-										{item.suppressionReason
-											? SUPPRESSION_REASON_LABELS[item.suppressionReason]
-											: CHANNEL_LABELS[item.channel]}
+										{DELIVERY_PLACE_DEFS[item.channel].label}
+										{item.suppressionReason &&
+											` · ${withholdingReasonSentence(item.suppressionReason)}`}
 									</p>
 									{context === "target" && (
 										<span className="text-xs text-muted-foreground">
@@ -169,7 +173,7 @@ function FeedbackSection({
 									)}
 								</ItemContent>
 								<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
-									<FeedbackStateBadge state={item.deliveryState} />
+									<StatusBadge def={deliveryOutcome(item)} />
 								</ItemFooter>
 							</Item>
 						</div>
