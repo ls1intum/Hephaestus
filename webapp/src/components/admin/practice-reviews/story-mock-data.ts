@@ -1055,14 +1055,11 @@ export function observationDetail(observationId: string): ReviewObservationDetai
 	const found = allObservationSpecs.find(({ observation }) => observation.id === observationId);
 	if (!found) throw new Error(`No observation ${observationId} in the fixture`);
 	const { run, observation } = found;
-	const {
-		area: _area,
-		feedbackDisposition: _disposition,
-		...shared
-	} = toObservation(run, observation);
+	// The detail carries the same fields as the list row minus the tally, which it replaces with the
+	// feedback records the tally was counting.
+	const { feedbackDisposition: _tally, ...shared } = toObservation(run, observation);
 	return {
 		...shared,
-		area: area(observation.area),
 		evidence: observation.evidence ? { citations: observation.evidence } : undefined,
 		feedback: feedbackFor(observationId).map(({ item }) => ({
 			feedbackId: item.id,

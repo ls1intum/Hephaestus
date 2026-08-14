@@ -193,7 +193,8 @@ export const ReviewOfAConversation: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", { name: "How should we roll back the pricing migration?" });
-		canvas.getByText("The thread ends without naming what was chosen");
+		// The heading comes from the job and the rows from a second query, so the rows are awaited.
+		await canvas.findByText("The thread ends without naming what was chosen");
 	},
 };
 

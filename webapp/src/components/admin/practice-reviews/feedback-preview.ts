@@ -54,6 +54,9 @@ function flattenMarkdown(source: string): Flattened {
 		if (line.trimStart().startsWith("```")) {
 			// An opening fence starts a block we skip; a closing one ends it. A preview cut mid-block
 			// never sees the closing fence, which is why `insideFence` also ends the loop's output.
+			// The line introducing the block goes with it: "You wrote:" followed by the *next* paragraph
+			// instead of the code claims the developer wrote something they did not.
+			if (!insideFence && kept.at(-1)?.endsWith(":")) kept.pop();
 			insideFence = !insideFence;
 			dropped = true;
 			continue;

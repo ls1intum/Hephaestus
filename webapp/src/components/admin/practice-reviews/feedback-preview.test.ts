@@ -31,14 +31,22 @@ describe("feedbackPreviewText", () => {
 		).toBe("See the naming guideline for the longer version.");
 	});
 
-	it("leaves out a fenced code block and says something was left out", () => {
+	it("leaves out a fenced code block, and the line that introduced it", () => {
 		expect(preview("You wrote:\n\n```java\nreturn null;\n```\n\nPrefer an Optional.")).toBe(
-			"You wrote: Prefer an Optional…",
+			"Prefer an Optional…",
+		);
+	});
+
+	it("keeps a lead-in that introduces prose rather than a block", () => {
+		expect(preview("Two options:\n\nRename it, or keep both for a release.")).toBe(
+			"Two options: Rename it, or keep both for a release.",
 		);
 	});
 
 	it("leaves out a fence the preview was cut inside", () => {
-		expect(preview("You wrote:\n\n```java\nreturn repository.findVisi", true)).toBe("You wrote:…");
+		expect(
+			preview("The lookup reads:\n\n```java\nreturn repository.findVisi", true),
+		).toBeUndefined();
 	});
 
 	it("drops the rule between two findings", () => {
