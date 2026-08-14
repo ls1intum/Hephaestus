@@ -42,10 +42,10 @@ describe("practice review routes", () => {
 	it.each([
 		["Reviews", "/w/acme/admin/practices/reviews"],
 		["Reviews", "/w/acme/admin/practices/reviews/11111111-1111-1111-1111-111111111111"],
-		["Observations", "/w/acme/admin/practices/reviews/findings"],
+		["Observations", "/w/acme/admin/practices/reviews/observations"],
 		[
 			"Observations",
-			"/w/acme/admin/practices/reviews/findings/55555555-5555-5555-5555-555555555555",
+			"/w/acme/admin/practices/reviews/observations/55555555-5555-5555-5555-555555555555",
 		],
 		["Delivery", "/w/acme/admin/practices/reviews/delivery"],
 		["Delivery", "/w/acme/admin/practices/reviews/delivery/33333333-3333-3333-3333-333333333333"],
@@ -68,6 +68,29 @@ describe("practice review routes", () => {
 		const location = await land("/w/acme/admin/practices/runs");
 
 		expect(location.pathname).toBe("/w/acme/admin/practices/reviews");
+	});
+
+	// The URL said "findings" for a concept the product calls an observation, and a bookmark or a
+	// link in a chat thread is the one copy of it nobody can be asked to update.
+	it.each([
+		[
+			"/w/acme/admin/practices/reviews/findings?severity=MAJOR",
+			"/w/acme/admin/practices/reviews/observations",
+		],
+		[
+			"/w/acme/admin/practices/reviews/findings/55555555-5555-5555-5555-555555555555",
+			"/w/acme/admin/practices/reviews/observations/55555555-5555-5555-5555-555555555555",
+		],
+	])("redirects the former Findings URL %s", async (from, expected) => {
+		const location = await land(from);
+
+		expect(location.pathname).toBe(expected);
+	});
+
+	it("carries a filter through the Findings redirect", async () => {
+		const location = await land("/w/acme/admin/practices/reviews/findings?severity=MAJOR");
+
+		expect(location.searchStr).toContain("severity=MAJOR");
 	});
 
 	it("treats reviewed work as a neutral view and carries its scope into Delivery", async () => {

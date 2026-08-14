@@ -1,6 +1,7 @@
 import { ExternalLinkIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ComponentType } from "react";
 import type { ReviewArtifact as ReviewArtifactData, ReviewRunTarget } from "@/api/types.gen";
+import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import {
 	ARTIFACT_KIND,
 	artifactKindIcon,
@@ -11,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export type ReviewArtifactDisplay = ReviewArtifactData | ReviewRunTarget;
+
 /**
  * URL-facing spelling of a kind: the wire id carries a dot, which reads badly in a path segment, so
  * the routes keep their own short slug and this map is where the two meet.
@@ -33,14 +35,29 @@ export function reviewArtifactTypeFromSlug(slug: string): KnownArtifactKind | un
 	return entry?.[0] as KnownArtifactKind | undefined;
 }
 
-export interface ReviewArtifactProps {
-	artifact: ReviewArtifactDisplay | undefined;
-	variant?: "summary" | "label";
-	display?: "compact" | "full";
-	className?: string;
-}
+type ArtifactGlyph = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
-export type ReviewArtifactLinkProps = ReviewArtifactProps;
+const PROVIDER_ICONS = {
+	GITHUB: GithubIcon,
+	GITLAB: GitlabIcon,
+	SLACK: SlackIcon,
+	OUTLINE: OutlineIcon,
+} satisfies Record<NonNullable<ReviewArtifactData["provider"]>, ArtifactGlyph>;
+
+/**
+ * The glyph for one piece of reviewed work: the forge it lives on, or its kind when nothing recorded
+ * a provider.
+ *
+ * <p>The label beside it already carries the kind — `PR #1423`, `MR !88`, `Issue #204`, `#deploys` —
+ * so a second pull-request glyph would say the same thing twice and leave the reader no way to tell a
+ * GitHub request from a GitLab one. The brand mark answers the question the words do not. The kind
+ * icon remains the fallback rather than a blank, and both maps are shared: `artifactKindIcon` is the
+ * one used by the artifact trace, and these are the same four brand marks the integrations console
+ * and the sidebar draw.
+ */
+export function reviewArtifactIcon(artifact: ReviewArtifactDisplay): ArtifactGlyph {
+	return artifact.provider ? PROVIDER_ICONS[artifact.provider] : artifactKindIcon(artifact.type);
+}
 
 export function reviewArtifactLabel(artifact: ReviewArtifactDisplay): string {
 	switch (artifact.type) {
@@ -60,13 +77,18 @@ export function reviewArtifactLabel(artifact: ReviewArtifactDisplay): string {
 	}
 }
 
+/** The repository and the item, when a repository is recorded: `ls1intum/Hephaestus · PR #1423`. */
+function qualifiedLabel(artifact: ReviewArtifactDisplay): string {
+	return [artifact.repositoryName, reviewArtifactLabel(artifact)].filter(Boolean).join(" · ");
+}
+
 export function reviewArtifactScopeLabel(
 	kind: string,
 	id: number | undefined,
 	artifact: ReviewArtifactDisplay | undefined,
 ): string {
 	if (id != null && artifact) {
-		return [artifact.repositoryName, reviewArtifactLabel(artifact)].filter(Boolean).join(" · ");
+		return qualifiedLabel(artifact);
 	}
 	const labels: Record<KnownArtifactKind, readonly [string, string]> = {
 		[ARTIFACT_KIND.pullRequest]: ["pull or merge request", "pull or merge requests"],
@@ -80,99 +102,61 @@ export function reviewArtifactScopeLabel(
 	return `${id == null ? "All" : "One"} ${scope}`;
 }
 
-function ArtifactIcon({ type }: { type: ReviewArtifactDisplay["type"] }) {
-	// Shared with the artifact trace, so one kind cannot be a document on one screen and a chat thread
-	// on another. The old fallback here handed every unrecognised kind the conversation icon.
-	const Icon = artifactKindIcon(type);
-	return <Icon aria-hidden />;
+export interface ReviewArtifactProps {
+	artifact: ReviewArtifactDisplay | undefined;
+	className?: string;
 }
 
-export function ReviewArtifact({
-	artifact,
-	variant = "summary",
-	display = "compact",
-	className,
-}: ReviewArtifactProps) {
+/**
+ * Which piece of work this is, inline and unlinked: a mark and `repo · PR #1423`.
+ *
+ * <p>Never its title. The title is long, and every surface that shows one already has somewhere
+ * better to put it — the run row uses it as the row's own name, the detail pages as the heading. The
+ * old component carried it as an optional second line behind a `variant` prop, which is how it came
+ * to be rendered inside a hover-underlined anchor.
+ */
+export function ReviewArtifactLabel({ artifact, className }: ReviewArtifactProps) {
 	if (!artifact) {
-		return <span className={cn("text-sm text-muted-foreground", className)}>No reviewed work</span>;
+		return <span className={cn("text-muted-foreground", className)}>No reviewed work</span>;
 	}
-
+	const Icon = reviewArtifactIcon(artifact);
 	return (
-		<span className={cn("flex w-full min-w-0 gap-2 whitespace-normal text-sm", className)}>
-			<ReviewArtifactContent artifact={artifact} variant={variant} display={display} />
+		<span className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5", className)}>
+			<Icon className="size-3.5 shrink-0" aria-hidden />
+			<span className="min-w-0 break-words">{qualifiedLabel(artifact)}</span>
 		</span>
 	);
 }
 
-export function ReviewArtifactLink({
-	artifact,
-	variant = "summary",
-	display = "compact",
-	className,
-}: ReviewArtifactLinkProps) {
+/**
+ * The same, as a link out to the forge — and only the label is underlined.
+ *
+ * <p>The product owner flagged twice that hovering this underlined the work's title as well. It did:
+ * the anchor wrapped both the label and the title and carried `hover:underline`, so the affordance
+ * covered text that was not the link's name. Now the anchor contains the label and nothing else, and
+ * a caller that wants the title renders it outside.
+ */
+export function ReviewArtifactLink({ artifact, className }: ReviewArtifactProps) {
 	if (!artifact?.url) {
-		return (
-			<ReviewArtifact
-				artifact={artifact}
-				variant={variant}
-				display={display}
-				className={className}
-			/>
-		);
+		return <ReviewArtifactLabel artifact={artifact} className={className} />;
 	}
-
+	const Icon = reviewArtifactIcon(artifact);
 	return (
 		<a
 			href={artifact.url}
 			target="_blank"
 			rel="noopener noreferrer"
 			className={cn(
-				"flex w-full min-w-0 gap-2 whitespace-normal text-sm hover:underline",
+				"group relative inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm",
 				className,
 			)}
 		>
-			<ReviewArtifactContent artifact={artifact} variant={variant} display={display}>
-				<ExternalLinkIcon className="size-3.5 shrink-0" aria-hidden />
-			</ReviewArtifactContent>
+			<Icon className="size-3.5 shrink-0" aria-hidden />
+			{/* `group-hover`, not `hover`, so the affordance answers the whole link — and it is on the
+			    label alone, so it can never reach a title rendered beside it. */}
+			<span className="min-w-0 break-words group-hover:underline">{qualifiedLabel(artifact)}</span>
+			<ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
 			<span className="sr-only"> (opens in a new tab)</span>
 		</a>
-	);
-}
-
-function ReviewArtifactContent({
-	artifact,
-	variant,
-	display,
-	children,
-}: {
-	artifact: ReviewArtifactDisplay;
-	variant: NonNullable<ReviewArtifactProps["variant"]>;
-	display: NonNullable<ReviewArtifactProps["display"]>;
-	children?: ReactNode;
-}) {
-	const artifactLabel = reviewArtifactLabel(artifact);
-	const label = [artifact.repositoryName, artifactLabel].filter(Boolean).join(" · ");
-	return (
-		<>
-			<span className="mt-0.5 shrink-0 [&>svg]:size-4">
-				<ArtifactIcon type={artifact.type} />
-			</span>
-			<span className="min-w-0">
-				<span className="flex items-center gap-1 font-medium">
-					<span className={cn(display === "compact" ? "truncate" : "break-words")}>{label}</span>
-					{children}
-				</span>
-				{variant === "summary" && artifact.title !== artifactLabel && (
-					<span
-						className={cn(
-							"text-muted-foreground",
-							display === "compact" ? "line-clamp-2" : "break-words",
-						)}
-					>
-						{artifact.title}
-					</span>
-				)}
-			</span>
-		</>
 	);
 }

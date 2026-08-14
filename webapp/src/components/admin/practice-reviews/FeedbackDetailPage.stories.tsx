@@ -4,7 +4,7 @@ import { expect, within } from "storybook/test";
 import type { ReviewFeedbackDetail } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackDetailPage } from "./FeedbackDetailPage";
-import { reviewFeedbackDetail } from "./story-mock-data";
+import { reviewFeedbackDetail, workspacePractices } from "./story-mock-data";
 
 const deliveredFeedbackDetail = {
 	...reviewFeedbackDetail,
@@ -38,6 +38,11 @@ const meta = {
 				http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
 					HttpResponse.json(reviewFeedbackDetail),
 				),
+				// The observations behind the feedback name their practice, and a practice name is a
+				// link with the practice's own prose behind it.
+				http.get("*/workspaces/:workspaceSlug/practices", () =>
+					HttpResponse.json(workspacePractices),
+				),
 			],
 		},
 	},
@@ -63,9 +68,10 @@ export const NotDelivered: Story = {
 		// Withheld text is badged where it is shown *and* traced under Delivery, and the trace is the
 		// only place the reason sentence appears.
 		await expect(await canvas.findAllByText("Withheld")).toHaveLength(2);
-		await expect(
-			canvas.getByRole("link", { name: "View all observations and feedback for this work" }),
-		).toBeVisible();
+		canvas.getByRole("link", { name: "See everything reviewed on this work" });
+		// The parent review is a link in the line under the title, not a UUID in a drawer.
+		canvas.getByRole("link", { name: "in a review" });
+		await expect(canvas.queryByText("Technical details")).not.toBeInTheDocument();
 		canvas.getByText("The work moved on");
 		canvas.getByText("The work was already merged, so a note on it would arrive too late.");
 		await expectNoPageOverflow();
@@ -80,6 +86,9 @@ export const Delivered: Story = {
 				http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
 					HttpResponse.json(deliveredFeedbackDetail),
 				),
+				http.get("*/workspaces/:workspaceSlug/practices", () =>
+					HttpResponse.json(workspacePractices),
+				),
 			],
 		},
 	},
@@ -89,9 +98,32 @@ export const Delivered: Story = {
 		// because reaching the developer is the ordinary case.
 		await expect(await canvas.findAllByText("Delivered")).toHaveLength(1);
 		canvas.getByText(/As an inline note on the work/);
-		canvas.getByText("As an inline note");
+		canvas.getByText(/As an inline note:/);
 		await expect(
 			canvas.getByText("server/src/main/java/ReviewController.java:42–44"),
 		).toBeVisible();
+	},
+};
+
+/**
+ * The composed text and the Markdown it was written in, as two views of one thing.
+ *
+ * The source used to sit in a "View Markdown source" accordion below the card — a second control in
+ * a second place that pushed the page down and showed the same words twice.
+ */
+export const RenderedAndSource: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas, canvasElement, userEvent }) => {
+		await canvas.findByRole("heading", { level: 4, name: "What could improve" });
+		await userEvent.click(
+			canvas.getByRole("button", { name: /Show the Markdown that was composed/ }),
+		);
+		await expect(canvasElement.querySelector("pre")?.textContent).toContain(
+			"## What could improve",
+		);
+		await userEvent.click(
+			canvas.getByRole("button", { name: /Show the feedback as the developer sees it/ }),
+		);
+		await canvas.findByRole("heading", { level: 4, name: "What could improve" });
 	},
 };

@@ -20,6 +20,7 @@ import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
 import { FeedbackResults } from "./FeedbackResults";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
+import { ReviewPersonFacet } from "./ReviewPersonFacet";
 import { type FeedbackSearch, feedbackQuery } from "./review-search";
 
 const PAGE_SIZE = 25;
@@ -117,6 +118,13 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 						selected={search.withheldFamily ?? []}
 						onChange={(values) => patchFilter({ withheldFamily: nonEmpty(values) })}
 					/>
+					<ReviewPersonFacet
+						workspaceSlug={workspaceSlug}
+						title="Recipient"
+						selected={search.recipientUserId}
+						onChange={(recipientUserId) => patchFilter({ recipientUserId })}
+						fallbackName={recipient?.name ?? recipient?.login}
+					/>
 					<DateRangeFacet
 						value={toDateRange(search)}
 						onChange={(range) => patchFilter(fromDateRange(range))}
@@ -127,14 +135,6 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 						label="Review"
 						value={search.agentJobId}
 						onClear={() => patchFilter({ agentJobId: undefined })}
-					/>
-				)}
-				{search.recipientUserId && (
-					<ReferenceFilterPill
-						label="Recipient"
-						id={search.recipientUserId}
-						name={recipient?.name ?? recipient?.login}
-						onClear={() => patchFilter({ recipientUserId: undefined })}
 					/>
 				)}
 				{search.artifactKind && (

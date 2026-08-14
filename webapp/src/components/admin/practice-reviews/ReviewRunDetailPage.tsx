@@ -32,9 +32,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
+import { ReviewDetailHeader } from "./ReviewDetailHeader";
 import { ReviewOutputSections } from "./ReviewOutputSections";
 import { ReviewRunActions } from "./ReviewRunActions";
-import { ReviewRunTechnicalDetails } from "./ReviewRunTechnicalDetails";
+import { ReviewRunCard } from "./ReviewRunCard";
 import type { RunsSearch } from "./review-search";
 
 const ACTIVE_REVIEW_POLL_MS = 5_000;
@@ -110,7 +111,6 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 					/>
 				),
 			}}
-			current="Review"
 		/>
 	);
 
@@ -154,22 +154,24 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{breadcrumbs}
-			<header className="space-y-4">
-				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-					<div className="min-w-0 space-y-2">
-						<div className="flex flex-wrap items-center gap-2">
-							<StatusBadge def={REVIEW_STATUS_DEFS[job.status]} />
-							{job.deliveryStatus && <StatusBadge def={SUMMARY_POST_DEFS[job.deliveryStatus]} />}
-						</div>
-						<ReviewArtifactLink artifact={job.target} variant="label" display="full" />
-						<h2 className="break-words text-2xl font-semibold tracking-tight">
-							{job.target.title}
-						</h2>
+			<ReviewDetailHeader
+				chips={
+					<>
+						<StatusBadge def={REVIEW_STATUS_DEFS[job.status]} />
+						{job.deliveryStatus && <StatusBadge def={SUMMARY_POST_DEFS[job.deliveryStatus]} />}
+					</>
+				}
+				title={job.target.title}
+				provenance={
+					<div className="space-y-1">
+						<ReviewArtifactLink artifact={job.target} className="text-sm" />
 						<p className="text-sm text-muted-foreground">
 							{job.startedAt ? "Started " : "Created "}
 							<RelativeTime value={job.startedAt ?? job.createdAt} />
 						</p>
 					</div>
+				}
+				actions={
 					<ReviewRunActions
 						job={job}
 						isCancelling={cancelJob.isPending}
@@ -177,7 +179,9 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 						onCancel={() => cancelJob.mutate({ path: { workspaceSlug, jobId } })}
 						onRetry={() => retryDelivery.mutate({ path: { workspaceSlug, jobId } })}
 					/>
-				</div>
+				}
+			/>
+			<div className="space-y-4">
 				{reviewEndedEarly && !endedWithoutOutput && (
 					<Alert variant={job.status === "FAILED" ? "destructive" : "default"}>
 						<AlertTitle>Review output may be incomplete</AlertTitle>
@@ -190,7 +194,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 						<AlertDescription>{hold.detail}</AlertDescription>
 					</Alert>
 				)}
-			</header>
+			</div>
 
 			{endedWithoutOutput ? (
 				<Empty className="border">
@@ -208,7 +212,6 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				<ReviewOutputSections
 					workspaceSlug={workspaceSlug}
 					scope={{ agentJobId: jobId }}
-					context="review"
 					outcome={job.reviewOutcome}
 					feedback={
 						feedbackQuery.isLoading
@@ -227,7 +230,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 											total: feedbackQuery.data?.page?.totalElements ?? 0,
 										}
 					}
-					findings={
+					observations={
 						findingsQuery.isLoading
 							? { status: "loading" }
 							: findingsQuery.isError
@@ -247,7 +250,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				/>
 			)}
 
-			<ReviewRunTechnicalDetails job={job} />
+			<ReviewRunCard job={job} />
 		</article>
 	);
 }

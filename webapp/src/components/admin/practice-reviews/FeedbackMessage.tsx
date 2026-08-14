@@ -1,4 +1,5 @@
-import type { AnchorHTMLAttributes, HTMLAttributes } from "react";
+import { CodeIcon, TextIcon } from "lucide-react";
+import { type AnchorHTMLAttributes, type HTMLAttributes, useState } from "react";
 import { Streamdown } from "streamdown";
 import { MarkdownCode } from "@/components/common/MarkdownCode";
 import {
@@ -7,6 +8,7 @@ import {
 } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
 /**
@@ -51,45 +53,88 @@ const UNTRUSTED_MARKDOWN_COMPONENTS = {
 };
 
 /**
- * The composed feedback as the developer would read it, under one badge saying what became of it.
+ * Tailwind Typography sizes its vertical rhythm for an article, where a heading opens a section the
+ * reader has scrolled to. This is a short comment in a card: three headings and a list inside a few
+ * hundred words, and the default `mt-8` above each one left a gap the product owner measured as
+ * "almost doubling what you would expect". Tightened to a rhythm that suits the length of the thing.
+ */
+const FEEDBACK_PROSE =
+	"prose prose-sm dark:prose-invert max-w-none break-words prose-headings:mt-4 prose-headings:mb-1.5 prose-headings:text-sm prose-headings:font-semibold prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 first:prose-headings:mt-0";
+
+type FeedbackView = "rendered" | "source";
+
+/**
+ * The composed feedback, as the developer would read it or as it was actually written.
  *
- * The header used to be a tinted panel carrying its own five-case copy table — a fifth set of words
- * for the delivery states, and the place the owner found "Ready for a future conversation with Heph.
- * It has not been delivered." The narrative moved to `DeliveryTrace`, which is where a reader looks
- * for it.
+ * <p>The source used to sit in a collapsed accordion below the card labelled "View Markdown source" —
+ * a second control, in a second place, that pushed the page down when opened and showed the same text
+ * twice. It is a view of one thing, so it is a switch on the thing: two toggles in the card's own
+ * header, and the body swaps underneath them.
  *
- * <p>What is left is one badge, and only on text that did *not* simply reach the developer. Badging
+ * <p>The badge in that header appears only on text that did *not* simply reach the developer. Badging
  * the ordinary case would colour every card and put a second "Delivered" on a page whose Delivery
- * section already says so. Text that was withheld, failed, is still queued, or has since been
- * replaced is the case that needs marking, because it can otherwise be quoted as though it was sent.
+ * section already says so. Text that was withheld, failed, is still queued, or has since been replaced
+ * is the case that needs marking, because it can otherwise be quoted as though it was sent.
  */
 export function FeedbackMessage({ feedback, className }: FeedbackMessageProps) {
+	const [view, setView] = useState<FeedbackView>("rendered");
 	const { body } = feedback;
 	const unsent = feedback.deliveryState !== "DELIVERED";
 
-	return (
-		<Card className={cn("gap-0 border py-0", className)}>
-			{unsent && (
-				<CardHeader className="border-b py-3">
-					<StatusBadge def={deliveryOutcome(feedback)} />
-				</CardHeader>
-			)}
-			{body ? (
-				<CardContent className="prose prose-sm dark:prose-invert max-w-none break-words py-4">
-					<Streamdown
-						mode="static"
-						rehypePlugins={[]}
-						remarkRehypeOptions={{ allowDangerousHtml: false }}
-						components={UNTRUSTED_MARKDOWN_COMPONENTS}
-					>
-						{body}
-					</Streamdown>
-				</CardContent>
-			) : (
+	if (!body) {
+		return (
+			<Card className={cn("gap-0 border py-0", className)}>
 				<CardContent className="py-4 text-sm text-muted-foreground">
 					No feedback text was composed for this record.
 				</CardContent>
-			)}
+			</Card>
+		);
+	}
+
+	return (
+		<Card className={cn("gap-0 border py-0", className)}>
+			<CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-3">
+				{unsent ? <StatusBadge def={deliveryOutcome(feedback)} /> : <span />}
+				<ToggleGroup
+					value={[view]}
+					onValueChange={(next: string[]) => {
+						// A toggle group can be emptied by re-pressing the active item; the body must always
+						// be showing something, so an empty selection keeps the current view.
+						const [chosen] = next;
+						if (chosen === "rendered" || chosen === "source") setView(chosen);
+					}}
+					variant="outline"
+					size="sm"
+					aria-label="How to show the feedback"
+				>
+					<ToggleGroupItem value="rendered" aria-label="Show the feedback as the developer sees it">
+						<TextIcon aria-hidden />
+						Rendered
+					</ToggleGroupItem>
+					<ToggleGroupItem value="source" aria-label="Show the Markdown that was composed">
+						<CodeIcon aria-hidden />
+						Source
+					</ToggleGroupItem>
+				</ToggleGroup>
+			</CardHeader>
+			<CardContent className="py-4">
+				{view === "rendered" ? (
+					<div className={FEEDBACK_PROSE}>
+						<Streamdown
+							mode="static"
+							rehypePlugins={[]}
+							remarkRehypeOptions={{ allowDangerousHtml: false }}
+							components={UNTRUSTED_MARKDOWN_COMPONENTS}
+						>
+							{body}
+						</Streamdown>
+					</div>
+				) : (
+					<pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs">
+						{body}
+					</pre>
+				)}
+			</CardContent>
 		</Card>
 	);
 }

@@ -6,7 +6,7 @@ const body =
 	"## What worked\n\nThe controller stays focused on HTTP concerns.\n\n[Read the guide](https://example.com/guide).";
 
 /**
- * The composed feedback under one badge saying what became of it.
+ * The composed feedback, as the developer would read it or as it was actually written.
  *
  * The card used to carry its own five-case copy table for the delivery states, which is how it came
  * to say "Ready for a future conversation with Heph. It has not been delivered." — a sentence about
@@ -35,6 +35,23 @@ export const Delivered: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByRole("heading", { level: 4, name: "What worked" });
 		await expect(canvas.queryByText("Delivered")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * The Markdown behind the rendering, on a switch in the card's own header.
+ *
+ * Tailwind Typography's default rhythm is sized for an article; in a card of a few hundred words its
+ * `mt-8` above every heading left the gap the product owner measured as "almost doubling what you
+ * would expect". The prose modifiers on this card tighten it to the length of the thing.
+ */
+export const SwitchToSource: Story = {
+	play: async ({ canvas, canvasElement, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: /Show the Markdown that was composed/ }),
+		);
+		await expect(canvasElement.querySelector("pre")?.textContent).toContain("## What worked");
+		await expect(canvas.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
 	},
 };
 

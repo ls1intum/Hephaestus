@@ -19,9 +19,10 @@ import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { statusFacetOptions } from "@/components/practice-vocabulary/status-def";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
-import { FindingResults } from "./FindingResults";
+import { ObservationResults } from "./ObservationResults";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
-import { type FindingsSearch, findingsQuery } from "./review-search";
+import { ReviewPersonFacet } from "./ReviewPersonFacet";
+import { type ObservationsSearch, observationsQuery } from "./review-search";
 
 const PAGE_SIZE = 25;
 /** Every option wears the badge its rows wear; see the note on `FeedbackListPage`'s facets. */
@@ -29,17 +30,21 @@ const ASSESSMENT_OPTIONS = statusFacetOptions(ASSESSMENT_DEFS);
 const PRESENCE_OPTIONS = statusFacetOptions(PRESENCE_DEFS);
 const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
 
-export interface FindingsListPageProps {
+export interface ObservationsListPageProps {
 	workspaceSlug: string;
-	search: FindingsSearch;
-	onSearchChange: (patch: Partial<FindingsSearch>) => void;
+	search: ObservationsSearch;
+	onSearchChange: (patch: Partial<ObservationsSearch>) => void;
 }
 
-export function FindingsListPage({ workspaceSlug, search, onSearchChange }: FindingsListPageProps) {
-	const findingsQueryResult = useQuery({
+export function ObservationsListPage({
+	workspaceSlug,
+	search,
+	onSearchChange,
+}: ObservationsListPageProps) {
+	const observationsQueryResult = useQuery({
 		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
-			query: findingsQuery(search, PAGE_SIZE),
+			query: observationsQuery(search, PAGE_SIZE),
 		}),
 	});
 	const areasQuery = useQuery({ ...listAreasOptions({ path: { workspaceSlug } }) });
@@ -53,9 +58,9 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 		label: practice.name,
 		description: (areasQuery.data ?? []).find((area) => area.slug === practice.areaSlug)?.name,
 	}));
-	const findings = findingsQueryResult.data?.content ?? [];
-	const totalPages = findingsQueryResult.data?.page?.totalPages;
-	const subject = findings[0]?.subject;
+	const observations = observationsQueryResult.data?.content ?? [];
+	const totalPages = observationsQueryResult.data?.page?.totalPages;
+	const subject = observations[0]?.subject;
 	const hasFilter = Boolean(
 		search.areaSlug?.length ||
 			search.practiceSlug?.length ||
@@ -83,7 +88,7 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 			from: undefined,
 			to: undefined,
 		});
-	const patchFilter = (patch: Partial<FindingsSearch>) => onSearchChange({ ...patch, page: 0 });
+	const patchFilter = (patch: Partial<ObservationsSearch>) => onSearchChange({ ...patch, page: 0 });
 
 	useEffect(() => {
 		if (totalPages !== undefined && search.page && search.page >= totalPages) {
@@ -98,7 +103,7 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 				onReset={reset}
 				actions={
 					<ResultCount
-						total={findingsQueryResult.data?.page?.totalElements}
+						total={observationsQueryResult.data?.page?.totalElements}
 						noun={["observation", "observations"]}
 						hasFilter={hasFilter}
 					/>
@@ -141,6 +146,13 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 						selected={search.presence ?? []}
 						onChange={(values) => patchFilter({ presence: nonEmpty(values) })}
 					/>
+					<ReviewPersonFacet
+						workspaceSlug={workspaceSlug}
+						title="Developer"
+						selected={search.subjectUserId}
+						onChange={(subjectUserId) => patchFilter({ subjectUserId })}
+						fallbackName={subject?.name ?? subject?.login}
+					/>
 					<DateRangeFacet
 						value={toDateRange(search)}
 						onChange={(range) => patchFilter(fromDateRange(range))}
@@ -153,51 +165,43 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 						onClear={() => patchFilter({ agentJobId: undefined })}
 					/>
 				)}
-				{search.subjectUserId && (
-					<ReferenceFilterPill
-						label="Developer"
-						id={search.subjectUserId}
-						name={subject?.name ?? subject?.login}
-						onClear={() => patchFilter({ subjectUserId: undefined })}
-					/>
-				)}
 				{search.artifactKind && (
 					<ReferenceFilterPill
 						label="Reviewed work"
 						value={reviewArtifactScopeLabel(
 							search.artifactKind,
 							search.artifactId,
-							findings[0]?.artifact,
+							observations[0]?.artifact,
 						)}
 						onClear={() => patchFilter({ artifactKind: undefined, artifactId: undefined })}
 					/>
 				)}
 			</FilterToolbar>
-			{findingsQueryResult.isError ? (
+			{observationsQueryResult.isError ? (
 				<QueryErrorAlert
-					error={findingsQueryResult.error}
+					error={observationsQueryResult.error}
 					title="Couldn't load observations"
-					onRetry={() => findingsQueryResult.refetch()}
+					onRetry={() => observationsQueryResult.refetch()}
 				/>
 			) : (
-				<FindingResults
+				<ObservationResults
 					workspaceSlug={workspaceSlug}
 					state={
-						findingsQueryResult.isLoading
+						observationsQueryResult.isLoading
 							? { status: "loading" }
-							: findings.length === 0
+							: observations.length === 0
 								? { status: "empty", filtered: hasFilter }
-								: { status: "ready", findings }
+								: { status: "ready", observations }
 					}
 				/>
 			)}
 			<TablePagination
-				page={findingsQueryResult.data?.page?.number ?? search.page ?? 0}
-				totalPages={findingsQueryResult.data?.page?.totalPages ?? 0}
+				page={observationsQueryResult.data?.page?.number ?? search.page ?? 0}
+				totalPages={observationsQueryResult.data?.page?.totalPages ?? 0}
 				renderPageLink={(page, props) => (
 					<Link
 						{...props}
-						to="/w/$workspaceSlug/admin/practices/reviews/findings"
+						to="/w/$workspaceSlug/admin/practices/reviews/observations"
 						params={{ workspaceSlug }}
 						search={(previous) => ({ ...previous, page: page === 0 ? undefined : page })}
 					/>

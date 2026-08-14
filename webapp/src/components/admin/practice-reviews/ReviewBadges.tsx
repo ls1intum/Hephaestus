@@ -5,8 +5,11 @@ import type {
 	ReviewObservation,
 	ReviewObservationCounts,
 } from "@/api/types.gen";
-import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-defs";
 import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import {
+	type ObservationResultFacts,
+	observationResult,
+} from "@/components/practice-vocabulary/observation-result";
 import { PRESENCE_DEFS } from "@/components/practice-vocabulary/presence-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
@@ -20,16 +23,17 @@ const CLAIM_CURRENTNESS_CONFIG = {
 		badge: "Uses older review rules",
 		badgeVariant: "warning",
 		Icon: ClockAlert,
-		title: "This result uses older review rules",
-		description: "This result was produced using an older practice definition.",
+		title: "This was judged against an older version of the practice",
+		description:
+			"The practice has been edited since. What it says may no longer be what the practice asks for.",
 	},
 	UNVERIFIABLE: {
-		badge: "Currentness unknown",
+		badge: "Rules version unknown",
 		badgeVariant: "outline",
 		Icon: CircleHelp,
-		title: "Currentness is unknown",
+		title: "We can't tell which version of the practice this was judged against",
 		description:
-			"We can’t determine whether this result uses the current review rules because comparison provenance is unavailable.",
+			"The record of which practice text the review read was not kept, so there is no way to say whether the practice has changed since. Treat it as you would any observation you have not checked.",
 	},
 } as const satisfies Record<
 	NonCurrentClaimCurrentness,
@@ -42,30 +46,22 @@ const CLAIM_CURRENTNESS_CONFIG = {
 	}
 >;
 
-type FindingResult = Pick<ReviewObservation, "presence" | "assessment" | "severity">;
-
 /**
- * What one observation concluded, as the smallest true set of badges.
+ * What one observation concluded, plus how much it costs when it is a shortfall.
  *
- * The two presence values that end the question answer it alone; only a practice that was in play
- * gets an assessment, and only a shortfall gets a severity beside it. Every badge is a registry
- * entry, so this decides *which* badges appear and never what any of them looks like.
+ * The rule for collapsing presence and assessment into one badge lives in `observationResult`, so
+ * the badge here and the leading icon on the row cannot disagree about what a row is.
  */
-export function FindingResultBadge({ finding }: { finding: FindingResult }) {
-	if (finding.presence === "NOT_APPLICABLE") {
-		return <StatusBadge def={PRESENCE_DEFS.NOT_APPLICABLE} />;
-	}
-	if (finding.presence === "INCONCLUSIVE") {
-		return <StatusBadge def={PRESENCE_DEFS.INCONCLUSIVE} />;
-	}
-	if (!finding.assessment) {
-		return <Badge variant="secondary">No result</Badge>;
-	}
+export function ObservationResultBadge({
+	observation,
+}: {
+	observation: ObservationResultFacts & Pick<ReviewObservation, "severity">;
+}) {
 	return (
 		<span className="flex flex-wrap items-center gap-1.5">
-			<StatusBadge def={ASSESSMENT_DEFS[finding.assessment]} />
-			{finding.assessment === "BAD" && finding.severity && (
-				<StatusBadge def={SEVERITY_DEFS[finding.severity]} />
+			<StatusBadge def={observationResult(observation)} />
+			{observation.assessment === "BAD" && observation.severity && (
+				<StatusBadge def={SEVERITY_DEFS[observation.severity]} />
 			)}
 		</span>
 	);
@@ -75,9 +71,9 @@ export function FindingResultBadge({ finding }: { finding: FindingResult }) {
  * What occasioned a measurement, shown only when it was not the ordinary case.
  *
  * <p>LIVE renders nothing: badging the overwhelming majority of rows says nothing and buries the two
- * that matter. A campaign's finding and one somebody asked for by hand are both self-selected rather
- * than a random draw from the work, so reading them as though they were live is the mistake this
- * exists to prevent.
+ * that matter. A campaign's observation and one somebody asked for by hand are both self-selected
+ * rather than a random draw from the work, so reading them as though they were live is the mistake
+ * this exists to prevent.
  */
 export function ObservationOriginBadge({ origin }: { origin: ReviewObservation["origin"] }) {
 	if (origin === "LIVE") return null;
@@ -114,24 +110,11 @@ export function ClaimCurrentnessAlert({
 	);
 }
 
-export function FindingFeedbackSummary({
-	disposition,
-}: {
-	disposition: ReviewObservation["feedbackDisposition"];
-}) {
-	const summary = feedbackCountsLabel(disposition);
-	return (
-		<p className="text-sm text-muted-foreground">
-			{summary ? `Feedback: ${summary.toLowerCase()}` : "No feedback composed"}
-		</p>
-	);
-}
-
 type FeedbackCounts = ReviewFeedbackCounts | ReviewFeedbackDisposition;
 
 /**
- * A tally of delivery outcomes reads as a sentence rather than a row of badges: badging five
- * counts on every row would colour the norm, which is what makes the one exceptional row invisible.
+ * A tally of delivery outcomes reads as a sentence rather than a row of badges: badging five counts
+ * on every row would colour the norm, which is what makes the one exceptional row invisible.
  *
  * The words still come from the registry — a count saying "not delivered" while the badge one column
  * over says "Withheld" is how the same enum ends up with two names.
@@ -151,28 +134,52 @@ function feedbackCountsLabel(counts: FeedbackCounts): string | undefined {
 	return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-export function FeedbackCountsSummary({ counts }: { counts: FeedbackCounts }) {
+/**
+ * What became of the feedback an observation or a review produced.
+ *
+ * <p>One component where there were two — `FeedbackCountsSummary` and `FindingFeedbackSummary` —
+ * which differed only in that one prefixed the sentence with "Feedback: " and the other did not, so
+ * the same tally read two ways on two screens. The prefix is now the caller's business, because on a
+ * row under a heading that already says Feedback it is noise, and in a meta line of mixed facts it
+ * is the only thing that says what the numbers count.
+ */
+export function FeedbackCountsSummary({
+	counts,
+	prefix,
+}: {
+	counts: FeedbackCounts;
+	prefix?: string;
+}) {
+	const summary = feedbackCountsLabel(counts);
+	if (!summary) return <span>No feedback composed</span>;
 	return (
-		<p className="text-sm text-muted-foreground">
-			{feedbackCountsLabel(counts) ?? "No feedback composed"}
-		</p>
+		<span>
+			{prefix && `${prefix} `}
+			{summary}
+		</span>
 	);
 }
 
-export function FindingCountsSummary({ counts }: { counts: ReviewObservationCounts }) {
+/**
+ * What a review found, as a sentence.
+ *
+ * <p>Every noun here is the registry's own word for the value it counts. `inconclusive` used to read
+ * "undetermined", which appears in no registry and on no badge — an operator who filtered by
+ * "Could not be determined" got back rows summarised with a word they had never seen. The two
+ * assessment counts are nominalised (`Strength` → strengths, `Needs improvement` → improvements)
+ * because a count needs a noun, but they keep the stem so the filter and the tally are recognisably
+ * about one thing.
+ */
+export function ObservationCountsSummary({ counts }: { counts: ReviewObservationCounts }) {
 	const parts = [
-		counts.strengths > 0
-			? `${counts.strengths} ${counts.strengths === 1 ? "strength" : "strengths"}`
-			: undefined,
-		counts.problems > 0
-			? `${counts.problems} ${counts.problems === 1 ? "improvement" : "improvements"}`
-			: undefined,
-		counts.notApplicable > 0 ? `${counts.notApplicable} not applicable` : undefined,
-		counts.inconclusive > 0 ? `${counts.inconclusive} undetermined` : undefined,
+		counts.strengths > 0 &&
+			`${counts.strengths} ${counts.strengths === 1 ? "strength" : "strengths"}`,
+		counts.problems > 0 &&
+			`${counts.problems} ${counts.problems === 1 ? "improvement" : "improvements"}`,
+		counts.notApplicable > 0 &&
+			`${counts.notApplicable} ${PRESENCE_DEFS.NOT_APPLICABLE.label.toLowerCase()}`,
+		counts.inconclusive > 0 &&
+			`${counts.inconclusive} ${PRESENCE_DEFS.INCONCLUSIVE.label.toLowerCase()}`,
 	].filter(Boolean);
-	return (
-		<p className="text-sm text-muted-foreground">
-			{parts.length > 0 ? parts.join(" · ") : "No observations"}
-		</p>
-	);
+	return <span>{parts.length > 0 ? parts.join(" · ") : "No observations"}</span>;
 }

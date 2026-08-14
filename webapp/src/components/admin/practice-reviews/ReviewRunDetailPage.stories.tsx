@@ -4,7 +4,7 @@ import { expect, waitFor, within } from "storybook/test";
 import { mockJobCompleted, mockJobRunning } from "@/components/admin/ai/story-mock-data";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunDetailPage } from "./ReviewRunDetailPage";
-import { reviewFeedback, reviewFindings } from "./story-mock-data";
+import { reviewFeedback, reviewObservations, workspacePractices } from "./story-mock-data";
 
 const rawFailure = "Cannot compute diff: all resolution strategies failed for commit 27f4e88c.";
 const failedJob = {
@@ -15,7 +15,7 @@ const failedJob = {
 	errorMessage: rawFailure,
 } as const;
 
-const previewFindings = [reviewFindings[1], reviewFindings[0]];
+const previewObservations = [reviewObservations[1], reviewObservations[0]];
 
 const page = (content: unknown[], totalElements = content.length) => ({
 	content,
@@ -25,10 +25,11 @@ const page = (content: unknown[], totalElements = content.length) => ({
 const handlers = (
 	job = mockJobCompleted,
 	feedback: unknown[] = reviewFeedback,
-	findings: unknown[] = previewFindings,
-	findingTotal = findings.length,
+	observations: unknown[] = previewObservations,
+	observationTotal = observations.length,
 ) => [
 	http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => HttpResponse.json(job)),
+	http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(workspacePractices)),
 	http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
 		HttpResponse.json(page(feedback)),
 	),
@@ -36,7 +37,7 @@ const handlers = (
 		if (new URL(request.url).searchParams.get("sort") !== "ACTIONABILITY") {
 			return HttpResponse.json({ detail: "Expected actionability order" }, { status: 400 });
 		}
-		return HttpResponse.json(page(findings, findingTotal));
+		return HttpResponse.json(page(observations, observationTotal));
 	}),
 ];
 
@@ -47,7 +48,9 @@ const meta = {
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: { handlers: handlers(mockJobCompleted, reviewFeedback, previewFindings, 30) },
+		msw: {
+			handlers: handlers(mockJobCompleted, reviewFeedback.slice(0, 2), previewObservations, 30),
+		},
 	},
 	tags: ["autodocs"],
 	args: {
@@ -68,8 +71,8 @@ export const CompletedWithMixedOutput: Story = {
 		).toBeVisible();
 		await expect(canvas.getByText("Summary posted")).toBeVisible();
 		await expect(await canvas.findByText(reviewFeedback[0].bodyPreview)).toBeVisible();
-		await expect(await canvas.findByText(reviewFindings[1].title)).toBeVisible();
-		await expect(canvas.getByRole("link", { name: "View all 30 observations" })).toBeVisible();
+		await expect(await canvas.findByText(reviewObservations[1].title)).toBeVisible();
+		await expect(canvas.getByRole("link", { name: "See all 30 observations" })).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -135,15 +138,17 @@ export const FailedWithoutOutput: Story = {
 		chromatic: { viewports: [1440] },
 		msw: { handlers: handlers(failedJob, [], []) },
 	},
-	play: async ({ canvasElement, userEvent }) => {
+	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Review couldn't be completed")).toBeVisible();
 		await expect(
 			await canvas.findByText("This review ended before it produced observations or feedback."),
 		).toBeVisible();
-		await expect(canvas.queryByText(rawFailure)).not.toBeInTheDocument();
-		await userEvent.click(canvas.getByRole("button", { name: "Technical details" }));
-		await expect(await canvas.findByText(rawFailure)).toBeVisible();
+		// The failure text is on the page. It used to be inside a collapsed "Technical details"
+		// accordion, together with the model and token counts — so the one screen that could say why a
+		// review produced nothing hid the answer behind a drawer labelled for technicians.
+		await canvas.findByText(rawFailure);
+		await expect(canvas.queryByText("Technical details")).not.toBeInTheDocument();
 	},
 };
 
@@ -151,12 +156,28 @@ export const FailedWithPartialOutput: Story = {
 	args: { jobId: failedJob.id },
 	parameters: {
 		chromatic: { viewports: [1440] },
-		msw: { handlers: handlers(failedJob, [], [reviewFindings[0]]) },
+		msw: { handlers: handlers(failedJob, [], [reviewObservations[0]]) },
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Review output may be incomplete")).toBeVisible();
-		await expect(await canvas.findByText(reviewFindings[0].title)).toBeVisible();
-		await expect(canvas.queryByText(rawFailure)).not.toBeInTheDocument();
+		await expect(await canvas.findByText(reviewObservations[0].title)).toBeVisible();
+	},
+};
+
+/**
+ * How the review ran, on the page rather than in a drawer.
+ *
+ * The model and the token counts are what an operator checks when a review costs more than it should
+ * or answers worse than it used to. The configuration snapshot is not rendered at all: it is a
+ * machine artefact, so the useful action on it is to put it where a machine can read it.
+ */
+export const HowTheRunWent: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await canvas.findByRole("heading", { name: "How this review ran", level: 3 });
+		canvas.getByRole("button", { name: "Copy configuration" });
+		canvas.getByText("Tokens read");
+		await expect(canvas.queryByText("Configuration snapshot")).not.toBeInTheDocument();
 	},
 };

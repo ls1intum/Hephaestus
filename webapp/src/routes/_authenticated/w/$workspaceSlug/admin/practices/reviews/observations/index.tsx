@@ -1,20 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FindingsListPage } from "@/components/admin/practice-reviews/FindingsListPage";
-import type { FindingsSearch } from "@/components/admin/practice-reviews/review-search";
+import { ObservationsListPage } from "@/components/admin/practice-reviews/ObservationsListPage";
+import type { ObservationsSearch } from "@/components/admin/practice-reviews/review-search";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/",
+	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations/",
 )({
-	head: workspaceAdminHead("Findings"),
-	component: FindingsListRoute,
+	head: workspaceAdminHead("Observations"),
+	component: ObservationsListRoute,
 });
 
-function FindingsListRoute() {
+function ObservationsListRoute() {
 	const { workspaceSlug } = Route.useParams();
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
-	const updateSearch = (patch: Partial<FindingsSearch>) =>
+	const updateSearch = (patch: Partial<ObservationsSearch>) =>
 		navigate({
 			search: (previous) => {
 				const next = { ...previous, ...patch };
@@ -24,6 +24,10 @@ function FindingsListRoute() {
 		});
 
 	return (
-		<FindingsListPage workspaceSlug={workspaceSlug} search={search} onSearchChange={updateSearch} />
+		<ObservationsListPage
+			workspaceSlug={workspaceSlug}
+			search={search}
+			onSearchChange={updateSearch}
+		/>
 	);
 }

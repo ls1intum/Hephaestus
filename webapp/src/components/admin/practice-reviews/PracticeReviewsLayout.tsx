@@ -23,11 +23,11 @@ const VIEWS = [
 		icon: Workflow,
 	},
 	{
-		id: "findings",
-		to: "/w/$workspaceSlug/admin/practices/reviews/findings",
+		id: "observations",
+		to: "/w/$workspaceSlug/admin/practices/reviews/observations",
 		label: "Observations",
 		title: "Observations",
-		description: "Explore strengths and improvements, with evidence from reviewed work.",
+		description: "What the reviews found in the work, with the passages they read it from.",
 		icon: ScanSearch,
 	},
 	{
@@ -35,8 +35,9 @@ const VIEWS = [
 		to: "/w/$workspaceSlug/admin/practices/reviews/delivery",
 		label: "Delivery",
 		title: "Feedback delivery",
-		description:
-			"See each piece of feedback Hephaestus prepared and whether it reached its recipient.",
+		// No product name, and no "prepared": nothing is prepared outside the conversation queue, and
+		// the operator's question is what became of the feedback, not which service composed it.
+		description: "Every piece of feedback a review composed, and what became of it.",
 		icon: MessageSquareText,
 	},
 ] as const;
@@ -78,9 +79,9 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 			fuzzy: true,
 		}),
 	);
-	const findingsActive = Boolean(
+	const observationsActive = Boolean(
 		matchRoute({
-			to: "/w/$workspaceSlug/admin/practices/reviews/findings",
+			to: "/w/$workspaceSlug/admin/practices/reviews/observations",
 			fuzzy: true,
 		}),
 	);
@@ -94,8 +95,8 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 		? undefined
 		: deliveryActive
 			? "delivery"
-			: findingsActive
-				? "findings"
+			: observationsActive
+				? "observations"
 				: "reviews";
 
 	return (
@@ -114,7 +115,7 @@ export function PracticeReviewsHeader({
 	const activeView = VIEWS.find((view) => view.id === activeSection);
 	const title = activeView?.title ?? "Reviewed work";
 	const description =
-		activeView?.description ?? "See the review output associated with one piece of work.";
+		activeView?.description ?? "Everything the reviews have said about one piece of work.";
 	const Icon = activeView?.icon ?? ScanSearch;
 	return (
 		<div className="space-y-4">

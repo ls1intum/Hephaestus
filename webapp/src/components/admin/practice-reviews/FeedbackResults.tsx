@@ -1,11 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon, MessageSquareTextIcon } from "lucide-react";
+import { MessageSquareTextIcon } from "lucide-react";
 import type { ReviewFeedback } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
-import {
-	type DeliveryFacts,
-	deliveryOutcome,
-} from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
@@ -16,27 +13,11 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@/components/ui/item";
-import {
-	Table,
-	TableBody,
-	TableCaption,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { ReviewArtifact, ReviewArtifactLink } from "./ReviewArtifact";
+import { ReviewArtifactLabel } from "./ReviewArtifact";
+import { ReviewPerson } from "./ReviewPerson";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
-import { subjectLabel } from "./review-format";
+import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
+import type { ReviewScopeSearch } from "./review-search";
 
 export type FeedbackResultsState =
 	| { status: "loading" }
@@ -46,30 +27,6 @@ export type FeedbackResultsState =
 export interface FeedbackResultsProps {
 	workspaceSlug: string;
 	state: FeedbackResultsState;
-}
-
-/**
- * The delivery of one piece of feedback, as the two axes stacked rather than folded together.
- *
- * The cell this replaces printed the withholding reason *or* the place, whichever was set — so a
- * reader could not tell whether they were being told what happened or where it would have happened,
- * and a delivered row never said where it went at all. Outcome first because it is what the column
- * is called, then where, then why if a gate had a say.
- */
-function DeliveryCell({ feedback, className }: { feedback: DeliveryFacts; className?: string }) {
-	return (
-		<div className={cn("flex flex-col items-start gap-1", className)}>
-			<StatusBadge def={deliveryOutcome(feedback)} />
-			<p className="max-w-52 text-xs text-muted-foreground">
-				{DELIVERY_PLACE_DEFS[feedback.channel].label}
-			</p>
-			{feedback.suppressionReason && (
-				<p className="max-w-52 text-xs text-muted-foreground">
-					{withholdingReasonSentence(feedback.suppressionReason)}
-				</p>
-			)}
-		</div>
-	);
 }
 
 export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) {
@@ -93,97 +50,73 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 			</Empty>
 		);
 	}
-	const { feedback } = state;
 
 	return (
-		<>
-			<div className="hidden xl:block">
-				<Table containerClassName="rounded-lg border">
-					<TableCaption className="sr-only">Feedback, newest first</TableCaption>
-					<TableHeader>
-						<TableRow>
-							<TableHead scope="col">Feedback</TableHead>
-							<TableHead scope="col">Outcome</TableHead>
-							<TableHead scope="col">Reviewed work</TableHead>
-							<TableHead scope="col" className="w-32">
-								Composed
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{feedback.map((item) => (
-							<TableRow key={item.id}>
-								<TableCell className="max-w-md whitespace-normal align-top">
-									<Link
-										to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
-										params={{ workspaceSlug, feedbackId: item.id }}
-										search={(previous) => previous}
-										className="line-clamp-2 font-medium hover:underline"
-									>
-										Feedback for {subjectLabel(item.recipient)}
-									</Link>
-									{item.bodyPreview && (
-										<p className="mt-1 line-clamp-2 text-sm">{item.bodyPreview}</p>
-									)}
-									<div className="mt-2 text-xs text-muted-foreground">
-										<span>
-											{item.observationCount}{" "}
-											{item.observationCount === 1 ? "observation" : "observations"}
-										</span>
-									</div>
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<DeliveryCell feedback={item} />
-								</TableCell>
-								<TableCell className="max-w-xs whitespace-normal align-top">
-									<ReviewArtifactLink artifact={item.artifact} />
-								</TableCell>
-								<TableCell className="align-top text-muted-foreground">
-									<RelativeTime value={item.createdAt} />
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
-			</div>
-			<ItemGroup className="xl:hidden">
-				{feedback.map((item) => (
-					<div key={item.id} role="listitem">
-						<Item
-							variant="outline"
-							className="items-start"
-							render={
-								<Link
-									to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
-									params={{ workspaceSlug, feedbackId: item.id }}
-									search={(previous) => previous}
-								/>
-							}
-						>
-							<ItemContent className="min-w-0">
-								<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-									Feedback for {subjectLabel(item.recipient)}
-								</ItemTitle>
-								{item.bodyPreview && (
-									<ItemDescription className="line-clamp-2 text-sm text-foreground">
-										{item.bodyPreview}
-									</ItemDescription>
-								)}
-								<p className="text-xs text-muted-foreground">
-									{item.observationCount}{" "}
-									{item.observationCount === 1 ? "observation" : "observations"} · composed{" "}
-									<RelativeTime value={item.createdAt} />
-								</p>
-								<DeliveryCell feedback={item} className="mt-1" />
-								<ReviewArtifact artifact={item.artifact} display="full" />
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden />
-							</ItemActions>
-						</Item>
-					</div>
-				))}
-			</ItemGroup>
-		</>
+		<ReviewRowList label="Feedback, newest first">
+			{state.feedback.map((item) => (
+				<FeedbackRow key={item.id} workspaceSlug={workspaceSlug} feedback={item} />
+			))}
+		</ReviewRowList>
+	);
+}
+
+export interface FeedbackRowProps {
+	workspaceSlug: string;
+	feedback: ReviewFeedback;
+	/** See `ObservationRow`: the list carries its filters forward, a scoped section carries its scope. */
+	scope?: ReviewScopeSearch;
+}
+
+/**
+ * One piece of feedback: what it says, where it was headed, and what became of it.
+ *
+ * <p>The row's name is the feedback's own opening words. It used to be "Feedback for Ada Lovelace",
+ * computed from the recipient — so a page of twenty-five rows was twenty-five near-identical titles
+ * and the only distinguishing text was a clamped preview *below* the link. The person is a chip on
+ * the right, where it is scanned rather than read, and the preview is promoted to the one thing that
+ * tells two rows apart.
+ *
+ * <p>Place and outcome stay separate, as everywhere else: the badge says what happened, the meta
+ * line says where it was going. A withheld row also carries its own precise reason, because the
+ * outcome badge only says that something stopped it.
+ */
+export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps) {
+	const place = DELIVERY_PLACE_DEFS[feedback.channel];
+	return (
+		<ReviewRow
+			status={deliveryOutcome(feedback)}
+			title={
+				<Link
+					to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
+					params={{ workspaceSlug, feedbackId: feedback.id }}
+					search={scope ?? ((previous) => previous)}
+					className="line-clamp-2"
+				>
+					{feedback.bodyPreview || "No feedback text was composed"}
+				</Link>
+			}
+			meta={
+				<>
+					<ReviewRowMeta
+						items={[
+							place.label,
+							<ReviewArtifactLabel key="work" artifact={feedback.artifact} />,
+							`${feedback.observationCount} ${feedback.observationCount === 1 ? "observation" : "observations"}`,
+							// See `ObservationRow`: no hover target under a stretched row link.
+							<RelativeTime key="composed" value={feedback.createdAt} tooltip={false} />,
+						]}
+					/>
+					{feedback.suppressionReason && (
+						<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
+					)}
+				</>
+			}
+			chips={
+				<>
+					<ReviewPerson person={feedback.recipient} />
+					<StatusBadge def={deliveryOutcome(feedback)} />
+				</>
+			}
+		/>
 	);
 }

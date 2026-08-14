@@ -3,11 +3,6 @@ import { MessageSquareTextIcon, ScanSearchIcon } from "lucide-react";
 import { useId } from "react";
 import type { AgentJob, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { RelativeTime } from "@/components/common/RelativeTime";
-import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
-import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
-import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
 import {
 	Empty,
 	EmptyDescription,
@@ -15,19 +10,11 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import {
-	Item,
-	ItemContent,
-	ItemDescription,
-	ItemFooter,
-	ItemGroup,
-	ItemTitle,
-} from "@/components/ui/item";
-import { Spinner } from "@/components/ui/spinner";
 import type { KnownArtifactKind } from "@/lib/artifact-kinds";
-import { ClaimCurrentnessBadge, FindingResultBadge } from "./ReviewBadges";
-import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
-import { subjectLabel } from "./review-format";
+import { FeedbackRow } from "./FeedbackResults";
+import { ObservationRow } from "./ObservationResults";
+import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
+import { ReviewRowList } from "./ReviewRow";
 
 export type ReviewSectionState<T> =
 	| { status: "loading" }
@@ -35,8 +22,15 @@ export type ReviewSectionState<T> =
 	| { status: "pending" }
 	| { status: "ready"; items: T[]; total: number };
 
+/**
+ * Says what a review declined to do, in place of what it found.
+ *
+ * Deliberately not "nothing was found": the review never got as far as looking, so reading its empty
+ * result as a clean bill of health would be exactly backwards. The product's name is not in it —
+ * an operator wants to know what happened to the work, not which service shrugged.
+ */
 const INSUFFICIENT_EVIDENCE_EXPLANATION =
-	"Hephaestus skipped automated review because required evidence was missing, unreadable, out of date, or not authorized. No practice was assessed, so this is not a result of finding nothing.";
+	"The review stopped before it assessed anything, because the material it needed was missing, unreadable, out of date, or not something it was allowed to read. No practice was judged — this is not a review that looked and found nothing.";
 
 export interface ReviewOutputScope {
 	agentJobId?: string;
@@ -48,9 +42,8 @@ export interface ReviewOutputScope {
 export interface ReviewOutputSectionsProps {
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
-	context: "review" | "target";
 	feedback: ReviewSectionState<ReviewFeedback>;
-	findings: ReviewSectionState<ReviewObservation>;
+	observations: ReviewSectionState<ReviewObservation>;
 	/**
 	 * Distinguishes "looked and found nothing" from "declined to look". Omitted by aggregate views,
 	 * which span several runs and so have no single outcome.
@@ -58,27 +51,34 @@ export interface ReviewOutputSectionsProps {
 	outcome?: AgentJob["reviewOutcome"];
 }
 
+/**
+ * What one review, or one piece of work, produced — the same two sections in the same order on both
+ * screens that show them.
+ *
+ * <p>Each section renders the very rows the corresponding list renders. They used to be a third and
+ * fourth hand-built row layout, with their own titles, their own field order and no severity on an
+ * observation, so the same record looked like a different kind of thing depending on which screen
+ * had reached it. The `context` prop that decided whether to print a timestamp is gone with them:
+ * both screens show one, because a row without a date is a row you cannot place.
+ */
 export function ReviewOutputSections({
 	workspaceSlug,
 	scope,
-	context,
 	feedback,
-	findings,
+	observations,
 	outcome,
 }: ReviewOutputSectionsProps) {
 	return (
 		<>
-			<FindingsSection
+			<ObservationsSection
 				workspaceSlug={workspaceSlug}
 				scope={scope}
-				context={context}
-				state={findings}
+				state={observations}
 				outcome={outcome}
 			/>
 			<FeedbackSection
 				workspaceSlug={workspaceSlug}
 				scope={scope}
-				context={context}
 				state={feedback}
 				outcome={outcome}
 			/>
@@ -89,14 +89,12 @@ export function ReviewOutputSections({
 function FeedbackSection({
 	workspaceSlug,
 	scope,
-	context,
 	state,
 	outcome,
 }: {
 	outcome?: AgentJob["reviewOutcome"];
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
-	context: "review" | "target";
 	state: ReviewSectionState<ReviewFeedback>;
 }) {
 	const items = state.status === "ready" ? state.items : [];
@@ -113,7 +111,7 @@ function FeedbackSection({
 				shown={items.length}
 			/>
 			{state.status === "loading" ? (
-				<Spinner aria-label="Loading feedback" />
+				<ReviewResultsSkeleton label="Loading feedback" rows={2} />
 			) : state.status === "error" ? (
 				<QueryErrorAlert
 					error={state.error}
@@ -139,62 +137,30 @@ function FeedbackSection({
 					</EmptyHeader>
 				</Empty>
 			) : (
-				<ItemGroup>
+				<ReviewRowList label="Feedback">
 					{items.map((item) => (
-						<div key={item.id} role="listitem">
-							<Item
-								variant="outline"
-								render={
-									<Link
-										to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
-										params={{ workspaceSlug, feedbackId: item.id }}
-										search={scope}
-									/>
-								}
-							>
-								<ItemContent className="min-w-0">
-									<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-										Feedback for {subjectLabel(item.recipient)}
-									</ItemTitle>
-									{item.bodyPreview && (
-										<ItemDescription className="line-clamp-2 text-sm text-foreground">
-											{item.bodyPreview}
-										</ItemDescription>
-									)}
-									<p className="text-xs text-muted-foreground">
-										{DELIVERY_PLACE_DEFS[item.channel].label}
-										{item.suppressionReason &&
-											` · ${withholdingReasonSentence(item.suppressionReason)}`}
-									</p>
-									{context === "target" && (
-										<span className="text-xs text-muted-foreground">
-											Composed <RelativeTime value={item.createdAt} />
-										</span>
-									)}
-								</ItemContent>
-								<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
-									<StatusBadge def={deliveryOutcome(item)} />
-								</ItemFooter>
-							</Item>
-						</div>
+						<FeedbackRow
+							key={item.id}
+							workspaceSlug={workspaceSlug}
+							feedback={item}
+							scope={scope}
+						/>
 					))}
-				</ItemGroup>
+				</ReviewRowList>
 			)}
 		</section>
 	);
 }
 
-function FindingsSection({
+function ObservationsSection({
 	workspaceSlug,
 	scope,
-	context,
 	state,
 	outcome,
 }: {
 	outcome?: AgentJob["reviewOutcome"];
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
-	context: "review" | "target";
 	state: ReviewSectionState<ReviewObservation>;
 }) {
 	const items = state.status === "ready" ? state.items : [];
@@ -204,14 +170,14 @@ function FindingsSection({
 			<SectionHeader
 				id={headingId}
 				title="Observations"
-				to="/w/$workspaceSlug/admin/practices/reviews/findings"
+				to="/w/$workspaceSlug/admin/practices/reviews/observations"
 				workspaceSlug={workspaceSlug}
 				scope={scope}
 				total={state.status === "ready" ? state.total : 0}
 				shown={items.length}
 			/>
 			{state.status === "loading" ? (
-				<Spinner aria-label="Loading observations" />
+				<ReviewResultsSkeleton label="Loading observations" rows={2} />
 			) : state.status === "error" ? (
 				<QueryErrorAlert
 					error={state.error}
@@ -239,38 +205,16 @@ function FindingsSection({
 					</EmptyHeader>
 				</Empty>
 			) : (
-				<ItemGroup>
-					{items.map((finding) => (
-						<div key={finding.id} role="listitem">
-							<Item
-								variant="outline"
-								render={
-									<Link
-										to="/w/$workspaceSlug/admin/practices/reviews/findings/$findingId"
-										params={{ workspaceSlug, findingId: finding.id }}
-										search={scope}
-									/>
-								}
-							>
-								<ItemContent className="min-w-0">
-									<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-										{finding.title}
-									</ItemTitle>
-									<ReviewPracticeLabel area={finding.area} practiceName={finding.practiceName} />
-									{context === "target" && (
-										<span className="text-xs text-muted-foreground">
-											Observed <RelativeTime value={finding.observedAt} />
-										</span>
-									)}
-								</ItemContent>
-								<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
-									<FindingResultBadge finding={finding} />
-									<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
-								</ItemFooter>
-							</Item>
-						</div>
+				<ReviewRowList label="Observations">
+					{items.map((observation) => (
+						<ObservationRow
+							key={observation.id}
+							workspaceSlug={workspaceSlug}
+							observation={observation}
+							scope={scope}
+						/>
 					))}
-				</ItemGroup>
+				</ReviewRowList>
 			)}
 		</section>
 	);
@@ -281,7 +225,7 @@ interface SectionHeaderProps {
 	title: string;
 	to:
 		| "/w/$workspaceSlug/admin/practices/reviews/delivery"
-		| "/w/$workspaceSlug/admin/practices/reviews/findings";
+		| "/w/$workspaceSlug/admin/practices/reviews/observations";
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
 	total: number;
@@ -291,19 +235,17 @@ interface SectionHeaderProps {
 function SectionHeader({ id, title, to, workspaceSlug, scope, total, shown }: SectionHeaderProps) {
 	return (
 		<div className="flex flex-wrap items-end justify-between gap-2">
-			<div>
-				<h3 id={id} className="text-lg font-semibold">
-					{title}
-				</h3>
-			</div>
+			<h3 id={id} className="text-lg font-semibold">
+				{title}
+			</h3>
 			{total > shown && (
 				<Link
-					className="text-sm font-medium underline"
+					className="text-sm font-medium underline underline-offset-4"
 					to={to}
 					params={{ workspaceSlug }}
 					search={scope}
 				>
-					View all {total} {title.toLowerCase()}
+					See all {total} {title.toLowerCase()}
 				</Link>
 			)}
 		</div>

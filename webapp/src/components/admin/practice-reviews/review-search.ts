@@ -59,7 +59,7 @@ export const feedbackSearchSchema = z
 	})
 	.transform(canonicalDateRange);
 
-export const findingsSearchSchema = z
+export const observationsSearchSchema = z
 	.object({
 		...scope,
 		page,
@@ -78,7 +78,7 @@ export const runsSearchSchema = z.object({
 });
 
 export type FeedbackSearch = z.infer<typeof feedbackSearchSchema>;
-export type FindingsSearch = z.infer<typeof findingsSearchSchema>;
+export type ObservationsSearch = z.infer<typeof observationsSearchSchema>;
 export type RunsSearch = z.infer<typeof runsSearchSchema>;
 
 export type ReviewScopeSearch = {
@@ -127,7 +127,7 @@ export function feedbackQuery(search: FeedbackSearch, size: number) {
 	};
 }
 
-export function findingsQuery(search: FindingsSearch, size: number) {
+export function observationsQuery(search: ObservationsSearch, size: number) {
 	return {
 		...scopeQuery(search),
 		page: search.page ?? 0,

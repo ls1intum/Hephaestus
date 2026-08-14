@@ -15,18 +15,25 @@ type Story = StoryObj<typeof meta>;
 
 export const Stale: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("This result uses older review rules")).toBeVisible();
+		await expect(
+			canvas.getByText("This was judged against an older version of the practice"),
+		).toBeVisible();
 	},
 };
 
 /**
- * Two different sentences, because they answer different questions: stale means we compared and the
- * rules had moved, unknown means we could not compare.
+ * The harder of the two to word, and the one the product owner said he could not follow.
+ *
+ * "Currentness is unknown" named a property of the record; the reader's question is whether they can
+ * trust what they are reading. This says what is missing (the record of which practice text was
+ * read), why that leaves the question open, and what to do about it.
  */
 export const Unverifiable: Story = {
 	args: { currentness: "UNVERIFIABLE" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Currentness is unknown")).toBeVisible();
+		await expect(
+			canvas.getByText("We can't tell which version of the practice this was judged against"),
+		).toBeVisible();
 	},
 };
 

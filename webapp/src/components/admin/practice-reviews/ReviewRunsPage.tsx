@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon, WorkflowIcon } from "lucide-react";
+import { WorkflowIcon } from "lucide-react";
 import { useEffect, useId } from "react";
 import { listPracticeReviewsOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewRunSummary } from "@/api/types.gen";
@@ -14,7 +14,7 @@ import {
 	type ReviewStatus,
 } from "@/components/practice-vocabulary/review-status-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
-import { statusToneClass, statusValues } from "@/components/practice-vocabulary/status-def";
+import { statusValues } from "@/components/practice-vocabulary/status-def";
 import {
 	Empty,
 	EmptyDescription,
@@ -24,33 +24,16 @@ import {
 } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@/components/ui/item";
-import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import {
-	Table,
-	TableBody,
-	TableCaption,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { ReviewArtifact } from "./ReviewArtifact";
-import { FeedbackCountsSummary, FindingCountsSummary } from "./ReviewBadges";
+import { ReviewArtifactLabel } from "./ReviewArtifact";
+import { FeedbackCountsSummary, ObservationCountsSummary } from "./ReviewBadges";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
+import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
 import type { RunsSearch } from "./review-search";
 
 const PAGE_SIZE = 20;
@@ -68,22 +51,16 @@ function isReviewStatus(value: string | null): value is ReviewStatus {
 }
 
 /**
- * One status, drawn the same way in the closed trigger and in the open list — the two places a
- * reader compares. The dropdown used to be plain text while the table beside it carried coloured
- * badges, so choosing a filter meant matching a word to a tag by memory.
+ * A status in the filter is drawn as the same tag the rows wear, in the closed trigger and in the
+ * open list alike.
+ *
+ * The dropdown was plain grey text beside a table of coloured tags, so choosing a filter meant
+ * matching a word to a tag from memory; a first pass gave it the icon and the tone but left the
+ * shape different. It is the badge itself now — one component, so the two cannot come apart again.
  */
 function StatusItemLabel({ value }: { value: string }) {
-	if (!isReviewStatus(value)) return <>All statuses</>;
-	const def = REVIEW_STATUS_DEFS[value];
-	return (
-		<>
-			<def.icon
-				aria-hidden
-				className={cn("size-3.5 shrink-0", statusToneClass(def.badgeVariant))}
-			/>
-			{def.label}
-		</>
-	);
+	if (!isReviewStatus(value)) return <span className="text-muted-foreground">All statuses</span>;
+	return <StatusBadge def={REVIEW_STATUS_DEFS[value]} />;
 }
 
 export interface ReviewRunsPageProps {
@@ -179,7 +156,16 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 					</EmptyHeader>
 				</Empty>
 			) : (
-				<ReviewList workspaceSlug={workspaceSlug} reviews={reviews} search={search} />
+				<ReviewRowList label="Practice reviews, newest first">
+					{reviews.map((review) => (
+						<ReviewRunRow
+							key={review.id}
+							workspaceSlug={workspaceSlug}
+							review={review}
+							search={search}
+						/>
+					))}
+				</ReviewRowList>
 			)}
 			<TablePagination
 				page={query.data?.page?.number ?? search.page ?? 0}
@@ -197,37 +183,51 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 	);
 }
 
-function RunFindingSummary({ review }: { review: ReviewRunSummary }) {
-	if (review.status === "COMPLETED" || hasFindingOutput(review)) {
-		return <FindingCountsSummary counts={review.observations} />;
-	}
-	if (review.status === "QUEUED" || review.status === "RUNNING") {
-		return <span className="text-muted-foreground">Pending</span>;
-	}
+export interface ReviewRunRowProps {
+	workspaceSlug: string;
+	review: ReviewRunSummary;
+	search: RunsSearch;
+}
+
+/**
+ * One review: the work it read, and what it produced.
+ *
+ * <p>The row is named after the work rather than after the review, because a review has no name an
+ * operator knows — it has a UUID. The two tallies sit under it as sentences, and only when there is
+ * something true to say: a review that has not finished says so, and one that ended without output
+ * says that instead of showing four zeroes.
+ */
+export function ReviewRunRow({ workspaceSlug, review, search }: ReviewRunRowProps) {
 	return (
-		<span className="text-muted-foreground">
-			<span aria-hidden>—</span>
-			<span className="sr-only">No observations produced</span>
-		</span>
+		<ReviewRow
+			status={REVIEW_STATUS_DEFS[review.status]}
+			title={
+				<Link
+					to="/w/$workspaceSlug/admin/practices/reviews/$jobId"
+					params={{ workspaceSlug, jobId: review.id }}
+					search={{ page: search.page, status: search.status }}
+				>
+					{review.target.title}
+				</Link>
+			}
+			meta={
+				<>
+					<ReviewRowMeta
+						items={[
+							<ReviewArtifactLabel key="work" artifact={review.target} />,
+							// See `ObservationRow`: no hover target under a stretched row link.
+							<RelativeTime key="created" value={review.createdAt} tooltip={false} />,
+						]}
+					/>
+					<RunOutputSummary review={review} />
+				</>
+			}
+			chips={<StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />}
+		/>
 	);
 }
 
-function RunFeedbackSummary({ review }: { review: ReviewRunSummary }) {
-	if (review.status === "COMPLETED" || hasFeedbackOutput(review)) {
-		return <FeedbackCountsSummary counts={review.feedback} />;
-	}
-	if (review.status === "QUEUED" || review.status === "RUNNING") {
-		return <span className="text-muted-foreground">Pending</span>;
-	}
-	return (
-		<span className="text-muted-foreground">
-			<span aria-hidden>—</span>
-			<span className="sr-only">No feedback composed</span>
-		</span>
-	);
-}
-
-function hasFindingOutput(review: ReviewRunSummary) {
+function hasObservationOutput(review: ReviewRunSummary) {
 	const { strengths, problems, notApplicable, inconclusive } = review.observations;
 	return strengths + problems + notApplicable + inconclusive > 0;
 }
@@ -237,110 +237,28 @@ function hasFeedbackOutput(review: ReviewRunSummary) {
 	return delivered + failed + prepared + superseded + suppressed > 0;
 }
 
-function RunCardOutputSummary({ review }: { review: ReviewRunSummary }) {
-	const hasOutput = hasFindingOutput(review) || hasFeedbackOutput(review);
-	if (review.status === "COMPLETED" || hasOutput) {
+/**
+ * What the review produced, or why there is nothing to show.
+ *
+ * A run that is still going has an empty tally that means "not yet", and one that failed has an
+ * empty tally that means "never". Printing "No observations" for both would make the first look like
+ * a finished review that found nothing.
+ */
+function RunOutputSummary({ review }: { review: ReviewRunSummary }) {
+	if (review.status === "COMPLETED" || hasObservationOutput(review) || hasFeedbackOutput(review)) {
 		return (
 			<>
-				<FindingCountsSummary counts={review.observations} />
-				<FeedbackCountsSummary counts={review.feedback} />
+				<p>
+					<ObservationCountsSummary counts={review.observations} />
+				</p>
+				<p>
+					<FeedbackCountsSummary counts={review.feedback} prefix="Feedback:" />
+				</p>
 			</>
 		);
 	}
 	if (review.status === "QUEUED" || review.status === "RUNNING") {
-		return <span className="text-sm text-muted-foreground">Awaiting output</span>;
+		return <p>Results appear as it finishes.</p>;
 	}
-	return <span className="text-sm text-muted-foreground">No output</span>;
-}
-
-function ReviewList({
-	workspaceSlug,
-	reviews,
-	search,
-}: {
-	workspaceSlug: string;
-	reviews: ReviewRunSummary[];
-	search: RunsSearch;
-}) {
-	return (
-		<>
-			<div className="hidden xl:block">
-				<Table containerClassName="rounded-lg border">
-					<TableCaption className="sr-only">Practice reviews, newest first</TableCaption>
-					<TableHeader>
-						<TableRow>
-							<TableHead scope="col">Reviewed work</TableHead>
-							<TableHead scope="col">Status</TableHead>
-							<TableHead scope="col">Observations</TableHead>
-							<TableHead scope="col">Feedback</TableHead>
-							<TableHead scope="col" className="w-32">
-								Created
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{reviews.map((review) => (
-							<TableRow key={review.id}>
-								<TableCell className="max-w-md whitespace-normal align-top">
-									<Link
-										to="/w/$workspaceSlug/admin/practices/reviews/$jobId"
-										params={{ workspaceSlug, jobId: review.id }}
-										search={{ page: search.page, status: search.status }}
-										className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									>
-										<ReviewArtifact artifact={review.target} />
-									</Link>
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<RunFindingSummary review={review} />
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<RunFeedbackSummary review={review} />
-								</TableCell>
-								<TableCell className="align-top text-muted-foreground">
-									<RelativeTime value={review.createdAt} />
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
-			</div>
-			<ItemGroup className="xl:hidden">
-				{reviews.map((review) => (
-					<div key={review.id} role="listitem">
-						<Item
-							variant="outline"
-							render={
-								<Link
-									to="/w/$workspaceSlug/admin/practices/reviews/$jobId"
-									params={{ workspaceSlug, jobId: review.id }}
-									search={{ page: search.page, status: search.status }}
-								/>
-							}
-						>
-							<ItemContent className="min-w-0">
-								<ItemTitle className="w-full min-w-0 line-clamp-none">
-									<ReviewArtifact artifact={review.target} variant="label" display="full" />
-								</ItemTitle>
-								<ItemDescription>{review.target.title}</ItemDescription>
-								<div className="mt-1">
-									<StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />
-								</div>
-								<RunCardOutputSummary review={review} />
-								<span className="text-xs text-muted-foreground">
-									Created <RelativeTime value={review.createdAt} />
-								</span>
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden />
-							</ItemActions>
-						</Item>
-					</div>
-				))}
-			</ItemGroup>
-		</>
-	);
+	return <p>It produced nothing before it stopped.</p>;
 }

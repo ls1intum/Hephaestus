@@ -12,9 +12,10 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { KnownArtifactKind } from "@/lib/artifact-kinds";
+import { artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
+import { ReviewDetailHeader } from "./ReviewDetailHeader";
 import { ReviewOutputSections } from "./ReviewOutputSections";
 
 export interface ReviewTargetPageProps {
@@ -23,6 +24,19 @@ export interface ReviewTargetPageProps {
 	artifactId: number;
 }
 
+/** How many of each to show before the section offers a link to the full, filtered list. */
+const PREVIEW_SIZE = 5;
+
+/**
+ * Everything the reviews have said about one piece of work.
+ *
+ * <p>The header used to lead with a grey "Reviewed work" eyebrow directly under a breadcrumb reading
+ * "Practice reviews / Reviewed work", then a heading, then a sentence explaining what the page was —
+ * three lines to say one thing, which is the duplication the product owner asked for a sweep of. The
+ * kind of work is now carried by the link's own mark and words (`ls1intum/Hephaestus · PR #1423`,
+ * under a GitHub or GitLab glyph), which is a fact about *this* work rather than a label for the
+ * page.
+ */
 export function ReviewTargetPage({
 	workspaceSlug,
 	artifactKind,
@@ -32,64 +46,59 @@ export function ReviewTargetPage({
 	const feedbackQuery = useQuery({
 		...listPracticeReviewFeedbackOptions({
 			path: { workspaceSlug },
-			query: { ...scope, size: 5 },
+			query: { ...scope, size: PREVIEW_SIZE },
 		}),
 	});
-	const findingsQuery = useQuery({
+	const observationsQuery = useQuery({
 		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
-			query: { ...scope, size: 5 },
+			query: { ...scope, size: PREVIEW_SIZE },
 		}),
 	});
 	const feedback = feedbackQuery.data?.content ?? [];
-	const findings = findingsQuery.data?.content ?? [];
-	const artifact = feedback[0]?.artifact ?? findings[0]?.artifact;
+	const observations = observationsQuery.data?.content ?? [];
+	const artifact = feedback[0]?.artifact ?? observations[0]?.artifact;
+	const stillLoading = feedbackQuery.isLoading || observationsQuery.isLoading;
 	const noOutput =
-		!feedbackQuery.isLoading &&
-		!findingsQuery.isLoading &&
+		!stillLoading &&
 		!feedbackQuery.isError &&
-		!findingsQuery.isError &&
+		!observationsQuery.isError &&
 		feedback.length === 0 &&
-		findings.length === 0;
+		observations.length === 0;
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
-			<ReviewBreadcrumbs workspaceSlug={workspaceSlug} current="Reviewed work" />
+			<ReviewBreadcrumbs workspaceSlug={workspaceSlug} />
 			{noOutput ? (
 				<Empty className="border">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
 							<FileQuestionIcon />
 						</EmptyMedia>
-						<EmptyTitle>No review output found</EmptyTitle>
+						<EmptyTitle>Nothing has been reviewed on this work</EmptyTitle>
 						<EmptyDescription>
-							No observations or feedback are recorded for this work.
+							No observations or feedback are recorded against it. Either no review has run, or the
+							practices in this workspace do not apply to{" "}
+							{artifactKindLabel(artifactKind).toLowerCase()}s.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			) : (
 				<>
-					<header className="space-y-3">
-						<div className="space-y-1">
-							<p className="text-sm font-medium text-muted-foreground">Reviewed work</p>
-							{!artifact && (feedbackQuery.isLoading || findingsQuery.isLoading) ? (
+					<ReviewDetailHeader
+						title={
+							!artifact && stillLoading ? (
 								<Skeleton className="h-8 w-72 max-w-full" />
 							) : (
-								<h2 className="break-words text-2xl font-semibold tracking-tight">
-									{artifact?.title ?? "Review output"}
-								</h2>
-							)}
-							<p className="text-sm text-muted-foreground">
-								Observations and feedback recorded across reviews of this work.
-							</p>
-						</div>
-						{artifact && <ReviewArtifactLink artifact={artifact} variant="label" display="full" />}
-					</header>
+								(artifact?.title ?? artifactKindLabel(artifactKind))
+							)
+						}
+						provenance={artifact && <ReviewArtifactLink artifact={artifact} className="text-sm" />}
+					/>
 
 					<ReviewOutputSections
 						workspaceSlug={workspaceSlug}
 						scope={scope}
-						context="target"
 						feedback={
 							feedbackQuery.isLoading
 								? { status: "loading" }
@@ -105,19 +114,19 @@ export function ReviewTargetPage({
 											total: feedbackQuery.data?.page?.totalElements ?? 0,
 										}
 						}
-						findings={
-							findingsQuery.isLoading
+						observations={
+							observationsQuery.isLoading
 								? { status: "loading" }
-								: findingsQuery.isError
+								: observationsQuery.isError
 									? {
 											status: "error",
-											error: findingsQuery.error,
-											onRetry: () => void findingsQuery.refetch(),
+											error: observationsQuery.error,
+											onRetry: () => void observationsQuery.refetch(),
 										}
 									: {
 											status: "ready",
-											items: findings,
-											total: findingsQuery.data?.page?.totalElements ?? 0,
+											items: observations,
+											total: observationsQuery.data?.page?.totalElements ?? 0,
 										}
 						}
 					/>

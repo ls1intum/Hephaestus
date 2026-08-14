@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { feedbackQuery, feedbackSearchSchema, findingsSearchSchema } from "./review-search";
+import { feedbackQuery, feedbackSearchSchema, observationsSearchSchema } from "./review-search";
 
 describe("practice review search", () => {
 	it("canonicalizes invalid URL filters", () => {
@@ -9,7 +9,7 @@ describe("practice review search", () => {
 			from: "not-a-date",
 			page: -4,
 		});
-		const findings = findingsSearchSchema.parse({
+		const findings = observationsSearchSchema.parse({
 			assessment: ["GOOD", "GOOD", "unknown"],
 			severity: "MAJOR",
 			from: "2026-08-10",

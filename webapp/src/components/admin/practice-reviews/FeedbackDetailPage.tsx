@@ -3,28 +3,33 @@ import { Link } from "@tanstack/react-router";
 import { ScanSearchIcon } from "lucide-react";
 import { getPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewPlacement } from "@/api/types.gen";
-import { DetailRow } from "@/components/common/DetailRow";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { RelativeTime } from "@/components/common/RelativeTime";
 import { DeliveryTrace } from "@/components/practice-vocabulary/DeliveryTrace";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { observationResult } from "@/components/practice-vocabulary/observation-result";
 import { PLACEMENT_DEFS } from "@/components/practice-vocabulary/placement-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import {
-	Accordion,
-	AccordionContent,
-	AccordionItem,
-	AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemContent, ItemFooter, ItemGroup, ItemTitle } from "@/components/ui/item";
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { FeedbackMessage } from "./FeedbackMessage";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
-import { ClaimCurrentnessBadge, FindingResultBadge } from "./ReviewBadges";
+import { ClaimCurrentnessBadge, ObservationResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
+import {
+	ReviewDetailHeader,
+	ReviewFact,
+	ReviewFactGrid,
+	ReviewProvenanceLine,
+} from "./ReviewDetailHeader";
 import { ReviewPerson } from "./ReviewPerson";
-import { ReviewPracticeLabel } from "./ReviewPracticeLabel";
-import { ReviewTechnicalDetails } from "./ReviewTechnicalDetails";
+import { ReviewPracticeLink } from "./ReviewPracticeLink";
+import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
 import { subjectLabel } from "./review-format";
 import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 
@@ -51,7 +56,6 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 					/>
 				),
 			}}
-			current="Feedback"
 		/>
 	);
 
@@ -82,31 +86,40 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 	const artifactSlug = feedback.artifact
 		? reviewArtifactTypeSlug(feedback.artifact.type)
 		: undefined;
+	const anchoredPlacements = feedback.placements.filter((placement) => placement.anchorPath);
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{breadcrumbs}
-			<header className="space-y-4">
-				<div className="space-y-1">
-					<h2 className="break-words text-2xl font-semibold tracking-tight">
-						Feedback for {subjectLabel(feedback.recipient)}
-					</h2>
-					<p className="text-sm text-muted-foreground">
-						Composed <RelativeTime value={feedback.createdAt} />
-					</p>
-				</div>
-				<div className="grid gap-3 lg:grid-cols-2">
-					{subjectDiffers && (
-						<div className="space-y-2">
-							<ReviewPerson person={feedback.recipient} prefix="To" display="full" />
-							<ReviewPerson person={feedback.subject} prefix="About" display="full" />
-						</div>
-					)}
-					<div className="min-w-0 space-y-2">
-						<ReviewArtifactLink artifact={feedback.artifact} display="full" />
+			<ReviewDetailHeader
+				chips={<StatusBadge def={deliveryOutcome(feedback)} />}
+				title={`Feedback for ${subjectLabel(feedback.recipient)}`}
+				provenance={
+					<ReviewProvenanceLine
+						workspaceSlug={workspaceSlug}
+						agentJobId={feedback.agentJobId}
+						verb="Composed"
+						at={feedback.createdAt}
+					/>
+				}
+			/>
+
+			<ReviewFactGrid>
+				<ReviewFact label={subjectDiffers ? "Addressed to" : "Developer"}>
+					<div className="space-y-1">
+						<ReviewPerson person={feedback.recipient} />
+						{subjectDiffers && <ReviewPerson person={feedback.subject} prefix="About" />}
+					</div>
+				</ReviewFact>
+				<ReviewFact label="Reviewed work">
+					<div className="space-y-1">
+						<ReviewArtifactLink artifact={feedback.artifact} />
+						{feedback.artifact && (
+							<p className="break-words text-muted-foreground">{feedback.artifact.title}</p>
+						)}
 						{feedback.artifact && artifactSlug && (
 							<Link
-								className="text-xs font-medium underline"
+								className="font-medium underline underline-offset-4"
 								to="/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId"
 								params={{
 									workspaceSlug,
@@ -114,38 +127,58 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 									artifactId: String(feedback.artifact.id),
 								}}
 							>
-								View all observations and feedback for this work
+								See everything reviewed on this work
 							</Link>
 						)}
 					</div>
-				</div>
-			</header>
+				</ReviewFact>
+			</ReviewFactGrid>
 
 			<section aria-labelledby="feedback-body-heading" className="space-y-3">
 				<h3 id="feedback-body-heading" className="text-lg font-semibold">
-					Feedback
+					What it says
 				</h3>
 				<FeedbackMessage feedback={feedback} />
-				{feedback.body && (
-					<Accordion aria-label="Feedback source">
-						<AccordionItem value="source">
-							<AccordionTrigger>View Markdown source</AccordionTrigger>
-							<AccordionContent>
-								<pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 text-xs">
-									{feedback.body}
-								</pre>
-							</AccordionContent>
-						</AccordionItem>
-					</Accordion>
+			</section>
+
+			<section aria-labelledby="delivery-heading" className="space-y-3">
+				<h3 id="delivery-heading" className="text-lg font-semibold">
+					What became of it
+				</h3>
+				<DeliveryTrace feedback={feedback} />
+				{anchoredPlacements.length > 0 && (
+					<div className="space-y-1 rounded-lg border p-3">
+						<p className="text-sm font-medium">Where it was anchored</p>
+						<ul className="space-y-1">
+							{anchoredPlacements.map((placement) => (
+								<li key={placement.id} className="text-sm text-muted-foreground">
+									<span>{PLACEMENT_DEFS[placement.placementType].label}: </span>
+									<code className="break-all">{anchorLabel(placement)}</code>
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+				{feedback.replacesId && (
+					<p className="text-sm text-muted-foreground">
+						{/* The one identifier worth keeping from the old Technical details drawer, because it
+						    is a link and not a label — the earlier feedback this one took the place of. */}
+						<Link
+							to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
+							params={{ workspaceSlug, feedbackId: feedback.replacesId }}
+							search={reviewScopeSearch(search)}
+							className="font-medium text-foreground underline underline-offset-4"
+						>
+							See the feedback this replaced
+						</Link>
+					</p>
 				)}
 			</section>
 
 			<section aria-labelledby="source-observations-heading" className="space-y-3">
-				<div>
-					<h3 id="source-observations-heading" className="text-lg font-semibold">
-						Observations behind this feedback
-					</h3>
-				</div>
+				<h3 id="source-observations-heading" className="text-lg font-semibold">
+					What it was based on
+				</h3>
 				{feedback.observations.length === 0 ? (
 					<Empty className="border">
 						<EmptyHeader>
@@ -153,92 +186,54 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 								<ScanSearchIcon />
 							</EmptyMedia>
 							<EmptyTitle>No observations are linked to this feedback</EmptyTitle>
+							<EmptyDescription>
+								The observations behind it were not recorded, so there is nothing to check it
+								against.
+							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
 				) : (
-					<ItemGroup>
+					<ReviewRowList label="Observations behind this feedback">
 						{feedback.observations.map((observation) => (
-							<div key={observation.observationId} role="listitem">
-								<Item
-									variant="outline"
-									render={
-										<Link
-											to="/w/$workspaceSlug/admin/practices/reviews/findings/$findingId"
-											params={{ workspaceSlug, findingId: observation.observationId }}
-											search={reviewScopeSearch(search)}
-										/>
-									}
-								>
-									<ItemContent className="min-w-0">
-										<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-											{observation.title}
-										</ItemTitle>
-										<ReviewPracticeLabel
-											area={observation.area}
-											practiceName={observation.practiceName}
-										/>
-									</ItemContent>
-									<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
-										<Badge variant="outline">
-											{observation.role === "PRIMARY"
-												? "Main observation"
-												: "Supporting observation"}
-										</Badge>
-										<FindingResultBadge finding={observation} />
+							<ReviewRow
+								key={observation.observationId}
+								status={observationResult(observation)}
+								title={
+									<Link
+										to="/w/$workspaceSlug/admin/practices/reviews/observations/$observationId"
+										params={{ workspaceSlug, observationId: observation.observationId }}
+										search={reviewScopeSearch(search)}
+									>
+										{observation.title}
+									</Link>
+								}
+								meta={
+									<ReviewRowMeta
+										items={[
+											<ReviewPracticeLink
+												key="practice"
+												workspaceSlug={workspaceSlug}
+												practiceSlug={observation.practiceSlug}
+												practiceName={observation.practiceName}
+												area={observation.area}
+											/>,
+											observation.role === "PRIMARY"
+												? "What this feedback is about"
+												: "Supporting this feedback",
+										]}
+									/>
+								}
+								chips={
+									<>
+										<ObservationResultBadge observation={observation} />
 										<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
-									</ItemFooter>
-								</Item>
-							</div>
+									</>
+								}
+							/>
 						))}
-					</ItemGroup>
+					</ReviewRowList>
 				)}
 			</section>
-
-			<section aria-labelledby="delivery-location-heading" className="space-y-3">
-				<h3 id="delivery-location-heading" className="text-lg font-semibold">
-					Delivery
-				</h3>
-				<DeliveryTrace feedback={feedback} />
-				{feedback.placements.some((placement) => placement.anchorPath) && (
-					<dl className="divide-y border-t">
-						{feedback.placements.map((placement) =>
-							placement.anchorPath ? (
-								<DetailRow key={placement.id} label={PLACEMENT_DEFS[placement.placementType].label}>
-									<code className="break-all">{anchorLabel(placement)}</code>
-								</DetailRow>
-							) : null,
-						)}
-					</dl>
-				)}
-			</section>
-
-			<ReviewTechnicalDetails>
-				<dl className="divide-y">
-					<DetailRow label="Feedback ID">
-						<code>{feedback.id}</code>
-					</DetailRow>
-					<DetailRow label="Review">
-						<Link
-							className="underline"
-							to="/w/$workspaceSlug/admin/practices/reviews/$jobId"
-							params={{ workspaceSlug, jobId: feedback.agentJobId }}
-						>
-							{feedback.agentJobId}
-						</Link>
-					</DetailRow>
-					<DetailRow label="Subject">{subjectLabel(feedback.subject)}</DetailRow>
-					{feedback.replacesId && (
-						<DetailRow label="Replaces">
-							<code>{feedback.replacesId}</code>
-						</DetailRow>
-					)}
-					{feedback.threadKey && (
-						<DetailRow label="Continuity key">
-							<code>{feedback.threadKey}</code>
-						</DetailRow>
-					)}
-				</dl>
-			</ReviewTechnicalDetails>
 		</article>
 	);
 }
